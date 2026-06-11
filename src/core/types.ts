@@ -73,6 +73,8 @@ export interface Tile {
   elevation: Elevation;
   feature: string | null; // FeatureId
   resource: string | null; // resource id from data/resources
+  /** Natural wonder id occupying this tile, or null. */
+  wonder: string | null;
   /** 6-bit mask; bit d set = river runs along the edge toward neighbor direction d. */
   riverMask: number;
   improvement: string | null; // ImprovementId
@@ -103,6 +105,10 @@ export interface City {
   population: number;
   /** Accumulated food toward next citizen. */
   foodBox: number;
+  /** Accumulated culture toward the next border expansion. */
+  cultureBox: number;
+  /** Tiles gained beyond the initial ring (drives expansion cost). */
+  tilesAcquired: number;
   /** Tile indexes the player forced to be worked. */
   lockedTiles: number[];
   focus: FocusId;
@@ -114,17 +120,36 @@ export interface City {
   districts: { type: DistrictId; tileIndex: number }[];
 }
 
+/** Empire research progress (one tech + one civic at a time, like Civ 6). */
+export interface ResearchState {
+  tech: string | null;
+  techProgress: number;
+  civic: string | null;
+  civicProgress: number;
+  techs: string[];
+  civics: string[];
+}
+
+/** Current government and slotted policy cards (null = empty slot). */
+export interface GovernmentState {
+  current: string | null;
+  /** One entry per slot, ordered as the government's slot list. */
+  policies: (string | null)[];
+}
+
 export interface GameState {
   map: GameMap;
   cities: City[];
   nextCityId: number;
   turn: number;
-  /** Sandbox: districts/buildings complete instantly and cost nothing. */
+  /** Sandbox: districts/buildings complete instantly, cost nothing, and ignore tech gating. */
   sandbox: boolean;
   treasury: number;
   scienceTotal: number;
   cultureTotal: number;
   faithTotal: number;
+  research: ResearchState;
+  government: GovernmentState;
 }
 
 export interface MapGenOptions {
@@ -134,6 +159,7 @@ export interface MapGenOptions {
   /** Approximate fraction of land tiles. */
   landFraction?: number;
   withResources?: boolean;
+  withWonders?: boolean;
 }
 
 export interface YieldBreakdown {

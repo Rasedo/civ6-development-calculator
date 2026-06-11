@@ -1,34 +1,35 @@
 import { describe, it, expect } from 'vitest';
 import { tileYields, districtAdjacency } from '../src/core/yields';
-import { makeMap, makeState, tileAtCoords } from './helpers';
+import { makeMap, makeState, tileAtCoords, bareCtx } from './helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
 import { DIR_E } from '../src/core/hex';
 
 describe('tile yields', () => {
   const map = makeMap();
+  const ctx = bareCtx(map);
 
   it('matches base Civ 6 terrain values', () => {
     const t = tileAtCoords(map, 1, 1);
 
     t.terrain = 'GRASSLAND';
-    expect(tileYields(t)).toMatchObject({ food: 2, production: 0, gold: 0 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 2, production: 0, gold: 0 });
 
     t.terrain = 'PLAINS';
     t.elevation = 'HILLS';
-    expect(tileYields(t)).toMatchObject({ food: 1, production: 2 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 1, production: 2 });
 
     t.elevation = 'FLAT';
     t.terrain = 'COAST';
-    expect(tileYields(t)).toMatchObject({ food: 1, gold: 1 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 1, gold: 1 });
 
     t.terrain = 'GRASSLAND';
     t.feature = 'WOODS';
-    expect(tileYields(t)).toMatchObject({ food: 2, production: 1 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 2, production: 1 });
 
     t.feature = 'FLOODPLAINS';
     t.terrain = 'DESERT';
-    expect(tileYields(t)).toMatchObject({ food: 3, production: 0 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 3, production: 0 });
 
     t.feature = null;
   });
@@ -36,7 +37,7 @@ describe('tile yields', () => {
   it('mountains yield nothing', () => {
     const t = tileAtCoords(map, 2, 2);
     t.elevation = 'MOUNTAIN';
-    expect(tileYields(t)).toMatchObject({ food: 0, production: 0 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 0, production: 0 });
     t.elevation = 'FLAT';
   });
 
@@ -46,7 +47,7 @@ describe('tile yields', () => {
     t.resource = 'WHEAT';
     t.improvement = 'FARM';
     // plains 1F1P + wheat 1F + farm 1F
-    expect(tileYields(t)).toMatchObject({ food: 3, production: 1 });
+    expect(tileYields(ctx, t)).toMatchObject({ food: 3, production: 1 });
     t.resource = null;
     t.improvement = null;
     t.terrain = 'GRASSLAND';

@@ -11,6 +11,7 @@ export type AdjacencySource =
   | 'RAINFOREST' // per adjacent rainforest
   | 'WOODS' // per adjacent woods
   | 'REEF' // per adjacent reef
+  | 'NATURAL_WONDER' // per adjacent natural wonder tile
   | 'RIVER' // flat bonus if the district tile touches a river
   | 'DISTRICT' // per adjacent completed district (any type)
   | 'CITY_CENTER' // per adjacent city center
@@ -92,6 +93,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     allowMultiple: false,
     adjacencyYield: 'faith',
     adjacency: [
+      { source: 'NATURAL_WONDER', amount: 2 },
       { source: 'MOUNTAIN', amount: 1 },
       { source: 'WOODS', amount: 0.5 },
       { source: 'DISTRICT', amount: 0.5 },

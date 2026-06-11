@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords } from './helpers';
+import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -46,7 +46,7 @@ describe('rule formulas', () => {
 });
 
 describe('founding cities', () => {
-  it('claims a 3-ring territory and grants the capital a palace', () => {
+  it('claims center + first ring and grants the capital a palace', () => {
     const state = makeState(makeMap(16, 16));
     const center = tileAtCoords(state.map, 8, 8);
     const r = foundCity(state, center.index);
@@ -57,24 +57,26 @@ describe('founding cities', () => {
     expect(center.district).toBe('CITY_CENTER');
     expect(center.districtComplete).toBe(true);
     const owned = state.map.tiles.filter((t) => t.cityId === city.id);
-    expect(owned.length).toBe(37); // 1 + 6 + 12 + 18
+    expect(owned.length).toBe(7); // Civ 6: ring 1 only; the rest comes from culture
   });
 
   it('enforces minimum city distance but not own-territory', () => {
     const state = makeState(makeMap(20, 20));
-    foundCity(state, tileAtCoords(state.map, 8, 8).index);
+    const a = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
+    expandBorders(state, a, 3);
     expect(canFoundCity(state, tileAtCoords(state.map, 10, 8).index).ok).toBe(false); // dist 2
     expect(canFoundCity(state, tileAtCoords(state.map, 11, 8).index).ok).toBe(true); // dist 3, owned by first city
   });
 
-  it('never steals already-claimed tiles (nearest-founder keeps them)', () => {
+  it('never steals already-claimed tiles', () => {
     const state = makeState(makeMap(20, 20));
     const a = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
-    const between = tileAtCoords(state.map, 10, 8); // dist 2 from A
-    expect(between.cityId).toBe(a.id);
-    const b = foundCity(state, tileAtCoords(state.map, 12, 8).index).city!;
-    expect(between.cityId).toBe(a.id); // still A's
-    expect(tileAtCoords(state.map, 13, 8).cityId).toBe(b.id);
+    const ring1 = tileAtCoords(state.map, 9, 8);
+    expect(ring1.cityId).toBe(a.id);
+    const b = foundCity(state, tileAtCoords(state.map, 11, 8).index).city!;
+    expect(ring1.cityId).toBe(a.id); // still A's
+    expect(tileAtCoords(state.map, 12, 8).cityId).toBe(b.id);
+    expect(tileAtCoords(state.map, 10, 8).cityId).toBe(b.id); // unowned gap goes to B's first ring
   });
 
   it('rejects water, mountains and oases', () => {
@@ -94,7 +96,7 @@ describe('citizens and growth', () => {
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
     expect(assignWorkedTiles(state, city).length).toBe(1);
 
-    const mediocre = tileAtCoords(state.map, 8, 6); // plain grassland, would not win on score
+    const mediocre = tileAtCoords(state.map, 7, 8); // plain grassland, would not win on score
     const better = tileAtCoords(state.map, 9, 8);
     better.elevation = 'HILLS'; // 2F1P beats 2F
     expect(assignWorkedTiles(state, city)).toContain(better.index);
@@ -141,9 +143,11 @@ describe('districts and buildings', () => {
     expect(city.queue.length).toBe(0);
   });
 
-  it('district completes after enough production', () => {
+  it('district requires research outside sandbox and completes after enough production', () => {
     const { state, city } = settled();
     const spot = tileAtCoords(state.map, 9, 8);
+    expect(queueDistrict(state, city.id, 'CAMPUS', spot.index).ok).toBe(false); // Writing missing
+    grantTechs(state, 'WRITING');
     expect(queueDistrict(state, city.id, 'CAMPUS', spot.index).ok).toBe(true);
     expect(spot.districtComplete).toBe(false);
     const prod = computeCityStats(state, city).total.production;
@@ -174,6 +178,7 @@ describe('districts and buildings', () => {
   it('encampment cannot touch the city center', () => {
     const { state, city } = settled();
     state.sandbox = true;
+    expandBorders(state, city, 2);
     expect(canPlaceDistrict(state, city, 'ENCAMPMENT', tileAtCoords(state.map, 9, 8).index).ok).toBe(false);
     expect(canPlaceDistrict(state, city, 'ENCAMPMENT', tileAtCoords(state.map, 10, 8).index).ok).toBe(true);
   });

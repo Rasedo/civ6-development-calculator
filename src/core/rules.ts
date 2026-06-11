@@ -1,11 +1,13 @@
 /**
  * Placement validation: city sites, improvements, features, districts,
- * buildings. Every rule returns a reason so the UI can explain refusals.
+ * buildings — including tech/civic gating (bypassed in sandbox mode).
+ * Every rule returns a reason so the UI can explain refusals.
  */
 
 import type { City, DistrictId, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors } from './hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from './query';
+import { computeUnlocks, type Unlocks } from './effects';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -20,12 +22,18 @@ export interface RuleResult {
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
+/** Sandbox ignores research gating entirely. */
+function gates(state: GameState): Unlocks | null {
+  return state.sandbox ? null : computeUnlocks(state);
+}
+
 // ---------------------------------------------------------------------------
 
 export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
   const tile = state.map.tiles[tileIndex];
   if (isWater(tile)) return no('Cities must be founded on land.');
   if (isImpassable(tile)) return no('Impassable terrain.');
+  if (tile.wonder) return no('Cannot settle on a natural wonder.');
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
   if (tile.district) return no('Tile already occupied.');
   for (const c of state.cities) {
@@ -39,35 +47,41 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
 
 // ---------------------------------------------------------------------------
 
-/** Improvements that may be built on this tile right now. */
-export function validImprovements(_state: GameState, tile: Tile): ImprovementId[] {
+/** Improvements that may be built on this tile right now (research-gated). */
+export function validImprovements(state: GameState, tile: Tile): ImprovementId[] {
   if (tile.cityId === -1) return []; // must be inside your borders
-  if (tile.district || isImpassable(tile)) return [];
+  if (tile.district || tile.wonder || isImpassable(tile)) return [];
+
+  const unlocks = gates(state);
+  const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);
 
   if (tile.resource) {
     // A tile with a resource only accepts the improvement that works it.
-    return [RESOURCES[tile.resource].improvement];
+    const imp = RESOURCES[tile.resource].improvement;
+    return unlocked(imp) ? [imp] : [];
   }
   if (isWater(tile)) return [];
 
   const out: ImprovementId[] = [];
   const flat = tile.elevation === 'FLAT';
   const hills = tile.elevation === 'HILLS';
+  const hillFarmsOk = !unlocks || unlocks.hillFarms;
 
   if (
-    (tile.feature === null &&
+    unlocked('FARM') &&
+    ((tile.feature === null &&
       (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS') &&
-      (flat || hills)) ||
-    tile.feature === 'FLOODPLAINS'
+      (flat || (hills && hillFarmsOk))) ||
+      tile.feature === 'FLOODPLAINS')
   ) {
     out.push('FARM');
   }
-  if (hills && tile.feature === null) out.push('MINE');
-  if (tile.feature === 'WOODS') out.push('LUMBER_MILL');
+  if (unlocked('MINE') && hills && tile.feature === null) out.push('MINE');
+  if (unlocked('LUMBER_MILL') && tile.feature === 'WOODS') out.push('LUMBER_MILL');
   return out;
 }
 
-export function canRemoveFeature(tile: Tile): RuleResult {
+export function canRemoveFeature(state: GameState, tile: Tile): RuleResult {
   if (!tile.feature) return no('No feature here.');
   const def = FEATURES[tile.feature];
   if (!def.removable) return no(`${def.name} cannot be removed.`);
@@ -76,6 +90,10 @@ export function canRemoveFeature(tile: Tile): RuleResult {
     if (res.requiresFeature?.includes(tile.feature)) {
       return no(`${res.name} depends on the ${def.name}.`);
     }
+  }
+  const unlocks = gates(state);
+  if (unlocks && !unlocks.featureRemovals.has(tile.feature)) {
+    return no(`Removing ${def.name} requires further research.`);
   }
   return ok;
 }
@@ -93,11 +111,17 @@ export function canPlaceDistrict(
   const tile = map.tiles[tileIndex];
   const center = map.tiles[city.centerIndex];
 
+  const unlocks = gates(state);
+  if (unlocks && type !== 'CITY_CENTER' && !unlocks.districts.has(type)) {
+    return no(`${def.name} requires research.`);
+  }
+
   if (tile.cityId !== city.id) return no('Tile not owned by this city.');
   const dist = hexDistance(center.col, center.row, tile.col, tile.row);
   if (dist === 0) return no('City center occupies this tile.');
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
   if (tile.district) return no('Another district is here.');
+  if (tile.wonder) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (tile.feature === 'FLOODPLAINS') return no('Districts cannot be built on floodplains.');
   if (tile.feature === 'OASIS') return no('Districts cannot be built on an oasis.');
@@ -157,9 +181,10 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
 
 // ---------------------------------------------------------------------------
 
-/** Buildings the city could queue right now. */
+/** Buildings the city could queue right now (research-gated). */
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   const map = state.map;
+  const unlocks = gates(state);
   const completed = new Set(
     city.districts.filter((d) => map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
   );
@@ -173,6 +198,7 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   for (const type of completed) {
     for (const def of buildingsForDistrict(type)) {
       if (have.has(def.id) || queued.has(def.id)) continue;
+      if (unlocks && !unlocks.buildings.has(def.id)) continue;
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r))) continue;
       if (def.exclusiveWith?.some((x) => have.has(x) || queued.has(x))) continue;
       if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;

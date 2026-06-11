@@ -1,6 +1,8 @@
 /** Shared test fixtures: small synthetic maps with uniform terrain. */
 
-import type { GameMap, GameState, TerrainId, Tile } from '../src/core/types';
+import type { City, GameMap, GameState, TerrainId, Tile } from '../src/core/types';
+import { tilesWithin } from '../src/core/hex';
+import { defaultModifiers, type YieldCtx } from '../src/core/effects';
 
 export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND'): GameMap {
   const tiles: Tile[] = [];
@@ -14,6 +16,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         elevation: 'FLAT',
         feature: null,
         resource: null,
+        wonder: null,
         riverMask: 0,
         improvement: null,
         district: null,
@@ -36,9 +39,38 @@ export function makeState(map: GameMap = makeMap()): GameState {
     scienceTotal: 0,
     cultureTotal: 0,
     faithTotal: 0,
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] },
+    government: { current: null, policies: [] },
   };
 }
 
 export function tileAtCoords(map: GameMap, col: number, row: number): Tile {
   return map.tiles[row * map.width + col];
+}
+
+/** Bare yield context for map-only tests (no research, no policies). */
+export function bareCtx(map: GameMap): YieldCtx {
+  return { map, mods: defaultModifiers() };
+}
+
+/** Mark techs as researched without paying for them. */
+export function grantTechs(state: GameState, ...ids: string[]): void {
+  for (const id of ids) {
+    if (!state.research.techs.includes(id)) state.research.techs.push(id);
+  }
+}
+
+/** Mark civics as researched without paying for them. */
+export function grantCivics(state: GameState, ...ids: string[]): void {
+  for (const id of ids) {
+    if (!state.research.civics.includes(id)) state.research.civics.push(id);
+  }
+}
+
+/** Instantly claim all unowned tiles within `radius` of the city center. */
+export function expandBorders(state: GameState, city: City, radius: number): void {
+  const center = state.map.tiles[city.centerIndex];
+  for (const t of tilesWithin(state.map, center.col, center.row, radius)) {
+    if (t.cityId === -1) t.cityId = city.id;
+  }
 }

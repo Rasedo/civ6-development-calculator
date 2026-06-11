@@ -22,6 +22,8 @@ import {
 } from './hex';
 import type { GameMap, MapGenOptions, TerrainId, Tile } from './types';
 import { RESOURCES, type ResourceDef } from '../data/resources';
+import { TERRAINS } from '../data/terrains';
+import { WONDERS, wonderQuota, type NaturalWonderDef } from '../data/wonders';
 
 export function generateMap(opts: MapGenOptions): GameMap {
   const width = opts.width;
@@ -41,6 +43,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
         elevation: 'FLAT',
         feature: null,
         resource: null,
+        wonder: null,
         riverMask: 0,
         improvement: null,
         district: null,
@@ -199,12 +202,92 @@ export function generateMap(opts: MapGenOptions): GameMap {
     }
   }
 
-  // --- 7. Resources --------------------------------------------------------------
+  // --- 7. Natural wonders ----------------------------------------------------------
+  if (opts.withWonders ?? true) {
+    placeWonders(map, deriveSeed(seed, 'wonders'));
+  }
+
+  // --- 8. Resources --------------------------------------------------------------
   if (withResources) {
     placeResources(map, deriveSeed(seed, 'resources'));
   }
 
   return map;
+}
+
+// ---------------------------------------------------------------------------
+
+function wonderTileValid(
+  map: GameMap,
+  t: Tile,
+  def: NaturalWonderDef,
+  latOf: (row: number) => number,
+  isAnchor: boolean,
+): boolean {
+  if (t.wonder) return false;
+  if (t.col < 2 || t.row < 2 || t.col >= map.width - 2 || t.row >= map.height - 2) return false;
+  if (isAnchor) {
+    const lat = latOf(t.row);
+    if (def.spawn.minLat !== undefined && lat < def.spawn.minLat) return false;
+    if (def.spawn.maxLat !== undefined && lat > def.spawn.maxLat) return false;
+  }
+  if (def.spawn.water) {
+    return t.terrain === 'COAST' && t.feature !== 'ICE';
+  }
+  if (TERRAINS[t.terrain].water || t.elevation === 'MOUNTAIN') return false;
+  if (isAnchor && def.spawn.terrains && !def.spawn.terrains.includes(t.terrain)) return false;
+  if (
+    isAnchor &&
+    def.spawn.inland &&
+    neighbors(map, t).some((n) => n.terrain === 'COAST' || n.terrain === 'OCEAN')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function placeWonders(map: GameMap, seed: number): void {
+  const rng = mulberry32(seed);
+  const quota = wonderQuota(map.width, map.height);
+  const half = (map.height - 1) / 2;
+  const latOf = (row: number) => Math.abs(row - half) / half;
+  const placedTiles: Tile[] = [];
+  let placedCount = 0;
+
+  for (const def of shuffle(rng, Object.values(WONDERS))) {
+    if (placedCount >= quota) break;
+    const anchors = shuffle(
+      rng,
+      map.tiles.filter((t) => wonderTileValid(map, t, def, latOf, true)),
+    );
+    for (const anchor of anchors) {
+      const tiles: Tile[] = [anchor];
+      for (const n of neighbors(map, anchor)) {
+        if (tiles.length >= def.size) break;
+        if (wonderTileValid(map, n, def, latOf, false)) tiles.push(n);
+      }
+      if (tiles.length < def.size) continue;
+      if (
+        placedTiles.some((p) =>
+          tiles.some((t) => hexDistance(p.col, p.row, t.col, t.row) < 6),
+        )
+      ) {
+        continue;
+      }
+      for (const t of tiles) {
+        t.wonder = def.id;
+        t.feature = null;
+        t.resource = null;
+        if (def.becomesTerrain) {
+          t.terrain = def.becomesTerrain;
+          t.elevation = 'FLAT';
+        }
+      }
+      placedTiles.push(...tiles);
+      placedCount++;
+      break;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +414,7 @@ function placeResources(map: GameMap, seed: number): void {
   for (const t of order) {
     if (quota <= 0) break;
     if (t.terrain === 'OCEAN') continue;
-    if (t.elevation === 'MOUNTAIN') continue;
+    if (t.elevation === 'MOUNTAIN' || t.wonder) continue;
     if (t.feature === 'ICE' || t.feature === 'OASIS') continue;
     if (neighbors(map, t).some((n) => n.resource)) continue;
 

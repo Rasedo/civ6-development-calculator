@@ -118,6 +118,37 @@ button.active { background: var(--accent); color: #1a1408; border-color: var(--a
 .chip-strategic { border-color: #c97a4a; }
 .chip-bonus { border-color: #7c9468; }
 .chip-river { border-color: #4f9fe8; color: #9cc8f0; }
+.chip-wonder { border-color: #ffe9a8; color: #ffe9a8; }
+
+.research-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.research-row.done { opacity: 0.55; }
+.research-row.current { background: rgba(95, 168, 232, 0.12); border-left: 2px solid var(--science); }
+.research-row.locked { opacity: 0.7; }
+
+.slot-row {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.slot-kind {
+  display: inline-block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-bottom: 3px;
+}
+.slot-military { background: #5a2f2f; }
+.slot-economic { background: #5a512f; }
+.slot-diplomatic { background: #2f4a5a; }
+.slot-wildcard { background: #4a2f5a; }
 
 .statgrid {
   display: grid;

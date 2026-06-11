@@ -9,11 +9,15 @@ import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { generateMap } from '../src/core/mapgen';
 import { makePreviewPng } from './png';
-import { createGame, foundCity, placeImprovement, queueDistrict, queueBuilding, endTurn } from '../src/core/game';
+import { createGame, foundCity, placeImprovement, queueDistrict, queueBuilding, endTurn, setTechResearch } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
 import { validImprovements, districtPlacementTiles } from '../src/core/rules';
 import { tileYields } from '../src/core/yields';
+import { makeYieldCtx, availableTechs } from '../src/core/effects';
 import { isWater, isMountain } from '../src/core/query';
+import { WONDERS } from '../src/data/wonders';
+import { TECHS } from '../src/data/techs';
+import { CIVICS } from '../src/data/civics';
 import type { GameState, Tile } from '../src/core/types';
 
 const seed = Number(process.argv[2] ?? 42);
@@ -37,16 +41,19 @@ for (const [k, v] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
 }
 console.log(`  river-adjacent tiles: ${riverTiles}, resources: ${resources}`);
 console.log(`  features: ${[...features.entries()].map(([k, v]) => `${k}:${v}`).join(' ')}`);
+const wonders = new Set(map.tiles.filter((t) => t.wonder).map((t) => t.wonder!));
+console.log(`  natural wonders: ${[...wonders].map((w) => WONDERS[w].name).join(', ') || 'none'}`);
 
 // --- 2. scripted playthrough ---------------------------------------------------
 const state: GameState = createGame({ width: 44, height: 26, seed });
 
 function settleScore(t: Tile): number {
-  if (isWater(t) || isMountain(t) || t.feature === 'OASIS') return -1;
+  if (isWater(t) || isMountain(t) || t.feature === 'OASIS' || t.wonder) return -1;
+  const ctx = makeYieldCtx(state);
   let s = 0;
   if (t.riverMask) s += 3;
   for (const n of neighborhood(state, t)) {
-    const y = tileYields(n);
+    const y = tileYields(ctx, n);
     s += y.food * 1.5 + y.production;
   }
   return s;
@@ -79,13 +86,26 @@ for (const t of state.map.tiles) {
 }
 console.log(`Placed ${improved} improvements`);
 
-// queue a campus on the best spot, then a library
-const spots = districtPlacementTiles(state, city, 'CAMPUS');
-if (spots.length) queueDistrict(state, city.id, 'CAMPUS', spots[0]);
-
+// Research toward Writing, then queue a campus and a library — exercising
+// the tech gating the same way a player would.
+let campusQueued = false;
 for (let i = 0; i < 60; i++) {
   endTurn(state);
-  if (city.queue.length === 0 && !city.buildings.includes('LIBRARY')) {
+  if (
+    !state.research.techs.includes('WRITING') &&
+    state.research.tech !== 'WRITING' &&
+    availableTechs(state).some((t) => t.id === 'WRITING')
+  ) {
+    setTechResearch(state, 'WRITING');
+  }
+  if (!campusQueued && state.research.techs.includes('WRITING')) {
+    const spots = districtPlacementTiles(state, city, 'CAMPUS');
+    if (spots.length) {
+      queueDistrict(state, city.id, 'CAMPUS', spots[0]);
+      campusQueued = true;
+    }
+  }
+  if (campusQueued && city.queue.length === 0 && !city.buildings.includes('LIBRARY')) {
     queueBuilding(state, city.id, 'LIBRARY');
   }
 }
@@ -96,6 +116,11 @@ console.log(`  yields/turn: food ${stats.total.food.toFixed(1)}, prod ${stats.to
   `gold ${stats.total.gold.toFixed(1)}, sci ${stats.total.science.toFixed(1)}, cult ${stats.total.culture.toFixed(1)}`);
 console.log(`  buildings: ${city.buildings.join(', ')}`);
 console.log(`  districts: ${city.districts.map((d) => d.type).join(', ')}`);
+console.log(`  borders: ${state.map.tiles.filter((t) => t.cityId === city.id).length} tiles owned ` +
+  `(${city.tilesAcquired} grown culturally)`);
+console.log(`  techs: ${state.research.techs.map((t) => TECHS[t].name).join(', ') || 'none'}`);
+console.log(`  civics: ${state.research.civics.map((c) => CIVICS[c].name).join(', ') || 'none'}`);
+console.log(`  government: ${state.government.current ?? 'none'}`);
 console.log(`  empire: treasury ${state.treasury.toFixed(0)}, science total ${state.scienceTotal.toFixed(0)}`);
 
 // --- 3. PNG snapshot -------------------------------------------------------------

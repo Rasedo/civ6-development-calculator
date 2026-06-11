@@ -10,6 +10,7 @@ import { TERRAINS, MOUNTAIN_COLOR } from '../data/terrains';
 import { RESOURCES, RESOURCE_CATEGORY_COLORS } from '../data/resources';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
+import { WONDERS } from '../data/wonders';
 import type { ImprovementId } from '../core/types';
 
 export const HEX_SIZE = 24;
@@ -125,6 +126,31 @@ export class MapRenderer {
       if (tile.elevation === 'HILLS') this.drawHills(cx, cy);
       if (tile.elevation === 'MOUNTAIN') this.drawMountain(cx, cy);
       if (tile.feature) this.drawFeature(tile.feature, cx, cy);
+      if (tile.wonder) {
+        const w = WONDERS[tile.wonder];
+        if (w) {
+          hexPath(cx, cy);
+          ctx.fillStyle = w.color + '66'; // translucent wonder tint
+          ctx.fill();
+        }
+      }
+    }
+
+    // --- territory borders (always on) ---------------------------------------
+    ctx.strokeStyle = 'rgba(216,181,74,0.6)';
+    ctx.lineWidth = 1.4;
+    for (const { tile, cx, cy } of visible) {
+      if (tile.cityId === -1) continue;
+      for (let d = 0; d < 6; d++) {
+        const [nc, nr] = neighborOffset(tile.col, tile.row, d);
+        const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
+        if (n && n.cityId === tile.cityId) continue;
+        const [a, b] = EDGE_CORNERS[d];
+        ctx.beginPath();
+        ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
+        ctx.lineTo(cx + corners[b].x, cy + corners[b].y);
+        ctx.stroke();
+      }
     }
 
     // --- pass 2: rivers --------------------------------------------------------
@@ -167,13 +193,14 @@ export class MapRenderer {
       }
     }
 
-    // --- pass 4: badges (resources, improvements, districts) -------------------
+    // --- pass 4: badges (resources, improvements, districts, wonders) ----------
     for (const { tile, cx, cy } of visible) {
       if (tile.resource) this.drawResource(tile.resource, cx, cy);
       if (tile.improvement) this.drawImprovement(tile.improvement as ImprovementId, cx, cy);
       if (tile.district && tile.district !== 'CITY_CENTER') {
         this.drawDistrict(tile.district, tile.districtComplete, cx, cy);
       }
+      if (tile.wonder) this.drawWonder(tile.wonder, cx, cy);
     }
 
     // --- pass 5: worked pips ------------------------------------------------------
@@ -395,6 +422,17 @@ export class MapRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(def.code, x, y + 0.5);
+  }
+
+  private drawWonder(wonder: string, cx: number, cy: number): void {
+    const { ctx } = this;
+    const def = WONDERS[wonder];
+    if (!def) return;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.font = `bold ${HEX_SIZE * 0.34}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`✦${def.code}`, cx, cy + 0.5);
   }
 
   private drawDistrict(district: string, complete: boolean, cx: number, cy: number): void {

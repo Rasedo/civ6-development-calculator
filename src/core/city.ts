@@ -1,18 +1,22 @@
 /**
- * City mechanics: housing, amenities, citizen tile assignment, growth math.
- * `computeCityStats` is the single entry point used by the UI and turn loop.
+ * City mechanics: housing, amenities, citizen tile assignment, growth math,
+ * cultural border expansion. `computeCityStats` is the single entry point
+ * used by the UI and turn loop.
  */
 
 import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
-import { tilesWithin } from './hex';
+import { tilesWithin, hexDistance } from './hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from './query';
 import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities } from './yields';
+import { getModifiers, makeYieldCtx, type Modifiers, type YieldCtx } from './effects';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { RESOURCES } from '../data/resources';
 import {
   CITY_WORK_RADIUS,
+  BORDER_MAX_RADIUS,
+  borderGrowthCost,
   FOOD_PER_CITIZEN,
   CITIZEN_SCIENCE,
   CITIZEN_CULTURE,
@@ -41,8 +45,10 @@ export interface CityStats {
     districts: Yields;
     buildings: Yields;
     citizens: Yields;
+    /** Flat bonuses from government/policies. */
+    bonuses: Yields;
   };
-  /** Final per-turn yields (amenity modifier applied to non-food). */
+  /** Final per-turn yields (amenity + government modifiers applied). */
   total: Yields;
   foodSurplus: number;
   /** Surplus after growth modifiers (what actually enters the food box). */
@@ -50,6 +56,13 @@ export interface CityStats {
   growthNeeded: number;
   /** Turns until next citizen; null if not growing. */
   turnsToGrow: number | null;
+  border: {
+    cost: number;
+    progress: number;
+    /** Turns until the next culture expansion; null if no culture/candidates. */
+    turns: number | null;
+    nextTile: number | null;
+  };
 }
 
 /** Tiles a city could work: owned, in range, passable, not a district tile. */
@@ -80,10 +93,11 @@ function tileScore(y: Yields, focus: FocusId): number {
 }
 
 /** Pick which tiles the city's citizens work: locked tiles first, then best score. */
-export function assignWorkedTiles(state: GameState, city: City): number[] {
+export function assignWorkedTiles(state: GameState, city: City, ctx?: YieldCtx): number[] {
+  const yctx = ctx ?? makeYieldCtx(state);
   const candidates = workableTiles(state, city);
   const scored = candidates
-    .map((t) => ({ index: t.index, score: tileScore(tileYields(t), city.focus) }))
+    .map((t) => ({ index: t.index, score: tileScore(tileYields(yctx, t), city.focus) }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
   const lockedValid = city.lockedTiles.filter((i) => candidates.some((c) => c.index === i));
@@ -96,15 +110,25 @@ export function assignWorkedTiles(state: GameState, city: City): number[] {
 }
 
 /** City-center tile yields, floored per Civ 6. */
-export function tileYieldsForCenter(center: Tile): Yields {
-  const y = tileYields({ ...center, district: null });
+export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
+  const y = tileYields(ctx, { ...center, district: null });
   y.food = Math.max(y.food, CITY_CENTER_MIN_FOOD);
   y.production = Math.max(y.production, CITY_CENTER_MIN_PRODUCTION);
   return y;
 }
 
-/** Housing from water access, districts, buildings and improvements. */
-export function computeHousing(state: GameState, city: City): number {
+/** Completed districts, excluding the city center. */
+function completedDistrictCount(state: GameState, city: City, specialtyOnly: boolean): number {
+  return city.districts.filter((d) => {
+    if (d.type === 'CITY_CENTER') return false;
+    if (!state.map.tiles[d.tileIndex].districtComplete) return false;
+    return specialtyOnly ? DISTRICTS[d.type].countsTowardLimit : true;
+  }).length;
+}
+
+/** Housing from water access, districts, buildings, improvements and policies. */
+export function computeHousing(state: GameState, city: City, mods?: Modifiers): number {
+  const m = mods ?? getModifiers(state);
   const map = state.map;
   const center = map.tiles[city.centerIndex];
 
@@ -132,6 +156,16 @@ export function computeHousing(state: GameState, city: City): number {
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
     if (t.cityId !== city.id || !t.improvement) continue;
     total += IMPROVEMENTS[t.improvement as ImprovementId].housing;
+  }
+
+  total += m.housingAll;
+  const districtCount = completedDistrictCount(state, city, false);
+  const specialtyCount = completedDistrictCount(state, city, true);
+  for (const rule of m.housingIfDistricts) {
+    if (districtCount >= rule.min) total += rule.housing;
+  }
+  for (const rule of m.newDeal) {
+    if (specialtyCount >= rule.min) total += rule.housing;
   }
   return total;
 }
@@ -168,24 +202,81 @@ export function luxuryAmenities(state: GameState): Map<number, number> {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Cultural border expansion
+// ---------------------------------------------------------------------------
+
+/** Unowned tiles this city could claim next (adjacent to its territory, within 5 rings). */
+export function borderCandidates(state: GameState, city: City): number[] {
+  const center = state.map.tiles[city.centerIndex];
+  const out: number[] = [];
+  for (const t of tilesWithin(state.map, center.col, center.row, BORDER_MAX_RADIUS)) {
+    if (t.cityId !== -1) continue;
+    const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
+      (n) => n.index !== t.index && n.cityId === city.id,
+    );
+    if (adjOwn) out.push(t.index);
+  }
+  return out;
+}
+
+function resourcePriority(tile: Tile): number {
+  if (!tile.resource) return 0;
+  const cat = RESOURCES[tile.resource].category;
+  return cat === 'luxury' ? 3 : cat === 'strategic' ? 2 : 1;
+}
+
+/** The tile culture growth would claim next (Civ 6-ish priorities). */
+export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
+  const yctx = ctx ?? makeYieldCtx(state);
+  const center = state.map.tiles[city.centerIndex];
+  const candidates = borderCandidates(state, city);
+  if (candidates.length === 0) return null;
+  const score = (i: number) => {
+    const t = state.map.tiles[i];
+    const y = tileYields(yctx, t);
+    const ySum = y.food + y.production + y.gold + y.science + y.culture + y.faith;
+    return {
+      dist: hexDistance(center.col, center.row, t.col, t.row),
+      res: resourcePriority(t),
+      ySum,
+      i,
+    };
+  };
+  return candidates
+    .map(score)
+    .sort((a, b) => a.dist - b.dist || b.res - a.res || b.ySum - a.ySum || a.i - b.i)[0].i;
+}
+
+/** Claim a tile for the city (culture growth or purchase). */
+export function acquireTile(state: GameState, city: City, tileIndex: number): void {
+  state.map.tiles[tileIndex].cityId = city.id;
+  city.tilesAcquired += 1;
+}
+
+// ---------------------------------------------------------------------------
+
 export function computeCityStats(
   state: GameState,
   city: City,
   luxMap?: Map<number, number>,
+  mods?: Modifiers,
 ): CityStats {
+  const m = mods ?? getModifiers(state);
+  const ctx: YieldCtx = { map: state.map, mods: m };
   const map = state.map;
   const center = map.tiles[city.centerIndex];
 
   // --- worked tiles ---------------------------------------------------------
-  const worked = assignWorkedTiles(state, city);
+  const worked = assignWorkedTiles(state, city, ctx);
   const tiles = emptyYields();
   // The city-center tile is worked for free.
-  addYields(tiles, tileYieldsForCenter(center));
-  for (const i of worked) addYields(tiles, tileYields(map.tiles[i]));
+  addYields(tiles, tileYieldsForCenter(ctx, center));
+  for (const i of worked) addYields(tiles, tileYields(ctx, map.tiles[i]));
 
   // --- districts & buildings -------------------------------------------------
-  const districts = cityDistrictYields(map, city);
-  const buildings = cityBuildingYields(map, city);
+  const districts = cityDistrictYields(ctx, city);
+  const buildings = cityBuildingYields(ctx, city);
   const regional = regionalEffects(state, city);
   addYields(buildings, regional.yields);
 
@@ -193,12 +284,24 @@ export function computeCityStats(
   citizens.science = city.population * CITIZEN_SCIENCE;
   citizens.culture = city.population * CITIZEN_CULTURE;
 
+  const bonuses = emptyYields();
+  addYields(bonuses, m.cityYields);
+  if (city.isCapital) addYields(bonuses, m.capitalYields);
+
   // --- housing & amenities -----------------------------------------------------
-  const housing = computeHousing(state, city);
-  const have =
+  const housing = computeHousing(state, city, m);
+  let have =
     localBuildingAmenities(city) +
     regional.amenities +
+    m.amenitiesAll +
     ((luxMap ?? luxuryAmenities(state)).get(city.id) ?? 0);
+  const specialtyCount = completedDistrictCount(state, city, true);
+  for (const rule of m.amenitiesIfSpecialty) {
+    if (specialtyCount >= rule.min) have += rule.amenities;
+  }
+  for (const rule of m.newDeal) {
+    if (specialtyCount >= rule.min) have += rule.amenities;
+  }
   const needed = amenitiesNeeded(city.population);
   const balance = have - needed;
   const tier = amenityTier(balance);
@@ -209,8 +312,12 @@ export function computeCityStats(
   addYields(total, districts);
   addYields(total, buildings);
   addYields(total, citizens);
+  addYields(total, bonuses);
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as YieldKey[]) {
     total[k] *= tier.yieldFactor;
+  }
+  for (const k of Object.keys(m.yieldMult) as YieldKey[]) {
+    total[k] *= m.yieldMult[k] ?? 1;
   }
 
   const foodSurplus = total.food - city.population * FOOD_PER_CITIZEN;
@@ -221,16 +328,25 @@ export function computeCityStats(
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
 
+  // --- border growth ---------------------------------------------------------
+  const borderCost = borderGrowthCost(city.tilesAcquired);
+  const nextTile = pickBorderTile(state, city, ctx);
+  const borderTurns =
+    nextTile !== null && total.culture > 0
+      ? Math.max(0, Math.ceil((borderCost - city.cultureBox) / total.culture))
+      : null;
+
   return {
     city,
     housing,
     amenities: { have, needed, balance, tier },
     workedTiles: worked,
-    breakdown: { tiles, districts, buildings, citizens },
+    breakdown: { tiles, districts, buildings, citizens, bonuses },
     total,
     foodSurplus,
     effectiveFoodSurplus: effective,
     growthNeeded,
     turnsToGrow,
+    border: { cost: borderCost, progress: city.cultureBox, turns: borderTurns, nextTile },
   };
 }

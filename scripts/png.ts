@@ -5,6 +5,7 @@
 
 import { hexCenter, cornerOffsets, pixelToHex, inBounds, tileIndex, EDGE_CORNERS, neighborOffset, SQRT3 } from '../src/core/hex';
 import { TERRAINS, MOUNTAIN_COLOR } from '../src/data/terrains';
+import { WONDERS } from '../src/data/wonders';
 import type { GameMap } from '../src/core/types';
 
 const HEX = 9; // px per hex circumradius
@@ -58,6 +59,7 @@ export function makePreviewPng(map: GameMap, deflate: (b: Buffer) => Buffer): Bu
           : t.elevation === 'HILLS' && def.hillsColor
             ? def.hillsColor
             : def.color;
+      if (t.wonder) color = WONDERS[t.wonder]?.color ?? color;
       put(x, y, rgb(color));
     }
   }

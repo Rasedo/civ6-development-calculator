@@ -14,8 +14,19 @@ export type MapSizeId = keyof typeof MAP_SIZES;
 /** Minimum distance between city centers. */
 export const CITY_MIN_DIST = 3;
 
-/** Tiles a city can own/work (rings from the center). */
+/** Tiles a city can work / place districts in (rings from the center). */
 export const CITY_WORK_RADIUS = 3;
+
+/** Borders can grow culturally out to this many rings. */
+export const BORDER_MAX_RADIUS = 5;
+
+/** Culture needed for a city's next border expansion (n = tiles acquired so far). */
+export function borderGrowthCost(n: number): number {
+  return Math.floor(20 + 10 * Math.pow(n, 1.1));
+}
+
+/** Gold price of buying a tile = culture cost × this (before policy discounts). */
+export const TILE_PURCHASE_GOLD_PER_CULTURE = 4;
 
 export const FOOD_PER_CITIZEN = 2;
 

@@ -3,6 +3,7 @@
 import { neighbors } from './hex';
 import { TERRAINS } from '../data/terrains';
 import { FEATURES } from '../data/features';
+import { WONDERS } from '../data/wonders';
 import type { GameMap, Tile } from './types';
 
 export function isWater(tile: Tile): boolean {
@@ -19,6 +20,7 @@ export function isMountain(tile: Tile): boolean {
 
 export function isImpassable(tile: Tile): boolean {
   if (isMountain(tile)) return true;
+  if (tile.wonder && WONDERS[tile.wonder]?.impassable) return true;
   return tile.feature != null && !!FEATURES[tile.feature]?.impassable;
 }
 

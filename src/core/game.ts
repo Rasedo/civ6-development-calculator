@@ -1,18 +1,23 @@
 /**
  * Game state lifecycle: creation, player actions (found city, improve,
- * place districts/buildings), the end-of-turn loop, and serialization.
+ * place districts/buildings, buy tiles, pick research, run government),
+ * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem } from './types';
+import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, Tile } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin } from './hex';
-import { computeCityStats, luxuryAmenities } from './city';
+import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile } from './city';
 import { canFoundCity, canPlaceDistrict, validImprovements, canRemoveFeature, availableBuildings, type RuleResult } from './rules';
+import { computeUnlocks, getModifiers, availableTechs, availableCivics } from './effects';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
-import { CITY_WORK_RADIUS, CITY_NAMES } from '../data/constants';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
+import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE } from '../data/constants';
 
 export function createGame(opts: MapGenOptions & { sandbox?: boolean }): GameState {
   return {
@@ -25,6 +30,8 @@ export function createGame(opts: MapGenOptions & { sandbox?: boolean }): GameSta
     scienceTotal: 0,
     cultureTotal: 0,
     faithTotal: 0,
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] },
+    government: { current: null, policies: [] },
   };
 }
 
@@ -46,6 +53,8 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
     centerIndex: tileIndex,
     population: 1,
     foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: 0,
     lockedTiles: [],
     focus: 'balanced',
     queue: [],
@@ -59,7 +68,9 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
 
-  for (const t of tilesWithin(state.map, tile.col, tile.row, CITY_WORK_RADIUS)) {
+  // Civ 6: a new city starts with its center plus the first ring only;
+  // everything beyond comes from culture growth or tile purchase.
+  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
     if (t.cityId === -1) t.cityId = id;
   }
   tile.cityId = id;
@@ -87,7 +98,7 @@ export function removeImprovement(state: GameState, tileIndex: number): void {
 
 export function removeFeature(state: GameState, tileIndex: number): RuleResult {
   const tile = state.map.tiles[tileIndex];
-  const check = canRemoveFeature(tile);
+  const check = canRemoveFeature(state, tile);
   if (!check.ok) return check;
   // Improvements that depended on the feature disappear with it.
   if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
@@ -155,14 +166,160 @@ export function itemLabel(item: QueueItem): string {
   return item.kind === 'district' ? DISTRICTS[item.district].name : BUILDINGS[item.building].name;
 }
 
+function isEncampmentItem(item: QueueItem): boolean {
+  return item.kind === 'district'
+    ? item.district === 'ENCAMPMENT'
+    : BUILDINGS[item.building]?.district === 'ENCAMPMENT';
+}
+
+// ---------------------------------------------------------------------------
+// Tiles, research, government actions
+// ---------------------------------------------------------------------------
+
+/** Gold price for this city's next tile (shared counter with culture growth). */
+export function tilePurchaseCost(state: GameState, city: City): number {
+  const mods = getModifiers(state);
+  return Math.round(
+    borderGrowthCost(city.tilesAcquired) * TILE_PURCHASE_GOLD_PER_CULTURE * mods.tilePurchaseMult,
+  );
+}
+
+export function buyTile(state: GameState, cityId: number, tileIndex: number): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  if (!borderCandidates(state, city).includes(tileIndex)) {
+    return { ok: false, reason: 'Tile must be unowned and adjacent to this city’s territory (within 5 rings).' };
+  }
+  const cost = tilePurchaseCost(state, city);
+  if (!state.sandbox) {
+    if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    state.treasury -= cost;
+  }
+  acquireTile(state, city, tileIndex);
+  return { ok: true };
+}
+
+export function setTechResearch(state: GameState, techId: string): RuleResult {
+  if (!availableTechs(state).some((t) => t.id === techId)) {
+    return { ok: false, reason: 'Tech not available (missing prerequisites or already researched).' };
+  }
+  state.research.tech = techId;
+  return { ok: true };
+}
+
+export function setCivicResearch(state: GameState, civicId: string): RuleResult {
+  if (!availableCivics(state).some((c) => c.id === civicId)) {
+    return { ok: false, reason: 'Civic not available (missing prerequisites or already researched).' };
+  }
+  state.research.civic = civicId;
+  return { ok: true };
+}
+
+export function setGovernment(state: GameState, governmentId: string): RuleResult {
+  const unlocks = computeUnlocks(state);
+  if (!state.sandbox && !unlocks.governments.has(governmentId)) {
+    return { ok: false, reason: 'Government not unlocked yet.' };
+  }
+  const def = GOVERNMENTS[governmentId];
+  if (!def) return { ok: false, reason: 'No such government.' };
+
+  const oldCards = state.government.policies.filter((p): p is string => p !== null);
+  state.government.current = governmentId;
+  state.government.policies = def.slots.map(() => null);
+  // Re-seat old cards into compatible slots where possible.
+  for (const cardId of oldCards) {
+    const card = POLICIES[cardId];
+    if (!card) continue;
+    const slot = def.slots.findIndex(
+      (kind, i) => state.government.policies[i] === null && cardFitsSlot(card, kind),
+    );
+    if (slot >= 0) state.government.policies[slot] = cardId;
+  }
+  return { ok: true };
+}
+
+export function setPolicy(state: GameState, slotIndex: number, policyId: string | null): RuleResult {
+  const govId = state.government.current;
+  if (!govId) return { ok: false, reason: 'No government yet (research Code of Laws).' };
+  const def = GOVERNMENTS[govId];
+  if (slotIndex < 0 || slotIndex >= def.slots.length) return { ok: false, reason: 'No such slot.' };
+  if (policyId === null) {
+    state.government.policies[slotIndex] = null;
+    return { ok: true };
+  }
+  const card = POLICIES[policyId];
+  if (!card) return { ok: false, reason: 'No such policy.' };
+  const unlocks = computeUnlocks(state);
+  if (!state.sandbox && !unlocks.policies.has(policyId)) {
+    return { ok: false, reason: 'Policy not unlocked yet.' };
+  }
+  if (!cardFitsSlot(card, def.slots[slotIndex])) {
+    return { ok: false, reason: `${card.name} does not fit a ${def.slots[slotIndex]} slot.` };
+  }
+  if (state.government.policies.some((p, i) => p === policyId && i !== slotIndex)) {
+    return { ok: false, reason: `${card.name} is already slotted.` };
+  }
+  state.government.policies[slotIndex] = policyId;
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Turn loop
+// ---------------------------------------------------------------------------
+
+function autoPickResearch(state: GameState): void {
+  if (state.research.tech === null) {
+    const next = availableTechs(state).sort((a, b) => a.cost - b.cost)[0];
+    if (next) state.research.tech = next.id;
+  }
+  if (state.research.civic === null) {
+    const next = availableCivics(state).sort((a, b) => a.cost - b.cost)[0];
+    if (next) state.research.civic = next.id;
+  }
+}
+
+function advanceResearch(state: GameState, science: number, culture: number): void {
+  const r = state.research;
+  autoPickResearch(state);
+
+  r.techProgress += science;
+  while (r.tech && r.techProgress >= TECHS[r.tech].cost) {
+    r.techProgress -= TECHS[r.tech].cost;
+    r.techs.push(r.tech);
+    r.tech = null;
+    autoPickResearch(state);
+  }
+  if (!r.tech) r.techProgress = Math.min(r.techProgress, 0); // nothing left to research
+
+  r.civicProgress += culture;
+  while (r.civic && r.civicProgress >= CIVICS[r.civic].cost) {
+    r.civicProgress -= CIVICS[r.civic].cost;
+    r.civics.push(r.civic);
+    r.civic = null;
+    autoPickResearch(state);
+  }
+  if (!r.civic) r.civicProgress = Math.min(r.civicProgress, 0);
+
+  // First government comes free with Code of Laws.
+  if (!state.government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {
+    setGovernment(state, 'CHIEFDOM');
+  }
+}
+
 export function endTurn(state: GameState): void {
   const luxMap = luxuryAmenities(state);
+  const mods = getModifiers(state);
+  let turnScience = 0;
+  let turnCulture = 0;
+
   for (const city of state.cities) {
-    const stats = computeCityStats(state, city, luxMap);
+    const stats = computeCityStats(state, city, luxMap, mods);
 
     // --- production ---------------------------------------------------------
     if (city.queue.length > 0) {
-      city.queue[0].progress += stats.total.production;
+      const head = city.queue[0];
+      const mult = isEncampmentItem(head) ? mods.encampmentProdMult : 1;
+      head.progress += stats.total.production * mult;
       while (city.queue.length > 0 && city.queue[0].progress >= itemCost(city.queue[0])) {
         const item = city.queue.shift()!;
         const overflow = item.progress - itemCost(item);
@@ -185,12 +342,29 @@ export function endTurn(state: GameState): void {
       city.foodBox = 0;
     }
 
+    // --- cultural border expansion -------------------------------------------
+    city.cultureBox += stats.total.culture;
+    while (city.cultureBox >= borderGrowthCost(city.tilesAcquired)) {
+      const next = pickBorderTile(state, city);
+      if (next === null) {
+        // Nowhere to grow: cap the box at the current threshold.
+        city.cultureBox = Math.min(city.cultureBox, borderGrowthCost(city.tilesAcquired));
+        break;
+      }
+      city.cultureBox -= borderGrowthCost(city.tilesAcquired);
+      acquireTile(state, city, next);
+    }
+
     // --- empire accumulators ---------------------------------------------------
     state.treasury += stats.total.gold;
     state.scienceTotal += stats.total.science;
     state.cultureTotal += stats.total.culture;
     state.faithTotal += stats.total.faith;
+    turnScience += stats.total.science;
+    turnCulture += stats.total.culture;
   }
+
+  advanceResearch(state, turnScience, turnCulture);
   state.turn += 1;
 }
 
@@ -202,10 +376,23 @@ export function toggleLockedTile(state: GameState, cityId: number, tileIndex: nu
   else city.lockedTiles.push(tileIndex);
 }
 
+// ---------------------------------------------------------------------------
+
 export function serialize(state: GameState): string {
   return JSON.stringify(state);
 }
 
+/** Parse a save, filling in fields that older (stage 1) saves lack. */
 export function deserialize(json: string): GameState {
-  return JSON.parse(json) as GameState;
+  const state = JSON.parse(json) as GameState;
+  state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] };
+  state.government ??= { current: null, policies: [] };
+  for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
+    t.wonder ??= null;
+  }
+  for (const c of state.cities) {
+    c.cultureBox ??= 0;
+    c.tilesAcquired ??= 0;
+  }
+  return state;
 }

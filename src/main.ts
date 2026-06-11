@@ -13,13 +13,27 @@ import {
   cancelQueueItem,
   endTurn,
   toggleLockedTile,
+  buyTile,
+  setTechResearch,
+  setCivicResearch,
+  setGovernment,
+  setPolicy,
   serialize,
   deserialize,
 } from './core/game';
-import { computeCityStats, workableTiles } from './core/city';
+import { computeCityStats, workableTiles, luxuryAmenities, borderCandidates } from './core/city';
 import { districtPlacementTiles } from './core/rules';
+import { getModifiers } from './core/effects';
 import { MapRenderer, type CityViewOverlay } from './ui/render';
-import { renderTilePanel, renderCityPanel, renderEmpireSummary, tileSummary, type PanelCallbacks } from './ui/panels';
+import {
+  renderTilePanel,
+  renderCityPanel,
+  renderEmpireSummary,
+  renderResearchPanel,
+  renderGovernmentPanel,
+  tileSummary,
+  type PanelCallbacks,
+} from './ui/panels';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -30,6 +44,7 @@ const renderer = new MapRenderer(canvas);
 const sizeSelect = $<HTMLSelectElement>('size-select');
 const seedInput = $<HTMLInputElement>('seed-input');
 const resourcesToggle = $<HTMLInputElement>('resources-toggle');
+const wondersToggle = $<HTMLInputElement>('wonders-toggle');
 const sandboxToggle = $<HTMLInputElement>('sandbox-toggle');
 const contextPanel = $<HTMLElement>('context-panel');
 const empireSummary = $<HTMLElement>('empire-summary');
@@ -48,8 +63,11 @@ seedInput.value = String(Math.floor(Math.random() * 1e9));
 
 // ---------------------------------------------------------------------------
 
+type RightView = 'context' | 'tech' | 'civic' | 'government';
+
 interface UiState {
-  mode: 'inspect' | 'found' | 'placeDistrict';
+  mode: 'inspect' | 'found' | 'placeDistrict' | 'buyTile';
+  rightView: RightView;
   pendingDistrict: DistrictId | null;
   pendingCityId: number | null;
   selectedTile: number | null;
@@ -60,6 +78,7 @@ interface UiState {
 
 const ui: UiState = {
   mode: 'inspect',
+  rightView: 'context',
   pendingDistrict: null,
   pendingCityId: null,
   selectedTile: null,
@@ -77,6 +96,7 @@ function newGameFromControls(): GameState {
     height: size.height,
     seed: Number(seedInput.value) || 1,
     withResources: resourcesToggle.checked,
+    withWonders: wondersToggle.checked,
     sandbox: sandboxToggle.checked,
   });
 }
@@ -92,17 +112,27 @@ function selectCity(id: number | null): void {
   ui.selectedCityId = id;
   ui.selectedTile = null;
   ui.manageCitizens = false;
-  if (ui.mode === 'placeDistrict') setMode('inspect');
+  ui.rightView = 'context';
+  if (ui.mode === 'placeDistrict' || ui.mode === 'buyTile') setMode('inspect');
 }
 
 function setMode(mode: UiState['mode']): void {
   ui.mode = mode;
-  if (mode !== 'placeDistrict') {
-    ui.pendingDistrict = null;
-    ui.pendingCityId = null;
-  }
+  if (mode !== 'placeDistrict') ui.pendingDistrict = null;
+  if (mode !== 'placeDistrict' && mode !== 'buyTile') ui.pendingCityId = null;
   $<HTMLButtonElement>('mode-inspect').classList.toggle('active', mode === 'inspect');
   $<HTMLButtonElement>('mode-found').classList.toggle('active', mode === 'found');
+}
+
+function setRightView(view: RightView): void {
+  ui.rightView = view;
+  for (const [btn, v] of [
+    ['view-tech', 'tech'],
+    ['view-civic', 'civic'],
+    ['view-government', 'government'],
+  ] as const) {
+    $<HTMLButtonElement>(btn).classList.toggle('active', view === v);
+  }
 }
 
 const callbacks: PanelCallbacks = {
@@ -131,6 +161,12 @@ const callbacks: PanelCallbacks = {
     showMessage('Click a highlighted tile to place the district (right-click/Esc to cancel).');
     refresh();
   },
+  onStartBuyTile(cityId) {
+    ui.mode = 'buyTile';
+    ui.pendingCityId = cityId;
+    showMessage('Click a highlighted tile to buy it (right-click/Esc to cancel).');
+    refresh();
+  },
   onQueueBuilding(cityId, buildingId) {
     const r = queueBuilding(state, cityId, buildingId);
     if (!r.ok) showMessage(r.reason!);
@@ -150,9 +186,37 @@ const callbacks: PanelCallbacks = {
     showMessage(checked ? 'Click owned tiles to lock/unlock them for citizens.' : '');
     refresh();
   },
+  onSetResearch(kind, id) {
+    const r = kind === 'tech' ? setTechResearch(state, id) : setCivicResearch(state, id);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onSetGovernment(id) {
+    const r = setGovernment(state, id);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onSetPolicy(slotIndex, policyId) {
+    const r = setPolicy(state, slotIndex, policyId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
 };
 
 // ---------------------------------------------------------------------------
+
+function empirePerTurn(): { science: number; culture: number } {
+  const lux = luxuryAmenities(state);
+  const mods = getModifiers(state);
+  let science = 0;
+  let culture = 0;
+  for (const c of state.cities) {
+    const s = computeCityStats(state, c, lux, mods);
+    science += s.total.science;
+    culture += s.total.culture;
+  }
+  return { science, culture };
+}
 
 function refresh(): void {
   // Keep stale selections from surviving regeneration.
@@ -170,18 +234,38 @@ function refresh(): void {
       locked: new Set(city.lockedTiles),
       centerIndex: city.centerIndex,
     };
-    renderCityPanel(contextPanel, state, stats, ui.manageCitizens, callbacks);
-  } else if (ui.selectedTile !== null) {
-    renderTilePanel(contextPanel, state, ui.selectedTile, callbacks);
-  } else {
-    contextPanel.innerHTML =
-      '<h2>Welcome</h2><p class="muted">Generate a map, switch to <b>Found city</b> mode and click a land tile. Then open the city to place districts and buildings, and improve tiles from the tile panel.</p>';
+    if (ui.rightView === 'context') {
+      renderCityPanel(contextPanel, state, stats, ui.manageCitizens, callbacks);
+    }
+  } else if (ui.rightView === 'context') {
+    if (ui.selectedTile !== null) {
+      renderTilePanel(contextPanel, state, ui.selectedTile, callbacks);
+    } else {
+      contextPanel.innerHTML =
+        '<h2>Welcome</h2><p class="muted">Generate a map, switch to <b>Found city</b> mode and click a land tile. Open the city to place districts/buildings and buy tiles; use the Tech/Civics/Government views to run your empire. Sandbox mode skips costs and research gating.</p>';
+    }
+  }
+
+  if (ui.rightView === 'tech' || ui.rightView === 'civic') {
+    const per = empirePerTurn();
+    renderResearchPanel(
+      contextPanel,
+      state,
+      ui.rightView === 'tech' ? 'tech' : 'civic',
+      ui.rightView === 'tech' ? per.science : per.culture,
+      callbacks,
+    );
+  } else if (ui.rightView === 'government') {
+    renderGovernmentPanel(contextPanel, state, callbacks);
   }
 
   let highlight: Set<number> | null = null;
   if (ui.mode === 'placeDistrict' && ui.pendingCityId !== null && ui.pendingDistrict) {
     const city = state.cities.find((c) => c.id === ui.pendingCityId);
     if (city) highlight = new Set(districtPlacementTiles(state, city, ui.pendingDistrict));
+  } else if (ui.mode === 'buyTile' && ui.pendingCityId !== null) {
+    const city = state.cities.find((c) => c.id === ui.pendingCityId);
+    if (city) highlight = new Set(borderCandidates(state, city));
   }
 
   renderer.draw(state, {
@@ -276,6 +360,20 @@ canvas.addEventListener('click', (e) => {
     return;
   }
 
+  if (ui.mode === 'buyTile' && ui.pendingCityId !== null) {
+    const cityId = ui.pendingCityId;
+    const r = buyTile(state, cityId, tileIdx);
+    if (r.ok) {
+      setMode('inspect');
+      selectCity(cityId);
+      showMessage('Tile purchased.');
+    } else {
+      showMessage(r.reason!);
+    }
+    refresh();
+    return;
+  }
+
   // inspect mode
   if (
     ui.manageCitizens &&
@@ -301,6 +399,8 @@ canvas.addEventListener('click', (e) => {
   }
   ui.selectedCityId = null;
   ui.selectedTile = tileIdx;
+  ui.rightView = 'context';
+  setRightView('context');
   refresh();
 });
 
@@ -335,6 +435,7 @@ $<HTMLButtonElement>('generate-btn').addEventListener('click', () => {
   ui.selectedTile = null;
   ui.selectedCityId = null;
   setMode('inspect');
+  setRightView('context');
   renderer.fit(state.map);
   refresh();
   showMessage(`Map generated (seed ${state.map.seed}).`);
@@ -353,6 +454,17 @@ $<HTMLButtonElement>('mode-found').addEventListener('click', () => {
   setMode(ui.mode === 'found' ? 'inspect' : 'found');
   refresh();
 });
+
+for (const [btn, view] of [
+  ['view-tech', 'tech'],
+  ['view-civic', 'civic'],
+  ['view-government', 'government'],
+] as const) {
+  $<HTMLButtonElement>(btn).addEventListener('click', () => {
+    setRightView(ui.rightView === view ? 'context' : view);
+    refresh();
+  });
+}
 
 sandboxToggle.addEventListener('change', () => {
   state.sandbox = sandboxToggle.checked;
@@ -387,6 +499,7 @@ $<HTMLButtonElement>('load-btn').addEventListener('click', () => {
   ui.selectedTile = null;
   ui.selectedCityId = null;
   setMode('inspect');
+  setRightView('context');
   renderer.fit(state.map);
   refresh();
   showMessage('Save loaded.');
