@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Civ 6 Development Calculator</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="left-panel">
+        <h1>Civ 6 Dev&nbsp;Calculator</h1>
+
+        <section>
+          <h3>Map</h3>
+          <label>Size <select id="size-select"></select></label>
+          <label>Seed
+            <span class="seedrow">
+              <input id="seed-input" type="number" min="1" />
+              <button id="randomize-seed" title="Random seed">🎲</button>
+            </span>
+          </label>
+          <label class="inline"><input type="checkbox" id="resources-toggle" checked /> Resources</label>
+          <button id="generate-btn" class="primary">Generate map</button>
+        </section>
+
+        <section>
+          <h3>Mode</h3>
+          <div class="btnrow">
+            <button id="mode-inspect" class="active">Inspect</button>
+            <button id="mode-found">Found city</button>
+          </div>
+          <label class="inline" title="Districts and buildings are placed instantly and for free">
+            <input type="checkbox" id="sandbox-toggle" /> Sandbox (instant build)
+          </label>
+        </section>
+
+        <section>
+          <h3>Turns</h3>
+          <div class="row">Turn <b id="turn-label">1</b></div>
+          <div class="btnrow">
+            <button id="end-turn" class="primary">Next turn</button>
+            <button id="end-turn-10">+10</button>
+          </div>
+        </section>
+
+        <section>
+          <h3>Empire</h3>
+          <div id="empire-summary"></div>
+        </section>
+
+        <section>
+          <div class="btnrow">
+            <button id="save-btn">Save</button>
+            <button id="load-btn">Load</button>
+          </div>
+        </section>
+
+        <div id="message-line"></div>
+        <div class="hint muted">Drag to pan · wheel to zoom · right-click / Esc to cancel</div>
+      </aside>
+
+      <div id="map-wrap">
+        <canvas id="map"></canvas>
+        <div id="hover-line"></div>
+      </div>
+
+      <aside id="right-panel">
+        <div id="context-panel"></div>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

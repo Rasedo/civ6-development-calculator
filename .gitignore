@@ -1,0 +1,5 @@
+node_modules/
+dist/
+map-preview.png
+package-lock.json
+*.local
