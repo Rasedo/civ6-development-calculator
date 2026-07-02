@@ -205,6 +205,19 @@ summary { cursor: pointer; color: var(--muted); }
 
 .site-row { cursor: default; }
 
+textarea {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  font: 11px/1.4 ui-monospace, monospace;
+  resize: vertical;
+}
+.import-steps { padding-left: 18px; }
+.import-steps li { margin: 3px 0; }
+
 #message-line {
   min-height: 1.4em;
   color: var(--accent);

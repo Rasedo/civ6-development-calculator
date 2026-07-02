@@ -20,12 +20,17 @@ import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE } from '../data/constants';
 
 export function createGame(opts: MapGenOptions & { sandbox?: boolean }): GameState {
+  return createGameFromMap(generateMap(opts), opts.sandbox ?? false);
+}
+
+/** Fresh game state around an existing map (e.g. one imported from Civ 6). */
+export function createGameFromMap(map: GameState['map'], sandbox = false): GameState {
   return {
-    map: generateMap(opts),
+    map,
     cities: [],
     nextCityId: 0,
     turn: 1,
-    sandbox: opts.sandbox ?? false,
+    sandbox,
     treasury: 0,
     scienceTotal: 0,
     cultureTotal: 0,

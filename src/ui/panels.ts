@@ -43,6 +43,7 @@ export interface PanelCallbacks {
   onToggleCandidate(index: number): void;
   onSetHorizon(turns: number): void;
   onRunCompare(): void;
+  onImportMap(text: string): void;
 }
 
 /** Mutable state for the build-comparison view (owned by main.ts). */
@@ -617,6 +618,27 @@ export function renderComparePanel(
     cb.onSetHorizon(Number((e.target as HTMLSelectElement).value));
   });
   container.querySelector('[data-act="run"]')?.addEventListener('click', () => cb.onRunCompare());
+}
+
+// ---------------------------------------------------------------------------
+
+export function renderImportPanel(container: HTMLElement, lastSummary: string | null, cb: PanelCallbacks): void {
+  container.innerHTML = `
+    <h2>Import a real Civ 6 map</h2>
+    <ol class="muted import-steps">
+      <li>Install the <b>MapExporter</b> mod from this repo's <code>civ6-mod/</code> folder (see its README).</li>
+      <li>Load your game — the mod prints the map to <code>Logs/Lua.log</code>.</li>
+      <li>Paste the whole log (or just the CIV6MAP lines) below.</li>
+    </ol>
+    <textarea data-act="import-text" rows="10" placeholder="CIV6MAP_BEGIN|84|54&#10;CIV6MAP|0|0|TERRAIN_OCEAN|-|-|-|0&#10;…"></textarea>
+    <div class="row"><button data-act="import" class="primary">Import</button></div>
+    ${lastSummary ? `<div class="row">Last import: ${lastSummary}</div>` : ''}
+    <div class="hint muted">Imported maps display mirrored north–south (adjacency and yields are exact). Unknown expansion features/resources are skipped and reported.</div>
+  `;
+  container.querySelector('[data-act="import"]')?.addEventListener('click', () => {
+    const ta = container.querySelector('[data-act="import-text"]') as HTMLTextAreaElement;
+    cb.onImportMap(ta.value);
+  });
 }
 
 // ---------------------------------------------------------------------------

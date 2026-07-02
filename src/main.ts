@@ -4,6 +4,7 @@ import './style.css';
 import type { DistrictId, GameState } from './core/types';
 import {
   createGame,
+  createGameFromMap,
   foundCity,
   placeImprovement,
   removeImprovement,
@@ -39,10 +40,12 @@ import {
   renderGovernmentPanel,
   renderSettlePanel,
   renderComparePanel,
+  renderImportPanel,
   tileSummary,
   type PanelCallbacks,
   type CompareState,
 } from './ui/panels';
+import { parseCivExport, importSummary } from './core/importer';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -72,7 +75,7 @@ seedInput.value = String(Math.floor(Math.random() * 1e9));
 
 // ---------------------------------------------------------------------------
 
-type RightView = 'context' | 'tech' | 'civic' | 'government' | 'settle' | 'compare';
+type RightView = 'context' | 'tech' | 'civic' | 'government' | 'settle' | 'compare' | 'import';
 
 interface UiState {
   mode: 'inspect' | 'found' | 'placeDistrict' | 'buyTile';
@@ -85,6 +88,7 @@ interface UiState {
   manageCitizens: boolean;
   settleSites: SettleSiteScore[] | null;
   compare: CompareState | null;
+  lastImportSummary: string | null;
 }
 
 const ui: UiState = {
@@ -98,6 +102,7 @@ const ui: UiState = {
   manageCitizens: false,
   settleSites: null,
   compare: null,
+  lastImportSummary: null,
 };
 
 let state: GameState = newGameFromControls();
@@ -253,6 +258,23 @@ const callbacks: PanelCallbacks = {
       .map((i) => projectTurns(state, cityId, candidates[i], horizon));
     refresh();
   },
+  onImportMap(text) {
+    try {
+      const { map, report } = parseCivExport(text);
+      state = createGameFromMap(map, sandboxToggle.checked);
+      ui.selectedTile = null;
+      ui.selectedCityId = null;
+      ui.settleSites = null;
+      ui.compare = null;
+      ui.lastImportSummary = importSummary(report);
+      setMode('inspect');
+      renderer.fit(state.map);
+      showMessage(`Map imported: ${ui.lastImportSummary}`);
+      refresh();
+    } catch (e) {
+      showMessage(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -313,6 +335,8 @@ function refresh(): void {
     renderSettlePanel(contextPanel, state, ui.settleSites, callbacks);
   } else if (ui.rightView === 'compare' && ui.compare) {
     renderComparePanel(contextPanel, state, ui.compare, callbacks);
+  } else if (ui.rightView === 'import') {
+    renderImportPanel(contextPanel, ui.lastImportSummary, callbacks);
   }
 
   let highlight: Set<number> | null = null;
@@ -519,6 +543,11 @@ $<HTMLButtonElement>('generate-btn').addEventListener('click', () => {
 
 $<HTMLButtonElement>('randomize-seed').addEventListener('click', () => {
   seedInput.value = String(Math.floor(Math.random() * 1e9));
+});
+
+$<HTMLButtonElement>('import-btn').addEventListener('click', () => {
+  setRightView(ui.rightView === 'import' ? 'context' : 'import');
+  refresh();
 });
 
 $<HTMLButtonElement>('mode-inspect').addEventListener('click', () => {
