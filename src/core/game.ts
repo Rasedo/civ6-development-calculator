@@ -535,6 +535,7 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
 // ---------------------------------------------------------------------------
 
 function autoPickResearch(state: GameState): void {
+  if (state.autoResearch === false) return; // someone else drives research
   const eff = (id: string, cost: number) => effectiveResearchCost(state, id, cost);
   if (state.research.tech === null) {
     const next = availableTechs(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
@@ -557,7 +558,9 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
     r.tech = null;
     autoPickResearch(state);
   }
-  if (!r.tech) r.techProgress = Math.min(r.techProgress, 0); // nothing left to research
+  // Progress banks while a manual picker deliberates; it only drains when
+  // the tree is actually exhausted.
+  if (!r.tech && availableTechs(state).length === 0) r.techProgress = Math.min(r.techProgress, 0);
 
   r.civicProgress += culture;
   while (r.civic && r.civicProgress >= effectiveResearchCost(state, r.civic, CIVICS[r.civic].cost)) {
@@ -566,7 +569,7 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
     r.civic = null;
     autoPickResearch(state);
   }
-  if (!r.civic) r.civicProgress = Math.min(r.civicProgress, 0);
+  if (!r.civic && availableCivics(state).length === 0) r.civicProgress = Math.min(r.civicProgress, 0);
 
   // First government comes free with Code of Laws.
   if (!state.government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {

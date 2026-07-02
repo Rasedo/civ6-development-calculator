@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { runEpisode, linearPolicy, type Candidate, type EnvOptions } from '../src/core/rlenv';
+import { runEpisode, linearPolicy, CANDIDATE_FEATURES, FEATURE_VERSION, type Candidate, type EnvOptions } from '../src/core/rlenv';
 
 const EVAL_SEEDS = [101, 202, 303, 404, 505, 606, 707, 808];
 
@@ -24,16 +24,26 @@ function pseudoRandomPolicy(_obs: number[], cands: Candidate[]): number {
   return cands.length ? pick % cands.length : 0;
 }
 
-// Greedy: prefer districts with adjacency, then buildings, some army under threat.
-const GREEDY = [0.6, 1.0, 0.8, 0.4, 0.1, 0, 0, 1.2, 0.5, 0.6, -0.4, -0.3];
+// Greedy hand baseline for the 28-feature layout (kinds ×12, cost, turns,
+// adjacency, site, Δyields ×6, housing, amenity, unlocks, threat, builders, military).
+const GREEDY = [
+  0.6, 1.0, 0.5, 1.2, -0.2, 0.1, 0.2, 0.5, 0.5, 0.5, 0.3, 0,
+  -0.1, -0.3, 0.8, 0.6,
+  0.3, 0.4, 0.2, 0.5, 0.4, 0.2,
+  0.3, 0.3, 0.4, -0.1, -0.4, -0.2,
+];
 
 const policies: Record<string, (obs: number[], cands: Candidate[]) => number> = {
   random: pseudoRandomPolicy,
   greedy: linearPolicy(GREEDY),
 };
 if (existsSync('rl-weights.json')) {
-  const { weights } = JSON.parse(readFileSync('rl-weights.json', 'utf-8'));
-  policies.trained = linearPolicy(weights);
+  const data = JSON.parse(readFileSync('rl-weights.json', 'utf-8'));
+  if (data.featureVersion === FEATURE_VERSION && data.weights?.length === CANDIDATE_FEATURES) {
+    policies.trained = linearPolicy(data.weights);
+  } else {
+    console.log('rl-weights.json ignored: stale feature layout — retrain with npm run rl:train\n');
+  }
 }
 
 const t0 = Date.now();

@@ -212,6 +212,12 @@ export interface GameState {
   disasters: boolean;
   /** Fog of war (units mode): unexplored tiles are hidden and unusable. */
   fogOfWar: boolean;
+  /**
+   * When false, end-of-turn stops auto-picking the cheapest research;
+   * something else (the RL env, a planner) chooses techs/civics instead.
+   * Absent/true = classic auto-pick.
+   */
+  autoResearch?: boolean;
   /** Per-tile explored flags (0/1), parallel to map.tiles; [] = all explored. */
   explored: number[];
   /** Recent gameplay events (goody rewards etc.) for the UI to surface. */

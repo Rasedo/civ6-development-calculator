@@ -1,30 +1,87 @@
 /**
- * Reinforcement-learning environment (stage 12): a gym-style macro-action
- * wrapper over the full simulation. Decisions happen when a city's queue
- * runs dry; everything else (citizens, research, borders, builders,
+ * Reinforcement-learning environment: a gym-style macro-action wrapper over
+ * the full simulation. The agent decides city production (builds, projects,
+ * purchases, settlers, units), research and civic picks, policy cards and
+ * government switches; everything else (citizens, borders, builders,
  * defense, scouting, barbarians, disasters) runs on autopilot between
  * decisions. Reward = empire score at a fixed horizon; runs are fully
  * reproducible from (seed, action indices).
  */
 
-import type { City, GameState, Unit } from './types';
-import { createGame, endTurn, queueBuilding, queueDistrict, queueWonder, queueSettler, foundCity } from './game';
+import type { City, GameState, Unit, Yields } from './types';
+import { YIELD_KEYS, emptyYields, addYields } from './types';
+import {
+  createGame,
+  endTurn,
+  queueBuilding,
+  queueDistrict,
+  queueWonder,
+  queueSettler,
+  foundCity,
+  serialize,
+  deserialize,
+  setGovernment,
+  setTechResearch,
+  setCivicResearch,
+  effectiveResearchCost,
+  districtCost,
+  settlerCost,
+  availableProjects,
+  projectCost,
+  queueProject,
+  purchaseBuilding,
+  purchaseUnit,
+  purchaseSettler,
+  buildingPurchaseCost,
+  buildingFaithCost,
+  unitPurchaseCost,
+  greatPeopleEarned,
+} from './game';
 import { compareCandidates, scoreSettleSites, choiceLabel, type BuildChoice } from './advisor';
 import { empireScore } from './empirePlanner';
 import type { Objective } from './planner';
 import { computeCityStats } from './city';
 import { districtAdjacency } from './yields';
+import { availableBuildings, buildingCompletable } from './rules';
+import { computeUnlocks, availableTechs, availableCivics, governmentSlots } from './effects';
 import { trainableUnits, queueUnit, orderMove, builderImprove, builderRepair, setExploreMission, unitDomain } from './units';
 import { attackTargets, meleeAttack, getCityHp } from './combat';
 import { initFog } from './fog';
 import { validImprovements } from './rules';
 import { hexDistance } from './hex';
 import { UNITS, CITY_MAX_HP } from '../data/units';
+import { BUILDINGS } from '../data/buildings';
+import { BUILT_WONDERS } from '../data/builtWonders';
+import { DISTRICTS } from '../data/districts';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
+import { PROJECT_YIELD_FRACTION } from '../data/projects';
+import { GP_CLASSES, gpCost } from '../data/greatPeople';
+import { neighbors } from './hex';
+import { tileFreeForUnit } from './units';
 
 export type EnvAction =
   | BuildChoice
   | { kind: 'settlerAt'; tileIndex: number }
-  | { kind: 'trainUnit'; unit: string };
+  | { kind: 'trainUnit'; unit: string }
+  | { kind: 'purchaseBuilding'; id: string }
+  | { kind: 'purchaseUnit'; unit: string }
+  | { kind: 'purchaseSettler' }
+  | { kind: 'project'; id: string }
+  | { kind: 'research'; id: string }
+  | { kind: 'civic'; id: string }
+  | { kind: 'setPolicy'; card: string; slot: number }
+  | { kind: 'keepPolicies' }
+  | { kind: 'setGovernment'; id: string }
+  | { kind: 'keepGovernment' };
+
+export type PendingDecision =
+  | { type: 'production'; cityId: number }
+  | { type: 'research' }
+  | { type: 'civic' }
+  | { type: 'policy' }
+  | { type: 'government' };
 
 export interface Candidate {
   action: EnvAction;
@@ -33,8 +90,27 @@ export interface Candidate {
   features: number[];
 }
 
-export const CANDIDATE_FEATURES = 12;
-export const OBSERVATION_SIZE = 16;
+/** One-hot slot order for the candidate's kind (first CAND_KINDS features). */
+const CAND_KINDS = [
+  'building',
+  'district',
+  'wonder',
+  'settlerAt',
+  'trainUnit',
+  'purchase',
+  'project',
+  'research',
+  'civic',
+  'policy',
+  'government',
+  'keep',
+] as const;
+
+/** Bump when the feature/observation layout changes; stored in weight files. */
+export const FEATURE_VERSION = 2;
+export const CANDIDATE_FEATURES = CAND_KINDS.length + 16; // 28
+export const OBSERVATION_SIZE = 24;
+export const MAX_CANDIDATES = 24;
 
 export interface EnvOptions {
   seed: number;
@@ -157,8 +233,13 @@ export class CivEnv {
   state!: GameState;
   horizon: number;
   objective: Objective;
-  private pendingCityId: number | null = null;
+  pending: PendingDecision | null = null;
   private lastScore = 0;
+  /** Civics count at which the agent last settled policies / government. */
+  private policySettledAt = 0;
+  private govSettledAt = 0;
+  /** Policy actions taken this wave (bounds eviction ping-pong). */
+  private policyMoves = 0;
 
   constructor(private opts: EnvOptions) {
     this.horizon = opts.horizon ?? 100;
@@ -173,6 +254,7 @@ export class CivEnv {
       unitsMode: this.opts.unitsMode ?? true,
     });
     this.state.disasters = this.opts.disasters ?? true;
+    this.state.autoResearch = false; // research is the agent's job
     // Settle the starting position, then drop the fog.
     const sites = scoreSettleSites(this.state, 1);
     if (sites.length > 0) foundCity(this.state, sites[0].tileIndex);
@@ -180,6 +262,10 @@ export class CivEnv {
       this.state.fogOfWar = true;
       initFog(this.state);
     }
+    this.pending = null;
+    this.policySettledAt = 0;
+    this.govSettledAt = 0;
+    this.policyMoves = 0;
     this.lastScore = empireScore(this.state, this.objective);
     return this.advance();
   }
@@ -188,14 +274,15 @@ export class CivEnv {
   step(actionIndex: number): StepResult {
     const cands = this.candidates();
     const chosen = cands[actionIndex];
-    if (chosen && this.pendingCityId !== null) {
-      this.apply(this.pendingCityId, chosen.action);
+    if (chosen && this.pending) {
+      this.apply(this.pending, chosen.action);
     }
     return this.advance();
   }
 
-  private apply(cityId: number, action: EnvAction): void {
+  private apply(decision: PendingDecision, action: EnvAction): void {
     const s = this.state;
+    const cityId = decision.type === 'production' ? decision.cityId : -1;
     switch (action.kind) {
       case 'none':
         break;
@@ -215,12 +302,82 @@ export class CivEnv {
       case 'trainUnit':
         queueUnit(s, cityId, action.unit);
         break;
+      case 'purchaseBuilding':
+        purchaseBuilding(s, cityId, action.id);
+        break;
+      case 'purchaseUnit':
+        purchaseUnit(s, cityId, action.unit);
+        break;
+      case 'purchaseSettler':
+        purchaseSettler(s, cityId);
+        break;
+      case 'project':
+        queueProject(s, cityId, action.id);
+        break;
+      case 'research':
+        setTechResearch(s, action.id);
+        break;
+      case 'civic':
+        setCivicResearch(s, action.id);
+        break;
+      case 'setPolicy': {
+        this.padPolicySlots();
+        s.government.policies[action.slot] = action.card;
+        // Evictions can ping-pong forever (A evicts B, B evicts A…), so a
+        // wave ends when the slots are full or after slots+2 moves.
+        this.policyMoves += 1;
+        if (
+          !s.government.policies.includes(null) ||
+          this.policyMoves >= governmentSlots(s).length + 2
+        ) {
+          this.settlePolicies();
+        }
+        break;
+      }
+      case 'keepPolicies':
+        this.settlePolicies();
+        break;
+      case 'setGovernment':
+        setGovernment(s, action.id);
+        this.govSettledAt = s.research.civics.length;
+        // A new government opens fresh slots: revisit policies right away.
+        this.policySettledAt = s.research.civics.length - 1;
+        this.policyMoves = 0;
+        break;
+      case 'keepGovernment':
+        this.govSettledAt = s.research.civics.length;
+        break;
     }
   }
 
-  private idleCity(): City | null {
-    for (const c of [...this.state.cities].sort((a, b) => a.id - b.id)) {
-      if (c.queue.length === 0) return c;
+  private settlePolicies(): void {
+    this.policySettledAt = this.state.research.civics.length;
+    this.policyMoves = 0;
+  }
+
+  /** Find the next decision that actually has choices, in priority order. */
+  private nextDecision(): PendingDecision | null {
+    const s = this.state;
+    if (s.research.civics.length > this.govSettledAt) {
+      const d: PendingDecision = { type: 'government' };
+      if (this.candidatesFor(d).length > 1) return d;
+      this.govSettledAt = s.research.civics.length;
+    }
+    if (s.research.civics.length > this.policySettledAt) {
+      const d: PendingDecision = { type: 'policy' };
+      if (this.candidatesFor(d).length > 1) return d;
+      this.settlePolicies();
+    }
+    if (s.research.tech === null && availableTechs(s).length > 0) {
+      return { type: 'research' };
+    }
+    if (s.research.civic === null && availableCivics(s).length > 0) {
+      return { type: 'civic' };
+    }
+    for (const c of [...s.cities].sort((a, b) => a.id - b.id)) {
+      if (c.queue.length > 0) continue;
+      const d: PendingDecision = { type: 'production', cityId: c.id };
+      if (this.candidatesFor(d).length > 0) return d;
     }
     return null;
   }
@@ -228,19 +385,16 @@ export class CivEnv {
   private advance(): StepResult {
     const s = this.state;
     while (s.turn < this.horizon) {
-      const idle = this.idleCity();
-      if (idle) {
-        this.pendingCityId = idle.id;
-        const cands = this.candidates();
-        if (cands.length > 0) {
-          return this.result(false);
-        }
-        this.pendingCityId = null;
+      const d = this.nextDecision();
+      if (d) {
+        this.pending = d;
+        return this.result(false);
       }
+      this.pending = null;
       playerAutoPhase(s);
       endTurn(s);
     }
-    this.pendingCityId = null;
+    this.pending = null;
     return this.result(true);
   }
 
@@ -257,80 +411,377 @@ export class CivEnv {
     };
   }
 
-  /** Candidates for the pending city (empty when no decision is pending). */
+  /** Candidates for the pending decision (empty when none is pending). */
   candidates(): Candidate[] {
-    const s = this.state;
-    if (this.pendingCityId === null) return [];
-    const city = s.cities.find((c) => c.id === this.pendingCityId);
-    if (!city) return [];
+    return this.pending ? this.candidatesFor(this.pending) : [];
+  }
 
+  private candidatesFor(decision: PendingDecision): Candidate[] {
+    switch (decision.type) {
+      case 'production':
+        return this.productionCandidates(decision.cityId);
+      case 'research':
+        return this.researchCandidates('tech');
+      case 'civic':
+        return this.researchCandidates('civic');
+      case 'policy':
+        return this.policyCandidates();
+      case 'government':
+        return this.governmentCandidates();
+    }
+  }
+
+  // --- production ------------------------------------------------------------
+
+  private productionCandidates(cityId: number): Candidate[] {
+    const s = this.state;
+    const city = s.cities.find((c) => c.id === cityId);
+    if (!city) return [];
+    const prod = Math.max(1, computeCityStats(s, city).total.production);
     const out: Candidate[] = [];
+
     for (const choice of compareCandidates(s, city.id)) {
       if (choice.kind === 'none') continue;
-      out.push({ action: choice, label: choiceLabel(choice), features: this.features(city, choice) });
+      out.push(this.buildCandidate(city, choice, prod));
     }
-    const sites = scoreSettleSites(s, 1);
-    if (sites.length > 0) {
-      out.push({
-        action: { kind: 'settlerAt', tileIndex: sites[0].tileIndex },
-        label: `Settler → site ${sites[0].score.toFixed(0)}`,
-        features: this.features(city, { kind: 'settlerAt', tileIndex: sites[0].tileIndex }, sites[0].score),
-      });
+    for (const p of availableProjects(s, city)) {
+      const cost = projectCost(s);
+      const delta = emptyYields();
+      if (p.yield) delta[p.yield] = prod * PROJECT_YIELD_FRACTION;
+      out.push(
+        this.candidate({ kind: 'project', id: p.id }, p.name, 'project', {
+          cost,
+          turns: cost / prod,
+          delta,
+          city,
+        }),
+      );
+    }
+    for (const site of scoreSettleSites(s, 3)) {
+      out.push(
+        this.candidate(
+          { kind: 'settlerAt', tileIndex: site.tileIndex },
+          `Settler → (${s.map.tiles[site.tileIndex].col},${s.map.tiles[site.tileIndex].row})`,
+          'settlerAt',
+          { cost: settlerCost(s), turns: settlerCost(s) / prod, siteScore: site.score, city },
+        ),
+      );
     }
     if (s.unitsMode) {
       for (const u of trainableUnits(s)) {
         if (u.id !== 'BUILDER' && u.id !== 'SCOUT' && u.combat === 0) continue;
-        out.push({
-          action: { kind: 'trainUnit', unit: u.id },
-          label: `Train ${u.name}`,
-          features: this.features(city, { kind: 'trainUnit', unit: u.id }),
-        });
+        out.push(
+          this.candidate({ kind: 'trainUnit', unit: u.id }, `Train ${u.name}`, 'trainUnit', {
+            cost: u.cost,
+            turns: u.cost / prod,
+            city,
+          }),
+        );
       }
     }
-    return out.slice(0, 16);
+    out.push(...this.purchaseCandidates(city));
+    return out.slice(0, MAX_CANDIDATES);
   }
 
-  /** Per-candidate features: [kind one-hot ×6, cost/100, adjacency/5, siteScore/50, threat, builders, military]. */
-  private features(city: City, action: EnvAction, siteScore = 0): number[] {
+  private buildCandidate(city: City, choice: BuildChoice, prod: number): Candidate {
     const s = this.state;
-    const kinds = ['building', 'district', 'wonder', 'settlerAt', 'trainUnit', 'none'];
-    const kindIdx = kinds.indexOf(action.kind);
-    const oneHot = kinds.map((_, i) => (i === kindIdx ? 1 : 0));
+    const delta = emptyYields();
     let cost = 0;
     let adjacency = 0;
-    if (action.kind === 'building') cost = 1;
-    if (action.kind === 'district') {
-      cost = 1;
-      adjacency = districtAdjacency(s.map, s.map.tiles[action.tileIndex], action.type) / 5;
+    let housing = 0;
+    let amenity = 0;
+    if (choice.kind === 'building') {
+      const def = BUILDINGS[choice.id];
+      cost = def?.cost ?? 0;
+      addYields(delta, def?.yields ?? {});
+      housing = def?.housing ?? 0;
+      amenity = def?.amenities ?? 0;
+    } else if (choice.kind === 'district') {
+      cost = districtCost(s);
+      const def = DISTRICTS[choice.type];
+      adjacency = districtAdjacency(s.map, s.map.tiles[choice.tileIndex], choice.type);
+      if (def.adjacencyYield) delta[def.adjacencyYield] += adjacency;
+      housing = def.housing;
+    } else if (choice.kind === 'wonder') {
+      const def = BUILT_WONDERS[choice.wonder];
+      cost = def?.cost ?? 0;
+      addYields(delta, def?.cityYields ?? {});
     }
-    if (action.kind === 'trainUnit') cost = (UNITS[action.unit]?.cost ?? 50) / 100;
-    const barbNear = s.units.filter((u) => {
-      if (u.owner !== 'barbarian') return false;
-      const bt = s.map.tiles[u.tileIndex];
+    return this.candidate(choice, choiceLabel(choice), choice.kind as (typeof CAND_KINDS)[number], {
+      cost,
+      turns: cost / prod,
+      adjacency,
+      delta,
+      housing,
+      amenity,
+      city,
+    });
+  }
+
+  private purchaseCandidates(city: City): Candidate[] {
+    const s = this.state;
+    const out: Candidate[] = [];
+    const affordable = availableBuildings(s, city)
+      .filter((b) => buildingCompletable(s, city, b.id))
+      .filter((b) =>
+        b.worship ? s.faithTotal >= buildingFaithCost(b.id) : s.treasury >= buildingPurchaseCost(b.id),
+      )
+      .sort((a, b) => a.cost - b.cost)
+      .slice(0, 2);
+    for (const b of affordable) {
+      const delta = emptyYields();
+      addYields(delta, b.yields ?? {});
+      out.push(
+        this.candidate({ kind: 'purchaseBuilding', id: b.id }, `Buy ${b.name}`, 'purchase', {
+          cost: buildingPurchaseCost(b.id) / 4,
+          delta,
+          housing: b.housing ?? 0,
+          amenity: b.amenities ?? 0,
+          city,
+        }),
+      );
+    }
+    if (s.unitsMode) {
+      const center = s.map.tiles[city.centerIndex];
+      const spawnable = (type: string) =>
+        [center, ...neighbors(s.map, center)].some((t) =>
+          tileFreeForUnit(s, t.index, { type, owner: 'player' }),
+        );
+      const units = trainableUnits(s)
+        .filter((u) => s.treasury >= unitPurchaseCost(u.id))
+        .filter((u) => u.charges !== undefined || u.combat > 0)
+        .filter((u) => spawnable(u.id)); // a failed instant-buy would livelock the decision loop
+      const builder = units.find((u) => u.charges !== undefined);
+      const strongest = [...units].filter((u) => u.combat > 0).sort((a, b) => b.combat - a.combat)[0];
+      for (const u of [builder, strongest].filter(Boolean) as typeof units) {
+        out.push(
+          this.candidate({ kind: 'purchaseUnit', unit: u.id }, `Buy ${u.name}`, 'purchase', {
+            cost: unitPurchaseCost(u.id) / 4,
+            city,
+          }),
+        );
+      }
+    }
+    if (s.treasury >= settlerCost(s) * 4) {
+      out.push(
+        this.candidate({ kind: 'purchaseSettler' }, 'Buy Settler', 'purchase', {
+          cost: settlerCost(s),
+          city,
+        }),
+      );
+    }
+    return out;
+  }
+
+  // --- research --------------------------------------------------------------
+
+  private researchCandidates(kind: 'tech' | 'civic'): Candidate[] {
+    const s = this.state;
+    const totals = this.empireTotals();
+    const rate = Math.max(0.5, kind === 'tech' ? totals.science : totals.culture);
+    const defs = kind === 'tech' ? availableTechs(s) : availableCivics(s);
+    const progress = kind === 'tech' ? s.research.techProgress : s.research.civicProgress;
+    return defs
+      .map((d) => ({ d, cost: effectiveResearchCost(s, d.id, d.cost) }))
+      .sort((a, b) => a.cost - b.cost)
+      .slice(0, 6)
+      .map(({ d, cost }) => {
+        const effects = (kind === 'tech' ? TECHS[d.id].effects : CIVICS[d.id].effects) ?? [];
+        const unlocks = effects.filter((e) => e.kind.startsWith('unlock')).length;
+        return this.candidate(
+          kind === 'tech' ? { kind: 'research', id: d.id } : { kind: 'civic', id: d.id },
+          `${kind === 'tech' ? 'Research' : 'Civic'}: ${d.name}`,
+          kind === 'tech' ? 'research' : 'civic',
+          { cost, turns: Math.max(0, cost - progress) / rate, unlocks },
+        );
+      });
+  }
+
+  // --- policies & government ---------------------------------------------------
+
+  private padPolicySlots(): void {
+    const s = this.state;
+    const slots = governmentSlots(s);
+    while (s.government.policies.length < slots.length) s.government.policies.push(null);
+  }
+
+  /** Empire per-turn yield totals (used for candidate deltas and rates). */
+  private empireTotals(state: GameState = this.state): Yields {
+    const totals = emptyYields();
+    for (const c of state.cities) {
+      addYields(totals, computeCityStats(state, c).total);
+    }
+    return totals;
+  }
+
+  /** Δ empire yields from putting `card` into `slot` (state restored after). */
+  private policySwapDelta(base: Yields, slot: number, card: string | null): Yields {
+    const s = this.state;
+    const prev = s.government.policies[slot] ?? null;
+    s.government.policies[slot] = card;
+    const after = this.empireTotals();
+    s.government.policies[slot] = prev;
+    const delta = emptyYields();
+    for (const k of YIELD_KEYS) delta[k] = after[k] - base[k];
+    return delta;
+  }
+
+  private policyCandidates(): Candidate[] {
+    const s = this.state;
+    if (!s.government.current) return [];
+    this.padPolicySlots();
+    const slots = governmentSlots(s);
+    const base = this.empireTotals();
+    const unlocked = s.sandbox ? new Set(Object.keys(POLICIES)) : computeUnlocks(s).policies;
+    const slotted = new Set(s.government.policies.filter((p): p is string => p !== null));
+
+    // Contribution of each currently slotted card (to pick replacement victims).
+    const removalDelta = new Map<number, number>();
+    s.government.policies.forEach((card, i) => {
+      if (card === null) return;
+      const d = this.policySwapDelta(base, i, null);
+      removalDelta.set(i, YIELD_KEYS.reduce((sum, k) => sum + d[k], 0));
+    });
+
+    const out: Candidate[] = [];
+    for (const cardId of unlocked) {
+      if (slotted.has(cardId)) continue;
+      const card = POLICIES[cardId];
+      if (!card) continue;
+      const fitting = slots
+        .map((kind, i) => (cardFitsSlot(card, kind) ? i : -1))
+        .filter((i) => i >= 0);
+      if (fitting.length === 0) continue;
+      const free = fitting.find((i) => s.government.policies[i] === null);
+      // No free slot: evict the fitting card contributing least (removal
+      // deltas are negative contributions, so the max is the weakest card).
+      const target =
+        free ??
+        fitting.reduce((best, i) => ((removalDelta.get(i) ?? 0) > (removalDelta.get(best) ?? 0) ? i : best), fitting[0]);
+      const delta = this.policySwapDelta(base, target, cardId);
+      out.push(
+        this.candidate({ kind: 'setPolicy', card: cardId, slot: target }, `Policy: ${card.name}`, 'policy', {
+          delta,
+        }),
+      );
+    }
+    if (out.length === 0) return [];
+    const trimmed = out.slice(0, MAX_CANDIDATES - 1);
+    trimmed.push(this.candidate({ kind: 'keepPolicies' }, 'Keep current policies', 'keep', {}));
+    return trimmed;
+  }
+
+  private governmentCandidates(): Candidate[] {
+    const s = this.state;
+    if (!s.government.current) return [];
+    const unlocked = computeUnlocks(s).governments;
+    const options = [...unlocked].filter((g) => g !== s.government.current && GOVERNMENTS[g]);
+    if (options.length === 0) return [];
+    const base = this.empireTotals();
+    const out: Candidate[] = [];
+    for (const id of options) {
+      // Switching reshuffles slots; evaluate on a clone.
+      const clone = deserialize(serialize(s));
+      setGovernment(clone, id);
+      const after = this.empireTotals(clone);
+      const delta = emptyYields();
+      for (const k of YIELD_KEYS) delta[k] = after[k] - base[k];
+      out.push(
+        this.candidate({ kind: 'setGovernment', id }, `Government: ${GOVERNMENTS[id].name}`, 'government', {
+          delta,
+        }),
+      );
+    }
+    out.push(this.candidate({ kind: 'keepGovernment' }, 'Keep current government', 'keep', {}));
+    return out;
+  }
+
+  // --- features ---------------------------------------------------------------
+
+  private candidate(
+    action: EnvAction,
+    label: string,
+    kind: (typeof CAND_KINDS)[number],
+    parts: {
+      cost?: number;
+      turns?: number;
+      adjacency?: number;
+      siteScore?: number;
+      delta?: Yields;
+      housing?: number;
+      amenity?: number;
+      unlocks?: number;
+      city?: City;
+    },
+  ): Candidate {
+    const s = this.state;
+    const oneHot = CAND_KINDS.map((k) => (k === kind ? 1 : 0));
+    const city = parts.city ?? s.cities.find((c) => c.isCapital) ?? s.cities[0];
+    let threat = 0;
+    if (city) {
       const ct = s.map.tiles[city.centerIndex];
-      return hexDistance(bt.col, bt.row, ct.col, ct.row) <= 6;
-    }).length;
+      threat = s.units.filter((u) => {
+        if (u.owner !== 'barbarian') return false;
+        const bt = s.map.tiles[u.tileIndex];
+        return hexDistance(bt.col, bt.row, ct.col, ct.row) <= 6;
+      }).length;
+    }
     const builders = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'civilian').length;
     const military = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'military').length;
-    return [...oneHot, cost, adjacency, siteScore / 50, Math.min(1, barbNear / 3), Math.min(1, builders / 3), Math.min(1, military / 4)];
+    const delta = parts.delta ?? emptyYields();
+    return {
+      action,
+      label,
+      features: [
+        ...oneHot,
+        (parts.cost ?? 0) / 200,
+        Math.min(2, (parts.turns ?? 0) / 20),
+        (parts.adjacency ?? 0) / 5,
+        (parts.siteScore ?? 0) / 50,
+        ...YIELD_KEYS.map((k) => delta[k] / 5),
+        (parts.housing ?? 0) / 3,
+        (parts.amenity ?? 0) / 2,
+        (parts.unlocks ?? 0) / 5,
+        Math.min(1, threat / 3),
+        Math.min(1, builders / 3),
+        Math.min(1, military / 4),
+      ],
+    };
   }
 
   /** Empire-level observation vector (OBSERVATION_SIZE numbers, roughly normalized). */
   observation(): number[] {
     const s = this.state;
-    let yields = { food: 0, production: 0, gold: 0, science: 0, culture: 0, faith: 0 };
+    const yields = emptyYields();
     let pop = 0;
     let hpDeficit = 0;
+    let amenityDeficit = 0;
+    let housingHeadroom = 0;
     for (const c of s.cities) {
       const st = computeCityStats(s, c);
-      for (const k of Object.keys(yields) as (keyof typeof yields)[]) yields[k] += st.total[k];
+      addYields(yields, st.total);
       pop += c.population;
       hpDeficit += (CITY_MAX_HP - getCityHp(s, c.id)) / CITY_MAX_HP;
+      amenityDeficit += Math.max(0, st.amenities.needed - st.amenities.have);
+      housingHeadroom += Math.min(4, st.housing - c.population);
     }
     const barbs = s.units.filter((u) => u.owner === 'barbarian').length;
+    const builders = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'civilian').length;
+    const military = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'military').length;
     const pillaged = s.map.tiles.filter((t) => t.pillaged).length;
+    const owned = s.map.tiles.filter((t) => t.cityId !== -1);
+    const improvable = owned.filter((t) => !t.improvement && !t.district && validImprovements(s, t).length > 0).length;
     const exploredFrac =
       s.explored.length > 0 ? s.explored.filter((e) => e === 1).length / s.explored.length : 1;
+    let gpProgress = 0;
+    for (const cls of GP_CLASSES) {
+      const pts = s.greatPeople.points[cls] ?? 0;
+      gpProgress = Math.max(gpProgress, pts / gpCost(greatPeopleEarned(s, cls)));
+    }
+    const slots = s.government.current ? governmentSlots(s) : [];
+    const emptySlots = slots.length
+      ? slots.filter((_, i) => (s.government.policies[i] ?? null) === null).length / slots.length
+      : 0;
     return [
       s.turn / this.horizon,
       s.cities.length / 8,
@@ -348,6 +799,14 @@ export class CivEnv {
       hpDeficit,
       Math.min(1, s.settlers / 2),
       exploredFrac,
+      Math.min(1, amenityDeficit / 10),
+      Math.max(-1, Math.min(1, housingHeadroom / 20)),
+      Math.min(1, builders / 3),
+      Math.min(1, military / 4),
+      owned.length ? improvable / owned.length : 0,
+      Math.min(1, s.faithTotal / 500),
+      Math.min(1, gpProgress),
+      emptySlots,
     ];
   }
 }
@@ -380,7 +839,7 @@ export function runEpisode(
   let r = env.reset();
   let decisions = 0;
   let guard = 0;
-  while (!r.done && guard++ < 2000) {
+  while (!r.done && guard++ < 5000) {
     r = env.step(policy(r.observation, r.candidates));
     decisions++;
   }

@@ -5,7 +5,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { runEpisode, linearPolicy, CANDIDATE_FEATURES, type EnvOptions } from '../src/core/rlenv';
+import { runEpisode, linearPolicy, CANDIDATE_FEATURES, FEATURE_VERSION, type EnvOptions } from '../src/core/rlenv';
 
 const GENERATIONS = Number(process.argv[2] ?? 20);
 const POPULATION = 12;
@@ -58,5 +58,8 @@ for (let gen = 1; gen <= GENERATIONS; gen++) {
 const secs = (Date.now() - t0) / 1000;
 console.log(`\nTrained ${GENERATIONS} generations x ${POPULATION} in ${secs.toFixed(1)}s`);
 console.log(`Weights: [${best.map((w) => w.toFixed(3)).join(', ')}]`);
-writeFileSync('rl-weights.json', JSON.stringify({ weights: best, meanScore: bestFit }, null, 2));
+writeFileSync(
+  'rl-weights.json',
+  JSON.stringify({ featureVersion: FEATURE_VERSION, weights: best, meanScore: bestFit }, null, 2),
+);
 console.log('Wrote rl-weights.json — evaluate with: npm run rl:eval');
