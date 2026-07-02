@@ -62,7 +62,26 @@ export function createGameFromMap(map: GameState['map'], sandbox = false): GameS
     greatPeople: { points: {}, earned: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
     tradeRoutes: [],
+    settlers: 0,
+    plannedSettles: [],
   };
+}
+
+/** Civ 6-ish settler cost, rising with every city, trained settler and queued one. */
+export function settlerCost(state: GameState): number {
+  const queued = state.cities.reduce(
+    (n, c) => n + c.queue.filter((q) => q.kind === 'settler').length,
+    0,
+  );
+  return 80 + 30 * Math.max(0, state.cities.length - 1 + state.settlers + queued);
+}
+
+/** Train a settler in a city (no district requirement). Sandbox founds free anyway. */
+export function queueSettler(state: GameState, cityId: number): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  city.queue.push({ kind: 'settler', progress: 0, cost: settlerCost(state) });
+  return { ok: true };
 }
 
 function cityName(id: number): string {
@@ -74,6 +93,15 @@ function cityName(id: number): string {
 export function foundCity(state: GameState, tileIndex: number): RuleResult & { city?: City } {
   const check = canFoundCity(state, tileIndex);
   if (!check.ok) return check;
+
+  // The first city uses your starting settler; later ones must be trained
+  // (unless sandbox). canFoundCity stays tile-only so advisors keep working.
+  if (!state.sandbox && state.cities.length > 0) {
+    if (state.settlers <= 0) {
+      return { ok: false, reason: 'No settler available — train one in a city.' };
+    }
+    state.settlers -= 1;
+  }
 
   const tile = state.map.tiles[tileIndex];
   const id = state.nextCityId++;
@@ -224,12 +252,14 @@ export function cancelQueueItem(state: GameState, cityId: number, index: number)
 export function itemCost(item: QueueItem): number {
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
+  if (item.kind === 'settler') return item.cost;
   return BUILDINGS[item.building].cost;
 }
 
 export function itemLabel(item: QueueItem): string {
   if (item.kind === 'district') return DISTRICTS[item.district].name;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;
+  if (item.kind === 'settler') return 'Settler';
   return BUILDINGS[item.building].name;
 }
 
@@ -253,7 +283,7 @@ export function setSpecialists(
 
 function isEncampmentItem(item: QueueItem): boolean {
   if (item.kind === 'district') return item.district === 'ENCAMPMENT';
-  if (item.kind === 'wonder') return false;
+  if (item.kind !== 'building') return false;
   return BUILDINGS[item.building]?.district === 'ENCAMPMENT';
 }
 
@@ -422,6 +452,8 @@ export function endTurn(state: GameState): void {
           state.map.tiles[item.tileIndex].districtComplete = true;
         } else if (item.kind === 'wonder') {
           state.map.tiles[item.tileIndex].builtWonderComplete = true;
+        } else if (item.kind === 'settler') {
+          state.settlers += 1;
         } else {
           city.buildings.push(item.building);
         }
@@ -464,6 +496,16 @@ export function endTurn(state: GameState): void {
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);
+
+  // Auto-found sites queued by the empire planner as settlers become available.
+  while (state.settlers > 0 && state.plannedSettles.length > 0) {
+    const target = state.plannedSettles.shift()!;
+    if (canFoundCity(state, target).ok) {
+      foundCity(state, target);
+    }
+    // Invalid targets (map changed since planning) are simply dropped.
+  }
+
   state.turn += 1;
 }
 
@@ -557,6 +599,8 @@ export function deserialize(json: string): GameState {
   }
   state.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null };
   state.tradeRoutes ??= [];
+  state.settlers ??= 0;
+  state.plannedSettles ??= [];
   for (const c of state.cities) {
     c.cultureBox ??= 0;
     c.tilesAcquired ??= 0;

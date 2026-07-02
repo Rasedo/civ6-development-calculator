@@ -48,17 +48,20 @@ import {
   renderPlannerPanel,
   renderReligionPanel,
   renderTradePanel,
+  renderEmpirePlanPanel,
   tileSummary,
   type PanelCallbacks,
   type CompareState,
   type PlannerState,
+  type EmpirePlanState,
 } from './ui/panels';
 import { parseCivExport, importSummary } from './core/importer';
 import { toggleBoost } from './core/boosts';
 import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
-import { choosePantheon, foundReligion } from './core/game';
+import { choosePantheon, foundReligion, queueSettler } from './core/game';
 import { addTradeRoute, removeTradeRoute } from './core/trade';
+import { searchEmpirePlan, adoptEmpirePlan } from './core/empirePlanner';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -99,7 +102,8 @@ type RightView =
   | 'greatPeople'
   | 'planner'
   | 'religion'
-  | 'trade';
+  | 'trade'
+  | 'empirePlan';
 
 interface UiState {
   mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile';
@@ -114,6 +118,7 @@ interface UiState {
   settleSites: SettleSiteScore[] | null;
   compare: CompareState | null;
   planner: PlannerState | null;
+  empirePlan: EmpirePlanState;
   lastImportSummary: string | null;
 }
 
@@ -130,6 +135,7 @@ const ui: UiState = {
   settleSites: null,
   compare: null,
   planner: null,
+  empirePlan: { objective: 'balanced', horizon: 30, results: null },
   lastImportSummary: null,
 };
 
@@ -182,6 +188,7 @@ function setRightView(view: RightView): void {
     ['view-gp', 'greatPeople'],
     ['view-religion', 'religion'],
     ['view-trade', 'trade'],
+    ['view-empire-plan', 'empirePlan'],
     ['settle-advisor', 'settle'],
   ] as const) {
     $<HTMLButtonElement>(btn).classList.toggle('active', view === v);
@@ -339,6 +346,41 @@ const callbacks: PanelCallbacks = {
       refresh();
     }, 20);
   },
+  onQueueSettler(cityId) {
+    const r = queueSettler(state, cityId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onSetEmpireObjective(objective) {
+    ui.empirePlan.objective = objective;
+    ui.empirePlan.results = null;
+    refresh();
+  },
+  onSetEmpireHorizon(turns) {
+    ui.empirePlan.horizon = turns;
+    ui.empirePlan.results = null;
+    refresh();
+  },
+  onRunEmpirePlan() {
+    showMessage('Searching empire plans…');
+    setTimeout(() => {
+      ui.empirePlan.results = searchEmpirePlan(state, {
+        horizon: ui.empirePlan.horizon,
+        objective: ui.empirePlan.objective,
+      });
+      showMessage(`Found ${ui.empirePlan.results.length} plan(s).`);
+      refresh();
+    }, 20);
+  },
+  onAdoptEmpirePlan(index) {
+    const plan = ui.empirePlan.results?.[index];
+    if (!plan) return;
+    const r = adoptEmpirePlan(state, plan);
+    showMessage(
+      r.reason ? `Adopted ${r.adopted} step(s); ${r.reason}` : `Adopted ${r.adopted} step(s).`,
+    );
+    refresh();
+  },
   onChoosePantheon(beliefId) {
     const r = choosePantheon(state, beliefId);
     if (!r.ok) showMessage(r.reason!);
@@ -462,6 +504,8 @@ function refresh(): void {
     renderReligionPanel(contextPanel, state, callbacks);
   } else if (ui.rightView === 'trade') {
     renderTradePanel(contextPanel, state, callbacks);
+  } else if (ui.rightView === 'empirePlan') {
+    renderEmpirePlanPanel(contextPanel, state, ui.empirePlan, callbacks);
   }
 
   let highlight: Set<number> | null = null;
@@ -737,6 +781,7 @@ for (const [btn, view] of [
   ['view-gp', 'greatPeople'],
   ['view-religion', 'religion'],
   ['view-trade', 'trade'],
+  ['view-empire-plan', 'empirePlan'],
 ] as const) {
   $<HTMLButtonElement>(btn).addEventListener('click', () => {
     setRightView(ui.rightView === view ? 'context' : view);

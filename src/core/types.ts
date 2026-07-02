@@ -100,7 +100,8 @@ export type FocusId = 'balanced' | YieldKey;
 export type QueueItem =
   | { kind: 'district'; district: DistrictId; tileIndex: number; progress: number; cost?: number }
   | { kind: 'building'; building: string; progress: number }
-  | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number };
+  | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number }
+  | { kind: 'settler'; progress: number; cost: number };
 
 export type GreatPersonClass =
   | 'SCIENTIST'
@@ -176,6 +177,10 @@ export interface GameState {
   };
   religion: ReligionState;
   tradeRoutes: TradeRoute[];
+  /** Trained settlers waiting to found a city (first city needs none). */
+  settlers: number;
+  /** Tile indexes queued for automatic founding as settlers complete. */
+  plannedSettles: number[];
 }
 
 export interface ReligionState {

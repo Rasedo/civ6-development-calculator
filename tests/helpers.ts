@@ -46,6 +46,8 @@ export function makeState(map: GameMap = makeMap()): GameState {
     greatPeople: { points: {}, earned: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
     tradeRoutes: [],
+    settlers: 0,
+    plannedSettles: [],
   };
 }
 

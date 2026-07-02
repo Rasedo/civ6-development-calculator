@@ -28,6 +28,8 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { GP_CLASSES, GP_CLASS_NAMES, GREAT_PEOPLE, gpCost, SPECIALIST_YIELDS } from '../data/greatPeople';
 import { choiceLabel, type BuildChoice, type Projection, type SettleSiteScore } from '../core/advisor';
 import { OBJECTIVES, type Objective, type Plan } from '../core/planner';
+import type { EmpirePlan } from '../core/empirePlanner';
+import { settlerCost } from '../core/game';
 import { TECHS, ERAS, type ResearchEffect, type TechDef } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
@@ -65,6 +67,18 @@ export interface PanelCallbacks {
   onFoundReligion(choice: { name: string; follower: string; founder: string; worship: string }): void;
   onAddTradeRoute(from: number, to: number): void;
   onRemoveTradeRoute(index: number): void;
+  onQueueSettler(cityId: number): void;
+  onSetEmpireObjective(objective: Objective): void;
+  onSetEmpireHorizon(turns: number): void;
+  onRunEmpirePlan(): void;
+  onAdoptEmpirePlan(index: number): void;
+}
+
+/** Mutable state for the empire planner view (owned by main.ts). */
+export interface EmpirePlanState {
+  objective: Objective;
+  horizon: number;
+  results: EmpirePlan[] | null;
 }
 
 /** Mutable state for the build-order planner view (owned by main.ts). */
@@ -350,6 +364,7 @@ export function renderCityPanel(
       <button data-act="buy-tile" ${canBuy ? '' : 'disabled'}>Buy tile (${buyCost}g)</button>
       <button data-act="compare">Compare builds…</button>
       <button data-act="plan">Plan build order…</button>
+      ${state.sandbox ? '' : `<button data-act="settler" title="Needed to found further cities">Train settler (${settlerCost(state)}⚙)</button>`}
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
     <details><summary>Yield breakdown</summary>
@@ -393,6 +408,7 @@ export function renderCityPanel(
   container.querySelector('[data-act="buy-tile"]')?.addEventListener('click', () => cb.onStartBuyTile(city.id));
   container.querySelector('[data-act="compare"]')?.addEventListener('click', () => cb.onOpenCompare(city.id));
   container.querySelector('[data-act="plan"]')?.addEventListener('click', () => cb.onOpenPlanner(city.id));
+  container.querySelector('[data-act="settler"]')?.addEventListener('click', () => cb.onQueueSettler(city.id));
   container.querySelector('[data-act="place-district"]')?.addEventListener('click', () => {
     const sel = container.querySelector('[data-act="district-select"]') as HTMLSelectElement;
     if (sel.value) cb.onStartDistrictPlacement(city.id, sel.value as DistrictId);
@@ -411,6 +427,61 @@ export function renderCityPanel(
       const el = b as HTMLElement;
       cb.onSetSpecialists(city.id, Number(el.dataset.tile), Number(el.dataset.n));
     }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empire planner
+// ---------------------------------------------------------------------------
+
+export function renderEmpirePlanPanel(
+  container: HTMLElement,
+  _state: GameState,
+  eplan: EmpirePlanState,
+  cb: PanelCallbacks,
+): void {
+  let resultsHtml = '';
+  if (eplan.results) {
+    resultsHtml = eplan.results
+      .map((plan, i) => {
+        const steps = plan.steps
+          .map((s) => `<b>${s.cityName}</b>: ${s.label} <span class="muted">t${s.decidedOnTurn}</span>`)
+          .join('<br>');
+        return `<div class="district-row">
+          <b>#${i + 1}</b> score ${fmt(plan.score)} · ${plan.cities} city(ies), pop ${plan.totalPop}<br>
+          <small>${steps || '(nothing to do)'}</small><br>
+          <small class="muted">${yieldsHtml(plan.empireYields)}</small>
+          <div class="row"><button data-act="adopt-emp" data-i="${i}">Adopt plan</button></div>
+        </div>`;
+      })
+      .join('');
+    if (eplan.results.length === 0) resultsHtml = '<div class="muted">No viable plans found.</div>';
+  }
+
+  container.innerHTML = `
+    <h2>Empire planner</h2>
+    <div class="row muted">Plans across every city at once: whenever a city finishes building, the search decides what it does next — including training a settler aimed at the best settle site (founded automatically when it completes). Steps for not-yet-founded cities can't be pre-queued; re-plan after they exist.</div>
+    <div class="row">
+      <label>Objective <select data-act="emp-objective">
+        ${OBJECTIVES.map((o) => `<option value="${o}" ${eplan.objective === o ? 'selected' : ''}>${o}</option>`).join('')}
+      </select></label>
+      <label>Horizon <select data-act="emp-horizon">
+        ${[20, 30, 40, 60].map((h) => `<option value="${h}" ${eplan.horizon === h ? 'selected' : ''}>${h} turns</option>`).join('')}
+      </select></label>
+    </div>
+    <div class="row"><button data-act="run-emp" class="primary">Search (may take several seconds)</button></div>
+    ${resultsHtml}
+  `;
+
+  container.querySelector('[data-act="emp-objective"]')?.addEventListener('change', (e) => {
+    cb.onSetEmpireObjective((e.target as HTMLSelectElement).value as Objective);
+  });
+  container.querySelector('[data-act="emp-horizon"]')?.addEventListener('change', (e) => {
+    cb.onSetEmpireHorizon(Number((e.target as HTMLSelectElement).value));
+  });
+  container.querySelector('[data-act="run-emp"]')?.addEventListener('click', () => cb.onRunEmpirePlan());
+  container.querySelectorAll('[data-act="adopt-emp"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onAdoptEmpirePlan(Number((b as HTMLElement).dataset.i))),
   );
 }
 
@@ -997,8 +1068,12 @@ export function renderEmpireSummary(container: HTMLElement, state: GameState): v
     for (const k of YIELD_KEYS) totals[k] += s.total[k];
     pop += c.population;
   }
+  const settlers =
+    state.settlers > 0 || state.plannedSettles.length > 0
+      ? ` · ${state.settlers} settler(s)${state.plannedSettles.length ? `, ${state.plannedSettles.length} settle(s) planned` : ''}`
+      : '';
   container.innerHTML = `
-    <div>${state.cities.length} city(ies), pop ${pop} · ${gov}</div>
+    <div>${state.cities.length} city(ies), pop ${pop} · ${gov}${settlers}</div>
     <div class="statgrid">
       <span class="y-science">Science</span><span>+${fmt(totals.science)} (${fmt(state.scienceTotal)})</span>
       <span class="y-culture">Culture</span><span>+${fmt(totals.culture)} (${fmt(state.cultureTotal)})</span>
