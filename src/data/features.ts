@@ -5,7 +5,7 @@
  * matters for coastal play), ice impassable.
  */
 
-import type { TerrainId, Yields } from '../core/types';
+import type { TerrainId, YieldKey, Yields } from '../core/types';
 
 export interface FeatureDef {
   id: string;
@@ -20,6 +20,8 @@ export interface FeatureDef {
   removable: boolean;
   /** Counts as fresh water for adjacent tiles / cities. */
   freshWater?: boolean;
+  /** Yield granted (era-scaled lump) when a builder chops it in units mode. */
+  chopYield?: YieldKey;
 }
 
 export const FEATURES: Record<string, FeatureDef> = {
@@ -30,6 +32,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'],
     allowHills: true,
     removable: true,
+    chopYield: 'production',
   },
   RAINFOREST: {
     id: 'RAINFOREST',
@@ -38,6 +41,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['PLAINS'],
     allowHills: true,
     removable: true,
+    chopYield: 'food',
   },
   MARSH: {
     id: 'MARSH',
@@ -46,6 +50,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['GRASSLAND'],
     allowHills: false,
     removable: true,
+    chopYield: 'food',
   },
   FLOODPLAINS: {
     id: 'FLOODPLAINS',

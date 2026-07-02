@@ -11,6 +11,9 @@ import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
 import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
+import { chopGrant, harvestGrant, applyLumpYield } from './economy';
+import { FEATURES } from '../data/features';
+import { RESOURCES } from '../data/resources';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -319,15 +322,48 @@ export function builderRepair(state: GameState, unitId: number): RuleResult {
   return ok;
 }
 
-/** Remove a feature (chop) with the builder standing on the tile (1 charge). */
+/**
+ * Remove a feature (chop) with the builder standing on the tile (1 charge).
+ * Chops inside your borders grant an era-scaled yield lump (the Civ 6
+ * "chop economy") — this is the only path that pays; the free calculator
+ * mode's Remove action does not.
+ */
 export function builderRemoveFeature(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
   const check = canRemoveFeature(state, tile);
   if (!check.ok) return check;
+  const grant = state.sandbox ? null : chopGrant(state, tile);
+  const featureName = tile.feature ? FEATURES[tile.feature]?.name ?? tile.feature : '';
   if (tile.improvement === 'LUMBER_MILL' && tile.feature === 'WOODS') tile.improvement = null;
   tile.feature = null;
+  if (grant) {
+    applyLumpYield(state, tile.index, grant);
+    state.eventLog.push(`Chopped ${featureName}: +${grant.amount} ${grant.key}.`);
+  }
+  spendCharge(state, unit!);
+  return ok;
+}
+
+/** Harvest a bonus resource (1 charge): removes it for an era-scaled yield lump. */
+export function builderHarvest(state: GameState, unitId: number): RuleResult {
+  const { unit, err } = builderOn(state, unitId);
+  if (err) return err;
+  const tile = state.map.tiles[unit!.tileIndex];
+  if (!tile.resource) return no('No resource here.');
+  const grant = harvestGrant(state, tile);
+  if (!grant) {
+    return no(
+      tile.cityId === -1
+        ? 'Harvesting only works inside your borders.'
+        : 'This resource cannot be harvested (or needs research).',
+    );
+  }
+  const resName = RESOURCES[tile.resource]?.name ?? tile.resource;
+  tile.resource = null;
+  applyLumpYield(state, tile.index, grant);
+  state.eventLog.push(`Harvested ${resName}: +${grant.amount} ${grant.key}.`);
   spendCharge(state, unit!);
   return ok;
 }

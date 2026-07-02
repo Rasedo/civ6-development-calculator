@@ -8,7 +8,9 @@ import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
 import { validImprovements, canRemoveFeature, availableBuildings, districtPlacementTiles, availableWonders } from '../core/rules';
-import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost, canChoosePantheon, canFoundReligion } from '../core/game';
+import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost, canChoosePantheon, canFoundReligion, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, unitPurchaseCost } from '../core/game';
+import { chopGrant, harvestGrant } from '../core/economy';
+import { buildingCompletable } from '../core/rules';
 import { tradeCapacity, routeYields, TRADE_ROUTE_RANGE } from '../core/trade';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
@@ -78,7 +80,12 @@ export interface PanelCallbacks {
   onOrderMove(unitId: number): void;
   onBuilderImprove(unitId: number, imp: string): void;
   onBuilderChop(unitId: number): void;
+  onBuilderHarvest(unitId: number): void;
   onBuilderRepair(unitId: number): void;
+  onPurchaseBuilding(cityId: number, buildingId: string): void;
+  onPurchaseUnit(cityId: number, unitType: string): void;
+  onPurchaseSettler(cityId: number): void;
+  onQueueProject(cityId: number, projectId: string): void;
   onAttack(unitId: number, targetTileIndex: number): void;
   onDisbandUnit(unitId: number): void;
   onToggleExplore(unitId: number): void;
@@ -229,7 +236,14 @@ export function renderTilePanel(
           )
           .join('')}
         ${isBuilder && tile.pillaged ? `<button data-act="unit-repair" data-id="${u.id}">Repair</button>` : ''}
-        ${isBuilder && tile.feature && canRemoveFeature(state, tile).ok ? `<button data-act="unit-chop" data-id="${u.id}">Remove ${FEATURES[tile.feature].name}</button>` : ''}
+        ${isBuilder && tile.feature && canRemoveFeature(state, tile).ok ? (() => {
+          const g = chopGrant(state, tile);
+          return `<button data-act="unit-chop" data-id="${u.id}">Chop ${FEATURES[tile.feature].name}${g ? ` (+${g.amount} ${g.key})` : ''}</button>`;
+        })() : ''}
+        ${isBuilder && tile.resource && harvestGrant(state, tile) ? (() => {
+          const g = harvestGrant(state, tile)!;
+          return `<button data-act="unit-harvest" data-id="${u.id}">Harvest ${RESOURCES[tile.resource].name} (+${g.amount} ${g.key})</button>`;
+        })() : ''}
         <button data-act="unit-disband" data-id="${u.id}">Disband</button>
       </div>
     </div>`;
@@ -307,6 +321,9 @@ export function renderTilePanel(
   );
   container.querySelectorAll('[data-act="unit-chop"]').forEach((b) =>
     b.addEventListener('click', () => cb.onBuilderChop(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="unit-harvest"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onBuilderHarvest(Number((b as HTMLElement).dataset.id))),
   );
   container.querySelectorAll('[data-act="unit-repair"]').forEach((b) =>
     b.addEventListener('click', () => cb.onBuilderRepair(Number((b as HTMLElement).dataset.id))),
@@ -419,11 +436,32 @@ export function renderCityPanel(
       if (b.housing) fx.push(`+${b.housing} housing`);
       if (b.amenities) fx.push(`+${b.amenities} amenity${b.regional ? ' (regional)' : ''}`);
       if (b.special === 'SHIPYARD') fx.push('Prod = Harbor adjacency');
+      let buyBtn = '';
+      if (!state.sandbox && buildingCompletable(state, city, b.id)) {
+        if (b.worship) {
+          const cost = buildingFaithCost(b.id);
+          buyBtn = `<button data-act="buy-bld" data-id="${b.id}" ${state.faithTotal >= cost ? '' : 'disabled'}>Buy ${cost} faith</button>`;
+        } else {
+          const cost = buildingPurchaseCost(b.id);
+          buyBtn = `<button data-act="buy-bld" data-id="${b.id}" ${state.treasury >= cost ? '' : 'disabled'}>Buy ${cost}g</button>`;
+        }
+      }
       return `<div class="build-row"><span>${b.name} <span class="muted">[${DISTRICTS[b.district].name}]${turns}</span><br>
         <small>${fx.join(' · ') || ''}</small></span>
-        <button data-act="bld" data-id="${b.id}">${state.sandbox ? 'Build' : 'Queue'}</button></div>`;
+        <span>${buyBtn}<button data-act="bld" data-id="${b.id}">${state.sandbox ? 'Build' : 'Queue'}</button></span></div>`;
     })
     .join('');
+
+  // District projects (repeatable production → yield conversions)
+  const projectRows = state.sandbox
+    ? ''
+    : availableProjects(state, city)
+        .map(
+          (p) => `<div class="build-row"><span>${p.name} <span class="muted">${projectCost(state)}⚙ repeatable</span><br>
+            <small>${p.description}</small></span>
+            <button data-act="project" data-id="${p.id}">Queue</button></div>`,
+        )
+        .join('');
 
   // District placement options (research-gated list still shown, disabled when no spots)
   const specialtyUsed = city.districts.filter((d) => DISTRICTS[d.type].countsTowardLimit).length;
@@ -464,9 +502,11 @@ export function renderCityPanel(
       <button data-act="buy-tile" ${canBuy ? '' : 'disabled'}>Buy tile (${buyCost}g)</button>
       <button data-act="compare">Compare builds…</button>
       <button data-act="plan">Plan build order…</button>
-      ${state.sandbox ? '' : `<button data-act="settler" title="Needed to found further cities">Train settler (${settlerCost(state)}⚙)</button>`}
+      ${state.sandbox ? '' : `<button data-act="settler" title="Needed to found further cities">Train settler (${settlerCost(state)}⚙)</button>
+      <button data-act="buy-settler" title="Buy a settler outright" ${state.treasury >= settlerCost(state) * 4 ? '' : 'disabled'}>Buy settler (${settlerCost(state) * 4}g)</button>`}
       ${trainableUnits(state)
-        .map((u) => `<button data-act="train-unit" data-id="${u.id}" title="${u.description}">Train ${u.name} (${u.cost}⚙)</button>`)
+        .map((u) => `<button data-act="train-unit" data-id="${u.id}" title="${u.description}">Train ${u.name} (${u.cost}⚙)</button>
+          ${state.sandbox ? '' : `<button data-act="buy-unit" data-id="${u.id}" title="Buy with gold" ${state.treasury >= unitPurchaseCost(u.id) ? '' : 'disabled'}>Buy (${unitPurchaseCost(u.id)}g)</button>`}`)
         .join('')}
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
@@ -499,6 +539,7 @@ export function renderCityPanel(
     ${buildableWonders || '<div class="muted">No wonders available here right now.</div>'}
     <h3>Buildings available</h3>
     ${buildable || '<div class="muted">Nothing available (complete districts and research further).</div>'}
+    ${projectRows ? `<h3>Projects</h3>${projectRows}` : ''}
     ${state.sandbox ? '' : `<h3>Production queue</h3>${queueRows || '<div class="muted">Queue is empty.</div>'}`}
   `;
 
@@ -521,6 +562,16 @@ export function renderCityPanel(
   });
   container.querySelectorAll('[data-act="bld"]').forEach((b) =>
     b.addEventListener('click', () => cb.onQueueBuilding(city.id, (b as HTMLElement).dataset.id!)),
+  );
+  container.querySelectorAll('[data-act="buy-bld"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onPurchaseBuilding(city.id, (b as HTMLElement).dataset.id!)),
+  );
+  container.querySelectorAll('[data-act="buy-unit"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onPurchaseUnit(city.id, (b as HTMLElement).dataset.id!)),
+  );
+  container.querySelector('[data-act="buy-settler"]')?.addEventListener('click', () => cb.onPurchaseSettler(city.id));
+  container.querySelectorAll('[data-act="project"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onQueueProject(city.id, (b as HTMLElement).dataset.id!)),
   );
   container.querySelectorAll('[data-act="cancel"]').forEach((b) =>
     b.addEventListener('click', () => cb.onCancelQueue(city.id, Number((b as HTMLElement).dataset.i))),

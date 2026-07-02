@@ -11,7 +11,7 @@ import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, ac
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { detectBoosts } from './boosts';
-import { spawnUnit, refreshUnits, unitMaintenance } from './units';
+import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits } from './units';
 import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -27,7 +27,9 @@ import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { BOOST_FRACTION } from '../data/boosts';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
-import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE } from '../data/constants';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
+import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
+import { applyLumpYield } from './economy';
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
@@ -255,6 +257,126 @@ export function queueWonder(
   return { ok: true };
 }
 
+// ---------------------------------------------------------------------------
+// Projects & purchases
+// ---------------------------------------------------------------------------
+
+/** Project production cost, scaling with research progress like districts. */
+export function projectCost(state: GameState): number {
+  return Math.max(15, Math.round(districtCost(state) * 0.5));
+}
+
+/** Projects this city can run (needs the matching completed district). */
+export function availableProjects(state: GameState, city: City): ProjectDef[] {
+  return Object.values(PROJECTS).filter((p) =>
+    city.districts.some(
+      (d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete,
+    ),
+  );
+}
+
+export function queueProject(state: GameState, cityId: number, projectId: string): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  if (state.sandbox) return { ok: false, reason: 'Projects have no effect in sandbox mode.' };
+  if (!availableProjects(state, city).some((p) => p.id === projectId)) {
+    return { ok: false, reason: 'Project needs its completed district in this city.' };
+  }
+  city.queue.push({ kind: 'project', project: projectId, progress: 0, cost: projectCost(state) });
+  return { ok: true };
+}
+
+function completeProject(state: GameState, city: City, projectId: string, cost: number): void {
+  const def = PROJECTS[projectId];
+  if (!def) return;
+  if (def.yield) {
+    const amount = Math.round(cost * PROJECT_YIELD_FRACTION);
+    applyLumpYield(state, city.centerIndex, { key: def.yield, amount });
+    state.eventLog.push(`${city.name} completed ${def.name}: +${amount} ${def.yield}.`);
+  }
+  if (def.gpClass) {
+    const pts = Math.round(cost * PROJECT_GPP_FRACTION);
+    state.greatPeople.points[def.gpClass] = (state.greatPeople.points[def.gpClass] ?? 0) + pts;
+    if (!def.yield) state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${def.gpClass} points.`);
+  }
+}
+
+/** Gold price to buy a building outright (Civ 6's 4× production cost). */
+export function buildingPurchaseCost(buildingId: string): number {
+  return (BUILDINGS[buildingId]?.cost ?? 0) * GOLD_PURCHASE_MULT;
+}
+
+/** Faith price of a worship building. */
+export function buildingFaithCost(buildingId: string): number {
+  return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
+}
+
+export function unitPurchaseCost(unitType: string): number {
+  return (UNITS[unitType]?.cost ?? 0) * GOLD_PURCHASE_MULT;
+}
+
+/**
+ * Buy a building with gold (worship buildings with faith instead, as in
+ * Civ 6). Unlike queueing, purchasing needs the district finished now.
+ */
+export function purchaseBuilding(state: GameState, cityId: number, buildingId: string): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
+    return { ok: false, reason: 'Building not available in this city.' };
+  }
+  if (!buildingCompletable(state, city, buildingId)) {
+    return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
+  }
+  const worship = BUILDINGS[buildingId]?.worship === true;
+  if (!state.sandbox) {
+    if (worship) {
+      const cost = buildingFaithCost(buildingId);
+      if (state.faithTotal < cost) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+      state.faithTotal -= cost;
+    } else {
+      const cost = buildingPurchaseCost(buildingId);
+      if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+      state.treasury -= cost;
+    }
+  }
+  city.buildings.push(buildingId);
+  return { ok: true };
+}
+
+/** Buy a unit with gold; it appears at the city center immediately. */
+export function purchaseUnit(state: GameState, cityId: number, unitType: string): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  if (!trainableUnits(state).some((d) => d.id === unitType)) {
+    return { ok: false, reason: 'Unit not available (enable units mode / research).' };
+  }
+  const cost = unitPurchaseCost(unitType);
+  if (!state.sandbox) {
+    if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    state.treasury -= cost;
+  }
+  const unit = spawnUnit(state, unitType, city.centerIndex);
+  if (!unit) {
+    if (!state.sandbox) state.treasury += cost; // refund: nowhere to stand
+    return { ok: false, reason: 'No free tile near the city center.' };
+  }
+  return { ok: true };
+}
+
+/** Buy a settler with gold (cost scales like trained settlers). */
+export function purchaseSettler(state: GameState, cityId: number): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const cost = settlerCost(state) * GOLD_PURCHASE_MULT;
+  if (!state.sandbox) {
+    if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    state.treasury -= cost;
+  }
+  state.settlers += 1;
+  return { ok: true };
+}
+
 export function cancelQueueItem(state: GameState, cityId: number, index: number): void {
   const city = state.cities.find((c) => c.id === cityId);
   if (!city || index < 0 || index >= city.queue.length) return;
@@ -278,6 +400,7 @@ export function itemCost(item: QueueItem): number {
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   if (item.kind === 'settler') return item.cost;
   if (item.kind === 'unit') return UNITS[item.unit]?.cost ?? 54;
+  if (item.kind === 'project') return item.cost;
   return BUILDINGS[item.building].cost;
 }
 
@@ -286,6 +409,7 @@ export function itemLabel(item: QueueItem): string {
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;
   if (item.kind === 'settler') return 'Settler';
   if (item.kind === 'unit') return UNITS[item.unit]?.name ?? item.unit;
+  if (item.kind === 'project') return PROJECTS[item.project]?.name ?? item.project;
   return BUILDINGS[item.building].name;
 }
 
@@ -466,6 +590,10 @@ export function endTurn(state: GameState): void {
       const head = city.queue[0];
       const mult = isEncampmentItem(head) ? mods.encampmentProdMult : 1;
       head.progress += stats.total.production * mult;
+      if (city.productionBank) {
+        head.progress += city.productionBank;
+        city.productionBank = 0;
+      }
       while (city.queue.length > 0 && city.queue[0].progress >= itemCost(city.queue[0])) {
         const head = city.queue[0];
         if (head.kind === 'building' && !buildingCompletable(state, city, head.building)) {
@@ -483,6 +611,8 @@ export function endTurn(state: GameState): void {
           state.settlers += 1;
         } else if (item.kind === 'unit') {
           spawnUnit(state, item.unit, city.centerIndex);
+        } else if (item.kind === 'project') {
+          completeProject(state, city, item.project, itemCost(item));
         } else {
           city.buildings.push(item.building);
         }
@@ -662,6 +792,8 @@ export function deserialize(json: string): GameState {
     c.tilesAcquired ??= 0;
     c.wonders ??= [];
     c.specialists ??= {};
+    // productionBank stays optional (readers use ?? 0) so that adding it
+    // here cannot desync serialize(live) vs serialize(roundtripped).
   }
   return state;
 }

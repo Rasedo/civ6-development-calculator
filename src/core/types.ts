@@ -112,7 +112,8 @@ export type QueueItem =
   | { kind: 'building'; building: string; progress: number }
   | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number }
   | { kind: 'settler'; progress: number; cost: number }
-  | { kind: 'unit'; unit: string; progress: number };
+  | { kind: 'unit'; unit: string; progress: number }
+  | { kind: 'project'; project: string; progress: number; cost: number };
 
 export type GreatPersonClass =
   | 'SCIENTIST'
@@ -147,6 +148,8 @@ export interface City {
   wonders: { id: string; tileIndex: number }[];
   /** Manual specialist assignments: district tileIndex (as string) -> count. */
   specialists: Record<string, number>;
+  /** Banked production from chops that landed while the queue was empty. */
+  productionBank?: number;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */

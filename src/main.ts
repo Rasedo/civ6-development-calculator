@@ -69,9 +69,9 @@ declare global {
 import { toggleBoost } from './core/boosts';
 import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
-import { choosePantheon, foundReligion, queueSettler } from './core/game';
+import { choosePantheon, foundReligion, queueSettler, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject } from './core/game';
 import { addTradeRoute, removeTradeRoute } from './core/trade';
-import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderRepair, disbandUnit, setExploreMission } from './core/units';
+import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderHarvest, builderRepair, disbandUnit, setExploreMission } from './core/units';
 import { initFog } from './core/fog';
 import { meleeAttack, rangedAttack } from './core/combat';
 import { UNITS as UNIT_DEFS } from './data/units';
@@ -429,6 +429,31 @@ const callbacks: PanelCallbacks = {
   },
   onBuilderChop(unitId) {
     const r = builderRemoveFeature(state, unitId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onBuilderHarvest(unitId) {
+    const r = builderHarvest(state, unitId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onPurchaseBuilding(cityId, buildingId) {
+    const r = purchaseBuilding(state, cityId, buildingId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onPurchaseUnit(cityId, unitType) {
+    const r = purchaseUnit(state, cityId, unitType);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onPurchaseSettler(cityId) {
+    const r = purchaseSettler(state, cityId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onQueueProject(cityId, projectId) {
+    const r = queueProject(state, cityId, projectId);
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },

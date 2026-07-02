@@ -28,6 +28,11 @@ export function borderGrowthCost(n: number): number {
 /** Gold price of buying a tile = culture cost × this (before policy discounts). */
 export const TILE_PURCHASE_GOLD_PER_CULTURE = 4;
 
+/** Gold price of buying a building/unit = production cost × this (Civ 6). */
+export const GOLD_PURCHASE_MULT = 4;
+/** Faith price of buying a worship building = production cost × this. */
+export const FAITH_PURCHASE_MULT = 2;
+
 export const FOOD_PER_CITIZEN = 2;
 
 /** Each citizen contributes these yields directly (Civ 6). */
