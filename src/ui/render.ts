@@ -158,6 +158,17 @@ export class MapRenderer {
 
       if (tile.elevation === 'HILLS') this.drawHills(cx, cy);
       if (tile.elevation === 'MOUNTAIN') this.drawMountain(cx, cy);
+      if (tile.volcano) {
+        ctx.fillStyle = '#e05530';
+        ctx.beginPath();
+        ctx.arc(cx, cy - HEX_SIZE * 0.42, HEX_SIZE * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (tile.droughtTurns > 0) {
+        hexPath(cx, cy);
+        ctx.fillStyle = 'rgba(160,110,40,0.28)';
+        ctx.fill();
+      }
       if (tile.feature) this.drawFeature(tile.feature, cx, cy);
       if (tile.wonder) {
         const w = WONDERS[tile.wonder];

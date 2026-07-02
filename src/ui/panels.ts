@@ -172,6 +172,10 @@ export function renderTilePanel(
   }
   if (hasRiver(tile)) chips.push('<span class="chip chip-river">River</span>');
   if (hasFreshWater(state.map, tile)) chips.push('<span class="chip chip-river">Fresh water</span>');
+  if (tile.volcano) chips.push('<span class="chip chip-strategic">Volcano</span>');
+  if (tile.fertility > 0) chips.push(`<span class="chip chip-bonus">Fertile +${tile.fertility}</span>`);
+  if (tile.droughtTurns > 0) chips.push(`<span class="chip chip-strategic">Drought (${tile.droughtTurns}t)</span>`);
+  if (tile.goodyHut) chips.push('<span class="chip chip-wonder">Tribal village</span>');
 
   let wonderHtml = '';
   if (wonder) {

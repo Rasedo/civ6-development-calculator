@@ -88,6 +88,12 @@ export interface Tile {
   pillaged: boolean;
   /** Tribal village (goody hut) waiting for a unit to claim it. */
   goodyHut: boolean;
+  /** Volcano (a mountain that occasionally erupts when disasters are on). */
+  volcano: boolean;
+  /** Permanent bonus food from floods/eruptions/storm silt (capped). */
+  fertility: number;
+  /** Turns of drought left (-1 food while active). */
+  droughtTurns: number;
   /** Owning city id, or -1. */
   cityId: number;
 }
@@ -199,6 +205,8 @@ export interface GameState {
   barbCamps: number[];
   /** City HP keyed by city id (string for JSON); missing = full (200). */
   cityHp: Record<string, number>;
+  /** Random natural disasters (floods, eruptions, droughts, storms). */
+  disasters: boolean;
   /** Fog of war (units mode): unexplored tiles are hidden and unusable. */
   fogOfWar: boolean;
   /** Per-tile explored flags (0/1), parallel to map.tiles; [] = all explored. */

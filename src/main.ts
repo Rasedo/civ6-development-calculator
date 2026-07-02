@@ -90,6 +90,7 @@ const wondersToggle = $<HTMLInputElement>('wonders-toggle');
 const sandboxToggle = $<HTMLInputElement>('sandbox-toggle');
 const unitsToggle = $<HTMLInputElement>('units-toggle');
 const fogToggle = $<HTMLInputElement>('fog-toggle');
+const disastersToggle = $<HTMLInputElement>('disasters-toggle');
 const contextPanel = $<HTMLElement>('context-panel');
 const empireSummary = $<HTMLElement>('empire-summary');
 const turnLabel = $<HTMLElement>('turn-label');
@@ -951,6 +952,12 @@ unitsToggle.addEventListener('change', () => {
       ? 'Units mode: improvements now need Builders (train them in cities).'
       : 'Units mode off: improvements are free and instant again.',
   );
+  refresh();
+});
+
+disastersToggle.addEventListener('change', () => {
+  state.disasters = disastersToggle.checked;
+  showMessage(state.disasters ? 'Disasters on — floods, droughts, storms and eruptions.' : 'Disasters off.');
   refresh();
 });
 

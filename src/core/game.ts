@@ -14,6 +14,7 @@ import { detectBoosts } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance } from './units';
 import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
+import { disasterPhase } from './disasters';
 import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -76,6 +77,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     rngState: (map.seed ^ 0x9e3779b9) >>> 0,
     barbCamps: [],
     cityHp: {},
+    disasters: false,
     fogOfWar: false,
     explored: [],
     eventLog: [],
@@ -525,6 +527,7 @@ export function endTurn(state: GameState): void {
     state.treasury -= unitMaintenance(state);
     barbarianPhase(state);
   }
+  if (state.disasters) disasterPhase(state);
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);
@@ -639,6 +642,7 @@ export function deserialize(json: string): GameState {
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
   state.barbCamps ??= [];
   state.cityHp ??= {};
+  state.disasters ??= false;
   state.fogOfWar ??= false;
   state.explored ??= [];
   state.eventLog ??= [];
@@ -649,6 +653,9 @@ export function deserialize(json: string): GameState {
   for (const t of state.map.tiles) {
     (t as Tile).pillaged ??= false;
     (t as Tile).goodyHut ??= false;
+    (t as Tile).volcano ??= false;
+    (t as Tile).fertility ??= 0;
+    (t as Tile).droughtTurns ??= 0;
   }
   for (const c of state.cities) {
     c.cultureBox ??= 0;

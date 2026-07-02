@@ -71,6 +71,10 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     if (w.adjacentYields) addYields(out, w.adjacentYields);
     if (w.doublesAdjacentTerrain) addYields(out, terrainYields(tile));
   }
+
+  // Disaster legacy: fertility feeds, drought starves.
+  if (tile.fertility > 0) out.food += tile.fertility;
+  if (tile.droughtTurns > 0) out.food = Math.max(0, out.food - 1);
   return out;
 }
 

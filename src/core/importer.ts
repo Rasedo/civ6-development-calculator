@@ -79,6 +79,9 @@ function blankTile(index: number, col: number, row: number): Tile {
     builtWonderComplete: false,
     pillaged: false,
     goodyHut: false,
+    volcano: false,
+    fertility: 0,
+    droughtTurns: 0,
     cityId: -1,
   };
 }

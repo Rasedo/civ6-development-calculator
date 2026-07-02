@@ -52,6 +52,9 @@ export function generateMap(opts: MapGenOptions): GameMap {
         builtWonderComplete: false,
         pillaged: false,
         goodyHut: false,
+        volcano: false,
+        fertility: 0,
+        droughtTurns: 0,
         cityId: -1,
       });
     }
@@ -214,6 +217,16 @@ export function generateMap(opts: MapGenOptions): GameMap {
   // --- 8. Resources --------------------------------------------------------------
   if (withResources) {
     placeResources(map, deriveSeed(seed, 'resources'));
+  }
+
+  // --- 8b. Volcanoes (a few mountains that can erupt) --------------------------------
+  {
+    const rngVo = mulberry32(deriveSeed(seed, 'volcanoes'));
+    const mountains = shuffle(rngVo, map.tiles.filter((t) => t.elevation === 'MOUNTAIN' && !t.wonder));
+    const count = Math.max(1, Math.round(mountains.length * 0.12));
+    for (let i = 0; i < count && i < mountains.length; i++) {
+      mountains[i].volcano = true;
+    }
   }
 
   // --- 9. Tribal villages -----------------------------------------------------------
