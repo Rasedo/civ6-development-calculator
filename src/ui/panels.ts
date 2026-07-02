@@ -25,6 +25,7 @@ import { WONDERS } from '../data/wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GP_CLASSES, GP_CLASS_NAMES, GREAT_PEOPLE, gpCost, SPECIALIST_YIELDS } from '../data/greatPeople';
 import { choiceLabel, type BuildChoice, type Projection, type SettleSiteScore } from '../core/advisor';
+import { OBJECTIVES, type Objective, type Plan } from '../core/planner';
 import { TECHS, ERAS, type ResearchEffect, type TechDef } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
@@ -53,6 +54,19 @@ export interface PanelCallbacks {
   onStartWonderPlacement(cityId: number, wonderId: string): void;
   onSetSpecialists(cityId: number, tileIndex: number, count: number): void;
   onToggleBoost(id: string): void;
+  onOpenPlanner(cityId: number): void;
+  onSetObjective(objective: Objective): void;
+  onSetPlanHorizon(turns: number): void;
+  onRunPlanner(): void;
+  onAdoptPlan(index: number): void;
+}
+
+/** Mutable state for the build-order planner view (owned by main.ts). */
+export interface PlannerState {
+  cityId: number;
+  objective: Objective;
+  horizon: number;
+  results: Plan[] | null;
 }
 
 /** Mutable state for the build-comparison view (owned by main.ts). */
@@ -329,6 +343,7 @@ export function renderCityPanel(
     <div class="row btnrow">
       <button data-act="buy-tile" ${canBuy ? '' : 'disabled'}>Buy tile (${buyCost}g)</button>
       <button data-act="compare">Compare builds…</button>
+      <button data-act="plan">Plan build order…</button>
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
     <details><summary>Yield breakdown</summary>
@@ -370,6 +385,7 @@ export function renderCityPanel(
   });
   container.querySelector('[data-act="buy-tile"]')?.addEventListener('click', () => cb.onStartBuyTile(city.id));
   container.querySelector('[data-act="compare"]')?.addEventListener('click', () => cb.onOpenCompare(city.id));
+  container.querySelector('[data-act="plan"]')?.addEventListener('click', () => cb.onOpenPlanner(city.id));
   container.querySelector('[data-act="place-district"]')?.addEventListener('click', () => {
     const sel = container.querySelector('[data-act="district-select"]') as HTMLSelectElement;
     if (sel.value) cb.onStartDistrictPlacement(city.id, sel.value as DistrictId);
@@ -388,6 +404,67 @@ export function renderCityPanel(
       const el = b as HTMLElement;
       cb.onSetSpecialists(city.id, Number(el.dataset.tile), Number(el.dataset.n));
     }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Build-order planner
+// ---------------------------------------------------------------------------
+
+export function renderPlannerPanel(
+  container: HTMLElement,
+  state: GameState,
+  planner: PlannerState,
+  cb: PanelCallbacks,
+): void {
+  const city = state.cities.find((c) => c.id === planner.cityId);
+  if (!city) {
+    container.innerHTML = '<div class="muted">City no longer exists.</div>';
+    return;
+  }
+
+  let resultsHtml = '';
+  if (planner.results) {
+    resultsHtml = planner.results
+      .map((plan, i) => {
+        const steps = plan.steps
+          .map((s) => `${s.label}${s.completedOnTurn ? ` <span class="muted">t${s.completedOnTurn}</span>` : ' <span class="muted">(unfinished)</span>'}`)
+          .join(' → ');
+        return `<div class="district-row">
+          <b>#${i + 1}</b> score ${fmt(plan.score)} · pop ${plan.pop}<br>
+          <small>${steps || '(build nothing)'}</small><br>
+          <small class="muted">${yieldsHtml(plan.finalYields)}</small>
+          <div class="row"><button data-act="adopt" data-i="${i}">Adopt plan</button></div>
+        </div>`;
+      })
+      .join('');
+    if (planner.results.length === 0) resultsHtml = '<div class="muted">No viable plans found.</div>';
+  }
+
+  container.innerHTML = `
+    <h2>Build-order planner — ${city.name}</h2>
+    <div class="row muted">Beam-searches sequences of districts/buildings/wonders (each at its best tile), simulating every branch turn-by-turn with real costs. Queue is replaced by the adopted plan.</div>
+    <div class="row">
+      <label>Objective <select data-act="objective">
+        ${OBJECTIVES.map((o) => `<option value="${o}" ${planner.objective === o ? 'selected' : ''}>${o}</option>`).join('')}
+      </select></label>
+      <label>Horizon <select data-act="plan-horizon">
+        ${[20, 30, 40, 60].map((h) => `<option value="${h}" ${planner.horizon === h ? 'selected' : ''}>${h} turns</option>`).join('')}
+      </select></label>
+    </div>
+    <div class="row"><button data-act="run-plan" class="primary">Search (may take a few seconds)</button></div>
+    ${resultsHtml}
+  `;
+
+  container.querySelector('[data-act="objective"]')?.addEventListener('change', (e) => {
+    cb.onSetObjective((e.target as HTMLSelectElement).value as Objective);
+  });
+  container.querySelector('[data-act="plan-horizon"]')?.addEventListener('change', (e) => {
+    cb.onSetPlanHorizon(Number((e.target as HTMLSelectElement).value));
+  });
+  container.querySelector('[data-act="run-plan"]')?.addEventListener('click', () => cb.onRunPlanner());
+  container.querySelectorAll('[data-act="adopt"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onAdoptPlan(Number((b as HTMLElement).dataset.i))),
   );
 }
 

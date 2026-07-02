@@ -8,7 +8,7 @@ import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapG
 import { generateMap } from './mapgen';
 import { tilesWithin } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
-import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, type RuleResult } from './rules';
+import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { detectBoosts } from './boosts';
 import { FEATURES } from '../data/features';
@@ -407,6 +407,12 @@ export function endTurn(state: GameState): void {
       const mult = isEncampmentItem(head) ? mods.encampmentProdMult : 1;
       head.progress += stats.total.production * mult;
       while (city.queue.length > 0 && city.queue[0].progress >= itemCost(city.queue[0])) {
+        const head = city.queue[0];
+        if (head.kind === 'building' && !buildingCompletable(state, city, head.building)) {
+          // Queued ahead of its district/prereqs — hold at full progress.
+          head.progress = itemCost(head);
+          break;
+        }
         const item = city.queue.shift()!;
         const overflow = item.progress - itemCost(item);
         if (item.kind === 'district') {

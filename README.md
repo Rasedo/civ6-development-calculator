@@ -9,8 +9,10 @@ with **no random events**.
 
 Stage 1 delivered the map/yield/city/turn engine; stage 2 added natural
 wonders, cultural border growth (plus tile purchase) and tech/civic trees with
-governments & policies; stage 3 added the optimization advisors (district
-placement scoring, settle-site ranking, N-turn build comparisons).
+governments & policies; stage 3 added the optimization advisors; stage 4 the
+real-map import mod; stage 5 world wonders, great people and specialists;
+stage 6 the fidelity pass (eurekas, cost scaling, appeal, maintenance);
+stage 7 the build-order search.
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -91,6 +93,26 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
   experiments.
 - **Save/load** to browser localStorage; full game state is plain JSON (stage-1
   saves migrate automatically).
+- **Real-map import**: the `civ6-mod/MapExporter` mod dumps a live game's map
+  to Lua.log; paste it into the Import panel to run the calculator on your
+  actual Civ 6 map (terrain, rivers, resources, natural wonders; unknown
+  expansion content is skipped and reported).
+- **World wonders** (13, base-game): tile-occupying builds with real placement
+  rules and effects — Petra's desert boost, Ruhr Valley +20% production,
+  Hanging Gardens +15% empire growth, Colosseum regional amenities, Forbidden
+  City's extra wildcard slot, Oxford/Big Ben multipliers; one per world;
+  Theater Squares get +1 adjacency per adjacent wonder.
+- **Great people**: 7 classes with points from districts/buildings/specialists,
+  doubling costs, and named individuals claimed automatically with instant
+  effects (writers/artists/musicians condensed into one Artist class).
+- **Specialists**: one slot per building in Campus/Holy Site/Commercial Hub/
+  Harbor/Theater/Industrial Zone; manual assignment trades worked tiles for
+  district yields and +1 GPP each.
+- **Eurekas & inspirations**: −40% per tech/civic; conditions the calculator
+  can observe fire automatically, the rest are manual "got it" toggles.
+- **District cost scaling** with research progress (locked at queue time),
+  **appeal-based Neighborhood housing** (2–6, shown when placing), and
+  **gold maintenance** for districts/buildings (commercial buildings free).
 - **Advisors** (the "calculator" part):
   - *District placement*: when placing a district, every legal tile shows its
     adjacency bonus as a Civ 6-style badge; the best spot (adjacency value vs
@@ -104,6 +126,11 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
     is simulated forward on a cloned game (citizens, research, borders on
     autopilot, sandbox off) and compared in a table — population, per-turn
     yields, totals, and what actually finished.
+  - *Build-order planner*: beam search over multi-step sequences of
+    districts/buildings/wonders toward a chosen objective (science, culture,
+    gold, production, food, balanced), simulating every branch turn-by-turn;
+    ranked plans with one-click Adopt (queue-ahead chains are handled — a
+    building never finishes before its district/prereqs).
 
 ## Known simplifications (stage 1)
 
@@ -120,21 +147,22 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
   ties them to civic completions); no anarchy or legacy bonuses.
 - Border-growth tile picking approximates Civ 6's priorities; no tile swapping
   between cities.
-- No built wonders, great people, specialists, appeal, religion beliefs, trade
-  routes, city-states, barbarians, units, combat, maintenance costs, or disasters.
-- Neighborhood housing is a flat +4 (appeal isn't modeled).
-- Citizen auto-assignment is a simple weighted greedy (use focus + tile locks for
-  fine control).
+- No religion beliefs, trade routes, city-states, barbarians, units, combat,
+  or disasters. Great-person effects are instant only (no tile activations);
+  the wonder list is a 13-wonder subset; some wonder unlock techs are
+  stand-ins for techs outside the compact tree.
+- Citizen auto-assignment is a simple weighted greedy (use focus + tile locks
+  and manual specialists for fine control).
+- Imported maps display mirrored north–south (adjacency stays exact).
 - No world wrap; map edges are hard borders.
 
 ## Roadmap ideas (later stages)
 
-1. Import real map data extracted from a Civ 6 game via a mod (the `GameMap` JSON
-   format in `src/core/types.ts` is the target interchange shape).
-2. Built wonders (incl. adjacency interactions) and great people.
-3. Eurekas/inspirations and game-progress district cost scaling.
-4. Deeper optimization: multi-step build-order search (the projection engine in
-   `src/core/advisor.ts` is the evaluation function for it).
+1. Religion (pantheons, beliefs, worship buildings) and trade routes.
+2. Multi-civ support (AI opponents or manually-scripted rivals) with loyalty.
+3. Empire-wide (multi-city) build-order planning and settle-order planning.
+4. In-game overlay tooling driven by the exporter mod (live sync instead of
+   one-shot import).
 
 ## Code layout
 

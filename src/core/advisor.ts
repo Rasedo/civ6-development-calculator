@@ -10,9 +10,10 @@ import { tilesWithin, hexDistance } from './hex';
 import { hasFreshWater, isCoastalLand } from './query';
 import { tileYields, effectiveAdjacency } from './yields';
 import { makeYieldCtx } from './effects';
-import { canFoundCity, canPlaceDistrict, districtPlacementTiles, availableBuildings } from './rules';
+import { canFoundCity, canPlaceDistrict, districtPlacementTiles, availableBuildings, availableWonders, wonderPlacementTiles } from './rules';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { computeCityStats } from './city';
-import { serialize, deserialize, endTurn, queueDistrict, queueBuilding, cancelQueueItem } from './game';
+import { serialize, deserialize, endTurn, queueDistrict, queueBuilding, queueWonder, cancelQueueItem } from './game';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -134,7 +135,8 @@ export function scoreSettleSites(state: GameState, limit = 8): SettleSiteScore[]
 export type BuildChoice =
   | { kind: 'none' }
   | { kind: 'building'; id: string }
-  | { kind: 'district'; type: DistrictId; tileIndex: number };
+  | { kind: 'district'; type: DistrictId; tileIndex: number }
+  | { kind: 'wonder'; wonder: string; tileIndex: number };
 
 export function choiceLabel(choice: BuildChoice): string {
   switch (choice.kind) {
@@ -144,6 +146,8 @@ export function choiceLabel(choice: BuildChoice): string {
       return BUILDINGS[choice.id]?.name ?? choice.id;
     case 'district':
       return DISTRICTS[choice.type].name;
+    case 'wonder':
+      return BUILT_WONDERS[choice.wonder]?.name ?? choice.wonder;
   }
 }
 
@@ -202,6 +206,9 @@ export function projectTurns(
   } else if (choice.kind === 'district') {
     const r = queueDistrict(clone, cityId, choice.type, choice.tileIndex);
     if (!r.ok) return { ...base, error: r.reason ?? 'Cannot place district.' };
+  } else if (choice.kind === 'wonder') {
+    const r = queueWonder(clone, cityId, choice.wonder, choice.tileIndex);
+    if (!r.ok) return { ...base, error: r.reason ?? 'Cannot place wonder.' };
   }
 
   const buildingsBefore = new Set(city.buildings);
@@ -259,6 +266,10 @@ export function compareCandidates(state: GameState, cityId: number): BuildChoice
     if (spots.length === 0) continue;
     if (!canPlaceDistrict(clone, city, type, spots[0].tileIndex).ok) continue;
     out.push({ kind: 'district', type, tileIndex: spots[0].tileIndex });
+  }
+  for (const w of availableWonders(clone, city)) {
+    const spots = wonderPlacementTiles(clone, city, w.id);
+    if (spots.length > 0) out.push({ kind: 'wonder', wonder: w.id, tileIndex: spots[0] });
   }
   return out;
 }

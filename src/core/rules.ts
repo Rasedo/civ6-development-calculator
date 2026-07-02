@@ -183,13 +183,16 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
 
 // ---------------------------------------------------------------------------
 
-/** Buildings the city could queue right now (research-gated). */
+/**
+ * Buildings the city could queue right now (research-gated). Districts under
+ * construction count (queue-ahead, like Civ 6) — a chain prerequisite is
+ * satisfied by an owned OR already-queued building; the turn loop refuses to
+ * finish a building before its district/prereqs exist.
+ */
 export function availableBuildings(state: GameState, city: City): BuildingDef[] {
   const map = state.map;
   const unlocks = gates(state);
-  const completed = new Set(
-    city.districts.filter((d) => map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
-  );
+  const placed = new Set(city.districts.map((d) => d.type));
   const queued = new Set(
     city.queue.filter((q) => q.kind === 'building').map((q) => (q.kind === 'building' ? q.building : '')),
   );
@@ -197,17 +200,29 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   const center = map.tiles[city.centerIndex];
 
   const out: BuildingDef[] = [];
-  for (const type of completed) {
+  for (const type of placed) {
     for (const def of buildingsForDistrict(type)) {
       if (have.has(def.id) || queued.has(def.id)) continue;
       if (unlocks && !unlocks.buildings.has(def.id)) continue;
-      if (def.requiresAny && !def.requiresAny.some((r) => have.has(r))) continue;
+      if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;
       if (def.exclusiveWith?.some((x) => have.has(x) || queued.has(x))) continue;
       if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
       out.push(def);
     }
   }
   return out;
+}
+
+/** Can this building actually finish right now (district done, prereqs owned)? */
+export function buildingCompletable(state: GameState, city: City, buildingId: string): boolean {
+  const def = BUILDINGS[buildingId];
+  if (!def) return false;
+  const districtDone = city.districts.some(
+    (d) => d.type === def.district && state.map.tiles[d.tileIndex].districtComplete,
+  );
+  if (!districtDone) return false;
+  if (def.requiresAny && !def.requiresAny.some((r) => city.buildings.includes(r))) return false;
+  return true;
 }
 
 export function buildingDef(id: string): BuildingDef {

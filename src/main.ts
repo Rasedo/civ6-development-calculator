@@ -45,13 +45,16 @@ import {
   renderComparePanel,
   renderImportPanel,
   renderGreatPeoplePanel,
+  renderPlannerPanel,
   tileSummary,
   type PanelCallbacks,
   type CompareState,
+  type PlannerState,
 } from './ui/panels';
 import { parseCivExport, importSummary } from './core/importer';
 import { toggleBoost } from './core/boosts';
 import { tileAppeal, appealTier } from './core/appeal';
+import { searchBuildOrder, adoptPlan } from './core/planner';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -81,7 +84,16 @@ seedInput.value = String(Math.floor(Math.random() * 1e9));
 
 // ---------------------------------------------------------------------------
 
-type RightView = 'context' | 'tech' | 'civic' | 'government' | 'settle' | 'compare' | 'import' | 'greatPeople';
+type RightView =
+  | 'context'
+  | 'tech'
+  | 'civic'
+  | 'government'
+  | 'settle'
+  | 'compare'
+  | 'import'
+  | 'greatPeople'
+  | 'planner';
 
 interface UiState {
   mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile';
@@ -95,6 +107,7 @@ interface UiState {
   manageCitizens: boolean;
   settleSites: SettleSiteScore[] | null;
   compare: CompareState | null;
+  planner: PlannerState | null;
   lastImportSummary: string | null;
 }
 
@@ -110,6 +123,7 @@ const ui: UiState = {
   manageCitizens: false,
   settleSites: null,
   compare: null,
+  planner: null,
   lastImportSummary: null,
 };
 
@@ -286,6 +300,52 @@ const callbacks: PanelCallbacks = {
     toggleBoost(state, id);
     refresh();
   },
+  onOpenPlanner(cityId) {
+    ui.planner = { cityId, objective: 'balanced', horizon: 30, results: null };
+    ui.rightView = 'planner';
+    refresh();
+  },
+  onSetObjective(objective) {
+    if (!ui.planner) return;
+    ui.planner.objective = objective;
+    ui.planner.results = null;
+    refresh();
+  },
+  onSetPlanHorizon(turns) {
+    if (!ui.planner) return;
+    ui.planner.horizon = turns;
+    ui.planner.results = null;
+    refresh();
+  },
+  onRunPlanner() {
+    if (!ui.planner) return;
+    showMessage('Searching build orders…');
+    const planner = ui.planner;
+    // Let the message paint before the synchronous search.
+    setTimeout(() => {
+      planner.results = searchBuildOrder(state, planner.cityId, {
+        horizon: planner.horizon,
+        objective: planner.objective,
+      });
+      showMessage(`Found ${planner.results.length} plan(s).`);
+      refresh();
+    }, 20);
+  },
+  onAdoptPlan(index) {
+    if (!ui.planner?.results) return;
+    const plan = ui.planner.results[index];
+    if (!plan) return;
+    const city = state.cities.find((c) => c.id === ui.planner!.cityId);
+    if (city) {
+      while (city.queue.length > 0) cancelQueueItem(state, city.id, 0);
+    }
+    const r = adoptPlan(state, ui.planner.cityId, plan);
+    showMessage(
+      r.reason ? `Adopted ${r.adopted} step(s); ${r.reason}` : `Adopted ${r.adopted} step(s).`,
+    );
+    selectCity(ui.planner.cityId);
+    refresh();
+  },
   onImportMap(text) {
     try {
       const { map, report } = parseCivExport(text);
@@ -367,6 +427,8 @@ function refresh(): void {
     renderImportPanel(contextPanel, ui.lastImportSummary, callbacks);
   } else if (ui.rightView === 'greatPeople') {
     renderGreatPeoplePanel(contextPanel, state);
+  } else if (ui.rightView === 'planner' && ui.planner) {
+    renderPlannerPanel(contextPanel, state, ui.planner, callbacks);
   }
 
   let highlight: Set<number> | null = null;
