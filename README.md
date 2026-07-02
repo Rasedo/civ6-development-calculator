@@ -9,7 +9,8 @@ with **no random events**.
 
 Stage 1 delivered the map/yield/city/turn engine; stage 2 added natural
 wonders, cultural border growth (plus tile purchase) and tech/civic trees with
-governments & policies.
+governments & policies; stage 3 added the optimization advisors (district
+placement scoring, settle-site ranking, N-turn build comparisons).
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -90,6 +91,19 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
   experiments.
 - **Save/load** to browser localStorage; full game state is plain JSON (stage-1
   saves migrate automatically).
+- **Advisors** (the "calculator" part):
+  - *District placement*: when placing a district, every legal tile shows its
+    adjacency bonus as a Civ 6-style badge; the best spot (adjacency value vs
+    tile yields sacrificed) is outlined in gold.
+  - *Settle advisor*: ranks the top founding sites map-wide by fresh-water
+    housing, unclaimed ring-weighted workable yields, and nearby resources
+    (luxuries your empire lacks score extra) — ranked badges on the map plus a
+    breakdown list, with found-city mode armed.
+  - *Build comparison*: pick any set of currently-buildable options (each
+    district evaluated at its best tile) and a 10–50 turn horizon; each option
+    is simulated forward on a cloned game (citizens, research, borders on
+    autopilot, sandbox off) and compared in a table — population, per-turn
+    yields, totals, and what actually finished.
 
 ## Known simplifications (stage 1)
 
@@ -115,17 +129,19 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 ## Roadmap ideas (later stages)
 
-1. Built wonders (incl. adjacency interactions) and great people.
-2. Eurekas/inspirations and game-progress district cost scaling.
-3. Import real map data extracted from a Civ 6 game via a mod (the `GameMap` JSON
+1. Import real map data extracted from a Civ 6 game via a mod (the `GameMap` JSON
    format in `src/core/types.ts` is the target interchange shape).
-4. Optimization tooling: "best campus spot" suggestions, full build-order solving.
+2. Built wonders (incl. adjacency interactions) and great people.
+3. Eurekas/inspirations and game-progress district cost scaling.
+4. Deeper optimization: multi-step build-order search (the projection engine in
+   `src/core/advisor.ts` is the evaluation function for it).
 
 ## Code layout
 
 ```
 src/core/   DOM-free engine: hex math (incl. edge/vertex graph for rivers),
-            mapgen, yields, placement rules, city stats, game state & turns
+            mapgen, yields, placement rules, city stats, game state & turns,
+            research/policy effects, optimization advisors
 src/data/   all game-rule data: terrains, features, resources, improvements,
             districts, buildings, constants & formulas
 src/ui/     canvas renderer + DOM panels

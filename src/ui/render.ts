@@ -26,6 +26,10 @@ export interface DrawOptions {
   selected: number | null;
   hover: number | null;
   highlight: Set<number> | null;
+  /** Small text badges drawn on tiles (e.g. adjacency previews, site ranks). */
+  labels: Map<number, string> | null;
+  /** Tiles to emphasize with a bright outline (best advisor picks). */
+  bestTiles: Set<number> | null;
   cityView: CityViewOverlay | null;
 }
 
@@ -79,6 +83,16 @@ export class MapRenderer {
   panBy(dxCss: number, dyCss: number): void {
     this.panX -= dxCss / this.zoom;
     this.panY -= dyCss / this.zoom;
+  }
+
+  /** Center the camera on a tile without changing zoom. */
+  centerOn(map: GameMap, tileIndex: number): void {
+    const tile = map.tiles[tileIndex];
+    if (!tile) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const c = hexCenter(tile.col, tile.row, HEX_SIZE);
+    this.panX = c.x - rect.width / (2 * this.zoom);
+    this.panY = c.y - rect.height / (2 * this.zoom);
   }
 
   // -------------------------------------------------------------------------
@@ -192,6 +206,15 @@ export class MapRenderer {
         ctx.stroke();
       }
     }
+    if (opts.bestTiles) {
+      for (const { tile, cx, cy } of visible) {
+        if (!opts.bestTiles.has(tile.index)) continue;
+        hexPath(cx, cy);
+        ctx.strokeStyle = '#ffd75e';
+        ctx.lineWidth = 2.6;
+        ctx.stroke();
+      }
+    }
 
     // --- pass 4: badges (resources, improvements, districts, wonders) ----------
     for (const { tile, cx, cy } of visible) {
@@ -201,6 +224,28 @@ export class MapRenderer {
         this.drawDistrict(tile.district, tile.districtComplete, cx, cy);
       }
       if (tile.wonder) this.drawWonder(tile.wonder, cx, cy);
+    }
+
+    // --- pass 4b: advisor labels -------------------------------------------------
+    if (opts.labels && opts.labels.size > 0) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${HEX_SIZE * 0.36}px system-ui, sans-serif`;
+      for (const { tile, cx, cy } of visible) {
+        const text = opts.labels.get(tile.index);
+        if (text === undefined) continue;
+        const w = ctx.measureText(text).width + HEX_SIZE * 0.3;
+        const h = HEX_SIZE * 0.48;
+        const y = cy - HEX_SIZE * 0.52;
+        roundRect(ctx, cx - w / 2, y - h / 2, w, h, 3);
+        ctx.fillStyle = 'rgba(16,19,24,0.9)';
+        ctx.fill();
+        ctx.strokeStyle = '#ffd75e';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#ffe9a8';
+        ctx.fillText(text, cx, y + 0.5);
+      }
     }
 
     // --- pass 5: worked pips ------------------------------------------------------

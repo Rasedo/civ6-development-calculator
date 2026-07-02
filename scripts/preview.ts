@@ -12,13 +12,12 @@ import { makePreviewPng } from './png';
 import { createGame, foundCity, placeImprovement, queueDistrict, queueBuilding, endTurn, setTechResearch } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
 import { validImprovements, districtPlacementTiles } from '../src/core/rules';
-import { tileYields } from '../src/core/yields';
-import { makeYieldCtx, availableTechs } from '../src/core/effects';
-import { isWater, isMountain } from '../src/core/query';
+import { availableTechs } from '../src/core/effects';
+import { scoreSettleSites, compareCandidates, projectTurns } from '../src/core/advisor';
 import { WONDERS } from '../src/data/wonders';
 import { TECHS } from '../src/data/techs';
 import { CIVICS } from '../src/data/civics';
-import type { GameState, Tile } from '../src/core/types';
+import type { GameState } from '../src/core/types';
 
 const seed = Number(process.argv[2] ?? 42);
 const map = generateMap({ width: 84, height: 54, seed });
@@ -47,32 +46,22 @@ console.log(`  natural wonders: ${[...wonders].map((w) => WONDERS[w].name).join(
 // --- 2. scripted playthrough ---------------------------------------------------
 const state: GameState = createGame({ width: 44, height: 26, seed });
 
-function settleScore(t: Tile): number {
-  if (isWater(t) || isMountain(t) || t.feature === 'OASIS' || t.wonder) return -1;
-  const ctx = makeYieldCtx(state);
-  let s = 0;
-  if (t.riverMask) s += 3;
-  for (const n of neighborhood(state, t)) {
-    const y = tileYields(ctx, n);
-    s += y.food * 1.5 + y.production;
-  }
-  return s;
-}
-function neighborhood(st: GameState, t: Tile): Tile[] {
-  const out: Tile[] = [];
-  for (const n of st.map.tiles) {
-    const dc = Math.abs(n.col - t.col);
-    const dr = Math.abs(n.row - t.row);
-    if (dc <= 2 && dr <= 2) out.push(n);
-  }
-  return out;
-}
-
-const best = [...state.map.tiles].sort((a, b) => settleScore(b) - settleScore(a))[0];
+const sites = scoreSettleSites(state, 3);
+if (sites.length === 0) throw new Error('no legal settle sites');
+console.log(
+  '\nTop settle sites: ' +
+    sites
+      .map((s) => {
+        const t = state.map.tiles[s.tileIndex];
+        return `(${t.col},${t.row}) ${s.score.toFixed(1)}`;
+      })
+      .join(', '),
+);
+const best = state.map.tiles[sites[0].tileIndex];
 const res = foundCity(state, best.index);
 if (!res.ok || !res.city) throw new Error('failed to settle: ' + res.reason);
 const city = res.city;
-console.log(`\nSettled ${city.name} at (${best.col},${best.row})`);
+console.log(`Settled ${city.name} at (${best.col},${best.row})`);
 
 // improve a few tiles
 let improved = 0;
@@ -122,6 +111,17 @@ console.log(`  techs: ${state.research.techs.map((t) => TECHS[t].name).join(', '
 console.log(`  civics: ${state.research.civics.map((c) => CIVICS[c].name).join(', ') || 'none'}`);
 console.log(`  government: ${state.government.current ?? 'none'}`);
 console.log(`  empire: treasury ${state.treasury.toFixed(0)}, science total ${state.scienceTotal.toFixed(0)}`);
+
+// --- 2b. build-choice comparison demo ---------------------------------------------
+console.log('\nBuild comparison over the next 20 turns:');
+for (const choice of compareCandidates(state, city.id).slice(0, 5)) {
+  const p = projectTurns(state, city.id, choice, 20);
+  const line = p.error
+    ? `✗ ${p.error}`
+    : `pop ${p.pop}, sci/t ${p.yields.science.toFixed(1)}, prod/t ${p.yields.production.toFixed(1)}, ` +
+      `cult/t ${p.yields.culture.toFixed(1)}, finished: ${p.completed.join(' + ') || '—'}`;
+  console.log(`  ${p.label.padEnd(24)} ${line}`);
+}
 
 // --- 3. PNG snapshot -------------------------------------------------------------
 const png = makePreviewPng(map, deflateSync);

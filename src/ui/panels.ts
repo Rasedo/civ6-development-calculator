@@ -18,6 +18,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { WONDERS } from '../data/wonders';
+import { choiceLabel, type BuildChoice, type Projection, type SettleSiteScore } from '../core/advisor';
 import { TECHS, ERAS, type ResearchEffect, type TechDef } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
@@ -37,6 +38,20 @@ export interface PanelCallbacks {
   onSetResearch(kind: 'tech' | 'civic', id: string): void;
   onSetGovernment(id: string): void;
   onSetPolicy(slotIndex: number, policyId: string | null): void;
+  onGotoTile(tileIndex: number): void;
+  onOpenCompare(cityId: number): void;
+  onToggleCandidate(index: number): void;
+  onSetHorizon(turns: number): void;
+  onRunCompare(): void;
+}
+
+/** Mutable state for the build-comparison view (owned by main.ts). */
+export interface CompareState {
+  cityId: number;
+  candidates: BuildChoice[];
+  selected: Set<number>;
+  horizon: number;
+  results: Projection[] | null;
 }
 
 const YIELD_LABELS: Record<YieldKey, string> = {
@@ -268,8 +283,9 @@ export function renderCityPanel(
       <span>Districts</span><span>${specialtyUsed} / ${maxD} specialty slots</span>
       <span>Borders</span><span>${fmt(stats.border.progress)} / ${stats.border.cost} culture · ${borderLine}</span>
     </div>
-    <div class="row">
+    <div class="row btnrow">
       <button data-act="buy-tile" ${canBuy ? '' : 'disabled'}>Buy tile (${buyCost}g)</button>
+      <button data-act="compare">Compare builds…</button>
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
     <details><summary>Yield breakdown</summary>
@@ -306,6 +322,7 @@ export function renderCityPanel(
     cb.onToggleManageCitizens((e.target as HTMLInputElement).checked);
   });
   container.querySelector('[data-act="buy-tile"]')?.addEventListener('click', () => cb.onStartBuyTile(city.id));
+  container.querySelector('[data-act="compare"]')?.addEventListener('click', () => cb.onOpenCompare(city.id));
   container.querySelector('[data-act="place-district"]')?.addEventListener('click', () => {
     const sel = container.querySelector('[data-act="district-select"]') as HTMLSelectElement;
     if (sel.value) cb.onStartDistrictPlacement(city.id, sel.value as DistrictId);
@@ -483,6 +500,123 @@ export function renderGovernmentPanel(
       cb.onSetPolicy(Number(el.dataset.slot), el.value || null);
     }),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Advisors
+// ---------------------------------------------------------------------------
+
+export function renderSettlePanel(
+  container: HTMLElement,
+  state: GameState,
+  sites: SettleSiteScore[],
+  cb: PanelCallbacks,
+): void {
+  const rows = sites
+    .map((s, i) => {
+      const t = state.map.tiles[s.tileIndex];
+      return `<div class="build-row site-row" data-idx="${s.tileIndex}">
+        <span><b>#${i + 1}</b> (${t.col}, ${t.row}) — score ${fmt(s.score)}<br>
+        <small class="muted">water ${fmt(s.housing)} · tiles ${fmt(s.yieldScore * 0.35)} · resources ${fmt(s.resourceScore)}</small></span>
+        <button data-act="goto" data-idx="${s.tileIndex}">Show</button>
+      </div>`;
+    })
+    .join('');
+
+  container.innerHTML = `
+    <h2>Settle advisor</h2>
+    <div class="row muted">Top founding sites by fresh water, unclaimed workable yields and nearby resources (new luxuries weighted extra). Found-city mode is active — click a ranked tile on the map to settle it.</div>
+    ${rows || '<div class="muted">No legal founding sites.</div>'}
+  `;
+  container.querySelectorAll('[data-act="goto"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onGotoTile(Number((b as HTMLElement).dataset.idx))),
+  );
+}
+
+export function renderComparePanel(
+  container: HTMLElement,
+  state: GameState,
+  compare: CompareState,
+  cb: PanelCallbacks,
+): void {
+  const city = state.cities.find((c) => c.id === compare.cityId);
+  if (!city) {
+    container.innerHTML = '<div class="muted">City no longer exists.</div>';
+    return;
+  }
+
+  const candidateRows = compare.candidates
+    .map((c, i) => {
+      const extra =
+        c.kind === 'district'
+          ? ` <span class="muted">@ (${state.map.tiles[c.tileIndex].col}, ${state.map.tiles[c.tileIndex].row})</span>`
+          : '';
+      return `<label class="inline"><input type="checkbox" data-act="cand" data-i="${i}" ${compare.selected.has(i) ? 'checked' : ''}>
+        ${choiceLabel(c)}${extra}</label>`;
+    })
+    .join('');
+
+  let resultsHtml = '';
+  if (compare.results) {
+    const cols = compare.results;
+    const header = cols.map((r) => `<th>${r.label}</th>`).join('');
+    const metric = (
+      name: string,
+      value: (r: Projection) => number | string,
+      better: 'high' | 'none' = 'high',
+    ) => {
+      const values = cols.map((r) => (r.error ? null : value(r)));
+      const numeric = values.filter((v): v is number => typeof v === 'number');
+      const best = better === 'high' && numeric.length ? Math.max(...numeric) : null;
+      const cells = values
+        .map((v, i) =>
+          cols[i].error
+            ? '<td class="muted">—</td>'
+            : `<td class="${best !== null && v === best ? 'best' : ''}">${typeof v === 'number' ? fmt(v) : v}</td>`,
+        )
+        .join('');
+      return `<tr><td>${name}</td>${cells}</tr>`;
+    };
+    resultsHtml = `
+      <table class="compare-table">
+        <tr><th></th>${header}</tr>
+        ${metric('Population', (r) => r.pop)}
+        ${metric('Food/t', (r) => r.yields.food)}
+        ${metric('Prod/t', (r) => r.yields.production)}
+        ${metric('Gold/t', (r) => r.yields.gold)}
+        ${metric('Sci/t', (r) => r.yields.science)}
+        ${metric('Cult/t', (r) => r.yields.culture)}
+        ${metric('Faith/t', (r) => r.yields.faith)}
+        ${metric('Science total', (r) => r.scienceTotal)}
+        ${metric('Culture total', (r) => r.cultureTotal)}
+        ${metric('Treasury', (r) => r.treasury)}
+        ${metric('Techs done', (r) => r.techs)}
+        ${metric('Completed', (r) => r.completed.join(', ') || '—', 'none')}
+      </table>
+      ${cols.some((r) => r.error) ? `<div class="muted hint">${cols.filter((r) => r.error).map((r) => `${r.label}: ${r.error}`).join(' · ')}</div>` : ''}
+    `;
+  }
+
+  container.innerHTML = `
+    <h2>Compare builds — ${city.name}</h2>
+    <div class="row muted">Each option clears the queue, builds only that item, then simulates forward (sandbox off, citizens/research/borders on autopilot). Districts use their best-scored tile.</div>
+    <div class="row">${candidateRows || '<span class="muted">Nothing buildable right now.</span>'}</div>
+    <div class="row">
+      <label>Horizon <select data-act="horizon">
+        ${[10, 20, 30, 50].map((h) => `<option value="${h}" ${compare.horizon === h ? 'selected' : ''}>${h} turns</option>`).join('')}
+      </select></label>
+      <button data-act="run" class="primary">Run comparison</button>
+    </div>
+    ${resultsHtml}
+  `;
+
+  container.querySelectorAll('[data-act="cand"]').forEach((el) =>
+    el.addEventListener('change', () => cb.onToggleCandidate(Number((el as HTMLElement).dataset.i))),
+  );
+  container.querySelector('[data-act="horizon"]')?.addEventListener('change', (e) => {
+    cb.onSetHorizon(Number((e.target as HTMLSelectElement).value));
+  });
+  container.querySelector('[data-act="run"]')?.addEventListener('click', () => cb.onRunCompare());
 }
 
 // ---------------------------------------------------------------------------

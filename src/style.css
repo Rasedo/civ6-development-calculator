@@ -188,6 +188,23 @@ summary { cursor: pointer; color: var(--muted); }
 }
 .build-row small { color: var(--muted); }
 
+.compare-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.compare-table th, .compare-table td {
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  text-align: right;
+}
+.compare-table th { background: var(--panel-2); text-align: center; }
+.compare-table td:first-child { color: var(--muted); text-align: left; }
+.compare-table td.best { color: var(--gold); font-weight: 700; }
+
+.site-row { cursor: default; }
+
 #message-line {
   min-height: 1.4em;
   color: var(--accent);

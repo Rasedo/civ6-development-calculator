@@ -22,8 +22,14 @@ import {
   deserialize,
 } from './core/game';
 import { computeCityStats, workableTiles, luxuryAmenities, borderCandidates } from './core/city';
-import { districtPlacementTiles } from './core/rules';
 import { getModifiers } from './core/effects';
+import {
+  scoreDistrictSpots,
+  scoreSettleSites,
+  compareCandidates,
+  projectTurns,
+  type SettleSiteScore,
+} from './core/advisor';
 import { MapRenderer, type CityViewOverlay } from './ui/render';
 import {
   renderTilePanel,
@@ -31,8 +37,11 @@ import {
   renderEmpireSummary,
   renderResearchPanel,
   renderGovernmentPanel,
+  renderSettlePanel,
+  renderComparePanel,
   tileSummary,
   type PanelCallbacks,
+  type CompareState,
 } from './ui/panels';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
@@ -63,7 +72,7 @@ seedInput.value = String(Math.floor(Math.random() * 1e9));
 
 // ---------------------------------------------------------------------------
 
-type RightView = 'context' | 'tech' | 'civic' | 'government';
+type RightView = 'context' | 'tech' | 'civic' | 'government' | 'settle' | 'compare';
 
 interface UiState {
   mode: 'inspect' | 'found' | 'placeDistrict' | 'buyTile';
@@ -74,6 +83,8 @@ interface UiState {
   selectedCityId: number | null;
   hoverTile: number | null;
   manageCitizens: boolean;
+  settleSites: SettleSiteScore[] | null;
+  compare: CompareState | null;
 }
 
 const ui: UiState = {
@@ -85,6 +96,8 @@ const ui: UiState = {
   selectedCityId: null,
   hoverTile: null,
   manageCitizens: false,
+  settleSites: null,
+  compare: null,
 };
 
 let state: GameState = newGameFromControls();
@@ -130,6 +143,7 @@ function setRightView(view: RightView): void {
     ['view-tech', 'tech'],
     ['view-civic', 'civic'],
     ['view-government', 'government'],
+    ['settle-advisor', 'settle'],
   ] as const) {
     $<HTMLButtonElement>(btn).classList.toggle('active', view === v);
   }
@@ -201,6 +215,44 @@ const callbacks: PanelCallbacks = {
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },
+  onGotoTile(tileIndex) {
+    renderer.centerOn(state.map, tileIndex);
+    refresh();
+  },
+  onOpenCompare(cityId) {
+    const candidates = compareCandidates(state, cityId);
+    ui.compare = {
+      cityId,
+      candidates,
+      // baseline + the first couple of real options pre-checked
+      selected: new Set(candidates.slice(0, 3).map((_, i) => i)),
+      horizon: 20,
+      results: null,
+    };
+    ui.rightView = 'compare';
+    refresh();
+  },
+  onToggleCandidate(index) {
+    if (!ui.compare) return;
+    if (ui.compare.selected.has(index)) ui.compare.selected.delete(index);
+    else ui.compare.selected.add(index);
+    ui.compare.results = null;
+    refresh();
+  },
+  onSetHorizon(turns) {
+    if (!ui.compare) return;
+    ui.compare.horizon = turns;
+    ui.compare.results = null;
+    refresh();
+  },
+  onRunCompare() {
+    if (!ui.compare) return;
+    const { cityId, candidates, selected, horizon } = ui.compare;
+    ui.compare.results = [...selected]
+      .sort((a, b) => a - b)
+      .map((i) => projectTurns(state, cityId, candidates[i], horizon));
+    refresh();
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -257,21 +309,41 @@ function refresh(): void {
     );
   } else if (ui.rightView === 'government') {
     renderGovernmentPanel(contextPanel, state, callbacks);
+  } else if (ui.rightView === 'settle' && ui.settleSites) {
+    renderSettlePanel(contextPanel, state, ui.settleSites, callbacks);
+  } else if (ui.rightView === 'compare' && ui.compare) {
+    renderComparePanel(contextPanel, state, ui.compare, callbacks);
   }
 
   let highlight: Set<number> | null = null;
+  let labels: Map<number, string> | null = null;
+  let bestTiles: Set<number> | null = null;
   if (ui.mode === 'placeDistrict' && ui.pendingCityId !== null && ui.pendingDistrict) {
     const city = state.cities.find((c) => c.id === ui.pendingCityId);
-    if (city) highlight = new Set(districtPlacementTiles(state, city, ui.pendingDistrict));
+    if (city) {
+      const spots = scoreDistrictSpots(state, city, ui.pendingDistrict);
+      highlight = new Set(spots.map((s) => s.tileIndex));
+      labels = new Map(spots.map((s) => [s.tileIndex, `+${s.adjacency}`]));
+      if (spots.length > 0) {
+        const top = spots[0].score;
+        bestTiles = new Set(spots.filter((s) => s.score === top).map((s) => s.tileIndex));
+      }
+    }
   } else if (ui.mode === 'buyTile' && ui.pendingCityId !== null) {
     const city = state.cities.find((c) => c.id === ui.pendingCityId);
     if (city) highlight = new Set(borderCandidates(state, city));
+  } else if (ui.settleSites && ui.rightView === 'settle') {
+    highlight = new Set(ui.settleSites.map((s) => s.tileIndex));
+    labels = new Map(ui.settleSites.map((s, i) => [s.tileIndex, `#${i + 1}`]));
+    bestTiles = new Set(ui.settleSites.slice(0, 1).map((s) => s.tileIndex));
   }
 
   renderer.draw(state, {
     selected: ui.selectedTile ?? (ui.selectedCityId !== null ? cityView!.centerIndex : null),
     hover: ui.hoverTile,
     highlight,
+    labels,
+    bestTiles,
     cityView,
   });
 
@@ -336,7 +408,9 @@ canvas.addEventListener('click', (e) => {
   if (ui.mode === 'found') {
     const r = foundCity(state, tileIdx);
     if (r.ok && r.city) {
+      ui.settleSites = null;
       setMode('inspect');
+      setRightView('context');
       selectCity(r.city.id);
       showMessage(`${r.city.name} founded.`);
     } else {
@@ -434,6 +508,8 @@ $<HTMLButtonElement>('generate-btn').addEventListener('click', () => {
   state = newGameFromControls();
   ui.selectedTile = null;
   ui.selectedCityId = null;
+  ui.settleSites = null;
+  ui.compare = null;
   setMode('inspect');
   setRightView('context');
   renderer.fit(state.map);
@@ -452,6 +528,26 @@ $<HTMLButtonElement>('mode-inspect').addEventListener('click', () => {
 
 $<HTMLButtonElement>('mode-found').addEventListener('click', () => {
   setMode(ui.mode === 'found' ? 'inspect' : 'found');
+  refresh();
+});
+
+$<HTMLButtonElement>('settle-advisor').addEventListener('click', () => {
+  if (ui.rightView === 'settle') {
+    ui.settleSites = null;
+    setRightView('context');
+    setMode('inspect');
+  } else {
+    ui.settleSites = scoreSettleSites(state);
+    ui.selectedCityId = null;
+    ui.selectedTile = null;
+    setRightView('settle');
+    setMode('found');
+    showMessage(
+      ui.settleSites.length
+        ? 'Top settle sites ranked on the map — click one to found a city.'
+        : 'No legal founding sites.',
+    );
+  }
   refresh();
 });
 
@@ -498,6 +594,8 @@ $<HTMLButtonElement>('load-btn').addEventListener('click', () => {
   sandboxToggle.checked = state.sandbox;
   ui.selectedTile = null;
   ui.selectedCityId = null;
+  ui.settleSites = null;
+  ui.compare = null;
   setMode('inspect');
   setRightView('context');
   renderer.fit(state.map);
