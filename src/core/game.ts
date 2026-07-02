@@ -13,6 +13,7 @@ import { computeUnlocks, getModifiers, availableTechs, availableCivics, governme
 import { detectBoosts } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance } from './units';
 import { barbarianPhase } from './combat';
+import { revealAround } from './fog';
 import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -75,6 +76,9 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     rngState: (map.seed ^ 0x9e3779b9) >>> 0,
     barbCamps: [],
     cityHp: {},
+    fogOfWar: false,
+    explored: [],
+    eventLog: [],
   };
 }
 
@@ -145,6 +149,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
     if (t.cityId === -1) t.cityId = id;
   }
   tile.cityId = id;
+  revealAround(state, tileIndex, 3);
 
   state.cities.push(city);
   return { ok: true, city };
@@ -634,12 +639,16 @@ export function deserialize(json: string): GameState {
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
   state.barbCamps ??= [];
   state.cityHp ??= {};
+  state.fogOfWar ??= false;
+  state.explored ??= [];
+  state.eventLog ??= [];
   for (const u of state.units) {
     u.owner ??= 'player';
     u.hp ??= 100;
   }
   for (const t of state.map.tiles) {
     (t as Tile).pillaged ??= false;
+    (t as Tile).goodyHut ??= false;
   }
   for (const c of state.cities) {
     c.cultureBox ??= 0;

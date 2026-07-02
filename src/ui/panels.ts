@@ -14,6 +14,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGI
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
 import { trainableUnits } from '../core/units';
 import { attackTargets, getCityHp } from '../core/combat';
+import { isExplored, fogActive } from '../core/fog';
 import { tileAppeal, appealTier } from '../core/appeal';
 import { isBoosted } from '../core/boosts';
 import { BOOSTS } from '../data/boosts';
@@ -80,6 +81,7 @@ export interface PanelCallbacks {
   onBuilderRepair(unitId: number): void;
   onAttack(unitId: number, targetTileIndex: number): void;
   onDisbandUnit(unitId: number): void;
+  onToggleExplore(unitId: number): void;
   onSetEmpireObjective(objective: Objective): void;
   onSetEmpireHorizon(turns: number): void;
   onRunEmpirePlan(): void;
@@ -148,6 +150,11 @@ export function renderTilePanel(
   tileIndex: number,
   cb: PanelCallbacks,
 ): void {
+  if (!isExplored(state, tileIndex)) {
+    container.innerHTML =
+      '<h2>Unexplored</h2><div class="muted">Terra incognita — send a unit (Scouts are fastest) to reveal it.</div>';
+    return;
+  }
   const tile = state.map.tiles[tileIndex];
   const ctx = makeYieldCtx(state);
   const terrain = TERRAINS[tile.terrain];
@@ -204,6 +211,7 @@ export function renderTilePanel(
       <b>${def?.name ?? u.type}</b> <span class="muted">${u.hp}/100 HP · ${u.movesLeft} MP${u.charges !== null ? ` · ${u.charges} charge(s)` : ''}</span>
       <div class="btnrow">
         <button data-act="unit-move" data-id="${u.id}">Move…</button>
+        ${fogActive(state) ? `<button data-act="unit-explore" data-id="${u.id}" class="${u.mission === 'explore' ? 'active' : ''}">${u.mission === 'explore' ? 'Exploring…' : 'Auto-explore'}</button>` : ''}
         ${targets
           .map((t) => {
             const tt = state.map.tiles[t];
@@ -304,6 +312,9 @@ export function renderTilePanel(
       const el = b as HTMLElement;
       cb.onAttack(Number(el.dataset.id), Number(el.dataset.t));
     }),
+  );
+  container.querySelectorAll('[data-act="unit-explore"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onToggleExplore(Number((b as HTMLElement).dataset.id))),
   );
   container.querySelectorAll('[data-act="unit-disband"]').forEach((b) =>
     b.addEventListener('click', () => cb.onDisbandUnit(Number((b as HTMLElement).dataset.id))),

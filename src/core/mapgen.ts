@@ -51,6 +51,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
         builtWonder: null,
         builtWonderComplete: false,
         pillaged: false,
+        goodyHut: false,
         cityId: -1,
       });
     }
@@ -213,6 +214,22 @@ export function generateMap(opts: MapGenOptions): GameMap {
   // --- 8. Resources --------------------------------------------------------------
   if (withResources) {
     placeResources(map, deriveSeed(seed, 'resources'));
+  }
+
+  // --- 9. Tribal villages -----------------------------------------------------------
+  if (opts.withVillages ?? true) {
+    const rngV = mulberry32(deriveSeed(seed, 'villages'));
+    let quota = Math.round(
+      map.tiles.filter((t) => !TERRAINS[t.terrain].water).length / 40,
+    );
+    for (const t of shuffle(rngV, [...map.tiles])) {
+      if (quota <= 0) break;
+      if (TERRAINS[t.terrain].water || t.elevation === 'MOUNTAIN') continue;
+      if (t.feature === 'ICE' || t.feature === 'OASIS' || t.wonder || t.resource) continue;
+      if (neighbors(map, t).some((n) => n.goodyHut)) continue;
+      t.goodyHut = true;
+      quota--;
+    }
   }
 
   return map;

@@ -24,6 +24,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         builtWonder: null,
         builtWonderComplete: false,
         pillaged: false,
+        goodyHut: false,
         cityId: -1,
       });
     }
@@ -55,6 +56,9 @@ export function makeState(map: GameMap = makeMap()): GameState {
     rngState: 42,
     barbCamps: [],
     cityHp: {},
+    fogOfWar: false,
+    explored: [],
+    eventLog: [],
   };
 }
 

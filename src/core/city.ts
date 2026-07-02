@@ -12,6 +12,7 @@ import { getModifiers, makeYieldCtx, type Modifiers, type YieldCtx } from './eff
 import { tileAppeal, appealTier } from './appeal';
 import { cityTradeYields } from './trade';
 import { hasRiver } from './query';
+import { revealAround } from './fog';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -336,6 +337,7 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
 export function acquireTile(state: GameState, city: City, tileIndex: number): void {
   state.map.tiles[tileIndex].cityId = city.id;
   city.tilesAcquired += 1;
+  revealAround(state, tileIndex, 1);
 }
 
 // ---------------------------------------------------------------------------

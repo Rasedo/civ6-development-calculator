@@ -10,24 +10,13 @@ import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
 import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
+import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
-// ---------------------------------------------------------------------------
-// In-state RNG (groundwork for stochastic mechanics; serialized => replayable)
-// ---------------------------------------------------------------------------
-
-/** Advance the game's RNG and return a float in [0, 1). */
-export function nextRandom(state: GameState): number {
-  let a = state.rngState | 0;
-  a = (a + 0x6d2b79f5) | 0;
-  let t = Math.imul(a ^ (a >>> 15), 1 | a);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  state.rngState = a;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
+export { nextRandom } from './rand';
 
 // ---------------------------------------------------------------------------
 // Movement
@@ -158,8 +147,10 @@ export function walkPath(state: GameState, unit: Unit): void {
     unit.path.shift();
     unit.movesLeft = river ? 0 : Math.max(0, unit.movesLeft - moveCostInto(to));
 
-    // Player units clear barbarian camps by entering them (+50 gold).
     if (unit.owner === 'player') {
+      revealAround(state, nextIndex);
+      claimGoodyHut(state, unit);
+      // Player units clear barbarian camps by entering them (+50 gold).
       const camp = state.barbCamps.indexOf(nextIndex);
       if (camp >= 0) {
         state.barbCamps.splice(camp, 1);
@@ -235,6 +226,7 @@ export function spawnUnit(
     path: null,
   };
   state.units.push(unit);
+  if (owner === 'player') revealAround(state, unit.tileIndex);
   return unit;
 }
 
@@ -258,7 +250,31 @@ export function refreshUnits(state: GameState): void {
     unit.hp = Math.min(UNIT_HP, unit.hp + (friendly ? 10 : 5));
     unit.movesLeft = UNITS[unit.type]?.moves ?? 2;
     if (unit.path) walkPath(state, unit);
+    // Auto-explore: keep chasing the fog until there is none in reach.
+    if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {
+      const target = nearestUnexplored(state, unit);
+      if (target === null) {
+        unit.mission = null;
+      } else {
+        const path = findPath(state, unit, target);
+        if (path) {
+          unit.path = path;
+          walkPath(state, unit);
+        } else {
+          unit.mission = null;
+        }
+      }
+    }
   }
+}
+
+/** Toggle a unit's auto-explore standing order. */
+export function setExploreMission(state: GameState, unitId: number, on: boolean): RuleResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit) return no('No such unit.');
+  unit.mission = on ? 'explore' : null;
+  if (!on) unit.path = null;
+  return ok;
 }
 
 // ---------------------------------------------------------------------------

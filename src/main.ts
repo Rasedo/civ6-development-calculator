@@ -71,7 +71,8 @@ import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
 import { choosePantheon, foundReligion, queueSettler } from './core/game';
 import { addTradeRoute, removeTradeRoute } from './core/trade';
-import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderRepair, disbandUnit } from './core/units';
+import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderRepair, disbandUnit, setExploreMission } from './core/units';
+import { initFog } from './core/fog';
 import { meleeAttack, rangedAttack } from './core/combat';
 import { UNITS as UNIT_DEFS } from './data/units';
 import { searchEmpirePlan, adoptEmpirePlan } from './core/empirePlanner';
@@ -88,6 +89,7 @@ const resourcesToggle = $<HTMLInputElement>('resources-toggle');
 const wondersToggle = $<HTMLInputElement>('wonders-toggle');
 const sandboxToggle = $<HTMLInputElement>('sandbox-toggle');
 const unitsToggle = $<HTMLInputElement>('units-toggle');
+const fogToggle = $<HTMLInputElement>('fog-toggle');
 const contextPanel = $<HTMLElement>('context-panel');
 const empireSummary = $<HTMLElement>('empire-summary');
 const turnLabel = $<HTMLElement>('turn-label');
@@ -445,6 +447,11 @@ const callbacks: PanelCallbacks = {
   },
   onDisbandUnit(unitId) {
     disbandUnit(state, unitId);
+    refresh();
+  },
+  onToggleExplore(unitId) {
+    const unit = state.units.find((u) => u.id === unitId);
+    setExploreMission(state, unitId, unit?.mission !== 'explore');
     refresh();
   },
   onConnectLiveSync() {
@@ -947,13 +954,38 @@ unitsToggle.addEventListener('change', () => {
   refresh();
 });
 
+fogToggle.addEventListener('change', () => {
+  state.fogOfWar = fogToggle.checked;
+  if (state.fogOfWar) {
+    if (!state.unitsMode) {
+      state.unitsMode = true;
+      unitsToggle.checked = true;
+    }
+    initFog(state);
+    showMessage('Fog of war on — scout to reveal the map.');
+  } else {
+    showMessage('Fog of war off.');
+  }
+  refresh();
+});
+
+let seenEvents = 0;
+function surfaceEvents(): void {
+  if (state.eventLog.length > seenEvents) {
+    showMessage(state.eventLog[state.eventLog.length - 1]);
+  }
+  seenEvents = state.eventLog.length;
+}
+
 $<HTMLButtonElement>('end-turn').addEventListener('click', () => {
   endTurn(state);
+  surfaceEvents();
   refresh();
 });
 
 $<HTMLButtonElement>('end-turn-10').addEventListener('click', () => {
   for (let i = 0; i < 10; i++) endTurn(state);
+  surfaceEvents();
   refresh();
 });
 

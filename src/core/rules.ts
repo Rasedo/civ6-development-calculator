@@ -8,6 +8,7 @@ import type { City, DistrictId, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors } from './hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from './query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
+import { isExplored } from './fog';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -32,6 +33,7 @@ function gates(state: GameState): Unlocks | null {
 
 export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
   const tile = state.map.tiles[tileIndex];
+  if (!isExplored(state, tileIndex)) return no('Unexplored — send a unit to scout it first.');
   if (isWater(tile)) return no('Cities must be founded on land.');
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (tile.wonder) return no('Cannot settle on a natural wonder.');

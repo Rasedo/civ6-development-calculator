@@ -86,6 +86,8 @@ export interface Tile {
   builtWonderComplete: boolean;
   /** Pillaged improvement (yields nothing until a builder repairs it). */
   pillaged: boolean;
+  /** Tribal village (goody hut) waiting for a unit to claim it. */
+  goodyHut: boolean;
   /** Owning city id, or -1. */
   cityId: number;
 }
@@ -197,6 +199,12 @@ export interface GameState {
   barbCamps: number[];
   /** City HP keyed by city id (string for JSON); missing = full (200). */
   cityHp: Record<string, number>;
+  /** Fog of war (units mode): unexplored tiles are hidden and unusable. */
+  fogOfWar: boolean;
+  /** Per-tile explored flags (0/1), parallel to map.tiles; [] = all explored. */
+  explored: number[];
+  /** Recent gameplay events (goody rewards etc.) for the UI to surface. */
+  eventLog: string[];
 }
 
 export interface Unit {
@@ -211,6 +219,8 @@ export interface Unit {
   charges: number | null;
   /** Remaining multi-turn movement path (tile indexes), or null. */
   path: number[] | null;
+  /** Standing order ('explore' keeps picking new frontier targets). */
+  mission?: 'explore' | null;
 }
 
 export interface ReligionState {
@@ -239,6 +249,7 @@ export interface MapGenOptions {
   landFraction?: number;
   withResources?: boolean;
   withWonders?: boolean;
+  withVillages?: boolean;
 }
 
 export interface YieldBreakdown {

@@ -13,6 +13,7 @@ import { DISTRICTS } from '../data/districts';
 import { WONDERS } from '../data/wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { UNITS } from '../data/units';
+import { fogActive, isExplored } from '../core/fog';
 import type { ImprovementId } from '../core/types';
 
 export const HEX_SIZE = 24;
@@ -115,10 +116,16 @@ export class MapRenderer {
     const x1 = this.panX + rect.width / this.zoom + 2 * HEX_SIZE;
     const y1 = this.panY + rect.height / this.zoom + 2 * HEX_SIZE;
     const corners = cornerOffsets(HEX_SIZE);
+    const fog = fogActive(state);
     const visible: { tile: Tile; cx: number; cy: number }[] = [];
+    const hidden: { cx: number; cy: number }[] = [];
     for (const tile of map.tiles) {
       const { x, y } = hexCenter(tile.col, tile.row, HEX_SIZE);
       if (x < x0 || x > x1 || y < y0 || y > y1) continue;
+      if (fog && !isExplored(state, tile.index)) {
+        hidden.push({ cx: x, cy: y });
+        continue; // unexplored tiles render as darkness and nothing else
+      }
       visible.push({ tile, cx: x, cy: y });
     }
 
@@ -128,6 +135,16 @@ export class MapRenderer {
       for (let i = 1; i < 6; i++) ctx.lineTo(cx + corners[i].x, cy + corners[i].y);
       ctx.closePath();
     };
+
+    // --- pass 0: the fog itself -------------------------------------------------
+    for (const { cx, cy } of hidden) {
+      hexPath(cx, cy);
+      ctx.fillStyle = '#151a22';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
 
     // --- pass 1: terrain fills + elevation + features ------------------------
     for (const { tile, cx, cy } of visible) {
@@ -298,6 +315,11 @@ export class MapRenderer {
           ctx.font = `bold ${HEX_SIZE * 0.5}px system-ui, sans-serif`;
           ctx.fillStyle = '#e05555';
           ctx.fillText('⛺', cx, cy + 0.5);
+        }
+        if (tile.goodyHut) {
+          ctx.font = `bold ${HEX_SIZE * 0.46}px system-ui, sans-serif`;
+          ctx.fillStyle = '#ffd75e';
+          ctx.fillText('🛖', cx, cy + 0.5);
         }
         if (tile.pillaged) {
           ctx.font = `bold ${HEX_SIZE * 0.42}px system-ui, sans-serif`;

@@ -188,9 +188,11 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 // ---------------------------------------------------------------------------
 
 function campCandidates(state: GameState): Tile[] {
+  const preferFog = state.fogOfWar && state.explored.length > 0;
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
-    if (t.cityId !== -1) return false;
+    if (t.cityId !== -1 || t.goodyHut) return false;
+    if (preferFog && state.explored[t.index] === 1) return false; // camps rise in the fog
     for (const c of state.cities) {
       const ct = state.map.tiles[c.centerIndex];
       if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
