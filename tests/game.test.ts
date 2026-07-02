@@ -7,7 +7,7 @@ import {
   amenityTier,
   maxSpecialtyDistricts,
 } from '../src/data/constants';
-import { foundCity, queueDistrict, queueBuilding, endTurn, toggleLockedTile } from '../src/core/game';
+import { foundCity, queueDistrict, queueBuilding, endTurn, toggleLockedTile, itemCost } from '../src/core/game';
 import { canFoundCity, canPlaceDistrict } from '../src/core/rules';
 import { computeCityStats, assignWorkedTiles, luxuryAmenities } from '../src/core/city';
 
@@ -151,7 +151,7 @@ describe('districts and buildings', () => {
     expect(queueDistrict(state, city.id, 'CAMPUS', spot.index).ok).toBe(true);
     expect(spot.districtComplete).toBe(false);
     const prod = computeCityStats(state, city).total.production;
-    const turns = Math.ceil(54 / prod);
+    const turns = Math.ceil(itemCost(city.queue[0]) / prod);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(spot.districtComplete).toBe(true);
   });

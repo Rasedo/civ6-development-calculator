@@ -98,7 +98,7 @@ export interface GameMap {
 export type FocusId = 'balanced' | YieldKey;
 
 export type QueueItem =
-  | { kind: 'district'; district: DistrictId; tileIndex: number; progress: number }
+  | { kind: 'district'; district: DistrictId; tileIndex: number; progress: number; cost?: number }
   | { kind: 'building'; building: string; progress: number }
   | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number };
 
@@ -145,6 +145,8 @@ export interface ResearchState {
   civicProgress: number;
   techs: string[];
   civics: string[];
+  /** Tech/civic ids whose eureka/inspiration has fired (-40% cost). */
+  boosted: string[];
 }
 
 /** Current government and slotted policy cards (null = empty slot). */

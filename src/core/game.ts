@@ -10,6 +10,7 @@ import { tilesWithin } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
+import { detectBoosts } from './boosts';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -19,7 +20,25 @@ import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost } from '../data/gre
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
+import { BOOST_FRACTION } from '../data/boosts';
 import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE } from '../data/constants';
+
+/** Eureka/inspiration discount applied to a research cost. */
+export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
+  return state.research.boosted.includes(id)
+    ? Math.round(baseCost * (1 - BOOST_FRACTION))
+    : baseCost;
+}
+
+/**
+ * Districts get pricier as the game advances (Civ 6 scales with overall
+ * research progress). Cost is locked in when the district is queued.
+ */
+export function districtCost(state: GameState): number {
+  const total = Object.keys(TECHS).length + Object.keys(CIVICS).length;
+  const done = state.research.techs.length + state.research.civics.length;
+  return Math.round(54 * (1 + 8 * (done / total)));
+}
 
 export function createGame(opts: MapGenOptions & { sandbox?: boolean }): GameState {
   return createGameFromMap(generateMap(opts), opts.sandbox ?? false);
@@ -37,7 +56,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false): GameS
     scienceTotal: 0,
     cultureTotal: 0,
     faithTotal: 0,
-    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] },
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
   };
@@ -136,7 +155,7 @@ export function queueDistrict(
 
   city.districts.push({ type, tileIndex });
   if (!state.sandbox) {
-    city.queue.push({ kind: 'district', district: type, tileIndex, progress: 0 });
+    city.queue.push({ kind: 'district', district: type, tileIndex, progress: 0, cost: districtCost(state) });
   }
   return { ok: true };
 }
@@ -200,7 +219,7 @@ export function cancelQueueItem(state: GameState, cityId: number, index: number)
 }
 
 export function itemCost(item: QueueItem): number {
-  if (item.kind === 'district') return DISTRICTS[item.district].cost;
+  if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   return BUILDINGS[item.building].cost;
 }
@@ -333,12 +352,13 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
 // ---------------------------------------------------------------------------
 
 function autoPickResearch(state: GameState): void {
+  const eff = (id: string, cost: number) => effectiveResearchCost(state, id, cost);
   if (state.research.tech === null) {
-    const next = availableTechs(state).sort((a, b) => a.cost - b.cost)[0];
+    const next = availableTechs(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
     if (next) state.research.tech = next.id;
   }
   if (state.research.civic === null) {
-    const next = availableCivics(state).sort((a, b) => a.cost - b.cost)[0];
+    const next = availableCivics(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
     if (next) state.research.civic = next.id;
   }
 }
@@ -348,8 +368,8 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
   autoPickResearch(state);
 
   r.techProgress += science;
-  while (r.tech && r.techProgress >= TECHS[r.tech].cost) {
-    r.techProgress -= TECHS[r.tech].cost;
+  while (r.tech && r.techProgress >= effectiveResearchCost(state, r.tech, TECHS[r.tech].cost)) {
+    r.techProgress -= effectiveResearchCost(state, r.tech, TECHS[r.tech].cost);
     r.techs.push(r.tech);
     r.tech = null;
     autoPickResearch(state);
@@ -357,8 +377,8 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
   if (!r.tech) r.techProgress = Math.min(r.techProgress, 0); // nothing left to research
 
   r.civicProgress += culture;
-  while (r.civic && r.civicProgress >= CIVICS[r.civic].cost) {
-    r.civicProgress -= CIVICS[r.civic].cost;
+  while (r.civic && r.civicProgress >= effectiveResearchCost(state, r.civic, CIVICS[r.civic].cost)) {
+    r.civicProgress -= effectiveResearchCost(state, r.civic, CIVICS[r.civic].cost);
     r.civics.push(r.civic);
     r.civic = null;
     autoPickResearch(state);
@@ -372,6 +392,7 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
 }
 
 export function endTurn(state: GameState): void {
+  detectBoosts(state);
   const luxMap = luxuryAmenities(state);
   const mods = getModifiers(state);
   let turnScience = 0;
@@ -514,7 +535,8 @@ export function serialize(state: GameState): string {
 /** Parse a save, filling in fields that older saves lack. */
 export function deserialize(json: string): GameState {
   const state = JSON.parse(json) as GameState;
-  state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] };
+  state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
+  state.research.boosted ??= [];
   state.government ??= { current: null, policies: [] };
   state.greatPeople ??= { points: {}, earned: [] };
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {

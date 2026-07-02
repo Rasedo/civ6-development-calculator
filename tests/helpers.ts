@@ -41,7 +41,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     scienceTotal: 0,
     cultureTotal: 0,
     faithTotal: 0,
-    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] },
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
   };

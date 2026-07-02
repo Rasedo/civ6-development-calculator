@@ -50,6 +50,8 @@ import {
   type CompareState,
 } from './ui/panels';
 import { parseCivExport, importSummary } from './core/importer';
+import { toggleBoost } from './core/boosts';
+import { tileAppeal, appealTier } from './core/appeal';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -280,6 +282,10 @@ const callbacks: PanelCallbacks = {
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },
+  onToggleBoost(id) {
+    toggleBoost(state, id);
+    refresh();
+  },
   onImportMap(text) {
     try {
       const { map, report } = parseCivExport(text);
@@ -371,7 +377,15 @@ function refresh(): void {
     if (city) {
       const spots = scoreDistrictSpots(state, city, ui.pendingDistrict);
       highlight = new Set(spots.map((s) => s.tileIndex));
-      labels = new Map(spots.map((s) => [s.tileIndex, `+${s.adjacency}`]));
+      labels =
+        ui.pendingDistrict === 'NEIGHBORHOOD'
+          ? new Map(
+              spots.map((s) => [
+                s.tileIndex,
+                `⌂${appealTier(tileAppeal(state.map, state.map.tiles[s.tileIndex])).housing}`,
+              ]),
+            )
+          : new Map(spots.map((s) => [s.tileIndex, `+${s.adjacency}`]));
       if (spots.length > 0) {
         const top = spots[0].score;
         bestTiles = new Set(spots.filter((s) => s.score === top).map((s) => s.tileIndex));

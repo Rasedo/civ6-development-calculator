@@ -204,6 +204,7 @@ summary { cursor: pointer; color: var(--muted); }
 .compare-table td.best { color: var(--gold); font-weight: 700; }
 
 .site-row { cursor: default; }
+.boosted { color: var(--gold); font-weight: 700; }
 
 textarea {
   width: 100%;

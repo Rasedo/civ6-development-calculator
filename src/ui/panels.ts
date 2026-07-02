@@ -8,7 +8,11 @@ import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
 import { validImprovements, canRemoveFeature, availableBuildings, districtPlacementTiles, availableWonders } from '../core/rules';
-import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned } from '../core/game';
+import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost } from '../core/game';
+import { tileAppeal, appealTier } from '../core/appeal';
+import { isBoosted } from '../core/boosts';
+import { BOOSTS } from '../data/boosts';
+import { isWater as isWaterTile } from '../core/query';
 import { makeYieldCtx, computeUnlocks, availableTechs, availableCivics, getModifiers, governmentSlots } from '../core/effects';
 import { hasRiver, hasFreshWater } from '../core/query';
 import { TERRAINS } from '../data/terrains';
@@ -48,6 +52,7 @@ export interface PanelCallbacks {
   onImportMap(text: string): void;
   onStartWonderPlacement(cityId: number, wonderId: string): void;
   onSetSpecialists(cityId: number, tileIndex: number, count: number): void;
+  onToggleBoost(id: string): void;
 }
 
 /** Mutable state for the build-comparison view (owned by main.ts). */
@@ -167,6 +172,7 @@ export function renderTilePanel(
     <h2>${wonder ? `✦ ${wonder.name}` : terrain.name + elevLabel}</h2>
     <div class="row chips">${chips.join(' ') || ''}</div>
     <div class="row">${yieldsHtml(tileYields(ctx, tile))}</div>
+    ${!isWaterTile(tile) && !wonder ? `<div class="row muted">Appeal: ${tileAppeal(state.map, tile)} (${appealTier(tileAppeal(state.map, tile)).name})</div>` : ''}
     <div class="row">Owner: ${owner ? `<a href="#" data-act="city">${owner.name}</a>` : '<span class="muted">none</span>'}</div>
     ${wonderHtml}
     ${districtHtml}
@@ -332,6 +338,7 @@ export function renderCityPanel(
         <span>Buildings</span><span>${yieldsHtml(stats.breakdown.buildings)}</span>
         <span>Citizens</span><span>${yieldsHtml(stats.breakdown.citizens)}</span>
         <span>Gov/policies</span><span>${yieldsHtml(stats.breakdown.bonuses)}</span>
+        <span>Maintenance</span><span class="${stats.maintenance > 0 ? 'bad' : ''}">−${fmt(stats.maintenance)} Gold</span>
       </div>
       <div class="muted hint">Amenity modifier ×${stats.amenities.tier.yieldFactor} on non-food.</div>
     </details>
@@ -341,7 +348,7 @@ export function renderCityPanel(
       </select></label>
       <label class="inline"><input type="checkbox" data-act="manage" ${manageCitizens ? 'checked' : ''}> lock tiles by clicking</label>
     </div>
-    <h3>Districts</h3>
+    <h3>Districts <span class="muted">(cost ${districtCost(state)}⚙ now)</span></h3>
     ${districtRows || '<div class="muted">None yet.</div>'}
     <div class="row">
       <select data-act="district-select">${districtOptions}</select>
@@ -490,14 +497,16 @@ export function renderResearchPanel(
       .map((d) => {
         const fx = effectSummary(d.effects);
         const prereqNames = d.prereqs.map((p) => (kind === 'tech' ? TECHS[p] : CIVICS[p])?.name ?? p);
+        const boosted = isBoosted(state, d.id);
+        const cost = effectiveResearchCost(state, d.id, d.cost);
         let status: string;
         let cls = '';
         if (completed.has(d.id)) {
           status = '✓';
           cls = 'done';
         } else if (d.id === current) {
-          const turns = perTurn > 0 ? Math.ceil((d.cost - progress) / perTurn) : '∞';
-          status = `${fmt(progress)}/${d.cost} · ~${turns}t`;
+          const turns = perTurn > 0 ? Math.ceil((cost - progress) / perTurn) : '∞';
+          status = `${fmt(progress)}/${cost} · ~${turns}t`;
           cls = 'current';
         } else if (availableIds.has(d.id)) {
           status = `<button data-act="research" data-id="${d.id}">Research</button>`;
@@ -505,9 +514,20 @@ export function renderResearchPanel(
           status = `<span class="muted">needs ${prereqNames.join(', ')}</span>`;
           cls = 'locked';
         }
+        const boost = BOOSTS[d.id];
+        let boostHtml = '';
+        if (boost && !completed.has(d.id)) {
+          const label = kind === 'tech' ? 'Eureka' : 'Inspiration';
+          const toggle = boost.check
+            ? boosted
+              ? ' <span class="boosted">✦ −40%</span>'
+              : ' <span class="muted">(auto)</span>'
+            : ` <button data-act="boost" data-id="${d.id}">${boosted ? 'unset' : 'got it'}</button>${boosted ? ' <span class="boosted">✦ −40%</span>' : ''}`;
+          boostHtml = `<br><small class="muted">${label}: ${boost.desc}</small>${toggle}`;
+        }
         return `<div class="research-row ${cls}">
-          <span><b>${d.name}</b> <span class="muted">${d.cost}${kind === 'tech' ? '🧪' : '🎭'}</span><br>
-          <small class="muted">${fx || '—'}</small></span>
+          <span><b>${d.name}</b> <span class="muted">${boosted && !completed.has(d.id) ? `<s>${d.cost}</s> ${cost}` : d.cost}${kind === 'tech' ? '🧪' : '🎭'}</span><br>
+          <small class="muted">${fx || '—'}</small>${boostHtml}</span>
           <span>${status}</span>
         </div>`;
       })
@@ -517,11 +537,14 @@ export function renderResearchPanel(
 
   container.innerHTML = `
     <h2>${kind === 'tech' ? 'Technologies' : 'Civics'}</h2>
-    <div class="row muted">+${fmt(perTurn)} ${kind === 'tech' ? 'science' : 'culture'}/turn — unselected research auto-picks the cheapest option.</div>
+    <div class="row muted">+${fmt(perTurn)} ${kind === 'tech' ? 'science' : 'culture'}/turn — unselected research auto-picks the cheapest option. Eurekas/inspirations give −40%; observable ones fire automatically, the rest have an honest "got it" toggle.</div>
     ${rows}
   `;
   container.querySelectorAll('[data-act="research"]').forEach((b) =>
     b.addEventListener('click', () => cb.onSetResearch(kind, (b as HTMLElement).dataset.id!)),
+  );
+  container.querySelectorAll('[data-act="boost"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onToggleBoost((b as HTMLElement).dataset.id!)),
   );
 }
 

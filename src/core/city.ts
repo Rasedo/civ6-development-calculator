@@ -9,6 +9,7 @@ import { tilesWithin, hexDistance } from './hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from './query';
 import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities } from './yields';
 import { getModifiers, makeYieldCtx, type Modifiers, type YieldCtx } from './effects';
+import { tileAppeal, appealTier } from './appeal';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -67,6 +68,31 @@ export interface CityStats {
   };
   /** Citizens working as specialists (already clamped to slots/population). */
   specialistTotal: number;
+  /** Gold upkeep of districts + buildings (already subtracted from total.gold). */
+  maintenance: number;
+}
+
+/** Gold upkeep: commercial money-makers are free, everything else scales with tier. */
+function buildingMaintenance(id: string): number {
+  const def = BUILDINGS[id];
+  if (!def || def.cost === 0) return 0;
+  if (def.district === 'COMMERCIAL_HUB') return 0;
+  if (def.cost >= 500) return 3;
+  if (def.cost >= 190) return 2;
+  return 1;
+}
+
+function districtMaintenance(type: string): number {
+  return type === 'CITY_CENTER' || type === 'NEIGHBORHOOD' || type === 'AQUEDUCT' ? 0 : 1;
+}
+
+export function cityMaintenance(state: GameState, city: City): number {
+  let total = 0;
+  for (const d of city.districts) {
+    if (state.map.tiles[d.tileIndex].districtComplete) total += districtMaintenance(d.type);
+  }
+  for (const b of city.buildings) total += buildingMaintenance(b);
+  return total;
 }
 
 /** Tiles a city could work: owned, in range, passable, not district/wonder tiles. */
@@ -193,7 +219,12 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
 
   let total = water;
   for (const d of city.districts) {
-    if (map.tiles[d.tileIndex].districtComplete) total += DISTRICTS[d.type].housing;
+    if (!map.tiles[d.tileIndex].districtComplete) continue;
+    if (d.type === 'NEIGHBORHOOD') {
+      total += appealTier(tileAppeal(map, map.tiles[d.tileIndex])).housing;
+    } else {
+      total += DISTRICTS[d.type].housing;
+    }
   }
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
@@ -431,6 +462,8 @@ export function computeCityStats(
       total[k] *= mult[k] ?? 1;
     }
   }
+  const maintenance = cityMaintenance(state, city);
+  total.gold -= maintenance;
 
   const foodSurplus = total.food - city.population * FOOD_PER_CITIZEN;
   let effective = foodSurplus;
@@ -465,5 +498,6 @@ export function computeCityStats(
     turnsToGrow,
     border: { cost: borderCost, progress: city.cultureBox, turns: borderTurns, nextTile },
     specialistTotal,
+    maintenance,
   };
 }

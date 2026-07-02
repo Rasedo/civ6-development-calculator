@@ -221,9 +221,9 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: false,
     allowMultiple: true,
     adjacency: [],
-    housing: 4, // real game: 2-6 based on appeal; appeal isn't modeled in stage 1
+    housing: 0, // appeal-based (2-6), computed from the tile it sits on
     placement: {},
-    description: '+4 housing (flat; appeal not modeled yet).',
+    description: 'Housing based on tile appeal (2-6).',
   }),
 };
 
