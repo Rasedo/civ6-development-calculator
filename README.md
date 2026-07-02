@@ -13,7 +13,10 @@ governments & policies; stage 3 added the optimization advisors; stage 4 the
 real-map import mod; stage 5 world wonders, great people and specialists;
 stage 6 the fidelity pass (eurekas, cost scaling, appeal, maintenance);
 stage 7 the build-order search; stage 8 religion and trade routes; stage 9
-settlers and the empire-wide planner; stage 10 live-sync with a running game.
+settlers and the empire-wide planner; stage 10 live-sync with a running game;
+stage 11a the unit framework (builders) behind a units-mode toggle — the first
+step toward a stochastic environment for reinforcement learning (barbarians,
+fog of war and disasters are next).
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -154,6 +157,14 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
   Access API) while the mod's LiveSync context runs — the calculator mirrors
   your real game every turn (cities, districts, wonders, buildings,
   improvements, borders, research) so all advisors analyze the live position.
+- **Units mode** (toggle; off = classic free-improvement calculator): units
+  live on the map with movement points, Civ 6-ish terrain costs (hills/woods
+  +1), the river-crossing rule (crossing ends the move), A* pathfinding with
+  multi-turn move orders, one-civilian-per-tile stacking, production-trained
+  units with gold upkeep — and **Builders** (3 charges) that improvements and
+  chops now require. All in-game randomness flows through a seeded RNG stored
+  in the game state, so stochastic mechanics stay replay- and clone-safe for
+  the planners (and future RL training).
 
 ## Known simplifications (stage 1)
 

@@ -11,6 +11,8 @@ import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, ac
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { detectBoosts } from './boosts';
+import { spawnUnit, refreshUnits, unitMaintenance } from './units';
+import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -41,12 +43,14 @@ export function districtCost(state: GameState): number {
   return Math.round(54 * (1 + 8 * (done / total)));
 }
 
-export function createGame(opts: MapGenOptions & { sandbox?: boolean }): GameState {
-  return createGameFromMap(generateMap(opts), opts.sandbox ?? false);
+export function createGame(
+  opts: MapGenOptions & { sandbox?: boolean; unitsMode?: boolean },
+): GameState {
+  return createGameFromMap(generateMap(opts), opts.sandbox ?? false, opts.unitsMode ?? false);
 }
 
 /** Fresh game state around an existing map (e.g. one imported from Civ 6). */
-export function createGameFromMap(map: GameState['map'], sandbox = false): GameState {
+export function createGameFromMap(map: GameState['map'], sandbox = false, unitsMode = false): GameState {
   return {
     map,
     cities: [],
@@ -64,6 +68,10 @@ export function createGameFromMap(map: GameState['map'], sandbox = false): GameS
     tradeRoutes: [],
     settlers: 0,
     plannedSettles: [],
+    unitsMode,
+    units: [],
+    nextUnitId: 0,
+    rngState: (map.seed ^ 0x9e3779b9) >>> 0,
   };
 }
 
@@ -144,6 +152,9 @@ export function placeImprovement(
   tileIndex: number,
   imp: ImprovementId,
 ): RuleResult {
+  if (state.unitsMode && !state.sandbox) {
+    return { ok: false, reason: 'Units mode: move a Builder onto the tile and use its Build action.' };
+  }
   const tile = state.map.tiles[tileIndex];
   if (!validImprovements(state, tile).includes(imp)) {
     return { ok: false, reason: 'Not a valid improvement for this tile.' };
@@ -157,6 +168,9 @@ export function removeImprovement(state: GameState, tileIndex: number): void {
 }
 
 export function removeFeature(state: GameState, tileIndex: number): RuleResult {
+  if (state.unitsMode && !state.sandbox) {
+    return { ok: false, reason: 'Units mode: move a Builder onto the tile and use its Remove action.' };
+  }
   const tile = state.map.tiles[tileIndex];
   const check = canRemoveFeature(state, tile);
   if (!check.ok) return check;
@@ -253,6 +267,7 @@ export function itemCost(item: QueueItem): number {
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   if (item.kind === 'settler') return item.cost;
+  if (item.kind === 'unit') return UNITS[item.unit]?.cost ?? 54;
   return BUILDINGS[item.building].cost;
 }
 
@@ -260,6 +275,7 @@ export function itemLabel(item: QueueItem): string {
   if (item.kind === 'district') return DISTRICTS[item.district].name;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;
   if (item.kind === 'settler') return 'Settler';
+  if (item.kind === 'unit') return UNITS[item.unit]?.name ?? item.unit;
   return BUILDINGS[item.building].name;
 }
 
@@ -426,6 +442,7 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
 
 export function endTurn(state: GameState): void {
   detectBoosts(state);
+  if (state.unitsMode) refreshUnits(state);
   const luxMap = luxuryAmenities(state);
   const mods = getModifiers(state);
   let turnScience = 0;
@@ -454,6 +471,8 @@ export function endTurn(state: GameState): void {
           state.map.tiles[item.tileIndex].builtWonderComplete = true;
         } else if (item.kind === 'settler') {
           state.settlers += 1;
+        } else if (item.kind === 'unit') {
+          spawnUnit(state, item.unit, city.centerIndex);
         } else {
           city.buildings.push(item.building);
         }
@@ -493,6 +512,8 @@ export function endTurn(state: GameState): void {
     turnScience += stats.total.science;
     turnCulture += stats.total.culture;
   }
+
+  if (state.unitsMode) state.treasury -= unitMaintenance(state);
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);
@@ -601,6 +622,10 @@ export function deserialize(json: string): GameState {
   state.tradeRoutes ??= [];
   state.settlers ??= 0;
   state.plannedSettles ??= [];
+  state.unitsMode ??= false;
+  state.units ??= [];
+  state.nextUnitId ??= 0;
+  state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
   for (const c of state.cities) {
     c.cultureBox ??= 0;
     c.tilesAcquired ??= 0;

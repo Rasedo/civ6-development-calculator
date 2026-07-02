@@ -101,7 +101,8 @@ export type QueueItem =
   | { kind: 'district'; district: DistrictId; tileIndex: number; progress: number; cost?: number }
   | { kind: 'building'; building: string; progress: number }
   | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number }
-  | { kind: 'settler'; progress: number; cost: number };
+  | { kind: 'settler'; progress: number; cost: number }
+  | { kind: 'unit'; unit: string; progress: number };
 
 export type GreatPersonClass =
   | 'SCIENTIST'
@@ -181,6 +182,27 @@ export interface GameState {
   settlers: number;
   /** Tile indexes queued for automatic founding as settlers complete. */
   plannedSettles: number[];
+  /**
+   * Units mode: improvements/chops need real builders, units exist on the
+   * map. Off = classic calculator behavior (free instant improvements).
+   */
+  unitsMode: boolean;
+  units: Unit[];
+  nextUnitId: number;
+  /** Seeded RNG state for all in-game randomness (serialized => replayable). */
+  rngState: number;
+}
+
+export interface Unit {
+  id: number;
+  /** Unit type id from data/units. */
+  type: string;
+  tileIndex: number;
+  movesLeft: number;
+  /** Builder charges; null for non-builders. */
+  charges: number | null;
+  /** Remaining multi-turn movement path (tile indexes), or null. */
+  path: number[] | null;
 }
 
 export interface ReligionState {

@@ -48,6 +48,10 @@ export function makeState(map: GameMap = makeMap()): GameState {
     tradeRoutes: [],
     settlers: 0,
     plannedSettles: [],
+    unitsMode: false,
+    units: [],
+    nextUnitId: 0,
+    rngState: 42,
   };
 }
 

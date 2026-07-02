@@ -12,6 +12,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { WONDERS } from '../data/wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { UNITS } from '../data/units';
 import type { ImprovementId } from '../core/types';
 
 export const HEX_SIZE = 24;
@@ -280,6 +281,32 @@ export class MapRenderer {
         ctx.strokeStyle = 'rgba(255,255,255,0.55)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+      }
+    }
+
+    // --- pass 6b: units -----------------------------------------------------------
+    if (state.unitsMode && state.units.length > 0) {
+      const byTile = new Map<number, string>();
+      for (const u of state.units) {
+        byTile.set(u.tileIndex, UNITS[u.type]?.code ?? '?');
+      }
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `bold ${HEX_SIZE * 0.3}px system-ui, sans-serif`;
+      for (const { tile, cx, cy } of visible) {
+        const code = byTile.get(tile.index);
+        if (!code) continue;
+        const x = cx - HEX_SIZE * 0.42;
+        const y = cy - HEX_SIZE * 0.42;
+        ctx.beginPath();
+        ctx.arc(x, y, HEX_SIZE * 0.24, 0, Math.PI * 2);
+        ctx.fillStyle = '#6fa8dc';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.fillStyle = '#14202c';
+        ctx.fillText(code, x, y + 0.5);
       }
     }
 

@@ -11,6 +11,8 @@ import { validImprovements, canRemoveFeature, availableBuildings, districtPlacem
 import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost, canChoosePantheon, canFoundReligion } from '../core/game';
 import { tradeCapacity, routeYields, TRADE_ROUTE_RANGE } from '../core/trade';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
+import { UNITS as UNIT_DEFS } from '../data/units';
+import { trainableUnits } from '../core/units';
 import { tileAppeal, appealTier } from '../core/appeal';
 import { isBoosted } from '../core/boosts';
 import { BOOSTS } from '../data/boosts';
@@ -70,6 +72,11 @@ export interface PanelCallbacks {
   onQueueSettler(cityId: number): void;
   onConnectLiveSync(): void;
   onDisconnectLiveSync(): void;
+  onQueueUnit(cityId: number, unitType: string): void;
+  onOrderMove(unitId: number): void;
+  onBuilderImprove(unitId: number, imp: string): void;
+  onBuilderChop(unitId: number): void;
+  onDisbandUnit(unitId: number): void;
   onSetEmpireObjective(objective: Objective): void;
   onSetEmpireHorizon(turns: number): void;
   onRunEmpirePlan(): void;
@@ -177,11 +184,38 @@ export function renderTilePanel(
     districtHtml = `<div class="row"><b style="color:${d.color}">${d.name}</b>${status}${adj}</div>`;
   }
 
+  const unitsHere = state.unitsMode ? state.units.filter((u) => u.tileIndex === tileIndex) : [];
+  let unitsHtml = '';
+  for (const u of unitsHere) {
+    const def = UNIT_DEFS[u.type];
+    const isBuilder = def?.charges !== undefined;
+    const buildable = isBuilder && (u.charges ?? 0) > 0 ? validImprovements(state, tile) : [];
+    unitsHtml += `<div class="district-row">
+      <b>${def?.name ?? u.type}</b> <span class="muted">${u.movesLeft} MP${u.charges !== null ? ` · ${u.charges} charge(s)` : ''}</span>
+      <div class="btnrow">
+        <button data-act="unit-move" data-id="${u.id}">Move…</button>
+        ${buildable
+          .map(
+            (id) =>
+              `<button data-act="unit-imp" data-id="${u.id}" data-imp="${id}">${IMPROVEMENTS[id].name}</button>`,
+          )
+          .join('')}
+        ${isBuilder && tile.feature && canRemoveFeature(state, tile).ok ? `<button data-act="unit-chop" data-id="${u.id}">Remove ${FEATURES[tile.feature].name}</button>` : ''}
+        <button data-act="unit-disband" data-id="${u.id}">Disband</button>
+      </div>
+    </div>`;
+  }
+
   let improvementHtml = '';
   if (tile.improvement) {
     const def = IMPROVEMENTS[tile.improvement as keyof typeof IMPROVEMENTS];
     improvementHtml = `<div class="row">Improvement: <b>${def.name}</b>
       <button data-act="rm-imp">Remove</button></div>`;
+  } else if (state.unitsMode && !state.sandbox) {
+    const valid = validImprovements(state, tile);
+    if (valid.length && unitsHere.length === 0) {
+      improvementHtml = `<div class="muted">Improvable (${valid.map((id) => IMPROVEMENTS[id].name).join(', ')}) — bring a Builder here.</div>`;
+    }
   } else {
     const valid = validImprovements(state, tile);
     if (valid.length) {
@@ -200,13 +234,14 @@ export function renderTilePanel(
   }
 
   let featureHtml = '';
-  if (tile.feature && canRemoveFeature(state, tile).ok) {
+  if (tile.feature && canRemoveFeature(state, tile).ok && !(state.unitsMode && !state.sandbox)) {
     featureHtml = `<div class="row"><button data-act="rm-feat">Remove ${FEATURES[tile.feature].name}</button></div>`;
   }
 
   container.innerHTML = `
     <h2>${wonder ? `✦ ${wonder.name}` : terrain.name + elevLabel}</h2>
     <div class="row chips">${chips.join(' ') || ''}</div>
+    ${unitsHtml}
     <div class="row">${yieldsHtml(tileYields(ctx, tile))}</div>
     ${!isWaterTile(tile) && !wonder ? `<div class="row muted">Appeal: ${tileAppeal(state.map, tile)} (${appealTier(tileAppeal(state.map, tile)).name})</div>` : ''}
     <div class="row">Owner: ${owner ? `<a href="#" data-act="city">${owner.name}</a>` : '<span class="muted">none</span>'}</div>
@@ -225,6 +260,21 @@ export function renderTilePanel(
   });
   container.querySelectorAll('[data-act="imp"]').forEach((b) =>
     b.addEventListener('click', () => cb.onPlaceImprovement(tileIndex, (b as HTMLElement).dataset.imp!)),
+  );
+  container.querySelectorAll('[data-act="unit-move"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onOrderMove(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="unit-imp"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const el = b as HTMLElement;
+      cb.onBuilderImprove(Number(el.dataset.id), el.dataset.imp!);
+    }),
+  );
+  container.querySelectorAll('[data-act="unit-chop"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onBuilderChop(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="unit-disband"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onDisbandUnit(Number((b as HTMLElement).dataset.id))),
   );
 }
 
@@ -367,6 +417,9 @@ export function renderCityPanel(
       <button data-act="compare">Compare builds…</button>
       <button data-act="plan">Plan build order…</button>
       ${state.sandbox ? '' : `<button data-act="settler" title="Needed to found further cities">Train settler (${settlerCost(state)}⚙)</button>`}
+      ${trainableUnits(state)
+        .map((u) => `<button data-act="train-unit" data-id="${u.id}" title="${u.description}">Train ${u.name} (${u.cost}⚙)</button>`)
+        .join('')}
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
     <details><summary>Yield breakdown</summary>
@@ -411,6 +464,9 @@ export function renderCityPanel(
   container.querySelector('[data-act="compare"]')?.addEventListener('click', () => cb.onOpenCompare(city.id));
   container.querySelector('[data-act="plan"]')?.addEventListener('click', () => cb.onOpenPlanner(city.id));
   container.querySelector('[data-act="settler"]')?.addEventListener('click', () => cb.onQueueSettler(city.id));
+  container.querySelectorAll('[data-act="train-unit"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onQueueUnit(city.id, (b as HTMLElement).dataset.id!)),
+  );
   container.querySelector('[data-act="place-district"]')?.addEventListener('click', () => {
     const sel = container.querySelector('[data-act="district-select"]') as HTMLSelectElement;
     if (sel.value) cb.onStartDistrictPlacement(city.id, sel.value as DistrictId);

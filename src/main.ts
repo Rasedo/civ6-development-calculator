@@ -71,6 +71,7 @@ import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
 import { choosePantheon, foundReligion, queueSettler } from './core/game';
 import { addTradeRoute, removeTradeRoute } from './core/trade';
+import { queueUnit, orderMove, builderImprove, builderRemoveFeature, disbandUnit } from './core/units';
 import { searchEmpirePlan, adoptEmpirePlan } from './core/empirePlanner';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
@@ -84,6 +85,7 @@ const seedInput = $<HTMLInputElement>('seed-input');
 const resourcesToggle = $<HTMLInputElement>('resources-toggle');
 const wondersToggle = $<HTMLInputElement>('wonders-toggle');
 const sandboxToggle = $<HTMLInputElement>('sandbox-toggle');
+const unitsToggle = $<HTMLInputElement>('units-toggle');
 const contextPanel = $<HTMLElement>('context-panel');
 const empireSummary = $<HTMLElement>('empire-summary');
 const turnLabel = $<HTMLElement>('turn-label');
@@ -116,10 +118,11 @@ type RightView =
   | 'empirePlan';
 
 interface UiState {
-  mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile';
+  mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile' | 'moveUnit';
   rightView: RightView;
   pendingDistrict: DistrictId | null;
   pendingWonder: string | null;
+  pendingUnitId: number | null;
   pendingCityId: number | null;
   selectedTile: number | null;
   selectedCityId: number | null;
@@ -138,6 +141,7 @@ const ui: UiState = {
   rightView: 'context',
   pendingDistrict: null,
   pendingWonder: null,
+  pendingUnitId: null,
   pendingCityId: null,
   selectedTile: null,
   selectedCityId: null,
@@ -199,6 +203,7 @@ function newGameFromControls(): GameState {
     withResources: resourcesToggle.checked,
     withWonders: wondersToggle.checked,
     sandbox: sandboxToggle.checked,
+    unitsMode: unitsToggle.checked,
   });
 }
 
@@ -221,6 +226,7 @@ function setMode(mode: UiState['mode']): void {
   ui.mode = mode;
   if (mode !== 'placeDistrict') ui.pendingDistrict = null;
   if (mode !== 'placeWonder') ui.pendingWonder = null;
+  if (mode !== 'moveUnit') ui.pendingUnitId = null;
   if (mode !== 'placeDistrict' && mode !== 'placeWonder' && mode !== 'buyTile') {
     ui.pendingCityId = null;
   }
@@ -398,6 +404,31 @@ const callbacks: PanelCallbacks = {
   onQueueSettler(cityId) {
     const r = queueSettler(state, cityId);
     if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onQueueUnit(cityId, unitType) {
+    const r = queueUnit(state, cityId, unitType);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onOrderMove(unitId) {
+    ui.mode = 'moveUnit';
+    ui.pendingUnitId = unitId;
+    showMessage('Click a destination tile (right-click/Esc to cancel).');
+    refresh();
+  },
+  onBuilderImprove(unitId, imp) {
+    const r = builderImprove(state, unitId, imp as never);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onBuilderChop(unitId) {
+    const r = builderRemoveFeature(state, unitId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onDisbandUnit(unitId) {
+    disbandUnit(state, unitId);
     refresh();
   },
   onConnectLiveSync() {
@@ -735,6 +766,19 @@ canvas.addEventListener('click', (e) => {
     return;
   }
 
+  if (ui.mode === 'moveUnit' && ui.pendingUnitId !== null) {
+    const r = orderMove(state, ui.pendingUnitId, tileIdx);
+    if (r.ok) {
+      setMode('inspect');
+      ui.selectedTile = tileIdx;
+      showMessage('Move ordered.');
+    } else {
+      showMessage(r.reason!);
+    }
+    refresh();
+    return;
+  }
+
   if (ui.mode === 'buyTile' && ui.pendingCityId !== null) {
     const cityId = ui.pendingCityId;
     const r = buyTile(state, cityId, tileIdx);
@@ -874,6 +918,16 @@ for (const [btn, view] of [
 
 sandboxToggle.addEventListener('change', () => {
   state.sandbox = sandboxToggle.checked;
+  refresh();
+});
+
+unitsToggle.addEventListener('change', () => {
+  state.unitsMode = unitsToggle.checked;
+  showMessage(
+    state.unitsMode
+      ? 'Units mode: improvements now need Builders (train them in cities).'
+      : 'Units mode off: improvements are free and instant again.',
+  );
   refresh();
 });
 
