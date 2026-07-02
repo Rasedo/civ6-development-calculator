@@ -8,6 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "preview:map": "vite-node scripts/preview.ts",
+    "rl:train": "vite-node scripts/train.ts",
+    "rl:eval": "vite-node scripts/evaluate.ts",
     "test": "vitest run"
   },
   "devDependencies": {

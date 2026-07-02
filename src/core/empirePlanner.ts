@@ -48,7 +48,7 @@ const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
   faith: 0.75,
 };
 
-function empireScore(state: GameState, objective: Objective): number {
+export function empireScore(state: GameState, objective: Objective): number {
   let score = 0;
   for (const city of state.cities) {
     const stats = computeCityStats(state, city);

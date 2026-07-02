@@ -3,3 +3,4 @@ dist/
 map-preview.png
 package-lock.json
 *.local
+rl-weights.json
