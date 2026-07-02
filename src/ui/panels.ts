@@ -6,10 +6,10 @@
 import type { DistrictId, GameState, Tile, YieldKey, Yields } from '../core/types';
 import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
-import { computeCityStats, luxuryAmenities, borderCandidates, type CityStats } from '../core/city';
-import { validImprovements, canRemoveFeature, availableBuildings, districtPlacementTiles } from '../core/rules';
-import { itemCost, itemLabel, tilePurchaseCost } from '../core/game';
-import { makeYieldCtx, computeUnlocks, availableTechs, availableCivics, getModifiers } from '../core/effects';
+import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
+import { validImprovements, canRemoveFeature, availableBuildings, districtPlacementTiles, availableWonders } from '../core/rules';
+import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned } from '../core/game';
+import { makeYieldCtx, computeUnlocks, availableTechs, availableCivics, getModifiers, governmentSlots } from '../core/effects';
 import { hasRiver, hasFreshWater } from '../core/query';
 import { TERRAINS } from '../data/terrains';
 import { FEATURES } from '../data/features';
@@ -18,6 +18,8 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { WONDERS } from '../data/wonders';
+import { BUILT_WONDERS } from '../data/builtWonders';
+import { GP_CLASSES, GP_CLASS_NAMES, GREAT_PEOPLE, gpCost, SPECIALIST_YIELDS } from '../data/greatPeople';
 import { choiceLabel, type BuildChoice, type Projection, type SettleSiteScore } from '../core/advisor';
 import { TECHS, ERAS, type ResearchEffect, type TechDef } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
@@ -44,6 +46,8 @@ export interface PanelCallbacks {
   onSetHorizon(turns: number): void;
   onRunCompare(): void;
   onImportMap(text: string): void;
+  onStartWonderPlacement(cityId: number, wonderId: string): void;
+  onSetSpecialists(cityId: number, tileIndex: number, count: number): void;
 }
 
 /** Mutable state for the build-comparison view (owned by main.ts). */
@@ -212,6 +216,8 @@ export function renderCityPanel(
   const canBuy = borderCandidates(state, city).length > 0;
 
   // Districts section
+  const slots = citySpecialistSlots(state, city);
+  const assigned = effectiveSpecialists(state, city);
   const districtRows = city.districts
     .map((d) => {
       const def = DISTRICTS[d.type];
@@ -225,12 +231,42 @@ export function renderCityPanel(
         .filter((b) => BUILDINGS[b]?.district === d.type)
         .map((b) => `<span class="chip">${BUILDINGS[b]?.name ?? b}</span>`)
         .join(' ');
+      let specialists = '';
+      const max = slots.get(d.tileIndex) ?? 0;
+      if (max > 0) {
+        const n = assigned.get(d.tileIndex) ?? 0;
+        const y = SPECIALIST_YIELDS[d.type] ?? {};
+        specialists = `<div class="row">Specialists
+          <button data-act="spec" data-tile="${d.tileIndex}" data-n="${n - 1}" ${n <= 0 ? 'disabled' : ''}>−</button>
+          <b>${n}/${max}</b>
+          <button data-act="spec" data-tile="${d.tileIndex}" data-n="${n + 1}" ${n >= max ? 'disabled' : ''}>+</button>
+          <span class="muted">(${yieldsStr(y)} each, +1 GPP)</span></div>`;
+      }
       return `<div class="district-row">
         <span class="dcode" style="border-color:${def.color};color:${def.color}">${def.code}</span>
         <b>${def.name}</b>${complete ? '' : ' <span class="muted">(building…)</span>'}${adj}
         <div class="chips">${blds}</div>
+        ${specialists}
       </div>`;
     })
+    .join('');
+
+  // Wonders section
+  const wonderRows = city.wonders
+    .map((w) => {
+      const def = BUILT_WONDERS[w.id];
+      const complete = map.tiles[w.tileIndex].builtWonderComplete;
+      return `<div class="district-row"><span class="dcode" style="border-color:#ffd75e;color:#ffe9a8">♛</span>
+        <b>${def?.name ?? w.id}</b>${complete ? '' : ' <span class="muted">(building…)</span>'}
+        <div class="muted"><small>${def?.description ?? ''}</small></div></div>`;
+    })
+    .join('');
+  const buildableWonders = availableWonders(state, city)
+    .map(
+      (w) => `<div class="build-row"><span>♛ ${w.name} <span class="muted">${w.cost}⚙</span><br>
+        <small class="muted">${w.description}</small></span>
+        <button data-act="wonder" data-id="${w.id}">Place…</button></div>`,
+    )
     .join('');
 
   // Buildable buildings
@@ -311,6 +347,9 @@ export function renderCityPanel(
       <select data-act="district-select">${districtOptions}</select>
       <button data-act="place-district">Place…</button>
     </div>
+    <h3>Wonders</h3>
+    ${wonderRows || ''}
+    ${buildableWonders || '<div class="muted">No wonders available here right now.</div>'}
     <h3>Buildings available</h3>
     ${buildable || '<div class="muted">Nothing available (complete districts and research further).</div>'}
     ${state.sandbox ? '' : `<h3>Production queue</h3>${queueRows || '<div class="muted">Queue is empty.</div>'}`}
@@ -334,6 +373,59 @@ export function renderCityPanel(
   container.querySelectorAll('[data-act="cancel"]').forEach((b) =>
     b.addEventListener('click', () => cb.onCancelQueue(city.id, Number((b as HTMLElement).dataset.i))),
   );
+  container.querySelectorAll('[data-act="wonder"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onStartWonderPlacement(city.id, (b as HTMLElement).dataset.id!)),
+  );
+  container.querySelectorAll('[data-act="spec"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const el = b as HTMLElement;
+      cb.onSetSpecialists(city.id, Number(el.dataset.tile), Number(el.dataset.n));
+    }),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Great people
+// ---------------------------------------------------------------------------
+
+export function renderGreatPeoplePanel(container: HTMLElement, state: GameState): void {
+  const perTurn = greatPersonPointsPerTurn(state);
+  const rows = GP_CLASSES.map((cls) => {
+    const earned = greatPeopleEarned(state, cls);
+    const people = GREAT_PEOPLE[cls];
+    const pts = state.greatPeople.points[cls] ?? 0;
+    const next = people[earned];
+    let status: string;
+    if (!next) {
+      status = '<span class="muted">all earned</span>';
+    } else {
+      const cost = gpCost(earned);
+      const turns = perTurn[cls] > 0 ? ` · ~${Math.ceil((cost - pts) / perTurn[cls])}t` : '';
+      status = `${fmt(pts)}/${cost} (+${perTurn[cls]}/t${turns})<br>
+        <small>Next: <b>${next.name}</b> — ${next.effectText}</small>`;
+    }
+    return `<div class="research-row ${perTurn[cls] === 0 && pts === 0 ? 'locked' : ''}">
+      <span><b>${GP_CLASS_NAMES[cls]}</b><br><small class="muted">${earned}/${people.length} earned</small></span>
+      <span>${status}</span>
+    </div>`;
+  }).join('');
+
+  const log = state.greatPeople.earned
+    .map((id) => {
+      for (const cls of GP_CLASSES) {
+        const p = GREAT_PEOPLE[cls].find((x) => x.id === id);
+        if (p) return `<span class="chip">${p.name}</span>`;
+      }
+      return '';
+    })
+    .join(' ');
+
+  container.innerHTML = `
+    <h2>Great people</h2>
+    <div class="row muted">Points come from each class's district (+1/turn), its buildings (+1 each) and specialists (+1 each). People are claimed automatically; effects are instant.</div>
+    ${rows}
+    ${log ? `<h3>Earned</h3><div class="chips">${log}</div>` : ''}
+  `;
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +547,7 @@ export function renderGovernmentPanel(
 
   let slotsHtml = '';
   if (cur) {
-    slotsHtml = cur.slots
+    slotsHtml = governmentSlots(state)
       .map((slotKind, i) => {
         const chosen = state.government.policies[i];
         const fitting = Object.values(POLICIES).filter(

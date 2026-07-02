@@ -15,6 +15,8 @@ import {
   endTurn,
   toggleLockedTile,
   buyTile,
+  queueWonder,
+  setSpecialists,
   setTechResearch,
   setCivicResearch,
   setGovernment,
@@ -23,6 +25,7 @@ import {
   deserialize,
 } from './core/game';
 import { computeCityStats, workableTiles, luxuryAmenities, borderCandidates } from './core/city';
+import { wonderPlacementTiles } from './core/rules';
 import { getModifiers } from './core/effects';
 import {
   scoreDistrictSpots,
@@ -41,6 +44,7 @@ import {
   renderSettlePanel,
   renderComparePanel,
   renderImportPanel,
+  renderGreatPeoplePanel,
   tileSummary,
   type PanelCallbacks,
   type CompareState,
@@ -75,12 +79,13 @@ seedInput.value = String(Math.floor(Math.random() * 1e9));
 
 // ---------------------------------------------------------------------------
 
-type RightView = 'context' | 'tech' | 'civic' | 'government' | 'settle' | 'compare' | 'import';
+type RightView = 'context' | 'tech' | 'civic' | 'government' | 'settle' | 'compare' | 'import' | 'greatPeople';
 
 interface UiState {
-  mode: 'inspect' | 'found' | 'placeDistrict' | 'buyTile';
+  mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile';
   rightView: RightView;
   pendingDistrict: DistrictId | null;
+  pendingWonder: string | null;
   pendingCityId: number | null;
   selectedTile: number | null;
   selectedCityId: number | null;
@@ -95,6 +100,7 @@ const ui: UiState = {
   mode: 'inspect',
   rightView: 'context',
   pendingDistrict: null,
+  pendingWonder: null,
   pendingCityId: null,
   selectedTile: null,
   selectedCityId: null,
@@ -137,7 +143,10 @@ function selectCity(id: number | null): void {
 function setMode(mode: UiState['mode']): void {
   ui.mode = mode;
   if (mode !== 'placeDistrict') ui.pendingDistrict = null;
-  if (mode !== 'placeDistrict' && mode !== 'buyTile') ui.pendingCityId = null;
+  if (mode !== 'placeWonder') ui.pendingWonder = null;
+  if (mode !== 'placeDistrict' && mode !== 'placeWonder' && mode !== 'buyTile') {
+    ui.pendingCityId = null;
+  }
   $<HTMLButtonElement>('mode-inspect').classList.toggle('active', mode === 'inspect');
   $<HTMLButtonElement>('mode-found').classList.toggle('active', mode === 'found');
 }
@@ -148,6 +157,7 @@ function setRightView(view: RightView): void {
     ['view-tech', 'tech'],
     ['view-civic', 'civic'],
     ['view-government', 'government'],
+    ['view-gp', 'greatPeople'],
     ['settle-advisor', 'settle'],
   ] as const) {
     $<HTMLButtonElement>(btn).classList.toggle('active', view === v);
@@ -258,6 +268,18 @@ const callbacks: PanelCallbacks = {
       .map((i) => projectTurns(state, cityId, candidates[i], horizon));
     refresh();
   },
+  onStartWonderPlacement(cityId, wonderId) {
+    ui.mode = 'placeWonder';
+    ui.pendingCityId = cityId;
+    ui.pendingWonder = wonderId;
+    showMessage('Click a highlighted tile to place the wonder (right-click/Esc to cancel).');
+    refresh();
+  },
+  onSetSpecialists(cityId, tileIndex, count) {
+    const r = setSpecialists(state, cityId, tileIndex, count);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
   onImportMap(text) {
     try {
       const { map, report } = parseCivExport(text);
@@ -337,6 +359,8 @@ function refresh(): void {
     renderComparePanel(contextPanel, state, ui.compare, callbacks);
   } else if (ui.rightView === 'import') {
     renderImportPanel(contextPanel, ui.lastImportSummary, callbacks);
+  } else if (ui.rightView === 'greatPeople') {
+    renderGreatPeoplePanel(contextPanel, state);
   }
 
   let highlight: Set<number> | null = null;
@@ -353,6 +377,9 @@ function refresh(): void {
         bestTiles = new Set(spots.filter((s) => s.score === top).map((s) => s.tileIndex));
       }
     }
+  } else if (ui.mode === 'placeWonder' && ui.pendingCityId !== null && ui.pendingWonder) {
+    const city = state.cities.find((c) => c.id === ui.pendingCityId);
+    if (city) highlight = new Set(wonderPlacementTiles(state, city, ui.pendingWonder));
   } else if (ui.mode === 'buyTile' && ui.pendingCityId !== null) {
     const city = state.cities.find((c) => c.id === ui.pendingCityId);
     if (city) highlight = new Set(borderCandidates(state, city));
@@ -451,6 +478,20 @@ canvas.addEventListener('click', (e) => {
       setMode('inspect');
       selectCity(cityId);
       showMessage(state.sandbox ? 'District placed.' : 'District added to the production queue.');
+    } else {
+      showMessage(r.reason!);
+    }
+    refresh();
+    return;
+  }
+
+  if (ui.mode === 'placeWonder' && ui.pendingCityId !== null && ui.pendingWonder) {
+    const r = queueWonder(state, ui.pendingCityId, ui.pendingWonder, tileIdx);
+    if (r.ok) {
+      const cityId = ui.pendingCityId;
+      setMode('inspect');
+      selectCity(cityId);
+      showMessage(state.sandbox ? 'Wonder placed.' : 'Wonder added to the production queue.');
     } else {
       showMessage(r.reason!);
     }
@@ -584,6 +625,7 @@ for (const [btn, view] of [
   ['view-tech', 'tech'],
   ['view-civic', 'civic'],
   ['view-government', 'government'],
+  ['view-gp', 'greatPeople'],
 ] as const) {
   $<HTMLButtonElement>(btn).addEventListener('click', () => {
     setRightView(ui.rightView === view ? 'context' : view);

@@ -75,6 +75,8 @@ function blankTile(index: number, col: number, row: number): Tile {
     improvement: null,
     district: null,
     districtComplete: false,
+    builtWonder: null,
+    builtWonderComplete: false,
     cityId: -1,
   };
 }

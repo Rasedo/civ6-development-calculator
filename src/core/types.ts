@@ -81,6 +81,9 @@ export interface Tile {
   /** District type occupying this tile (may be under construction). */
   district: DistrictId | null;
   districtComplete: boolean;
+  /** World wonder occupying this tile (may be under construction). */
+  builtWonder: string | null;
+  builtWonderComplete: boolean;
   /** Owning city id, or -1. */
   cityId: number;
 }
@@ -96,7 +99,17 @@ export type FocusId = 'balanced' | YieldKey;
 
 export type QueueItem =
   | { kind: 'district'; district: DistrictId; tileIndex: number; progress: number }
-  | { kind: 'building'; building: string; progress: number };
+  | { kind: 'building'; building: string; progress: number }
+  | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number };
+
+export type GreatPersonClass =
+  | 'SCIENTIST'
+  | 'ENGINEER'
+  | 'MERCHANT'
+  | 'PROPHET'
+  | 'ARTIST'
+  | 'ADMIRAL'
+  | 'GENERAL';
 
 export interface City {
   id: number;
@@ -118,6 +131,10 @@ export interface City {
   buildings: string[];
   /** District instances: type -> tile indexes (NEIGHBORHOOD may repeat). */
   districts: { type: DistrictId; tileIndex: number }[];
+  /** World wonders this city has placed (complete flag lives on the tile). */
+  wonders: { id: string; tileIndex: number }[];
+  /** Manual specialist assignments: district tileIndex (as string) -> count. */
+  specialists: Record<string, number>;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */
@@ -150,6 +167,11 @@ export interface GameState {
   faithTotal: number;
   research: ResearchState;
   government: GovernmentState;
+  greatPeople: {
+    points: Partial<Record<GreatPersonClass, number>>;
+    /** Ids of great people already earned (in claim order). */
+    earned: string[];
+  };
 }
 
 export interface MapGenOptions {

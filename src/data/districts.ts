@@ -12,6 +12,7 @@ export type AdjacencySource =
   | 'WOODS' // per adjacent woods
   | 'REEF' // per adjacent reef
   | 'NATURAL_WONDER' // per adjacent natural wonder tile
+  | 'BUILT_WONDER' // per adjacent completed world wonder
   | 'RIVER' // flat bonus if the district tile touches a river
   | 'DISTRICT' // per adjacent completed district (any type)
   | 'CITY_CENTER' // per adjacent city center
@@ -111,10 +112,13 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     allowMultiple: false,
     adjacencyYield: 'culture',
-    adjacency: [{ source: 'DISTRICT', amount: 0.5 }],
+    adjacency: [
+      { source: 'BUILT_WONDER', amount: 1 },
+      { source: 'DISTRICT', amount: 0.5 },
+    ],
     housing: 0,
     placement: {},
-    description: 'Culture district (wonder adjacency arrives with wonders in a later stage).',
+    description: 'Culture district (+1 per adjacent world wonder).',
   }),
   COMMERCIAL_HUB: D({
     id: 'COMMERCIAL_HUB',

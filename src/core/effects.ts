@@ -211,3 +211,18 @@ export interface YieldCtx {
 export function makeYieldCtx(state: GameState): YieldCtx {
   return { map: state.map, mods: getModifiers(state) };
 }
+
+/** Current government's policy slots, including wonder-granted extras. */
+export function governmentSlots(state: GameState): import('../data/policies').SlotKind[] {
+  const gov = state.government.current ? GOVERNMENTS[state.government.current] : null;
+  if (!gov) return [];
+  const slots = [...gov.slots];
+  // Forbidden City grants an extra wildcard slot.
+  const hasFC = state.cities.some((c) =>
+    c.wonders?.some(
+      (w) => w.id === 'FORBIDDEN_CITY' && state.map.tiles[w.tileIndex].builtWonderComplete,
+    ),
+  );
+  if (hasFC) slots.push('wildcard');
+  return slots;
+}

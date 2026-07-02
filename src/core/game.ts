@@ -4,16 +4,18 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, ImprovementId, MapGenOptions, QueueItem, Tile } from './types';
+import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, Tile } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin } from './hex';
-import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile } from './city';
-import { canFoundCity, canPlaceDistrict, validImprovements, canRemoveFeature, availableBuildings, type RuleResult } from './rules';
-import { computeUnlocks, getModifiers, availableTechs, availableCivics } from './effects';
+import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
+import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, type RuleResult } from './rules';
+import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
+import { BUILT_WONDERS } from '../data/builtWonders';
+import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
@@ -37,6 +39,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false): GameS
     faithTotal: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] },
     government: { current: null, policies: [] },
+    greatPeople: { points: {}, earned: [] },
   };
 }
 
@@ -66,6 +69,8 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
     isCapital: state.cities.length === 0,
     buildings: state.cities.length === 0 ? ['PALACE'] : [],
     districts: [{ type: 'CITY_CENTER', tileIndex }],
+    wonders: [],
+    specialists: {},
   };
 
   tile.district = 'CITY_CENTER';
@@ -150,6 +155,32 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   return { ok: true };
 }
 
+/** Queue a world wonder on a tile. */
+export function queueWonder(
+  state: GameState,
+  cityId: number,
+  wonderId: string,
+  tileIndex: number,
+): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const check = canPlaceWonder(state, city, wonderId, tileIndex);
+  if (!check.ok) return check;
+
+  const tile = state.map.tiles[tileIndex];
+  tile.builtWonder = wonderId;
+  tile.builtWonderComplete = state.sandbox;
+  tile.improvement = null;
+  tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+
+  city.wonders.push({ id: wonderId, tileIndex });
+  if (!state.sandbox) {
+    city.queue.push({ kind: 'wonder', wonder: wonderId, tileIndex, progress: 0 });
+  }
+  return { ok: true };
+}
+
 export function cancelQueueItem(state: GameState, cityId: number, index: number): void {
   const city = state.cities.find((c) => c.id === cityId);
   if (!city || index < 0 || index >= city.queue.length) return;
@@ -159,22 +190,49 @@ export function cancelQueueItem(state: GameState, cityId: number, index: number)
     tile.district = null;
     tile.districtComplete = false;
     city.districts = city.districts.filter((d) => d.tileIndex !== item.tileIndex);
+  } else if (item.kind === 'wonder') {
+    const tile = state.map.tiles[item.tileIndex];
+    tile.builtWonder = null;
+    tile.builtWonderComplete = false;
+    city.wonders = city.wonders.filter((w) => w.tileIndex !== item.tileIndex);
   }
   city.queue.splice(index, 1);
 }
 
 export function itemCost(item: QueueItem): number {
-  return item.kind === 'district' ? DISTRICTS[item.district].cost : BUILDINGS[item.building].cost;
+  if (item.kind === 'district') return DISTRICTS[item.district].cost;
+  if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
+  return BUILDINGS[item.building].cost;
 }
 
 export function itemLabel(item: QueueItem): string {
-  return item.kind === 'district' ? DISTRICTS[item.district].name : BUILDINGS[item.building].name;
+  if (item.kind === 'district') return DISTRICTS[item.district].name;
+  if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].name;
+  return BUILDINGS[item.building].name;
+}
+
+/** Manually assign specialists to a district tile (clamped to slots & population). */
+export function setSpecialists(
+  state: GameState,
+  cityId: number,
+  tileIndex: number,
+  count: number,
+): RuleResult {
+  const city = state.cities.find((c) => c.id === cityId);
+  if (!city) return { ok: false, reason: 'No such city.' };
+  const slots = citySpecialistSlots(state, city);
+  const max = slots.get(tileIndex) ?? 0;
+  if (max === 0) return { ok: false, reason: 'That district has no specialist slots.' };
+  const clamped = Math.max(0, Math.min(count, max));
+  if (clamped === 0) delete city.specialists[String(tileIndex)];
+  else city.specialists[String(tileIndex)] = clamped;
+  return { ok: true };
 }
 
 function isEncampmentItem(item: QueueItem): boolean {
-  return item.kind === 'district'
-    ? item.district === 'ENCAMPMENT'
-    : BUILDINGS[item.building]?.district === 'ENCAMPMENT';
+  if (item.kind === 'district') return item.district === 'ENCAMPMENT';
+  if (item.kind === 'wonder') return false;
+  return BUILDINGS[item.building]?.district === 'ENCAMPMENT';
 }
 
 // ---------------------------------------------------------------------------
@@ -230,12 +288,13 @@ export function setGovernment(state: GameState, governmentId: string): RuleResul
 
   const oldCards = state.government.policies.filter((p): p is string => p !== null);
   state.government.current = governmentId;
-  state.government.policies = def.slots.map(() => null);
+  const slots = governmentSlots(state); // includes wonder-granted extras
+  state.government.policies = slots.map(() => null);
   // Re-seat old cards into compatible slots where possible.
   for (const cardId of oldCards) {
     const card = POLICIES[cardId];
     if (!card) continue;
-    const slot = def.slots.findIndex(
+    const slot = slots.findIndex(
       (kind, i) => state.government.policies[i] === null && cardFitsSlot(card, kind),
     );
     if (slot >= 0) state.government.policies[slot] = cardId;
@@ -246,8 +305,9 @@ export function setGovernment(state: GameState, governmentId: string): RuleResul
 export function setPolicy(state: GameState, slotIndex: number, policyId: string | null): RuleResult {
   const govId = state.government.current;
   if (!govId) return { ok: false, reason: 'No government yet (research Code of Laws).' };
-  const def = GOVERNMENTS[govId];
-  if (slotIndex < 0 || slotIndex >= def.slots.length) return { ok: false, reason: 'No such slot.' };
+  const slots = governmentSlots(state);
+  if (slotIndex < 0 || slotIndex >= slots.length) return { ok: false, reason: 'No such slot.' };
+  while (state.government.policies.length < slots.length) state.government.policies.push(null);
   if (policyId === null) {
     state.government.policies[slotIndex] = null;
     return { ok: true };
@@ -258,8 +318,8 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
   if (!state.sandbox && !unlocks.policies.has(policyId)) {
     return { ok: false, reason: 'Policy not unlocked yet.' };
   }
-  if (!cardFitsSlot(card, def.slots[slotIndex])) {
-    return { ok: false, reason: `${card.name} does not fit a ${def.slots[slotIndex]} slot.` };
+  if (!cardFitsSlot(card, slots[slotIndex])) {
+    return { ok: false, reason: `${card.name} does not fit a ${slots[slotIndex]} slot.` };
   }
   if (state.government.policies.some((p, i) => p === policyId && i !== slotIndex)) {
     return { ok: false, reason: `${card.name} is already slotted.` };
@@ -330,6 +390,8 @@ export function endTurn(state: GameState): void {
         const overflow = item.progress - itemCost(item);
         if (item.kind === 'district') {
           state.map.tiles[item.tileIndex].districtComplete = true;
+        } else if (item.kind === 'wonder') {
+          state.map.tiles[item.tileIndex].builtWonderComplete = true;
         } else {
           city.buildings.push(item.building);
         }
@@ -370,7 +432,69 @@ export function endTurn(state: GameState): void {
   }
 
   advanceResearch(state, turnScience, turnCulture);
+  advanceGreatPeople(state);
   state.turn += 1;
+}
+
+// ---------------------------------------------------------------------------
+// Great people
+// ---------------------------------------------------------------------------
+
+/** Points each class gains per turn (districts + their buildings + specialists). */
+export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonClass, number> {
+  const out = Object.fromEntries(GP_CLASSES.map((c) => [c, 0])) as Record<GreatPersonClass, number>;
+  for (const city of state.cities) {
+    for (const cls of GP_CLASSES) {
+      const district = GP_CLASS_DISTRICT[cls];
+      const inst = city.districts.find(
+        (d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete,
+      );
+      if (!inst) continue;
+      let pts = 1;
+      pts += city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
+      pts += city.specialists[String(inst.tileIndex)] ?? 0;
+      out[cls] += pts;
+    }
+  }
+  return out;
+}
+
+/** Number of people of a class already earned. */
+export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
+  return state.greatPeople.earned.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
+}
+
+function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
+  const n = greatPeopleEarned(state, cls);
+  const person = GREAT_PEOPLE[cls][n];
+  if (!person) return; // class exhausted
+  const fx = person.effect;
+  if (fx.science) state.research.techProgress += fx.science;
+  if (fx.culture) state.research.civicProgress += fx.culture;
+  if (fx.faith) state.faithTotal += fx.faith;
+  if (fx.gold) state.treasury += fx.gold;
+  if (fx.productionToCapital) {
+    const capital = state.cities.find((c) => c.isCapital);
+    if (capital && capital.queue.length > 0) {
+      capital.queue[0].progress += fx.productionToCapital;
+    }
+  }
+  state.greatPeople.earned.push(person.id);
+}
+
+function advanceGreatPeople(state: GameState): void {
+  const perTurn = greatPersonPointsPerTurn(state);
+  for (const cls of GP_CLASSES) {
+    if (perTurn[cls] === 0 && (state.greatPeople.points[cls] ?? 0) === 0) continue;
+    let pts = (state.greatPeople.points[cls] ?? 0) + perTurn[cls];
+    let earned = greatPeopleEarned(state, cls);
+    while (earned < GREAT_PEOPLE[cls].length && pts >= gpCost(earned)) {
+      pts -= gpCost(earned);
+      applyGreatPersonEffect(state, cls);
+      earned++;
+    }
+    state.greatPeople.points[cls] = pts;
+  }
 }
 
 export function toggleLockedTile(state: GameState, cityId: number, tileIndex: number): void {
@@ -387,17 +511,22 @@ export function serialize(state: GameState): string {
   return JSON.stringify(state);
 }
 
-/** Parse a save, filling in fields that older (stage 1) saves lack. */
+/** Parse a save, filling in fields that older saves lack. */
 export function deserialize(json: string): GameState {
   const state = JSON.parse(json) as GameState;
   state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] };
   state.government ??= { current: null, policies: [] };
+  state.greatPeople ??= { points: {}, earned: [] };
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
     t.wonder ??= null;
+    t.builtWonder ??= null;
+    t.builtWonderComplete ??= false;
   }
   for (const c of state.cities) {
     c.cultureBox ??= 0;
     c.tilesAcquired ??= 0;
+    c.wonders ??= [];
+    c.specialists ??= {};
   }
   return state;
 }

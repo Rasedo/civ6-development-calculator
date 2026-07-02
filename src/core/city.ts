@@ -12,6 +12,8 @@ import { getModifiers, makeYieldCtx, type Modifiers, type YieldCtx } from './eff
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
+import { BUILT_WONDERS } from '../data/builtWonders';
+import { SPECIALIST_YIELDS } from '../data/greatPeople';
 import { RESOURCES } from '../data/resources';
 import {
   CITY_WORK_RADIUS,
@@ -63,14 +65,53 @@ export interface CityStats {
     turns: number | null;
     nextTile: number | null;
   };
+  /** Citizens working as specialists (already clamped to slots/population). */
+  specialistTotal: number;
 }
 
-/** Tiles a city could work: owned, in range, passable, not a district tile. */
+/** Tiles a city could work: owned, in range, passable, not district/wonder tiles. */
 export function workableTiles(state: GameState, city: City): Tile[] {
   const center = state.map.tiles[city.centerIndex];
   return tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS).filter(
-    (t) => t.cityId === city.id && t.index !== city.centerIndex && !t.district && !isImpassable(t),
+    (t) =>
+      t.cityId === city.id &&
+      t.index !== city.centerIndex &&
+      !t.district &&
+      !t.builtWonder &&
+      !isImpassable(t),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Specialists
+// ---------------------------------------------------------------------------
+
+/** Specialist capacity per district tile (one slot per building in it). */
+export function citySpecialistSlots(state: GameState, city: City): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const d of city.districts) {
+    if (!SPECIALIST_YIELDS[d.type]) continue;
+    if (!state.map.tiles[d.tileIndex].districtComplete) continue;
+    const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type).length;
+    if (slots > 0) out.set(d.tileIndex, slots);
+  }
+  return out;
+}
+
+/** Assigned specialists clamped to slots (and, in aggregate, to population). */
+export function effectiveSpecialists(state: GameState, city: City): Map<number, number> {
+  const slots = citySpecialistSlots(state, city);
+  const out = new Map<number, number>();
+  let budget = city.population;
+  for (const [tileIndex, max] of slots) {
+    const wanted = city.specialists[String(tileIndex)] ?? 0;
+    const n = Math.max(0, Math.min(wanted, max, budget));
+    if (n > 0) {
+      out.set(tileIndex, n);
+      budget -= n;
+    }
+  }
+  return out;
 }
 
 const FOCUS_BASE: Record<YieldKey, number> = {
@@ -93,7 +134,12 @@ function tileScore(y: Yields, focus: FocusId): number {
 }
 
 /** Pick which tiles the city's citizens work: locked tiles first, then best score. */
-export function assignWorkedTiles(state: GameState, city: City, ctx?: YieldCtx): number[] {
+export function assignWorkedTiles(
+  state: GameState,
+  city: City,
+  ctx?: YieldCtx,
+  workers = city.population,
+): number[] {
   const yctx = ctx ?? makeYieldCtx(state);
   const candidates = workableTiles(state, city);
   const scored = candidates
@@ -101,9 +147,9 @@ export function assignWorkedTiles(state: GameState, city: City, ctx?: YieldCtx):
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
   const lockedValid = city.lockedTiles.filter((i) => candidates.some((c) => c.index === i));
-  const worked: number[] = lockedValid.slice(0, city.population);
+  const worked: number[] = lockedValid.slice(0, workers);
   for (const s of scored) {
-    if (worked.length >= city.population) break;
+    if (worked.length >= workers) break;
     if (!worked.includes(s.index)) worked.push(s.index);
   }
   return worked;
@@ -256,6 +302,40 @@ export function acquireTile(state: GameState, city: City, tileIndex: number): vo
 
 // ---------------------------------------------------------------------------
 
+/** Completed world-wonder defs owned by a city. */
+function completedWonders(state: GameState, city: City) {
+  return city.wonders
+    .filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete)
+    .map((w) => ({ def: BUILT_WONDERS[w.id], tileIndex: w.tileIndex }))
+    .filter((w) => w.def);
+}
+
+/** Empire-wide growth multiplier from wonders (Hanging Gardens). */
+function empireGrowthMult(state: GameState): number {
+  let mult = 1;
+  for (const c of state.cities) {
+    for (const w of completedWonders(state, c)) {
+      if (w.def.effects?.growthAllMult) mult *= w.def.effects.growthAllMult;
+    }
+  }
+  return mult;
+}
+
+/** Amenities reaching `city` from regional wonders (Colosseum). */
+function wonderRegionalAmenities(state: GameState, city: City): number {
+  const center = state.map.tiles[city.centerIndex];
+  let n = 0;
+  for (const c of state.cities) {
+    for (const w of completedWonders(state, c)) {
+      const amt = w.def.effects?.regionalAmenities;
+      if (!amt) continue;
+      const t = state.map.tiles[w.tileIndex];
+      if (hexDistance(t.col, t.row, center.col, center.row) <= 6) n += amt;
+    }
+  }
+  return n;
+}
+
 export function computeCityStats(
   state: GameState,
   city: City,
@@ -266,19 +346,43 @@ export function computeCityStats(
   const ctx: YieldCtx = { map: state.map, mods: m };
   const map = state.map;
   const center = map.tiles[city.centerIndex];
+  const wonders = completedWonders(state, city);
+  const hasPetra = wonders.some((w) => w.def.effects?.petraDesert);
+
+  // --- specialists ------------------------------------------------------------
+  const specialists = effectiveSpecialists(state, city);
+  let specialistTotal = 0;
+  for (const n of specialists.values()) specialistTotal += n;
 
   // --- worked tiles ---------------------------------------------------------
-  const worked = assignWorkedTiles(state, city, ctx);
+  const worked = assignWorkedTiles(state, city, ctx, city.population - specialistTotal);
   const tiles = emptyYields();
   // The city-center tile is worked for free.
   addYields(tiles, tileYieldsForCenter(ctx, center));
-  for (const i of worked) addYields(tiles, tileYields(ctx, map.tiles[i]));
+  const petraBonus = (t: Tile) => {
+    if (hasPetra && t.terrain === 'DESERT' && t.feature !== 'FLOODPLAINS' && !t.district) {
+      addYields(tiles, { food: 2, gold: 2, production: 1 });
+    }
+  };
+  petraBonus(center);
+  for (const i of worked) {
+    addYields(tiles, tileYields(ctx, map.tiles[i]));
+    petraBonus(map.tiles[i]);
+  }
 
   // --- districts & buildings -------------------------------------------------
   const districts = cityDistrictYields(ctx, city);
+  for (const [tileIndex, n] of specialists) {
+    const inst = city.districts.find((d) => d.tileIndex === tileIndex);
+    const y = inst ? SPECIALIST_YIELDS[inst.type] : undefined;
+    if (y) addYields(districts, y, n);
+  }
   const buildings = cityBuildingYields(ctx, city);
   const regional = regionalEffects(state, city);
   addYields(buildings, regional.yields);
+  for (const w of wonders) {
+    if (w.def.cityYields) addYields(buildings, w.def.cityYields);
+  }
 
   const citizens = emptyYields();
   citizens.science = city.population * CITIZEN_SCIENCE;
@@ -293,6 +397,7 @@ export function computeCityStats(
   let have =
     localBuildingAmenities(city) +
     regional.amenities +
+    wonderRegionalAmenities(state, city) +
     m.amenitiesAll +
     ((luxMap ?? luxuryAmenities(state)).get(city.id) ?? 0);
   const specialtyCount = completedDistrictCount(state, city, true);
@@ -319,11 +424,22 @@ export function computeCityStats(
   for (const k of Object.keys(m.yieldMult) as YieldKey[]) {
     total[k] *= m.yieldMult[k] ?? 1;
   }
+  for (const w of wonders) {
+    const mult = w.def.effects?.cityYieldMult;
+    if (!mult) continue;
+    for (const k of Object.keys(mult) as YieldKey[]) {
+      total[k] *= mult[k] ?? 1;
+    }
+  }
 
   const foodSurplus = total.food - city.population * FOOD_PER_CITIZEN;
   let effective = foodSurplus;
   if (foodSurplus > 0) {
-    effective = foodSurplus * housingGrowthFactor(housing - city.population) * tier.growthFactor;
+    effective =
+      foodSurplus *
+      housingGrowthFactor(housing - city.population) *
+      tier.growthFactor *
+      empireGrowthMult(state);
   }
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
@@ -348,5 +464,6 @@ export function computeCityStats(
     growthNeeded,
     turnsToGrow,
     border: { cost: borderCost, progress: city.cultureBox, turns: borderTurns, nextTile },
+    specialistTotal,
   };
 }

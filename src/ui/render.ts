@@ -11,6 +11,7 @@ import { RESOURCES, RESOURCE_CATEGORY_COLORS } from '../data/resources';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { WONDERS } from '../data/wonders';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import type { ImprovementId } from '../core/types';
 
 export const HEX_SIZE = 24;
@@ -223,6 +224,7 @@ export class MapRenderer {
       if (tile.district && tile.district !== 'CITY_CENTER') {
         this.drawDistrict(tile.district, tile.districtComplete, cx, cy);
       }
+      if (tile.builtWonder) this.drawBuiltWonder(tile.builtWonder, tile.builtWonderComplete, cx, cy);
       if (tile.wonder) this.drawWonder(tile.wonder, cx, cy);
     }
 
@@ -467,6 +469,28 @@ export class MapRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(def.code, x, y + 0.5);
+  }
+
+  private drawBuiltWonder(id: string, complete: boolean, cx: number, cy: number): void {
+    const { ctx } = this;
+    const def = BUILT_WONDERS[id];
+    if (!def) return;
+    const w = HEX_SIZE * 1.05;
+    const h = HEX_SIZE * 0.58;
+    ctx.save();
+    if (!complete) ctx.setLineDash([3, 2]);
+    roundRect(ctx, cx - w / 2, cy - h / 2, w, h, 3);
+    ctx.fillStyle = 'rgba(40,32,12,0.9)';
+    ctx.fill();
+    ctx.strokeStyle = '#ffd75e';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#ffe9a8';
+    ctx.font = `bold ${HEX_SIZE * 0.32}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(complete ? `♛${def.code}` : `♛${def.code}…`, cx, cy + 0.5);
   }
 
   private drawWonder(wonder: string, cx: number, cy: number): void {

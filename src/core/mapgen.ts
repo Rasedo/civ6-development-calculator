@@ -48,6 +48,8 @@ export function generateMap(opts: MapGenOptions): GameMap {
         improvement: null,
         district: null,
         districtComplete: false,
+        builtWonder: null,
+        builtWonderComplete: false,
         cityId: -1,
       });
     }

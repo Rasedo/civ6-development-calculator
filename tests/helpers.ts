@@ -21,6 +21,8 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         improvement: null,
         district: null,
         districtComplete: false,
+        builtWonder: null,
+        builtWonderComplete: false,
         cityId: -1,
       });
     }
@@ -41,6 +43,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     faithTotal: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [] },
     government: { current: null, policies: [] },
+    greatPeople: { points: {}, earned: [] },
   };
 }
 

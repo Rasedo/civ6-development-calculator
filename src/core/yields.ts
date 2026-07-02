@@ -34,7 +34,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     return out;
   }
   if (isMountain(tile)) return out;
-  if (tile.district) return out; // district tiles don't produce tile yields
+  if (tile.district || tile.builtWonder) return out; // paved tiles don't produce tile yields
 
   addYields(out, terrainYields(tile));
   if (tile.feature) {
@@ -78,6 +78,8 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return neighbor.feature === 'REEF';
     case 'NATURAL_WONDER':
       return neighbor.wonder !== null;
+    case 'BUILT_WONDER':
+      return neighbor.builtWonder !== null && neighbor.builtWonderComplete;
     case 'DISTRICT':
       return neighbor.district !== null && neighbor.districtComplete;
     case 'CITY_CENTER':

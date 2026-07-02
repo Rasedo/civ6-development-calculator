@@ -7,11 +7,12 @@
 import type { City, DistrictId, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors } from './hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from './query';
-import { computeUnlocks, type Unlocks } from './effects';
+import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
+import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
 
 export interface RuleResult {
@@ -121,6 +122,7 @@ export function canPlaceDistrict(
   if (dist === 0) return no('City center occupies this tile.');
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
   if (tile.district) return no('Another district is here.');
+  if (tile.builtWonder) return no('A wonder occupies this tile.');
   if (tile.wonder) return no('Cannot build on a natural wonder.');
   if (isImpassable(tile)) return no('Impassable terrain.');
   if (tile.feature === 'FLOODPLAINS') return no('Districts cannot be built on floodplains.');
@@ -210,4 +212,99 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
 
 export function buildingDef(id: string): BuildingDef {
   return BUILDINGS[id];
+}
+
+// ---------------------------------------------------------------------------
+// World wonders
+// ---------------------------------------------------------------------------
+
+/** Has this wonder been placed (building or built) anywhere in the world? */
+export function wonderExists(state: GameState, wonderId: string): boolean {
+  return state.map.tiles.some((t) => t.builtWonder === wonderId);
+}
+
+export function canPlaceWonder(
+  state: GameState,
+  city: City,
+  wonderId: string,
+  tileIndex: number,
+): RuleResult {
+  const def = BUILT_WONDERS[wonderId];
+  if (!def) return no('No such wonder.');
+  const map = state.map;
+  const tile = map.tiles[tileIndex];
+  const center = map.tiles[city.centerIndex];
+
+  if (!state.sandbox) {
+    if (def.requiresTech && !isTechComplete(state, def.requiresTech)) {
+      return no(`${def.name} requires research.`);
+    }
+    if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic)) {
+      return no(`${def.name} requires a civic.`);
+    }
+  }
+  if (wonderExists(state, wonderId)) return no(`${def.name} already exists in the world.`);
+
+  if (tile.cityId !== city.id) return no('Tile not owned by this city.');
+  const dist = hexDistance(center.col, center.row, tile.col, tile.row);
+  if (dist === 0 || dist > CITY_WORK_RADIUS) return no('Must be within 3 tiles of the city center.');
+  if (tile.district || tile.builtWonder) return no('Tile already occupied.');
+  if (tile.wonder) return no('Cannot build on a natural wonder.');
+  if (isImpassable(tile)) return no('Impassable terrain.');
+  if (tile.resource) {
+    const cat = RESOURCES[tile.resource].category;
+    if (cat !== 'bonus') return no(`Cannot build over a ${cat} resource.`);
+  }
+
+  const p = def.placement;
+  if (p.onCoastalWater) {
+    if (!isCoastalWater(map, tile)) return no('Must be on coast/lake water adjacent to land.');
+  } else {
+    if (isWater(tile)) return no('Must be on land.');
+    if (tile.feature === 'FLOODPLAINS' && !p.allowFloodplains) {
+      return no('Cannot be built on floodplains.');
+    }
+    if (tile.feature === 'OASIS') return no('Cannot be built on an oasis.');
+    if (p.terrains && !p.terrains.includes(tile.terrain)) {
+      return no(`Requires ${p.terrains.join('/')} terrain.`);
+    }
+    if (p.flatOnly && tile.elevation !== 'FLAT') return no('Requires flat land.');
+    if (p.hillsOnly && tile.elevation !== 'HILLS') return no('Requires hills.');
+  }
+  if (p.requiresRiver && !hasRiver(tile)) return no('Must be adjacent to a river.');
+
+  const around = neighbors(map, tile);
+  if (p.adjacentDistrict) {
+    const okAdj = around.some((n) => n.district === p.adjacentDistrict && n.districtComplete);
+    if (!okAdj) return no(`Must be adjacent to a completed ${DISTRICTS[p.adjacentDistrict].name}.`);
+  }
+  if (p.adjacentResource) {
+    if (!around.some((n) => n.resource === p.adjacentResource)) {
+      return no(`Must be adjacent to ${p.adjacentResource.toLowerCase()}.`);
+    }
+  }
+  return ok;
+}
+
+export function wonderPlacementTiles(state: GameState, city: City, wonderId: string): number[] {
+  const center = state.map.tiles[city.centerIndex];
+  const out: number[] = [];
+  for (const t of state.map.tiles) {
+    if (t.cityId !== city.id) continue;
+    if (hexDistance(center.col, center.row, t.col, t.row) > CITY_WORK_RADIUS) continue;
+    if (canPlaceWonder(state, city, wonderId, t.index).ok) out.push(t.index);
+  }
+  return out;
+}
+
+/** Wonders this city could start right now (unlocked, unbuilt, with a legal tile). */
+export function availableWonders(state: GameState, city: City): BuiltWonderDef[] {
+  return Object.values(BUILT_WONDERS).filter((def) => {
+    if (wonderExists(state, def.id)) return false;
+    if (!state.sandbox) {
+      if (def.requiresTech && !isTechComplete(state, def.requiresTech)) return false;
+      if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic)) return false;
+    }
+    return wonderPlacementTiles(state, city, def.id).length > 0;
+  });
 }
