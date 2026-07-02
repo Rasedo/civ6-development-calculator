@@ -12,7 +12,8 @@ wonders, cultural border growth (plus tile purchase) and tech/civic trees with
 governments & policies; stage 3 added the optimization advisors; stage 4 the
 real-map import mod; stage 5 world wonders, great people and specialists;
 stage 6 the fidelity pass (eurekas, cost scaling, appeal, maintenance);
-stage 7 the build-order search; stage 8 religion and trade routes.
+stage 7 the build-order search; stage 8 religion and trade routes; stage 9
+settlers and the empire-wide planner; stage 10 live-sync with a running game.
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -143,6 +144,16 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
     gold, production, food, balanced), simulating every branch turn-by-turn;
     ranked plans with one-click Adopt (queue-ahead chains are handled — a
     building never finishes before its district/prereqs).
+  - *Empire planner*: the same search across every city at once — whenever a
+    city's queue runs dry the search decides its next build, including
+    training a settler aimed at the best settle site (settlers are real
+    production items: first city free, then 80 + 30/each; planned sites
+    auto-found the moment a settler completes, and freshly founded cities
+    join the plan's decision process).
+- **Live sync**: connect the app to your `Lua.log` (Chromium's File System
+  Access API) while the mod's LiveSync context runs — the calculator mirrors
+  your real game every turn (cities, districts, wonders, buildings,
+  improvements, borders, research) so all advisors analyze the live position.
 
 ## Known simplifications (stage 1)
 
@@ -174,9 +185,8 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 1. Multi-civ support (AI opponents or manually-scripted rivals) with loyalty,
    religious spread and international trade.
-2. Empire-wide (multi-city) build-order planning and settle-order planning.
-3. In-game overlay tooling driven by the exporter mod (live sync instead of
-   one-shot import).
+2. Deeper live-sync fidelity: queues, policies and beliefs read from the game;
+   Firefox/Safari fallback via manual re-paste.
 
 ## Code layout
 

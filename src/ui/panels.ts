@@ -68,6 +68,8 @@ export interface PanelCallbacks {
   onAddTradeRoute(from: number, to: number): void;
   onRemoveTradeRoute(index: number): void;
   onQueueSettler(cityId: number): void;
+  onConnectLiveSync(): void;
+  onDisconnectLiveSync(): void;
   onSetEmpireObjective(objective: Objective): void;
   onSetEmpireHorizon(turns: number): void;
   onRunEmpirePlan(): void;
@@ -518,11 +520,13 @@ export function renderReligionPanel(container: HTMLElement, state: GameState, cb
 
   let religionHtml = '';
   if (rel.founded) {
+    const follower = rel.follower ? FOLLOWER_BELIEFS[rel.follower] : null;
+    const founder = rel.founder ? FOUNDER_BELIEFS[rel.founder] : null;
     religionHtml = `
       <h3>${rel.name}</h3>
-      ${beliefRow(FOLLOWER_BELIEFS[rel.follower!], true)}
-      ${beliefRow(FOUNDER_BELIEFS[rel.founder!], true)}
-      <div class="row muted">Worship building: <b>${BUILDINGS[rel.worship!]?.name ?? rel.worship}</b> (buildable in Holy Sites with a Temple). All of your cities follow ${rel.name}; followers = your total population.</div>
+      ${follower ? beliefRow(follower, true) : '<div class="muted">Follower belief not set (synced state) — edit the save or re-found locally.</div>'}
+      ${founder ? beliefRow(founder, true) : '<div class="muted">Founder belief not set (synced state).</div>'}
+      <div class="row muted">Worship building: <b>${rel.worship ? BUILDINGS[rel.worship]?.name ?? rel.worship : 'none'}</b> (buildable in Holy Sites with a Temple). All of your cities follow ${rel.name}; followers = your total population.</div>
     `;
   } else if (foundOk.ok) {
     const opts = (defs: Record<string, { id: string; name: string; description: string }>, act: string) =>
@@ -1020,7 +1024,12 @@ export function renderComparePanel(
 
 // ---------------------------------------------------------------------------
 
-export function renderImportPanel(container: HTMLElement, lastSummary: string | null, cb: PanelCallbacks): void {
+export function renderImportPanel(
+  container: HTMLElement,
+  lastSummary: string | null,
+  liveSync: { supported: boolean; active: boolean; status: string },
+  cb: PanelCallbacks,
+): void {
   container.innerHTML = `
     <h2>Import a real Civ 6 map</h2>
     <ol class="muted import-steps">
@@ -1031,12 +1040,25 @@ export function renderImportPanel(container: HTMLElement, lastSummary: string | 
     <textarea data-act="import-text" rows="10" placeholder="CIV6MAP_BEGIN|84|54&#10;CIV6MAP|0|0|TERRAIN_OCEAN|-|-|-|0&#10;…"></textarea>
     <div class="row"><button data-act="import" class="primary">Import</button></div>
     ${lastSummary ? `<div class="row">Last import: ${lastSummary}</div>` : ''}
-    <div class="hint muted">Imported maps display mirrored north–south (adjacency and yields are exact). Unknown expansion features/resources are skipped and reported.</div>
+    <h3>Live sync</h3>
+    <div class="row muted">With the mod's LiveSync context running, the calculator can watch <code>Lua.log</code> and mirror your game every turn — cities, districts, wonders, buildings, improvements, borders and research — so every advisor runs on the live position. Local extras (queues, policies, beliefs) reset on each sync.</div>
+    ${
+      liveSync.supported
+        ? `<div class="row btnrow">
+            <button data-act="sync-connect" ${liveSync.active ? 'disabled' : ''} class="primary">Connect Lua.log…</button>
+            <button data-act="sync-stop" ${liveSync.active ? '' : 'disabled'}>Disconnect</button>
+          </div>
+          <div class="row">${liveSync.status || '<span class="muted">Not connected.</span>'}</div>`
+        : '<div class="row muted">Your browser lacks the File System Access API (use a Chromium-based browser), or paste the log manually above.</div>'
+    }
+    <div class="hint muted">Imported maps display mirrored north–south (adjacency and yields are exact). Unknown expansion content is skipped and reported.</div>
   `;
   container.querySelector('[data-act="import"]')?.addEventListener('click', () => {
     const ta = container.querySelector('[data-act="import-text"]') as HTMLTextAreaElement;
     cb.onImportMap(ta.value);
   });
+  container.querySelector('[data-act="sync-connect"]')?.addEventListener('click', () => cb.onConnectLiveSync());
+  container.querySelector('[data-act="sync-stop"]')?.addEventListener('click', () => cb.onDisconnectLiveSync());
 }
 
 // ---------------------------------------------------------------------------

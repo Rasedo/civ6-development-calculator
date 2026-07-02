@@ -56,6 +56,16 @@ import {
   type EmpirePlanState,
 } from './ui/panels';
 import { parseCivExport, importSummary } from './core/importer';
+import { parseLiveSync, syncSummary } from './core/livesync';
+
+// Minimal File System Access API surface (Chromium).
+declare global {
+  interface Window {
+    showOpenFilePicker?: (options?: {
+      types?: { description: string; accept: Record<string, string[]> }[];
+    }) => Promise<{ getFile(): Promise<File> }[]>;
+  }
+}
 import { toggleBoost } from './core/boosts';
 import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
@@ -120,6 +130,7 @@ interface UiState {
   planner: PlannerState | null;
   empirePlan: EmpirePlanState;
   lastImportSummary: string | null;
+  liveSync: { active: boolean; status: string };
 }
 
 const ui: UiState = {
@@ -137,7 +148,45 @@ const ui: UiState = {
   planner: null,
   empirePlan: { objective: 'balanced', horizon: 30, results: null },
   lastImportSummary: null,
+  liveSync: { active: false, status: '' },
 };
+
+// Live-sync plumbing (module-level: file handles don't serialize).
+let syncHandle: { getFile(): Promise<File> } | null = null;
+let syncTimer: ReturnType<typeof setInterval> | undefined;
+let syncLastSize = -1;
+
+async function pollLiveSync(): Promise<void> {
+  if (!syncHandle) return;
+  try {
+    const file = await syncHandle.getFile();
+    if (file.size === syncLastSize) return;
+    syncLastSize = file.size;
+    const text = await file.text();
+    const { state: synced, report } = parseLiveSync(text);
+    synced.sandbox = sandboxToggle.checked;
+    state = synced;
+    ui.selectedTile = null;
+    ui.selectedCityId = null;
+    ui.settleSites = null;
+    ui.compare = null;
+    ui.planner = null;
+    ui.liveSync.status = `Synced: ${syncSummary(report)}`;
+    refresh();
+  } catch (e) {
+    ui.liveSync.status = `Sync error: ${e instanceof Error ? e.message : String(e)}`;
+    refresh();
+  }
+}
+
+function stopLiveSync(): void {
+  clearInterval(syncTimer);
+  syncTimer = undefined;
+  syncHandle = null;
+  syncLastSize = -1;
+  ui.liveSync.active = false;
+  ui.liveSync.status = '';
+}
 
 let state: GameState = newGameFromControls();
 
@@ -351,6 +400,35 @@ const callbacks: PanelCallbacks = {
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },
+  onConnectLiveSync() {
+    if (!window.showOpenFilePicker) {
+      showMessage('File System Access API unavailable in this browser.');
+      return;
+    }
+    window
+      .showOpenFilePicker({
+        types: [{ description: 'Civ 6 Lua.log', accept: { 'text/plain': ['.log', '.txt'] } }],
+      })
+      .then(([handle]) => {
+        if (!handle) return;
+        syncHandle = handle;
+        syncLastSize = -1;
+        ui.liveSync.active = true;
+        ui.liveSync.status = 'Connected — waiting for the first snapshot…';
+        clearInterval(syncTimer);
+        syncTimer = setInterval(pollLiveSync, 3000);
+        void pollLiveSync();
+        refresh();
+      })
+      .catch(() => {
+        /* picker dismissed */
+      });
+  },
+  onDisconnectLiveSync() {
+    stopLiveSync();
+    showMessage('Live sync stopped.');
+    refresh();
+  },
   onSetEmpireObjective(objective) {
     ui.empirePlan.objective = objective;
     ui.empirePlan.results = null;
@@ -495,7 +573,12 @@ function refresh(): void {
   } else if (ui.rightView === 'compare' && ui.compare) {
     renderComparePanel(contextPanel, state, ui.compare, callbacks);
   } else if (ui.rightView === 'import') {
-    renderImportPanel(contextPanel, ui.lastImportSummary, callbacks);
+    renderImportPanel(
+      contextPanel,
+      ui.lastImportSummary,
+      { supported: !!window.showOpenFilePicker, ...ui.liveSync },
+      callbacks,
+    );
   } else if (ui.rightView === 'greatPeople') {
     renderGreatPeoplePanel(contextPanel, state);
   } else if (ui.rightView === 'planner' && ui.planner) {

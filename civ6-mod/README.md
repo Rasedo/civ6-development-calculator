@@ -1,7 +1,8 @@
 # Map Exporter mod
 
 Exports a real Civilization VI game's map so the Development Calculator can
-load it.
+load it — and, with the LiveSync context, keeps the calculator mirroring your
+game turn by turn.
 
 ## Install
 
@@ -27,6 +28,22 @@ load it.
 Note: the calculator displays imported maps mirrored north–south (Civ 6 counts
 rows from the south, the calculator from the north; the mirror keeps every
 adjacency exact). Yields, rivers and wonders are unaffected.
+
+## Live sync
+
+`LiveSync.lua` (same mod, enabled automatically) prints a `CIV6SYNC` snapshot
+at load and at the start of every one of your turns: completed techs/civics,
+your cities (position, population, name), each city's buildings, and plot
+deltas (improvements, districts, world wonders, ownership).
+
+In the calculator: **Import map → Live sync → Connect Lua.log…** (Chromium
+browsers only — it uses the File System Access API). The app re-reads the log
+every few seconds and rebuilds a mirrored state, so the district advisor,
+settle advisor, comparisons and planners all run on your live position.
+Mirrored: map, cities, districts, wonders, buildings, improvements, borders
+(nearest-city approximation), research, and your worship building. Not
+mirrored (reset each sync): production queues, policy cards, beliefs,
+specialists — set those by hand if an analysis depends on them.
 
 ## Format
 

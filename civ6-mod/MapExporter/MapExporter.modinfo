@@ -14,9 +14,17 @@
       </Properties>
       <File>MapExporter.xml</File>
     </AddUserInterfaces>
+    <AddUserInterfaces id="MapExporter_LiveSync">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>LiveSync.xml</File>
+    </AddUserInterfaces>
   </InGameActions>
   <Files>
     <File>MapExporter.xml</File>
     <File>MapExporter.lua</File>
+    <File>LiveSync.xml</File>
+    <File>LiveSync.lua</File>
   </Files>
 </Mod>
