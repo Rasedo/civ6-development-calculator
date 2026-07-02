@@ -203,7 +203,12 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
   for (const type of placed) {
     for (const def of buildingsForDistrict(type)) {
       if (have.has(def.id) || queued.has(def.id)) continue;
-      if (unlocks && !unlocks.buildings.has(def.id)) continue;
+      // Worship buildings are outside research: they come from your religion.
+      if (def.worship) {
+        if (state.religion?.worship !== def.id) continue;
+      } else if (unlocks && !unlocks.buildings.has(def.id)) {
+        continue;
+      }
       if (def.requiresAny && !def.requiresAny.some((r) => have.has(r) || queued.has(r))) continue;
       if (def.exclusiveWith?.some((x) => have.has(x) || queued.has(x))) continue;
       if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;

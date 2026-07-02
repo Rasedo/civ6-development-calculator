@@ -174,6 +174,26 @@ export interface GameState {
     /** Ids of great people already earned (in claim order). */
     earned: string[];
   };
+  religion: ReligionState;
+  tradeRoutes: TradeRoute[];
+}
+
+export interface ReligionState {
+  /** Chosen pantheon belief id (costs 25 faith). */
+  pantheon: string | null;
+  founded: boolean;
+  name: string | null;
+  follower: string | null;
+  founder: string | null;
+  /** Worship building id unlocked by founding. */
+  worship: string | null;
+}
+
+export interface TradeRoute {
+  /** Origin city id (receives the yields). */
+  from: number;
+  /** Destination city id. */
+  to: number;
 }
 
 export interface MapGenOptions {

@@ -3,10 +3,11 @@
  * `Modifiers` object that the yield/housing/amenity code consumes.
  */
 
-import type { DistrictId, GameState, ImprovementId, Yields } from './types';
+import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResourceCategory, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, type PolicyEffects } from '../data/policies';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, type BeliefEffects } from '../data/religion';
 
 // ---------------------------------------------------------------------------
 // Unlocks
@@ -121,6 +122,17 @@ export interface Modifiers {
   tilePurchaseMult: number;
   encampmentProdMult: number;
   yieldMult: Partial<Yields>;
+  // --- religion-driven -------------------------------------------------------
+  featureYields: Partial<Record<string, Partial<Yields>>>;
+  improvementOnResource: { category: ResourceCategory; yields: Partial<Yields> }[];
+  borderCostMult: number;
+  growthMult: number;
+  gppFlat: Partial<Record<GreatPersonClass, number>>;
+  workEthic: boolean;
+  buildingYieldAdd: Partial<Record<string, Partial<Yields>>>;
+  buildingHousingAdd: Partial<Record<string, number>>;
+  riverCity: { amenities: number; housing: number } | null;
+  faithPerWonder: number;
 }
 
 export function defaultModifiers(): Modifiers {
@@ -140,6 +152,16 @@ export function defaultModifiers(): Modifiers {
     tilePurchaseMult: 1,
     encampmentProdMult: 1,
     yieldMult: {},
+    featureYields: {},
+    improvementOnResource: [],
+    borderCostMult: 1,
+    growthMult: 1,
+    gppFlat: {},
+    workEthic: false,
+    buildingYieldAdd: {},
+    buildingHousingAdd: {},
+    riverCity: null,
+    faithPerWonder: 0,
   };
 }
 
@@ -199,7 +221,68 @@ export function getModifiers(state: GameState): Modifiers {
       if (card) applyPolicyEffects(mods, card.effects);
     }
   }
+
+  // Religion: pantheon always; follower/founder beliefs once founded.
+  applyBeliefEffects(state, mods, state.religion?.pantheon ? PANTHEONS[state.religion.pantheon] : undefined);
+  if (state.religion?.founded) {
+    applyBeliefEffects(state, mods, state.religion.follower ? FOLLOWER_BELIEFS[state.religion.follower] : undefined);
+    applyBeliefEffects(state, mods, state.religion.founder ? FOUNDER_BELIEFS[state.religion.founder] : undefined);
+  }
   return mods;
+}
+
+function applyBeliefEffects(
+  state: GameState,
+  mods: Modifiers,
+  belief?: { effects: BeliefEffects },
+): void {
+  if (!belief) return;
+  const fx = belief.effects;
+  for (const [imp, y] of Object.entries(fx.improvementYields ?? {})) {
+    const cur = (mods.improvementYields[imp as ImprovementId] ??= {});
+    addPartial(cur, y);
+  }
+  for (const [feat, y] of Object.entries(fx.featureYields ?? {})) {
+    const cur = (mods.featureYields[feat] ??= {});
+    addPartial(cur, y);
+  }
+  if (fx.improvementOnResource) mods.improvementOnResource.push(fx.improvementOnResource);
+  if (fx.borderCostMult) mods.borderCostMult *= fx.borderCostMult;
+  if (fx.growthMult) mods.growthMult *= fx.growthMult;
+  for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
+    const key = cls as GreatPersonClass;
+    mods.gppFlat[key] = (mods.gppFlat[key] ?? 0) + (n ?? 0);
+  }
+  if (fx.workEthic) mods.workEthic = true;
+  for (const [b, y] of Object.entries(fx.buildingYields ?? {})) {
+    const cur = (mods.buildingYieldAdd[b] ??= {});
+    addPartial(cur, y);
+  }
+  for (const [b, n] of Object.entries(fx.buildingHousing ?? {})) {
+    mods.buildingHousingAdd[b] = (mods.buildingHousingAdd[b] ?? 0) + (n ?? 0);
+  }
+  if (fx.amenitiesIfSpecialty) mods.amenitiesIfSpecialty.push(fx.amenitiesIfSpecialty);
+  if (fx.riverCity) mods.riverCity = fx.riverCity;
+  if (fx.faithPerWonder) mods.faithPerWonder += fx.faithPerWonder;
+
+  // Founder incomes land in the capital (followers = your total population).
+  if (fx.perFollowers) {
+    const followers = state.cities.reduce((s, c) => s + c.population, 0);
+    const times = Math.floor(followers / fx.perFollowers.per);
+    if (times > 0) {
+      for (const [k, v] of Object.entries(fx.perFollowers.yields)) {
+        const key = k as keyof Yields;
+        mods.capitalYields[key] = (mods.capitalYields[key] ?? 0) + (v ?? 0) * times;
+      }
+    }
+  }
+  if (fx.perCity) {
+    const n = state.cities.length;
+    for (const [k, v] of Object.entries(fx.perCity)) {
+      const key = k as keyof Yields;
+      mods.capitalYields[key] = (mods.capitalYields[key] ?? 0) + (v ?? 0) * n;
+    }
+  }
 }
 
 /** Convenience bundle used by yield computations. */

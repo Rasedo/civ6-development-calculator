@@ -10,6 +10,8 @@ import { hasFreshWater, isCoastalLand, isImpassable } from './query';
 import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities } from './yields';
 import { getModifiers, makeYieldCtx, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
+import { cityTradeYields } from './trade';
+import { hasRiver } from './query';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -48,8 +50,10 @@ export interface CityStats {
     districts: Yields;
     buildings: Yields;
     citizens: Yields;
-    /** Flat bonuses from government/policies. */
+    /** Flat bonuses from government/policies/religion. */
     bonuses: Yields;
+    /** Income from this city's outgoing trade routes. */
+    trade: Yields;
   };
   /** Final per-turn yields (amenity + government modifiers applied). */
   total: Yields;
@@ -229,7 +233,10 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
     if (def?.housing) total += def.housing;
+    const beliefHousing = m.buildingHousingAdd[id];
+    if (beliefHousing) total += beliefHousing;
   }
+  if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
     if (t.cityId !== city.id || !t.improvement) continue;
     total += IMPROVEMENTS[t.improvement as ImprovementId].housing;
@@ -414,6 +421,9 @@ export function computeCityStats(
   for (const w of wonders) {
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
   }
+  if (m.faithPerWonder > 0) buildings.faith += m.faithPerWonder * wonders.length;
+
+  const trade = cityTradeYields(state, city);
 
   const citizens = emptyYields();
   citizens.science = city.population * CITIZEN_SCIENCE;
@@ -430,6 +440,7 @@ export function computeCityStats(
     regional.amenities +
     wonderRegionalAmenities(state, city) +
     m.amenitiesAll +
+    (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state)).get(city.id) ?? 0);
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {
@@ -449,6 +460,7 @@ export function computeCityStats(
   addYields(total, buildings);
   addYields(total, citizens);
   addYields(total, bonuses);
+  addYields(total, trade);
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as YieldKey[]) {
     total[k] *= tier.yieldFactor;
   }
@@ -472,13 +484,14 @@ export function computeCityStats(
       foodSurplus *
       housingGrowthFactor(housing - city.population) *
       tier.growthFactor *
-      empireGrowthMult(state);
+      empireGrowthMult(state) *
+      m.growthMult;
   }
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
 
   // --- border growth ---------------------------------------------------------
-  const borderCost = borderGrowthCost(city.tilesAcquired);
+  const borderCost = Math.round(borderGrowthCost(city.tilesAcquired) * m.borderCostMult);
   const nextTile = pickBorderTile(state, city, ctx);
   const borderTurns =
     nextTile !== null && total.culture > 0
@@ -490,7 +503,7 @@ export function computeCityStats(
     housing,
     amenities: { have, needed, balance, tier },
     workedTiles: worked,
-    breakdown: { tiles, districts, buildings, citizens, bonuses },
+    breakdown: { tiles, districts, buildings, citizens, bonuses, trade },
     total,
     foodSurplus,
     effectiveFoodSurplus: effective,

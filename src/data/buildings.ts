@@ -28,6 +28,8 @@ export interface BuildingDef {
   special?: 'WATER_MILL' | 'SHIPYARD';
   /** Granted automatically to the capital; never buildable. */
   autoCapital?: boolean;
+  /** Worship building — only buildable if your religion selected it. */
+  worship?: boolean;
 }
 
 const list: BuildingDef[] = [
@@ -46,6 +48,12 @@ const list: BuildingDef[] = [
   // --- Holy Site -------------------------------------------------------------
   { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 70, yields: { faith: 2 } },
   { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 120, requiresAny: ['SHRINE'], yields: { faith: 4 } },
+  // Worship buildings (one unlocked by founding a religion; player's pick)
+  { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, culture: 3 }, worship: true },
+  { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true },
+  { id: 'MEETING_HOUSE', name: 'Meeting House', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, production: 2 }, worship: true },
+  { id: 'PAGODA', name: 'Pagoda', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, housing: 1, worship: true },
+  { id: 'STUPA', name: 'Stupa', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3 }, amenities: 1, worship: true },
 
   // --- Theater Square ----------------------------------------------------------
   { id: 'AMPHITHEATER', name: 'Amphitheater', district: 'THEATER_SQUARE', cost: 150, yields: { culture: 2 } },

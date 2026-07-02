@@ -46,6 +46,8 @@ import {
   renderImportPanel,
   renderGreatPeoplePanel,
   renderPlannerPanel,
+  renderReligionPanel,
+  renderTradePanel,
   tileSummary,
   type PanelCallbacks,
   type CompareState,
@@ -55,6 +57,8 @@ import { parseCivExport, importSummary } from './core/importer';
 import { toggleBoost } from './core/boosts';
 import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
+import { choosePantheon, foundReligion } from './core/game';
+import { addTradeRoute, removeTradeRoute } from './core/trade';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -93,7 +97,9 @@ type RightView =
   | 'compare'
   | 'import'
   | 'greatPeople'
-  | 'planner';
+  | 'planner'
+  | 'religion'
+  | 'trade';
 
 interface UiState {
   mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile';
@@ -174,6 +180,8 @@ function setRightView(view: RightView): void {
     ['view-civic', 'civic'],
     ['view-government', 'government'],
     ['view-gp', 'greatPeople'],
+    ['view-religion', 'religion'],
+    ['view-trade', 'trade'],
     ['settle-advisor', 'settle'],
   ] as const) {
     $<HTMLButtonElement>(btn).classList.toggle('active', view === v);
@@ -331,6 +339,27 @@ const callbacks: PanelCallbacks = {
       refresh();
     }, 20);
   },
+  onChoosePantheon(beliefId) {
+    const r = choosePantheon(state, beliefId);
+    if (!r.ok) showMessage(r.reason!);
+    else showMessage('Pantheon chosen.');
+    refresh();
+  },
+  onFoundReligion(choice) {
+    const r = foundReligion(state, choice);
+    if (!r.ok) showMessage(r.reason!);
+    else showMessage(`${state.religion.name} founded!`);
+    refresh();
+  },
+  onAddTradeRoute(from, to) {
+    const r = addTradeRoute(state, from, to);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onRemoveTradeRoute(index) {
+    removeTradeRoute(state, index);
+    refresh();
+  },
   onAdoptPlan(index) {
     if (!ui.planner?.results) return;
     const plan = ui.planner.results[index];
@@ -429,6 +458,10 @@ function refresh(): void {
     renderGreatPeoplePanel(contextPanel, state);
   } else if (ui.rightView === 'planner' && ui.planner) {
     renderPlannerPanel(contextPanel, state, ui.planner, callbacks);
+  } else if (ui.rightView === 'religion') {
+    renderReligionPanel(contextPanel, state, callbacks);
+  } else if (ui.rightView === 'trade') {
+    renderTradePanel(contextPanel, state, callbacks);
   }
 
   let highlight: Set<number> | null = null;
@@ -702,6 +735,8 @@ for (const [btn, view] of [
   ['view-civic', 'civic'],
   ['view-government', 'government'],
   ['view-gp', 'greatPeople'],
+  ['view-religion', 'religion'],
+  ['view-trade', 'trade'],
 ] as const) {
   $<HTMLButtonElement>(btn).addEventListener('click', () => {
     setRightView(ui.rightView === view ? 'context' : view);

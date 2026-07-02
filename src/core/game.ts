@@ -21,6 +21,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { BOOST_FRACTION } from '../data/boosts';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE } from '../data/constants';
 
 /** Eureka/inspiration discount applied to a research cost. */
@@ -59,6 +60,8 @@ export function createGameFromMap(map: GameState['map'], sandbox = false): GameS
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
+    tradeRoutes: [],
   };
 }
 
@@ -437,15 +440,16 @@ export function endTurn(state: GameState): void {
     }
 
     // --- cultural border expansion -------------------------------------------
+    const borderCost = () => Math.round(borderGrowthCost(city.tilesAcquired) * mods.borderCostMult);
     city.cultureBox += stats.total.culture;
-    while (city.cultureBox >= borderGrowthCost(city.tilesAcquired)) {
+    while (city.cultureBox >= borderCost()) {
       const next = pickBorderTile(state, city);
       if (next === null) {
         // Nowhere to grow: cap the box at the current threshold.
-        city.cultureBox = Math.min(city.cultureBox, borderGrowthCost(city.tilesAcquired));
+        city.cultureBox = Math.min(city.cultureBox, borderCost());
         break;
       }
-      city.cultureBox -= borderGrowthCost(city.tilesAcquired);
+      city.cultureBox -= borderCost();
       acquireTile(state, city, next);
     }
 
@@ -467,9 +471,10 @@ export function endTurn(state: GameState): void {
 // Great people
 // ---------------------------------------------------------------------------
 
-/** Points each class gains per turn (districts + their buildings + specialists). */
+/** Points each class gains per turn (districts + their buildings + specialists + beliefs). */
 export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonClass, number> {
   const out = Object.fromEntries(GP_CLASSES.map((c) => [c, 0])) as Record<GreatPersonClass, number>;
+  const gppFlat = getModifiers(state).gppFlat;
   for (const city of state.cities) {
     for (const cls of GP_CLASSES) {
       const district = GP_CLASS_DISTRICT[cls];
@@ -477,7 +482,7 @@ export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonCl
         (d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete,
       );
       if (!inst) continue;
-      let pts = 1;
+      let pts = 1 + (gppFlat[cls] ?? 0);
       pts += city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
       pts += city.specialists[String(inst.tileIndex)] ?? 0;
       out[cls] += pts;
@@ -550,6 +555,8 @@ export function deserialize(json: string): GameState {
     t.builtWonder ??= null;
     t.builtWonderComplete ??= false;
   }
+  state.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null };
+  state.tradeRoutes ??= [];
   for (const c of state.cities) {
     c.cultureBox ??= 0;
     c.tilesAcquired ??= 0;
@@ -557,4 +564,55 @@ export function deserialize(json: string): GameState {
     c.specialists ??= {};
   }
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// Religion
+// ---------------------------------------------------------------------------
+
+export function canChoosePantheon(state: GameState): RuleResult {
+  if (state.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
+  if (!state.sandbox && state.faithTotal < PANTHEON_FAITH_COST) {
+    return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(state.faithTotal)} banked).` };
+  }
+  return { ok: true };
+}
+
+export function choosePantheon(state: GameState, beliefId: string): RuleResult {
+  const check = canChoosePantheon(state);
+  if (!check.ok) return check;
+  if (!PANTHEONS[beliefId]) return { ok: false, reason: 'No such pantheon belief.' };
+  if (!state.sandbox) state.faithTotal -= PANTHEON_FAITH_COST;
+  state.religion.pantheon = beliefId;
+  return { ok: true };
+}
+
+export function canFoundReligion(state: GameState): RuleResult {
+  if (state.religion.founded) return { ok: false, reason: 'Religion already founded.' };
+  if (!state.religion.pantheon) return { ok: false, reason: 'Choose a pantheon first.' };
+  const hasHolySite = state.cities.some((c) =>
+    c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
+  );
+  if (!hasHolySite) return { ok: false, reason: 'Needs a completed Holy Site.' };
+  if (!state.sandbox && greatPeopleEarned(state, 'PROPHET') === 0) {
+    return { ok: false, reason: 'Needs a Great Prophet (earn Prophet great-person points).' };
+  }
+  return { ok: true };
+}
+
+export function foundReligion(
+  state: GameState,
+  choice: { name: string; follower: string; founder: string; worship: string },
+): RuleResult {
+  const check = canFoundReligion(state);
+  if (!check.ok) return check;
+  if (!FOLLOWER_BELIEFS[choice.follower]) return { ok: false, reason: 'No such follower belief.' };
+  if (!FOUNDER_BELIEFS[choice.founder]) return { ok: false, reason: 'No such founder belief.' };
+  if (!WORSHIP_BUILDINGS.includes(choice.worship)) return { ok: false, reason: 'No such worship building.' };
+  state.religion.founded = true;
+  state.religion.name = choice.name || RELIGION_NAMES[0];
+  state.religion.follower = choice.follower;
+  state.religion.founder = choice.founder;
+  state.religion.worship = choice.worship;
+  return { ok: true };
 }

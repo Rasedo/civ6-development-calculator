@@ -41,6 +41,8 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     const f = FEATURES[tile.feature];
     if (f.impassable) return emptyYields();
     addYields(out, f.yields);
+    const beliefBonus = ctx.mods.featureYields[tile.feature];
+    if (beliefBonus) addYields(out, beliefBonus);
   }
   if (tile.resource) addYields(out, RESOURCES[tile.resource].yields);
 
@@ -49,6 +51,12 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     addYields(out, IMPROVEMENTS[imp].yields);
     const boost = ctx.mods.improvementYields[imp];
     if (boost) addYields(out, boost);
+    if (tile.resource) {
+      const cat = RESOURCES[tile.resource].category;
+      for (const rule of ctx.mods.improvementOnResource) {
+        if (rule.category === cat) addYields(out, rule.yields);
+      }
+    }
     if (imp === 'FARM' && ctx.mods.farmAdjTier > 0) {
       const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM').length;
       if (adjFarms >= 2) out.food += ctx.mods.farmAdjTier;
@@ -130,7 +138,10 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     if (!tile.districtComplete) continue;
     const def = DISTRICTS[d.type];
     if (def.adjacencyYield) {
-      out[def.adjacencyYield] += effectiveAdjacency(ctx, tile, d.type);
+      const adj = effectiveAdjacency(ctx, tile, d.type);
+      out[def.adjacencyYield] += adj;
+      // Work Ethic: Holy Site adjacency also provides production.
+      if (d.type === 'HOLY_SITE' && ctx.mods.workEthic) out.production += adj;
     }
   }
   return out;
@@ -149,6 +160,8 @@ export function cityBuildingYields(ctx: YieldCtx, city: City): Yields {
     if (def.regional) continue; // handled by regional scan (affects own city too)
     const mult = ctx.mods.buildingYieldMult[def.district] ?? 1;
     if (def.yields) addYields(out, def.yields, mult);
+    const beliefAdd = ctx.mods.buildingYieldAdd[id];
+    if (beliefAdd) addYields(out, beliefAdd);
     if (def.special === 'SHIPYARD') {
       const harbor = city.districts.find((d) => d.type === 'HARBOR');
       if (harbor && ctx.map.tiles[harbor.tileIndex].districtComplete) {

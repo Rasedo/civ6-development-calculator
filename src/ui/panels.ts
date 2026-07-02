@@ -8,7 +8,9 @@ import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
 import { validImprovements, canRemoveFeature, availableBuildings, districtPlacementTiles, availableWonders } from '../core/rules';
-import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost } from '../core/game';
+import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost, canChoosePantheon, canFoundReligion } from '../core/game';
+import { tradeCapacity, routeYields, TRADE_ROUTE_RANGE } from '../core/trade';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { tileAppeal, appealTier } from '../core/appeal';
 import { isBoosted } from '../core/boosts';
 import { BOOSTS } from '../data/boosts';
@@ -59,6 +61,10 @@ export interface PanelCallbacks {
   onSetPlanHorizon(turns: number): void;
   onRunPlanner(): void;
   onAdoptPlan(index: number): void;
+  onChoosePantheon(beliefId: string): void;
+  onFoundReligion(choice: { name: string; follower: string; founder: string; worship: string }): void;
+  onAddTradeRoute(from: number, to: number): void;
+  onRemoveTradeRoute(index: number): void;
 }
 
 /** Mutable state for the build-order planner view (owned by main.ts). */
@@ -353,6 +359,7 @@ export function renderCityPanel(
         <span>Buildings</span><span>${yieldsHtml(stats.breakdown.buildings)}</span>
         <span>Citizens</span><span>${yieldsHtml(stats.breakdown.citizens)}</span>
         <span>Gov/policies</span><span>${yieldsHtml(stats.breakdown.bonuses)}</span>
+        <span>Trade</span><span>${yieldsHtml(stats.breakdown.trade)}</span>
         <span>Maintenance</span><span class="${stats.maintenance > 0 ? 'bad' : ''}">−${fmt(stats.maintenance)} Gold</span>
       </div>
       <div class="muted hint">Amenity modifier ×${stats.amenities.tier.yieldFactor} on non-food.</div>
@@ -405,6 +412,134 @@ export function renderCityPanel(
       cb.onSetSpecialists(city.id, Number(el.dataset.tile), Number(el.dataset.n));
     }),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Religion
+// ---------------------------------------------------------------------------
+
+export function renderReligionPanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
+  const rel = state.religion;
+  const pantheonOk = canChoosePantheon(state);
+  const foundOk = canFoundReligion(state);
+
+  const beliefRow = (b: { id: string; name: string; description: string }, chosen: boolean) =>
+    `<div class="research-row ${chosen ? 'current' : ''}">
+      <span><b>${b.name}</b><br><small class="muted">${b.description}</small></span>
+      ${chosen ? '<span>✓</span>' : ''}
+    </div>`;
+
+  let pantheonHtml = '';
+  if (rel.pantheon) {
+    pantheonHtml = `<h3>Pantheon</h3>${beliefRow(PANTHEONS[rel.pantheon], true)}`;
+  } else if (pantheonOk.ok) {
+    pantheonHtml =
+      `<h3>Choose a pantheon (${PANTHEON_FAITH_COST} faith)</h3>` +
+      Object.values(PANTHEONS)
+        .map(
+          (b) => `<div class="research-row"><span><b>${b.name}</b><br><small class="muted">${b.description}</small></span>
+          <button data-act="pantheon" data-id="${b.id}">Choose</button></div>`,
+        )
+        .join('');
+  } else {
+    pantheonHtml = `<h3>Pantheon</h3><div class="muted">${pantheonOk.reason}</div>`;
+  }
+
+  let religionHtml = '';
+  if (rel.founded) {
+    religionHtml = `
+      <h3>${rel.name}</h3>
+      ${beliefRow(FOLLOWER_BELIEFS[rel.follower!], true)}
+      ${beliefRow(FOUNDER_BELIEFS[rel.founder!], true)}
+      <div class="row muted">Worship building: <b>${BUILDINGS[rel.worship!]?.name ?? rel.worship}</b> (buildable in Holy Sites with a Temple). All of your cities follow ${rel.name}; followers = your total population.</div>
+    `;
+  } else if (foundOk.ok) {
+    const opts = (defs: Record<string, { id: string; name: string; description: string }>, act: string) =>
+      `<select data-act="${act}">${Object.values(defs)
+        .map((b) => `<option value="${b.id}" title="${b.description}">${b.name}</option>`)
+        .join('')}</select>`;
+    religionHtml = `
+      <h3>Found a religion</h3>
+      <label>Name <select data-act="rel-name">${RELIGION_NAMES.map((n) => `<option>${n}</option>`).join('')}</select></label>
+      <label>Follower belief ${opts(FOLLOWER_BELIEFS, 'rel-follower')}</label>
+      <label>Founder belief ${opts(FOUNDER_BELIEFS, 'rel-founder')}</label>
+      <label>Worship building <select data-act="rel-worship">${WORSHIP_BUILDINGS.map((w) => `<option value="${w}">${BUILDINGS[w]?.name ?? w}</option>`).join('')}</select></label>
+      <div class="row"><button data-act="found" class="primary">Found religion</button></div>
+      <div class="hint muted">Belief descriptions appear as tooltips.</div>
+    `;
+  } else {
+    religionHtml = `<h3>Religion</h3><div class="muted">${foundOk.reason}</div>`;
+  }
+
+  container.innerHTML = `
+    <h2>Religion</h2>
+    <div class="row muted">Faith banked: ${fmt(state.faithTotal)}. Spread isn't modeled — once founded, every one of your cities follows your religion.</div>
+    ${pantheonHtml}
+    ${religionHtml}
+  `;
+
+  container.querySelectorAll('[data-act="pantheon"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onChoosePantheon((b as HTMLElement).dataset.id!)),
+  );
+  container.querySelector('[data-act="found"]')?.addEventListener('click', () => {
+    const get = (act: string) => (container.querySelector(`[data-act="${act}"]`) as HTMLSelectElement)?.value;
+    cb.onFoundReligion({
+      name: get('rel-name'),
+      follower: get('rel-follower'),
+      founder: get('rel-founder'),
+      worship: get('rel-worship'),
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Trade routes
+// ---------------------------------------------------------------------------
+
+export function renderTradePanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
+  const cap = tradeCapacity(state);
+  const routes = state.tradeRoutes
+    .map((r, i) => {
+      const from = state.cities.find((c) => c.id === r.from);
+      const to = state.cities.find((c) => c.id === r.to);
+      if (!from || !to) return '';
+      const y = routeYields(state, to);
+      return `<div class="queue-row"><span>${from.name} → ${to.name}
+        <span class="muted">${yieldsHtml(y)} to ${from.name}</span></span>
+        <button data-act="rm-route" data-i="${i}">✕</button></div>`;
+    })
+    .join('');
+
+  const cityOptions = state.cities
+    .map((c) => `<option value="${c.id}">${c.name}</option>`)
+    .join('');
+
+  container.innerHTML = `
+    <h2>Trade routes</h2>
+    <div class="row">Capacity: <b>${state.tradeRoutes.length} / ${cap}</b>
+      <span class="muted">(Foreign Trade civic, Markets, Lighthouses, Colossus, Great Zimbabwe)</span></div>
+    ${routes || '<div class="muted">No routes running.</div>'}
+    ${
+      state.cities.length >= 2
+        ? `<h3>New route</h3>
+          <div class="row">
+            <label>From <select data-act="route-from">${cityOptions}</select></label>
+            <label>To <select data-act="route-to">${cityOptions}</select></label>
+            <button data-act="add-route">Start route</button>
+          </div>
+          <div class="hint muted">Domestic routes: origin gains +1🍞+1⚙, plus +1 of each per 2 specialty districts at the destination. Range ${TRADE_ROUTE_RANGE} tiles.</div>`
+        : '<div class="muted">Found a second city to run trade routes.</div>'
+    }
+  `;
+
+  container.querySelectorAll('[data-act="rm-route"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onRemoveTradeRoute(Number((b as HTMLElement).dataset.i))),
+  );
+  container.querySelector('[data-act="add-route"]')?.addEventListener('click', () => {
+    const from = Number((container.querySelector('[data-act="route-from"]') as HTMLSelectElement).value);
+    const to = Number((container.querySelector('[data-act="route-to"]') as HTMLSelectElement).value);
+    cb.onAddTradeRoute(from, to);
+  });
 }
 
 // ---------------------------------------------------------------------------

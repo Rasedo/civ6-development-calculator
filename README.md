@@ -12,7 +12,7 @@ wonders, cultural border growth (plus tile purchase) and tech/civic trees with
 governments & policies; stage 3 added the optimization advisors; stage 4 the
 real-map import mod; stage 5 world wonders, great people and specialists;
 stage 6 the fidelity pass (eurekas, cost scaling, appeal, maintenance);
-stage 7 the build-order search.
+stage 7 the build-order search; stage 8 religion and trade routes.
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -113,6 +113,18 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
 - **District cost scaling** with research progress (locked at queue time),
   **appeal-based Neighborhood housing** (2–6, shown when placing), and
   **gold maintenance** for districts/buildings (commercial buildings free).
+- **Religion**: pantheons (25 faith, 11 beliefs — improvement/feature yields,
+  Fertility Rites growth, Religious Settlements border discount, Divine Spark
+  GPP, River Goddess); founding via a Great Prophet + Holy Site with follower
+  beliefs (Work Ethic, Choral Music, Feed the World, Zen Meditation, …),
+  founder beliefs (Tithe, World Church, …) and a worship building of your
+  choice (Cathedral/Gurdwara/Meeting House/Pagoda/Stupa). Spread isn't
+  modeled: all of your cities follow your religion; followers = your
+  population, and founder income lands in the capital.
+- **Trade routes** (domestic — you're alone): capacity from the Foreign Trade
+  civic, Markets, Lighthouses, Colossus and Great Zimbabwe; each route pays
+  the origin +1🍞+1⚙ plus +1 of each per 2 specialty districts at the
+  destination; 15-tile range; managed in the Trade panel.
 - **Advisors** (the "calculator" part):
   - *District placement*: when placing a district, every legal tile shows its
     adjacency bonus as a Civ 6-style badge; the best spot (adjacency value vs
@@ -147,10 +159,12 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
   ties them to civic completions); no anarchy or legacy bonuses.
 - Border-growth tile picking approximates Civ 6's priorities; no tile swapping
   between cities.
-- No religion beliefs, trade routes, city-states, barbarians, units, combat,
-  or disasters. Great-person effects are instant only (no tile activations);
-  the wonder list is a 13-wonder subset; some wonder unlock techs are
-  stand-ins for techs outside the compact tree.
+- No city-states, barbarians, units, combat, or disasters. Great-person
+  effects are instant only (no tile activations); the wonder list is a
+  13-wonder subset; some wonder unlock techs are stand-ins for techs outside
+  the compact tree. Religion has no spread/pressure (your cities always
+  follow) and no enhancer beliefs; trade routes are domestic only, without
+  roads or plunder.
 - Citizen auto-assignment is a simple weighted greedy (use focus + tile locks
   and manual specialists for fine control).
 - Imported maps display mirrored north–south (adjacency stays exact).
@@ -158,10 +172,10 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 ## Roadmap ideas (later stages)
 
-1. Religion (pantheons, beliefs, worship buildings) and trade routes.
-2. Multi-civ support (AI opponents or manually-scripted rivals) with loyalty.
-3. Empire-wide (multi-city) build-order planning and settle-order planning.
-4. In-game overlay tooling driven by the exporter mod (live sync instead of
+1. Multi-civ support (AI opponents or manually-scripted rivals) with loyalty,
+   religious spread and international trade.
+2. Empire-wide (multi-city) build-order planning and settle-order planning.
+3. In-game overlay tooling driven by the exporter mod (live sync instead of
    one-shot import).
 
 ## Code layout

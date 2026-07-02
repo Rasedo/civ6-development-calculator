@@ -1,0 +1,160 @@
+import { describe, it, expect } from 'vitest';
+import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from './helpers';
+import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, foundReligion } from '../src/core/game';
+import { computeCityStats } from '../src/core/city';
+import { tileYields } from '../src/core/yields';
+import { makeYieldCtx } from '../src/core/effects';
+import { availableBuildings } from '../src/core/rules';
+import { tradeCapacity, addTradeRoute, routeYields, canAddTradeRoute } from '../src/core/trade';
+
+function sandboxCity() {
+  const state = makeState(makeMap(20, 20));
+  state.sandbox = true;
+  const city = foundCity(state, tileAtCoords(state.map, 9, 9).index).city!;
+  expandBorders(state, city, 2);
+  return { state, city };
+}
+
+describe('pantheons', () => {
+  it('cost 25 faith and apply their effects', () => {
+    const state = makeState(makeMap(16, 16));
+    foundCity(state, tileAtCoords(state.map, 8, 8).index);
+    expect(choosePantheon(state, 'GOD_OF_THE_OPEN_SKY').ok).toBe(false); // no faith yet
+    state.faithTotal = 30;
+    expect(choosePantheon(state, 'GOD_OF_THE_OPEN_SKY').ok).toBe(true);
+    expect(state.faithTotal).toBe(5);
+
+    const pasture = tileAtCoords(state.map, 9, 8);
+    pasture.resource = 'CATTLE';
+    pasture.improvement = 'PASTURE';
+    expect(tileYields(makeYieldCtx(state), pasture).culture).toBe(1);
+  });
+
+  it('Fertility Rites boosts growth; Religious Settlements cheapens borders', () => {
+    const { state, city } = sandboxCity();
+    const before = computeCityStats(state, city);
+    state.religion.pantheon = 'FERTILITY_RITES';
+    const after = computeCityStats(state, city);
+    expect(after.effectiveFoodSurplus).toBeCloseTo(before.effectiveFoodSurplus * 1.1, 5);
+
+    state.religion.pantheon = 'RELIGIOUS_SETTLEMENTS';
+    const cheap = computeCityStats(state, city);
+    expect(cheap.border.cost).toBe(Math.round(before.border.cost * 0.85));
+  });
+});
+
+describe('founding a religion', () => {
+  function ready() {
+    const { state, city } = sandboxCity();
+    state.religion.pantheon = 'FERTILITY_RITES';
+    queueDistrict(state, city.id, 'HOLY_SITE', tileAtCoords(state.map, 10, 9).index);
+    queueBuilding(state, city.id, 'SHRINE');
+    queueBuilding(state, city.id, 'TEMPLE');
+    return { state, city };
+  }
+
+  it('requires pantheon, holy site and (outside sandbox) a prophet', () => {
+    const state = makeState(makeMap(16, 16));
+    foundCity(state, tileAtCoords(state.map, 8, 8).index);
+    expect(canFoundReligion(state).ok).toBe(false);
+
+    const { state: s2 } = ready();
+    expect(canFoundReligion(s2).ok).toBe(true); // sandbox waives the prophet
+    s2.sandbox = false;
+    expect(canFoundReligion(s2).ok).toBe(false);
+    s2.greatPeople.earned.push('GP_CONFUCIUS');
+    expect(canFoundReligion(s2).ok).toBe(true);
+  });
+
+  it('beliefs and the worship building take effect', () => {
+    const { state, city } = ready();
+    const before = computeCityStats(state, city);
+    expect(
+      foundReligion(state, {
+        name: 'Taoism',
+        follower: 'CHORAL_MUSIC',
+        founder: 'TITHE',
+        worship: 'GURDWARA',
+      }).ok,
+    ).toBe(true);
+
+    const after = computeCityStats(state, city);
+    // Choral Music: shrine +2c, temple +4c
+    expect(after.breakdown.buildings.culture - before.breakdown.buildings.culture).toBe(6);
+    // Tithe: pop 1 -> 0 gold yet; grow the city artificially to 4 -> +1 gold in capital
+    city.population = 4;
+    const withFollowers = computeCityStats(state, city);
+    expect(withFollowers.breakdown.bonuses.gold).toBeGreaterThanOrEqual(1);
+    // Gurdwara buildable now (and only that worship building)
+    const buildable = availableBuildings(state, city).map((b) => b.id);
+    expect(buildable).toContain('GURDWARA');
+    expect(buildable).not.toContain('STUPA');
+  });
+
+  it('Work Ethic converts holy site adjacency into production', () => {
+    const { state, city } = ready();
+    tileAtCoords(state.map, 11, 9).elevation = 'MOUNTAIN'; // next to the holy site
+    foundReligion(state, {
+      name: 'Shinto',
+      follower: 'WORK_ETHIC',
+      founder: 'CHURCH_PROPERTY',
+      worship: 'MEETING_HOUSE',
+    });
+    const stats = computeCityStats(state, city);
+    expect(stats.breakdown.districts.production).toBeGreaterThanOrEqual(1);
+    expect(stats.breakdown.districts.production).toBe(stats.breakdown.districts.faith);
+  });
+});
+
+describe('trade routes', () => {
+  function twoCities() {
+    const state = makeState(makeMap(24, 20));
+    state.sandbox = true;
+    const a = foundCity(state, tileAtCoords(state.map, 8, 9).index).city!;
+    const b = foundCity(state, tileAtCoords(state.map, 14, 9).index).city!;
+    expandBorders(state, a, 2);
+    expandBorders(state, b, 2);
+    return { state, a, b };
+  }
+
+  it('capacity comes from the civic, buildings and wonders', () => {
+    const { state, a, b } = twoCities();
+    expect(tradeCapacity(state)).toBe(0);
+    grantCivics(state, 'FOREIGN_TRADE');
+    expect(tradeCapacity(state)).toBe(1);
+    queueDistrict(state, a.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 9).index);
+    queueBuilding(state, a.id, 'MARKET');
+    expect(tradeCapacity(state)).toBe(2);
+    void b;
+  });
+
+  it('validates routes and pays the origin', () => {
+    const { state, a, b } = twoCities();
+    expect(addTradeRoute(state, a.id, b.id).ok).toBe(false); // no capacity
+    grantCivics(state, 'FOREIGN_TRADE');
+    expect(addTradeRoute(state, a.id, a.id).ok).toBe(false); // self
+    expect(addTradeRoute(state, a.id, b.id).ok).toBe(true);
+    expect(addTradeRoute(state, a.id, b.id).ok).toBe(false); // duplicate + capacity
+
+    // base domestic yields: +1 food +1 production
+    expect(routeYields(state, b)).toMatchObject({ food: 1, production: 1 });
+    const stats = computeCityStats(state, a);
+    expect(stats.breakdown.trade.food).toBe(1);
+    expect(stats.breakdown.trade.production).toBe(1);
+
+    // destination development raises it: 2 specialty districts -> +1/+1
+    b.population = 7; // allow the district count
+    expect(queueDistrict(state, b.id, 'CAMPUS', tileAtCoords(state.map, 15, 9).index).ok).toBe(true);
+    expect(queueDistrict(state, b.id, 'HOLY_SITE', tileAtCoords(state.map, 13, 9).index).ok).toBe(true);
+    expect(routeYields(state, b)).toMatchObject({ food: 2, production: 2 });
+  });
+
+  it('enforces range', () => {
+    const state = makeState(makeMap(40, 12));
+    state.sandbox = true;
+    const a = foundCity(state, tileAtCoords(state.map, 2, 6).index).city!;
+    const b = foundCity(state, tileAtCoords(state.map, 36, 6).index).city!;
+    grantCivics(state, 'FOREIGN_TRADE');
+    expect(canAddTradeRoute(state, a.id, b.id).ok).toBe(false);
+  });
+});
