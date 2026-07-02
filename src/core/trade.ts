@@ -42,13 +42,27 @@ export function routeYields(state: GameState, dest: City): Yields {
   return out;
 }
 
-/** All trade income for a city (sum of its outgoing routes). */
+/** A route is suspended while barbarians prowl near either endpoint. */
+export function routeRaided(state: GameState, from: City, to: City): boolean {
+  if (!state.unitsMode) return false;
+  for (const u of state.units) {
+    if (u.owner !== 'barbarian') continue;
+    const t = state.map.tiles[u.tileIndex];
+    for (const city of [from, to]) {
+      const c = state.map.tiles[city.centerIndex];
+      if (hexDistance(t.col, t.row, c.col, c.row) <= 3) return true;
+    }
+  }
+  return false;
+}
+
+/** All trade income for a city (sum of its outgoing, unraided routes). */
 export function cityTradeYields(state: GameState, city: City): Yields {
   const out = emptyYields();
   for (const route of state.tradeRoutes) {
     if (route.from !== city.id) continue;
     const dest = state.cities.find((c) => c.id === route.to);
-    if (dest) addYields(out, routeYields(state, dest));
+    if (dest && !routeRaided(state, city, dest)) addYields(out, routeYields(state, dest));
   }
   return out;
 }

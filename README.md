@@ -14,9 +14,10 @@ real-map import mod; stage 5 world wonders, great people and specialists;
 stage 6 the fidelity pass (eurekas, cost scaling, appeal, maintenance);
 stage 7 the build-order search; stage 8 religion and trade routes; stage 9
 settlers and the empire-wide planner; stage 10 live-sync with a running game;
-stage 11a the unit framework (builders) behind a units-mode toggle — the first
-step toward a stochastic environment for reinforcement learning (barbarians,
-fog of war and disasters are next).
+stages 11a–11b the units-mode environment — builders, a military roster,
+combat, and randomized barbarians (camps, raiders, pillaging, city sieges) —
+the stochastic foundation for reinforcement learning (fog of war and
+disasters are next).
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -162,9 +163,16 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
   +1), the river-crossing rule (crossing ends the move), A* pathfinding with
   multi-turn move orders, one-civilian-per-tile stacking, production-trained
   units with gold upkeep — and **Builders** (3 charges) that improvements and
-  chops now require. All in-game randomness flows through a seeded RNG stored
-  in the game state, so stochastic mechanics stay replay- and clone-safe for
-  the planners (and future RL training).
+  chops now require (repairs are free). A military roster (Scout, Warrior,
+  Slinger, Archer, Spearman, Horseman) fights with the Civ 6 damage curve
+  (30·e^(0.04·Δ)·rand) and +3 terrain defense; ranged units strike without
+  retaliation. **Barbarians** spawn camps in the wilds (clearing one pays 50
+  gold), garrison them, and send raiders that pillage improvements (suspending
+  their yields until repaired), suspend trade routes they prowl near, and
+  besiege cities — a city at 0 HP is sacked (population/gold loss, nearby
+  pillaging), not captured. All in-game randomness flows through a seeded RNG
+  stored in the game state, so every stochastic run is replayable from
+  (seed, action sequence) and clone-safe for planner rollouts and RL.
 
 ## Known simplifications (stage 1)
 

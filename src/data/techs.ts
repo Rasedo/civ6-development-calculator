@@ -58,6 +58,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('SAILING', 'Sailing', 'Ancient', 50, [], [
       { kind: 'unlockImprovement', improvement: 'FISHING_BOATS' },
     ]),
+    T('ARCHERY', 'Archery', 'Ancient', 50, ['ANIMAL_HUSBANDRY']),
     T('ASTROLOGY', 'Astrology', 'Ancient', 50, [], [
       { kind: 'unlockDistrict', district: 'HOLY_SITE' },
       { kind: 'unlockBuilding', building: 'SHRINE' },

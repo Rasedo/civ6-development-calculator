@@ -205,6 +205,7 @@ summary { cursor: pointer; color: var(--muted); }
 
 .site-row { cursor: default; }
 .boosted { color: var(--gold); font-weight: 700; }
+button.danger { border-color: #a04545; }
 
 textarea {
   width: 100%;

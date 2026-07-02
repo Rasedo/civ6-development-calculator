@@ -77,6 +77,7 @@ function blankTile(index: number, col: number, row: number): Tile {
     districtComplete: false,
     builtWonder: null,
     builtWonderComplete: false,
+    pillaged: false,
     cityId: -1,
   };
 }

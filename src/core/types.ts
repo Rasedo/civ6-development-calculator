@@ -84,6 +84,8 @@ export interface Tile {
   /** World wonder occupying this tile (may be under construction). */
   builtWonder: string | null;
   builtWonderComplete: boolean;
+  /** Pillaged improvement (yields nothing until a builder repairs it). */
+  pillaged: boolean;
   /** Owning city id, or -1. */
   cityId: number;
 }
@@ -191,14 +193,20 @@ export interface GameState {
   nextUnitId: number;
   /** Seeded RNG state for all in-game randomness (serialized => replayable). */
   rngState: number;
+  /** Barbarian camp tile indexes (units mode only). */
+  barbCamps: number[];
+  /** City HP keyed by city id (string for JSON); missing = full (200). */
+  cityHp: Record<string, number>;
 }
 
 export interface Unit {
   id: number;
   /** Unit type id from data/units. */
   type: string;
+  owner: 'player' | 'barbarian';
   tileIndex: number;
   movesLeft: number;
+  hp: number;
   /** Builder charges; null for non-builders. */
   charges: number | null;
   /** Remaining multi-turn movement path (tile indexes), or null. */

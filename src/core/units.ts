@@ -9,7 +9,7 @@ import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from 
 import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
-import { UNITS, type UnitDef } from '../data/units';
+import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -63,12 +63,30 @@ export function unitAt(state: GameState, tileIndex: number): Unit | undefined {
   return state.units.find((u) => u.tileIndex === tileIndex);
 }
 
-/** Stacking: one civilian per tile (military stacking arrives in 11b). */
-export function tileFreeForUnit(state: GameState, tileIndex: number, ignoreUnitId?: number): boolean {
+export function unitsAt(state: GameState, tileIndex: number): Unit[] {
+  return state.units.filter((u) => u.tileIndex === tileIndex);
+}
+
+export function unitDomain(type: string): 'civilian' | 'military' {
+  return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
+}
+
+/** Stacking: 1 military + 1 civilian per side; enemies block entirely. */
+export function tileFreeForUnit(
+  state: GameState,
+  tileIndex: number,
+  unit?: Unit | { type: string; owner: Unit['owner']; id?: number },
+): boolean {
   const tile = state.map.tiles[tileIndex];
   if (!unitPassable(tile)) return false;
-  const u = unitAt(state, tileIndex);
-  return !u || u.id === ignoreUnitId;
+  const owner = unit?.owner ?? 'player';
+  const domain = unit ? unitDomain(unit.type) : 'civilian';
+  for (const u of unitsAt(state, tileIndex)) {
+    if (u.id === unit?.id) continue;
+    if (u.owner !== owner) return false; // enemy occupied
+    if (unitDomain(u.type) === domain) return false; // same-slot ally
+  }
+  return true;
 }
 
 /**
@@ -129,8 +147,9 @@ export function walkPath(state: GameState, unit: Unit): void {
     const nextIndex = unit.path[0];
     const from = state.map.tiles[unit.tileIndex];
     const to = state.map.tiles[nextIndex];
-    // The destination tile must be free when it's the final step.
-    if (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit.id)) {
+    // Enemy-occupied tiles block; the final step also needs a free slot.
+    const blockedByEnemy = unitsAt(state, nextIndex).some((u) => u.owner !== unit.owner);
+    if (blockedByEnemy || (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit))) {
       unit.path = null;
       return;
     }
@@ -138,6 +157,15 @@ export function walkPath(state: GameState, unit: Unit): void {
     unit.tileIndex = nextIndex;
     unit.path.shift();
     unit.movesLeft = river ? 0 : Math.max(0, unit.movesLeft - moveCostInto(to));
+
+    // Player units clear barbarian camps by entering them (+50 gold).
+    if (unit.owner === 'player') {
+      const camp = state.barbCamps.indexOf(nextIndex);
+      if (camp >= 0) {
+        state.barbCamps.splice(camp, 1);
+        state.treasury += 50;
+      }
+    }
   }
   if (unit.path && unit.path.length === 0) unit.path = null;
 }
@@ -147,7 +175,7 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) return no('No such unit.');
   if (targetIndex === unit.tileIndex) return no('Already there.');
-  if (!tileFreeForUnit(state, targetIndex, unit.id)) return no('Destination blocked or impassable.');
+  if (!tileFreeForUnit(state, targetIndex, unit)) return no('Destination blocked or impassable.');
   const path = findPath(state, unit, targetIndex);
   if (!path) return no('No path to that tile.');
   unit.path = path;
@@ -181,20 +209,28 @@ export function queueUnit(state: GameState, cityId: number, unitType: string): R
   return ok;
 }
 
-/** Place a new unit on/near a tile (first free spot by distance). */
-export function spawnUnit(state: GameState, unitType: string, nearIndex: number): Unit | null {
+/** Place a new unit on/near a tile (first free slot by distance). */
+export function spawnUnit(
+  state: GameState,
+  unitType: string,
+  nearIndex: number,
+  owner: Unit['owner'] = 'player',
+): Unit | null {
   const def = UNITS[unitType];
   if (!def) return null;
   const near = state.map.tiles[nearIndex];
+  const probe = { type: unitType, owner };
   const spot = [near, ...neighbors(state.map, near)]
     .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
-    .find((t) => tileFreeForUnit(state, t.index));
+    .find((t) => tileFreeForUnit(state, t.index, probe));
   if (!spot) return null;
   const unit: Unit = {
     id: state.nextUnitId++,
     type: unitType,
+    owner,
     tileIndex: spot.index,
     movesLeft: def.moves,
+    hp: UNIT_HP,
     charges: def.charges ?? null,
     path: null,
   };
@@ -206,14 +242,20 @@ export function disbandUnit(state: GameState, unitId: number): void {
   state.units = state.units.filter((u) => u.id !== unitId);
 }
 
-/** Empire-level gold upkeep of all units. */
+/** Empire-level gold upkeep of the player's units. */
 export function unitMaintenance(state: GameState): number {
-  return state.units.reduce((s, u) => s + (UNITS[u.type]?.maintenance ?? 0), 0);
+  return state.units.reduce(
+    (s, u) => s + (u.owner === 'player' ? UNITS[u.type]?.maintenance ?? 0 : 0),
+    0,
+  );
 }
 
-/** Start-of-turn refresh: MP back to full, multi-turn moves continue. */
+/** Start-of-turn refresh: heal, MP back to full, multi-turn moves continue. */
 export function refreshUnits(state: GameState): void {
   for (const unit of state.units) {
+    const tile = state.map.tiles[unit.tileIndex];
+    const friendly = unit.owner === 'player' ? tile.cityId !== -1 : true;
+    unit.hp = Math.min(UNIT_HP, unit.hp + (friendly ? 10 : 5));
     unit.movesLeft = UNITS[unit.type]?.moves ?? 2;
     if (unit.path) walkPath(state, unit);
   }
@@ -247,6 +289,17 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
   }
   tile.improvement = imp;
   spendCharge(state, unit!);
+  return ok;
+}
+
+/** Repair a pillaged improvement (no charge, ends the builder's turn). */
+export function builderRepair(state: GameState, unitId: number): RuleResult {
+  const { unit, err } = builderOn(state, unitId);
+  if (err) return err;
+  const tile = state.map.tiles[unit!.tileIndex];
+  if (!tile.pillaged) return no('Nothing pillaged here.');
+  tile.pillaged = false;
+  unit!.movesLeft = 0;
   return ok;
 }
 

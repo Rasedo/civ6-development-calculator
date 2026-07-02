@@ -12,6 +12,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { detectBoosts } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance } from './units';
+import { barbarianPhase } from './combat';
 import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -72,6 +73,8 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     units: [],
     nextUnitId: 0,
     rngState: (map.seed ^ 0x9e3779b9) >>> 0,
+    barbCamps: [],
+    cityHp: {},
   };
 }
 
@@ -513,7 +516,10 @@ export function endTurn(state: GameState): void {
     turnCulture += stats.total.culture;
   }
 
-  if (state.unitsMode) state.treasury -= unitMaintenance(state);
+  if (state.unitsMode) {
+    state.treasury -= unitMaintenance(state);
+    barbarianPhase(state);
+  }
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);
@@ -626,6 +632,15 @@ export function deserialize(json: string): GameState {
   state.units ??= [];
   state.nextUnitId ??= 0;
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
+  state.barbCamps ??= [];
+  state.cityHp ??= {};
+  for (const u of state.units) {
+    u.owner ??= 'player';
+    u.hp ??= 100;
+  }
+  for (const t of state.map.tiles) {
+    (t as Tile).pillaged ??= false;
+  }
   for (const c of state.cities) {
     c.cultureBox ??= 0;
     c.tilesAcquired ??= 0;

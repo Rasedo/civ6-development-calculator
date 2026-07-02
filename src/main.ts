@@ -71,7 +71,9 @@ import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
 import { choosePantheon, foundReligion, queueSettler } from './core/game';
 import { addTradeRoute, removeTradeRoute } from './core/trade';
-import { queueUnit, orderMove, builderImprove, builderRemoveFeature, disbandUnit } from './core/units';
+import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderRepair, disbandUnit } from './core/units';
+import { meleeAttack, rangedAttack } from './core/combat';
+import { UNITS as UNIT_DEFS } from './data/units';
 import { searchEmpirePlan, adoptEmpirePlan } from './core/empirePlanner';
 import { MAP_SIZES, type MapSizeId } from './data/constants';
 
@@ -424,6 +426,20 @@ const callbacks: PanelCallbacks = {
   },
   onBuilderChop(unitId) {
     const r = builderRemoveFeature(state, unitId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onBuilderRepair(unitId) {
+    const r = builderRepair(state, unitId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onAttack(unitId, targetTileIndex) {
+    const unit = state.units.find((u) => u.id === unitId);
+    const def = unit ? UNIT_DEFS[unit.type] : undefined;
+    const r = def?.ranged
+      ? rangedAttack(state, unitId, targetTileIndex)
+      : meleeAttack(state, unitId, targetTileIndex);
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },

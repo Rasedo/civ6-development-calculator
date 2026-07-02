@@ -50,6 +50,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
         districtComplete: false,
         builtWonder: null,
         builtWonderComplete: false,
+        pillaged: false,
         cityId: -1,
       });
     }

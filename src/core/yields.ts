@@ -46,7 +46,7 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   }
   if (tile.resource) addYields(out, RESOURCES[tile.resource].yields);
 
-  if (tile.improvement) {
+  if (tile.improvement && !tile.pillaged) {
     const imp = tile.improvement as ImprovementId;
     addYields(out, IMPROVEMENTS[imp].yields);
     const boost = ctx.mods.improvementYields[imp];

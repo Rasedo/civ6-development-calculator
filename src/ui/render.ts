@@ -284,29 +284,40 @@ export class MapRenderer {
       }
     }
 
-    // --- pass 6b: units -----------------------------------------------------------
-    if (state.unitsMode && state.units.length > 0) {
-      const byTile = new Map<number, string>();
-      for (const u of state.units) {
-        byTile.set(u.tileIndex, UNITS[u.type]?.code ?? '?');
-      }
+    // --- pass 6b: units, camps, pillage marks -----------------------------------
+    if (state.unitsMode) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `bold ${HEX_SIZE * 0.3}px system-ui, sans-serif`;
+      const camps = new Set(state.barbCamps);
+      const byTile = new Map<number, { code: string; barb: boolean }>();
+      for (const u of state.units) {
+        byTile.set(u.tileIndex, { code: UNITS[u.type]?.code ?? '?', barb: u.owner === 'barbarian' });
+      }
       for (const { tile, cx, cy } of visible) {
-        const code = byTile.get(tile.index);
-        if (!code) continue;
+        if (camps.has(tile.index)) {
+          ctx.font = `bold ${HEX_SIZE * 0.5}px system-ui, sans-serif`;
+          ctx.fillStyle = '#e05555';
+          ctx.fillText('⛺', cx, cy + 0.5);
+        }
+        if (tile.pillaged) {
+          ctx.font = `bold ${HEX_SIZE * 0.42}px system-ui, sans-serif`;
+          ctx.fillStyle = '#ff6a3d';
+          ctx.fillText('✕', cx + HEX_SIZE * 0.4, cy + HEX_SIZE * 0.42);
+        }
+        const badge = byTile.get(tile.index);
+        if (!badge) continue;
         const x = cx - HEX_SIZE * 0.42;
         const y = cy - HEX_SIZE * 0.42;
         ctx.beginPath();
         ctx.arc(x, y, HEX_SIZE * 0.24, 0, Math.PI * 2);
-        ctx.fillStyle = '#6fa8dc';
+        ctx.fillStyle = badge.barb ? '#c04040' : '#6fa8dc';
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.2;
         ctx.stroke();
-        ctx.fillStyle = '#14202c';
-        ctx.fillText(code, x, y + 0.5);
+        ctx.fillStyle = badge.barb ? '#2c0e0e' : '#14202c';
+        ctx.font = `bold ${HEX_SIZE * 0.3}px system-ui, sans-serif`;
+        ctx.fillText(badge.code, x, y + 0.5);
       }
     }
 

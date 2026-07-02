@@ -11,8 +11,9 @@ import { validImprovements, canRemoveFeature, availableBuildings, districtPlacem
 import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost, canChoosePantheon, canFoundReligion } from '../core/game';
 import { tradeCapacity, routeYields, TRADE_ROUTE_RANGE } from '../core/trade';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
-import { UNITS as UNIT_DEFS } from '../data/units';
+import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
 import { trainableUnits } from '../core/units';
+import { attackTargets, getCityHp } from '../core/combat';
 import { tileAppeal, appealTier } from '../core/appeal';
 import { isBoosted } from '../core/boosts';
 import { BOOSTS } from '../data/boosts';
@@ -76,6 +77,8 @@ export interface PanelCallbacks {
   onOrderMove(unitId: number): void;
   onBuilderImprove(unitId: number, imp: string): void;
   onBuilderChop(unitId: number): void;
+  onBuilderRepair(unitId: number): void;
+  onAttack(unitId: number, targetTileIndex: number): void;
   onDisbandUnit(unitId: number): void;
   onSetEmpireObjective(objective: Objective): void;
   onSetEmpireHorizon(turns: number): void;
@@ -189,21 +192,41 @@ export function renderTilePanel(
   for (const u of unitsHere) {
     const def = UNIT_DEFS[u.type];
     const isBuilder = def?.charges !== undefined;
+    const mine = u.owner === 'player';
+    if (!mine) {
+      unitsHtml += `<div class="district-row"><b class="bad">Barbarian ${def?.name ?? u.type}</b>
+        <span class="muted">${u.hp}/100 HP</span></div>`;
+      continue;
+    }
     const buildable = isBuilder && (u.charges ?? 0) > 0 ? validImprovements(state, tile) : [];
+    const targets = attackTargets(state, u);
     unitsHtml += `<div class="district-row">
-      <b>${def?.name ?? u.type}</b> <span class="muted">${u.movesLeft} MP${u.charges !== null ? ` · ${u.charges} charge(s)` : ''}</span>
+      <b>${def?.name ?? u.type}</b> <span class="muted">${u.hp}/100 HP · ${u.movesLeft} MP${u.charges !== null ? ` · ${u.charges} charge(s)` : ''}</span>
       <div class="btnrow">
         <button data-act="unit-move" data-id="${u.id}">Move…</button>
+        ${targets
+          .map((t) => {
+            const tt = state.map.tiles[t];
+            return `<button data-act="unit-attack" data-id="${u.id}" data-t="${t}" class="danger">${def?.ranged ? 'Shoot' : 'Attack'} (${tt.col},${tt.row})</button>`;
+          })
+          .join('')}
         ${buildable
           .map(
             (id) =>
               `<button data-act="unit-imp" data-id="${u.id}" data-imp="${id}">${IMPROVEMENTS[id].name}</button>`,
           )
           .join('')}
+        ${isBuilder && tile.pillaged ? `<button data-act="unit-repair" data-id="${u.id}">Repair</button>` : ''}
         ${isBuilder && tile.feature && canRemoveFeature(state, tile).ok ? `<button data-act="unit-chop" data-id="${u.id}">Remove ${FEATURES[tile.feature].name}</button>` : ''}
         <button data-act="unit-disband" data-id="${u.id}">Disband</button>
       </div>
     </div>`;
+  }
+  if (state.unitsMode && state.barbCamps.includes(tileIndex)) {
+    unitsHtml += '<div class="row bad">Barbarian camp — clear it with a military unit (+50 gold).</div>';
+  }
+  if (tile.pillaged) {
+    unitsHtml += '<div class="row bad">Pillaged — yields suspended until a Builder repairs it.</div>';
   }
 
   let improvementHtml = '';
@@ -272,6 +295,15 @@ export function renderTilePanel(
   );
   container.querySelectorAll('[data-act="unit-chop"]').forEach((b) =>
     b.addEventListener('click', () => cb.onBuilderChop(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="unit-repair"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onBuilderRepair(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="unit-attack"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const el = b as HTMLElement;
+      cb.onAttack(Number(el.dataset.id), Number(el.dataset.t));
+    }),
   );
   container.querySelectorAll('[data-act="unit-disband"]').forEach((b) =>
     b.addEventListener('click', () => cb.onDisbandUnit(Number((b as HTMLElement).dataset.id))),
@@ -405,6 +437,7 @@ export function renderCityPanel(
   container.innerHTML = `
     <h2>${city.isCapital ? '★ ' : ''}${city.name}</h2>
     <div class="row">Population <b>${city.population}</b> · ${growthLine}</div>
+    ${state.unitsMode && getCityHp(state, city.id) < CITY_MAX_HP ? `<div class="row bad">City HP ${getCityHp(state, city.id)}/${CITY_MAX_HP} — under attack!</div>` : ''}
     <div class="row statgrid">
       <span>Food box</span><span>${fmt(city.foodBox)} / ${stats.growthNeeded} (+${fmt(stats.effectiveFoodSurplus)})</span>
       <span>Housing</span><span class="${stats.housing - city.population < 1 ? 'bad' : ''}">${city.population} / ${fmt(stats.housing)}</span>

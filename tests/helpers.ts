@@ -23,6 +23,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         districtComplete: false,
         builtWonder: null,
         builtWonderComplete: false,
+        pillaged: false,
         cityId: -1,
       });
     }
@@ -52,6 +53,8 @@ export function makeState(map: GameMap = makeMap()): GameState {
     units: [],
     nextUnitId: 0,
     rngState: 42,
+    barbCamps: [],
+    cityHp: {},
   };
 }
 
