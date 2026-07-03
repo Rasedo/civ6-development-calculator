@@ -98,6 +98,8 @@ export interface Tile {
   cityId: number;
   /** Owning city-state id (territory blocks settling/borders); absent = none. */
   csId?: number;
+  /** Owning rival-civ id; absent = none. */
+  rivalId?: number;
 }
 
 export interface GameMap {
@@ -230,13 +232,21 @@ export interface GameState {
   influencePoints: number;
   /** Earned envoys waiting to be assigned to a met city-state. */
   envoysAvailable: number;
+  /** Scripted rival civilizations ([] = none / feature off). */
+  rivals: RivalCiv[];
+  /** Pantheon beliefs claimed by rivals (unavailable to the player). */
+  claimedPantheons: string[];
+  /** Follower/founder beliefs claimed by rival religions. */
+  claimedBeliefs: string[];
 }
 
 export interface Unit {
   id: number;
   /** Unit type id from data/units. */
   type: string;
-  owner: 'player' | 'barbarian';
+  owner: 'player' | 'barbarian' | 'rival';
+  /** Owning rival civ id (rival units only). */
+  civId?: number;
   tileIndex: number;
   movesLeft: number;
   hp: number;
@@ -246,6 +256,43 @@ export interface Unit {
   path: number[] | null;
   /** Standing order ('explore' keeps picking new frontier targets). */
   mission?: 'explore' | null;
+}
+
+export interface RivalCity {
+  id: number;
+  name: string;
+  centerIndex: number;
+  population: number;
+  /** Abstract food box driving scheduled growth. */
+  growthBox: number;
+  /** Tiles claimed beyond ring 1 (border pacing). */
+  tilesAcquired: number;
+  hp: number;
+  foundedTurn: number;
+}
+
+/** A scripted rival empire: real map presence, abstract economy. */
+export interface RivalCiv {
+  id: number;
+  name: string;
+  color: string;
+  /** 0..1 — settling pace and war likelihood. */
+  aggression: number;
+  cities: RivalCity[];
+  nextCityId: number;
+  atWar: boolean;
+  warTurns: number;
+  peaceTurns: number;
+  /** Abstract research progress (unit quality, city defense). */
+  techLevel: number;
+  /** Production banked toward the next settler. */
+  productionStock: number;
+  /** Production banked toward the next military unit. */
+  militaryStock: number;
+  /** Great-person race points per class. */
+  gpp: Partial<Record<GreatPersonClass, number>>;
+  pantheonClaimed: boolean;
+  religionFounded: boolean;
 }
 
 export interface ReligionState {

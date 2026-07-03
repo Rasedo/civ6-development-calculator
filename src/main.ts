@@ -49,6 +49,7 @@ import {
   renderReligionPanel,
   renderTradePanel,
   renderCityStatesPanel,
+  renderRivalsPanel,
   renderEmpirePlanPanel,
   tileSummary,
   type PanelCallbacks,
@@ -73,6 +74,7 @@ import { searchBuildOrder, adoptPlan } from './core/planner';
 import { choosePantheon, foundReligion, queueSettler, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject } from './core/game';
 import { addTradeRoute, addCsTradeRoute, removeTradeRoute } from './core/trade';
 import { assignEnvoy } from './core/cityStates';
+import { declareWar, sueForPeace } from './core/rivals';
 import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderHarvest, builderRepair, disbandUnit, setExploreMission } from './core/units';
 import { initFog } from './core/fog';
 import { meleeAttack, rangedAttack } from './core/combat';
@@ -93,6 +95,7 @@ const sandboxToggle = $<HTMLInputElement>('sandbox-toggle');
 const unitsToggle = $<HTMLInputElement>('units-toggle');
 const fogToggle = $<HTMLInputElement>('fog-toggle');
 const disastersToggle = $<HTMLInputElement>('disasters-toggle');
+const rivalsToggle = $<HTMLInputElement>('rivals-toggle');
 const contextPanel = $<HTMLElement>('context-panel');
 const empireSummary = $<HTMLElement>('empire-summary');
 const turnLabel = $<HTMLElement>('turn-label');
@@ -123,6 +126,7 @@ type RightView =
   | 'religion'
   | 'trade'
   | 'cityStates'
+  | 'rivals'
   | 'empirePlan';
 
 interface UiState {
@@ -213,6 +217,7 @@ function newGameFromControls(): GameState {
     sandbox: sandboxToggle.checked,
     unitsMode: unitsToggle.checked,
     cityStates: true,
+    rivals: rivalsToggle.checked,
   });
 }
 
@@ -253,6 +258,7 @@ function setRightView(view: RightView): void {
     ['view-religion', 'religion'],
     ['view-trade', 'trade'],
     ['view-city-states', 'cityStates'],
+    ['view-rivals', 'rivals'],
     ['view-empire-plan', 'empirePlan'],
     ['settle-advisor', 'settle'],
   ] as const) {
@@ -571,6 +577,16 @@ const callbacks: PanelCallbacks = {
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },
+  onDeclareWar(rivalId) {
+    const r = declareWar(state, rivalId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onSueForPeace(rivalId) {
+    const r = sueForPeace(state, rivalId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
   onRemoveTradeRoute(index) {
     removeTradeRoute(state, index);
     refresh();
@@ -684,6 +700,8 @@ function refresh(): void {
     renderTradePanel(contextPanel, state, callbacks);
   } else if (ui.rightView === 'cityStates') {
     renderCityStatesPanel(contextPanel, state, callbacks);
+  } else if (ui.rightView === 'rivals') {
+    renderRivalsPanel(contextPanel, state, callbacks);
   } else if (ui.rightView === 'empirePlan') {
     renderEmpirePlanPanel(contextPanel, state, ui.empirePlan, callbacks);
   }
@@ -975,6 +993,7 @@ for (const [btn, view] of [
   ['view-religion', 'religion'],
   ['view-trade', 'trade'],
   ['view-city-states', 'cityStates'],
+  ['view-rivals', 'rivals'],
   ['view-empire-plan', 'empirePlan'],
 ] as const) {
   $<HTMLButtonElement>(btn).addEventListener('click', () => {

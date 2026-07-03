@@ -16,6 +16,7 @@ import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
+import { placeRivals, rivalPhase } from './rivals';
 import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -50,11 +51,19 @@ export function districtCost(state: GameState): number {
 }
 
 export function createGame(
-  opts: MapGenOptions & { sandbox?: boolean; unitsMode?: boolean; cityStates?: boolean | number },
+  opts: MapGenOptions & {
+    sandbox?: boolean;
+    unitsMode?: boolean;
+    cityStates?: boolean | number;
+    rivals?: boolean | number;
+  },
 ): GameState {
   const state = createGameFromMap(generateMap(opts), opts.sandbox ?? false, opts.unitsMode ?? false);
   if (opts.cityStates) {
     placeCityStates(state, typeof opts.cityStates === 'number' ? opts.cityStates : undefined);
+  }
+  if (opts.rivals) {
+    placeRivals(state, typeof opts.rivals === 'number' ? opts.rivals : undefined);
   }
   return state;
 }
@@ -91,6 +100,9 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     cityStates: [],
     influencePoints: 0,
     envoysAvailable: 0,
+    rivals: [],
+    claimedPantheons: [],
+    claimedBeliefs: [],
   };
 }
 
@@ -158,7 +170,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   // Civ 6: a new city starts with its center plus the first ring only;
   // everything beyond comes from culture growth or tile purchase.
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) t.cityId = id;
+    if (t.cityId === -1 && (t.csId ?? -1) === -1 && (t.rivalId ?? -1) === -1) t.cityId = id;
   }
   tile.cityId = id;
   revealAround(state, tileIndex, 3);
@@ -670,6 +682,7 @@ export function endTurn(state: GameState): void {
   }
   if (state.disasters) disasterPhase(state);
   cityStatePhase(state);
+  rivalPhase(state);
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);
@@ -791,6 +804,9 @@ export function deserialize(json: string): GameState {
   state.cityStates ??= [];
   state.influencePoints ??= 0;
   state.envoysAvailable ??= 0;
+  state.rivals ??= [];
+  state.claimedPantheons ??= [];
+  state.claimedBeliefs ??= [];
   for (const u of state.units) {
     u.owner ??= 'player';
     u.hp ??= 100;
@@ -829,6 +845,9 @@ export function choosePantheon(state: GameState, beliefId: string): RuleResult {
   const check = canChoosePantheon(state);
   if (!check.ok) return check;
   if (!PANTHEONS[beliefId]) return { ok: false, reason: 'No such pantheon belief.' };
+  if (state.claimedPantheons.includes(beliefId)) {
+    return { ok: false, reason: 'A rival civilization already follows that pantheon.' };
+  }
   if (!state.sandbox) state.faithTotal -= PANTHEON_FAITH_COST;
   state.religion.pantheon = beliefId;
   return { ok: true };
@@ -856,6 +875,9 @@ export function foundReligion(
   if (!FOLLOWER_BELIEFS[choice.follower]) return { ok: false, reason: 'No such follower belief.' };
   if (!FOUNDER_BELIEFS[choice.founder]) return { ok: false, reason: 'No such founder belief.' };
   if (!WORSHIP_BUILDINGS.includes(choice.worship)) return { ok: false, reason: 'No such worship building.' };
+  if (state.claimedBeliefs.includes(choice.follower) || state.claimedBeliefs.includes(choice.founder)) {
+    return { ok: false, reason: 'A rival religion already claimed that belief.' };
+  }
   state.religion.founded = true;
   state.religion.name = choice.name || RELIGION_NAMES[0];
   state.religion.follower = choice.follower;

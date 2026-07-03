@@ -66,6 +66,9 @@ export function makeState(map: GameMap = makeMap()): GameState {
     cityStates: [],
     influencePoints: 0,
     envoysAvailable: 0,
+    rivals: [],
+    claimedPantheons: [],
+    claimedBeliefs: [],
   };
 }
 

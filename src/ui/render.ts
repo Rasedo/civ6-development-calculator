@@ -217,6 +217,25 @@ export class MapRenderer {
       }
     }
 
+    // --- rival territory borders -----------------------------------------------
+    for (const { tile, cx, cy } of visible) {
+      const rivalId = tile.rivalId ?? -1;
+      if (rivalId === -1) continue;
+      const rival = state.rivals.find((r) => r.id === rivalId);
+      ctx.strokeStyle = rival?.color ?? '#888888';
+      ctx.lineWidth = 1.4;
+      for (let d = 0; d < 6; d++) {
+        const [nc, nr] = neighborOffset(tile.col, tile.row, d);
+        const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
+        if (n && (n.rivalId ?? -1) === rivalId) continue;
+        const [a, b] = EDGE_CORNERS[d];
+        ctx.beginPath();
+        ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
+        ctx.lineTo(cx + corners[b].x, cy + corners[b].y);
+        ctx.stroke();
+      }
+    }
+
     // --- pass 2: rivers --------------------------------------------------------
     ctx.strokeStyle = '#4f9fe8';
     ctx.lineWidth = HEX_SIZE * 0.16;
@@ -337,9 +356,18 @@ export class MapRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const camps = new Set(state.barbCamps);
-      const byTile = new Map<number, { code: string; barb: boolean }>();
+      const byTile = new Map<number, { code: string; fill: string; text: string }>();
       for (const u of state.units) {
-        byTile.set(u.tileIndex, { code: UNITS[u.type]?.code ?? '?', barb: u.owner === 'barbarian' });
+        let fill = '#6fa8dc';
+        let text = '#14202c';
+        if (u.owner === 'barbarian') {
+          fill = '#c04040';
+          text = '#2c0e0e';
+        } else if (u.owner === 'rival') {
+          fill = state.rivals.find((r) => r.id === u.civId)?.color ?? '#888888';
+          text = '#101318';
+        }
+        byTile.set(u.tileIndex, { code: UNITS[u.type]?.code ?? '?', fill, text });
       }
       for (const { tile, cx, cy } of visible) {
         if (camps.has(tile.index)) {
@@ -363,12 +391,12 @@ export class MapRenderer {
         const y = cy - HEX_SIZE * 0.42;
         ctx.beginPath();
         ctx.arc(x, y, HEX_SIZE * 0.24, 0, Math.PI * 2);
-        ctx.fillStyle = badge.barb ? '#c04040' : '#6fa8dc';
+        ctx.fillStyle = badge.fill;
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.2;
         ctx.stroke();
-        ctx.fillStyle = badge.barb ? '#2c0e0e' : '#14202c';
+        ctx.fillStyle = badge.text;
         ctx.font = `bold ${HEX_SIZE * 0.3}px system-ui, sans-serif`;
         ctx.fillText(badge.code, x, y + 0.5);
       }
@@ -393,6 +421,33 @@ export class MapRenderer {
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = '#ecdfb8';
+      ctx.fillText(label, cx, by + 0.5);
+    }
+
+    // --- rival city banners ------------------------------------------------------
+    for (const { tile, cx, cy } of visible) {
+      let owner: { color: string; atWar: boolean } | null = null;
+      let label = '';
+      for (const rival of state.rivals) {
+        const rc = rival.cities.find((c) => c.centerIndex === tile.index);
+        if (rc) {
+          owner = rival;
+          label = `${rival.atWar ? '⚔ ' : ''}${rc.name}  ${rc.population}`;
+          break;
+        }
+      }
+      if (!owner) continue;
+      ctx.font = `bold ${HEX_SIZE * 0.34}px system-ui, sans-serif`;
+      const w = ctx.measureText(label).width + HEX_SIZE * 0.5;
+      const h = HEX_SIZE * 0.58;
+      const by = cy - HEX_SIZE * 1.05;
+      ctx.fillStyle = 'rgba(16,19,24,0.92)';
+      ctx.strokeStyle = owner.color;
+      ctx.lineWidth = owner.atWar ? 2 : 1.2;
+      roundRect(ctx, cx - w / 2, by - h / 2, w, h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#dfe5ec';
       ctx.fillText(label, cx, by + 0.5);
     }
 

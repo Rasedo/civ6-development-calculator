@@ -40,6 +40,7 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
   if (tile.district) return no('Tile already occupied.');
   if ((tile.csId ?? -1) !== -1) return no('City-state territory.');
+  if ((tile.rivalId ?? -1) !== -1) return no('Rival territory.');
   for (const c of state.cities) {
     const center = state.map.tiles[c.centerIndex];
     if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {
@@ -50,6 +51,14 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
     const center = state.map.tiles[cs.centerIndex];
     if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {
       return no(`Too close to the city-state of ${cs.name}.`);
+    }
+  }
+  for (const rival of state.rivals ?? []) {
+    for (const rc of rival.cities) {
+      const center = state.map.tiles[rc.centerIndex];
+      if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {
+        return no(`Too close to ${rc.name} (${rival.name}).`);
+      }
     }
   }
   return ok;

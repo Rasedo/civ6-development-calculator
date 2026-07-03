@@ -108,6 +108,7 @@ export function scoreSettleSites(state: GameState, limit = 8): SettleSiteScore[]
     let resourceScore = 0;
     for (const t of tilesWithin(state.map, site.col, site.row, CITY_WORK_RADIUS)) {
       if (t.index === site.index || t.cityId !== -1) continue; // don't count claimed tiles
+      if ((t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1) continue; // foreign land
       const ring = hexDistance(site.col, site.row, t.col, t.row);
       yieldScore += weightedSum(tileYields(ctx, t)) * (RING_WEIGHT[ring] ?? 0);
       if (t.resource) {
@@ -117,12 +118,21 @@ export function scoreSettleSites(state: GameState, limit = 8): SettleSiteScore[]
         else resourceScore += 1;
       }
     }
+    // Settling in a rival's lap invites border friction and early wars.
+    let rivalPenalty = 0;
+    for (const rival of state.rivals) {
+      for (const rc of rival.cities) {
+        const rt = state.map.tiles[rc.centerIndex];
+        const d = hexDistance(site.col, site.row, rt.col, rt.row);
+        if (d < 8) rivalPenalty = Math.max(rivalPenalty, (8 - d) * 1.5);
+      }
+    }
     out.push({
       tileIndex: site.index,
       housing,
       yieldScore,
       resourceScore,
-      score: housing + yieldScore * 0.35 + resourceScore,
+      score: housing + yieldScore * 0.35 + resourceScore - rivalPenalty,
     });
   }
   return out.sort((a, b) => b.score - a.score || a.tileIndex - b.tileIndex).slice(0, limit);

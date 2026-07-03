@@ -4,7 +4,7 @@
  * training, maintenance, and builder actions. Military/combat land in 11b.
  */
 
-import type { GameState, Tile, Unit } from './types';
+import type { GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from './hex';
 import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
@@ -63,19 +63,40 @@ export function unitDomain(type: string): 'civilian' | 'military' {
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
-/** Stacking: 1 military + 1 civilian per side; enemies block entirely. */
+/** Side key: rival civs are distinct sides; everyone else is their owner. */
+export function unitSide(unit: { owner: Unit['owner']; civId?: number }): string {
+  return unit.owner === 'rival' ? `rival:${unit.civId ?? 0}` : unit.owner;
+}
+
+/**
+ * Are two units enemies right now? Barbarians fight everyone; rival civs
+ * fight the player only while at war; rival civs never fight each other.
+ */
+export function unitsHostile(
+  state: GameState,
+  a: { owner: Unit['owner']; civId?: number },
+  b: { owner: Unit['owner']; civId?: number },
+): boolean {
+  if (unitSide(a) === unitSide(b)) return false;
+  if (a.owner === 'barbarian' || b.owner === 'barbarian') return true;
+  if (a.owner === 'rival' && b.owner === 'rival') return false;
+  const civId = a.owner === 'rival' ? a.civId : b.civId;
+  return state.rivals.find((r) => r.id === civId)?.atWar ?? false;
+}
+
+/** Stacking: 1 military + 1 civilian per side; other sides block entirely. */
 export function tileFreeForUnit(
   state: GameState,
   tileIndex: number,
-  unit?: Unit | { type: string; owner: Unit['owner']; id?: number },
+  unit?: Unit | { type: string; owner: Unit['owner']; civId?: number; id?: number },
 ): boolean {
   const tile = state.map.tiles[tileIndex];
   if (!unitPassable(tile)) return false;
-  const owner = unit?.owner ?? 'player';
+  const side = unit ? unitSide(unit) : 'player';
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id) continue;
-    if (u.owner !== owner) return false; // enemy occupied
+    if (unitSide(u) !== side) return false; // foreign occupied
     if (unitDomain(u.type) === domain) return false; // same-slot ally
   }
   return true;
@@ -209,11 +230,12 @@ export function spawnUnit(
   unitType: string,
   nearIndex: number,
   owner: Unit['owner'] = 'player',
+  civId?: number,
 ): Unit | null {
   const def = UNITS[unitType];
   if (!def) return null;
   const near = state.map.tiles[nearIndex];
-  const probe = { type: unitType, owner };
+  const probe = { type: unitType, owner, civId };
   const spot = [near, ...neighbors(state.map, near)]
     .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
     .find((t) => tileFreeForUnit(state, t.index, probe));
@@ -228,9 +250,22 @@ export function spawnUnit(
     charges: def.charges ?? null,
     path: null,
   };
+  if (civId !== undefined) unit.civId = civId;
   state.units.push(unit);
   if (owner === 'player') revealAround(state, unit.tileIndex);
   return unit;
+}
+
+/** Rival city occupying a tile, with its owner, if any. */
+export function rivalCityAt(
+  state: GameState,
+  tileIndex: number,
+): { rival: RivalCiv; city: RivalCity } | undefined {
+  for (const rival of state.rivals) {
+    const city = rival.cities.find((c) => c.centerIndex === tileIndex);
+    if (city) return { rival, city };
+  }
+  return undefined;
 }
 
 export function disbandUnit(state: GameState, unitId: number): void {

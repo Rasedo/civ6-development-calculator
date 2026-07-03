@@ -14,6 +14,8 @@ import { buildingCompletable } from '../core/rules';
 import { tradeCapacity, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from '../core/trade';
 import { isSuzerain, envoyBonusDelta, questLabel } from '../core/cityStates';
 import { CS_TYPE_COLORS, ENVOY_COST, INFLUENCE_PER_TURN, GOV_INFLUENCE_TIER } from '../data/cityStates';
+import { playerStrength, rivalStrength, rivalProximity } from '../core/rivals';
+import { PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST } from '../data/rivals';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
 import { trainableUnits } from '../core/units';
@@ -97,6 +99,8 @@ export interface PanelCallbacks {
   onAdoptEmpirePlan(index: number): void;
   onAssignEnvoy(csId: number): void;
   onAddCsTradeRoute(from: number, csId: number): void;
+  onDeclareWar(rivalId: number): void;
+  onSueForPeace(rivalId: number): void;
 }
 
 /** Mutable state for the empire planner view (owned by main.ts). */
@@ -831,6 +835,58 @@ export function renderCityStatesPanel(container: HTMLElement, state: GameState, 
 
   container.querySelectorAll('[data-act="envoy"]').forEach((b) =>
     b.addEventListener('click', () => cb.onAssignEnvoy(Number((b as HTMLElement).dataset.id))),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rival civilizations
+// ---------------------------------------------------------------------------
+
+export function renderRivalsPanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
+  const yourStrength = playerStrength(state);
+  const rows = state.rivals
+    .map((r) => {
+      if (r.cities.length === 0) {
+        return `<div class="build-row"><span><b style="color:${r.color}">■</b> ${r.name}
+          <span class="muted">eliminated</span></span></div>`;
+      }
+      const strength = rivalStrength(state, r);
+      const pop = r.cities.reduce((s, c) => s + c.population, 0);
+      const prox = rivalProximity(state, r);
+      const rel = r.atWar
+        ? `<span class="bad">AT WAR (${r.warTurns}t)</span>`
+        : '<span class="muted">peace</span>';
+      const peaceCost = PEACE_GOLD_COST(r.warTurns);
+      return `<div class="build-row"><span>
+          <b style="color:${r.color}">■</b> ${r.name} — ${rel}<br>
+          <small class="muted">${r.cities.length} cities · pop ${pop} · strength ~${strength} (you ~${yourStrength})
+          ${isFinite(prox) ? ` · border gap ${prox}` : ''}</small><br>
+          <small class="muted">${r.cities.map((c) => c.name).join(', ')}</small>
+        </span>
+        <span>${
+          r.atWar
+            ? `<button data-act="peace" data-id="${r.id}" ${r.warTurns >= PEACE_MIN_WAR_TURNS ? '' : 'disabled'}>Peace (${peaceCost}g)</button>`
+            : `<button data-act="war" data-id="${r.id}" class="danger">Declare war</button>`
+        }</span>
+      </div>`;
+    })
+    .join('');
+
+  container.innerHTML = `
+    <h2>Rival civilizations</h2>
+    <div class="hint muted">Rivals settle, grow and expand on a script. They race you for great people,
+      pantheons and beliefs. At war their units raid like barbarians and their cities can be
+      conquered (melee a city center at 0 HP to capture it).</div>
+    ${rows || '<div class="muted">No rival civilizations on this map.</div>'}
+    ${state.claimedPantheons.length ? `<div class="muted">Pantheons taken: ${state.claimedPantheons.length}</div>` : ''}
+    ${state.claimedBeliefs.length ? `<div class="muted">Beliefs taken: ${state.claimedBeliefs.length}</div>` : ''}
+  `;
+
+  container.querySelectorAll('[data-act="war"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onDeclareWar(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="peace"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onSueForPeace(Number((b as HTMLElement).dataset.id))),
   );
 }
 

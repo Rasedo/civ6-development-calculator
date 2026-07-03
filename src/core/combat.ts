@@ -7,8 +7,8 @@
  * captured. All randomness flows through the in-state RNG.
  */
 
-import type { City, GameState, Tile, Unit } from './types';
-import { neighbors, hexDistance } from './hex';
+import type { City, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../data/units';
 import {
@@ -19,7 +19,11 @@ import {
   tileFreeForUnit,
   spawnUnit,
   disbandUnit,
+  unitsHostile,
+  rivalCityAt,
 } from './units';
+import { revealAround } from './fog';
+import { CITY_WORK_RADIUS } from '../data/constants';
 import type { RuleResult } from './rules';
 
 const ok: RuleResult = { ok: true };
@@ -94,16 +98,26 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     return no('Target must be adjacent.');
   }
 
-  const enemies = unitsAt(state, targetIndex).filter((u) => u.owner !== attacker.owner);
+  const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
+  const hostileToPlayer = attacker.owner !== 'player' && unitsHostile(state, attacker, { owner: 'player' });
   const enemyCity =
-    target.district === 'CITY_CENTER'
-      ? state.cities.find((c) => c.centerIndex === targetIndex && attacker.owner === 'barbarian')
+    target.district === 'CITY_CENTER' && hostileToPlayer
+      ? state.cities.find((c) => c.centerIndex === targetIndex)
       : undefined;
+  const rivalTarget = attacker.owner === 'player' ? rivalCityAt(state, targetIndex) : undefined;
 
-  if (enemies.length === 0 && !enemyCity) return no('Nothing to attack there.');
+  if (enemies.length === 0 && !enemyCity && !rivalTarget) return no('Nothing to attack there.');
 
   if (enemyCity) {
     attackCity(state, attacker, enemyCity);
+    return ok;
+  }
+
+  if (enemies.length === 0 && rivalTarget) {
+    if (!rivalTarget.rival.atWar) {
+      return no(`You are at peace with ${rivalTarget.rival.name} — declare war first.`);
+    }
+    attackRivalCity(state, attacker, rivalTarget.rival, rivalTarget.city);
     return ok;
   }
 
@@ -153,7 +167,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   if (hexDistance(from.col, from.row, target.col, target.row) > def.ranged.range) {
     return no('Out of range.');
   }
-  const enemies = unitsAt(state, targetIndex).filter((u) => u.owner !== attacker.owner);
+  const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target);
@@ -169,18 +183,77 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   if (!def || def.combat <= 0 || unit.movesLeft <= 0) return [];
   const from = state.map.tiles[unit.tileIndex];
   const range = def.ranged?.range ?? 1;
+  const hostileToPlayer = unit.owner !== 'player' && unitsHostile(state, unit, { owner: 'player' });
   const out: number[] = [];
   for (const t of state.map.tiles) {
     const d = hexDistance(from.col, from.row, t.col, t.row);
     if (d < 1 || d > range) continue;
-    const hasEnemy = unitsAt(state, t.index).some((u) => u.owner !== unit.owner);
-    const enemyCity =
-      unit.owner === 'barbarian' &&
-      t.district === 'CITY_CENTER' &&
-      d === 1;
-    if (hasEnemy || enemyCity) out.push(t.index);
+    const hasEnemy = unitsAt(state, t.index).some((u) => unitsHostile(state, unit, u));
+    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d === 1;
+    const rivalCity =
+      unit.owner === 'player' && d === 1 && (rivalCityAt(state, t.index)?.rival.atWar ?? false);
+    if (hasEnemy || playerCity || rivalCity) out.push(t.index);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Rival cities: siege and capture
+// ---------------------------------------------------------------------------
+
+function rivalCityDefense(rival: RivalCiv, city: RivalCity): number {
+  return 15 + city.population + Math.floor(rival.techLevel * 1.5);
+}
+
+function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
+  const atkCS = UNITS[attacker.type]?.combat ?? 0;
+  const defCS = rivalCityDefense(rival, city);
+  city.hp -= damageRoll(state, atkCS - defCS);
+  attacker.hp -= damageRoll(state, defCS - atkCS);
+  attacker.movesLeft = 0;
+  if (attacker.hp <= 0) killUnit(state, attacker);
+  if (city.hp <= 0) captureRivalCity(state, rival, city);
+}
+
+/** Conquest: the rival city joins your empire (pop hit, no districts kept). */
+export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity): void {
+  rival.cities = rival.cities.filter((c) => c.id !== city.id);
+  const center = state.map.tiles[city.centerIndex];
+  const id = state.nextCityId++;
+  // Their territory within working range transfers to the new owner.
+  for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
+    if ((t.rivalId ?? -1) === rival.id) {
+      t.rivalId = undefined;
+      if (t.cityId === -1) t.cityId = id;
+    }
+  }
+  center.cityId = id;
+  state.cities.push({
+    id,
+    name: city.name,
+    centerIndex: city.centerIndex,
+    population: Math.max(1, Math.floor(city.population * 0.75)),
+    foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: city.tilesAcquired,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: city.centerIndex }],
+    wonders: [],
+    specialists: {},
+  });
+  state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
+  revealAround(state, city.centerIndex, 3);
+  state.treasury += 40;
+  state.eventLog.push(`${city.name} captured from ${rival.name}!`);
+  // Losing a city stings: the war ends if it was their last, else they fight on.
+  if (rival.cities.length === 0) {
+    rival.atWar = false;
+    state.eventLog.push(`${rival.name} has been eliminated.`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +265,7 @@ function campCandidates(state: GameState): Tile[] {
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
     if (t.cityId !== -1 || t.goodyHut) return false;
+    if ((t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1) return false;
     if (preferFog && state.explored[t.index] === 1) return false; // camps rise in the fog
     for (const c of state.cities) {
       const ct = state.map.tiles[c.centerIndex];
@@ -209,8 +283,11 @@ function barbUnits(state: GameState): Unit[] {
   return state.units.filter((u) => u.owner === 'barbarian');
 }
 
-/** One barbarian unit's turn: attack > pillage > advance toward a target. */
-function barbAct(state: GameState, unit: Unit): void {
+/**
+ * One hostile unit's turn against the player: attack > pillage > advance.
+ * Shared by barbarian raiders and at-war rival units.
+ */
+export function hostileUnitAct(state: GameState, unit: Unit): void {
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
 
@@ -322,16 +399,16 @@ export function barbarianPhase(state: GameState): void {
   }
   for (const unit of barbUnits(state)) {
     if (guards.has(unit.id)) continue;
-    if (unit.movesLeft > 0) barbAct(state, unit);
+    if (unit.movesLeft > 0) hostileUnitAct(state, unit);
   }
 
-  // City healing when no barbarian is adjacent.
+  // City healing when no hostile is adjacent.
   for (const city of state.cities) {
     const hp = getCityHp(state, city.id);
     if (hp >= CITY_MAX_HP) continue;
     const center = map.tiles[city.centerIndex];
     const besieged = neighbors(map, center).some((n) =>
-      unitsAt(state, n.index).some((u) => u.owner === 'barbarian'),
+      unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'player' })),
     );
     if (!besieged) state.cityHp[String(city.id)] = Math.min(CITY_MAX_HP, hp + 20);
   }
