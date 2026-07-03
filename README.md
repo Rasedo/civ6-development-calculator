@@ -346,11 +346,21 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 - Imported maps display mirrored north–south (adjacency stays exact).
 - No world wrap; map edges are hard borders.
 
+## GPU engine (alternative)
+
+`gpu/` holds a **vectorized PyTorch port** of the simulation core:
+thousands of games step in lockstep as batched tensor ops (~23× the TS
+engine per CPU core already; built for CUDA). It is parity-proven against
+this engine — `npm run gpu:export` records reference traces from the real
+engine, `python gpu/parity_test.py` must reproduce them integer-exact.
+Phase 1 covers the single-city economic core; see `gpu/README.md` for the
+exact covered/not-covered table and the phase roadmap.
+
 ## Roadmap ideas (later stages)
 
 1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
-   with a learned value function (AlphaZero-lite), and eventually a
-   GPU-vectorized engine port for self-play-scale throughput.
+   with a learned value function (AlphaZero-lite); GPU-engine phases 2+
+   (multi-city, action interface, hostile world) toward self-play scale.
 2. Opponent depth II: rival build queues and districts on the map, loyalty
    pressure working in your favor (flipping rival border cities), open
    borders and diplomacy beyond war/peace.
