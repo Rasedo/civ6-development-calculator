@@ -239,6 +239,13 @@ autopilot between decisions.
   per generation, and gradient/weight norms. History survives `--resume`
   (it lives in the checkpoint) and streams to `rl-history.jsonl` for offline
   analysis. `--dashboard 0` disables, `--dashboard <port>` relocates.
+- **Python/PPO bridge** (`python/`): the escalation from ES to
+  decision-level RL. `scripts/rl-bridge.ts` exposes the env over a stdio
+  JSON protocol; `python/civ6_env.py` wraps it as a Gymnasium env with
+  action masking, and `train_ppo.py`/`eval_ppo.py` run sb3-contrib's
+  MaskablePPO against N parallel node simulators (evaluation uses the same
+  held-out seeds as `rl:eval`, so results are directly comparable). See
+  `python/README.md` for Windows setup.
 
 ### Training overnight
 
