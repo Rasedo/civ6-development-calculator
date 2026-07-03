@@ -21,6 +21,7 @@ export default defineConfig({
         train: 'scripts/train.ts',
         evaluate: 'scripts/evaluate.ts',
         'rl-worker': 'scripts/rl-worker.ts',
+        'rl-bridge': 'scripts/rl-bridge.ts',
       },
       output: {
         entryFileNames: '[name].js',
