@@ -16,6 +16,8 @@ import { isSuzerain, envoyBonusDelta, questLabel } from '../core/cityStates';
 import { CS_TYPE_COLORS, ENVOY_COST, INFLUENCE_PER_TURN, GOV_INFLUENCE_TIER } from '../data/cityStates';
 import { playerStrength, rivalStrength, rivalProximity } from '../core/rivals';
 import { PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST } from '../data/rivals';
+import type { LoadedPolicy, Recommendation } from '../core/aiAdvisor';
+import { FEATURE_VERSION as FEATURE_VERSION_UI } from '../core/rlenv';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
 import { trainableUnits } from '../core/units';
@@ -102,6 +104,9 @@ export interface PanelCallbacks {
   onAddCsTradeRoute(from: number, csId: number): void;
   onDeclareWar(rivalId: number): void;
   onSueForPeace(rivalId: number): void;
+  onLoadAiWeights(text: string): void;
+  onClearAiWeights(): void;
+  onApplyAiOption(decisionIndex: number, optionIndex: number): void;
 }
 
 /** Mutable state for the empire planner view (owned by main.ts). */
@@ -1340,6 +1345,74 @@ export function renderImportPanel(
   });
   container.querySelector('[data-act="sync-connect"]')?.addEventListener('click', () => cb.onConnectLiveSync());
   container.querySelector('[data-act="sync-stop"]')?.addEventListener('click', () => cb.onDisconnectLiveSync());
+}
+
+// ---------------------------------------------------------------------------
+// AI advisor
+// ---------------------------------------------------------------------------
+
+export function renderAiAdvisorPanel(
+  container: HTMLElement,
+  _state: GameState,
+  policy: LoadedPolicy | null,
+  recommendations: Recommendation[],
+  cb: PanelCallbacks,
+): void {
+  const header = policy
+    ? `<div class="row">Loaded: <b>${policy.label}</b>
+        ${policy.compatible ? '' : `<span class="bad"> · engine v${FEATURE_VERSION_UI}, weights v${policy.featureVersion} — recommendations may be miscalibrated</span>`}
+        <button data-act="ai-clear">Unload</button></div>`
+    : `<div class="row muted">Paste <code>rl-weights.json</code> (from <code>npm run rl:train</code>) or an exported
+        PPO policy (<code>python/export_policy.py</code>), then Load. Weights persist in this browser.</div>
+      <textarea data-act="ai-text" rows="4" placeholder='{"featureVersion":4,"arch":"mlp","spec":{…},"params":[…]}'></textarea>
+      <div class="row btnrow">
+        <button data-act="ai-load" class="primary">Load weights</button>
+        <label class="inline"><input type="file" data-act="ai-file" accept=".json" style="max-width:180px"> or pick the file</label>
+      </div>`;
+
+  const recs = recommendations
+    .map((rec, di) => {
+      const best = rec.options[0]?.score ?? 0;
+      const rows = rec.options
+        .map((opt, oi) => {
+          const delta = opt.score - best;
+          return `<div class="queue-row"><span>${oi === 0 ? '★ ' : ''}${opt.candidate.label}
+            <span class="muted">${oi === 0 ? 'best' : `Δ ${delta.toFixed(2)}`}</span></span>
+            <button data-act="ai-apply" data-d="${di}" data-o="${oi}">Do it</button></div>`;
+        })
+        .join('');
+      return `<h3>${rec.title}</h3>${rows}`;
+    })
+    .join('');
+
+  container.innerHTML = `
+    <h2>AI advisor</h2>
+    ${header}
+    ${
+      policy
+        ? recs ||
+          '<div class="muted">No open decisions — queues are full and research is set. End a turn or clear a queue to get recommendations.</div>'
+        : ''
+    }
+    ${policy ? '<div class="hint muted">Rankings assume a horizon-100 game (the training setting). ★ marks the policy\'s pick; Δ is the score gap to it.</div>' : ''}
+  `;
+
+  container.querySelector('[data-act="ai-load"]')?.addEventListener('click', () => {
+    const ta = container.querySelector('[data-act="ai-text"]') as HTMLTextAreaElement;
+    cb.onLoadAiWeights(ta.value);
+  });
+  container.querySelector('[data-act="ai-file"]')?.addEventListener('change', (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    void file.text().then((text) => cb.onLoadAiWeights(text));
+  });
+  container.querySelector('[data-act="ai-clear"]')?.addEventListener('click', () => cb.onClearAiWeights());
+  container.querySelectorAll('[data-act="ai-apply"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const el = b as HTMLElement;
+      cb.onApplyAiOption(Number(el.dataset.d), Number(el.dataset.o));
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -50,6 +50,7 @@ import {
   renderTradePanel,
   renderCityStatesPanel,
   renderRivalsPanel,
+  renderAiAdvisorPanel,
   renderEmpirePlanPanel,
   tileSummary,
   type PanelCallbacks,
@@ -59,6 +60,8 @@ import {
 } from './ui/panels';
 import { parseCivExport, importSummary } from './core/importer';
 import { parseLiveSync, syncSummary } from './core/livesync';
+import { loadPolicyJson, adviseAll, type LoadedPolicy, type Recommendation } from './core/aiAdvisor';
+import { applyEnvAction } from './core/rlenv';
 
 // Minimal File System Access API surface (Chromium).
 declare global {
@@ -127,7 +130,8 @@ type RightView =
   | 'trade'
   | 'cityStates'
   | 'rivals'
-  | 'empirePlan';
+  | 'empirePlan'
+  | 'aiAdvisor';
 
 interface UiState {
   mode: 'inspect' | 'found' | 'placeDistrict' | 'placeWonder' | 'buyTile' | 'moveUnit';
@@ -166,6 +170,17 @@ const ui: UiState = {
   lastImportSummary: null,
   liveSync: { active: false, status: '' },
 };
+
+// AI advisor (module-level: the loaded policy holds closures).
+let aiPolicy: LoadedPolicy | null = null;
+let aiRecommendations: Recommendation[] = [];
+const AI_WEIGHTS_KEY = 'civ6-ai-weights';
+try {
+  const saved = localStorage.getItem(AI_WEIGHTS_KEY);
+  if (saved) aiPolicy = loadPolicyJson(saved);
+} catch {
+  localStorage.removeItem(AI_WEIGHTS_KEY);
+}
 
 // Live-sync plumbing (module-level: file handles don't serialize).
 let syncHandle: { getFile(): Promise<File> } | null = null;
@@ -260,6 +275,7 @@ function setRightView(view: RightView): void {
     ['view-city-states', 'cityStates'],
     ['view-rivals', 'rivals'],
     ['view-empire-plan', 'empirePlan'],
+    ['view-ai', 'aiAdvisor'],
     ['settle-advisor', 'settle'],
   ] as const) {
     $<HTMLButtonElement>(btn).classList.toggle('active', view === v);
@@ -623,6 +639,30 @@ const callbacks: PanelCallbacks = {
       showMessage(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   },
+  onLoadAiWeights(text) {
+    try {
+      aiPolicy = loadPolicyJson(text);
+      localStorage.setItem(AI_WEIGHTS_KEY, text);
+      showMessage(`AI advisor loaded: ${aiPolicy.label}`);
+    } catch (e) {
+      showMessage(`Could not load weights: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    refresh();
+  },
+  onClearAiWeights() {
+    aiPolicy = null;
+    aiRecommendations = [];
+    localStorage.removeItem(AI_WEIGHTS_KEY);
+    refresh();
+  },
+  onApplyAiOption(decisionIndex, optionIndex) {
+    const rec = aiRecommendations[decisionIndex];
+    const opt = rec?.options[optionIndex];
+    if (!rec || !opt) return;
+    applyEnvAction(state, rec.decision, opt.candidate.action);
+    showMessage(`AI advisor: ${opt.candidate.label}`);
+    refresh();
+  },
   onImportSync(text) {
     // Manual live-sync (Firefox/Safari path): same parser as the Lua.log
     // poller, fed from the paste box. Re-paste to refresh.
@@ -723,6 +763,9 @@ function refresh(): void {
     renderCityStatesPanel(contextPanel, state, callbacks);
   } else if (ui.rightView === 'rivals') {
     renderRivalsPanel(contextPanel, state, callbacks);
+  } else if (ui.rightView === 'aiAdvisor') {
+    aiRecommendations = aiPolicy ? adviseAll(state, aiPolicy) : [];
+    renderAiAdvisorPanel(contextPanel, state, aiPolicy, aiRecommendations, callbacks);
   } else if (ui.rightView === 'empirePlan') {
     renderEmpirePlanPanel(contextPanel, state, ui.empirePlan, callbacks);
   }
@@ -1016,6 +1059,7 @@ for (const [btn, view] of [
   ['view-city-states', 'cityStates'],
   ['view-rivals', 'rivals'],
   ['view-empire-plan', 'empirePlan'],
+  ['view-ai', 'aiAdvisor'],
 ] as const) {
   $<HTMLButtonElement>(btn).addEventListener('click', () => {
     setRightView(ui.rightView === view ? 'context' : view);
