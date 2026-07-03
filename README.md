@@ -359,19 +359,23 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 `gpu/` holds a **vectorized PyTorch port** of the simulation core:
 thousands of games step in lockstep as `[games, cities, …]` tensor ops
-(~7× the TS engine on the same CPU in the training dtype; built for
-CUDA). It is parity-proven against this engine — `npm run gpu:export`
-records reference traces from the real engine, `python gpu/parity_test.py`
-must reproduce them integer-exact. Phases 1–2 cover a multi-city economic
-core: settlers, city founding, per-city production queues, and cultural
-border competition on the shared ownership map; see `gpu/README.md` for
-the exact covered/not-covered table and the phase roadmap.
+(several × the TS engine on the same CPU; built for CUDA). It is
+parity-proven against this engine both on-script (`npm run gpu:export` →
+`python gpu/parity_test.py` reproduces recorded traces integer-exact) and
+**off-script**: `python gpu/rollout.py` plays random masked actions and
+logs them, `npm run gpu:replay` feeds that log through the real engine
+and must match every turn. Phases 1–3 cover a multi-city economic core —
+settlers, founding, per-city queues, border competition — plus the RL
+surface: masked production/research/civic actions, detected eurekas,
+`empireScore` rewards, a batched env (`civ6gpu.BatchEnv`) and
+counter-based RNG. See `gpu/README.md` for the covered/not-covered table
+and the phase roadmap.
 
 ## Roadmap ideas (later stages)
 
 1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
-   with a learned value function (AlphaZero-lite); GPU-engine phases 3+
-   (action interface, hostile world) toward self-play scale.
+   with a learned value function (AlphaZero-lite); GPU-engine phases 4+
+   (hostile world, on-device training) toward self-play scale.
 2. Opponent depth II: rival build queues and districts on the map, loyalty
    pressure working in your favor (flipping rival border cities), open
    borders and diplomacy beyond war/peace.

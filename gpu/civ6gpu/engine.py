@@ -1,11 +1,20 @@
 """Vectorized (batched) port of the TypeScript engine's economic core.
 
-Phase 2 scope — a peaceful multi-city empire per game: the capital trains
-settlers (pop-gated, cost rising per city) and founds cities at
-fixture-planned sites as they complete; every city then runs tile yields →
-citizen assignment → city stats (housing, amenities) → growth/starvation →
-production (City Center buildings) → cultural border expansion on the
-SHARED ownership map → empire research with eureka discounts.
+Phase 3 scope — the multi-city economy of phase 2 driven by an RL-style
+macro-action surface instead of a hardwired script. Each turn a policy may
+choose, per game: what every idle city produces (a City Center building, a
+settler, or idle), which tech to research and which civic to pursue —
+validity masks mirror the TS engine's availability rules exactly. Eurekas
+are *detected* from state (not replayed from a schedule), because an
+off-script trajectory triggers them at different turns. Rewards come from
+an exact mirror of empireScore(state, 'balanced').
+
+Passing no actions runs the phase-2 scripted policy (settler-gated capital
++ cheapest-building + cheapest-research), which is what the fixture parity
+test exercises. Off-script behaviour is proven by the round trip in
+gpu/rollout.py + scripts/replay-gpu.ts: this engine plays random masked
+actions and logs them; the real TS engine replays that log and must
+reproduce every trace row.
 
 State lives in [B, C, ...] torch tensors (B games × C city slots stepping
 in lockstep; a slot is dead until its city is founded). Cities within one
@@ -83,6 +92,9 @@ class Rules:
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
+    score_pop_weight: float
+    score_yield_weights: torch.Tensor  # [6]
+    boosts: list  # [{target, idx, kind, ...}] — covered-scope eureka conditions
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -115,6 +127,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
+        score_pop_weight=r["score"]["popWeight"],
+        score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
+        boosts=r.get("boosts", []),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -143,15 +158,29 @@ def load_fixture(path: Path) -> dict:
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 4
 
+# Names of the mutable state tensors (everything reset() restores).
+_MUTABLE = [
+    "alive", "pop", "food_box", "culture_box", "tiles_acquired", "owner", "workable",
+    "buildings", "current", "cur_cost", "progress", "settlers", "settlers_queued",
+    "treasury", "science_total", "culture_total", "techs", "civics",
+    "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
+]
+
 
 class BatchSim:
     """B games × C city slots stepping in lockstep. Build from fixtures
-    (parity) or by replicating one fixture B times (benchmark)."""
+    (parity) or by replicating one fixture B times (benchmark/training).
 
-    def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64):
+    `boosts` mode: 'detect' evaluates eureka conditions from state each
+    turn (required for off-script play); 'schedule' replays the turns the
+    exporter recorded (debug aid for isolating detection bugs).
+    """
+
+    def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64, boosts: str = "detect"):
         self.rules = rules
         self.device = device
         self.dtype = dtype
+        self.boost_mode = boosts
         B = len(fixtures)
         f0 = fixtures[0]
         self.B, self.W, self.H = B, f0["width"], f0["height"]
@@ -168,6 +197,7 @@ class BatchSim:
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
         self.workable = torch.tensor([[t["workable"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
 
         # --- static per-city-slot data (sites are known upfront; `alive`
@@ -183,6 +213,7 @@ class BatchSim:
             for f in fixtures
         ]
         self.water_housing = torch.tensor(water, dtype=dtype, device=device)
+        self.coastal = torch.tensor([[bool(c["coastal"]) for c in f["cities"]] for f in fixtures], dtype=torch.bool, device=device)
         self.river_center = torch.tensor(
             [[bool(c["riverAtCenter"]) for c in f["cities"]] for f in fixtures], dtype=torch.bool, device=device
         )
@@ -204,7 +235,8 @@ class BatchSim:
 
         NB, NT, NC = len(rules.b_cost), len(rules.t_cost), len(rules.c_cost)
         self.NB = NB
-        self.SETTLER = NB  # production sentinel one past the building table
+        self.SETTLER = NB  # production action: one past the building table
+        self.IDLE = NB + 1  # production action: queue nothing this turn
         self.rules_dev = Rules(
             **{
                 k: (v.to(device=device, dtype=dtype) if isinstance(v, torch.Tensor) and v.is_floating_point() else v.to(device) if isinstance(v, torch.Tensor) else v)
@@ -247,6 +279,15 @@ class BatchSim:
         self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
         self._arangeT = torch.arange(T, device=device)
         self._arangeNB = torch.arange(NB, device=device)
+
+        # Pristine copy of the mutable state, for reset().
+        self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
+
+    def reset(self) -> None:
+        """Restore the initial state (all games, lockstep)."""
+        for k, v in self._pristine.items():
+            getattr(self, k).copy_(v)
+        self.turn = 1
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -293,48 +334,23 @@ class BatchSim:
         has = avail.any(dim=1)
         return torch.where((cur == -1) & has, best, cur)
 
-    # --- one full turn -----------------------------------------------------------
+    def _buildable(self) -> torch.Tensor:
+        """[B, C, NB] City Center buildings each city could queue now."""
+        rd = self.rules_dev
+        unlocked = torch.where(
+            rd.b_unlock.unsqueeze(0) >= 0,
+            self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(self.B, -1)),
+            torch.ones(self.B, self.NB, dtype=torch.bool, device=self.device),
+        )
+        return unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
 
-    def step(self) -> None:
+    def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Per-city yields/housing/growth-factor from the current state:
+        (total [B, C, 6] alive-masked, housing [B, C], growth_f [B, C]).
+        Mirrors computeCityStats — used both inside step() and to score."""
         r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
         rd = self.rules_dev
 
-        # Boost schedule fires at the start of the turn (mirrors detectBoosts
-        # running before research advances).
-        for b, sched in enumerate(self.boost_schedule):
-            for e in sched:
-                if e["turn"] == self.turn:
-                    (self.tech_boosted if e["kind"] == "tech" else self.civic_boosted)[b, e["idx"]] = True
-
-        # --- scripted production picks ------------------------------------------
-        # Capital first: a settler when sites remain and pop reached the gate
-        # (mirrors the exporter script; cost mirrors settlerCost()).
-        empty = self.alive & (self.current == -1)
-        n_cities = self.alive.sum(dim=1)
-        queued_settlers = (self.current == self.SETTLER).sum(dim=1)
-        want_settler = empty[:, 0] & (self.settlers_queued < (C - 1)) & (self.pop[:, 0] >= r.settler_pop_gate)
-        s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers + queued_settlers).clamp(min=0).to(self.dtype)
-        self.current[:, 0] = torch.where(want_settler, torch.full_like(self.current[:, 0], self.SETTLER), self.current[:, 0])
-        self.cur_cost[:, 0] = torch.where(want_settler, s_cost, self.cur_cost[:, 0])
-        self.progress[:, 0] = torch.where(want_settler, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
-        self.settlers_queued = self.settlers_queued + want_settler.long()
-
-        # Everyone else (and the capital once settlers are done): cheapest
-        # available City Center building.
-        empty = self.alive & (self.current == -1)
-        unlocked = torch.where(
-            rd.b_unlock.unsqueeze(0) >= 0,
-            self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
-            torch.ones(B, self.NB, dtype=torch.bool, device=dev),
-        )  # [B, NB]
-        buildable = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
-        first = torch.where(buildable, self._arangeNB.view(1, 1, -1), self.NB).min(dim=2).values  # [B, C]
-        pickable = empty & (first < self.NB)
-        self.progress = torch.where(pickable, torch.zeros_like(self.progress), self.progress)
-        self.cur_cost = torch.where(pickable, rd.b_cost[first.clamp(max=self.NB - 1)], self.cur_cost)
-        self.current = torch.where(pickable, first, self.current)
-
-        # --- worked tiles + city yields ------------------------------------------
         slot_ids = torch.arange(C, device=dev).view(1, C, 1)
         cand = (
             (self.owner.unsqueeze(1) == slot_ids)
@@ -369,6 +385,145 @@ class BatchSim:
 
         # Dead slots contribute nothing (their static center yields are preloaded).
         total = total * self.alive.unsqueeze(2).to(self.dtype)
+        return total, housing, growth_f
+
+    def empire_score(self) -> torch.Tensor:
+        """[B] — mirrors empireScore(state, 'balanced'): Σ over cities of
+        population × popWeight + city yields · balanced weights."""
+        total, _, _ = self._city_totals()
+        rd = self.rules_dev
+        pop_term = self.pop.sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
+        yield_term = torch.einsum("bck,k->b", total, rd.score_yield_weights)
+        return pop_term + yield_term
+
+    # --- action masks (the macro-action surface) --------------------------------
+
+    def production_mask(self) -> torch.Tensor:
+        """[B, C, NB+2] valid production actions for idle cities: columns
+        0..NB-1 = City Center buildings, NB = settler (always trainable, as
+        queueSettler is), NB+1 = idle. All-False where no decision pends."""
+        pend = self.alive & (self.current == -1)
+        always = torch.ones(self.B, self.C, 2, dtype=torch.bool, device=self.device)
+        return torch.cat([self._buildable(), always], dim=2) & pend.unsqueeze(2)
+
+    def tech_mask(self) -> torch.Tensor:
+        """[B, NT] valid research picks; all-False where research is busy."""
+        return self._available_mask(self.techs, self._prereq_t) & (self.cur_tech == -1).unsqueeze(1)
+
+    def civic_mask(self) -> torch.Tensor:
+        """[B, NC] valid civic picks; all-False where the slot is busy."""
+        return self._available_mask(self.civics, self._prereq_c) & (self.cur_civic == -1).unsqueeze(1)
+
+    # --- eureka detection --------------------------------------------------------
+
+    def _detect_boosts(self) -> None:
+        """Mirrors detectBoosts: flag every satisfied, unresearched,
+        un-boosted condition. Runs where detectBoosts does — the start of
+        the turn, before anything advances."""
+        pop_sum = None
+        for row in self.rules.boosts:
+            kind = row["kind"]
+            if kind == "building":
+                pred = self.buildings[:, :, row["b"]].sum(dim=1) >= row["count"]
+            elif kind == "cityPop":
+                pred = (self.pop >= row["pop"]).any(dim=1)
+            elif kind == "totalPop":
+                if pop_sum is None:
+                    pop_sum = self.pop.sum(dim=1)
+                pred = pop_sum >= row["pop"]
+            elif kind == "coastalCity":
+                pred = (self.alive & self.coastal).any(dim=1)
+            elif kind == "cities":
+                pred = self.alive.sum(dim=1) >= row["count"]
+            elif kind == "tech":
+                pred = self.techs[:, row["t"]]
+            elif kind == "nearNaturalWonder":
+                pred = ((self.owner >= 0) & self.wonder_near).any(dim=1)
+            else:
+                continue
+            if row["target"] == "tech":
+                self.tech_boosted[:, row["idx"]] |= pred & ~self.techs[:, row["idx"]]
+            else:
+                self.civic_boosted[:, row["idx"]] |= pred & ~self.civics[:, row["idx"]]
+
+    # --- one full turn -----------------------------------------------------------
+
+    def step(self, production: torch.Tensor | None = None, tech: torch.Tensor | None = None, civic: torch.Tensor | None = None) -> None:
+        """Advance every game one turn.
+
+        production: [B, C] long — per-city action (0..NB-1 building, NB
+        settler, NB+1 idle; anything else / masked-invalid = no-op), or
+        None for the scripted phase-2 policy. tech/civic: [B] long picks
+        applied where the research slot is empty (validated against the
+        masks; -1 = no pick), or None for cheapest-first auto-research.
+        """
+        r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
+        rd = self.rules_dev
+
+        # --- production choice ------------------------------------------------
+        if production is None:
+            # Scripted: the capital trains a settler when sites remain and pop
+            # reached the gate (mirrors the exporter; cost mirrors settlerCost).
+            empty = self.alive & (self.current == -1)
+            n_cities = self.alive.sum(dim=1)
+            queued_settlers = (self.current == self.SETTLER).sum(dim=1)
+            want_settler = empty[:, 0] & (self.settlers_queued < (C - 1)) & (self.pop[:, 0] >= r.settler_pop_gate)
+            s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers + queued_settlers).clamp(min=0).to(self.dtype)
+            self.current[:, 0] = torch.where(want_settler, torch.full_like(self.current[:, 0], self.SETTLER), self.current[:, 0])
+            self.cur_cost[:, 0] = torch.where(want_settler, s_cost, self.cur_cost[:, 0])
+            self.progress[:, 0] = torch.where(want_settler, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
+            self.settlers_queued = self.settlers_queued + want_settler.long()
+
+            # Everyone else: cheapest available City Center building.
+            empty = self.alive & (self.current == -1)
+            buildable = self._buildable()
+            first = torch.where(buildable, self._arangeNB.view(1, 1, -1), self.NB).min(dim=2).values  # [B, C]
+            pickable = empty & (first < self.NB)
+            self.progress = torch.where(pickable, torch.zeros_like(self.progress), self.progress)
+            self.cur_cost = torch.where(pickable, rd.b_cost[first.clamp(max=self.NB - 1)], self.cur_cost)
+            self.current = torch.where(pickable, first, self.current)
+        else:
+            act = torch.where(self.alive & (self.current == -1), production.to(torch.long), torch.full_like(production.to(torch.long), -1))
+            buildable = self._buildable()
+            is_b = (act >= 0) & (act < self.NB)
+            valid_b = is_b & buildable.gather(2, act.clamp(min=0, max=self.NB - 1).unsqueeze(2)).squeeze(2)
+            is_s = act == self.SETTLER
+            # The TS engine queues city-by-city in slot order, and each queued
+            # settler raises the next one's price — an exclusive prefix sum
+            # reproduces that sequential cost exactly.
+            base_q = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
+            prefix = is_s.long().cumsum(dim=1) - is_s.long()
+            n_cities = self.alive.sum(dim=1, keepdim=True)
+            s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers.unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
+            self.progress = torch.where(valid_b | is_s, torch.zeros_like(self.progress), self.progress)
+            self.cur_cost = torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost)
+            self.cur_cost = torch.where(is_s, s_cost, self.cur_cost)
+            self.current = torch.where(valid_b, act, self.current)
+            self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
+            self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
+
+        # --- research choice (validated; -1 or invalid = keep pending) ---------
+        if tech is not None:
+            t_act = tech.to(torch.long)
+            ok = (self.cur_tech == -1) & (t_act >= 0) & self._available_mask(self.techs, self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self.cur_tech = torch.where(ok, t_act, self.cur_tech)
+        if civic is not None:
+            c_act = civic.to(torch.long)
+            ok = (self.cur_civic == -1) & (c_act >= 0) & self._available_mask(self.civics, self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+            self.cur_civic = torch.where(ok, c_act, self.cur_civic)
+
+        # --- eurekas (mirrors detectBoosts at the start of endTurn) ------------
+        if self.boost_mode == "detect":
+            self._detect_boosts()
+        else:
+            for b, sched in enumerate(self.boost_schedule):
+                for e in sched:
+                    if e["turn"] == self.turn:
+                        (self.tech_boosted if e["kind"] == "tech" else self.civic_boosted)[b, e["idx"]] = True
+
+        # --- worked tiles + city yields ------------------------------------------
+        total, housing, growth_f = self._city_totals()
+        popf = self.pop.to(self.dtype)
 
         # --- production ------------------------------------------------------------
         has_item = self.current >= 0
@@ -442,7 +597,8 @@ class BatchSim:
         # --- research ---------------------------------------------------------------------
         turn_science = total[:, :, 3].sum(dim=1)
         turn_culture = total[:, :, 4].sum(dim=1)
-        self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
+        if tech is None:
+            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
         self.tech_prog = self.tech_prog + turn_science
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_tech >= 0
@@ -457,9 +613,15 @@ class BatchSim:
             self.techs[rows, self.cur_tech[rows]] = True
             self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
             self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
-            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
+            if tech is None:
+                self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
+        # Banked progress only drains once the tree is exhausted (mirrors
+        # advanceResearch; in manual mode progress banks while undecided).
+        no_tech = (self.cur_tech == -1) & ~self._available_mask(self.techs, self._prereq_t).any(dim=1)
+        self.tech_prog = torch.where(no_tech, torch.minimum(self.tech_prog, torch.zeros_like(self.tech_prog)), self.tech_prog)
 
-        self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+        if civic is None:
+            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
         self.civic_prog = self.civic_prog + turn_culture
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_civic >= 0
@@ -474,7 +636,10 @@ class BatchSim:
             self.civics[rows, self.cur_civic[rows]] = True
             self.civic_prog = torch.where(fin, self.civic_prog - eff, self.civic_prog)
             self.cur_civic = torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic)
-            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+            if civic is None:
+                self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+        no_civic = (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
+        self.civic_prog = torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog)
 
         # --- founding (mirrors the plannedSettles loop at the end of endTurn) ------
         # Slots fill strictly in order, so scanning ascending handles several
@@ -505,7 +670,7 @@ class BatchSim:
 
         self.turn += 1
 
-    # --- parity trace row (matches scripts/export-gpu.ts encoding) ----------------
+    # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 
     def trace_row(self) -> torch.Tensor:
         cols = [
@@ -517,6 +682,7 @@ class BatchSim:
             torch.round(self.treasury * 1000),
             torch.round(self.science_total * 1000),
             torch.round(self.culture_total * 1000),
+            torch.round(self.empire_score() * 1000),
         ]
         for c in range(self.C):
             cols += [

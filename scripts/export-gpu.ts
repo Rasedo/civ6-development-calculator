@@ -13,6 +13,13 @@
  *   - every city runs the scripted cheapest-building policy and competes
  *     for tiles through cultural border growth on the shared map.
  *
+ * Since phase 3 the rules also carry the boost-condition table (the GPU
+ * engine detects eurekas itself — required for off-script action play)
+ * and the empire-score weights (the RL reward), and the trace carries an
+ * empireScore column. Site metadata is precomputed for every candidate
+ * site up front, mirroring what foundCity would produce (it strips the
+ * center tile's removable feature).
+ *
  * The GPU engine must reproduce these traces exactly — the TS engine is
  * the oracle.
  *
@@ -27,14 +34,17 @@ import { availableBuildings } from '../src/core/rules';
 import { makeYieldCtx } from '../src/core/effects';
 import { tileYields } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
-import { hexDistance } from '../src/core/hex';
+import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
+import { traceRow } from './gpu-trace';
+import { hexDistance, neighbors } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isImpassable } from '../src/core/query';
-import { YIELD_KEYS, type City, type GameState } from '../src/core/types';
+import { YIELD_KEYS, type City, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
+import { FEATURES } from '../src/data/features';
 import { TECHS } from '../src/data/techs';
 import { CIVICS } from '../src/data/civics';
 import { RESOURCES } from '../src/data/resources';
-import { BOOST_FRACTION } from '../src/data/boosts';
+import { BOOSTS, BOOST_FRACTION } from '../src/data/boosts';
 import {
   CITIZEN_SCIENCE,
   CITIZEN_CULTURE,
@@ -48,7 +58,7 @@ import {
 
 const N_SEEDS = Number(process.argv[2] ?? 10);
 const N_TURNS = Number(process.argv[3] ?? 100);
-const N_EXTRA = Number(process.argv[4] ?? 2); // cities founded beyond the capital
+const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler
 const OUT = 'gpu/fixtures';
 
@@ -65,12 +75,39 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 const centerBuildings = Object.values(BUILDINGS)
   .filter((b) => b.district === 'CITY_CENTER' && b.id !== 'PALACE' && !b.worship)
   .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
+const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
 const buildingUnlockTech = new Map<string, number>();
 techList.forEach((t, i) => {
   for (const fx of t.effects ?? []) {
     if (fx.kind === 'unlockBuilding') buildingUnlockTech.set(fx.building, i);
   }
 });
+
+// Boost conditions the covered scope can actually trigger (everything else
+// — improvements, districts, great people, wonders, policies — is
+// structurally unreachable in this scenario for BOTH engines, so skipping
+// it preserves parity).
+const boostRows: object[] = [];
+for (const [id, def] of Object.entries(BOOSTS)) {
+  if (!def.check) continue;
+  const target = techIdx.has(id) ? 'tech' : civicIdx.has(id) ? 'civic' : null;
+  if (!target) continue;
+  const idx = target === 'tech' ? techIdx.get(id)! : civicIdx.get(id)!;
+  const c = def.check;
+  let row: object | null = null;
+  if (c.kind === 'building') {
+    const b = buildingIdx.get(c.id);
+    if (b !== undefined) row = { kind: 'building', b, count: c.count };
+  } else if (c.kind === 'cityPop') row = { kind: 'cityPop', pop: c.pop };
+  else if (c.kind === 'totalPop') row = { kind: 'totalPop', pop: c.pop };
+  else if (c.kind === 'coastalCity') row = { kind: 'coastalCity' };
+  else if (c.kind === 'cities') row = { kind: 'cities', count: c.count };
+  else if (c.kind === 'tech') {
+    const t = techIdx.get(c.id);
+    if (t !== undefined) row = { kind: 'tech', t };
+  } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
+  if (row) boostRows.push({ target, idx, ...row });
+}
 
 const rules = {
   focusBase: [2, 2, 1, 1, 1, 1], // food, production, gold, science, culture, faith
@@ -91,6 +128,9 @@ const rules = {
   ],
   // Mirrors settlerCost(): 80 + 30 × (cities − 1 + settlers banked + settlers queued).
   scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE },
+  // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
+  score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
+  boosts: boostRows,
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
     housing: BUILDINGS.PALACE?.housing ?? 0,
@@ -120,7 +160,9 @@ const rules = {
   })),
 };
 writeFileSync(`${OUT}/rules.json`, JSON.stringify(rules));
-console.log(`rules.json: ${rules.buildings.length} buildings, ${rules.techs.length} techs, ${rules.civics.length} civics`);
+console.log(
+  `rules.json: ${rules.buildings.length} buildings, ${rules.techs.length} techs, ${rules.civics.length} civics, ${boostRows.length} detectable boosts`,
+);
 
 // --- per-seed fixtures ----------------------------------------------------------
 
@@ -146,30 +188,40 @@ for (let s = 0; s < N_SEEDS; s++) {
       y: YIELD_KEYS.map((k) => Math.round(y[k] * 1000) / 1000),
       workable: !isImpassable(t) && !t.district ? 1 : 0,
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
+      // near a natural wonder (for the ASTROLOGY-style eureka)
+      wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
     };
   });
 
-  // Static per-city data, captured at founding time (foundCity strips the
-  // center tile's feature, so its yields must be read *after* the fact).
-  function cityMeta(city: City, foundedTurn: number) {
-    const center = map.tiles[city.centerIndex];
-    const cy = tileYieldsForCenter(makeYieldCtx(state), center);
+  // Static per-site data, all precomputed at t=0. foundCity strips the
+  // center tile's removable feature, so the stripped tile is what the
+  // future city center will yield (for the capital the map tile is already
+  // stripped, making this the same computation).
+  function siteMeta(tileIndex: number, baseMaint: number) {
+    const t = map.tiles[tileIndex];
+    const stripped: Tile = {
+      ...t,
+      district: null,
+      improvement: null,
+      feature: t.feature && FEATURES[t.feature].removable ? null : t.feature,
+    };
+    const cy = tileYieldsForCenter(ctx, stripped);
     return {
-      site: city.centerIndex,
-      foundedTurn,
+      site: tileIndex,
+      foundedTurn: -1,
       centerYields: YIELD_KEYS.map((k) => cy[k]),
-      freshWater: hasFreshWater(map, center) ? 1 : 0,
-      coastal: isCoastalLand(map, center) ? 1 : 0,
-      riverAtCenter: hasRiver(center) ? 1 : 0,
+      freshWater: hasFreshWater(map, t) ? 1 : 0,
+      coastal: isCoastalLand(map, t) ? 1 : 0,
+      riverAtCenter: hasRiver(t) ? 1 : 0,
       /** City-center district (+ Palace for the capital) upkeep at founding. */
-      baseMaintenance: cityMaintenance(state, city),
+      baseMaintenance: baseMaint,
     };
   }
-  const cities = [cityMeta(capital, 0)];
 
-  // Choose the future settle sites now, spaced out from the capital and from
-  // each other; the engine consumes this exact ordered list. Relax the
-  // spacing if a cramped map can't fit N_EXTRA well-separated cities.
+  // Choose the candidate settle sites now, spaced out from the capital and
+  // from each other (≥ CITY_MIN_DIST keeps every founding order legal); the
+  // engine consumes this exact ordered list. Relax the spacing if a cramped
+  // map can't fit N_EXTRA well-separated cities.
   const siteCands = scoreSettleSites(state, 60);
   const chosen: number[] = [];
   for (const minDist of [6, 5, 4]) {
@@ -186,6 +238,10 @@ for (let s = 0; s < N_SEEDS; s++) {
   }
   if (chosen.length < N_EXTRA) throw new Error(`seed ${seed}: only found ${chosen.length}/${N_EXTRA} settle sites`);
   state.plannedSettles = [...chosen];
+
+  const cities = [siteMeta(capital.centerIndex, cityMaintenance(state, capital))];
+  for (const c of chosen) cities.push(siteMeta(c, 0));
+  cities[0].foundedTurn = 0;
 
   const ownerInit = map.tiles.map((t) => t.cityId);
   const C_MAX = 1 + N_EXTRA;
@@ -208,8 +264,8 @@ for (let s = 0; s < N_SEEDS; s++) {
     }
     const citiesBefore = state.cities.length;
     endTurn(state);
-    for (const city of state.cities.slice(citiesBefore)) {
-      cities.push(cityMeta(city, state.turn - 1));
+    for (let i = citiesBefore; i < state.cities.length; i++) {
+      cities[i].foundedTurn = state.turn - 1;
     }
     for (const id of state.research.boosted) {
       if (knownBoosts.has(id)) continue;
@@ -217,41 +273,16 @@ for (let s = 0; s < N_SEEDS; s++) {
       if (techIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'tech', idx: techIdx.get(id)! });
       else if (civicIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'civic', idx: civicIdx.get(id)! });
     }
-    const row = [
-      state.turn,
-      state.research.techs.length,
-      state.research.civics.length,
-      state.settlers,
-      state.cities.length,
-      Math.round(state.treasury * 1000),
-      Math.round(state.scienceTotal * 1000),
-      Math.round(state.cultureTotal * 1000),
-    ];
-    for (let c = 0; c < C_MAX; c++) {
-      const city = state.cities[c];
-      if (!city) {
-        row.push(0, 0, 0, 0, 0, 0);
-        continue;
-      }
-      row.push(
-        city.population,
-        map.tiles.filter((x) => x.cityId === city.id).length,
-        city.buildings.length,
-        city.tilesAcquired,
-        Math.round(city.foodBox * 1000),
-        Math.round(city.cultureBox * 1000),
-      );
-    }
-    trace.push(row);
+    trace.push(traceRow(state, C_MAX));
   }
-  if (state.cities.length !== C_MAX) {
-    throw new Error(`seed ${seed}: founded ${state.cities.length}/${C_MAX} cities — a planned site was rejected`);
+  if (state.cities.length < 3) {
+    throw new Error(`seed ${seed}: only ${state.cities.length} cities founded by turn ${N_TURNS}`);
   }
 
   const fixture = { seed, width: map.width, height: map.height, cities, tiles, ownerInit, boostSchedule, trace };
   writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));
-  const founded = cities.map((c) => `t${c.foundedTurn}`).join(' ');
+  const founded = cities.filter((c) => c.foundedTurn >= 0).map((c) => `t${c.foundedTurn}`).join(' ');
   const pops = state.cities.map((c) => c.population).join('/');
-  console.log(`seed${seed}.json: ${N_TURNS} turns, ${state.cities.length} cities (${founded}), pop ${pops}, ${boostSchedule.length} boosts`);
+  console.log(`seed${seed}.json: ${N_TURNS} turns, ${state.cities.length}/${C_MAX} cities (${founded}), pop ${pops}, ${boostSchedule.length} boosts`);
 }
 console.log(`\nFixtures in ${OUT}/ — run gpu/parity_test.py against them.`);

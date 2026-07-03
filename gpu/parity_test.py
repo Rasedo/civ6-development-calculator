@@ -19,7 +19,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
-HEAD = ["turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture"]
+HEAD = ["turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture", "score"]
 PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox"]
 
 
@@ -33,7 +33,7 @@ def columns(n_cities: int) -> tuple[list[str], torch.Tensor]:
     turn over turn); the drift check below catches those regardless.
     """
     cols = list(HEAD)
-    atol = [0.0] * 5 + [2.0] * 3
+    atol = [0.0] * 5 + [2.0] * 4
     for c in range(n_cities):
         cols += [f"{name}{c}" for name in PER_CITY]
         atol += [0.0, 0.0, 0.0, 0.0, 2.0, 2.0]

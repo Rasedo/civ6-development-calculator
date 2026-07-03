@@ -13,7 +13,9 @@
     "rl:eval": "npm run rl:build && node dist-rl/evaluate.js",
     "rl:train:dev": "vite-node scripts/train.ts",
     "test": "vitest run",
-    "gpu:export": "vite-node scripts/export-gpu.ts"
+    "gpu:export": "vite-node scripts/export-gpu.ts",
+    "gpu:rollout": "python3 gpu/rollout.py",
+    "gpu:replay": "vite-node scripts/replay-gpu.ts"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

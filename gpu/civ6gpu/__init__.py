@@ -1,3 +1,5 @@
 from .engine import BatchSim, Rules, load_rules, load_fixture, FIXTURES
+from .env import BatchEnv
+from . import rng
 
-__all__ = ["BatchSim", "Rules", "load_rules", "load_fixture", "FIXTURES"]
+__all__ = ["BatchSim", "BatchEnv", "Rules", "load_rules", "load_fixture", "FIXTURES", "rng"]

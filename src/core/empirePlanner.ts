@@ -39,7 +39,7 @@ export interface EmpirePlannerOptions {
   maxDecisions?: number;
 }
 
-const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
+export const BALANCED_WEIGHTS: Partial<Record<YieldKey, number>> = {
   food: 1,
   production: 2,
   gold: 1,
