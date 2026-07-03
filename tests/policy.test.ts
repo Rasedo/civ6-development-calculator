@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { paramCount, scoreCandidate, makePolicy, type PolicySpec } from '../src/core/policy';
-import { Lcg, centeredRanks, esGradient, makeAdam, adamStep } from '../src/core/es';
+import { Lcg, centeredRanks, esGradient, makeAdam, adamStep, ema, linearTrend } from '../src/core/es';
 import { runEpisode, CANDIDATE_FEATURES, OBSERVATION_SIZE } from '../src/core/rlenv';
 import type { Candidate } from '../src/core/rlenv';
 
@@ -85,6 +85,17 @@ describe('evolution strategy machinery', () => {
     expect(ranks[0]).toBe(-0.5);
     expect(ranks[1]).toBe(0.5);
     expect(ranks[2]).toBe(0);
+  });
+
+  it('ema smooths and linearTrend reads slopes', () => {
+    const smoothed = ema([0, 10, 10, 10], 0.5);
+    expect(smoothed[0]).toBe(0);
+    expect(smoothed[1]).toBe(5);
+    expect(smoothed[3]).toBeGreaterThan(smoothed[2]); // still approaching 10
+    expect(linearTrend([1, 2, 3, 4])).toBeCloseTo(1, 9);
+    expect(linearTrend([5, 5, 5])).toBeCloseTo(0, 9);
+    expect(linearTrend([9, 7, 5])).toBeCloseTo(-2, 9);
+    expect(linearTrend([3])).toBe(0);
   });
 
   it('ES with Adam climbs a toy quadratic', () => {

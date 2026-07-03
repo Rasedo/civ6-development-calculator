@@ -6,3 +6,4 @@ package-lock.json
 *.local
 rl-weights.json
 rl-checkpoint.json
+rl-history.jsonl

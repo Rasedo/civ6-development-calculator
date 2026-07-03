@@ -233,6 +233,12 @@ autopilot between decisions.
 - **Evaluator** (`npm run rl:eval`): 50 paired held-out seeds by default with
   bootstrap 95% CIs and paired win-rates; `--planner` adds the beam-search
   empire planner as a baseline (same maps, same autopilot).
+- **Live dashboard**: while training, open **http://localhost:4650** for
+  charts — training fitness (mean + EMA + max) with an explicit
+  climbing/flat trend verdict, held-out score with best-so-far, episodes/sec
+  per generation, and gradient/weight norms. History survives `--resume`
+  (it lives in the checkpoint) and streams to `rl-history.jsonl` for offline
+  analysis. `--dashboard 0` disables, `--dashboard <port>` relocates.
 
 ### Training overnight
 

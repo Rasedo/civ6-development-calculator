@@ -64,6 +64,32 @@ export function adamStep(
   }
 }
 
+/** Exponential moving average of a series (alpha = smoothing weight of the new value). */
+export function ema(values: number[], alpha = 0.1): number[] {
+  const out: number[] = [];
+  let acc = 0;
+  values.forEach((v, i) => {
+    acc = i === 0 ? v : alpha * v + (1 - alpha) * acc;
+    out.push(acc);
+  });
+  return out;
+}
+
+/** Least-squares slope of a series per index step (0 for fewer than 2 points). */
+export function linearTrend(values: number[]): number {
+  const n = values.length;
+  if (n < 2) return 0;
+  const xMean = (n - 1) / 2;
+  const yMean = values.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - xMean) * (values[i] - yMean);
+    den += (i - xMean) * (i - xMean);
+  }
+  return den === 0 ? 0 : num / den;
+}
+
 /**
  * ES gradient estimate from antithetic pairs. `epsilons[i]` is the i-th
  * perturbation; `fitness` holds 2·n entries ordered [+ε0, −ε0, +ε1, −ε1, …].

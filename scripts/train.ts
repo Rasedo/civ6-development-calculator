@@ -10,15 +10,18 @@
  * Flags (defaults): --gens 200  --pop 24  --sigma 0.15  --lr 0.05
  *   --seeds-per-gen 8  --horizon 100  --arch mlp|bilinear|linear (mlp)
  *   --hidden 24  --objective balanced  --workers <cpus-1>  --eval-every 10
- *   --resume
+ *   --resume  --dashboard 4650 (0 disables)
  *
- * Writes rl-weights.json (best held-out weights) and rl-checkpoint.json
- * (full trainer state, saved every generation and on Ctrl+C).
+ * Writes rl-weights.json (best held-out weights), rl-checkpoint.json
+ * (full trainer state, saved every generation and on Ctrl+C) and
+ * rl-history.jsonl (per-generation stats). While training, live charts
+ * are served at http://localhost:4650.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
+import { startDashboard, type GenStat } from './dashboard';
 import {
   runEpisode,
   CANDIDATE_FEATURES,
@@ -63,6 +66,8 @@ const HIDDEN = num('hidden', 24);
 const OBJECTIVE = (args.objective as Objective) || 'balanced';
 const EVAL_EVERY = num('eval-every', 10);
 const RESUME = args.resume === true || args.resume === 'true';
+/** Live chart server port (0 disables). */
+const DASHBOARD_PORT = num('dashboard', 4650);
 
 // Bundled runs can use worker threads; vite-node (TS) runs fall back inline.
 const isBundled = !import.meta.url.endsWith('.ts');
@@ -70,6 +75,7 @@ const WORKERS = Math.max(0, num('workers', isBundled ? Math.max(1, availablePara
 
 const CHECKPOINT = 'rl-checkpoint.json';
 const WEIGHTS = 'rl-weights.json';
+const HISTORY_LOG = 'rl-history.jsonl';
 const HELD_OUT_SEEDS = [7101, 7207, 7303, 7411, 7523, 7639, 7741, 7853];
 
 const spec: PolicySpec = {
@@ -170,6 +176,8 @@ interface Checkpoint {
   bestHeldOut: number;
   bestTheta: number[];
   config: { sigma: number; lr: number; pop: number; seedsPerGen: number; horizon: number; objective: string };
+  /** Per-generation stats (drives the dashboard across resumes). */
+  history?: GenStat[];
 }
 
 function saveCheckpoint(cp: Checkpoint): void {
@@ -196,6 +204,7 @@ async function main(): Promise<void> {
   let startGen = 0;
   let bestHeldOut = -Infinity;
   let bestTheta = [...theta];
+  let history: GenStat[] = [];
 
   if (RESUME && existsSync(CHECKPOINT)) {
     const cp = JSON.parse(readFileSync(CHECKPOINT, 'utf-8')) as Checkpoint;
@@ -209,8 +218,23 @@ async function main(): Promise<void> {
     startGen = cp.gen;
     bestHeldOut = cp.bestHeldOut;
     bestTheta = cp.bestTheta;
+    history = cp.history ?? [];
     console.log(`Resumed at generation ${startGen} (best held-out ${bestHeldOut.toFixed(1)})`);
   }
+  // Rebuild the JSONL log to match the in-memory history, then append live.
+  writeFileSync(HISTORY_LOG, history.map((h) => JSON.stringify(h) + '\n').join(''));
+
+  const dashboard =
+    DASHBOARD_PORT > 0
+      ? startDashboard(DASHBOARD_PORT, () => ({
+          history,
+          gens: GENS,
+          bestHeldOut: bestHeldOut === -Infinity ? null : bestHeldOut,
+          arch: ARCH,
+          dim: DIM,
+          config: { sigma: SIGMA, lr: LR, pop: POP, seedsPerGen: SEEDS_PER_GEN, horizon: HORIZON, objective: OBJECTIVE },
+        }))
+      : null;
 
   console.log(
     `ES training: arch=${ARCH} params=${DIM} pop=${POP} sigma=${SIGMA} lr=${LR} ` +
@@ -231,6 +255,7 @@ async function main(): Promise<void> {
       bestHeldOut,
       bestTheta,
       config: { sigma: SIGMA, lr: LR, pop: POP, seedsPerGen: SEEDS_PER_GEN, horizon: HORIZON, objective: OBJECTIVE },
+      history,
     });
   process.on('SIGINT', () => {
     interrupted = true;
@@ -241,6 +266,7 @@ async function main(): Promise<void> {
   let episodes = 0;
 
   for (let gen = startGen + 1; gen <= GENS; gen++) {
+    const genT0 = Date.now();
     // Fresh training seeds each generation (same for the whole population).
     const seeds = Array.from({ length: SEEDS_PER_GEN }, () => 1000 + rng.int(1_000_000));
 
@@ -271,16 +297,20 @@ async function main(): Promise<void> {
 
     const mean = fitness.reduce((a, b) => a + b, 0) / fitness.length;
     const max = Math.max(...fitness);
+    const std = Math.sqrt(fitness.reduce((s, f) => s + (f - mean) ** 2, 0) / fitness.length);
     const elapsed = (Date.now() - t0) / 1000;
     const epsPerSec = episodes / elapsed;
     const remaining = ((GENS - gen) * jobs.length) / Math.max(0.1, epsPerSec);
     let line = `gen ${gen}/${GENS}  fit ${mean.toFixed(1)} (max ${max.toFixed(1)})  ${epsPerSec.toFixed(1)} eps/s  ETA ${(remaining / 60).toFixed(0)}m`;
 
+    let genEpisodes = jobs.length;
+    let held: number | null = null;
     if (gen % EVAL_EVERY === 0 || gen === GENS) {
       const evalJobs: Job[] = HELD_OUT_SEEDS.map((seed) => ({ p: 0, seed }));
       const evalScores = await runner.run([theta], evalJobs);
       episodes += evalJobs.length;
-      const held = evalScores.reduce((a, b) => a + b, 0) / evalScores.length;
+      genEpisodes += evalJobs.length;
+      held = evalScores.reduce((a, b) => a + b, 0) / evalScores.length;
       line += `  held-out ${held.toFixed(1)}`;
       if (held > bestHeldOut) {
         bestHeldOut = held;
@@ -289,6 +319,22 @@ async function main(): Promise<void> {
         line += '  ★ saved';
       }
     }
+
+    const stat: GenStat = {
+      gen,
+      fit: Math.round(mean * 10) / 10,
+      fitMax: Math.round(max * 10) / 10,
+      fitStd: Math.round(std * 10) / 10,
+      held: held === null ? null : Math.round(held * 10) / 10,
+      best: bestHeldOut === -Infinity ? 0 : Math.round(bestHeldOut * 10) / 10,
+      gnorm: Math.round(Math.sqrt(grad.reduce((s, g) => s + g * g, 0)) * 1000) / 1000,
+      tnorm: Math.round(Math.sqrt(theta.reduce((s, v) => s + v * v, 0)) * 100) / 100,
+      eps: Math.round((genEpisodes / Math.max(0.05, (Date.now() - genT0) / 1000)) * 10) / 10,
+      t: Math.round(elapsed),
+    };
+    history.push(stat);
+    appendFileSync(HISTORY_LOG, JSON.stringify(stat) + '\n');
+
     console.log(line);
     checkpointNow(gen);
     if (interrupted) break;
@@ -299,6 +345,7 @@ async function main(): Promise<void> {
     saveWeights(theta, NaN, GENS);
   }
   await runner.close();
+  dashboard?.close();
   console.log(
     `\nDone in ${((Date.now() - t0) / 60000).toFixed(1)} min · best held-out ${bestHeldOut.toFixed(1)} → ${WEIGHTS}`,
   );
