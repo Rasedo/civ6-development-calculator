@@ -252,6 +252,26 @@ autopilot between decisions.
   small convolutional tower learns its own spatial features alongside the
   candidate vector — the GPU-worthy stage.
 
+### Benchmark
+
+50 paired held-out seeds, horizon 100, everything enabled (units, fog,
+disasters, city-states, rivals). ES run: MLP (1,465 params), pop 32 × 8
+seeds/gen, converged ≈ gen 110 on a Ryzen 9 3900X (~1 h):
+
+| policy | mean | 95% CI | win vs greedy |
+|---|---|---|---|
+| random | 182.0 | [168.6, 196.6] | 20% |
+| greedy (hand baseline) | 221.8 | [210.0, 233.8] | — |
+| **trained (ES, MLP)** | **310.6** | **[294.4, 329.2]** | **100%** |
+| empire planner (beam search) | 130.9 | [102.5, 160.9] | 0% |
+
+The learned policy beats the hand baseline on every seed and scores 2.4×
+the deterministic planner, which lands *below random* here — search built
+for the peaceful solo game cannot cope with wars, raids and disasters.
+Reproduce with `npm run rl:train` overnight, then
+`npm run rl:eval -- --seeds 50 --planner`. Open challenge: beat 310.6 with
+`python/train_ppo.py` (same seeds via `eval_ppo.py --seeds 50`).
+
 ### Training overnight
 
 ```bash
