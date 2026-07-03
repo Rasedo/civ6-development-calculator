@@ -1,20 +1,27 @@
 """Vectorized (batched) port of the TypeScript engine's economic core.
 
-Phase 1 scope — one auto-settled city per game, peaceful world:
-tile yields → citizen assignment → city stats (housing, amenities) →
-growth/starvation → production (City Center buildings) → cultural border
-expansion → research with eureka discounts. Every formula mirrors
-src/core/*.ts; gpu/parity_test.py proves turn-exact agreement against
-traces recorded from the real engine (scripts/export-gpu.ts).
+Phase 2 scope — a peaceful multi-city empire per game: the capital trains
+settlers (pop-gated, cost rising per city) and founds cities at
+fixture-planned sites as they complete; every city then runs tile yields →
+citizen assignment → city stats (housing, amenities) → growth/starvation →
+production (City Center buildings) → cultural border expansion on the
+SHARED ownership map → empire research with eureka discounts.
 
-All state lives in [B, ...] torch tensors, so thousands of games step in
-lockstep — float64 on CPU for parity, float32 on CUDA for throughput.
+State lives in [B, C, ...] torch tensors (B games × C city slots stepping
+in lockstep; a slot is dead until its city is founded). Cities within one
+game interact only through the tile-owner map, and the TS engine resolves
+border growth in founding order — so everything is batched across B and C
+except the border loop, which walks the C slots sequentially (C is tiny).
+
+Every formula mirrors src/core/*.ts; gpu/parity_test.py proves turn-exact
+agreement against traces recorded from the real engine
+(scripts/export-gpu.ts). float64 on CPU for parity, float32 on CUDA for
+throughput.
 """
 
 from __future__ import annotations
 
 import json
-import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,6 +80,9 @@ class Rules:
     housing_coastal: float
     housing_none: float
     amenity_tiers: list  # [(min, growth, yield)]
+    settler_base: float
+    settler_per_city: float
+    settler_pop_gate: int
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -102,6 +112,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         housing_coastal=r["housing"]["coastal"],
         housing_none=r["housing"]["none"],
         amenity_tiers=[(t["min"], t["growth"], t["yield"]) for t in r["amenityTiers"]],
+        settler_base=r["scenario"]["settlerBase"],
+        settler_per_city=r["scenario"]["settlerPerCity"],
+        settler_pop_gate=r["scenario"]["settlerPopGate"],
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -127,14 +140,13 @@ def load_fixture(path: Path) -> dict:
 # The batched simulation
 # ---------------------------------------------------------------------------
 
-GROWTH_LOOPS = 1  # TS grows at most one pop per turn
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 4
 
 
 class BatchSim:
-    """B games stepping in lockstep. Build from fixtures (parity) or by
-    replicating one fixture B times (benchmark)."""
+    """B games × C city slots stepping in lockstep. Build from fixtures
+    (parity) or by replicating one fixture B times (benchmark)."""
 
     def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64):
         self.rules = rules
@@ -145,33 +157,54 @@ class BatchSim:
         self.B, self.W, self.H = B, f0["width"], f0["height"]
         T = self.W * self.H
         self.T = T
+        C = len(f0["cities"])
+        assert all(len(f["cities"]) == C for f in fixtures), "fixtures must share a city-slot count"
+        self.C = C
 
         def ften(getter, shape_tail=()):
             return torch.tensor([getter(f) for f in fixtures], dtype=dtype, device=device).reshape(B, *shape_tail)
 
+        # --- static map -------------------------------------------------------
         self.tile_yields = ften(lambda f: [t["y"] for t in f["tiles"]], (T, 6))
         self.workable = torch.tensor([[t["workable"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self.center = torch.tensor([f["centerIndex"] for f in fixtures], dtype=torch.long, device=device)
-        self.center_yields = ften(lambda f: f["centerYields"], (6,))
-        self.base_maintenance = ften(lambda f: f["baseMaintenance"])
+        self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+
+        # --- static per-city-slot data (sites are known upfront; `alive`
+        # gates their use until the city is actually founded) ------------------
+        self.site = torch.tensor([[c["site"] for c in f["cities"]] for f in fixtures], dtype=torch.long, device=device)
+        self.center_yields = ften(lambda f: [c["centerYields"] for c in f["cities"]], (C, 6))
+        self.base_maintenance = ften(lambda f: [c["baseMaintenance"] for c in f["cities"]], (C,))
         water = [
-            rules.housing_fresh if f["freshWater"] else rules.housing_coastal if f["coastal"] else rules.housing_none
+            [
+                rules.housing_fresh if c["freshWater"] else rules.housing_coastal if c["coastal"] else rules.housing_none
+                for c in f["cities"]
+            ]
             for f in fixtures
         ]
         self.water_housing = torch.tensor(water, dtype=dtype, device=device)
-        self.river_center = torch.tensor([bool(f["riverAtCenter"]) for f in fixtures], dtype=torch.bool, device=device)
-        self.owned = torch.tensor([f["ownedInit"] for f in fixtures], dtype=torch.bool, device=device)
+        self.river_center = torch.tensor(
+            [[bool(c["riverAtCenter"]) for c in f["cities"]] for f in fixtures], dtype=torch.bool, device=device
+        )
+        self.dist = torch.stack(
+            [torch.stack([hex_distance_from(self.W, self.H, c["site"]) for c in f["cities"]]) for f in fixtures]
+        ).to(device=device, dtype=torch.int16)  # [B, C, T]
 
-        # Distance-from-center and neighbors are per-map (same size for all).
-        dists = torch.stack([hex_distance_from(self.W, self.H, f["centerIndex"]) for f in fixtures]).to(device)
-        self.dist = dists  # [B, T]
-        self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+        # The Palace exists only in the capital (slot 0).
+        pal_y = torch.zeros(C, 6, dtype=dtype, device=device)
+        pal_y[0] = rules.palace_yields.to(device=device, dtype=dtype)
+        self.palace_slot_yields = pal_y
+        slot0 = torch.zeros(C, dtype=dtype, device=device)
+        slot0[0] = 1.0
+        self.palace_slot_housing = slot0 * rules.palace_housing
+        self.palace_slot_amenities = slot0 * rules.palace_amenities
 
         # Boost schedules: [turn, kind(0 tech/1 civic), idx] per game.
         self.boost_schedule = [f.get("boostSchedule", []) for f in fixtures]
 
         NB, NT, NC = len(rules.b_cost), len(rules.t_cost), len(rules.c_cost)
+        self.NB = NB
+        self.SETTLER = NB  # production sentinel one past the building table
         self.rules_dev = Rules(
             **{
                 k: (v.to(device=device, dtype=dtype) if isinstance(v, torch.Tensor) and v.is_floating_point() else v.to(device) if isinstance(v, torch.Tensor) else v)
@@ -179,18 +212,26 @@ class BatchSim:
             }
         )
 
+        # --- dynamic state ------------------------------------------------------
         z = lambda *shape, dt=dtype: torch.zeros(*shape, dtype=dt, device=device)
         self.turn = 1
-        self.pop = torch.ones(B, dtype=torch.long, device=device)
-        self.food_box = z(B)
-        self.culture_box = z(B)
-        self.tiles_acquired = torch.zeros(B, dtype=torch.long, device=device)
+        self.alive = torch.zeros(B, C, dtype=torch.bool, device=device)
+        self.alive[:, 0] = True
+        self.pop = torch.zeros(B, C, dtype=torch.long, device=device)
+        self.pop[:, 0] = 1
+        self.food_box = z(B, C)
+        self.culture_box = z(B, C)
+        self.tiles_acquired = torch.zeros(B, C, dtype=torch.long, device=device)
+        self.owner = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
+        self.buildings = torch.zeros(B, C, NB, dtype=torch.bool, device=device)
+        self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
+        self.cur_cost = z(B, C)
+        self.progress = z(B, C)
+        self.settlers = torch.zeros(B, dtype=torch.long, device=device)
+        self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
         self.treasury = z(B)
         self.science_total = z(B)
         self.culture_total = z(B)
-        self.buildings = torch.zeros(B, NB, dtype=torch.bool, device=device)
-        self.current = torch.full((B,), -1, dtype=torch.long, device=device)
-        self.progress = z(B)
         self.techs = torch.zeros(B, NT, dtype=torch.bool, device=device)
         self.civics = torch.zeros(B, NC, dtype=torch.bool, device=device)
         self.tech_boosted = torch.zeros(B, NT, dtype=torch.bool, device=device)
@@ -202,9 +243,10 @@ class BatchSim:
 
         # Precomputed static prereq masks would race with completion inside a
         # turn; availability is recomputed per loop (cheap: NT ≤ 32).
-        self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT)
-        self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC)
+        self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
+        self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
         self._arangeT = torch.arange(T, device=device)
+        self._arangeNB = torch.arange(NB, device=device)
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -254,7 +296,8 @@ class BatchSim:
     # --- one full turn -----------------------------------------------------------
 
     def step(self) -> None:
-        r, B, dev = self.rules, self.B, self.device
+        r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
+        rd = self.rules_dev
 
         # Boost schedule fires at the start of the turn (mirrors detectBoosts
         # running before research advances).
@@ -263,112 +306,148 @@ class BatchSim:
                 if e["turn"] == self.turn:
                     (self.tech_boosted if e["kind"] == "tech" else self.civic_boosted)[b, e["idx"]] = True
 
-        # --- scripted production pick (cheapest available building) -------------
+        # --- scripted production picks ------------------------------------------
+        # Capital first: a settler when sites remain and pop reached the gate
+        # (mirrors the exporter script; cost mirrors settlerCost()).
+        empty = self.alive & (self.current == -1)
+        n_cities = self.alive.sum(dim=1)
+        queued_settlers = (self.current == self.SETTLER).sum(dim=1)
+        want_settler = empty[:, 0] & (self.settlers_queued < (C - 1)) & (self.pop[:, 0] >= r.settler_pop_gate)
+        s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers + queued_settlers).clamp(min=0).to(self.dtype)
+        self.current[:, 0] = torch.where(want_settler, torch.full_like(self.current[:, 0], self.SETTLER), self.current[:, 0])
+        self.cur_cost[:, 0] = torch.where(want_settler, s_cost, self.cur_cost[:, 0])
+        self.progress[:, 0] = torch.where(want_settler, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
+        self.settlers_queued = self.settlers_queued + want_settler.long()
+
+        # Everyone else (and the capital once settlers are done): cheapest
+        # available City Center building.
+        empty = self.alive & (self.current == -1)
         unlocked = torch.where(
-            self.rules_dev.b_unlock.unsqueeze(0) >= 0,
-            self.techs.gather(1, self.rules_dev.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
-            torch.ones(B, len(r.b_cost), dtype=torch.bool, device=dev),
-        )
-        buildable = unlocked & ~self.buildings & (~self.rules_dev.b_river.unsqueeze(0) | self.river_center.unsqueeze(1))
-        first = torch.where(buildable, torch.arange(len(r.b_cost), device=dev).unsqueeze(0), len(r.b_cost)).min(dim=1).values
-        pick = torch.where((self.current == -1) & (first < len(r.b_cost)), first, self.current)
-        self.progress = torch.where((self.current == -1) & (pick != -1), torch.zeros_like(self.progress), self.progress)
-        self.current = pick
+            rd.b_unlock.unsqueeze(0) >= 0,
+            self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.ones(B, self.NB, dtype=torch.bool, device=dev),
+        )  # [B, NB]
+        buildable = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
+        first = torch.where(buildable, self._arangeNB.view(1, 1, -1), self.NB).min(dim=2).values  # [B, C]
+        pickable = empty & (first < self.NB)
+        self.progress = torch.where(pickable, torch.zeros_like(self.progress), self.progress)
+        self.cur_cost = torch.where(pickable, rd.b_cost[first.clamp(max=self.NB - 1)], self.cur_cost)
+        self.current = torch.where(pickable, first, self.current)
 
         # --- worked tiles + city yields ------------------------------------------
-        cand = self.owned & self.workable & (self.dist <= 3) & (self._arangeT.unsqueeze(0) != self.center.unsqueeze(1))
-        score = (self.tile_yields * self.rules_dev.focus_base).sum(dim=2)
-        score = torch.where(cand, score, torch.tensor(-1e18, dtype=self.dtype, device=dev))
-        score = score - self._arangeT.to(self.dtype) * 1e-9  # tie: lowest index first
-        k = int(self.pop.max().item())
-        top_scores, top_idx = score.topk(k, dim=1)
-        take = (torch.arange(k, device=dev).unsqueeze(0) < self.pop.unsqueeze(1)) & (top_scores > -1e17)
-        worked_y = (self.tile_yields.gather(1, top_idx.unsqueeze(2).expand(-1, -1, 6)) * take.unsqueeze(2)).sum(dim=1)
+        slot_ids = torch.arange(C, device=dev).view(1, C, 1)
+        cand = (
+            (self.owner.unsqueeze(1) == slot_ids)
+            & self.workable.unsqueeze(1)
+            & (self.dist <= 3)
+            & (self._arangeT.view(1, 1, T) != self.site.unsqueeze(2))
+        )  # [B, C, T]
+        tile_score = (self.tile_yields * rd.focus_base).sum(dim=2)  # [B, T]
+        score = torch.where(cand, tile_score.unsqueeze(1), torch.tensor(-1e18, dtype=self.dtype, device=dev))
+        score = score - self._arangeT.to(self.dtype).view(1, 1, T) * 1e-9  # tie: lowest index first
+        k = max(int(self.pop.max().item()), 1)
+        top_scores, top_idx = score.topk(k, dim=2)
+        take = (torch.arange(k, device=dev).view(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)
+        ty = self.tile_yields.unsqueeze(1).expand(B, C, T, 6).gather(2, top_idx.unsqueeze(-1).expand(B, C, k, 6))
+        worked_y = (ty * take.unsqueeze(-1).to(self.dtype)).sum(dim=2)  # [B, C, 6]
 
-        b_y = (self.buildings.to(self.dtype) @ self.rules_dev.b_yields)
-        total = worked_y + self.center_yields + self.rules_dev.palace_yields.unsqueeze(0) + b_y
+        bf = self.buildings.to(self.dtype)
+        b_y = torch.einsum("bcn,nk->bck", bf, rd.b_yields)
+        total = worked_y + self.center_yields + self.palace_slot_yields.unsqueeze(0) + b_y
         popf = self.pop.to(self.dtype)
-        total[:, 3] += popf * r.citizen_science
-        total[:, 4] += popf * r.citizen_culture
+        total[:, :, 3] += popf * r.citizen_science
+        total[:, :, 4] += popf * r.citizen_culture
 
-        amen_have = self.rules.palace_amenities + (self.buildings.to(self.dtype) @ self.rules_dev.b_amenities)
+        amen_have = self.palace_slot_amenities.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_amenities)
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
         growth_f, yield_f = self._amenity_factors(amen_have - amen_need)
-        total[:, 1:] *= yield_f.unsqueeze(1)  # non-food × amenity factor
-        maintenance = self.base_maintenance + (self.buildings.to(self.dtype) @ self.rules_dev.b_maintenance)
-        total[:, 2] -= maintenance
+        total[:, :, 1:] *= yield_f.unsqueeze(2)  # non-food × amenity factor
+        maintenance = self.base_maintenance + torch.einsum("bcn,n->bc", bf, rd.b_maintenance)
+        total[:, :, 2] -= maintenance
 
-        housing = self.water_housing + r.palace_housing + (self.buildings.to(self.dtype) @ self.rules_dev.b_housing)
+        housing = self.water_housing + self.palace_slot_housing.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_housing)
+
+        # Dead slots contribute nothing (their static center yields are preloaded).
+        total = total * self.alive.unsqueeze(2).to(self.dtype)
 
         # --- production ------------------------------------------------------------
         has_item = self.current >= 0
-        self.progress = torch.where(has_item, self.progress + total[:, 1], self.progress)
-        cost = self.rules_dev.b_cost.gather(0, self.current.clamp(min=0))
-        done = has_item & (self.progress >= cost)
-        if done.any():
-            rows = done.nonzero(as_tuple=True)[0]
-            self.buildings[rows, self.current[rows]] = True
-            self.current = torch.where(done, torch.full_like(self.current, -1), self.current)
-            self.progress = torch.where(done, torch.zeros_like(self.progress), self.progress)  # overflow drops (queue empty)
+        self.progress = torch.where(has_item, self.progress + total[:, :, 1], self.progress)
+        done = has_item & (self.progress >= self.cur_cost)
+        made_settler = done & (self.current == self.SETTLER)
+        self.settlers = self.settlers + made_settler.sum(dim=1)
+        made_building = done & (self.current < self.NB)
+        if made_building.any():
+            bi, ci = made_building.nonzero(as_tuple=True)
+            self.buildings[bi, ci, self.current[bi, ci]] = True
+        self.current = torch.where(done, torch.full_like(self.current, -1), self.current)
+        self.progress = torch.where(done, torch.zeros_like(self.progress), self.progress)  # overflow drops (queue empty)
 
         # --- growth ------------------------------------------------------------------
-        surplus = total[:, 0] - popf * r.food_per_citizen
-        head = (housing - popf)
+        surplus = total[:, :, 0] - popf * r.food_per_citizen
+        head = housing - popf
         hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
         effective = torch.where(surplus > 0, surplus * hf * growth_f, surplus)
         self.food_box = self.food_box + effective
         need = self._growth_needed(self.pop)
-        grow = self.food_box >= need
-        self.pop = torch.where(grow, self.pop + 1, self.pop)
+        grow = self.alive & (self.food_box >= need)
+        self.pop = self.pop + grow.long()
         self.food_box = torch.where(grow, self.food_box - need, self.food_box)
-        starve = ~grow & (self.food_box < 0)
+        starve = self.alive & ~grow & (self.food_box < 0)
         self.pop = torch.where(starve, (self.pop - 1).clamp(min=1), self.pop)
         self.food_box = torch.where(starve, torch.zeros_like(self.food_box), self.food_box)
 
         # --- borders --------------------------------------------------------------------
-        self.culture_box = self.culture_box + total[:, 4]
+        # The TS engine expands each city fully, in founding order, within a
+        # turn — later cities see earlier claims. C is tiny, so walk slots.
+        self.culture_box = self.culture_box + total[:, :, 4]
         y_sum = self.tile_yields.sum(dim=2)
-        for _ in range(BORDER_LOOPS):
-            cost_b = self._border_cost(self.tiles_acquired)
-            ready = self.culture_box >= cost_b
-            if not ready.any():
-                break
-            adj_owned = self.owned.gather(1, self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)).reshape(B, self.T, 6)
-            adj_owned = (adj_owned & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
-            cand_b = ~self.owned & (self.dist <= 5) & adj_owned
-            # order: dist asc, resource priority desc, yield sum desc, index asc
-            key = (
-                self.dist.to(self.dtype) * 1e12
-                - self.res_priority.to(self.dtype) * 1e9
-                - torch.round(y_sum * 1000) * 1e4
-                + self._arangeT.to(self.dtype)
-            )
-            key = torch.where(cand_b, key, torch.tensor(float("inf"), dtype=self.dtype, device=dev))
-            best = key.argmin(dim=1)
-            has_cand = cand_b.any(dim=1)
-            expand = ready & has_cand
-            if expand.any():
-                rows = expand.nonzero(as_tuple=True)[0]
-                self.owned[rows, best[rows]] = True
-                self.culture_box = torch.where(expand, self.culture_box - cost_b, self.culture_box)
-                self.tiles_acquired = torch.where(expand, self.tiles_acquired + 1, self.tiles_acquired)
-            capped = ready & ~has_cand
-            self.culture_box = torch.where(capped, torch.minimum(self.culture_box, cost_b), self.culture_box)
-            if not (ready & has_cand).any():
-                break
+        neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
+        neigh_valid = (self.neigh >= 0).view(1, T, 6)
+        for c in range(C):
+            for _ in range(BORDER_LOOPS):
+                cost_b = self._border_cost(self.tiles_acquired[:, c])
+                ready = self.alive[:, c] & (self.culture_box[:, c] >= cost_b)
+                if not ready.any():
+                    break
+                owner_nb = self.owner.gather(1, neigh_flat).reshape(B, T, 6)
+                adj_own = ((owner_nb == c) & neigh_valid).any(dim=2)
+                cand_b = (self.owner == -1) & (self.dist[:, c] <= 5) & adj_own
+                # order: dist asc, resource priority desc, yield sum desc, index asc
+                key = (
+                    self.dist[:, c].to(self.dtype) * 1e12
+                    - self.res_priority.to(self.dtype) * 1e9
+                    - torch.round(y_sum * 1000) * 1e4
+                    + self._arangeT.to(self.dtype)
+                )
+                key = torch.where(cand_b, key, torch.tensor(float("inf"), dtype=self.dtype, device=dev))
+                best = key.argmin(dim=1)
+                has_cand = cand_b.any(dim=1)
+                expand = ready & has_cand
+                if expand.any():
+                    rows = expand.nonzero(as_tuple=True)[0]
+                    self.owner[rows, best[rows]] = c
+                    self.culture_box[:, c] = torch.where(expand, self.culture_box[:, c] - cost_b, self.culture_box[:, c])
+                    self.tiles_acquired[:, c] = self.tiles_acquired[:, c] + expand.long()
+                capped = ready & ~has_cand
+                self.culture_box[:, c] = torch.where(capped, torch.minimum(self.culture_box[:, c], cost_b), self.culture_box[:, c])
+                if not expand.any():
+                    break
 
         # --- empire accumulators ----------------------------------------------------------
-        self.treasury = self.treasury + total[:, 2]
-        self.science_total = self.science_total + total[:, 3]
-        self.culture_total = self.culture_total + total[:, 4]
+        self.treasury = self.treasury + total[:, :, 2].sum(dim=1)
+        self.science_total = self.science_total + total[:, :, 3].sum(dim=1)
+        self.culture_total = self.culture_total + total[:, :, 4].sum(dim=1)
 
         # --- research ---------------------------------------------------------------------
-        self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, self.rules_dev.t_cost, self._prereq_t.to(dev))
-        self.tech_prog = self.tech_prog + total[:, 3]
+        turn_science = total[:, :, 3].sum(dim=1)
+        turn_culture = total[:, :, 4].sum(dim=1)
+        self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
+        self.tech_prog = self.tech_prog + turn_science
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_tech >= 0
             eff = self._eff_cost(
-                self.rules_dev.t_cost.gather(0, self.cur_tech.clamp(min=0)),
+                rd.t_cost.gather(0, self.cur_tech.clamp(min=0)),
                 self.tech_boosted.gather(1, self.cur_tech.clamp(min=0).unsqueeze(1)).squeeze(1),
             )
             fin = active & (self.tech_prog >= eff)
@@ -378,14 +457,14 @@ class BatchSim:
             self.techs[rows, self.cur_tech[rows]] = True
             self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
             self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
-            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, self.rules_dev.t_cost, self._prereq_t.to(dev))
+            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
 
-        self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, self.rules_dev.c_cost, self._prereq_c.to(dev))
-        self.civic_prog = self.civic_prog + total[:, 4]
+        self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+        self.civic_prog = self.civic_prog + turn_culture
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_civic >= 0
             eff = self._eff_cost(
-                self.rules_dev.c_cost.gather(0, self.cur_civic.clamp(min=0)),
+                rd.c_cost.gather(0, self.cur_civic.clamp(min=0)),
                 self.civic_boosted.gather(1, self.cur_civic.clamp(min=0).unsqueeze(1)).squeeze(1),
             )
             fin = active & (self.civic_prog >= eff)
@@ -395,26 +474,57 @@ class BatchSim:
             self.civics[rows, self.cur_civic[rows]] = True
             self.civic_prog = torch.where(fin, self.civic_prog - eff, self.civic_prog)
             self.cur_civic = torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic)
-            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, self.rules_dev.c_cost, self._prereq_c.to(dev))
+            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+
+        # --- founding (mirrors the plannedSettles loop at the end of endTurn) ------
+        # Slots fill strictly in order, so scanning ascending handles several
+        # foundings in one turn: founding slot c makes slot c+1 eligible.
+        for c in range(1, C):
+            found = (self.settlers > 0) & self.alive[:, c - 1] & ~self.alive[:, c]
+            if not found.any():
+                continue
+            rows = found.nonzero(as_tuple=True)[0]
+            s_idx = self.site[rows, c]
+            self.alive[rows, c] = True
+            self.pop[rows, c] = 1
+            self.food_box[rows, c] = 0
+            self.culture_box[rows, c] = 0
+            self.tiles_acquired[rows, c] = 0
+            self.current[rows, c] = -1
+            self.progress[rows, c] = 0
+            self.settlers[rows] -= 1
+            # Claim the center (unconditionally, as foundCity does) plus any
+            # unowned first-ring tiles; the center becomes a district tile.
+            self.owner[rows, s_idx] = c
+            self.workable[rows, s_idx] = False
+            nb = self.neigh[s_idx]  # [R, 6]
+            for d in range(6):
+                n_d = nb[:, d]
+                ok = (n_d >= 0) & (self.owner[rows, n_d.clamp(min=0)] == -1)
+                self.owner[rows[ok], n_d[ok]] = c
 
         self.turn += 1
 
     # --- parity trace row (matches scripts/export-gpu.ts encoding) ----------------
 
     def trace_row(self) -> torch.Tensor:
-        return torch.stack(
-            [
-                torch.full((self.B,), float(self.turn), dtype=self.dtype, device=self.device),
-                self.pop.to(self.dtype),
-                torch.round(self.food_box * 1000),
-                torch.round(self.treasury * 1000),
-                torch.round(self.science_total * 1000),
-                torch.round(self.culture_total * 1000),
-                self.techs.sum(dim=1).to(self.dtype),
-                self.civics.sum(dim=1).to(self.dtype),
-                self.owned.sum(dim=1).to(self.dtype),
-                self.buildings.sum(dim=1).to(self.dtype) + 1,  # +PALACE
-                torch.round(self.culture_box * 1000),
-            ],
-            dim=1,
-        )
+        cols = [
+            torch.full((self.B,), float(self.turn), dtype=self.dtype, device=self.device),
+            self.techs.sum(dim=1).to(self.dtype),
+            self.civics.sum(dim=1).to(self.dtype),
+            self.settlers.to(self.dtype),
+            self.alive.sum(dim=1).to(self.dtype),
+            torch.round(self.treasury * 1000),
+            torch.round(self.science_total * 1000),
+            torch.round(self.culture_total * 1000),
+        ]
+        for c in range(self.C):
+            cols += [
+                self.pop[:, c].to(self.dtype),
+                (self.owner == c).sum(dim=1).to(self.dtype),
+                self.buildings[:, c].sum(dim=1).to(self.dtype) + (1 if c == 0 else 0),  # +PALACE in the capital
+                self.tiles_acquired[:, c].to(self.dtype),
+                torch.round(self.food_box[:, c] * 1000),
+                torch.round(self.culture_box[:, c] * 1000),
+            ]
+        return torch.stack(cols, dim=1)

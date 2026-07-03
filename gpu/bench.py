@@ -4,8 +4,9 @@
     python gpu/bench.py --turns 100 --batches 1,256,4096
 
 Reports game-turns/second (one 'turn' = one full simulated turn of ONE
-game; a batch of 4096 stepping once = 4096 turns). Compare with the
-TypeScript engine: ~3 episodes/sec/core × ~100 turns ≈ 300 turns/sec/core.
+game — all its cities; a batch of 4096 stepping once = 4096 turns).
+Compare with the TypeScript engine on the identical multi-city scenario:
+~1,240 game-turns/sec on one CPU core.
 """
 
 from __future__ import annotations
