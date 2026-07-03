@@ -289,15 +289,23 @@ seeds/gen, converged ≈ gen 110 on a Ryzen 9 3900X (~1 h):
 | greedy (hand baseline) | 221.8 | [210.0, 233.8] | — |
 | **trained (ES, MLP)** | **310.6** | **[294.4, 329.2]** | **100%** |
 | **trained (PPO, MLP)** | **310.4** | **[292.8, 327.9]** | — |
+| trained (PPO, CNN map + features) | 281.4 | [262.9, 299.9] | — |
 | empire planner (beam search) | 130.9 | [102.5, 160.9] | 0% |
 
 PPO (2M decisions ≈ 8k episodes, 3900X) and ES (~66k episodes) land in a
 **statistical dead heat** despite being entirely different algorithms —
-PPO got there on ~8× fewer episodes, but neither breaks ~310. Two very
-different optimizers converging on the same score over the same
-hand-built features points at a **representation ceiling**, not an
-optimization one: the next lever is what the policy *sees* (the CNN map
-observation), not how long it trains.
+PPO got there on ~8× fewer episodes, but neither breaks ~310. The CNN
+run was the falsifying experiment for the obvious explanation: it sees
+the same hand-built features **plus** the raw map (20 semantic planes),
+yet after 1.3M steps (RTX 3070 Ti, plateaued 900k steps with `approx_kl`
+pinned ~0.05) it finished **below** both MLPs — its CI doesn't even
+reach 310. So map-vision doesn't pay for its optimization cost at this
+budget, and the twin ~310 result reads less like a *representation*
+ceiling and more like an **action-space ceiling**: macro decisions
+(production/research/policies) are saturated, and the remaining score
+lives in what the autopilot owns — unit orders, settle timing, war. The
+GPU engine's env (`gpu/`), where the policy commands units directly, is
+the testbed for that hypothesis.
 
 The learned policy beats the hand baseline on every seed and scores 2.4×
 the deterministic planner, which lands *below random* here — search built
