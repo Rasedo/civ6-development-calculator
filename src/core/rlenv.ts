@@ -214,7 +214,7 @@ function autoMilitary(state: GameState, unit: Unit): void {
   if (home !== undefined && home !== unit.tileIndex) orderMove(state, unit.id, home);
 }
 
-function playerAutoPhase(state: GameState): void {
+export function playerAutoPhase(state: GameState): void {
   if (!state.unitsMode) return;
   for (const unit of [...state.units]) {
     if (unit.owner !== 'player' || unit.movesLeft <= 0) continue;

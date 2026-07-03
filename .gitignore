@@ -1,6 +1,8 @@
 node_modules/
 dist/
+dist-rl/
 map-preview.png
 package-lock.json
 *.local
 rl-weights.json
+rl-checkpoint.json

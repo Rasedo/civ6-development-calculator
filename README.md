@@ -1,23 +1,21 @@
 # Civ 6 Development Calculator
 
-A prototype of a Civilization VI city-development calculator: it generates a
-Civ 6-style hex map (with natural wonders), lets you found cities, place tile
-improvements, districts and buildings, research the tech & civic trees, run a
-government with policy cards, and simulates yields, growth, cultural border
-expansion and production over turns — assuming you are **alone on the map**
-with **no random events**.
+A Civilization VI development simulator and optimizer: it generates a Civ
+6-style hex map (natural wonders, rivers-on-edges, resources), lets you found
+cities, place improvements/districts/buildings/wonders, research the tech &
+civic trees, run a government with policy cards, found a religion and trade —
+then simulates everything over turns. On top of the calculator sit
+optimization advisors (settle/placement/build-order/empire-wide beam search)
+and a full **reinforcement-learning environment** with an evolution-strategy
+trainer.
 
-Stage 1 delivered the map/yield/city/turn engine; stage 2 added natural
-wonders, cultural border growth (plus tile purchase) and tech/civic trees with
-governments & policies; stage 3 added the optimization advisors; stage 4 the
-real-map import mod; stage 5 world wonders, great people and specialists;
-stage 6 the fidelity pass (eurekas, cost scaling, appeal, maintenance);
-stage 7 the build-order search; stage 8 religion and trade routes; stage 9
-settlers and the empire-wide planner; stage 10 live-sync with a running game;
-stages 11a–11b the units-mode environment — builders, a military roster,
-combat, and randomized barbarians (camps, raiders, pillaging, city sieges) —
-the stochastic foundation for reinforcement learning (fog of war and
-disasters are next).
+The world is optionally hostile and contested: units mode adds builders,
+military and randomized barbarians; fog of war hides the map; seeded
+disasters (floods, droughts, storms, eruptions) reshape tiles; **city-states**
+court your envoys; and scripted **rival civilizations** settle, expand, race
+you for great people, pantheons and beliefs, declare war, raid — and can be
+conquered. All randomness flows through a seeded in-state RNG, so every run
+replays exactly from (seed, action sequence).
 
 > Tip: `npm run preview:map [seed]` renders a generated map to `map-preview.png`
 > headlessly (no browser needed) and prints terrain stats plus a scripted
@@ -31,6 +29,9 @@ npm run dev          # dev server at http://localhost:5173
 npm test             # engine unit tests (vitest)
 npm run build        # type-check + production build into dist/
 npm run preview:map  # headless: map stats + scripted playthrough + map-preview.png
+
+npm run rl:train     # train a policy (evolution strategy, parallel workers)
+npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out seeds
 ```
 
 ## What's simulated
@@ -173,28 +174,110 @@ npm run preview:map  # headless: map stats + scripted playthrough + map-preview.
   pillaging), not captured. All in-game randomness flows through a seeded RNG
   stored in the game state, so every stochastic run is replayable from
   (seed, action sequence) and clone-safe for planner rollouts and RL.
+- **Fog of war** (toggle, implies units mode): unexplored tiles are hidden and
+  unusable (no settling, no inspection); founding, movement and border growth
+  reveal; scouts take auto-explore standing orders; barbarian camps rise in
+  the fog; **tribal villages** pay a seeded reward (gold, faith, population,
+  a eureka, culture, or a map reveal) to the first unit that steps in.
+- **Disasters** (toggle): volcanoes dot the mountains; seeded floods,
+  eruptions, droughts and storms pillage improvements but leave permanent
+  tile fertility behind — the risk/reward flows through `tileYields`, so
+  every advisor prices it automatically.
+- **Economy levers**: buy buildings/units/settlers outright with gold (4×
+  production cost) and worship buildings with faith; builders **chop** woods/
+  rainforest/marsh and **harvest** bonus resources for era-scaled yield lumps
+  (only inside your borders — the classic chop economy); repeatable **district
+  projects** (Research Grants, Festival, Prayers, Investment, Shipping,
+  Training) convert production into yields plus great-person points.
+- **City-states** (six types): placed at map creation, their territory blocks
+  settling and border growth. Influence accrues into **envoys** (quests pay
+  extra): 1 = +2 type-yield in your capital, 3 = +2 in every matching
+  district, 6 = +4; suzerainty at 3+ (trade type: +1 route capacity). They
+  accept trade routes (+3 gold + their specialty).
+- **Rival civilizations** (toggle): scripted empires with real cities,
+  territory and units — they settle, grow, expand borders and train
+  era-scaled military on a seeded schedule; they **race you** for the shared
+  great-people pool and take pantheons/beliefs out of yours; when strong and
+  close they **declare war** and raid exactly like barbarians; you can declare
+  war, buy peace (gold scales with duration), or batter their cities to 0 HP
+  and **capture** them (population hit, territory transfers).
 
-## Known simplifications (stage 1)
+## Reinforcement learning
+
+`src/core/rlenv.ts` wraps the full simulation as a gym-style macro-action
+environment (`CivEnv`). The agent takes every strategic decision — what each
+idle city builds (buildings, districts at their best tile, wonders, projects,
+units, settlers aimed at ranked sites, gold/faith purchases), which tech and
+civic to research, which policy cards to slot, when to switch government,
+and where envoys go. Builders, military defense, scouting, citizens, borders
+and all the world phases (barbarians, disasters, city-states, rivals) run on
+autopilot between decisions.
+
+- **Observation** (30 dims): empire yields, treasury/faith, research progress,
+  threat/pillage/HP, housing & amenity headroom, great-person progress,
+  envoys/suzerainty, war flag, strength ratio vs the strongest rival, border
+  pressure.
+- **Candidates** (≤24 per decision, 29 features each): kind one-hots plus
+  honest costs, turns-to-complete, adjacency, site score, projected per-yield
+  deltas (policy cards are evaluated by slotting them into the live state and
+  diffing empire yields), housing/amenity adds, threat context.
+- **Reward**: shaped empire-score delta per decision + terminal score at the
+  horizon. Fully deterministic from (seed, action indices).
+- **Policies** (`src/core/policy.ts`): linear, bilinear (state-aware), or a
+  small tanh MLP (~1.5k params) — all pure TS.
+- **Trainer** (`npm run rl:train`): OpenAI-style evolution strategy with
+  antithetic pairs, centered-rank shaping and Adam; fresh training seeds each
+  generation; held-out evaluation with best-weights tracking; worker-thread
+  parallelism (episodes bundle to plain JS first — no TS overhead);
+  checkpoint every generation with `--resume`; Ctrl+C-safe.
+- **Evaluator** (`npm run rl:eval`): 50 paired held-out seeds by default with
+  bootstrap 95% CIs and paired win-rates; `--planner` adds the beam-search
+  empire planner as a baseline (same maps, same autopilot).
+
+### Training overnight
+
+```bash
+# sensible overnight run (adjust --workers to your cores - 1)
+npm run rl:train -- --gens 2000 --pop 32 --seeds-per-gen 8 --workers 7
+
+# resume after an interruption
+npm run rl:train -- --resume --gens 4000 --pop 32 --seeds-per-gen 8 --workers 7
+
+# then compare against the baselines
+npm run rl:eval -- --seeds 50 --planner
+```
+
+Throughput is roughly **3–4 episodes/sec per worker** at horizon 100 (44×26
+map, everything enabled). One generation costs `pop × seeds-per-gen`
+episodes: pop 32 × 8 seeds ≈ 256 episodes ≈ 10 s on 7 workers, so an 8-hour
+run is ~2,500–3,000 generations. Knobs worth trying: `--arch bilinear` (fewer
+params, faster to converge), `--hidden 32`, `--sigma 0.1`, more
+`--seeds-per-gen` for less noisy fitness. Weight files carry the feature
+version — retrain after pulling engine changes that bump it.
+
+## Known simplifications
 
 These are deliberate; the engine is data-driven so most are easy to revisit:
 
 - Numbers are *eyeballed-but-close* to base Civ 6 — see `src/data/*.ts` to tweak
   any yield, cost or rule constant.
-- The trees are compact (pure-military/filler nodes trimmed); no eurekas or
-  inspirations; district costs stay flat (no game-progress cost scaling).
-- No diplomatic policy cards exist (nothing to be diplomatic with) — diplomatic
-  slots sit idle; Veterancy is the only military card. Some government inherent
-  bonuses are eyeballed stand-ins where the real one needs unmodeled systems.
-- Policy swaps and government changes are free anytime (Civ 6 charges gold or
-  ties them to civic completions); no anarchy or legacy bonuses.
+- The trees are compact (22 techs / 28 civics, pure-military/filler nodes
+  trimmed), so long horizons exhaust research around the medieval era.
+- No diplomatic policy cards; some government inherent bonuses are eyeballed
+  stand-ins. Policy swaps and government changes are free anytime; no anarchy
+  or legacy bonuses.
 - Border-growth tile picking approximates Civ 6's priorities; no tile swapping
   between cities.
-- No city-states, barbarians, units, combat, or disasters. Great-person
-  effects are instant only (no tile activations); the wonder list is a
-  13-wonder subset; some wonder unlock techs are stand-ins for techs outside
-  the compact tree. Religion has no spread/pressure (your cities always
-  follow) and no enhancer beliefs; trade routes are domestic only, without
-  roads or plunder.
+- Rivals are *scripted*, not full AIs: real cities/units/territory but an
+  abstract economy (no real yields/queues underneath); they don't fight each
+  other or the barbarians; losing one of your cities means a sack, not a
+  capture. City-states are peaceful (no levies, no conquest of them yet).
+- Great-person effects are instant only; the wonder list is a 13-wonder
+  subset. Religion has no spread/pressure (your cities always follow) and no
+  enhancer beliefs; rival religions only contest the belief pools. Trade
+  routes have no roads or duration.
+- No unit promotions/XP, embarkation (land units stay ashore), walls/city
+  ranged strikes, or sea-level rise.
 - Citizen auto-assignment is a simple weighted greedy (use focus + tile locks
   and manual specialists for fine control).
 - Imported maps display mirrored north–south (adjacency stays exact).
@@ -202,9 +285,11 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 ## Roadmap ideas (later stages)
 
-1. Multi-civ support (AI opponents or manually-scripted rivals) with loyalty,
-   religious spread and international trade.
-2. Deeper live-sync fidelity: queues, policies and beliefs read from the game;
+1. Deeper opponents: rival economies with real yields, rival-vs-barbarian
+   combat, city-state levies and conquest, loyalty pressure.
+2. RL escalation: spatial (CNN) observations over tile tensors, PPO via a
+   Python bridge, or planner-guided search with a learned value function.
+3. Deeper live-sync fidelity: queues, policies and beliefs read from the game;
    Firefox/Safari fallback via manual re-paste.
 
 ## Code layout
@@ -212,10 +297,13 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 ```
 src/core/   DOM-free engine: hex math (incl. edge/vertex graph for rivers),
             mapgen, yields, placement rules, city stats, game state & turns,
-            research/policy effects, optimization advisors
+            research/policy effects, economy (chops/purchases), city-states,
+            rivals, combat, fog, disasters, advisors/planners, RL env,
+            policy nets + evolution-strategy machinery
 src/data/   all game-rule data: terrains, features, resources, improvements,
-            districts, buildings, constants & formulas
+            districts, buildings, projects, city-states, rivals, constants
 src/ui/     canvas renderer + DOM panels
-tests/      vitest suites for hex math, mapgen invariants, yields, game rules
-scripts/    headless map preview / engine smoke test (writes map-preview.png)
+tests/      vitest suites (200+ tests) for every subsystem
+scripts/    headless map preview, RL trainer/evaluator, worker entry
+civ6-mod/   the MapExporter/LiveSync mod for real Civ 6 games
 ```

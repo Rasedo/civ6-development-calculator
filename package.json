@@ -8,8 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "preview:map": "vite-node scripts/preview.ts",
-    "rl:train": "vite-node scripts/train.ts",
-    "rl:eval": "vite-node scripts/evaluate.ts",
+    "rl:build": "vite build -c vite.rl.config.ts",
+    "rl:train": "npm run rl:build && node dist-rl/train.js",
+    "rl:eval": "npm run rl:build && node dist-rl/evaluate.js",
+    "rl:train:dev": "vite-node scripts/train.ts",
     "test": "vitest run"
   },
   "devDependencies": {
