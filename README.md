@@ -51,9 +51,9 @@ npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out 
   fresh-water housing, Commercial Hub adjacency and floodplains.
 - **Tile yields**: terrain + hills + feature + resource + improvement, base Civ 6 values.
 - **Improvements** (farm, mine, quarry, lumber mill, pasture, camp, plantation,
-  fishing boats, oil well) with placement validation; instant and free (builders are
-  not modeled in stage 1). Improved luxuries grant amenities (+1 to the 4 neediest
-  cities per unique luxury).
+  fishing boats, oil well) with placement validation; instant and free in the
+  classic calculator mode, real Builder charges in units mode. Improved
+  luxuries grant amenities (+1 to the 4 neediest cities per unique luxury).
 - **Cities**: 3-tile minimum spacing; founding claims the center + first ring
   only (like Civ 6); free-worked center tile floored at 2🍞/1⚙; citizens work
   tiles chosen by a per-city focus (or manual tile locks); each citizen eats
