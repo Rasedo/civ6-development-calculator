@@ -288,7 +288,16 @@ seeds/gen, converged ≈ gen 110 on a Ryzen 9 3900X (~1 h):
 | random | 182.0 | [168.6, 196.6] | 20% |
 | greedy (hand baseline) | 221.8 | [210.0, 233.8] | — |
 | **trained (ES, MLP)** | **310.6** | **[294.4, 329.2]** | **100%** |
+| **trained (PPO, MLP)** | **310.4** | **[292.8, 327.9]** | — |
 | empire planner (beam search) | 130.9 | [102.5, 160.9] | 0% |
+
+PPO (2M decisions ≈ 8k episodes, 3900X) and ES (~66k episodes) land in a
+**statistical dead heat** despite being entirely different algorithms —
+PPO got there on ~8× fewer episodes, but neither breaks ~310. Two very
+different optimizers converging on the same score over the same
+hand-built features points at a **representation ceiling**, not an
+optimization one: the next lever is what the policy *sees* (the CNN map
+observation), not how long it trains.
 
 The learned policy beats the hand baseline on every seed and scores 2.4×
 the deterministic planner, which lands *below random* here — search built
