@@ -5,8 +5,8 @@
 
 Reports game-turns/second (one 'turn' = one full simulated turn of ONE
 game — all its cities; a batch of 4096 stepping once = 4096 turns).
-Compare with the TypeScript engine on the identical multi-city scenario:
-~1,130 game-turns/sec on one CPU core.
+Compare with the TypeScript engine on the identical multi-city-plus-
+barbarians scenario: ~840 game-turns/sec on one CPU core.
 """
 
 from __future__ import annotations

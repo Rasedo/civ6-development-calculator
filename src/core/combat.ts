@@ -32,7 +32,7 @@ const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 export const CAMP_CLEAR_REWARD = 50;
-const MAX_BARB_PER_CAMP = 3;
+export const MAX_BARB_PER_CAMP = 3;
 
 // ---------------------------------------------------------------------------
 // Combat math

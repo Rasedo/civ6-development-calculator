@@ -81,6 +81,7 @@ def main() -> None:
     out = {
         "width": sim.W,
         "height": sim.H,
+        "unitsMode": int(fixtures[0].get("unitsMode", 0)),
         "buildings": [b["id"] for b in rules_raw["buildings"]],
         "techs": [t["id"] for t in rules_raw["techs"]],
         "civics": [c["id"] for c in rules_raw["civics"]],

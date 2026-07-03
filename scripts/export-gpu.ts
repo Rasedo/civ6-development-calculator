@@ -37,7 +37,10 @@ import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow } from './gpu-trace';
 import { hexDistance, neighbors } from '../src/core/hex';
-import { hasFreshWater, hasRiver, isCoastalLand, isImpassable } from '../src/core/query';
+import { hasFreshWater, hasRiver, isCoastalLand, isImpassable, isWater } from '../src/core/query';
+import { unitPassable } from '../src/core/units';
+import { MAX_BARB_PER_CAMP } from '../src/core/combat';
+import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
 import { FEATURES } from '../src/data/features';
@@ -131,6 +134,21 @@ const rules = {
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   boosts: boostRows,
+  // Barbarian rules (mirrors combat.ts). dmgBase[d+60] = 30·e^(0.04·d) is
+  // computed HERE so both engines share the exact same doubles — libm exp()
+  // may differ by an ulp between runtimes, and damage rounds to integers.
+  combat: {
+    unitHp: UNIT_HP,
+    cityMaxHp: CITY_MAX_HP,
+    maxBarbPerCamp: MAX_BARB_PER_CAMP,
+    campSpawnChance: 0.08,
+    garrisonGrowChance: 0.1,
+    spearmanAfterTurn: 60,
+    cityHealPerTurn: 20,
+    unitHealPerTurn: 10,
+    unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
+    dmgBase: Array.from({ length: 121 }, (_, i) => 30 * Math.exp(0.04 * (i - 60))),
+  },
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
     housing: BUILDINGS.PALACE?.housing ?? 0,
@@ -175,7 +193,7 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = 9001 + s * 13;
-  const state = createGame({ width: 44, height: 26, seed, withResources: true, withWonders: true });
+  const state = createGame({ width: 44, height: 26, seed, withResources: true, withWonders: true, unitsMode: true });
   const site = scoreSettleSites(state, 1)[0];
   foundCity(state, site.tileIndex);
   const capital = state.cities[0];
@@ -190,8 +208,15 @@ for (let s = 0; s < N_SEEDS; s++) {
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
       // near a natural wonder (for the ASTROLOGY-style eureka)
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
+      // land units may stand here (mirrors unitPassable)
+      pass: unitPassable(t) ? 1 : 0,
+      // statically camp-eligible (dynamic exclusions — ownership, distance
+      // to cities/camps — are the engine's job; mirrors campCandidates)
+      camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
     };
   });
+  const landTiles = map.tiles.filter((t) => !isWater(t)).length;
+  const maxCamps = Math.max(1, Math.floor(landTiles / 120));
 
   // Static per-site data, all precomputed at t=0. foundCity strips the
   // center tile's removable feature, so the stripped tile is what the
@@ -279,7 +304,19 @@ for (let s = 0; s < N_SEEDS; s++) {
     throw new Error(`seed ${seed}: only ${state.cities.length} cities founded by turn ${N_TURNS}`);
   }
 
-  const fixture = { seed, width: map.width, height: map.height, cities, tiles, ownerInit, boostSchedule, trace };
+  const fixture = {
+    seed,
+    width: map.width,
+    height: map.height,
+    unitsMode: 1,
+    maxCamps,
+    rngInit: (seed ^ 0x9e3779b9) >>> 0,
+    cities,
+    tiles,
+    ownerInit,
+    boostSchedule,
+    trace,
+  };
   writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));
   const founded = cities.filter((c) => c.foundedTurn >= 0).map((c) => `t${c.foundedTurn}`).join(' ');
   const pops = state.cities.map((c) => c.population).join('/');

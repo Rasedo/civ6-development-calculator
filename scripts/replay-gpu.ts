@@ -19,6 +19,7 @@ const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
   height: number;
+  unitsMode?: number;
   buildings: string[];
   techs: string[];
   civics: string[];
@@ -38,7 +39,14 @@ let worst = 0;
 
 for (const game of roll.games) {
   games += 1;
-  const state = createGame({ width: roll.width, height: roll.height, seed: game.seed, withResources: true, withWonders: true });
+  const state = createGame({
+    width: roll.width,
+    height: roll.height,
+    seed: game.seed,
+    withResources: true,
+    withWonders: true,
+    unitsMode: !!roll.unitsMode,
+  });
   foundCity(state, game.sites[0]);
   state.plannedSettles = game.sites.slice(1);
   state.autoResearch = false; // picks come from the action log, as in CivEnv

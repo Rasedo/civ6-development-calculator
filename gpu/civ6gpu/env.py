@@ -23,7 +23,7 @@ class BatchEnv:
 
     @property
     def obs_size(self) -> int:
-        return 6 + 6 * self.sim.C
+        return 8 + 7 * self.sim.C
 
     def reset(self) -> torch.Tensor:
         self.sim.reset()
@@ -69,9 +69,10 @@ class BatchEnv:
                 torch.where(s.current >= 0, s.progress / denom, torch.zeros_like(s.progress)),
                 s.culture_box / s._border_cost(s.tiles_acquired).clamp(min=1),
                 owned / 20.0,
+                torch.where(s.alive, s.city_hp, torch.zeros_like(s.city_hp)).to(d) / 200.0,
             ],
             dim=2,
-        )  # [B, C, 6]
+        )  # [B, C, 7]
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=s.device),
@@ -80,7 +81,9 @@ class BatchEnv:
                 s.treasury / 100.0,
                 s.tech_prog / 50.0,
                 s.civic_prog / 50.0,
+                s.u_alive.sum(dim=1).to(d) / 10.0,
+                s.n_camps.to(d),
             ],
             dim=1,
-        )  # [B, 6]
+        )  # [B, 8]
         return torch.cat([emp, per.reshape(B, -1)], dim=1)

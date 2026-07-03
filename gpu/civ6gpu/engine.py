@@ -95,6 +95,7 @@ class Rules:
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — covered-scope eureka conditions
+    combat: dict  # barbarian constants + the JS-computed damage-base table
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -130,6 +131,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
+        combat=r.get("combat", {}),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -157,6 +159,24 @@ def load_fixture(path: Path) -> dict:
 
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 4
+U_MAX = 96  # barbarian unit slots per game (append-only; runtime-asserted)
+M32 = 0xFFFFFFFF
+
+_PAIR_DIST_CACHE: dict[tuple[int, int], torch.Tensor] = {}
+
+
+def pair_distances(width: int, height: int) -> torch.Tensor:
+    """[T, T] int16 hex distance between every pair of tiles (per map shape)."""
+    key = (width, height)
+    if key not in _PAIR_DIST_CACHE:
+        rows = [hex_distance_from(width, height, i) for i in range(width * height)]
+        _PAIR_DIST_CACHE[key] = torch.stack(rows).to(torch.int16)
+    return _PAIR_DIST_CACHE[key]
+
+
+def js_round(x: torch.Tensor) -> torch.Tensor:
+    """JS Math.round: half-up toward +∞ (torch.round is half-to-even)."""
+    return torch.floor(x + 0.5)
 
 # Names of the mutable state tensors (everything reset() restores).
 _MUTABLE = [
@@ -164,6 +184,8 @@ _MUTABLE = [
     "buildings", "current", "cur_cost", "progress", "settlers", "settlers_queued",
     "treasury", "science_total", "culture_total", "techs", "civics",
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
+    "rng_state", "city_hp", "center_at", "occ",
+    "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps",
 ]
 
 
@@ -198,7 +220,10 @@ class BatchSim:
         self.workable = torch.tensor([[t["workable"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+        self.pair_dist = pair_distances(self.W, self.H).to(device)  # [T, T] int16
 
         # --- static per-city-slot data (sites are known upfront; `alive`
         # gates their use until the city is actually founded) ------------------
@@ -272,6 +297,30 @@ class BatchSim:
         self.cur_civic = torch.full((B,), -1, dtype=torch.long, device=device)
         self.tech_prog = z(B)
         self.civic_prog = z(B)
+
+        # --- the hostile world (phase 4a: barbarians) -----------------------------
+        self.units_mode = bool(f0.get("unitsMode", 0))
+        assert all(bool(f.get("unitsMode", 0)) == self.units_mode for f in fixtures)
+        cb = rules.combat
+        self.max_camps = torch.tensor([f.get("maxCamps", 0) for f in fixtures], dtype=torch.long, device=device)
+        self.K = int(self.max_camps.max().item()) if self.units_mode else 0
+        # The in-state mulberry32, one u32 per game, mirrored draw for draw.
+        self.rng_state = torch.tensor([f.get("rngInit", 0) for f in fixtures], dtype=torch.int64, device=device)
+        self.city_hp = torch.full((B, C), int(cb.get("cityMaxHp", 200)), dtype=torch.long, device=device)
+        self.center_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # city slot at tile
+        self.center_at.scatter_(1, self.site[:, :1], 0)  # the capital
+        self.occ = torch.zeros(B, T, dtype=torch.bool, device=device)  # any unit on tile
+        self.u_alive = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)
+        self.u_type = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # 0 WARRIOR / 1 SPEARMAN
+        self.u_tile = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
+        self.u_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
+        self.next_slot = torch.zeros(B, dtype=torch.long, device=device)  # append-only: keeps unit order
+        self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
+        self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
+        # Damage table stays float64 regardless of sim dtype: the RNG factor
+        # is float64 and damage rounds to integers the TS engine must match.
+        self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 121), dtype=torch.float64, device=device)
+        self._unit_combat = torch.tensor(cb.get("unitCombat", [20, 25]), dtype=torch.long, device=device)
 
         # Precomputed static prereq masks would race with completion inside a
         # turn; availability is recomputed per loop (cheap: NT ≤ 32).
@@ -446,6 +495,206 @@ class BatchSim:
             else:
                 self.civic_boosted[:, row["idx"]] |= pred & ~self.civics[:, row["idx"]]
 
+    # --- barbarians (phase 4a) ----------------------------------------------------
+
+    def _next_random(self, mask: torch.Tensor) -> torch.Tensor:
+        """Mirrors nextRandom (mulberry32 on state.rngState): advances the
+        u32 state ONLY where mask, returns [B] float64 draws (garbage
+        elsewhere). All arithmetic runs on u32-in-int64; int64 wrap-around
+        preserves values mod 2^32, so masking after each op is exact."""
+        a = (self.rng_state + 0x6D2B79F5) & M32
+        t = ((a ^ (a >> 15)) * (1 | a)) & M32
+        t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
+        out = ((t ^ (t >> 14)) & M32).to(torch.float64) / 4294967296.0
+        self.rng_state = torch.where(mask, a, self.rng_state)
+        return out
+
+    def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor) -> torch.Tensor:
+        """Mirrors damageRoll: 30·e^(0.04·Δ)·rand(0.75–1.25), JS-rounded,
+        min 1. Δ is always an integer here, so the exponential comes from
+        the fixture's JS-computed table (libm exp() can differ by an ulp
+        between runtimes and the result rounds to an integer)."""
+        r = self._next_random(mask)
+        base = self._dmg_base[(diff + 60).clamp(0, 120)]
+        return js_round(base * (0.75 + 0.5 * r)).clamp(min=1).to(torch.long)
+
+    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int) -> None:
+        """Mirrors spawnUnit: the anchor tile if free, else the first free
+        neighbor in direction order (its stable distance sort keeps that
+        exact order). No spot → no unit. Appends to the slot list, which is
+        what keeps GPU unit order identical to state.units array order."""
+        if not bool(mask.any()):
+            return
+        cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)  # [B, 7]
+        okc = cand7.clamp(min=0)
+        ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~self.occ.gather(1, okc)
+        first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
+        can = mask & (first < 7)
+        if not bool(can.any()):
+            return
+        spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
+        rows = can.nonzero(as_tuple=True)[0]
+        slot = self.next_slot[rows]
+        assert int(slot.max()) < U_MAX, "barbarian slot pool exhausted — raise U_MAX"
+        self.u_alive[rows, slot] = True
+        self.u_type[rows, slot] = unit_type
+        self.u_tile[rows, slot] = spot[rows]
+        self.u_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
+        self.occ[rows, spot[rows]] = True
+        self.next_slot[rows] += 1
+
+    def _barbarian_phase(self) -> None:
+        """Mirrors barbarianPhase turn for turn, draw for draw: camp roll →
+        camp placement → per-camp garrison rolls → raider actions (attack
+        else march) in unit order → city healing."""
+        cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
+        city_max_hp = int(cb.get("cityMaxHp", 200))
+
+        # New camp? One draw whenever below the cap (cities always exist);
+        # a second draw picks the spot only if any candidate exists.
+        can_roll = self.n_camps < self.max_camps
+        r1 = self._next_random(can_roll)
+        want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
+        if bool(want.any()):
+            near_city = ((self.dist < 5) & self.alive.unsqueeze(2)).any(dim=1)  # [B, T]
+            cand = self.camp_ok & (self.owner == -1) & ~near_city
+            if self.K > 0:
+                camp_d = self.pair_dist[self.camp_tile.clamp(min=0)].to(torch.long)  # [B, K, T]
+                near_camp = ((camp_d < 5) & (self.camp_tile >= 0).unsqueeze(2)).any(dim=1)
+                cand = cand & ~near_camp
+            has = want & cand.any(dim=1)
+            r2 = self._next_random(has)
+            if bool(has.any()):
+                k = torch.floor(r2 * cand.sum(dim=1).to(torch.float64)).to(torch.long)
+                cum = cand.long().cumsum(dim=1)
+                sel = cand & (cum == (k + 1).unsqueeze(1))
+                spot = sel.long().argmax(dim=1)
+                rows = has.nonzero(as_tuple=True)[0]
+                self.camp_tile[rows, self.n_camps[rows]] = spot[rows]
+                self.n_camps[rows] += 1
+                self._spawn_barb(has, spot, 0)  # WARRIOR
+
+        # Garrisons + growth. The near-camp check uses the unit list as it
+        # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
+        # recounts live (TS calls barbUnits() fresh inside the condition).
+        pre_alive = self.u_alive.clone()
+        grow_type = 1 if self.turn > cb.get("spearmanAfterTurn", 60) else 0
+        for k in range(self.K):
+            camp = self.camp_tile[:, k]
+            active = camp >= 0
+            if not bool(active.any()):
+                continue
+            du = self.pair_dist[camp.clamp(min=0)].gather(1, self.u_tile).to(torch.long)  # [B, U]
+            near_any = (pre_alive & (du <= 1)).any(dim=1)
+            self._spawn_barb(active & ~near_any, camp, 0)  # empty camp regarrisons
+            can_grow = active & near_any & (self.u_alive.sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
+            r = self._next_random(can_grow)
+            self._spawn_barb(can_grow & (r < cb.get("garrisonGrowChance", 0.1)), camp, grow_type)
+
+        # One guard stays home per camp: first unit (in unit order) within
+        # reach of each camp (in camp order), like the TS guard set.
+        guard = torch.zeros(B, U_MAX, dtype=torch.bool, device=dev)
+        for k in range(self.K):
+            camp = self.camp_tile[:, k]
+            active = camp >= 0
+            if not bool(active.any()):
+                continue
+            du = self.pair_dist[camp.clamp(min=0)].gather(1, self.u_tile).to(torch.long)
+            near = self.u_alive & (du <= 1) & ~guard & active.unsqueeze(1)
+            any_near = near.any(dim=1)
+            first = near.long().argmax(dim=1)
+            rows = any_near.nonzero(as_tuple=True)[0]
+            guard[rows, first[rows]] = True
+
+        # Raiders act in unit order: attack an adjacent city, else march
+        # toward the nearest one. Sequential slots mirror the TS loop —
+        # a second raider hitting the same city sees the first one's damage.
+        u_high = int(self.next_slot.max().item())
+        arange6 = torch.arange(6, device=dev)
+
+        # cityDefenseStrength reads the first military unit standing on the
+        # center REGARDLESS of owner — a barbarian that a city was founded
+        # under counts as its garrison (it can neither attack from range 0
+        # nor step strictly closer, so it stands there forever). Garrison
+        # membership can't change inside the raider loop (such a unit never
+        # acts or dies here), so compute it once.
+        garrison_cs = torch.zeros(B, self.C, dtype=torch.long, device=dev)
+        g_found = torch.zeros(B, self.C, dtype=torch.bool, device=dev)
+        for uu in range(u_high):
+            on_center = self.u_alive[:, uu].unsqueeze(1) & (self.site == self.u_tile[:, uu].unsqueeze(1)) & ~g_found
+            garrison_cs = torch.where(on_center, self._unit_combat[self.u_type[:, uu]].unsqueeze(1), garrison_cs)
+            g_found = g_found | on_center
+        for u in range(u_high):
+            act = self.u_alive[:, u] & ~guard[:, u]
+            if not bool(act.any()):
+                continue
+            here = self.u_tile[:, u]
+            nb = self.neigh[here]  # [B, 6]
+            ctr = self.center_at.gather(1, nb.clamp(min=0))
+            valid = (nb >= 0) & (ctr >= 0)
+            tkey = torch.where(valid, nb, T + 1)
+            target_tile = tkey.min(dim=1).values
+            attack = act & (target_tile <= T)
+
+            if bool(attack.any()):
+                slot = self.center_at.gather(1, target_tile.clamp(max=T - 1).unsqueeze(1)).squeeze(1)
+                atk_cs = self._unit_combat[self.u_type[:, u]]
+                g_cs = garrison_cs.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                def_cs = torch.maximum(g_cs, torch.full_like(g_cs, 15)) + torch.div(
+                    self.pop.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1), 2, rounding_mode="floor"
+                )
+                d_city = self._damage_roll(attack, atk_cs - def_cs)
+                d_self = self._damage_roll(attack, def_cs - atk_cs)
+                rows = attack.nonzero(as_tuple=True)[0]
+                cs = slot[rows]
+                self.city_hp[rows, cs] -= d_city[rows]
+                self.u_hp[:, u] = torch.where(attack, self.u_hp[:, u] - d_self, self.u_hp[:, u])
+                died = attack & (self.u_hp[:, u] <= 0)
+                if bool(died.any()):
+                    dr = died.nonzero(as_tuple=True)[0]
+                    self.occ[dr, self.u_tile[dr, u]] = False
+                    self.u_alive[:, u] = self.u_alive[:, u] & ~died
+                sacked_rows = rows[self.city_hp[rows, cs] <= 0]
+                if len(sacked_rows) > 0:
+                    sc = slot[sacked_rows]
+                    self.pop[sacked_rows, sc] = ((self.pop[sacked_rows, sc] * 3) // 4).clamp(min=1)
+                    loss = torch.minimum(
+                        torch.tensor(100.0, dtype=self.dtype, device=dev),
+                        js_round(self.treasury[sacked_rows] * 0.2).to(self.dtype),
+                    )
+                    self.treasury[sacked_rows] -= loss
+                    self.city_hp[sacked_rows, sc] = round(city_max_hp / 2)
+
+            # March: nearest alive city (ties → founding order), then the
+            # passable free neighbor closest to it (ties → direction order),
+            # moving only if strictly closer.
+            march = act & ~attack
+            if not bool(march.any()):
+                continue
+            dc = self.pair_dist[here].gather(1, self.site).to(torch.long)  # [B, C] dist to each slot's site
+            ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
+            tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1)
+            d_here = self.pair_dist[here].gather(1, tgt.unsqueeze(1)).squeeze(1).to(torch.long)
+            nbc = nb.clamp(min=0)
+            step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self.occ.gather(1, nbc)
+            d_nb = self.pair_dist[tgt].gather(1, nbc).to(torch.long)  # dist(neighbor, target); symmetric
+            skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
+            best = skey.min(dim=1).values
+            move = march & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
+            if bool(move.any()):
+                dest = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
+                rows = move.nonzero(as_tuple=True)[0]
+                self.occ[rows, here[rows]] = False
+                self.occ[rows, dest[rows]] = True
+                self.u_tile[rows, u] = dest[rows]
+
+        # Cities heal +20 when no hostile stands adjacent.
+        nb_c = self.neigh[self.site.clamp(min=0)]  # [B, C, 6]
+        adj = self.occ.gather(1, nb_c.clamp(min=0).reshape(B, -1)).reshape(B, self.C, 6) & (nb_c >= 0)
+        besieged = adj.any(dim=2)
+        healable = self.alive & (self.city_hp < city_max_hp) & ~besieged
+        self.city_hp = torch.where(healable, (self.city_hp + cb.get("cityHealPerTurn", 20)).clamp(max=city_max_hp), self.city_hp)
+
     # --- one full turn -----------------------------------------------------------
 
     def step(self, production: torch.Tensor | None = None, tech: torch.Tensor | None = None, civic: torch.Tensor | None = None) -> None:
@@ -521,6 +770,12 @@ class BatchSim:
                     if e["turn"] == self.turn:
                         (self.tech_boosted if e["kind"] == "tech" else self.civic_boosted)[b, e["idx"]] = True
 
+        # --- refreshUnits: hostiles heal +10 in the wilds (no player units) -----
+        if self.units_mode:
+            heal = self.rules.combat.get("unitHealPerTurn", 10)
+            cap = self.rules.combat.get("unitHp", 100)
+            self.u_hp = torch.where(self.u_alive, (self.u_hp + heal).clamp(max=cap), self.u_hp)
+
         # --- worked tiles + city yields ------------------------------------------
         total, housing, growth_f = self._city_totals()
         popf = self.pop.to(self.dtype)
@@ -594,6 +849,10 @@ class BatchSim:
         self.science_total = self.science_total + total[:, :, 3].sum(dim=1)
         self.culture_total = self.culture_total + total[:, :, 4].sum(dim=1)
 
+        # --- the hostile world (after the city loop, before research) ----------------------
+        if self.units_mode:
+            self._barbarian_phase()  # unit maintenance is 0 gold — no player units exist
+
         # --- research ---------------------------------------------------------------------
         turn_science = total[:, :, 3].sum(dim=1)
         turn_culture = total[:, :, 4].sum(dim=1)
@@ -662,6 +921,7 @@ class BatchSim:
             # unowned first-ring tiles; the center becomes a district tile.
             self.owner[rows, s_idx] = c
             self.workable[rows, s_idx] = False
+            self.center_at[rows, s_idx] = c
             nb = self.neigh[s_idx]  # [R, 6]
             for d in range(6):
                 n_d = nb[:, d]
@@ -683,6 +943,9 @@ class BatchSim:
             torch.round(self.science_total * 1000),
             torch.round(self.culture_total * 1000),
             torch.round(self.empire_score() * 1000),
+            self.rng_state.to(self.dtype),
+            self.n_camps.to(self.dtype),
+            self.u_alive.sum(dim=1).to(self.dtype),
         ]
         for c in range(self.C):
             cols += [
@@ -692,5 +955,6 @@ class BatchSim:
                 self.tiles_acquired[:, c].to(self.dtype),
                 torch.round(self.food_box[:, c] * 1000),
                 torch.round(self.culture_box[:, c] * 1000),
+                torch.where(self.alive[:, c], self.city_hp[:, c], torch.zeros_like(self.city_hp[:, c])).to(self.dtype),
             ]
         return torch.stack(cols, dim=1)
