@@ -12,3 +12,5 @@ python/__pycache__/
 python/checkpoints/
 python/tb/
 python/*.zip
+gpu/fixtures/
+gpu/**/__pycache__/
