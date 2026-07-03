@@ -79,6 +79,32 @@ def run() -> None:
     proc.stdin.write(json.dumps({"cmd": "close"}) + "\n")
     proc.stdin.flush()
     proc.wait(timeout=5)
+
+    # --- spatial mode round trip -------------------------------------------
+    import base64
+
+    proc = subprocess.Popen(
+        ["node", str(BRIDGE)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
+    )
+    info = request(
+        proc, {"cmd": "init", "envs": 1, "horizon": 20, "seed": 9, "spatial": True}
+    )
+    planes, h, w = info["mapShape"]
+    r = request(proc, {"cmd": "reset"})["results"][0]
+    raw = base64.b64decode(r["map"])
+    assert len(raw) == planes * h * w, (len(raw), planes, h, w)
+    assert any(b > 0 for b in raw), "spatial tensor is all zeros"
+    r = request(proc, {"cmd": "step", "actions": [0]})["results"][0]
+    assert "map" in r and len(base64.b64decode(r["map"])) == planes * h * w
+    print(f"spatial mode ok: {planes}×{h}×{w} planes round-trip")
+    proc.stdin.write(json.dumps({"cmd": "close"}) + "\n")
+    proc.stdin.flush()
+    proc.wait(timeout=5)
     print("bridge smoke test PASSED")
 
 

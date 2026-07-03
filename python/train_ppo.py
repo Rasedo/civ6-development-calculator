@@ -52,10 +52,14 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--n-steps", type=int, default=256, help="rollout length per env per update")
     p.add_argument("--load", default=None, help="checkpoint .zip to resume from")
+    p.add_argument("--cnn", action="store_true", help="spatial map observation + CNN policy")
     args = p.parse_args()
 
     env = SubprocVecEnv(
-        [make_env(i, seed=args.seed, horizon=args.horizon, objective=args.objective) for i in range(args.envs)]
+        [
+            make_env(i, seed=args.seed, horizon=args.horizon, objective=args.objective, spatial=args.cnn)
+            for i in range(args.envs)
+        ]
     )
 
     try:
@@ -66,19 +70,31 @@ def main() -> None:
         tb_dir = None
         print("(tensorboard not installed — curves logged to stdout only)")
 
+    if args.cnn:
+        from cnn_policy import Civ6CnnExtractor
+
+        policy = "MultiInputPolicy"
+        policy_kwargs = dict(
+            features_extractor_class=Civ6CnnExtractor,
+            net_arch=dict(pi=[128], vf=[128]),
+        )
+    else:
+        policy = "MlpPolicy"
+        policy_kwargs = dict(net_arch=dict(pi=[128, 128], vf=[128, 128]))
+
     if args.load:
         model = MaskablePPO.load(args.load, env=env, device=args.device)
         print(f"resumed from {args.load}")
     else:
         model = MaskablePPO(
-            "MlpPolicy",
+            policy,
             env,
             learning_rate=args.lr,
             n_steps=args.n_steps,
             batch_size=256,
             gamma=0.999,  # long games: value nearly undiscounted
             ent_coef=0.01,
-            policy_kwargs=dict(net_arch=dict(pi=[128, 128], vf=[128, 128])),
+            policy_kwargs=policy_kwargs,
             verbose=1,
             tensorboard_log=tb_dir,
             device=args.device,

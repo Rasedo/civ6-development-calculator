@@ -246,6 +246,11 @@ autopilot between decisions.
   MaskablePPO against N parallel node simulators (evaluation uses the same
   held-out seeds as `rl:eval`, so results are directly comparable). See
   `python/README.md` for Windows setup.
+- **CNN spatial observations** (`--cnn`): the engine renders the map as 20
+  semantic uint8 planes (`src/core/spatial.ts` — terrain, yields,
+  resources, rivers, ownership, cities, units, hostiles; fog-aware) and a
+  small convolutional tower learns its own spatial features alongside the
+  candidate vector — the GPU-worthy stage.
 
 ### Training overnight
 

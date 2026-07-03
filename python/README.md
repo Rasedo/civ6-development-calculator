@@ -35,6 +35,26 @@ python train_ppo.py --envs 16 --timesteps 2000000
 - Watch curves: `tensorboard --logdir tb` → `civ6/score_mean` is the true
   (unscaled) empire score of recent episodes.
 
+## CNN mode: let the network see the map
+
+```powershell
+python train_ppo.py --cnn --envs 16 --timesteps 3000000 --device cuda
+```
+
+`--cnn` switches the observation from 30 summary numbers to the map itself:
+20 semantic uint8 planes (terrain, yields, resources, rivers, ownership,
+cities, districts, units, hostiles, fog) at 26×44, encoded engine-side in
+`src/core/spatial.ts` and consumed by a small 3-layer conv tower
+(`cnn_policy.py`, ~1.3M params) alongside the candidate vector. Unexplored
+tiles are all-zero — the network cannot see through fog.
+
+This is the stage where the GPU earns its keep: on CPU the conv forward
+roughly halves throughput, on a modern GPU it's negligible. Expect slower
+*learning* per step than the MLP at first (more parameters to shape), with a
+higher ceiling — the network can discover spatial patterns (settle spots,
+adjacency clusters, threat directions) that the hand-built features can't
+express. Evaluation auto-detects CNN models.
+
 ## Evaluate
 
 ```powershell

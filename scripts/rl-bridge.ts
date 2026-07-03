@@ -28,6 +28,7 @@ import {
   type StepResult,
 } from '../src/core/rlenv';
 import { empireScore } from '../src/core/empirePlanner';
+import { spatialObservation, SPATIAL_PLANE_COUNT } from '../src/core/spatial';
 import type { Objective } from '../src/core/planner';
 
 interface EnvSlot {
@@ -42,6 +43,10 @@ let slots: EnvSlot[] = [];
 let horizon = 100;
 let objective: Objective = 'balanced';
 let baseSeed = 1;
+/** When true, results carry a base64 uint8 map tensor for CNN policies. */
+let spatial = false;
+const MAP_W = 44;
+const MAP_H = 26;
 
 function envSeed(index: number, episode: number): number {
   // Deterministic, collision-free-enough seed schedule per env slot.
@@ -51,8 +56,8 @@ function envSeed(index: number, episode: number): number {
 function makeEnv(index: number, episode: number): CivEnv {
   return new CivEnv({
     seed: envSeed(index, episode),
-    width: 44,
-    height: 26,
+    width: MAP_W,
+    height: MAP_H,
     horizon,
     objective,
   });
@@ -66,9 +71,11 @@ interface WireResult {
   done: boolean;
   score?: number;
   turn: number;
+  /** base64 uint8 planes×h×w tensor (spatial mode only). */
+  map?: string;
 }
 
-function encode(r: StepResult, reward: number, done: boolean, score?: number): WireResult {
+function encode(env: CivEnv, r: StepResult, reward: number, done: boolean, score?: number): WireResult {
   const cands = new Array<number>(MAX_CANDIDATES * CANDIDATE_FEATURES).fill(0);
   const mask = new Array<number>(MAX_CANDIDATES).fill(0);
   r.candidates.slice(0, MAX_CANDIDATES).forEach((c, i) => {
@@ -76,7 +83,11 @@ function encode(r: StepResult, reward: number, done: boolean, score?: number): W
     for (let j = 0; j < CANDIDATE_FEATURES; j++) cands[i * CANDIDATE_FEATURES + j] = c.features[j] ?? 0;
   });
   if (mask[0] === 0) mask[0] = 1; // never emit an all-invalid mask
-  return { obs: r.observation, cands, mask, reward, done, score, turn: r.turn };
+  const out: WireResult = { obs: r.observation, cands, mask, reward, done, score, turn: r.turn };
+  if (spatial) {
+    out.map = Buffer.from(spatialObservation(env.state)).toString('base64');
+  }
+  return out;
 }
 
 function resetSlot(index: number): WireResult {
@@ -84,7 +95,7 @@ function resetSlot(index: number): WireResult {
   slot.env = makeEnv(index, slot.episodes);
   slot.last = slot.env.reset();
   slot.score = empireScore(slot.env.state, objective); // starting score level
-  return encode(slot.last, 0, false);
+  return encode(slot.env, slot.last, 0, false);
 }
 
 function stepSlot(index: number, action: number): WireResult {
@@ -103,14 +114,22 @@ function stepSlot(index: number, action: number): WireResult {
   }
   slot.score += r.reward;
   slot.last = r;
-  return encode(r, r.reward, false);
+  return encode(slot.env, r, r.reward, false);
 }
 
 const rl = createInterface({ input: process.stdin, terminal: false });
 rl.on('line', (line) => {
   const trimmed = line.trim();
   if (!trimmed) return;
-  let msg: { cmd: string; envs?: number; horizon?: number; objective?: string; seed?: number; actions?: number[] };
+  let msg: {
+    cmd: string;
+    envs?: number;
+    horizon?: number;
+    objective?: string;
+    seed?: number;
+    actions?: number[];
+    spatial?: boolean;
+  };
   try {
     msg = JSON.parse(trimmed);
   } catch {
@@ -123,6 +142,7 @@ rl.on('line', (line) => {
         horizon = msg.horizon ?? 100;
         objective = (msg.objective as Objective) ?? 'balanced';
         baseSeed = msg.seed ?? 1;
+        spatial = msg.spatial === true;
         const n = Math.max(1, msg.envs ?? 1);
         slots = Array.from({ length: n }, (_, i) => {
           const env = makeEnv(i, 0);
@@ -138,6 +158,7 @@ rl.on('line', (line) => {
             candSize: CANDIDATE_FEATURES,
             maxCands: MAX_CANDIDATES,
             featureVersion: FEATURE_VERSION,
+            mapShape: spatial ? [SPATIAL_PLANE_COUNT, MAP_H, MAP_W] : null,
           }) + '\n',
         );
         break;

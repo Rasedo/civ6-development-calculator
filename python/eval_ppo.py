@@ -9,13 +9,15 @@ from __future__ import annotations
 import argparse
 
 import numpy as np
+from gymnasium import spaces
 from sb3_contrib import MaskablePPO
 
 from civ6_env import Civ6Env
 
 
 def run_episode(model: MaskablePPO, seed: int, horizon: int, objective: str) -> float:
-    env = Civ6Env(seed=seed, horizon=horizon, objective=objective)
+    spatial = isinstance(model.observation_space, spaces.Dict)
+    env = Civ6Env(seed=seed, horizon=horizon, objective=objective, spatial=spatial)
     obs, _ = env.reset()
     score = 0.0
     while True:

@@ -14,6 +14,7 @@ scaled by `reward_scale`.
 
 from __future__ import annotations
 
+import base64
 import json
 import subprocess
 from pathlib import Path
@@ -44,6 +45,7 @@ class Civ6Env(gym.Env):
         horizon: int = 100,
         objective: str = "balanced",
         reward_scale: float = 0.01,
+        spatial: bool = False,
         node: str = "node",
         bridge_js: str | Path = BRIDGE_JS,
     ):
@@ -61,8 +63,16 @@ class Civ6Env(gym.Env):
             bufsize=1,
         )
         self.reward_scale = reward_scale
+        self.spatial = spatial
         info = self._request(
-            {"cmd": "init", "envs": 1, "horizon": horizon, "objective": objective, "seed": seed}
+            {
+                "cmd": "init",
+                "envs": 1,
+                "horizon": horizon,
+                "objective": objective,
+                "seed": seed,
+                "spatial": spatial,
+            }
         )
         if not info.get("ok"):
             raise BridgeError(f"bridge init failed: {info}")
@@ -70,9 +80,20 @@ class Civ6Env(gym.Env):
         self.cand_size = info["candSize"]
         self.max_cands = info["maxCands"]
         self.feature_version = info["featureVersion"]
+        self.map_shape = tuple(info["mapShape"]) if info.get("mapShape") else None
 
-        dim = self.obs_size + self.max_cands * self.cand_size
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(dim,), dtype=np.float32)
+        vec_dim = self.obs_size + self.max_cands * self.cand_size
+        vec_space = spaces.Box(low=-np.inf, high=np.inf, shape=(vec_dim,), dtype=np.float32)
+        if spatial:
+            assert self.map_shape is not None
+            self.observation_space = spaces.Dict(
+                {
+                    "map": spaces.Box(low=0, high=255, shape=self.map_shape, dtype=np.uint8),
+                    "vec": vec_space,
+                }
+            )
+        else:
+            self.observation_space = vec_space
         self.action_space = spaces.Discrete(self.max_cands)
         self._mask = np.ones(self.max_cands, dtype=bool)
         self._last_final_score: float | None = None
@@ -91,11 +112,16 @@ class Civ6Env(gym.Env):
             raise BridgeError(out["error"])
         return out
 
-    def _unpack(self, r: dict) -> np.ndarray:
+    def _unpack(self, r: dict):
         self._mask = np.asarray(r["mask"], dtype=bool)
-        return np.concatenate(
+        vec = np.concatenate(
             [np.asarray(r["obs"], dtype=np.float32), np.asarray(r["cands"], dtype=np.float32)]
         )
+        if not self.spatial:
+            return vec
+        raw = base64.b64decode(r["map"])
+        planes = np.frombuffer(raw, dtype=np.uint8).reshape(self.map_shape).copy()
+        return {"map": planes, "vec": vec}
 
     # --- gym api ----------------------------------------------------------
 
