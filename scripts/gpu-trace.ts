@@ -32,6 +32,7 @@ export function traceRow(state: GameState, cMax: number): number[] {
     state.rngState >>> 0,
     state.barbCamps.length,
     state.units.filter((u) => u.owner === 'barbarian').length,
+    state.units.filter((u) => u.owner === 'player').length,
   ];
   for (let c = 0; c < cMax; c++) {
     const city = state.cities[c];
@@ -54,7 +55,7 @@ export function traceRow(state: GameState, cMax: number): number[] {
 
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number): number[] {
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0];
+  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0];
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0);
   return tol;
 }

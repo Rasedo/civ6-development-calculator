@@ -43,21 +43,26 @@ half-to-even), and the damage curve's `30·e^(0.04·Δ)` table is computed
 in JS and shipped in the fixtures, since libm `exp()` may differ by an
 ulp between runtimes.
 
-Current status: scripted **10 seeds × 100 turns × 6 city slots** and
-off-script **30 random games × 100 turns**, both integer-exact with
-floats within 1 milli-unit — across ~500 besieged city-turns and dozens
-of sackings. The harness catches planted bugs (settler cost nudges,
-dropped ring-1 claims, disabled eureka detection, missing same-turn
-settler-cost sequencing, swapped damage-roll order), and caught a real
-one during development: `cityDefenseStrength` counts a military unit
-standing on the center as garrison *regardless of owner*, so a barbarian
-that a city is founded under becomes its accidental defender — the trace
-diverged within two turns of the founding. One honest caveat: a boost
-firing *earlier* than the TS engine is invisible until it crosses its
-target's completion boundary, so detection-timing coverage is only as
-strong as the random trajectories are varied. Fixtures are regenerated,
-not committed — they must always match the engine version you're
-comparing against.
+Current status: scripted **10 seeds × 100 turns × 6 city slots** (with a
+warrior trained per city) and off-script **30 random games × 100 turns**
+with attack-preferring armies — ~10,000 unit moves, ~230 melee attacks,
+~170 barbarians killed, ~60 player units lost, camps cleared — all
+integer-exact with floats within 1 milli-unit. The harness catches
+planted bugs (settler cost nudges, dropped ring-1 claims, disabled
+eureka detection, swapped damage-roll order, a removed victor-survives
+rule), and caught real ones during development: `cityDefenseStrength`
+counts a military unit standing on the center as garrison *regardless of
+owner* (a barbarian a city is founded under becomes its accidental
+defender); `orderMove` to an *adjacent* tile can A*-route through cheaper
+intermediate tiles with different side effects, so the replay applies
+single-step orders as forced one-step `walkPath`s; and goody huts —
+placed by default and claimed with an untraced reward roll — had to be
+excluded from the reference maps. One honest caveat: a boost firing
+*earlier* than the TS engine is invisible until it crosses its target's
+completion boundary, so detection-timing coverage is only as strong as
+the random trajectories are varied. Fixtures are regenerated, not
+committed — they must always match the engine version you're comparing
+against.
 
 ## The action surface (phase 3)
 
@@ -67,11 +72,22 @@ turn, `BatchSim.step(production, tech, civic)` accepts:
 - **production** `[B, C]` — per idle city: a City Center building
   (`0..NB-1`), a settler (`NB`; always trainable, price rising per city
   exactly like `settlerCost`, including several cities queueing in the
-  same turn), or idle (`NB+1`). Founding consumes the fixture's
+  same turn), idle (`NB+1`), or train a roster unit (`NB+2..`,
+  tech-gated like `trainableUnits`). Founding consumes the fixture's
   advisor-ranked site list in order, like the TS autopilot.
 - **tech / civic** `[B]` — applied when the research slot is empty;
   progress banks while the policy deliberates, exactly like manual
   research in the TS engine.
+- **units** `[B, P]` (phase 4b) — one order per player unit per turn:
+  step to a neighbor (0–5), melee-attack the barbarian there (6–11), or
+  hold (12). Orders execute in spawn order and are RE-validated at
+  execution on both engines identically (an earlier unit's move can
+  invalidate a later order — rejected orders are no-ops, not errors).
+  Combat mirrors `meleeAttack`: terrain defense, the victor-survives
+  rule on mutual kills, advancing into the emptied tile, and clearing a
+  barbarian camp on entry (+50 gold, camp list splice). This goes BEYOND
+  the TS `CivEnv`, which delegates units to an autopilot — here the
+  policy commands the army directly.
 
 Validity masks (`production_mask()`, `tech_mask()`, `civic_mask()`)
 mirror the TS availability rules; invalid or `-1` actions are no-ops.
@@ -98,14 +114,16 @@ systems (barbarians, disasters) will use it next.
 | Tile yields (via exported per-tile tables) | Improvements/builders (yields are static) |
 | Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the City Center |
 | Growth/starvation, housing (water+buildings), amenity tiers | Luxury amenity sharing (inert until improvements) |
-| City Center buildings (unlocks, river gate, maintenance) | Player units: training, movement, counterattack |
+| City Center buildings (unlocks, river gate, maintenance) | Ranged attacks, multi-tile moves (A* pathing) |
 | Settlers: rising cost, training, auto-founding | Rival civs, city-states, loyalty |
 | Multi-city: per-city queues, ring-1 claims at founding | Policies/governments/religion modifiers |
 | Shared-map border competition (exact per-city ordering) | Fog of war, disasters, trade |
 | Tech/civic research: manual picks, banking, auto-pick | Pillaging (needs improvements on the map) |
-| Eureka **detection** + discounts (covered-scope conditions) | Eureka conditions outside covered state |
-| RL action masks, empireScore reward, batched env | |
+| Eureka **detection** + discounts (covered-scope conditions) | Goody huts (reference maps exported without them) |
+| RL action masks, empireScore reward, batched env | Eureka conditions outside covered state |
 | Barbarians: camps, garrisons, raiders, sieges, sacks, healing | |
+| Player military: training, single-step moves, melee, camp clearing | |
+| Per-side stacking (1 military + 1 civilian; foreign blocks) | |
 | In-state mulberry32 RNG, mirrored draw for draw | |
 
 Each later phase moves a row from the right column to the left, extending
@@ -144,8 +162,9 @@ simulating up to six cities plus the barbarian world. Run
    - ✅ 4a. Barbarians — camps, garrisons, raiders, greedy marches, city
      sieges/sacks, healing — with the in-state mulberry32 mirrored draw
      for draw (the trace pins the RNG state itself every turn).
-   - 4b. Player military: unit training in the production action head,
-     movement/attack as new action heads, camp clearing.
+   - ✅ 4b. Player military — the trainable roster in the production
+     head, per-unit move/attack/hold orders with execution-time
+     revalidation, melee combat both directions, camp clearing.
    - 4c. Rivals and city-states; 4d. disasters — each behind the same
      parity gate.
 5. Native GPU training loop: policy inference and env stepping never

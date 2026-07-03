@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 from civ6gpu.rng import masked_choice
 
-HEAD_PROD, HEAD_TECH, HEAD_CIVIC = 101, 202, 303
+HEAD_PROD, HEAD_TECH, HEAD_CIVIC, HEAD_UNIT = 101, 202, 303, 404
 
 
 def main() -> None:
@@ -51,17 +51,29 @@ def main() -> None:
     B, C = sim.B, sim.C
     game_seed = torch.tensor([args.seed * 1_000_003 + i for i in range(B)], dtype=torch.int64)
     slots = torch.arange(C, dtype=torch.int64).view(1, C)
+    from civ6gpu.engine import P_MAX
+
+    pslots = torch.arange(P_MAX, dtype=torch.int64).view(1, P_MAX)
 
     games = [
         {"seed": f["seed"], "rng": int(game_seed[i]), "sites": [c["site"] for c in f["cities"]], "actions": [], "trace": []}
         for i, f in enumerate(fixtures)
     ]
 
+    HOLD = 12
     for _ in range(args.turns):
         turn = sim.turn
         pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)  # [B, C]
         ta = masked_choice(sim.tech_mask(), game_seed, turn, HEAD_TECH)  # [B]
         ca = masked_choice(sim.civic_mask(), game_seed, turn, HEAD_CIVIC)  # [B]
+        # Attack-preferring random orders: units that CAN fight always do —
+        # random pacifists would leave the kill/advance/camp-clear paths
+        # (and the camp-list splice they exercise) untested.
+        um = sim.unit_action_mask()
+        has_attack = um[:, :, 6:12].any(dim=2, keepdim=True)
+        um = um & ~(has_attack & (torch.arange(13).view(1, 1, 13) < 6))  # drop moves when a fight is on
+        um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack  # and don't hold back either
+        ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)  # [B, P]
         for b in range(B):
             entry: dict = {"t": turn}
             prods = [[c, int(pa[b, c])] for c in range(C) if pa[b, c] >= 0]
@@ -71,9 +83,12 @@ def main() -> None:
                 entry["r"] = int(ta[b])
             if ca[b] >= 0:
                 entry["c"] = int(ca[b])
+            orders = [[p, int(ua[b, p])] for p in range(P_MAX) if 0 <= ua[b, p] < HOLD]
+            if orders:
+                entry["u"] = orders
             if len(entry) > 1:
                 games[b]["actions"].append(entry)
-        sim.step(production=pa, tech=ta, civic=ca)
+        sim.step(production=pa, tech=ta, civic=ca, units=ua)
         rows = sim.trace_row()
         for b in range(B):
             games[b]["trace"].append([float(x) for x in rows[b]])
@@ -82,6 +97,7 @@ def main() -> None:
         "width": sim.W,
         "height": sim.H,
         "unitsMode": int(fixtures[0].get("unitsMode", 0)),
+        "unitIds": [u["id"] for u in rules_raw.get("units", [])],
         "buildings": [b["id"] for b in rules_raw["buildings"]],
         "techs": [t["id"] for t in rules_raw["techs"]],
         "civics": [c["id"] for c in rules_raw["civics"]],

@@ -13,6 +13,9 @@
 
 import { readFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler, setTechResearch, setCivicResearch } from '../src/core/game';
+import { queueUnit, walkPath } from '../src/core/units';
+import { meleeAttack } from '../src/core/combat';
+import { neighborTile } from '../src/core/hex';
 import { traceRow, rowTolerance } from './gpu-trace';
 
 const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
@@ -20,6 +23,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
   height: number;
   unitsMode?: number;
+  unitIds: string[];
   buildings: string[];
   techs: string[];
   civics: string[];
@@ -27,7 +31,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
     seed: number;
     rng: number;
     sites: number[];
-    actions: { t: number; p?: [number, number][]; r?: number; c?: number }[];
+    actions: { t: number; p?: [number, number][]; r?: number; c?: number; u?: [number, number][] }[];
     trace: number[][];
   }[];
 };
@@ -46,6 +50,7 @@ for (const game of roll.games) {
     withResources: true,
     withWonders: true,
     unitsMode: !!roll.unitsMode,
+    withVillages: false, // must match the exporter — hut claiming is unported
   });
   foundCity(state, game.sites[0]);
   state.plannedSettles = game.sites.slice(1);
@@ -53,6 +58,18 @@ for (const game of roll.games) {
   const C = game.sites.length;
   const tol = rowTolerance(C);
   const byTurn = new Map(game.actions.map((a) => [a.t, a]));
+  // GPU unit slots are append-only in spawn order and survive deaths;
+  // mirror that with a spawn log instead of indexing the live array.
+  const spawnLog: number[] = [];
+  const logged = new Set<number>();
+  const updateSpawnLog = () => {
+    for (const un of state.units) {
+      if (un.owner === 'player' && !logged.has(un.id)) {
+        logged.add(un.id);
+        spawnLog.push(un.id);
+      }
+    }
+  };
 
   const fail = (msg: string) => {
     console.log(`seed ${game.seed} rng ${game.rng}: ${msg}`);
@@ -62,6 +79,30 @@ for (const game of roll.games) {
   for (let t = 0; t < game.trace.length; t++) {
     const act = byTurn.get(state.turn);
     let bad = false;
+    // Unit orders first (a player moves the army, then ends the turn).
+    // Failures are NO-OPS, not errors: both engines re-validate orders at
+    // execution time (an earlier unit's move can invalidate a later one's),
+    // so a rejected order here must match a no-op there — any real
+    // divergence surfaces in the trace comparison instead.
+    for (const [slot, a] of act?.u ?? []) {
+      const unit = state.units.find((un) => un.id === spawnLog[slot]);
+      if (!unit) {
+        fail(`turn ${state.turn}: order for missing player unit ${slot}`);
+        bad = true;
+        break;
+      }
+      const dir = a % 6;
+      const n = neighborTile(state.map, state.map.tiles[unit.tileIndex], dir);
+      if (!n) continue;
+      if (a < 6) {
+        // The action is "step one tile", so apply it as a forced one-step
+        // path — NOT orderMove, whose A* may route an adjacent destination
+        // through cheaper intermediate tiles (different side effects).
+        unit.path = [n.index];
+        walkPath(state, unit);
+      } else if (a < 12) meleeAttack(state, unit.id, n.index);
+    }
+    if (bad) break;
     for (const [slot, a] of act?.p ?? []) {
       const city = state.cities[slot];
       if (!city || city.queue.length > 0) {
@@ -80,6 +121,13 @@ for (const game of roll.games) {
         const r = queueSettler(state, city.id);
         if (!r.ok) {
           fail(`turn ${state.turn}: queueSettler in slot ${slot}: ${r.reason}`);
+          bad = true;
+          break;
+        }
+      } else if (a >= NB + 2) {
+        const r = queueUnit(state, city.id, roll.unitIds[a - NB - 2]);
+        if (!r.ok) {
+          fail(`turn ${state.turn}: queueUnit(${roll.unitIds[a - NB - 2]}) in slot ${slot}: ${r.reason}`);
           bad = true;
           break;
         }
@@ -112,6 +160,7 @@ for (const game of roll.games) {
     if (bad) break;
 
     endTurn(state);
+    updateSpawnLog();
     const want = game.trace[t];
     const got = traceRow(state, C);
     for (let i = 0; i < got.length; i++) {

@@ -364,13 +364,16 @@ parity-proven against this engine both on-script (`npm run gpu:export` →
 `python gpu/parity_test.py` reproduces recorded traces integer-exact) and
 **off-script**: `python gpu/rollout.py` plays random masked actions and
 logs them, `npm run gpu:replay` feeds that log through the real engine
-and must match every turn. Phases 1–4a cover a multi-city economic core —
+and must match every turn. Phases 1–4b cover a multi-city economic core —
 settlers, founding, per-city queues, border competition — plus the RL
 surface (masked production/research/civic actions, detected eurekas,
-`empireScore` rewards, a batched env `civ6gpu.BatchEnv`) and the first
-slice of the hostile world: barbarian camps, raiders and city sieges,
-with the in-state mulberry32 RNG mirrored draw for draw. See
-`gpu/README.md` for the covered/not-covered table and the phase roadmap.
+`empireScore` rewards, a batched env `civ6gpu.BatchEnv`) and a genuinely
+hostile world: barbarian camps, raiders and city sieges with the in-state
+mulberry32 RNG mirrored draw for draw, and a player military the policy
+commands directly — unit training, per-unit move/attack orders, melee
+combat and camp clearing (richer than `CivEnv`, whose autopilot owns the
+army). See `gpu/README.md` for the covered/not-covered table and the
+phase roadmap.
 
 ## Roadmap ideas (later stages)
 

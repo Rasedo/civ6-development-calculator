@@ -29,6 +29,8 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler } from '../src/core/game';
+import { queueUnit } from '../src/core/units';
+import { terrainDefense } from '../src/core/combat';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
 import { makeYieldCtx } from '../src/core/effects';
@@ -147,8 +149,20 @@ const rules = {
     cityHealPerTurn: 20,
     unitHealPerTurn: 10,
     unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
+    campClearReward: 50,
     dmgBase: Array.from({ length: 121 }, (_, i) => 30 * Math.exp(0.04 * (i - 60))),
   },
+  // The trainable roster (mirrors trainableUnits + UNITS data). `civilian`
+  // marks builder-type units (charges) — they hold the civilian stacking
+  // slot and cannot attack.
+  units: Object.values(UNITS).map((u) => ({
+    id: u.id,
+    cost: u.cost,
+    combat: u.combat,
+    maintenance: u.maintenance,
+    civilian: u.charges !== undefined ? 1 : 0,
+    requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
+  })),
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
     housing: BUILDINGS.PALACE?.housing ?? 0,
@@ -193,7 +207,10 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = 9001 + s * 13;
-  const state = createGame({ width: 44, height: 26, seed, withResources: true, withWonders: true, unitsMode: true });
+  // withVillages: false — goody-hut claiming (a fog-era mechanic with its
+  // own reward rolls) is outside the ported scope, so the reference maps
+  // must not carry huts a moving unit could trip over.
+  const state = createGame({ width: 44, height: 26, seed, withResources: true, withWonders: true, unitsMode: true, withVillages: false });
   const site = scoreSettleSites(state, 1)[0];
   foundCity(state, site.tileIndex);
   const capital = state.cities[0];
@@ -210,6 +227,8 @@ for (let s = 0; s < N_SEEDS; s++) {
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
       // land units may stand here (mirrors unitPassable)
       pass: unitPassable(t) ? 1 : 0,
+      // defender bonus (mirrors terrainDefense: hills / woods / rainforest / marsh)
+      tdef: terrainDefense(t),
       // statically camp-eligible (dynamic exclusions — ownership, distance
       // to cities/camps — are the engine's job; mirrors campCandidates)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
@@ -276,12 +295,19 @@ for (let s = 0; s < N_SEEDS; s++) {
   const trace: number[][] = [];
   let settlersQueued = 0;
 
+  const warriorTrained = new Set<number>();
   for (let t = 0; t < N_TURNS; t++) {
     for (const city of state.cities) {
       if (city.queue.length > 0) continue;
       if (city.isCapital && settlersQueued < chosen.length && city.population >= SETTLER_POP_GATE) {
         queueSettler(state, city.id);
         settlersQueued += 1;
+      } else if (!warriorTrained.has(city.id) && city.population >= 2) {
+        // One defender per city: exercises training, spawn placement and
+        // passive garrisons under the scripted gate (movement/attack are
+        // the rollout gate's job).
+        queueUnit(state, city.id, 'WARRIOR');
+        warriorTrained.add(city.id);
       } else {
         const next = cheapestBuilding(state, city);
         if (next) queueBuilding(state, city.id, next);

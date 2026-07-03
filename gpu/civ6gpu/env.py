@@ -23,7 +23,7 @@ class BatchEnv:
 
     @property
     def obs_size(self) -> int:
-        return 8 + 7 * self.sim.C
+        return 9 + 7 * self.sim.C
 
     def reset(self) -> torch.Tensor:
         self.sim.reset()
@@ -31,12 +31,13 @@ class BatchEnv:
         return self.observe()
 
     def masks(self) -> dict[str, torch.Tensor]:
-        """production [B, C, NB+2], tech [B, NT], civic [B, NC] — all-False
-        rows mean no decision pends there this turn."""
+        """production [B, C, NB+2+NU], tech [B, NT], civic [B, NC], units
+        [B, P, 13] — all-False rows mean no decision pends there this turn."""
         return {
             "production": self.sim.production_mask(),
             "tech": self.sim.tech_mask(),
             "civic": self.sim.civic_mask(),
+            "units": self.sim.unit_action_mask(),
         }
 
     def step(
@@ -44,10 +45,11 @@ class BatchEnv:
         production: torch.Tensor | None = None,
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
+        units: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Returns (obs [B, F], reward [B], done). done is batch-wide —
         lockstep fixed-horizon episodes; the caller resets."""
-        self.sim.step(production=production, tech=tech, civic=civic)
+        self.sim.step(production=production, tech=tech, civic=civic, units=units)
         score = self.sim.empire_score()
         reward = score - self._last_score
         self._last_score = score
@@ -83,7 +85,8 @@ class BatchEnv:
                 s.civic_prog / 50.0,
                 s.u_alive.sum(dim=1).to(d) / 10.0,
                 s.n_camps.to(d),
+                s.p_alive.sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
-        )  # [B, 8]
+        )  # [B, 9]
         return torch.cat([emp, per.reshape(B, -1)], dim=1)
