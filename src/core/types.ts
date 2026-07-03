@@ -154,6 +154,11 @@ export interface City {
   specialists: Record<string, number>;
   /** Banked production from chops that landed while the queue was empty. */
   productionBank?: number;
+  /**
+   * Loyalty 0–100 (only moves while rival civs exist; capitals immune).
+   * A city at 0 flips to the pressuring rival. Absent = 100.
+   */
+  loyalty?: number;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */
@@ -344,6 +349,10 @@ export interface CityState {
   quest: CityStateQuest | null;
   /** Turn the current quest was issued (for reissue pacing). */
   questIssuedTurn: number;
+  /** Siege hit points; absent = full (CS_MAX_HP). */
+  hp?: number;
+  /** Turn of the player's last militaristic levy here (cooldown). */
+  lastLevyTurn?: number;
 }
 
 export interface MapGenOptions {

@@ -13,7 +13,8 @@ import { chopGrant, harvestGrant } from '../core/economy';
 import { buildingCompletable } from '../core/rules';
 import { tradeCapacity, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from '../core/trade';
 import { isSuzerain, envoyBonusDelta, questLabel } from '../core/cityStates';
-import { CS_TYPE_COLORS, ENVOY_COST, INFLUENCE_PER_TURN, GOV_INFLUENCE_TIER } from '../data/cityStates';
+import { CS_TYPE_COLORS, ENVOY_COST, INFLUENCE_PER_TURN, GOV_INFLUENCE_TIER, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { loyaltyDelta } from '../core/rivals';
 import { playerStrength, rivalStrength, rivalProximity } from '../core/rivals';
 import { PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST } from '../data/rivals';
 import type { LoadedPolicy, Recommendation } from '../core/aiAdvisor';
@@ -107,6 +108,7 @@ export interface PanelCallbacks {
   onLoadAiWeights(text: string): void;
   onClearAiWeights(): void;
   onApplyAiOption(decisionIndex: number, optionIndex: number): void;
+  onLevyUnits(csId: number): void;
 }
 
 /** Mutable state for the empire planner view (owned by main.ts). */
@@ -505,6 +507,16 @@ export function renderCityPanel(
     <h2>${city.isCapital ? '★ ' : ''}${city.name}</h2>
     <div class="row">Population <b>${city.population}</b> · ${growthLine}</div>
     ${state.unitsMode && getCityHp(state, city.id) < CITY_MAX_HP ? `<div class="row bad">City HP ${getCityHp(state, city.id)}/${CITY_MAX_HP} — under attack!</div>` : ''}
+    ${
+      state.rivals.some((r) => r.cities.length > 0) && !city.isCapital
+        ? (() => {
+            const loyalty = city.loyalty ?? 100;
+            const d = loyaltyDelta(state, city, stats.amenities.tier.name);
+            const cls = loyalty < 50 ? 'bad' : '';
+            return `<div class="row ${cls}">Loyalty ${fmt(loyalty)}/100 (${d >= 0 ? '+' : ''}${d.toFixed(1)}/turn)${loyalty < 50 ? ' — defection risk!' : ''}</div>`;
+          })()
+        : ''
+    }
     <div class="row statgrid">
       <span>Food box</span><span>${fmt(city.foodBox)} / ${stats.growthNeeded} (+${fmt(stats.effectiveFoodSurplus)})</span>
       <span>Housing</span><span class="${stats.housing - city.population < 1 ? 'bad' : ''}">${city.population} / ${fmt(stats.housing)}</span>
@@ -819,13 +831,17 @@ export function renderCityStatesPanel(container: HTMLElement, state: GameState, 
       const gain = YIELD_KEYS.filter((k) => delta[k] > 0)
         .map((k) => `+${fmt(delta[k])} ${YIELD_LABELS[k]}`)
         .join(' ');
+      const levy =
+        suzerain && cs.type === 'militaristic'
+          ? `<button data-act="levy" data-id="${cs.id}" title="Levy ${LEVY_UNITS} units (${LEVY_GOLD_COST}g, ${LEVY_COOLDOWN}-turn cooldown)">Levy ⚔</button>`
+          : '';
       return `<div class="build-row"><span>
           <b style="color:${CS_TYPE_COLORS[cs.type]}">◆</b> ${cs.name}
           <span class="muted">${cs.type} · ${cs.envoys}⚑${suzerain ? ' · Suzerain' : ''}</span><br>
           <small class="muted">${cs.quest ? `Quest: ${questLabel(cs.quest)} (+1⚑)` : 'No active quest.'}</small>
           ${gain ? `<br><small>Next envoy: ${gain}</small>` : ''}
         </span>
-        <button data-act="envoy" data-id="${cs.id}" ${state.envoysAvailable > 0 ? '' : 'disabled'}>+⚑</button>
+        <span>${levy}<button data-act="envoy" data-id="${cs.id}" ${state.envoysAvailable > 0 ? '' : 'disabled'}>+⚑</button></span>
       </div>`;
     })
     .join('');
@@ -841,6 +857,9 @@ export function renderCityStatesPanel(container: HTMLElement, state: GameState, 
 
   container.querySelectorAll('[data-act="envoy"]').forEach((b) =>
     b.addEventListener('click', () => cb.onAssignEnvoy(Number((b as HTMLElement).dataset.id))),
+  );
+  container.querySelectorAll('[data-act="levy"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onLevyUnits(Number((b as HTMLElement).dataset.id))),
   );
 }
 

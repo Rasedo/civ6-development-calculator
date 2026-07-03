@@ -5,12 +5,16 @@
  * — at-war units raid like barbarians, and cities can be conquered.
  */
 
-import type { GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import type { City, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
-import { hostileUnitAct } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
+import { defaultModifiers } from './effects';
+import { tileYields } from './yields';
+import { isSuzerain } from './cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { FEATURES } from '../data/features';
@@ -24,8 +28,6 @@ import {
   RIVAL_GROWTH_FACTOR,
   RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
-  RIVAL_PROD_RATE,
-  RIVAL_MIL_RATE,
   RIVAL_SETTLER_COST,
   RIVAL_BORDER_PERIOD,
   RIVAL_GPP_RATE,
@@ -35,6 +37,13 @@ import {
   PEACE_MIN_WAR_TURNS,
   PEACE_GOLD_COST,
   RIVAL_CITY_MAX_HP,
+  RIVAL_WORK_RADIUS,
+  RIVAL_PROD_TO_SETTLER,
+  RIVAL_PROD_TO_MILITARY,
+  LOYALTY_MAX,
+  LOYALTY_RANGE,
+  LOYALTY_PRESSURE_SCALE,
+  LOYALTY_AMENITY,
 } from '../data/rivals';
 
 const ok: RuleResult = { ok: true };
@@ -234,6 +243,111 @@ function makePeace(state: GameState, rival: RivalCiv): void {
   state.eventLog.push(`Peace with ${rival.name}.`);
 }
 
+/** Levy a militaristic city-state's troops (suzerain only, gold, cooldown). */
+export function levyUnits(state: GameState, csId: number): RuleResult {
+  const cs = state.cityStates.find((c) => c.id === csId);
+  if (!cs) return no('No such city-state.');
+  if (cs.type !== 'militaristic') return no('Only militaristic city-states levy troops.');
+  if (!isSuzerain(cs)) return no('You must be suzerain (3+ envoys).');
+  const since = state.turn - (cs.lastLevyTurn ?? -LEVY_COOLDOWN);
+  if (since < LEVY_COOLDOWN) {
+    return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
+  }
+  if (!state.sandbox) {
+    if (state.treasury < LEVY_GOLD_COST) return no(`Levy costs ${LEVY_GOLD_COST} gold.`);
+    state.treasury -= LEVY_GOLD_COST;
+  }
+  const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
+  for (let i = 0; i < LEVY_UNITS; i++) {
+    spawnUnit(state, type, cs.centerIndex, 'player');
+  }
+  cs.lastLevyTurn = state.turn;
+  state.eventLog.push(`${cs.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
+  return ok;
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty (only in motion while rival civs exist; capitals are immune)
+// ---------------------------------------------------------------------------
+
+/** Per-turn loyalty change for a player city under rival pressure. */
+export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
+  const here = state.map.tiles[city.centerIndex];
+  let own = 0;
+  let foreign = 0;
+  for (const c of state.cities) {
+    const t = state.map.tiles[c.centerIndex];
+    const d = hexDistance(here.col, here.row, t.col, t.row);
+    if (d <= LOYALTY_RANGE) own += c.population * (LOYALTY_RANGE + 1 - d);
+  }
+  for (const rival of state.rivals) {
+    for (const rc of rival.cities) {
+      const t = state.map.tiles[rc.centerIndex];
+      const d = hexDistance(here.col, here.row, t.col, t.row);
+      if (d <= LOYALTY_RANGE) foreign += rc.population * (LOYALTY_RANGE + 1 - d);
+    }
+  }
+  const pressure =
+    own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
+  return pressure + (LOYALTY_AMENITY[amenityTierName] ?? 0);
+}
+
+/**
+ * Apply a turn of loyalty to `city` (called from endTurn with the stats it
+ * already computed). Returns true when the city has hit 0 and must flip.
+ */
+export function applyLoyalty(state: GameState, city: City, amenityTierName: string): boolean {
+  if (!state.rivals.some((r) => r.cities.length > 0)) return false;
+  if (city.isCapital) {
+    city.loyalty = LOYALTY_MAX;
+    return false;
+  }
+  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName);
+  city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
+  return city.loyalty <= 0;
+}
+
+/** A city at 0 loyalty defects to the rival exerting the most pressure. */
+export function flipCityToRival(state: GameState, city: City): void {
+  const here = state.map.tiles[city.centerIndex];
+  let winner: RivalCiv | null = null;
+  let best = -1;
+  for (const rival of state.rivals) {
+    let pressure = 0;
+    for (const rc of rival.cities) {
+      const t = state.map.tiles[rc.centerIndex];
+      const d = hexDistance(here.col, here.row, t.col, t.row);
+      if (d <= LOYALTY_RANGE) pressure += rc.population * (LOYALTY_RANGE + 1 - d);
+    }
+    if (pressure > best) {
+      best = pressure;
+      winner = rival;
+    }
+  }
+  if (!winner) return;
+
+  state.cities = state.cities.filter((c) => c.id !== city.id);
+  delete state.cityHp[String(city.id)];
+  state.tradeRoutes = state.tradeRoutes.filter((r) => r.from !== city.id && r.to !== city.id);
+  for (const t of state.map.tiles) {
+    if (t.cityId === city.id) {
+      t.cityId = -1;
+      t.rivalId = winner.id;
+    }
+  }
+  winner.cities.push({
+    id: winner.nextCityId++,
+    name: city.name,
+    centerIndex: city.centerIndex,
+    population: Math.max(1, Math.floor(city.population * 0.75)),
+    growthBox: 0,
+    tilesAcquired: city.tilesAcquired,
+    hp: Math.round(RIVAL_CITY_MAX_HP / 2),
+    foundedTurn: state.turn,
+  });
+  state.eventLog.push(`${city.name} has defected to ${winner.name}! (loyalty collapsed)`);
+}
+
 // ---------------------------------------------------------------------------
 // Per-turn phase
 // ---------------------------------------------------------------------------
@@ -367,6 +481,33 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
   }
 }
 
+/**
+ * A rival city's food/production from its actual territory: the best
+ * `population` owned tiles within working range (no-modifier yields, plus
+ * a base and a small tech scaler). Good land now means strong rivals.
+ */
+export function rivalCityYields(
+  state: GameState,
+  rival: RivalCiv,
+  rc: RivalCity,
+): { food: number; production: number } {
+  const center = state.map.tiles[rc.centerIndex];
+  const ctx = { map: state.map, mods: defaultModifiers() };
+  const workable = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
+    .filter((t) => (t.rivalId ?? -1) === rival.id && !isWater(t) && !isImpassable(t) && t.index !== rc.centerIndex)
+    .map((t) => tileYields(ctx, t))
+    .sort((a, b) => b.food + b.production - (a.food + a.production))
+    .slice(0, rc.population);
+  let food = 3;
+  let production = 2;
+  for (const y of workable) {
+    food += y.food;
+    production += y.production;
+  }
+  production *= 1 + rival.techLevel / 25;
+  return { food, production };
+}
+
 export function rivalPhase(state: GameState): void {
   if (state.rivals.length === 0) return;
 
@@ -379,9 +520,12 @@ export function rivalPhase(state: GameState): void {
     if (rival.cities.length === 0) continue; // eliminated
     rival.techLevel += 0.15 + 0.05 * rival.cities.length;
 
-    // Cities: growth, borders, healing.
+    // Cities: real tile yields drive growth and the production stocks.
+    let prodSum = 0;
     for (const rc of rival.cities) {
-      rc.growthBox += 2 + rc.population * 0.25;
+      const { food, production } = rivalCityYields(state, rival, rc);
+      prodSum += production;
+      rc.growthBox += Math.max(0.5, food - 2 * rc.population);
       const need = growthFoodNeeded(rc.population) * RIVAL_GROWTH_FACTOR;
       if (rc.growthBox >= need && rc.population < RIVAL_MAX_POP) {
         rc.population += 1;
@@ -394,9 +538,9 @@ export function rivalPhase(state: GameState): void {
     }
 
     // Stocks and spending.
-    const popSum = rival.cities.reduce((s, c) => s + c.population, 0);
-    rival.productionStock += popSum * RIVAL_PROD_RATE * (0.7 + rival.aggression * 0.6);
-    rival.militaryStock += popSum * RIVAL_MIL_RATE * (0.7 + rival.aggression * 0.6);
+    const pace = 0.7 + rival.aggression * 0.6;
+    rival.productionStock += prodSum * RIVAL_PROD_TO_SETTLER * pace;
+    rival.militaryStock += prodSum * RIVAL_PROD_TO_MILITARY * pace;
 
     if (
       rival.cities.length < RIVAL_MAX_CITIES &&
@@ -430,7 +574,15 @@ export function rivalPhase(state: GameState): void {
       }
     } else {
       rival.peaceTurns += 1;
-      for (const unit of rivalUnits(state, rival.id)) patrol(state, rival, unit);
+      for (const unit of rivalUnits(state, rival.id)) {
+        // Self-defense first: kill adjacent barbarians, then drift home.
+        const targets = attackTargets(state, unit);
+        if (targets.length > 0) {
+          meleeAttack(state, unit.id, targets[0]);
+          continue;
+        }
+        patrol(state, rival, unit);
+      }
       if (
         state.cities.length > 0 &&
         rival.peaceTurns > 20 &&

@@ -69,6 +69,12 @@ export const SUZERAIN_ENVOYS = 3;
 export const QUEST_COOLDOWN = 12;
 /** Quest reward. */
 export const QUEST_ENVOYS = 1;
+/** Siege hit points of a city-state. */
+export const CS_MAX_HP = 150;
+/** Suzerain levy from militaristic city-states: units granted, gold, cooldown. */
+export const LEVY_UNITS = 2;
+export const LEVY_GOLD_COST = 120;
+export const LEVY_COOLDOWN = 20;
 
 /** Government tier for influence accrual (matches data/policies tiers). */
 export const GOV_INFLUENCE_TIER: Record<string, number> = {

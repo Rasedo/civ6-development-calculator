@@ -111,8 +111,13 @@ const CAND_KINDS = [
   'keep',
 ] as const;
 
-/** Bump when the feature/observation layout changes; stored in weight files. */
-export const FEATURE_VERSION = 4;
+/**
+ * Bump when the feature/observation layout OR the environment's dynamics
+ * change enough to invalidate trained weights and benchmarks. v5: deeper
+ * opponents (rival tile economies, barbarian↔rival combat, city-state
+ * conquest/levies, loyalty pressure) — same layout as v4, harder world.
+ */
+export const FEATURE_VERSION = 5;
 export const CANDIDATE_FEATURES = CAND_KINDS.length + 16; // 29
 export const OBSERVATION_SIZE = 30;
 export const MAX_CANDIDATES = 24;

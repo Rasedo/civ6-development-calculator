@@ -7,10 +7,12 @@
  * captured. All randomness flows through the in-state RNG.
  */
 
-import type { City, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import type { City, CityState, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../data/units';
+import { CS_MAX_HP } from '../data/cityStates';
+import { cityStateAt } from './cityStates';
 import {
   nextRandom,
   unitsAt,
@@ -104,9 +106,21 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     target.district === 'CITY_CENTER' && hostileToPlayer
       ? state.cities.find((c) => c.centerIndex === targetIndex)
       : undefined;
-  const rivalTarget = attacker.owner === 'player' ? rivalCityAt(state, targetIndex) : undefined;
+  const rivalTarget =
+    attacker.owner === 'player' || attacker.owner === 'barbarian'
+      ? rivalCityAt(state, targetIndex)
+      : undefined;
+  const csTarget =
+    attacker.owner === 'player'
+      ? (() => {
+          const cs = cityStateAt(state, targetIndex);
+          return cs && cs.centerIndex === targetIndex ? cs : undefined;
+        })()
+      : undefined;
 
-  if (enemies.length === 0 && !enemyCity && !rivalTarget) return no('Nothing to attack there.');
+  if (enemies.length === 0 && !enemyCity && !rivalTarget && !csTarget) {
+    return no('Nothing to attack there.');
+  }
 
   if (enemyCity) {
     attackCity(state, attacker, enemyCity);
@@ -114,10 +128,15 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   }
 
   if (enemies.length === 0 && rivalTarget) {
-    if (!rivalTarget.rival.atWar) {
+    if (attacker.owner === 'player' && !rivalTarget.rival.atWar) {
       return no(`You are at peace with ${rivalTarget.rival.name} — declare war first.`);
     }
     attackRivalCity(state, attacker, rivalTarget.rival, rivalTarget.city);
+    return ok;
+  }
+
+  if (enemies.length === 0 && csTarget) {
+    attackCityState(state, attacker, csTarget);
     return ok;
   }
 
@@ -191,7 +210,9 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     const hasEnemy = unitsAt(state, t.index).some((u) => unitsHostile(state, unit, u));
     const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d === 1;
     const rivalCity =
-      unit.owner === 'player' && d === 1 && (rivalCityAt(state, t.index)?.rival.atWar ?? false);
+      d === 1 &&
+      ((unit.owner === 'player' && (rivalCityAt(state, t.index)?.rival.atWar ?? false)) ||
+        (unit.owner === 'barbarian' && rivalCityAt(state, t.index) !== undefined));
     if (hasEnemy || playerCity || rivalCity) out.push(t.index);
   }
   return out;
@@ -212,7 +233,62 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
   attacker.hp -= damageRoll(state, defCS - atkCS);
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
-  if (city.hp <= 0) captureRivalCity(state, rival, city);
+  if (city.hp <= 0) {
+    if (attacker.owner === 'player') {
+      captureRivalCity(state, rival, city);
+    } else {
+      // Barbarians sack, they don't govern.
+      city.population = Math.max(1, Math.floor(city.population * 0.75));
+      city.hp = Math.round(200 / 2);
+      state.eventLog.push(`Barbarians sacked ${city.name} (${rival.name}).`);
+    }
+  }
+}
+
+/** Player siege of a city-state (attacking it IS the declaration of war). */
+function attackCityState(state: GameState, attacker: Unit, cs: CityState): void {
+  const atkCS = UNITS[attacker.type]?.combat ?? 0;
+  const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
+  cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS);
+  attacker.hp -= damageRoll(state, defCS - atkCS);
+  attacker.movesLeft = 0;
+  if (attacker.hp <= 0) killUnit(state, attacker);
+  if ((cs.hp ?? 0) <= 0) captureCityState(state, cs);
+}
+
+/** Conquest of a city-state: it joins your empire; its envoys die with it. */
+export function captureCityState(state: GameState, cs: CityState): void {
+  state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
+  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
+  const center = state.map.tiles[cs.centerIndex];
+  const id = state.nextCityId++;
+  for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
+    if ((t.csId ?? -1) === cs.id) {
+      t.csId = undefined;
+      if (t.cityId === -1) t.cityId = id;
+    }
+  }
+  center.cityId = id;
+  state.cities.push({
+    id,
+    name: cs.name,
+    centerIndex: cs.centerIndex,
+    population: Math.max(1, Math.floor(cs.population * 0.75)),
+    foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: 0,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: cs.centerIndex }],
+    wonders: [],
+    specialists: {},
+  });
+  state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
+  revealAround(state, cs.centerIndex, 3);
+  state.eventLog.push(`${cs.name} conquered — the city-state joins your empire.`);
 }
 
 /** Conquest: the rival city joins your empire (pop hit, no districts kept). */
@@ -291,13 +367,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
 
-  // 1. Attack an adjacent player unit or city.
-  const targets = attackTargets(state, unit).filter((i) => {
-    const t = map.tiles[i];
-    return (
-      unitsAt(state, i).some((u) => u.owner === 'player') || t.district === 'CITY_CENTER'
-    );
-  });
+  // 1. Attack anything hostile in reach (player or, for barbarians, rivals too).
+  const targets = attackTargets(state, unit);
   if (targets.length > 0) {
     meleeAttack(state, unit.id, targets[0]);
     return;

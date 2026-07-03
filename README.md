@@ -202,11 +202,24 @@ npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out 
   accept trade routes (+3 gold + their specialty).
 - **Rival civilizations** (toggle): scripted empires with real cities,
   territory and units — they settle, grow, expand borders and train
-  era-scaled military on a seeded schedule; they **race you** for the shared
-  great-people pool and take pantheons/beliefs out of yours; when strong and
-  close they **declare war** and raid exactly like barbarians; you can declare
-  war, buy peace (gold scales with duration), or batter their cities to 0 HP
-  and **capture** them (population hit, territory transfers).
+  era-scaled military; they **race you** for the shared great-people pool and
+  take pantheons/beliefs out of yours; when strong and close they **declare
+  war** and raid exactly like barbarians; you can declare war, buy peace
+  (gold scales with duration), or batter their cities to 0 HP and **capture**
+  them (population hit, territory transfers). Their economy is
+  **map-dependent**: rival cities work their best owned tiles, so good land
+  makes strong neighbors — and their borders claim it turn by turn.
+- **A living world**: barbarians raid rivals too (attacking their units and
+  sacking their cities), and rival units strike back at adjacent raiders —
+  wars you never joined burn on your borders. **City-states can be
+  conquered** (siege the center to 0 HP — attacking is the declaration; the
+  city joins your empire and its envoy bonuses die with it) and suzerains of
+  militaristic city-states can **levy troops** for gold on a cooldown.
+- **Loyalty** (active while rival civs exist): every non-capital city feels
+  population pressure from nearby city centers, yours against theirs, tuned
+  by amenities. Border cities under a big rival's shadow bleed loyalty
+  (shown on the banner and city panel) and **defect to the rival at 0** —
+  forward-settling is now a real gamble. Capitals are immune.
 
 ## Reinforcement learning
 
@@ -259,6 +272,12 @@ autopilot between decisions.
   candidate vector — the GPU-worthy stage.
 
 ### Benchmark
+
+> **Engine v4** numbers. The deeper-opponents update (v5: rival tile
+> economies, barbarian↔rival wars, city-state conquest/levies, loyalty)
+> made the world harder — weights trained on v4 still load in the UI
+> advisor (with a warning) but `rl:eval` flags them stale, and these
+> baselines need re-running on v5 for fair comparisons.
 
 50 paired held-out seeds, horizon 100, everything enabled (units, fog,
 disasters, city-states, rivals). ES run: MLP (1,465 params), pop 32 × 8
@@ -329,13 +348,12 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 ## Roadmap ideas (later stages)
 
-1. Deeper opponents: rival economies with real yields, rival-vs-barbarian
-   combat, city-state levies and conquest, loyalty pressure.
-2. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
+1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
    with a learned value function (AlphaZero-lite), and eventually a
    GPU-vectorized engine port for self-play-scale throughput.
-3. In-UI "AI advisor": run trained weights (ES or an exported PPO policy)
-   as a recommendation layer in the calculator.
+2. Opponent depth II: rival build queues and districts on the map, loyalty
+   pressure working in your favor (flipping rival border cities), open
+   borders and diplomacy beyond war/peace.
 
 ## Code layout
 

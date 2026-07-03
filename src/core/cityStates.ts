@@ -21,6 +21,7 @@ import {
   CS_TYPE_YIELD,
   CS_TYPE_DISTRICT,
   CS_NAMES,
+  CS_MAX_HP,
   ENVOY_COST,
   INFLUENCE_PER_TURN,
   CS_CAPITAL_BONUS,
@@ -273,8 +274,11 @@ export function cityStatePhase(state: GameState): void {
     }
   }
 
-  // Cosmetic slow growth.
+  // Cosmetic slow growth + siege recovery.
   if (state.turn % 12 === 0) {
     for (const cs of state.cityStates) cs.population = Math.min(10, cs.population + 1);
+  }
+  for (const cs of state.cityStates) {
+    if (cs.hp !== undefined && cs.hp < CS_MAX_HP) cs.hp = Math.min(CS_MAX_HP, cs.hp + 10);
   }
 }

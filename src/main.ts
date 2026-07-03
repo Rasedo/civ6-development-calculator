@@ -77,7 +77,7 @@ import { searchBuildOrder, adoptPlan } from './core/planner';
 import { choosePantheon, foundReligion, queueSettler, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject } from './core/game';
 import { addTradeRoute, addCsTradeRoute, removeTradeRoute } from './core/trade';
 import { assignEnvoy } from './core/cityStates';
-import { declareWar, sueForPeace } from './core/rivals';
+import { declareWar, sueForPeace, levyUnits } from './core/rivals';
 import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderHarvest, builderRepair, disbandUnit, setExploreMission } from './core/units';
 import { initFog } from './core/fog';
 import { meleeAttack, rangedAttack } from './core/combat';
@@ -600,6 +600,11 @@ const callbacks: PanelCallbacks = {
   },
   onSueForPeace(rivalId) {
     const r = sueForPeace(state, rivalId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onLevyUnits(csId) {
+    const r = levyUnits(state, csId);
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },

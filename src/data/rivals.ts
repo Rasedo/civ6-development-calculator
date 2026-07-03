@@ -34,3 +34,25 @@ export const RIVAL_WAR_MIN_TURNS = 14;
 export const PEACE_MIN_WAR_TURNS = 8;
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 export const RIVAL_CITY_MAX_HP = 200;
+
+// --- deeper-opponent pacing ---------------------------------------------------
+/** Rival cities work their best owned tiles out to this ring. */
+export const RIVAL_WORK_RADIUS = 3;
+/** Fraction of a rival city's tile production banked toward settlers / military. */
+export const RIVAL_PROD_TO_SETTLER = 0.3;
+export const RIVAL_PROD_TO_MILITARY = 0.22;
+
+// --- loyalty -------------------------------------------------------------------
+export const LOYALTY_MAX = 100;
+/** City centers exert population pressure out to this many tiles. */
+export const LOYALTY_RANGE = 9;
+/** Max per-turn swing from population pressure. */
+export const LOYALTY_PRESSURE_SCALE = 10;
+/** Per-turn loyalty by amenity tier name. */
+export const LOYALTY_AMENITY: Record<string, number> = {
+  Ecstatic: 3,
+  Happy: 1.5,
+  Content: 0,
+  Displeased: -1.5,
+  Unhappy: -3,
+};

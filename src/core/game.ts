@@ -16,7 +16,7 @@ import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
-import { placeRivals, rivalPhase } from './rivals';
+import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
 import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -604,9 +604,15 @@ export function endTurn(state: GameState): void {
   const mods = getModifiers(state);
   let turnScience = 0;
   let turnCulture = 0;
+  const defectors: City[] = [];
 
   for (const city of state.cities) {
     const stats = computeCityStats(state, city, luxMap, mods);
+
+    // --- loyalty (rival-pressure games only) ---------------------------------
+    if (applyLoyalty(state, city, stats.amenities.tier.name)) {
+      defectors.push(city);
+    }
 
     // --- production ---------------------------------------------------------
     if (city.queue.length > 0) {
@@ -675,6 +681,9 @@ export function endTurn(state: GameState): void {
     turnScience += stats.total.science;
     turnCulture += stats.total.culture;
   }
+
+  // Loyalty collapses resolve after the city loop (they mutate the list).
+  for (const city of defectors) flipCityToRival(state, city);
 
   if (state.unitsMode) {
     state.treasury -= unitMaintenance(state);

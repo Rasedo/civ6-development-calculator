@@ -409,7 +409,8 @@ export class MapRenderer {
       if (tile.district !== 'CITY_CENTER') continue;
       const city = state.cities.find((c) => c.centerIndex === tile.index);
       if (!city) continue;
-      const label = `${city.isCapital ? '★ ' : ''}${city.name}  ${city.population}`;
+      const loyalty = city.loyalty ?? 100;
+      const label = `${city.isCapital ? '★ ' : ''}${city.name}  ${city.population}${loyalty < 100 ? `  ⚑${Math.round(loyalty)}` : ''}`;
       ctx.font = `bold ${HEX_SIZE * 0.38}px system-ui, sans-serif`;
       const w = ctx.measureText(label).width + HEX_SIZE * 0.5;
       const h = HEX_SIZE * 0.62;
