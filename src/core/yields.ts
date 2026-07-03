@@ -141,6 +141,8 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     const tile = ctx.map.tiles[d.tileIndex];
     if (!tile.districtComplete) continue;
     const def = DISTRICTS[d.type];
+    const csAdd = ctx.mods.districtYieldAdd[d.type];
+    if (csAdd) addYields(out, csAdd);
     if (def.adjacencyYield) {
       const adj = effectiveAdjacency(ctx, tile, d.type);
       out[def.adjacencyYield] += adj;

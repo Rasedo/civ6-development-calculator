@@ -24,10 +24,10 @@ function pseudoRandomPolicy(_obs: number[], cands: Candidate[]): number {
   return cands.length ? pick % cands.length : 0;
 }
 
-// Greedy hand baseline for the 28-feature layout (kinds ×12, cost, turns,
+// Greedy hand baseline for the 29-feature layout (kinds ×13, cost, turns,
 // adjacency, site, Δyields ×6, housing, amenity, unlocks, threat, builders, military).
 const GREEDY = [
-  0.6, 1.0, 0.5, 1.2, -0.2, 0.1, 0.2, 0.5, 0.5, 0.5, 0.3, 0,
+  0.6, 1.0, 0.5, 1.2, -0.2, 0.1, 0.2, 0.5, 0.5, 0.5, 0.3, 0.4, 0,
   -0.1, -0.3, 0.8, 0.6,
   0.3, 0.4, 0.2, 0.5, 0.4, 0.2,
   0.3, 0.3, 0.4, -0.1, -0.4, -0.2,

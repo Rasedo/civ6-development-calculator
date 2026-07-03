@@ -96,6 +96,8 @@ export interface Tile {
   droughtTurns: number;
   /** Owning city id, or -1. */
   cityId: number;
+  /** Owning city-state id (territory blocks settling/borders); absent = none. */
+  csId?: number;
 }
 
 export interface GameMap {
@@ -222,6 +224,12 @@ export interface GameState {
   explored: number[];
   /** Recent gameplay events (goody rewards etc.) for the UI to surface. */
   eventLog: string[];
+  /** Independent city-states on the map ([] = none / feature off). */
+  cityStates: CityState[];
+  /** Influence points accrued toward the next envoy. */
+  influencePoints: number;
+  /** Earned envoys waiting to be assigned to a met city-state. */
+  envoysAvailable: number;
 }
 
 export interface Unit {
@@ -254,8 +262,41 @@ export interface ReligionState {
 export interface TradeRoute {
   /** Origin city id (receives the yields). */
   from: number;
-  /** Destination city id. */
+  /** Destination city id (-1 when the destination is a city-state). */
   to: number;
+  /** Destination city-state id, if this is an international route. */
+  toCs?: number;
+}
+
+export type CityStateType =
+  | 'scientific'
+  | 'cultural'
+  | 'trade'
+  | 'industrial'
+  | 'militaristic'
+  | 'religious';
+
+export interface CityStateQuest {
+  kind: 'clearCamp' | 'sendTradeRoute' | 'buildDistrict';
+  /** For buildDistrict: the district type asked for. */
+  district?: DistrictId;
+  /** For clearCamp: the camp tile that must be cleared. */
+  campIndex?: number;
+}
+
+export interface CityState {
+  id: number;
+  name: string;
+  type: CityStateType;
+  centerIndex: number;
+  population: number;
+  /** Envoys the player has assigned here. */
+  envoys: number;
+  /** Met once the player has explored near it (envoys need contact). */
+  met: boolean;
+  quest: CityStateQuest | null;
+  /** Turn the current quest was issued (for reissue pacing). */
+  questIssuedTurn: number;
 }
 
 export interface MapGenOptions {

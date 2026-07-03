@@ -14,6 +14,7 @@ import { WONDERS } from '../data/wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { UNITS } from '../data/units';
 import { fogActive, isExplored } from '../core/fog';
+import { CS_TYPE_COLORS } from '../data/cityStates';
 import type { ImprovementId } from '../core/types';
 
 export const HEX_SIZE = 24;
@@ -189,6 +190,25 @@ export class MapRenderer {
         const [nc, nr] = neighborOffset(tile.col, tile.row, d);
         const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
         if (n && n.cityId === tile.cityId) continue;
+        const [a, b] = EDGE_CORNERS[d];
+        ctx.beginPath();
+        ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
+        ctx.lineTo(cx + corners[b].x, cy + corners[b].y);
+        ctx.stroke();
+      }
+    }
+
+    // --- city-state territory borders ----------------------------------------
+    for (const { tile, cx, cy } of visible) {
+      const csId = tile.csId ?? -1;
+      if (csId === -1) continue;
+      const cs = state.cityStates.find((c) => c.id === csId);
+      ctx.strokeStyle = cs ? CS_TYPE_COLORS[cs.type] : '#999999';
+      ctx.lineWidth = 1.4;
+      for (let d = 0; d < 6; d++) {
+        const [nc, nr] = neighborOffset(tile.col, tile.row, d);
+        const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
+        if (n && (n.csId ?? -1) === csId) continue;
         const [a, b] = EDGE_CORNERS[d];
         ctx.beginPath();
         ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
@@ -373,6 +393,25 @@ export class MapRenderer {
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = '#ecdfb8';
+      ctx.fillText(label, cx, by + 0.5);
+    }
+
+    // --- city-state banners ----------------------------------------------------
+    for (const { tile, cx, cy } of visible) {
+      const cs = state.cityStates.find((c) => c.centerIndex === tile.index);
+      if (!cs) continue;
+      const label = `◆ ${cs.name}${cs.envoys > 0 ? `  ${cs.envoys}⚑` : ''}`;
+      ctx.font = `bold ${HEX_SIZE * 0.34}px system-ui, sans-serif`;
+      const w = ctx.measureText(label).width + HEX_SIZE * 0.5;
+      const h = HEX_SIZE * 0.58;
+      const by = cy - HEX_SIZE * 1.05;
+      ctx.fillStyle = 'rgba(16,19,24,0.92)';
+      ctx.strokeStyle = CS_TYPE_COLORS[cs.type];
+      ctx.lineWidth = 1.2;
+      roundRect(ctx, cx - w / 2, by - h / 2, w, h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#dfe5ec';
       ctx.fillText(label, cx, by + 0.5);
     }
   }

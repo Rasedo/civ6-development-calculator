@@ -8,6 +8,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, type PolicyEffects } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, type BeliefEffects } from '../data/religion';
+import { csEnvoyBonuses } from './cityStates';
 
 // ---------------------------------------------------------------------------
 // Unlocks
@@ -133,6 +134,8 @@ export interface Modifiers {
   buildingHousingAdd: Partial<Record<string, number>>;
   riverCity: { amenities: number; housing: number } | null;
   faithPerWonder: number;
+  /** Flat yields per completed district instance (city-state envoys). */
+  districtYieldAdd: Partial<Record<DistrictId, Partial<Yields>>>;
 }
 
 export function defaultModifiers(): Modifiers {
@@ -162,6 +165,7 @@ export function defaultModifiers(): Modifiers {
     buildingHousingAdd: {},
     riverCity: null,
     faithPerWonder: 0,
+    districtYieldAdd: {},
   };
 }
 
@@ -227,6 +231,16 @@ export function getModifiers(state: GameState): Modifiers {
   if (state.religion?.founded) {
     applyBeliefEffects(state, mods, state.religion.follower ? FOLLOWER_BELIEFS[state.religion.follower] : undefined);
     applyBeliefEffects(state, mods, state.religion.founder ? FOUNDER_BELIEFS[state.religion.founder] : undefined);
+  }
+
+  // City-state envoy bonuses
+  if (state.cityStates?.length) {
+    const cs = csEnvoyBonuses(state);
+    addPartial(mods.capitalYields, cs.capital);
+    for (const [district, y] of Object.entries(cs.districtAdd)) {
+      const cur = (mods.districtYieldAdd[district as DistrictId] ??= {});
+      addPartial(cur, y);
+    }
   }
   return mods;
 }

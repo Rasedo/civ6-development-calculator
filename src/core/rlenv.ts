@@ -60,6 +60,7 @@ import { PROJECT_YIELD_FRACTION } from '../data/projects';
 import { GP_CLASSES, gpCost } from '../data/greatPeople';
 import { neighbors } from './hex';
 import { tileFreeForUnit } from './units';
+import { assignEnvoy, envoyBonusDelta, metCityStates, isSuzerain } from './cityStates';
 
 export type EnvAction =
   | BuildChoice
@@ -74,14 +75,16 @@ export type EnvAction =
   | { kind: 'setPolicy'; card: string; slot: number }
   | { kind: 'keepPolicies' }
   | { kind: 'setGovernment'; id: string }
-  | { kind: 'keepGovernment' };
+  | { kind: 'keepGovernment' }
+  | { kind: 'assignEnvoy'; csId: number };
 
 export type PendingDecision =
   | { type: 'production'; cityId: number }
   | { type: 'research' }
   | { type: 'civic' }
   | { type: 'policy' }
-  | { type: 'government' };
+  | { type: 'government' }
+  | { type: 'envoy' };
 
 export interface Candidate {
   action: EnvAction;
@@ -103,13 +106,14 @@ const CAND_KINDS = [
   'civic',
   'policy',
   'government',
+  'envoy',
   'keep',
 ] as const;
 
 /** Bump when the feature/observation layout changes; stored in weight files. */
-export const FEATURE_VERSION = 2;
-export const CANDIDATE_FEATURES = CAND_KINDS.length + 16; // 28
-export const OBSERVATION_SIZE = 24;
+export const FEATURE_VERSION = 3;
+export const CANDIDATE_FEATURES = CAND_KINDS.length + 16; // 29
+export const OBSERVATION_SIZE = 27;
 export const MAX_CANDIDATES = 24;
 
 export interface EnvOptions {
@@ -252,6 +256,7 @@ export class CivEnv {
       height: this.opts.height ?? 26,
       seed: this.opts.seed,
       unitsMode: this.opts.unitsMode ?? true,
+      cityStates: true,
     });
     this.state.disasters = this.opts.disasters ?? true;
     this.state.autoResearch = false; // research is the agent's job
@@ -347,6 +352,9 @@ export class CivEnv {
       case 'keepGovernment':
         this.govSettledAt = s.research.civics.length;
         break;
+      case 'assignEnvoy':
+        assignEnvoy(s, action.csId);
+        break;
     }
   }
 
@@ -373,6 +381,9 @@ export class CivEnv {
     }
     if (s.research.civic === null && availableCivics(s).length > 0) {
       return { type: 'civic' };
+    }
+    if (s.envoysAvailable > 0 && metCityStates(s).length > 0) {
+      return { type: 'envoy' };
     }
     for (const c of [...s.cities].sort((a, b) => a.id - b.id)) {
       if (c.queue.length > 0) continue;
@@ -428,7 +439,23 @@ export class CivEnv {
         return this.policyCandidates();
       case 'government':
         return this.governmentCandidates();
+      case 'envoy':
+        return this.envoyCandidates();
     }
+  }
+
+  private envoyCandidates(): Candidate[] {
+    const s = this.state;
+    return metCityStates(s).map((cs) => {
+      const next = cs.envoys + 1;
+      const crossing = next === 1 || next === 3 || next === 6 ? 1 : 0;
+      return this.candidate(
+        { kind: 'assignEnvoy', csId: cs.id },
+        `Envoy → ${cs.name} (${cs.type}, ${cs.envoys})`,
+        'envoy',
+        { delta: envoyBonusDelta(s, cs), unlocks: crossing },
+      );
+    });
   }
 
   // --- production ------------------------------------------------------------
@@ -807,6 +834,9 @@ export class CivEnv {
       Math.min(1, s.faithTotal / 500),
       Math.min(1, gpProgress),
       emptySlots,
+      Math.min(1, s.envoysAvailable / 3),
+      Math.min(1, metCityStates(s).length / 6),
+      Math.min(1, s.cityStates.filter(isSuzerain).length / 6),
     ];
   }
 }

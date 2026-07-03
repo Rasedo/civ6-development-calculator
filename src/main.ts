@@ -48,6 +48,7 @@ import {
   renderPlannerPanel,
   renderReligionPanel,
   renderTradePanel,
+  renderCityStatesPanel,
   renderEmpirePlanPanel,
   tileSummary,
   type PanelCallbacks,
@@ -70,7 +71,8 @@ import { toggleBoost } from './core/boosts';
 import { tileAppeal, appealTier } from './core/appeal';
 import { searchBuildOrder, adoptPlan } from './core/planner';
 import { choosePantheon, foundReligion, queueSettler, purchaseBuilding, purchaseUnit, purchaseSettler, queueProject } from './core/game';
-import { addTradeRoute, removeTradeRoute } from './core/trade';
+import { addTradeRoute, addCsTradeRoute, removeTradeRoute } from './core/trade';
+import { assignEnvoy } from './core/cityStates';
 import { queueUnit, orderMove, builderImprove, builderRemoveFeature, builderHarvest, builderRepair, disbandUnit, setExploreMission } from './core/units';
 import { initFog } from './core/fog';
 import { meleeAttack, rangedAttack } from './core/combat';
@@ -120,6 +122,7 @@ type RightView =
   | 'planner'
   | 'religion'
   | 'trade'
+  | 'cityStates'
   | 'empirePlan';
 
 interface UiState {
@@ -209,6 +212,7 @@ function newGameFromControls(): GameState {
     withWonders: wondersToggle.checked,
     sandbox: sandboxToggle.checked,
     unitsMode: unitsToggle.checked,
+    cityStates: true,
   });
 }
 
@@ -248,6 +252,7 @@ function setRightView(view: RightView): void {
     ['view-gp', 'greatPeople'],
     ['view-religion', 'religion'],
     ['view-trade', 'trade'],
+    ['view-city-states', 'cityStates'],
     ['view-empire-plan', 'empirePlan'],
     ['settle-advisor', 'settle'],
   ] as const) {
@@ -556,6 +561,16 @@ const callbacks: PanelCallbacks = {
     if (!r.ok) showMessage(r.reason!);
     refresh();
   },
+  onAddCsTradeRoute(from, csId) {
+    const r = addCsTradeRoute(state, from, csId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
+  onAssignEnvoy(csId) {
+    const r = assignEnvoy(state, csId);
+    if (!r.ok) showMessage(r.reason!);
+    refresh();
+  },
   onRemoveTradeRoute(index) {
     removeTradeRoute(state, index);
     refresh();
@@ -667,6 +682,8 @@ function refresh(): void {
     renderReligionPanel(contextPanel, state, callbacks);
   } else if (ui.rightView === 'trade') {
     renderTradePanel(contextPanel, state, callbacks);
+  } else if (ui.rightView === 'cityStates') {
+    renderCityStatesPanel(contextPanel, state, callbacks);
   } else if (ui.rightView === 'empirePlan') {
     renderEmpirePlanPanel(contextPanel, state, ui.empirePlan, callbacks);
   }
@@ -957,6 +974,7 @@ for (const [btn, view] of [
   ['view-gp', 'greatPeople'],
   ['view-religion', 'religion'],
   ['view-trade', 'trade'],
+  ['view-city-states', 'cityStates'],
   ['view-empire-plan', 'empirePlan'],
 ] as const) {
   $<HTMLButtonElement>(btn).addEventListener('click', () => {

@@ -11,7 +11,9 @@ import { validImprovements, canRemoveFeature, availableBuildings, districtPlacem
 import { itemCost, itemLabel, tilePurchaseCost, greatPersonPointsPerTurn, greatPeopleEarned, districtCost, effectiveResearchCost, canChoosePantheon, canFoundReligion, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, unitPurchaseCost } from '../core/game';
 import { chopGrant, harvestGrant } from '../core/economy';
 import { buildingCompletable } from '../core/rules';
-import { tradeCapacity, routeYields, TRADE_ROUTE_RANGE } from '../core/trade';
+import { tradeCapacity, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from '../core/trade';
+import { isSuzerain, envoyBonusDelta, questLabel } from '../core/cityStates';
+import { CS_TYPE_COLORS, ENVOY_COST, INFLUENCE_PER_TURN, GOV_INFLUENCE_TIER } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
 import { trainableUnits } from '../core/units';
@@ -93,6 +95,8 @@ export interface PanelCallbacks {
   onSetEmpireHorizon(turns: number): void;
   onRunEmpirePlan(): void;
   onAdoptEmpirePlan(index: number): void;
+  onAssignEnvoy(csId: number): void;
+  onAddCsTradeRoute(from: number, csId: number): void;
 }
 
 /** Mutable state for the empire planner view (owned by main.ts). */
@@ -731,8 +735,16 @@ export function renderTradePanel(container: HTMLElement, state: GameState, cb: P
   const routes = state.tradeRoutes
     .map((r, i) => {
       const from = state.cities.find((c) => c.id === r.from);
+      if (!from) return '';
+      if (r.toCs !== undefined) {
+        const cs = state.cityStates.find((c) => c.id === r.toCs);
+        if (!cs) return '';
+        return `<div class="queue-row"><span>${from.name} → ◆ ${cs.name}
+          <span class="muted">${yieldsHtml(csRouteYields(cs))} to ${from.name}</span></span>
+          <button data-act="rm-route" data-i="${i}">✕</button></div>`;
+      }
       const to = state.cities.find((c) => c.id === r.to);
-      if (!from || !to) return '';
+      if (!to) return '';
       const y = routeYields(state, to);
       return `<div class="queue-row"><span>${from.name} → ${to.name}
         <span class="muted">${yieldsHtml(y)} to ${from.name}</span></span>
@@ -743,22 +755,29 @@ export function renderTradePanel(container: HTMLElement, state: GameState, cb: P
   const cityOptions = state.cities
     .map((c) => `<option value="${c.id}">${c.name}</option>`)
     .join('');
+  const destOptions =
+    cityOptions +
+    state.cityStates
+      .filter((cs) => cs.met)
+      .map((cs) => `<option value="cs:${cs.id}">◆ ${cs.name} (${cs.type})</option>`)
+      .join('');
+  const canRoute = state.cities.length >= 2 || (state.cities.length >= 1 && state.cityStates.some((c) => c.met));
 
   container.innerHTML = `
     <h2>Trade routes</h2>
     <div class="row">Capacity: <b>${state.tradeRoutes.length} / ${cap}</b>
-      <span class="muted">(Foreign Trade civic, Markets, Lighthouses, Colossus, Great Zimbabwe)</span></div>
+      <span class="muted">(Foreign Trade civic, Markets, Lighthouses, Colossus, Great Zimbabwe, trade-city-state suzerainty)</span></div>
     ${routes || '<div class="muted">No routes running.</div>'}
     ${
-      state.cities.length >= 2
+      canRoute
         ? `<h3>New route</h3>
           <div class="row">
             <label>From <select data-act="route-from">${cityOptions}</select></label>
-            <label>To <select data-act="route-to">${cityOptions}</select></label>
+            <label>To <select data-act="route-to">${destOptions}</select></label>
             <button data-act="add-route">Start route</button>
           </div>
-          <div class="hint muted">Domestic routes: origin gains +1🍞+1⚙, plus +1 of each per 2 specialty districts at the destination. Range ${TRADE_ROUTE_RANGE} tiles.</div>`
-        : '<div class="muted">Found a second city to run trade routes.</div>'
+          <div class="hint muted">Domestic routes: origin gains +1🍞+1⚙ plus destination district bonuses. City-state routes: +3🪙 plus their specialty. Range ${TRADE_ROUTE_RANGE} tiles.</div>`
+        : '<div class="muted">Found a second city (or meet a city-state) to run trade routes.</div>'
     }
   `;
 
@@ -767,9 +786,52 @@ export function renderTradePanel(container: HTMLElement, state: GameState, cb: P
   );
   container.querySelector('[data-act="add-route"]')?.addEventListener('click', () => {
     const from = Number((container.querySelector('[data-act="route-from"]') as HTMLSelectElement).value);
-    const to = Number((container.querySelector('[data-act="route-to"]') as HTMLSelectElement).value);
-    cb.onAddTradeRoute(from, to);
+    const toRaw = (container.querySelector('[data-act="route-to"]') as HTMLSelectElement).value;
+    if (toRaw.startsWith('cs:')) cb.onAddCsTradeRoute(from, Number(toRaw.slice(3)));
+    else cb.onAddTradeRoute(from, Number(toRaw));
   });
+}
+
+// ---------------------------------------------------------------------------
+// City-states
+// ---------------------------------------------------------------------------
+
+export function renderCityStatesPanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
+  const tier = state.government.current ? GOV_INFLUENCE_TIER[state.government.current] ?? 0 : 0;
+  const perTurn = INFLUENCE_PER_TURN + tier;
+  const met = state.cityStates.filter((cs) => cs.met);
+  const unmet = state.cityStates.length - met.length;
+
+  const rows = met
+    .map((cs) => {
+      const suzerain = isSuzerain(cs);
+      const delta = envoyBonusDelta(state, cs);
+      const gain = YIELD_KEYS.filter((k) => delta[k] > 0)
+        .map((k) => `+${fmt(delta[k])} ${YIELD_LABELS[k]}`)
+        .join(' ');
+      return `<div class="build-row"><span>
+          <b style="color:${CS_TYPE_COLORS[cs.type]}">◆</b> ${cs.name}
+          <span class="muted">${cs.type} · ${cs.envoys}⚑${suzerain ? ' · Suzerain' : ''}</span><br>
+          <small class="muted">${cs.quest ? `Quest: ${questLabel(cs.quest)} (+1⚑)` : 'No active quest.'}</small>
+          ${gain ? `<br><small>Next envoy: ${gain}</small>` : ''}
+        </span>
+        <button data-act="envoy" data-id="${cs.id}" ${state.envoysAvailable > 0 ? '' : 'disabled'}>+⚑</button>
+      </div>`;
+    })
+    .join('');
+
+  container.innerHTML = `
+    <h2>City-states</h2>
+    <div class="row">Envoys available: <b>${state.envoysAvailable}</b> ·
+      Influence ${fmt(state.influencePoints)} / ${ENVOY_COST} <span class="muted">(+${perTurn}/turn)</span></div>
+    <div class="hint muted">1⚑: +2 type-yield in the capital. 3⚑: +2 in every matching district. 6⚑: +4. Suzerain at 3⚑ (trade type: +1 route capacity).</div>
+    ${rows || '<div class="muted">None met yet — explore the map.</div>'}
+    ${unmet > 0 ? `<div class="muted">${unmet} city-state${unmet === 1 ? '' : 's'} undiscovered.</div>` : ''}
+  `;
+
+  container.querySelectorAll('[data-act="envoy"]').forEach((b) =>
+    b.addEventListener('click', () => cb.onAssignEnvoy(Number((b as HTMLElement).dataset.id))),
+  );
 }
 
 // ---------------------------------------------------------------------------

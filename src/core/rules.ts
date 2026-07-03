@@ -39,10 +39,17 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
   if (tile.wonder) return no('Cannot settle on a natural wonder.');
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
   if (tile.district) return no('Tile already occupied.');
+  if ((tile.csId ?? -1) !== -1) return no('City-state territory.');
   for (const c of state.cities) {
     const center = state.map.tiles[c.centerIndex];
     if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {
       return no(`Too close to ${c.name} (min ${CITY_MIN_DIST} tiles).`);
+    }
+  }
+  for (const cs of state.cityStates ?? []) {
+    const center = state.map.tiles[cs.centerIndex];
+    if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {
+      return no(`Too close to the city-state of ${cs.name}.`);
     }
   }
   return ok;

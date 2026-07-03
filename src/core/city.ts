@@ -297,6 +297,7 @@ export function borderCandidates(state: GameState, city: City): number[] {
   const out: number[] = [];
   for (const t of tilesWithin(state.map, center.col, center.row, BORDER_MAX_RADIUS)) {
     if (t.cityId !== -1) continue;
+    if ((t.csId ?? -1) !== -1) continue; // city-state territory is off limits
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && n.cityId === city.id,
     );

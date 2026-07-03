@@ -63,6 +63,9 @@ export function makeState(map: GameMap = makeMap()): GameState {
     fogOfWar: false,
     explored: [],
     eventLog: [],
+    cityStates: [],
+    influencePoints: 0,
+    envoysAvailable: 0,
   };
 }
 

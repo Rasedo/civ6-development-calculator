@@ -15,6 +15,7 @@ import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits } from './unit
 import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
+import { placeCityStates, cityStatePhase } from './cityStates';
 import { UNITS } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -49,9 +50,13 @@ export function districtCost(state: GameState): number {
 }
 
 export function createGame(
-  opts: MapGenOptions & { sandbox?: boolean; unitsMode?: boolean },
+  opts: MapGenOptions & { sandbox?: boolean; unitsMode?: boolean; cityStates?: boolean | number },
 ): GameState {
-  return createGameFromMap(generateMap(opts), opts.sandbox ?? false, opts.unitsMode ?? false);
+  const state = createGameFromMap(generateMap(opts), opts.sandbox ?? false, opts.unitsMode ?? false);
+  if (opts.cityStates) {
+    placeCityStates(state, typeof opts.cityStates === 'number' ? opts.cityStates : undefined);
+  }
+  return state;
 }
 
 /** Fresh game state around an existing map (e.g. one imported from Civ 6). */
@@ -83,6 +88,9 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     fogOfWar: false,
     explored: [],
     eventLog: [],
+    cityStates: [],
+    influencePoints: 0,
+    envoysAvailable: 0,
   };
 }
 
@@ -150,7 +158,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   // Civ 6: a new city starts with its center plus the first ring only;
   // everything beyond comes from culture growth or tile purchase.
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (t.cityId === -1) t.cityId = id;
+    if (t.cityId === -1 && (t.csId ?? -1) === -1) t.cityId = id;
   }
   tile.cityId = id;
   revealAround(state, tileIndex, 3);
@@ -661,6 +669,7 @@ export function endTurn(state: GameState): void {
     barbarianPhase(state);
   }
   if (state.disasters) disasterPhase(state);
+  cityStatePhase(state);
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);
@@ -779,6 +788,9 @@ export function deserialize(json: string): GameState {
   state.fogOfWar ??= false;
   state.explored ??= [];
   state.eventLog ??= [];
+  state.cityStates ??= [];
+  state.influencePoints ??= 0;
+  state.envoysAvailable ??= 0;
   for (const u of state.units) {
     u.owner ??= 'player';
     u.hp ??= 100;

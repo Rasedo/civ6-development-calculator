@@ -10,10 +10,10 @@ import {
 
 const OPTS = { seed: 77, width: 44, height: 26, horizon: 40, objective: 'balanced' as const };
 
-// A hand-tuned reference for the 28-feature layout (kinds ×12, cost, turns,
+// A hand-tuned reference for the 29-feature layout (kinds ×13, cost, turns,
 // adjacency, site, Δyields ×6, housing, amenity, unlocks, threat, builders, military).
 const GREEDY = [
-  0.6, 1.0, 0.5, 1.2, -0.2, 0.1, 0.2, 0.5, 0.5, 0.5, 0.3, 0,
+  0.6, 1.0, 0.5, 1.2, -0.2, 0.1, 0.2, 0.5, 0.5, 0.5, 0.3, 0.4, 0,
   -0.1, -0.3, 0.8, 0.6,
   0.3, 0.4, 0.2, 0.5, 0.4, 0.2,
   0.3, 0.3, 0.4, -0.1, -0.4, -0.2,
