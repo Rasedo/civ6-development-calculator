@@ -95,6 +95,76 @@ describe('live sync parser', () => {
     expect(state.cities[0].population).toBe(2);
   });
 
+  it('mirrors government, policy cards and beliefs', () => {
+    const text = [
+      ...mapBlock(),
+      ...syncBlock(25, [
+        'CIV6SYNC_RESEARCH|TECH_POTTERY|CIVIC_CODE_OF_LAWS,CIVIC_POLITICAL_PHILOSOPHY',
+        'CIV6SYNC_GOV|GOVERNMENT_OLIGARCHY',
+        'CIV6SYNC_POLICIES|POLICY_URBAN_PLANNING,POLICY_GOD_KING,POLICY_UNKNOWN_DLC',
+        'CIV6SYNC_BELIEFS|BELIEF_FERTILITY_RITES,BELIEF_WORK_ETHIC,BELIEF_TITHE,BELIEF_MYSTERY_CULT',
+        'CIV6SYNC_CITY|7|4|4|4|Kyoto',
+      ]),
+    ].join('\n');
+
+    const { state, report } = parseLiveSync(text);
+    expect(state.government.current).toBe('OLIGARCHY');
+    expect(state.government.policies).toContain('URBAN_PLANNING');
+    expect(state.government.policies).toContain('GOD_KING');
+    expect(report.skipped['policy']).toBe(1); // the unknown DLC card
+    expect(state.religion.pantheon).toBe('FERTILITY_RITES');
+    expect(state.religion.follower).toBe('WORK_ETHIC');
+    expect(state.religion.founder).toBe('TITHE');
+    expect(state.religion.founded).toBe(true);
+    expect(report.skipped['belief']).toBe(1);
+  });
+
+  it('mirrors current production, rescaled onto our costs', () => {
+    const text = [
+      ...mapBlock(),
+      ...syncBlock(18, [
+        'CIV6SYNC_CITY|7|4|4|4|Kyoto',
+        'CIV6SYNC_CITY|8|8|8|2|Osaka',
+        'CIV6SYNC_PLOT|5|4|-|DISTRICT_CAMPUS|-|0',
+        'CIV6SYNC_QUEUE|7|DISTRICT_CAMPUS|27|54', // half done in the real game
+        'CIV6SYNC_QUEUE|8|UNIT_SETTLER|20|80',
+      ]),
+    ].join('\n');
+
+    const { state } = parseLiveSync(text);
+    const kyoto = state.cities.find((c) => c.name === 'Kyoto')!;
+    const osaka = state.cities.find((c) => c.name === 'Osaka')!;
+
+    expect(kyoto.queue.length).toBe(1);
+    const dq = kyoto.queue[0];
+    expect(dq.kind).toBe('district');
+    if (dq.kind === 'district') {
+      expect(dq.district).toBe('CAMPUS');
+      expect(dq.progress / (dq.cost ?? 1)).toBeCloseTo(0.5, 5); // ratio preserved
+      expect(state.map.tiles[dq.tileIndex].districtComplete).toBe(false); // demoted
+    }
+
+    expect(osaka.queue.length).toBe(1);
+    const sq = osaka.queue[0];
+    expect(sq.kind).toBe('settler');
+    if (sq.kind === 'settler') {
+      expect(sq.progress / sq.cost).toBeCloseTo(0.25, 5);
+    }
+  });
+
+  it('unknown queue items are skipped and reported', () => {
+    const text = [
+      ...mapBlock(),
+      ...syncBlock(9, [
+        'CIV6SYNC_CITY|7|4|4|2|Kyoto',
+        'CIV6SYNC_QUEUE|7|UNIT_GIANT_DEATH_ROBOT|10|300',
+      ]),
+    ].join('\n');
+    const { state, report } = parseLiveSync(text);
+    expect(state.cities[0].queue.length).toBe(0);
+    expect(report.skipped['queue']).toBe(1);
+  });
+
   it('a synced worship building marks the religion choice', () => {
     const text = [
       ...mapBlock(),

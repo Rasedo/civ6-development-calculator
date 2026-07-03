@@ -1,7 +1,7 @@
 /**
- * Trade routes (domestic only — you're alone in the world). The origin city
- * receives food + production based on the destination's development, roughly
- * following Civ 6's domestic-route feel.
+ * Trade routes. Domestic routes pay the origin food + production based on
+ * the destination's development (Civ 6's domestic-route feel); routes to
+ * met city-states pay gold plus the city-state's specialty yield.
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Yields } from './types';

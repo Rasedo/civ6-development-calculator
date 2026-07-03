@@ -80,6 +80,7 @@ export interface PanelCallbacks {
   onQueueSettler(cityId: number): void;
   onConnectLiveSync(): void;
   onDisconnectLiveSync(): void;
+  onImportSync(text: string): void;
   onQueueUnit(cityId: number, unitType: string): void;
   onOrderMove(unitId: number): void;
   onBuilderImprove(unitId: number, imp: string): void;
@@ -1311,10 +1312,13 @@ export function renderImportPanel(
       <li>Paste the whole log (or just the CIV6MAP lines) below.</li>
     </ol>
     <textarea data-act="import-text" rows="10" placeholder="CIV6MAP_BEGIN|84|54&#10;CIV6MAP|0|0|TERRAIN_OCEAN|-|-|-|0&#10;…"></textarea>
-    <div class="row"><button data-act="import" class="primary">Import</button></div>
+    <div class="row btnrow">
+      <button data-act="import" class="primary">Import map</button>
+      <button data-act="import-sync" title="Parse the pasted log's CIV6SYNC blocks too — cities, buildings, research, government, policies, beliefs and queues">Apply as live sync</button>
+    </div>
     ${lastSummary ? `<div class="row">Last import: ${lastSummary}</div>` : ''}
     <h3>Live sync</h3>
-    <div class="row muted">With the mod's LiveSync context running, the calculator can watch <code>Lua.log</code> and mirror your game every turn — cities, districts, wonders, buildings, improvements, borders and research — so every advisor runs on the live position. Local extras (queues, policies, beliefs) reset on each sync.</div>
+    <div class="row muted">With the mod's LiveSync context running, the calculator mirrors your game every turn — cities, districts, wonders, buildings, improvements, borders, research, <b>government &amp; policy cards, pantheon &amp; beliefs, and each city's current production</b> (progress rescaled onto this engine's costs) — so every advisor runs on the live position.</div>
     ${
       liveSync.supported
         ? `<div class="row btnrow">
@@ -1322,13 +1326,17 @@ export function renderImportPanel(
             <button data-act="sync-stop" ${liveSync.active ? '' : 'disabled'}>Disconnect</button>
           </div>
           <div class="row">${liveSync.status || '<span class="muted">Not connected.</span>'}</div>`
-        : '<div class="row muted">Your browser lacks the File System Access API (use a Chromium-based browser), or paste the log manually above.</div>'
+        : '<div class="row muted">Your browser lacks the File System Access API for automatic polling (Chromium only) — paste the log above and use <b>Apply as live sync</b> instead; re-paste whenever you want to refresh.</div>'
     }
     <div class="hint muted">Imported maps display mirrored north–south (adjacency and yields are exact). Unknown expansion content is skipped and reported.</div>
   `;
   container.querySelector('[data-act="import"]')?.addEventListener('click', () => {
     const ta = container.querySelector('[data-act="import-text"]') as HTMLTextAreaElement;
     cb.onImportMap(ta.value);
+  });
+  container.querySelector('[data-act="import-sync"]')?.addEventListener('click', () => {
+    const ta = container.querySelector('[data-act="import-text"]') as HTMLTextAreaElement;
+    cb.onImportSync(ta.value);
   });
   container.querySelector('[data-act="sync-connect"]')?.addEventListener('click', () => cb.onConnectLiveSync());
   container.querySelector('[data-act="sync-stop"]')?.addEventListener('click', () => cb.onDisconnectLiveSync());

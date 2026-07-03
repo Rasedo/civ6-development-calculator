@@ -623,6 +623,27 @@ const callbacks: PanelCallbacks = {
       showMessage(`Import failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   },
+  onImportSync(text) {
+    // Manual live-sync (Firefox/Safari path): same parser as the Lua.log
+    // poller, fed from the paste box. Re-paste to refresh.
+    try {
+      const { state: synced, report } = parseLiveSync(text);
+      synced.sandbox = sandboxToggle.checked;
+      state = synced;
+      ui.selectedTile = null;
+      ui.selectedCityId = null;
+      ui.settleSites = null;
+      ui.compare = null;
+      ui.planner = null;
+      ui.lastImportSummary = syncSummary(report);
+      setMode('inspect');
+      renderer.fit(state.map);
+      showMessage(`Synced from pasted log: ${ui.lastImportSummary}`);
+      refresh();
+    } catch (e) {
+      showMessage(`Sync failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------

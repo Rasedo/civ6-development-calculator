@@ -33,17 +33,28 @@ adjacency exact). Yields, rivers and wonders are unaffected.
 
 `LiveSync.lua` (same mod, enabled automatically) prints a `CIV6SYNC` snapshot
 at load and at the start of every one of your turns: completed techs/civics,
-your cities (position, population, name), each city's buildings, and plot
-deltas (improvements, districts, world wonders, ownership).
+your government and slotted policy cards, your pantheon and founded-religion
+beliefs, your cities (position, population, name), each city's buildings and
+current production (with progress/cost), and plot deltas (improvements,
+districts, world wonders, ownership).
 
 In the calculator: **Import map → Live sync → Connect Lua.log…** (Chromium
 browsers only — it uses the File System Access API). The app re-reads the log
 every few seconds and rebuilds a mirrored state, so the district advisor,
 settle advisor, comparisons and planners all run on your live position.
+On Firefox/Safari, paste the log into the Import textarea and click
+**Apply as live sync** instead (re-paste to refresh).
+
 Mirrored: map, cities, districts, wonders, buildings, improvements, borders
-(nearest-city approximation), research, and your worship building. Not
-mirrored (reset each sync): production queues, policy cards, beliefs,
-specialists — set those by hand if an analysis depends on them.
+(nearest-city approximation), research, government + policy cards (placed
+into the first compatible slot), pantheon/follower/founder beliefs, worship
+building, and each city's current production — progress is rescaled onto
+this engine's production costs so turns-to-complete stay meaningful.
+Not mirrored: specialists, deeper queue entries beyond the current item,
+and any DLC content this engine doesn't model (skipped and counted in the
+sync summary). The government/policy/belief/queue reads are pcall-guarded:
+on game versions where an API differs, those lines are simply absent and
+the rest of the sync still works.
 
 ## Format
 
@@ -51,6 +62,17 @@ specialists — set those by hand if an analysis depends on them.
 CIV6MAP_BEGIN|<width>|<height>
 CIV6MAP|<x>|<y>|<TERRAIN_*>|<FEATURE_* or ->|<RESOURCE_* or ->|<L or ->|<riverFlags>
 CIV6MAP_END
+
+CIV6SYNC_BEGIN|<turn>|<localPlayerId>
+CIV6SYNC_RESEARCH|TECH_A,TECH_B|CIVIC_A,CIVIC_B
+CIV6SYNC_GOV|GOVERNMENT_X
+CIV6SYNC_POLICIES|POLICY_A,POLICY_B
+CIV6SYNC_BELIEFS|BELIEF_A,BELIEF_B
+CIV6SYNC_CITY|<cityId>|<x>|<y>|<population>|<name>
+CIV6SYNC_CITYBLD|<cityId>|BUILDING_A,BUILDING_B
+CIV6SYNC_QUEUE|<cityId>|<producedType>|<progress>|<cost>
+CIV6SYNC_PLOT|<x>|<y>|<improvement>|<district>|<wonder>|<owner>   (deltas only)
+CIV6SYNC_END
 ```
 
 `riverFlags`: bit 1 = river on east edge, bit 2 = southeast edge, bit 4 =

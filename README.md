@@ -77,7 +77,7 @@ npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out 
   Lighthouse→Seaport with the Shipyard's "production = harbor adjacency" rule,
   Workshop→Power Plant and Zoo/Stadium with 6-tile **regional** effects,
   Barracks|Stable→Military Academy, Arena). Capital gets a free Palace.
-- **Tech & civic trees**: compact (22 techs / 28 civics) but with real Civ 6
+- **Tech & civic trees**: compact (32 techs / 31 civics) but with real Civ 6
   names, era structure, prereq shapes and gating — districts, buildings,
   improvements and feature removal all unlock the way they do in the game
   (Campus = Writing, Theater Square = Drama & Poetry, hill farms = Civil
@@ -127,10 +127,12 @@ npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out 
   choice (Cathedral/Gurdwara/Meeting House/Pagoda/Stupa). Spread isn't
   modeled: all of your cities follow your religion; followers = your
   population, and founder income lands in the capital.
-- **Trade routes** (domestic — you're alone): capacity from the Foreign Trade
-  civic, Markets, Lighthouses, Colossus and Great Zimbabwe; each route pays
-  the origin +1🍞+1⚙ plus +1 of each per 2 specialty districts at the
-  destination; 15-tile range; managed in the Trade panel.
+- **Trade routes**: capacity from the Foreign Trade civic, Markets,
+  Lighthouses, Colossus, Great Zimbabwe and trade-city-state suzerainty.
+  Domestic routes pay the origin +1🍞+1⚙ plus +1 of each per 2 specialty
+  districts at the destination; routes to met city-states pay +3🪙 plus
+  their specialty yield. 15-tile range, raidable by barbarians; managed in
+  the Trade panel.
 - **Advisors** (the "calculator" part):
   - *District placement*: when placing a district, every legal tile shows its
     adjacency bonus as a Civ 6-style badge; the best spot (adjacency value vs
@@ -158,7 +160,11 @@ npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out 
 - **Live sync**: connect the app to your `Lua.log` (Chromium's File System
   Access API) while the mod's LiveSync context runs — the calculator mirrors
   your real game every turn (cities, districts, wonders, buildings,
-  improvements, borders, research) so all advisors analyze the live position.
+  improvements, borders, research, **government & policy cards, pantheon &
+  beliefs, and each city's current production** with progress rescaled onto
+  this engine's costs) so all advisors analyze the live position. No
+  Chromium? Paste the log into the Import panel and hit **Apply as live
+  sync** — same parser, manual refresh.
 - **Units mode** (toggle; off = classic free-improvement calculator): units
   live on the map with movement points, Civ 6-ish terrain costs (hills/woods
   +1), the river-crossing rule (crossing ends the move), A* pathfinding with
@@ -299,7 +305,7 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 - Numbers are *eyeballed-but-close* to base Civ 6 — see `src/data/*.ts` to tweak
   any yield, cost or rule constant.
-- The trees are compact (22 techs / 28 civics, pure-military/filler nodes
+- The trees are compact (32 techs / 31 civics, pure-military/filler nodes
   trimmed), so long horizons exhaust research around the medieval era.
 - No diplomatic policy cards; some government inherent bonuses are eyeballed
   stand-ins. Policy swaps and government changes are free anytime; no anarchy
@@ -325,10 +331,11 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 1. Deeper opponents: rival economies with real yields, rival-vs-barbarian
    combat, city-state levies and conquest, loyalty pressure.
-2. RL escalation: spatial (CNN) observations over tile tensors, PPO via a
-   Python bridge, or planner-guided search with a learned value function.
-3. Deeper live-sync fidelity: queues, policies and beliefs read from the game;
-   Firefox/Safari fallback via manual re-paste.
+2. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
+   with a learned value function (AlphaZero-lite), and eventually a
+   GPU-vectorized engine port for self-play-scale throughput.
+3. In-UI "AI advisor": run trained weights (ES or an exported PPO policy)
+   as a recommendation layer in the calculator.
 
 ## Code layout
 
