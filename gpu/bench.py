@@ -61,8 +61,14 @@ def main() -> None:
             try:
                 rate = bench(device, dtype, b, args.turns, fixture, rules)
                 print(f"{device:8} {b:>6}  {rate:>15,.0f}")
-            except torch.cuda.OutOfMemoryError:
+            except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+                if "out of memory" not in str(e).lower():
+                    raise
+                # A too-large batch shouldn't abort the sweep — report and
+                # move on, freeing the partial allocation first.
                 print(f"{device:8} {b:>6}  OOM")
+                if device == "cuda":
+                    torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
