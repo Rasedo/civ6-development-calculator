@@ -68,8 +68,9 @@ tensorboard --logdir gpu/runs/overnight/tb     # or read gpu/runs/overnight/log.
 
 - `score/mean` — the number that matters. Baselines on THIS env
   (50-episode eval): random 111.0 ± 12.2, scripted autopilot
-  172.5 ± 17.3. The CPU smoke run hit 186.4 after 256k steps and was
-  still climbing; an overnight run should be well past that.
+  172.5 ± 17.3. The CPU smoke run hit 186.4 after 256k steps; a 40M-step
+  overnight run on an RTX 4070 SUPER reached 213.6 ± 13.5 greedy (14-action,
+  farms-only build space) — ~20% over the autopilot, plateauing by ~10M.
 - `policy/approx_kl` — healthy is ~0.002–0.01. Pinned above ~0.03 for
   many updates → halve `--lr`.
 - `policy/entropy` — should decline slowly over the whole run. A crash

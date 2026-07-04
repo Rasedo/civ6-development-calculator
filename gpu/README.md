@@ -197,7 +197,12 @@ and the full hostile world, unlike the TS benchmark scenario:
 | random masked actions | 111.0 ± 12.2 |
 | engine scripted autopilot | 172.5 ± 17.3 |
 | PPO, native loop — 256k steps on the 4-core CPU (~35 min) | 186.4 ± 16.0 |
+| PPO, 40M steps overnight on an RTX 4070 SUPER (14-action, farms only) | 213.6 ± 13.5 |
 
+The overnight run beats the scripted autopilot by ~20% with non-overlapping
+95% CIs, and lifts the whole distribution (its worst game, 116.8, more than
+doubles scripted's worst, 53.0). It used the phase-6a action space — no mines
+or lumber mills — so a 16-action phase-6b retrain is the natural next step.
 The CPU demo passes the autopilot inside ~70k steps and is still
 climbing at 256k — a CUDA box at batch 1024 collects that much
 experience per handful of updates; long runs are the point.
