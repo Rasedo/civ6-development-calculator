@@ -77,6 +77,7 @@ import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
+import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
 import { TECHS } from '../src/data/techs';
 import { CIVICS } from '../src/data/civics';
@@ -236,8 +237,21 @@ const rules = {
     combat: u.combat,
     maintenance: u.maintenance,
     civilian: u.charges !== undefined ? 1 : 0,
+    charges: u.charges ?? 0,
     requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
   })),
+  // Tile improvements (phase 6a: FARM only). `ids` are the engine's
+  // improvement index (0 = FARM); a tile's improvement state is -1 = none.
+  // FARM is ungated (+1 food, +0.5 housing); the hill-farm sub-case needs
+  // the hillFarms civic (mirrors validImprovements), which the flat/
+  // floodplain case does not. builderIdx is BUILDER's roster position.
+  improvements: {
+    ids: ['FARM'],
+    farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
+    farmHousing: IMPROVEMENTS.FARM.housing,
+    builderIdx: Object.values(UNITS).findIndex((u) => u.id === 'BUILDER'),
+    hillFarmsCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'hillFarms')),
+  },
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
     housing: BUILDINGS.PALACE?.housing ?? 0,
@@ -360,6 +374,24 @@ for (let s = 0; s < N_SEEDS; s++) {
         return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
       }),
       hl: t.elevation === 'HILLS' ? 1 : 0,
+      // FARM validity (phase 6a), STATIC part of validImprovements — split
+      // by gate. fa_f: flat grass/plains (no feature) or floodplains,
+      // ungated. fa_h: hill grass/plains (no feature), needs the hillFarms
+      // civic. Both require no resource (resource tiles only accept the
+      // resource's own improvement), no district/natural-wonder, passable,
+      // land. Ownership, the already-improved check and dynamically-founded
+      // city centers stay the engine's job.
+      fa_f:
+        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
+        ((t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT') ||
+          t.feature === 'FLOODPLAINS')
+          ? 1
+          : 0,
+      fa_h:
+        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
+        t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'HILLS'
+          ? 1
+          : 0,
       // disaster statics: floodplain, drought-candidate (flat grass/plains),
       // desert, fertilizable (land, not mountain)
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,

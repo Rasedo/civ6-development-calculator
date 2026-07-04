@@ -100,6 +100,7 @@ class Rules:
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
     cs: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     rivals: dict  # rival-civ pacing, loyalty, GP costs, belief-pool sizes
+    improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -140,6 +141,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         units=r.get("units", []),
         cs=r.get("cs", {}),
         rivals=r.get("rivals", {}),
+        improvements=r.get("improvements", {}),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -245,7 +247,7 @@ _MUTABLE = [
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
-    "fertility", "drought",
+    "fertility", "drought", "improvement", "pillaged", "p_charges",
 ]
 
 
@@ -445,6 +447,21 @@ class BatchSim:
                 self.volcano_tile[b, i] = v
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
+
+        # --- improvements (phase 6a: FARM) ---------------------------------------
+        imp = rules.improvements or {}
+        self.improvements_on = bool(imp.get("ids"))
+        self.FARM = 0  # improvement index; -1 = none
+        self._farm_food = float(imp.get("farmFood", 1))
+        self._farm_housing = float(imp.get("farmHousing", 0.5))
+        self._builder_idx = int(imp.get("builderIdx", -1))
+        self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
+        self.farm_flat = torch.tensor([[t.get("fa_f", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.farm_hill = torch.tensor([[t.get("fa_h", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
+        self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
+        self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
+
         self._eff_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
@@ -565,6 +582,7 @@ class BatchSim:
         self._p_maint = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
         self._p_civ = torch.tensor([bool(u["civilian"]) for u in ru], dtype=torch.bool, device=device)
         self._p_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
+        self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
 
         # Precomputed static prereq masks would race with completion inside a
@@ -640,7 +658,14 @@ class BatchSim:
         directly and skip the full [B, T, 6] assembly."""
         if self._food_cache is not None and self._food_cache[0] == self._eff_version:
             return self._food_cache[1]
-        food = self.tile_yields[:, :, 0] + self.fertility.to(self.dtype)
+        base = self.tile_yields[:, :, 0]
+        if self.improvements_on:
+            # A FARM adds its food to the tile's base yield (part of
+            # tileYields, before the fertility/drought tail); a pillaged
+            # improvement yields nothing.
+            farm = (self.improvement == self.FARM) & ~self.pillaged
+            base = base + farm.to(self.dtype) * self._farm_food
+        food = base + self.fertility.to(self.dtype)
         food = torch.where(self.drought > 0, (food - 1).clamp(min=0), food)
         # Natural-wonder tiles EARLY-RETURN in tileYields with the wonder's
         # fixed yields, BEFORE the fertility/drought tail — the disaster
@@ -657,7 +682,7 @@ class BatchSim:
         Cached per disaster version: fertility/drought mutate ONLY inside
         _disaster_phase (which bumps the version). The cache returns the
         identical tensor, so downstream float behavior is unchanged."""
-        if not self.disasters:
+        if not self.disasters and not self.improvements_on:
             return self.tile_yields
         if self._eff_cache is not None and self._eff_cache[0] == self._eff_version:
             return self._eff_cache[1]
@@ -1426,7 +1451,7 @@ class BatchSim:
         )
         # food is the only disaster-dynamic column; production is static —
         # no [B, T, 6] assembly needed here (the sums below are per-column)
-        f = (self._eff_food() if self.disasters else self.tile_yields[:, :, 0]).gather(1, tc).double()
+        f = (self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]).gather(1, tc).double()
         p = self.tile_yields[:, :, 1].gather(1, tc).double()
         # ANY city center is paved (tile.district set at founding) and
         # yields nothing. Reachable when a loyalty flip parks two same-civ
