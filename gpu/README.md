@@ -162,7 +162,11 @@ and the full hostile world, unlike the TS benchmark scenario:
 |---|---|
 | random masked actions | 111.0 ± 12.2 |
 | engine scripted autopilot | 172.5 ± 17.3 |
-| PPO (native loop, CPU smoke run) | passes the autopilot inside ~70k steps (~10 updates at batch 64); train longer on a CUDA box |
+| PPO, native loop — 256k steps on the 4-core CPU (~35 min) | 186.4 ± 16.0 |
+
+The CPU demo passes the autopilot inside ~70k steps and is still
+climbing at 256k — a CUDA box at batch 1024 collects that much
+experience per handful of updates; long runs are the point.
 
 ## What phases 1–4d cover (and what they don't)
 
