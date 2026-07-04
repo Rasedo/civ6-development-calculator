@@ -25,9 +25,14 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
   - [x] **D2a** raw static-source adjacency table [B,T,10] exported (in-exporter
         self-check: floor(static)==districtAdjacency on every non-dynamic tile) +
         engine loads it inert.
-  - [ ] **D2b** scripted exporter places one Campus on its best-adjacency owned
-        tile; GPU mirrors placement + floor(static + live dynamic center/district)
-        adjacency yield into city totals + district-per-pop cap. Gate to green.
+  - [x] **D2b-machinery** _city_totals paves district tiles (excluded from
+        citizen candidates) + adds floor(d_static_adj[·,CAMPUS]) science for
+        owned Campus tiles (pre-amenity, mirrors cityDistrictYields); exporter
+        ships the `du` placeable-land mask + campusUnlockTech/campusIdx. Inert,
+        poke-verified, both gates green.
+  - [ ] **D2b-activate** scripted instant-place ONE Campus on the best-static-adj
+        owned tile with no adjacent city center (GPU mirrors the exact choice),
+        gate to green. Then D3 relaxes placement + adds dynamic adjacency.
 - [ ] **D3** Dynamic adjacency: adjacent-district (+0.5 each), city-center,
       harbor, mine/quarry (IZ), built-wonder. Add the rest of the specialty
       districts. Gate to green.
@@ -102,3 +107,12 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   * Iterate: first mismatch → parity_test HEAD column → the likely suspects are
     the tile-choice tie-break, the citizen reassignment after paving, and place
     timing (same turn in both). Then D3 relaxes placement + adds dynamic sources.
+- D2b-machinery [x]: _city_totals now excludes district tiles from citizen
+  candidates (paving, mirrors workableTiles !t.district) and adds
+  floor(d_static_adj[·,CAMPUS]) science for owned Campus tiles BEFORE the
+  amenity multiplier (mirrors cityDistrictYields); exporter ships the `du`
+  district-placeable land mask + campusUnlockTech(WRITING)/campusIdx; engine
+  loads d_usable/campus_unlock_tech/campus_placed(unused yet)/CAMPUS. Inert
+  (nothing places a Campus) → both gates green; poke-test: a poked Campus
+  (floor adj 2) lifts capital science 3.57→5.67. Next: D2b-activate (scripted
+  instant-place on the best non-center-adjacent tile; mirror the choice; gate).

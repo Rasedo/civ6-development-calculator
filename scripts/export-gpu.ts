@@ -348,6 +348,14 @@ const rules = {
       notAdjCenter: d.placement.notAdjacentToCityCenter ? 1 : 0,
     };
   }),
+  // D2b scaffold: which district the scripted policy places (Campus) and the
+  // tech that unlocks it (WRITING).
+  districtScaffold: {
+    campusIdx: PLACEABLE_DISTRICTS.indexOf('CAMPUS'),
+    campusUnlockTech: techList.findIndex((t) =>
+      t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === 'CAMPUS'),
+    ),
+  },
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
     housing: BUILDINGS.PALACE?.housing ?? 0,
@@ -453,6 +461,14 @@ for (let s = 0; s < N_SEEDS; s++) {
       // statically settleable for rival expansion (mirrors siteQuality's -1s;
       // ownership and dynamic districts are the engine's job)
       st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' && !t.district ? 1 : 0,
+      // district-usable land (static part of canPlaceDistrict for a non-coastal
+      // land district): not water/impassable/wonder/builtWonder/oasis/floodplains,
+      // no non-bonus resource, no district at t=0. Ownership, radius, the pop cap
+      // and dynamically-built districts stay the engine's job.
+      du:
+        !isWater(t) && !isImpassable(t) && !t.wonder && !t.builtWonder &&
+        t.feature !== 'OASIS' && t.feature !== 'FLOODPLAINS' && !t.district &&
+        !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       // raw static district adjacency per placeable district (D2a). The engine
       // adds live dynamic sources (adjacent district/center/mine) then floors;
       // self-checked here at t=0 where dynamic=0 so floor(static)=districtAdjacency.

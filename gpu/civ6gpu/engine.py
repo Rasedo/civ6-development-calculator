@@ -102,6 +102,7 @@ class Rules:
     rivals: dict  # rival-civ pacing, loyalty, GP costs, belief-pool sizes
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
+    district_scaffold: dict  # D2b: {campusIdx, campusUnlockTech}
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -144,6 +145,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         rivals=r.get("rivals", {}),
         improvements=r.get("improvements", {}),
         districts=r.get("districts", []),
+        district_scaffold=r.get("districtScaffold", {}),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -249,7 +251,7 @@ _MUTABLE = [
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
-    "fertility", "drought", "improvement", "pillaged", "p_charges", "district",
+    "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "campus_placed",
 ]
 
 
@@ -489,6 +491,13 @@ class BatchSim:
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
         )  # [B, T, nD] raw static-source adjacency, inert until D2b consumes it
+        sc = rules.district_scaffold or {}
+        self.CAMPUS = int(sc.get("campusIdx", 0))
+        self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
+        self.campus_placed = torch.zeros(B, dtype=torch.bool, device=device)  # D2b scaffold flag (activation is next stage)
+        self.d_usable = torch.tensor(
+            [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
+        )  # [B, T] district-placeable land — static part of canPlaceDistrict
 
         self._eff_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None
@@ -899,6 +908,7 @@ class BatchSim:
             & self.workable.gather(1, tcf).reshape(B, C, M)
             & (self.dist.gather(2, tc) <= 3)
             & (tiles != self.site.unsqueeze(2))
+            & (self.district.gather(1, tcf).reshape(B, C, M) < 0)  # district tiles are paved (mirrors workableTiles !t.district)
         )  # [B, C, M]
         score = torch.where(cand, tile_score.gather(1, tcf).reshape(B, C, M), torch.tensor(-1e18, dtype=self.dtype, device=dev))
         score = score - tc.to(self.dtype) * 1e-9  # tie: lowest index first
@@ -920,6 +930,16 @@ class BatchSim:
             center_y = self.center_yields.clone()
             center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
         total = worked_y + center_y + self.palace_slot_yields.unsqueeze(0) + b_y
+        if self.districts_on:
+            # District adjacency yields (D2b: Campus science only, placed where no
+            # dynamic source is live so the value is purely floor(static);
+            # dynamic sources + other district types are D3). Mirrors
+            # cityDistrictYields: floor(adjacency) into the district's yield
+            # column, summed into the pre-amenity total.
+            dt = self.district.gather(1, tcf).reshape(B, C, M)
+            campus = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids) & (dt == self.CAMPUS)
+            d_sci = (torch.floor(self.d_static_adj[:, :, self.CAMPUS].gather(1, tcf).reshape(B, C, M)) * campus.to(self.dtype)).sum(dim=2)
+            total[:, :, 3] = total[:, :, 3] + d_sci
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
