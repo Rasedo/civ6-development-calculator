@@ -111,10 +111,11 @@ turn, `BatchSim.step(production, tech, civic)` accepts:
 - **tech / civic** `[B]` — applied when the research slot is empty;
   progress banks while the policy deliberates, exactly like manual
   research in the TS engine.
-- **units** `[B, P, 14]` (phase 4b, +build in phase 6) — one order per
+- **units** `[B, P, 16]` (phase 4b, +build in phase 6) — one order per
   player unit per turn: step to a neighbor (0–5), melee-attack the
-  barbarian there (6–11), hold (12), or build a FARM (13 — builders on a
-  buildable tile). Orders execute in spawn order and are RE-validated at
+  barbarian there (6–11), hold (12), or build a FARM / MINE / LUMBER_MILL
+  (13/14/15 — builders on a tile where that improvement is valid). Orders
+  execute in spawn order and are RE-validated at
   execution on both engines identically (an earlier unit's move can
   invalidate a later order — rejected orders are no-ops, not errors).
   Combat mirrors `meleeAttack`: terrain defense, the victor-survives
@@ -205,7 +206,7 @@ experience per handful of updates; long runs are the point.
 
 | Ported & parity-checked | Not yet (runs in TS only) |
 |---|---|
-| Tile yields (via exported per-tile tables) | Improvements beyond FARM (mine/pasture/chops) |
+| Tile yields (via exported per-tile tables) | Improvements beyond FARM/MINE/LUMBER_MILL (pasture/camp/plantation/chops) |
 | Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the City Center |
 | Growth/starvation, housing (water+buildings+farms), amenity tiers | Ranged attacks, multi-tile A* moves |
 | City Center buildings (unlocks, river gate, maintenance) | Conquest: capturing rival cities / city-states |
@@ -316,5 +317,14 @@ card for the CUDA numbers.
    disasters scorch improvements. The RL units head gained a **build
    action (13)** so the policy commands builders directly (50 build orders
    across the 72-game off-script gate, 31 games building farms) — all
-   behind the same two gates. Next here: MINE/LUMBER_MILL (tech-gated,
-   tech-boosted yields) and chop/harvest one-time yields.
+   behind the same two gates.
+7. ✅ MINE & LUMBER_MILL (phase 6b). Tile PRODUCTION goes dynamic: builders
+   build mines (hills or a mined resource, gated by MINING; tech-boosted
+   +1⚙ each by Apprenticeship and Industrialization) and lumber mills
+   (woods, gated by CONSTRUCTION) via RL build actions 14/15. Mines are
+   raided/pillaged like any improvement and fire the WHEEL/APPRENTICESHIP
+   eurekas; housing stays FARM-only. The off-script gate builds ~15 mines
+   across 11 games; lumber mills (CONSTRUCTION lands after 3-charge builders
+   act) are covered by a deterministic build-action self-test. Next here:
+   chop/harvest one-time yields, then the resource improvements
+   (pasture/camp/plantation).
