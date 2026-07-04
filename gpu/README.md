@@ -213,13 +213,18 @@ float64 on CPU; training uses float32.
 Reference numbers on the same 4-core container, **identical full-world
 scenario** (6 city slots + barbarians + 3 city-states + 2 rivals +
 disasters) in both engines: the TS engine does ~520 game-turns/sec per
-core (~2,100/sec across 4 cores); the vectorized engine does ~3,000
-game-turns/sec in float64 (the parity dtype) and ~5,000–7,000 in
-float32 (the training dtype; the shared container is noisy) at batch
-1024. The rival machinery walks small python loops per civ/city/unit
-slot, which narrows the CPU margin — batch scaling and CUDA are the
-point, and those loops are the first optimization target for phase 5.
-Run `python gpu/bench.py` on an RTX-class card for the CUDA numbers.
+core (~2,100/sec across 4 cores); after the 5b kernelization pass the
+vectorized engine does ~9,600 game-turns/sec in float64 (the parity
+dtype) and ~13,000 in float32 (the training dtype) at batch 1024 —
+3× the pre-5b numbers, from four families of parity-exact rewrites:
+pairwise distance indexing instead of `[B, …, T]` row materializations,
+per-turn caching of the disaster-adjusted yield planes, the citizen
+topk narrowed from the full map to the radius-3 window (same candidates,
+same keys, same order), and batched disaster area effects. The
+remaining per-slot python loops (raider/unit acts, rival city walks)
+carry real sequential draw/occupancy semantics; batch scaling and CUDA
+hide their launch overhead. Run `python gpu/bench.py` on an RTX-class
+card for the CUDA numbers.
 
 ## Phase roadmap
 
@@ -252,7 +257,16 @@ Run `python gpu/bench.py` on an RTX-class card for the CUDA numbers.
      by unit features), per-episode world re-seeding, checkpoints +
      CSV/TensorBoard, and the `gpu/eval.py` benchmark protocol with
      random/scripted baselines.
-   - 5b. Kernelize the per-slot python loops. Per-phase profile at
-     B=512 (share of a step): rival phase ~26%, barbarian phase ~24%,
-     city totals ~12%, disasters ~11%, loyalty ~4% — the rival and
-     barbarian slot-walks are half the step and go first.
+   - ✅ 5b. Kernelize the hot loops — 3× step throughput (f64 3.1k →
+     9.6k, f32 → 13k game-turns/sec at batch 1024 on the 4-core box),
+     all parity-exact and re-verified through both gates after every
+     round: pairwise `pair_dist[a, b]` indexing (13 sites — the war
+     -declaration check alone materialized 28 MB/rival/turn), cached
+     disaster yield planes (the rival economies re-cloned [B, T, 6]
+     up to 20×/turn), the citizen topk over the 37-tile work window
+     instead of the full map, camp-distance hoists, batched disaster
+     areas, static candidate lists for disaster picks, and a
+     dyadic-exactness fast path that collapses the rival yield reduce
+     (guarded: it falls back to sequential adds if any tile yield is
+     not an integer/half). Loops that survive carry genuine
+     sequential-draw semantics (raider and rival unit acts).

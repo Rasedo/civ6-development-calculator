@@ -427,6 +427,7 @@ class BatchSim:
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
+        self._off1 = tiles_within_offsets(1).to(device)
         ids = [u["id"] for u in (rules.units or [])]
         self._r_spearman = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
         self._r_horseman = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
@@ -444,6 +445,27 @@ class BatchSim:
                 self.volcano_tile[b, i] = v
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
+        self._eff_version = 0
+        self._eff_cache: tuple[int, torch.Tensor] | None = None
+        self._food_cache: tuple[int, torch.Tensor] | None = None
+        self._score_cache: tuple[int, torch.Tensor] | None = None
+        # Static candidate lists for _pick_static: the k-th candidate in
+        # tile order, so a pick is one gather instead of a [B, T] cumsum.
+        def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+            n = cand.sum(dim=1)
+            width = max(int(n.max()), 1)
+            idx = torch.argsort((~cand).to(torch.int8), dim=1, stable=True)[:, :width]
+            return idx, n
+        self._flood_list = cand_list(self.floodplain)
+        self._droughtc_list = cand_list(self.drought_cand)
+        self._land_list = cand_list(~self.water)
+        # Rival yields sum the picked tiles' food/production sequentially to
+        # mirror the TS reduce. When every value is a dyadic rational
+        # (integers and halves — true for all shipped rules), every partial
+        # sum is exact in f64, so ANY summation order gives the identical
+        # bits and one .sum() replaces the per-tile add loop.
+        fp2 = self.tile_yields[:, :, :2].double() * 2
+        self._dyadic_fp = bool((fp2 == fp2.round()).all())
 
         # The Palace exists only in the capital (slot 0).
         pal_y = torch.zeros(C, 6, dtype=dtype, device=device)
@@ -560,6 +582,10 @@ class BatchSim:
         for k, v in self._pristine.items():
             getattr(self, k).copy_(v)
         self.turn = 1
+        self._eff_version += 1  # fertility/drought just changed under the cache
+        self._eff_cache = None
+        self._food_cache = None
+        self._score_cache = None
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -606,50 +632,91 @@ class BatchSim:
         has = avail.any(dim=1)
         return torch.where((cur == -1) & has, best, cur)
 
+    def _eff_food(self) -> torch.Tensor:
+        """[B, T] tile FOOD with the disaster legacy applied: fertility
+        feeds (+1 each, already capped), drought starves (−1, floored at
+        0) — mirrors the tail of tileYields. Food is the only column
+        disasters touch; consumers that don't mix columns read this
+        directly and skip the full [B, T, 6] assembly."""
+        if self._food_cache is not None and self._food_cache[0] == self._eff_version:
+            return self._food_cache[1]
+        food = self.tile_yields[:, :, 0] + self.fertility.to(self.dtype)
+        food = torch.where(self.drought > 0, (food - 1).clamp(min=0), food)
+        self._food_cache = (self._eff_version, food)
+        return food
+
     def _eff_yields(self) -> torch.Tensor:
-        """[B, T, 6] tile yields with the disaster legacy applied: fertility
-        feeds (+1 food each, already capped), drought starves (−1 food,
-        floored at 0) — mirrors the tail of tileYields."""
+        """[B, T, 6] tile yields with disaster food — for consumers whose
+        cross-column float sums must keep the assembled row order.
+
+        Cached per disaster version: fertility/drought mutate ONLY inside
+        _disaster_phase (which bumps the version). The cache returns the
+        identical tensor, so downstream float behavior is unchanged."""
         if not self.disasters:
             return self.tile_yields
+        if self._eff_cache is not None and self._eff_cache[0] == self._eff_version:
+            return self._eff_cache[1]
         ty = self.tile_yields.clone()
-        food = ty[:, :, 0] + self.fertility.to(self.dtype)
-        food = torch.where(self.drought > 0, (food - 1).clamp(min=0), food)
-        ty[:, :, 0] = food
+        ty[:, :, 0] = self._eff_food()
+        self._eff_cache = (self._eff_version, ty)
         return ty
 
     def _fertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        """+1 fertility (capped) on land, non-mountain tiles."""
+        """+1 fertility (capped) on land, non-mountain tiles. (row, tile)
+        pairs must be unique — duplicates would collapse to a single +1."""
         ok = self.fertilizable[rows, tiles]
         r2, t2 = rows[ok], tiles[ok]
         self.fertility[r2, t2] = (self.fertility[r2, t2] + 1).clamp(max=3)
 
-    def _pick_static(self, mask_hit: torch.Tensor, cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _fertilize_counted(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """Like _fertilize but duplicate (row, tile) pairs stack: min(3,
+        f + n) equals n sequential capped +1s, so a scatter-add then one
+        clamp reproduces the TS loop exactly."""
+        ok = self.fertilizable[rows, tiles]
+        gi = rows[ok] * self.T + tiles[ok]
+        cnt = torch.zeros(self.B * self.T, dtype=torch.long, device=self.device)
+        cnt.index_put_((gi,), torch.ones_like(gi), accumulate=True)
+        touched = cnt > 0
+        flat = self.fertility.view(-1)
+        flat[touched] = (flat[touched] + cnt[touched]).clamp(max=3)
+
+    def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirror of pick(): one draw where mask_hit & candidates exist;
-        returns (chosen mask, tile). Candidate sets here are static."""
-        cnt = cand.sum(dim=1)
+        returns (chosen mask, tile). The candidate sets are static, so the
+        k-th candidate comes from a precomputed tile-ordered list — one
+        gather instead of a [B, T] cumsum."""
+        idx, cnt = cand_list
         has = mask_hit & (cnt > 0)
         r = self._next_random(has)
         k = torch.floor(r * cnt.to(torch.float64)).to(torch.long)
-        cum = cand.long().cumsum(dim=1)
-        sel = cand & (cum == (k + 1).clamp(min=1).unsqueeze(1))
-        return has, sel.long().argmax(dim=1)
+        tile = idx.gather(1, k.clamp(min=0, max=idx.shape[1] - 1).unsqueeze(1)).squeeze(1)
+        return has, tile
 
     def _disaster_phase(self) -> None:
         """Mirrors disasterPhase draw for draw: drought clocks tick, then a
         flood roll (+pick), one roll per volcano, a drought roll (+pick),
         and a storm roll (+pick). Improvement scorching is inert (none
-        exist); the lasting effects are fertility and drought clocks."""
+        exist); the lasting effects are fertility and drought clocks.
+
+        Area effects are applied BATCHED (5b): no draw in this phase reads
+        fertility or the drought clocks, so deferring each event's writes
+        past the remaining rolls is exact; +1-capped fertility and max()ed
+        drought clocks are order-free (min(3, f+n) equals any sequence of
+        capped +1s, max is commutative)."""
         B, dev = self.B, self.device
+        self._eff_version += 1
         self.drought = (self.drought - 1).clamp(min=0)
         every = torch.ones(B, dtype=torch.bool, device=dev)
 
         r = self._next_random(every)
-        hit, tile = self._pick_static(r < 0.05, self.floodplain)
+        hit, tile = self._pick_static(r < 0.05, self._flood_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
             self._fertilize(rows, tile[rows])
 
+        # Per-volcano rolls stay sequential (draw order is the contract);
+        # the eruptions' neighbor fertilization batches across volcanoes.
+        er_rows, er_volc = [], []
         for k in range(self.volcano_tile.shape[1]):
             volc = self.volcano_tile[:, k]
             active = volc >= 0
@@ -659,33 +726,39 @@ class BatchSim:
             erupt = active & (rv < 0.02)
             if bool(erupt.any()):
                 rows = erupt.nonzero(as_tuple=True)[0]
-                nb = self.neigh[volc[rows]]  # [R, 6]
-                for d in range(6):
-                    n_d = nb[:, d]
-                    on = n_d >= 0
-                    self._fertilize(rows[on], n_d[on])
+                er_rows.append(rows)
+                er_volc.append(volc[rows])
+        if er_rows:
+            rows = torch.cat(er_rows)
+            nb = self.neigh[torch.cat(er_volc)]  # [R, 6]
+            rr6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
+            nbf = nb.reshape(-1)
+            on = nbf >= 0
+            self._fertilize_counted(rr6[on], nbf[on])
 
         r = self._next_random(every)
-        hit, tile = self._pick_static(r < 0.02, self.drought_cand)
+        hit, tile = self._pick_static(r < 0.02, self._droughtc_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
             area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)  # [R, 19]
-            for m in range(area.shape[1]):
-                t_m = area[:, m]
-                on = (t_m >= 0) & ~self.water[rows, t_m.clamp(min=0)]
-                self.drought[rows[on], t_m[on]] = torch.maximum(
-                    self.drought[rows[on], t_m[on]], torch.full_like(t_m[on], 8)
-                )
+            M = area.shape[1]
+            rrm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
+            af = area.reshape(-1)
+            on = (af >= 0) & ~self.water[rrm, af.clamp(min=0)]
+            flat = self.drought.view(-1)
+            gi = rrm[on] * self.T + af[on]
+            flat.scatter_reduce_(0, gi, torch.full_like(gi, 8), reduce="amax")
 
         r = self._next_random(every)
-        hit, tile = self._pick_static(r < 0.04, ~self.water)
+        hit, tile = self._pick_static(r < 0.04, self._land_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
-            area = tiles_from_offsets(tile[rows], tiles_within_offsets(1).to(dev), self.W, self.H)
-            for m in range(area.shape[1]):
-                t_m = area[:, m]
-                on = (t_m >= 0) & self.desert[rows, t_m.clamp(min=0)]
-                self._fertilize(rows[on], t_m[on])
+            area = tiles_from_offsets(tile[rows], self._off1, self.W, self.H)  # [R, 7]
+            M = area.shape[1]
+            rrm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
+            af = area.reshape(-1)
+            on = (af >= 0) & self.desert[rrm, af.clamp(min=0)]
+            self._fertilize(rrm[on], af[on])
 
     def _buildable(self) -> torch.Tensor:
         """[B, C, NB] City Center buildings each city could queue now."""
@@ -704,21 +777,34 @@ class BatchSim:
         r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
         rd = self.rules_dev
 
+        # Workable candidates live within the radius-3 window (37 offsets) —
+        # scoring only that window (5b) keeps the exact same candidate set,
+        # per-tile keys and topk order as the full-map scan, 30× smaller.
+        eff_y = self._eff_yields()  # disasters make food dynamic
+        if self._score_cache is not None and self._score_cache[0] == self._eff_version:
+            tile_score = self._score_cache[1]
+        else:
+            tile_score = (eff_y * rd.focus_base).sum(dim=2)  # [B, T]
+            self._score_cache = (self._eff_version, tile_score)
+        tiles = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), self._off3, self.W, self.H).reshape(B, C, -1)
+        M = tiles.shape[2]
+        tc = tiles.clamp(min=0)
+        tcf = tc.reshape(B, -1)
         slot_ids = torch.arange(C, device=dev).view(1, C, 1)
         cand = (
-            (self.owner.unsqueeze(1) == slot_ids)
-            & self.workable.unsqueeze(1)
-            & (self.dist <= 3)
-            & (self._arangeT.view(1, 1, T) != self.site.unsqueeze(2))
-        )  # [B, C, T]
-        eff_y = self._eff_yields()  # disasters make food dynamic
-        tile_score = (eff_y * rd.focus_base).sum(dim=2)  # [B, T]
-        score = torch.where(cand, tile_score.unsqueeze(1), torch.tensor(-1e18, dtype=self.dtype, device=dev))
-        score = score - self._arangeT.to(self.dtype).view(1, 1, T) * 1e-9  # tie: lowest index first
-        k = max(int(self.pop.max().item()), 1)
+            (tiles >= 0)
+            & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
+            & self.workable.gather(1, tcf).reshape(B, C, M)
+            & (self.dist.gather(2, tc) <= 3)
+            & (tiles != self.site.unsqueeze(2))
+        )  # [B, C, M]
+        score = torch.where(cand, tile_score.gather(1, tcf).reshape(B, C, M), torch.tensor(-1e18, dtype=self.dtype, device=dev))
+        score = score - tc.to(self.dtype) * 1e-9  # tie: lowest index first
+        k = min(max(int(self.pop.max().item()), 1), M)
         top_scores, top_idx = score.topk(k, dim=2)
         take = (torch.arange(k, device=dev).view(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)
-        ty = eff_y.unsqueeze(1).expand(B, C, T, 6).gather(2, top_idx.unsqueeze(-1).expand(B, C, k, 6))
+        top_tile = tc.gather(2, top_idx)  # [B, C, k] global tile ids
+        ty = eff_y.unsqueeze(1).expand(B, C, T, 6).gather(2, top_tile.unsqueeze(-1).expand(B, C, k, 6))
         worked_y = (ty * take.unsqueeze(-1).to(self.dtype)).sum(dim=2)  # [B, C, 6]
 
         bf = self.buildings.to(self.dtype)
@@ -1112,30 +1198,38 @@ class BatchSim:
         # Garrisons + growth. The near-camp check uses the unit list as it
         # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
         # recounts live (TS calls barbUnits() fresh inside the condition).
+        # The camp↔unit distance matrix is hoisted (5b): camps don't move,
+        # and units spawned mid-loop are invisible to the pre_alive mask.
         pre_alive = self.u_alive.clone()
         grow_type = 1 if self.turn > cb.get("spearmanAfterTurn", 60) else 0
-        for k in range(self.K):
+        any_camp = bool((self.camp_tile >= 0).any())
+        if any_camp:
+            du_all = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.u_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
+            near_any_all = (pre_alive.unsqueeze(1) & (du_all <= 1)).any(dim=2)  # [B, K]
+        for k in range(self.K if any_camp else 0):
             camp = self.camp_tile[:, k]
             active = camp >= 0
             if not bool(active.any()):
                 continue
-            du = self.pair_dist[camp.clamp(min=0)].gather(1, self.u_tile).to(torch.long)  # [B, U]
-            near_any = (pre_alive & (du <= 1)).any(dim=1)
+            near_any = near_any_all[:, k]
             self._spawn_barb(active & ~near_any, camp, 0)  # empty camp regarrisons
             can_grow = active & near_any & (self.u_alive.sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
             r = self._next_random(can_grow)
             self._spawn_barb(can_grow & (r < cb.get("garrisonGrowChance", 0.1)), camp, grow_type)
 
         # One guard stays home per camp: first unit (in unit order) within
-        # reach of each camp (in camp order), like the TS guard set.
+        # reach of each camp (in camp order), like the TS guard set. Only
+        # `guard` mutates inside this loop, so the distances hoist too
+        # (fresh — garrison spawns just added units).
         guard = torch.zeros(B, U_MAX, dtype=torch.bool, device=dev)
-        for k in range(self.K):
+        if any_camp:
+            du_g = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.u_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
+        for k in range(self.K if any_camp else 0):
             camp = self.camp_tile[:, k]
             active = camp >= 0
             if not bool(active.any()):
                 continue
-            du = self.pair_dist[camp.clamp(min=0)].gather(1, self.u_tile).to(torch.long)
-            near = self.u_alive & (du <= 1) & ~guard & active.unsqueeze(1)
+            near = self.u_alive & (du_g[:, k] <= 1) & ~guard & active.unsqueeze(1)
             any_near = near.any(dim=1)
             first = near.long().argmax(dim=1)
             rows = any_near.nonzero(as_tuple=True)[0]
@@ -1194,12 +1288,12 @@ class BatchSim:
             march = act & ~attack
             if not bool(march.any()):
                 continue
-            dc = self.pair_dist[here].gather(1, self.site.clamp(min=0)).to(torch.long)  # [B, C] dist to each slot's site
+            dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C] dist to each slot's site
             ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
             tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-            d_here = self.pair_dist[here].gather(1, tgt.unsqueeze(1)).squeeze(1).to(torch.long)
+            d_here = self.pair_dist[here, tgt].to(torch.long)
             step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "barb")
-            d_nb = self.pair_dist[tgt].gather(1, nbc).to(torch.long)  # dist(neighbor, target); symmetric
+            d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)  # dist(neighbor, target); symmetric
             skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
             best = skey.min(dim=1).values
             move = march & (ckey.min(dim=1).values < 10**9) & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
@@ -1264,7 +1358,7 @@ class BatchSim:
             # such a quest can never be satisfied — but the DRAW is not).
             due = act & (self.cs_quest[:, s] == 0) & (self.turn - self.cs_quest_issued[:, s] >= cooldown)
             self._next_random(due)  # the askable-district pick
-            cdist = self.pair_dist[self.cs_center[:, s]].gather(1, self.camp_tile.clamp(min=0)).to(torch.long)
+            cdist = self.pair_dist[self.cs_center[:, s].unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
             near = (self.camp_tile >= 0) & (cdist <= 6)
             has_camp = near.any(dim=1)
             first_k = near.long().argmax(dim=1)
@@ -1325,9 +1419,10 @@ class BatchSim:
             & self.passable.gather(1, tc)
             & (tiles != center.unsqueeze(1))
         )
-        eff_y = self._eff_yields()
-        f = eff_y[:, :, 0].gather(1, tc).double()
-        p = eff_y[:, :, 1].gather(1, tc).double()
+        # food is the only disaster-dynamic column; production is static —
+        # no [B, T, 6] assembly needed here (the sums below are per-column)
+        f = (self._eff_food() if self.disasters else self.tile_yields[:, :, 0]).gather(1, tc).double()
+        p = self.tile_yields[:, :, 1].gather(1, tc).double()
         M = tiles.shape[1]
         key = torch.where(valid, (f + p) * 1e6 - torch.arange(M, device=self.device, dtype=torch.float64), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         kk = min(int(self.rules.rivals.get("maxPop", 12)), M)
@@ -1335,11 +1430,17 @@ class BatchSim:
         take = (torch.arange(kk, device=self.device).unsqueeze(0) < self.rc_pop[:, r, j].unsqueeze(1)) & (top_vals > -1e17)
         f_sel = f.gather(1, top_idx) * take.double()
         p_sel = p.gather(1, top_idx) * take.double()
-        food = torch.full((self.B,), 3.0, dtype=torch.float64, device=self.device)
-        prod = torch.full((self.B,), 2.0, dtype=torch.float64, device=self.device)
-        for m in range(kk):  # sequential adds mirror the TS loop's rounding
-            food = food + f_sel[:, m]
-            prod = prod + p_sel[:, m]
+        if self._dyadic_fp:
+            # every term is an exact dyadic (disasters shift food by
+            # integers), so this .sum() is bit-identical to the TS reduce
+            food = 3.0 + f_sel.sum(dim=1)
+            prod = 2.0 + p_sel.sum(dim=1)
+        else:
+            food = torch.full((self.B,), 3.0, dtype=torch.float64, device=self.device)
+            prod = torch.full((self.B,), 2.0, dtype=torch.float64, device=self.device)
+            for m in range(kk):  # sequential adds mirror the TS loop's rounding
+                food = food + f_sel[:, m]
+                prod = prod + p_sel[:, m]
         prod = prod * (1 + self.r_tech[:, r] / 25)
         return torch.where(mask, food, torch.zeros_like(food)), torch.where(mask, prod, torch.zeros_like(prod))
 
@@ -1358,7 +1459,7 @@ class BatchSim:
         adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(self.B, -1)).reshape(self.B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
         ok = ok & adj_own
         res3 = (self.res_priority.gather(1, tc) > 0).double() * 3
-        d = self.pair_dist[center].gather(1, tc).double()
+        d = self.pair_dist[center.unsqueeze(1), tc].double()
         score = torch.where(ok, res3 - d * 2 - tiles.double() / 1e6, torch.tensor(-torch.inf, dtype=torch.float64, device=self.device))
         best_s, best_i = score.max(dim=1)
         claim = due & (best_s > -torch.inf)
@@ -1411,12 +1512,12 @@ class BatchSim:
                 q = q + c3[:, :, m2, 2] * okd[:, :, m2]
                 q = q + hill[:, :, m2]
             # tooClose: player cities < 3, city-states < 3, any rival city < 4
-            dp = self.pair_dist[tc.reshape(-1)].reshape(B, -1, self.T)
-            d_pl = dp.gather(2, pl_centers.unsqueeze(1).expand(-1, tiles.shape[1], -1)).to(torch.long)
+            tc3 = tc.unsqueeze(2)  # [B, M, 1] — pairwise indexing, no [B, M, T]
+            d_pl = self.pair_dist[tc3, pl_centers.unsqueeze(1)].to(torch.long)
             near_pl = ((d_pl < 3) & self.alive.unsqueeze(1)).any(dim=2)
-            d_cs = dp.gather(2, self.cs_center.clamp(min=0).unsqueeze(1).expand(-1, tiles.shape[1], -1)).to(torch.long)
+            d_cs = self.pair_dist[tc3, self.cs_center.clamp(min=0).unsqueeze(1)].to(torch.long)
             near_cs = ((d_cs < 3) & self.cs_alive.unsqueeze(1)).any(dim=2)
-            d_rc = dp.gather(2, rc_flat.clamp(min=0).unsqueeze(1).expand(-1, tiles.shape[1], -1)).to(torch.long)
+            d_rc = self.pair_dist[tc3, rc_flat.clamp(min=0).unsqueeze(1)].to(torch.long)
             near_rc = ((d_rc < 4) & rc_live.unsqueeze(1)).any(dim=2)
             good = okt & ~near_pl & ~near_cs & ~near_rc & src.unsqueeze(1)
             q = torch.where(good, q, torch.tensor(-torch.inf, dtype=torch.float64, device=dev))
@@ -1608,14 +1709,14 @@ class BatchSim:
         march = act & ~attack
         if not bool(march.any()):
             return
-        dc = self.pair_dist[here.clamp(min=0)].gather(1, self.site.clamp(min=0)).to(torch.long)
+        dc = self.pair_dist[here.clamp(min=0).unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
         ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
         best_k = ckey.min(dim=1).values
         has_city = best_k < 10**9
         tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-        d_here = self.pair_dist[here.clamp(min=0)].gather(1, tgt.unsqueeze(1)).squeeze(1).to(torch.long)
+        d_here = self.pair_dist[here.clamp(min=0), tgt].to(torch.long)
         step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rival")
-        d_nb = self.pair_dist[tgt].gather(1, nbc).to(torch.long)
+        d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
         skey = torch.where(step_ok, d_nb * 8 + torch.arange(6, device=dev), 10**9)
         best = skey.min(dim=1).values
         move = march & has_city & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
@@ -1686,10 +1787,10 @@ class BatchSim:
         patrol = act & ~attack
         if not bool(patrol.any()):
             return
-        dh = self.pair_dist[here.clamp(min=0)].gather(1, self.rc_center[:, r].clamp(min=0)).to(torch.long)
+        dh = self.pair_dist[here.clamp(min=0).unsqueeze(1), self.rc_center[:, r].clamp(min=0)].to(torch.long)
         hkey = torch.where(self.rc_alive[:, r], dh * 16 + torch.arange(self.RC, device=dev), 10**9)
         home = self.rc_center[:, r].gather(1, hkey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-        d_home = self.pair_dist[here.clamp(min=0)].gather(1, home.unsqueeze(1)).squeeze(1).to(torch.long)
+        d_home = self.pair_dist[here.clamp(min=0), home].to(torch.long)
         roam = patrol & (d_home > 3) & (hkey.min(dim=1).values < 10**9)
         if not bool(roam.any()):
             return
@@ -1703,7 +1804,7 @@ class BatchSim:
             & (self.pciv_at.gather(1, nbpc) < 0)
             & (self.rv_at.gather(1, nbpc) < 0)
         )
-        d_nb = self.pair_dist[home].gather(1, nbpc).to(torch.long)
+        d_nb = self.pair_dist[home.unsqueeze(1), nbpc].to(torch.long)
         skey = torch.where(free, d_nb * 8 + torch.arange(6, device=dev), 10**9)
         best = skey.min(dim=1).values
         move = roam & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_home)
@@ -1835,8 +1936,9 @@ class BatchSim:
             p_str = self.alive.sum(dim=1) * 10 + (self.p_alive.to(torch.long) * self._p_combat[self.p_type]).sum(dim=1)
             own_cs = (self.v_alive & (self.v_civ == r)).to(torch.long) * self._p_combat[self.v_type]
             r_str = js_round(n_cities2.double() * 8 + self.r_milstock[:, r] * 0.2 + own_cs.sum(dim=1).double())
-            d_pr = self.pair_dist[self.site.clamp(min=0).reshape(-1)].reshape(B, self.C, self.T)
-            d_pr = d_pr.gather(2, self.rc_center[:, r].clamp(min=0).unsqueeze(1).expand(-1, self.C, -1)).to(torch.long)
+            d_pr = self.pair_dist[
+                self.site.clamp(min=0).unsqueeze(2), self.rc_center[:, r].clamp(min=0).unsqueeze(1)
+            ].to(torch.long)  # [B, C, RC] pairwise — no [B, C, T] intermediate
             pair_ok = self.alive.unsqueeze(2) & self.rc_alive[:, r].unsqueeze(1)
             prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
             cond = (
@@ -1866,7 +1968,7 @@ class BatchSim:
         rng = int(self.rules.rivals.get("loyaltyRange", 9))
         scale = float(self.rules.rivals.get("loyaltyScale", 10))
         sitec = self.site.clamp(min=0)
-        d_cc = self.pair_dist[sitec.reshape(-1)].reshape(B, C, self.T).gather(2, sitec.unsqueeze(1).expand(B, C, C)).to(self.dtype)
+        d_cc = self.pair_dist[sitec.unsqueeze(2), sitec.unsqueeze(1)].to(self.dtype)
         # d_cc[b, c, c'] = dist(site[c], site[c']) — weight by source c'
         w = (rng + 1 - d_cc).clamp(min=0)
         arange_c = torch.arange(C, device=dev)
@@ -1876,7 +1978,7 @@ class BatchSim:
         # foreign pressure from rival cities
         rc_flat = self.rc_center.reshape(B, -1).clamp(min=0)
         rc_live = self.rc_alive.reshape(B, -1)
-        d_cr = self.pair_dist[sitec.reshape(-1)].reshape(B, C, self.T).gather(2, rc_flat.unsqueeze(1).expand(B, C, -1)).to(self.dtype)
+        d_cr = self.pair_dist[sitec.unsqueeze(2), rc_flat.unsqueeze(1)].to(self.dtype)
         wf = (rng + 1 - d_cr).clamp(min=0)
         foreign = (wf * self.rc_pop.reshape(B, -1).unsqueeze(1).to(self.dtype) * rc_live.unsqueeze(1).to(self.dtype)).sum(dim=2)
         tot = own + foreign
@@ -1898,7 +2000,7 @@ class BatchSim:
             if not bool(fc.any()):
                 continue
             site_c = self.site[:, c].clamp(min=0)
-            d_rc = self.pair_dist[site_c].gather(1, rc_flat).to(self.dtype)
+            d_rc = self.pair_dist[site_c.unsqueeze(1), rc_flat].to(self.dtype)
             wr = (rng + 1 - d_rc).clamp(min=0) * self.rc_pop.reshape(B, -1).to(self.dtype) * rc_live.to(self.dtype)
             press_r = wr.reshape(B, self.R if self.R > 0 else 1, self.RC).sum(dim=2)
             press_r = torch.where(self.r_alive, press_r, torch.full_like(press_r, -1.0))
@@ -2231,9 +2333,9 @@ class BatchSim:
             free = (self.cs_at.gather(1, sc.unsqueeze(1)).squeeze(1) < 0) & (
                 self.rival_at.gather(1, sc.unsqueeze(1)).squeeze(1) < 0
             )
-            dcity = torch.where(self.alive, self.pair_dist[sc].gather(1, self.site.clamp(min=0)).to(torch.long), 999)
+            dcity = torch.where(self.alive, self.pair_dist[sc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long), 999)
             rc_flat = self.rc_center.reshape(B, -1).clamp(min=0)
-            drc = torch.where(self.rc_alive.reshape(B, -1), self.pair_dist[sc].gather(1, rc_flat).to(torch.long), 999)
+            drc = torch.where(self.rc_alive.reshape(B, -1), self.pair_dist[sc.unsqueeze(1), rc_flat].to(torch.long), 999)
             ok = free & (dcity.min(dim=1).values >= 3) & (drc.min(dim=1).values >= 3)
             valid = can & ok
             self.next_site_ptr = self.next_site_ptr + can.long()  # consumed either way

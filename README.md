@@ -389,9 +389,9 @@ protocol (random 111.0, scripted autopilot 172.5 on this env). See
 ## Roadmap ideas (later stages)
 
 1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
-   with a learned value function (AlphaZero-lite); GPU-engine phase 5b
-   (kernelize the rival/barbarian slot loops — half the step cost) and
-   long CUDA runs of the native trainer toward self-play scale.
+   with a learned value function (AlphaZero-lite); long CUDA runs of the
+   native GPU trainer (phase 5 complete: on-device PPO + a 3× kernelized
+   engine, ~13k game-turns/sec on 4 CPU cores) toward self-play scale.
 2. Opponent depth II: rival build queues and districts on the map, loyalty
    pressure working in your favor (flipping rival border cities), open
    borders and diplomacy beyond war/peace.
