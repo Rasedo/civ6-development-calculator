@@ -67,7 +67,7 @@ import {
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
 import { makeYieldCtx } from '../src/core/effects';
-import { tileYields } from '../src/core/yields';
+import { tileYields, districtAdjacency } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow } from './gpu-trace';
@@ -76,7 +76,7 @@ import { hasFreshWater, hasRiver, isCoastalLand, isImpassable, isWater } from '.
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
-import { YIELD_KEYS, type City, type GameState, type Tile } from '../src/core/types';
+import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { IMPROVEMENTS } from '../src/data/improvements';
@@ -167,6 +167,40 @@ const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
   'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE', 'MINE_OR_QUARRY',
 ];
+
+// Terrain-permanent adjacency sources (known at t=0). The dynamic ones
+// (adjacent district/center/harbor/mine, built wonder) are added live by the
+// engine before the floor.
+const STATIC_ADJ_SRC = new Set<AdjacencySource>([
+  'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
+]);
+
+/** Raw (unfloored) static-source district adjacency for `id` on `tile`. */
+function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number {
+  const def = DISTRICTS[id];
+  if (!def.adjacencyYield) return 0;
+  let sum = 0;
+  const around = neighbors(map, tile);
+  for (const rule of def.adjacency) {
+    if (!STATIC_ADJ_SRC.has(rule.source)) continue;
+    if (rule.source === 'RIVER') {
+      if (hasRiver(tile)) sum += rule.amount;
+      continue;
+    }
+    for (const n of around) {
+      const m =
+        rule.source === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN' && !n.wonder
+        : rule.source === 'RAINFOREST' ? n.feature === 'RAINFOREST'
+        : rule.source === 'WOODS' ? n.feature === 'WOODS'
+        : rule.source === 'REEF' ? n.feature === 'REEF'
+        : rule.source === 'NATURAL_WONDER' ? n.wonder !== null
+        : rule.source === 'SEA_RESOURCE' ? isWater(n) && n.resource !== null
+        : false;
+      if (m) sum += rule.amount;
+    }
+  }
+  return sum;
+}
 
 const rules = {
   focusBase: [2, 2, 1, 1, 1, 1], // food, production, gold, science, culture, faith
@@ -419,6 +453,22 @@ for (let s = 0; s < N_SEEDS; s++) {
       // statically settleable for rival expansion (mirrors siteQuality's -1s;
       // ownership and dynamic districts are the engine's job)
       st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' && !t.district ? 1 : 0,
+      // raw static district adjacency per placeable district (D2a). The engine
+      // adds live dynamic sources (adjacent district/center/mine) then floors;
+      // self-checked here at t=0 where dynamic=0 so floor(static)=districtAdjacency.
+      dadj: PLACEABLE_DISTRICTS.map((id) => {
+        const raw = staticAdjRaw(map, t, id);
+        // Validate only where no dynamic source is live (no adjacent completed
+        // district — at export the sole one is the just-founded city center;
+        // no mines/harbors/wonders exist yet). There districtAdjacency ==
+        // floor(static). Center-/district-adjacent tiles get validated by the
+        // D2b parity gate once the engine adds dynamic sources before flooring.
+        const adjDynamic = neighbors(map, t).some((n) => n.district !== null && n.districtComplete);
+        if (!adjDynamic && Math.floor(raw) !== districtAdjacency(map, t, id)) {
+          throw new Error(`dadj mismatch @${t.index} ${id}: floor(${raw}) != ${districtAdjacency(map, t, id)}`);
+        }
+        return raw;
+      }),
       // this tile's static contributions to a nearby site's quality, one
       // per source (terrain, feature, resource) plus the hills flag —
       // siteQuality adds them as FOUR SEPARATE += steps, and candidate

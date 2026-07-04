@@ -484,6 +484,11 @@ class BatchSim:
         self.districts_cat = list(rules.districts or [])
         self.districts_on = bool(self.districts_cat)
         self.district = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else PLACEABLE_DISTRICTS idx
+        nD = len(self.districts_cat)
+        self.d_static_adj = torch.tensor(
+            [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
+            dtype=dtype, device=device,
+        )  # [B, T, nD] raw static-source adjacency, inert until D2b consumes it
 
         self._eff_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None

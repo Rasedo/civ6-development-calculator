@@ -21,9 +21,13 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
       rules, housing, placement flags) + STATIC per-tile adjacency contribution
       (mountain/rainforest/woods/reef/river/sea-resource/natural-wonder — known
       at t=0). Self-test; both gates stay green (nothing builds districts yet).
-- [ ] **D2** Scripted exporter builds ONE specialty district (Campus) on its
-      best static-adjacency tile; GPU mirrors placement + the static adjacency
-      yield (floor rule) + district-per-pop cap. Iterate gate to green.
+- [~] **D2** Campus placement + adjacency yield (split):
+  - [x] **D2a** raw static-source adjacency table [B,T,10] exported (in-exporter
+        self-check: floor(static)==districtAdjacency on every non-dynamic tile) +
+        engine loads it inert.
+  - [ ] **D2b** scripted exporter places one Campus on its best-adjacency owned
+        tile; GPU mirrors placement + floor(static + live dynamic center/district)
+        adjacency yield into city totals + district-per-pop cap. Gate to green.
 - [ ] **D3** Dynamic adjacency: adjacent-district (+0.5 each), city-center,
       harbor, mine/quarry (IZ), built-wonder. Add the rest of the specialty
       districts. Gate to green.
@@ -62,3 +66,8 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   (-1=none) in _MUTABLE (resets). Self-test green (Campus science/54, CH river+2
   gold, Harbor coastal); both gates stay green. Next: D2 — scripted Campus
   placement + static (terrain-based) adjacency yield, gate-verified.
+- D2a [x]: raw static-source adjacency table [B,T,10] exported + loaded inert.
+  In-exporter self-check passed on all 24 maps (floor(static)==districtAdjacency
+  wherever no dynamic source is live; the just-founded city center is skipped).
+  Campus static max 6.0; both gates green. Next: D2b — Campus placement + the
+  floored (static + live center/district) adjacency yield into city totals.
