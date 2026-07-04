@@ -30,6 +30,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
   height: number;
   unitsMode?: number;
+  disasters?: number;
   csMax?: number;
   rMax?: number;
   unitIds: string[];
@@ -63,6 +64,7 @@ for (const game of roll.games) {
     cityStates: roll.csMax ? roll.csMax : undefined,
     rivals: roll.rMax ? roll.rMax : undefined,
   });
+  if (roll.disasters) state.disasters = true;
   foundCity(state, game.sites[0]);
   state.plannedSettles = game.sites.slice(1);
   state.autoResearch = false; // picks come from the action log, as in CivEnv

@@ -371,21 +371,23 @@ thousands of games step in lockstep as `[games, cities, …]` tensor ops
 (`npm run gpu:export` → `python gpu/parity_test.py` reproduces recorded
 traces integer-exact) and **off-script**: `python gpu/rollout.py` plays
 random masked actions and logs them, `npm run gpu:replay` feeds that log
-through the real engine and must match every turn. Phases 1–4c cover a
+through the real engine and must match every turn. Phases 1–4d cover a
 multi-city economy plus the RL surface (masked production/research/
 civic/unit/envoy actions, detected eurekas, `empireScore` rewards, a
 batched env `civ6gpu.BatchEnv`) inside a genuinely hostile world:
 barbarian camps and raiders, a player-commanded military, city-states
-courting envoys, and scripted rival civs that grow, settle, race
-beliefs, declare war and flip disloyal cities — all with the in-state
-mulberry32 RNG mirrored draw for draw. See `gpu/README.md` for the
-covered/not-covered table and the phase roadmap.
+courting envoys, scripted rival civs that grow, settle, race beliefs,
+declare war and flip disloyal cities, and natural disasters (floods,
+volcanoes, droughts, storms) reshaping tile food — all with the
+in-state mulberry32 RNG mirrored draw for draw. See `gpu/README.md`
+for the covered/not-covered table and the phase roadmap.
 
 ## Roadmap ideas (later stages)
 
 1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
-   with a learned value function (AlphaZero-lite); GPU-engine phases 4+
-   (hostile world, on-device training) toward self-play scale.
+   with a learned value function (AlphaZero-lite); GPU-engine phase 5
+   (on-device training over the phase-4 hostile world) toward self-play
+   scale.
 2. Opponent depth II: rival build queues and districts on the map, loyalty
    pressure working in your favor (flipping rival border cities), open
    borders and diplomacy beyond war/peace.

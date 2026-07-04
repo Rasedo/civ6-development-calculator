@@ -100,6 +100,7 @@ def main() -> None:
         "width": sim.W,
         "height": sim.H,
         "unitsMode": int(fixtures[0].get("unitsMode", 0)),
+        "disasters": int(fixtures[0].get("disasters", 0)),
         "csMax": int(fixtures[0].get("csMax", 0)),
         "rMax": int(fixtures[0].get("rMax", 0)),
         "unitIds": [u["id"] for u in rules_raw.get("units", [])],

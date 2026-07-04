@@ -89,6 +89,7 @@ class Rules:
     housing_coastal: float
     housing_none: float
     amenity_tiers: list  # [(min, growth, yield)]
+    center_min_food: float
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
@@ -128,6 +129,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         housing_coastal=r["housing"]["coastal"],
         housing_none=r["housing"]["none"],
         amenity_tiers=[(t["min"], t["growth"], t["yield"]) for t in r["amenityTiers"]],
+        center_min_food=r.get("centerMinFood", 2),
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
@@ -233,7 +235,7 @@ _MUTABLE = [
     "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at",
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps",
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained",
-    "site", "center_yields", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
+    "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued",
     "influence", "envoys_avail",
@@ -243,6 +245,7 @@ _MUTABLE = [
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
+    "fertility", "drought",
 ]
 
 
@@ -290,6 +293,7 @@ class BatchSim:
         self.KS = C  # candidate sites; slot 0's site is the pre-founded capital
         self.site_tile = torch.tensor([[c["site"] for c in f["cities"]] for f in fixtures], dtype=torch.long, device=device)
         self.site_cy = ften(lambda f: [c["centerYields"] for c in f["cities"]], (C, 6))
+        self.site_raw_food = ften(lambda f: [c.get("rawFood", 2) for c in f["cities"]], (C,))
         self.site_maint = ften(lambda f: [c["baseMaintenance"] for c in f["cities"]], (C,))
         water = [
             [
@@ -306,6 +310,7 @@ class BatchSim:
 
         self.site = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.center_yields = torch.zeros(B, C, 6, dtype=dtype, device=device)
+        self.center_raw_food = torch.zeros(B, C, dtype=dtype, device=device)
         self.base_maintenance = torch.zeros(B, C, dtype=dtype, device=device)
         self.water_housing = torch.zeros(B, C, dtype=dtype, device=device)
         self.coastal = torch.zeros(B, C, dtype=torch.bool, device=device)
@@ -315,6 +320,7 @@ class BatchSim:
         self.founded_n = torch.ones(B, dtype=torch.long, device=device)  # monotonic: flips never free a slot
         self.site[:, 0] = self.site_tile[:, 0]
         self.center_yields[:, 0] = self.site_cy[:, 0]
+        self.center_raw_food[:, 0] = self.site_raw_food[:, 0]
         self.base_maintenance[:, 0] = self.site_maint[:, 0]
         self.water_housing[:, 0] = self.site_water[:, 0]
         self.coastal[:, 0] = self.site_coastal[:, 0]
@@ -424,6 +430,20 @@ class BatchSim:
         ids = [u["id"] for u in (rules.units or [])]
         self._r_spearman = ids.index("SPEARMAN") if "SPEARMAN" in ids else 0
         self._r_horseman = ids.index("HORSEMAN") if "HORSEMAN" in ids else 0
+
+        # --- disasters (phase 4d) ------------------------------------------------
+        self.disasters = bool(f0.get("disasters", 0))
+        self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.drought_cand = torch.tensor([[t.get("dc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.desert = torch.tensor([[t.get("de", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.fertilizable = torch.tensor([[t.get("fz", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        n_volc = max(max((len(f.get("volcanoes", [])) for f in fixtures), default=0), 1)
+        self.volcano_tile = torch.full((B, n_volc), -1, dtype=torch.long, device=device)
+        for b, f in enumerate(fixtures):
+            for i, v in enumerate(f.get("volcanoes", [])):
+                self.volcano_tile[b, i] = v
+        self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
+        self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
 
         # The Palace exists only in the capital (slot 0).
         pal_y = torch.zeros(C, 6, dtype=dtype, device=device)
@@ -586,6 +606,87 @@ class BatchSim:
         has = avail.any(dim=1)
         return torch.where((cur == -1) & has, best, cur)
 
+    def _eff_yields(self) -> torch.Tensor:
+        """[B, T, 6] tile yields with the disaster legacy applied: fertility
+        feeds (+1 food each, already capped), drought starves (−1 food,
+        floored at 0) — mirrors the tail of tileYields."""
+        if not self.disasters:
+            return self.tile_yields
+        ty = self.tile_yields.clone()
+        food = ty[:, :, 0] + self.fertility.to(self.dtype)
+        food = torch.where(self.drought > 0, (food - 1).clamp(min=0), food)
+        ty[:, :, 0] = food
+        return ty
+
+    def _fertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """+1 fertility (capped) on land, non-mountain tiles."""
+        ok = self.fertilizable[rows, tiles]
+        r2, t2 = rows[ok], tiles[ok]
+        self.fertility[r2, t2] = (self.fertility[r2, t2] + 1).clamp(max=3)
+
+    def _pick_static(self, mask_hit: torch.Tensor, cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Mirror of pick(): one draw where mask_hit & candidates exist;
+        returns (chosen mask, tile). Candidate sets here are static."""
+        cnt = cand.sum(dim=1)
+        has = mask_hit & (cnt > 0)
+        r = self._next_random(has)
+        k = torch.floor(r * cnt.to(torch.float64)).to(torch.long)
+        cum = cand.long().cumsum(dim=1)
+        sel = cand & (cum == (k + 1).clamp(min=1).unsqueeze(1))
+        return has, sel.long().argmax(dim=1)
+
+    def _disaster_phase(self) -> None:
+        """Mirrors disasterPhase draw for draw: drought clocks tick, then a
+        flood roll (+pick), one roll per volcano, a drought roll (+pick),
+        and a storm roll (+pick). Improvement scorching is inert (none
+        exist); the lasting effects are fertility and drought clocks."""
+        B, dev = self.B, self.device
+        self.drought = (self.drought - 1).clamp(min=0)
+        every = torch.ones(B, dtype=torch.bool, device=dev)
+
+        r = self._next_random(every)
+        hit, tile = self._pick_static(r < 0.05, self.floodplain)
+        if bool(hit.any()):
+            rows = hit.nonzero(as_tuple=True)[0]
+            self._fertilize(rows, tile[rows])
+
+        for k in range(self.volcano_tile.shape[1]):
+            volc = self.volcano_tile[:, k]
+            active = volc >= 0
+            if not bool(active.any()):
+                continue
+            rv = self._next_random(active)
+            erupt = active & (rv < 0.02)
+            if bool(erupt.any()):
+                rows = erupt.nonzero(as_tuple=True)[0]
+                nb = self.neigh[volc[rows]]  # [R, 6]
+                for d in range(6):
+                    n_d = nb[:, d]
+                    on = n_d >= 0
+                    self._fertilize(rows[on], n_d[on])
+
+        r = self._next_random(every)
+        hit, tile = self._pick_static(r < 0.02, self.drought_cand)
+        if bool(hit.any()):
+            rows = hit.nonzero(as_tuple=True)[0]
+            area = tiles_from_offsets(tile[rows], self._off2, self.W, self.H)  # [R, 19]
+            for m in range(area.shape[1]):
+                t_m = area[:, m]
+                on = (t_m >= 0) & ~self.water[rows, t_m.clamp(min=0)]
+                self.drought[rows[on], t_m[on]] = torch.maximum(
+                    self.drought[rows[on], t_m[on]], torch.full_like(t_m[on], 8)
+                )
+
+        r = self._next_random(every)
+        hit, tile = self._pick_static(r < 0.04, ~self.water)
+        if bool(hit.any()):
+            rows = hit.nonzero(as_tuple=True)[0]
+            area = tiles_from_offsets(tile[rows], tiles_within_offsets(1).to(dev), self.W, self.H)
+            for m in range(area.shape[1]):
+                t_m = area[:, m]
+                on = (t_m >= 0) & self.desert[rows, t_m.clamp(min=0)]
+                self._fertilize(rows[on], t_m[on])
+
     def _buildable(self) -> torch.Tensor:
         """[B, C, NB] City Center buildings each city could queue now."""
         rd = self.rules_dev
@@ -610,18 +711,27 @@ class BatchSim:
             & (self.dist <= 3)
             & (self._arangeT.view(1, 1, T) != self.site.unsqueeze(2))
         )  # [B, C, T]
-        tile_score = (self.tile_yields * rd.focus_base).sum(dim=2)  # [B, T]
+        eff_y = self._eff_yields()  # disasters make food dynamic
+        tile_score = (eff_y * rd.focus_base).sum(dim=2)  # [B, T]
         score = torch.where(cand, tile_score.unsqueeze(1), torch.tensor(-1e18, dtype=self.dtype, device=dev))
         score = score - self._arangeT.to(self.dtype).view(1, 1, T) * 1e-9  # tie: lowest index first
         k = max(int(self.pop.max().item()), 1)
         top_scores, top_idx = score.topk(k, dim=2)
         take = (torch.arange(k, device=dev).view(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)
-        ty = self.tile_yields.unsqueeze(1).expand(B, C, T, 6).gather(2, top_idx.unsqueeze(-1).expand(B, C, k, 6))
+        ty = eff_y.unsqueeze(1).expand(B, C, T, 6).gather(2, top_idx.unsqueeze(-1).expand(B, C, k, 6))
         worked_y = (ty * take.unsqueeze(-1).to(self.dtype)).sum(dim=2)  # [B, C, 6]
 
         bf = self.buildings.to(self.dtype)
         b_y = torch.einsum("bcn,nk->bck", bf, rd.b_yields)
-        total = worked_y + self.center_yields + self.palace_slot_yields.unsqueeze(0) + b_y
+        center_y = self.center_yields
+        if self.disasters:
+            # fertility/drought hit the center's RAW food before the min-clamp
+            sitec = self.site.clamp(min=0)
+            cf = self.center_raw_food + self.fertility.gather(1, sitec).to(self.dtype)
+            cf = torch.where(self.drought.gather(1, sitec) > 0, (cf - 1).clamp(min=0), cf)
+            center_y = self.center_yields.clone()
+            center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
+        total = worked_y + center_y + self.palace_slot_yields.unsqueeze(0) + b_y
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
@@ -1215,8 +1325,9 @@ class BatchSim:
             & self.passable.gather(1, tc)
             & (tiles != center.unsqueeze(1))
         )
-        f = self.tile_yields[:, :, 0].gather(1, tc).double()
-        p = self.tile_yields[:, :, 1].gather(1, tc).double()
+        eff_y = self._eff_yields()
+        f = eff_y[:, :, 0].gather(1, tc).double()
+        p = eff_y[:, :, 1].gather(1, tc).double()
         M = tiles.shape[1]
         key = torch.where(valid, (f + p) * 1e6 - torch.arange(M, device=self.device, dtype=torch.float64), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         kk = min(int(self.rules.rivals.get("maxPop", 12)), M)
@@ -2005,7 +2116,7 @@ class BatchSim:
         # The TS engine expands each city fully, in founding order, within a
         # turn — later cities see earlier claims. C is tiny, so walk slots.
         self.culture_box = self.culture_box + total[:, :, 4]
-        y_sum = self.tile_yields.sum(dim=2)
+        y_sum = self._eff_yields().sum(dim=2)
         neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
         neigh_valid = (self.neigh >= 0).view(1, T, 6)
         for c in range(C):
@@ -2050,6 +2161,8 @@ class BatchSim:
         if self.units_mode:
             self.treasury = self.treasury - (self.p_alive.to(self.dtype) * self._p_maint[self.p_type]).sum(dim=1)
             self._barbarian_phase()
+        if self.disasters:
+            self._disaster_phase()
         self._city_state_phase()
         self._rival_phase()
 
@@ -2132,6 +2245,7 @@ class BatchSim:
             p_idx = ptr[rows]
             self.site[rows, c_new] = s_idx
             self.center_yields[rows, c_new] = self.site_cy[rows, p_idx]
+            self.center_raw_food[rows, c_new] = self.site_raw_food[rows, p_idx]
             self.base_maintenance[rows, c_new] = self.site_maint[rows, p_idx]
             self.water_housing[rows, c_new] = self.site_water[rows, p_idx]
             self.coastal[rows, c_new] = self.site_coastal[rows, p_idx]
@@ -2187,6 +2301,8 @@ class BatchSim:
             self.p_alive.sum(dim=1).to(self.dtype),
             self.envoys_avail.to(self.dtype),
             self.influence,
+            self.fertility.sum(dim=1).to(self.dtype),
+            (self.drought > 0).sum(dim=1).to(self.dtype),
         ]
         for s in range(self.S):
             cols += [

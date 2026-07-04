@@ -296,6 +296,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     cityStates: CS_MAX,
     rivals: R_MAX,
   });
+  state.disasters = true; // phase 4d: weather rolls join the RNG stream
   const site = scoreSettleSites(state, 1)[0];
   foundCity(state, site.tileIndex);
   const capital = state.cities[0];
@@ -359,8 +360,15 @@ for (let s = 0; s < N_SEEDS; s++) {
         return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
       }),
       hl: t.elevation === 'HILLS' ? 1 : 0,
+      // disaster statics: floodplain, drought-candidate (flat grass/plains),
+      // desert, fertilizable (land, not mountain)
+      fp: t.feature === 'FLOODPLAINS' ? 1 : 0,
+      dc: (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT' ? 1 : 0,
+      de: t.terrain === 'DESERT' ? 1 : 0,
+      fz: !isWater(t) && t.elevation !== 'MOUNTAIN' ? 1 : 0,
     };
   });
+  const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => t.index);
   const landTiles = map.tiles.filter((t) => !isWater(t)).length;
   const maxCamps = Math.max(1, Math.floor(landTiles / 120));
 
@@ -380,6 +388,9 @@ for (let s = 0; s < N_SEEDS; s++) {
     return {
       site: tileIndex,
       centerYields: YIELD_KEYS.map((k) => cy[k]),
+      // pre-clamp food: disasters (fertility/drought) apply BEFORE the
+      // city-center minimum, so the engine must redo the clamp live
+      rawFood: tileYields(ctx, stripped).food,
       freshWater: hasFreshWater(map, t) ? 1 : 0,
       coastal: isCoastalLand(map, t) ? 1 : 0,
       riverAtCenter: hasRiver(t) ? 1 : 0,
@@ -479,6 +490,8 @@ for (let s = 0; s < N_SEEDS; s++) {
     width: map.width,
     height: map.height,
     unitsMode: 1,
+    disasters: 1,
+    volcanoes,
     maxCamps,
     rngInit,
     csMax: CS_MAX,

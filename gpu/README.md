@@ -6,9 +6,10 @@ TypeScript engine remains the source of truth; this port exists for
 self-play-scale RL training — and since phase 3 it is *trainable against*:
 a masked macro-action surface drives production, research, civics, unit
 orders and envoys, while the world fights back: barbarians raid (4a),
-the policy commands its own army (4b), and city-states and scripted
+the policy commands its own army (4b), city-states and scripted
 rival civilizations live alongside — growing, settling, racing beliefs,
-declaring war and flipping disloyal cities (4c).
+declaring war and flipping disloyal cities (4c) — and the climate takes
+its cut: floods, droughts, storms and volcanoes reshape tile food (4d).
 
 ## The parity contract
 
@@ -47,9 +48,10 @@ in JS and shipped in the fixtures, since libm `exp()` may differ by an
 ulp between runtimes.
 
 Current status: scripted **10 seeds × 100 turns × 6 city slots + 3
-city-states + 2 rival civs** and off-script **30 random games × 100
-turns** — across 21 rival war declarations, 3 loyalty flips, ~95 rival
-settlements, envoy assignments, quests and hundreds of fights — all
+city-states + 2 rival civs + disasters** and off-script **30 random
+games × 100 turns** — across rival war declarations, loyalty flips,
+~95 rival settlements, envoy assignments, quests, hundreds of fights
+and a steady drip of floods, droughts, storms and eruptions — all
 integer-exact with floats within 1 milli-unit, the in-state RNG pinned
 every turn. The harness catches planted bugs (settler cost nudges,
 dropped ring-1 claims, disabled eureka detection, swapped damage-roll
@@ -60,12 +62,15 @@ per tile flipped a strict `>` between two sites that differ by one ulp
 (36.5 vs 36.49999999999999 — the exporter now ships per-SOURCE terms and
 the engine replays the exact four-add sequence); the rival tech level
 accumulated in two adds where the TS engine uses one (the ulp flipped a
-`floor(tech·1.5)` defense); and a `gather(1, tiles[g])` read rows
-0..|g|−1 instead of rows g, corrupting a phantom unit slot. One honest
-caveat remains: a boost firing *earlier* than the TS engine is invisible
-until it crosses its target's completion boundary. Fixtures are
-regenerated, not committed — they must always match the engine version
-you're comparing against.
+`floor(tech·1.5)` defense); a `gather(1, tiles[g])` read rows
+0..|g|−1 instead of rows g, corrupting a phantom unit slot; and 4d's
+catch — disasters modify a city center's *raw* food **before** the
+min-2 clamp, so the exported post-clamp center yields hid a drought
+(the exporter now ships the pre-clamp food and the engine redoes the
+clamp live). One honest caveat remains: a boost firing *earlier* than
+the TS engine is invisible until it crosses its target's completion
+boundary. Fixtures are regenerated, not committed — they must always
+match the engine version you're comparing against.
 
 ## The action surface (phase 3)
 
@@ -110,10 +115,12 @@ parity-checked in every trace row — rewards telescope to the same
 fitness the TS benchmarks report). `civ6gpu.rng` provides the
 counter-based RNG (splitmix64): every draw is a pure function of
 `(seed, turn, head, slot)`, so streams survive batch reordering and
-resumes — the random rollout actor uses it today, phase 4's stochastic
-systems (barbarians, disasters) will use it next.
+resumes. It drives the *policy* side (the random rollout actor); the
+*world's* randomness — barbarians, quests, rival wars, disasters — runs
+on the mirrored in-state mulberry32, because those draws must match the
+TS engine draw for draw.
 
-## What phases 1–4c cover (and what they don't)
+## What phases 1–4d cover (and what they don't)
 
 | Ported & parity-checked | Not yet (runs in TS only) |
 |---|---|
@@ -125,7 +132,7 @@ systems (barbarians, disasters) will use it next.
 | Multi-city: per-city queues, ring-1 claims at founding | Player-declared war and peace deals |
 | Shared-map border competition (exact per-city ordering) | Militaristic levies, CS trade-route quests |
 | Tech/civic research: manual picks, banking, auto-pick | Policies/governments/religion modifiers |
-| Eureka **detection** + discounts (covered-scope conditions) | Fog of war, disasters, trade |
+| Eureka **detection** + discounts (covered-scope conditions) | Fog of war, trade routes |
 | RL action masks, empireScore reward, batched env | Pillaging (needs improvements on the map) |
 | Barbarians: camps, garrisons, raiders, sieges, sacks, healing | Goody huts (reference maps exported without them) |
 | Player military: training, single-step moves, melee, camp clearing | Eureka conditions outside covered state |
@@ -134,6 +141,7 @@ systems (barbarians, disasters) will use it next.
 | Rivals: tile economies, border growth, settling, unit production | |
 | Rival wars: declarations, raids, sieges, auto-peace; barb↔rival | |
 | Loyalty pressure and city flips (capitals immune) | |
+| Disasters: floods, volcanoes, droughts, storms; fertility & drought food shifts | |
 | In-state mulberry32 RNG, mirrored draw for draw | |
 
 Each later phase moves a row from the right column to the left, extending
@@ -153,15 +161,15 @@ Needs only `torch` (already in `python/requirements.txt`). Parity runs in
 float64 on CPU; training uses float32.
 
 Reference numbers on the same 4-core container, **identical full-world
-scenario** (6 city slots + barbarians + 3 city-states + 2 rivals) in
-both engines: the TS engine does ~520 game-turns/sec per core
-(~2,100/sec across 4 cores); the vectorized engine does ~3,900
-game-turns/sec in float64 (the parity dtype) and ~5,700 in float32 (the
-training dtype) at batch 1024. The rival machinery walks small python
-loops per civ/city/unit slot, which narrows the CPU margin — batch
-scaling and CUDA are the point, and those loops are the first
-optimization target for phase 5. Run `python gpu/bench.py` on an
-RTX-class card for the CUDA numbers.
+scenario** (6 city slots + barbarians + 3 city-states + 2 rivals +
+disasters) in both engines: the TS engine does ~520 game-turns/sec per
+core (~2,100/sec across 4 cores); the vectorized engine does ~3,000
+game-turns/sec in float64 (the parity dtype) and ~5,000–7,000 in
+float32 (the training dtype; the shared container is noisy) at batch
+1024. The rival machinery walks small python loops per civ/city/unit
+slot, which narrows the CPU margin — batch scaling and CUDA are the
+point, and those loops are the first optimization target for phase 5.
+Run `python gpu/bench.py` on an RTX-class card for the CUDA numbers.
 
 ## Phase roadmap
 
@@ -183,6 +191,10 @@ RTX-class card for the CUDA numbers.
      settling, unit production, GP/pantheon/belief races (draws
      mirrored), war and auto-peace, at-war raids and peacetime patrols,
      loyalty pressure and city flips.
-   - 4d. Disasters — the last stochastic system, behind the same gate.
+   - ✅ 4d. Disasters — the last stochastic system, behind the same
+     gate: river floods, volcanic eruptions, area droughts and storms,
+     each fertilizing (+1 food, cap 3) or drought-striking (−1 food,
+     floored at 0) tiles; tile and city-center food become dynamic
+     (`_eff_yields`, pre-clamp raw center food shipped in fixtures).
 5. Native GPU training loop: policy inference and env stepping never
    leave the device (and kernelize the per-slot python loops).
