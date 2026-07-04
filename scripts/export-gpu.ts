@@ -93,7 +93,7 @@ import {
   HOUSING_NO_WATER,
 } from '../src/data/constants';
 
-const N_SEEDS = Number(process.argv[2] ?? 10);
+const N_SEEDS = Number(process.argv[2] ?? 24);
 const N_TURNS = Number(process.argv[3] ?? 100);
 const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler

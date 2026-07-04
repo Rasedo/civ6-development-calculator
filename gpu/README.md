@@ -47,8 +47,8 @@ half-to-even), and the damage curve's `30·e^(0.04·Δ)` table is computed
 in JS and shipped in the fixtures, since libm `exp()` may differ by an
 ulp between runtimes.
 
-Current status: scripted **10 seeds × 100 turns × 6 city slots + 3
-city-states + 2 rival civs + disasters** and off-script **30 random
+Current status: scripted **24 seeds × 100 turns × 6 city slots + 3
+city-states + 2 rival civs + disasters** and off-script **72 random
 games × 100 turns** — across rival war declarations, loyalty flips,
 ~95 rival settlements, envoy assignments, quests, hundreds of fights
 and a steady drip of floods, droughts, storms and eruptions — all
@@ -56,20 +56,31 @@ integer-exact with floats within 1 milli-unit, the in-state RNG pinned
 every turn. The harness catches planted bugs (settler cost nudges,
 dropped ring-1 claims, disabled eureka detection, swapped damage-roll
 order, a removed victor-survives rule, a nudged war-declaration chance),
-and caught real ones during development, all of the same species:
-**floating-point associativity and indexing**. Site quality pre-summed
-per tile flipped a strict `>` between two sites that differ by one ulp
-(36.5 vs 36.49999999999999 — the exporter now ships per-SOURCE terms and
-the engine replays the exact four-add sequence); the rival tech level
+and caught real ones during development. One family is **floating-point
+associativity and indexing**: site quality pre-summed per tile flipped a
+strict `>` between two sites that differ by one ulp (36.5 vs
+36.49999999999999 — the exporter now ships per-SOURCE terms and the
+engine replays the exact four-add sequence); the rival tech level
 accumulated in two adds where the TS engine uses one (the ulp flipped a
 `floor(tech·1.5)` defense); a `gather(1, tiles[g])` read rows
-0..|g|−1 instead of rows g, corrupting a phantom unit slot; and 4d's
-catch — disasters modify a city center's *raw* food **before** the
-min-2 clamp, so the exported post-clamp center yields hid a drought
-(the exporter now ships the pre-clamp food and the engine redoes the
-clamp live). One honest caveat remains: a boost firing *earlier* than
-the TS engine is invisible until it crosses its target's completion
-boundary. Fixtures are regenerated, not committed — they must always
+0..|g|−1 instead of rows g, corrupting a phantom unit slot; and disasters
+modify a city center's *raw* food **before** the min-2 clamp, so the
+exported post-clamp center yields hid a drought (the exporter now ships
+the pre-clamp food and the engine redoes the clamp live). A second
+family — surfaced when the seed set widened from 10 to 24 — is **the
+vectorized engine trusting a `t=0` static where the TS engine recomputes
+live**, each needing rare geometry to bite: a rival working tile that
+*later* became a city center still carried its founding-day yield (paved
+center tiles produce nothing — now masked by live `center_at`/`rvcity_at`
+occupancy); a city founded on woods/rainforest/marsh kept the feature's
++3 terrain-defense in the static table after `foundCity` strips the
+feature (defense now drops to the hills component at founding); and a
+natural-wonder tile inside a rival's radius let fertility/drought move
+its food, when `tileYields` early-returns the wonder's fixed yield before
+the disaster tail (wonder food now pinned). One honest caveat remains: a
+boost firing *earlier* than the TS engine is invisible until it crosses
+its target's completion boundary. Fixtures are regenerated, not committed
+— they must always
 match the engine version you're comparing against.
 
 ## The action surface (phase 3)

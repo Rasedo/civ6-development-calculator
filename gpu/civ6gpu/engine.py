@@ -232,7 +232,7 @@ _MUTABLE = [
     "buildings", "current", "cur_cost", "progress", "settlers", "settlers_queued",
     "treasury", "science_total", "culture_total", "techs", "civics",
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
-    "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at",
+    "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef",
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps",
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained",
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
@@ -642,6 +642,11 @@ class BatchSim:
             return self._food_cache[1]
         food = self.tile_yields[:, :, 0] + self.fertility.to(self.dtype)
         food = torch.where(self.drought > 0, (food - 1).clamp(min=0), food)
+        # Natural-wonder tiles EARLY-RETURN in tileYields with the wonder's
+        # fixed yields, BEFORE the fertility/drought tail — the disaster
+        # STATE still lands on them (the trace counts it), but their food
+        # never moves.
+        food = torch.where(self.nwonder, self.tile_yields[:, :, 0], food)
         self._food_cache = (self._eff_version, food)
         return food
 
@@ -1423,6 +1428,14 @@ class BatchSim:
         # no [B, T, 6] assembly needed here (the sums below are per-column)
         f = (self._eff_food() if self.disasters else self.tile_yields[:, :, 0]).gather(1, tc).double()
         p = self.tile_yields[:, :, 1].gather(1, tc).double()
+        # ANY city center is paved (tile.district set at founding) and
+        # yields nothing. Reachable when a loyalty flip parks two same-civ
+        # cities inside each other's work radius: the neighbor's center
+        # stays a CANDIDATE — it occupies a sorted slot exactly like the
+        # TS list — but contributes zero food/production.
+        paved = (self.center_at.gather(1, tc) >= 0) | (self.rvcity_at.gather(1, tc) >= 0)
+        f = torch.where(paved, torch.zeros_like(f), f)
+        p = torch.where(paved, torch.zeros_like(p), p)
         M = tiles.shape[1]
         key = torch.where(valid, (f + p) * 1e6 - torch.arange(M, device=self.device, dtype=torch.float64), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         kk = min(int(self.rules.rivals.get("maxPop", 12)), M)
@@ -2370,6 +2383,12 @@ class BatchSim:
             self.owner[rows, s_idx] = c_new
             self.workable[rows, s_idx] = False
             self.center_at[rows, s_idx] = c_new
+            # foundCity strips the removable feature — exactly the woods/
+            # rainforest/marsh that carry +3 defense — so the center tile's
+            # terrain defense drops to its hills component. (Rival and
+            # city-state founding do NOT strip; the capital's statics were
+            # exported post-founding, already stripped.)
+            self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
             nb = self.neigh[s_idx]  # [R, 6]
             for d in range(6):
                 n_d = nb[:, d]
