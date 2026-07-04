@@ -132,6 +132,10 @@ python gpu/train_ppo.py --batch 1024 --updates 2000 --anneal-lr   # GPU box
 python gpu/eval.py --policy gpu/runs/ppo/best.pt   # 50-episode protocol
 ```
 
+`gpu/TRAINING.md` is the step-by-step guide (fixture export, device
+choice, overnight sizing, what the TensorBoard curves should look
+like, resume, eval).
+
 The policy is a shared MLP trunk with five masked-categorical heads
 mirroring the action surface — per-city production, tech, civic, envoy,
 and a per-unit-slot head that runs a small MLP on (trunk embedding ⊕
