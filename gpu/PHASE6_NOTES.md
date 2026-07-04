@@ -97,3 +97,48 @@ farms), so it is the economy-timing shift, not farms per se.
   determinism, since it is a real latent divergence the shifted timing
   merely exposes (same species as the tdef / paved-center / resource-farm
   bugs the widened seed set has been surfacing).
+
+## Session 2 progress (patch: `gpu/phase6-wip.patch`)
+
+Re-applied the full builder slice and fixed **five** bugs; the divergence
+moved t38 → t44 → t57 (steady progress, same species each time). All the
+working code is in `gpu/phase6-wip.patch` (apply with `git apply
+gpu/phase6-wip.patch` onto this commit). It is NOT committed live because
+the gate is still red at seed 9053 t57. Fixes, in order found:
+
+1. **Resource-farm validity** (export) — as above; re-applied.
+2. **Housing hunk** in `_city_totals` — as above; re-applied.
+3. **Barb march targets the nearest IMPROVEMENT first**, then the nearest
+   city (`hostileUnitAct` step 3: raiders head for your farms to pillage).
+   The GPU march only targeted cities. Fix: nearest unpillaged owned
+   improvement within `dist < 13` (ties → lowest tile index), else nearest
+   city. Backward-compatible (no farms → nearest city). **This fixed the
+   seed-9001 `hp0` blocker from session 1.**
+4. **IRRIGATION eureka** ("farm a resource") is now reachable. Export
+   `improvement` boost rows for `id==='FARM'` (`{kind:'improvement', imp:0,
+   count, onResource}`) and detect in `_detect_boosts`:
+   `(improvement==FARM) & (onResource ? res_priority>0 : True)`, count ≥ n,
+   NOT pillage-gated. (Only FARM is buildable, so only IRRIGATION.)
+5. **City sack pillages the center's 6 neighbours** (`sackCity`). The GPU
+   sack reduced pop/treasury/hp but didn't pillage. Fix: in
+   `_hostile_city_attack`'s sack branch, for the 6 `neigh[center]` tiles set
+   `pillaged` where `improvement>=0 & ~pillaged`, bump `_eff_version`.
+
+Plus the barb **pillage branch** (session 1) is re-applied.
+
+### Current blocker (seed 9053 t57, first mismatch = `rng`)
+GPU makes **2 more draws than TS** in turn 57 = one extra barb combat.
+Logged GPU combats at t57: `_hostile_vs_unit u9→tile523`,
+`_hostile_city_attack u10→city1`, `_hostile_vs_unit u6→tile522`. One of
+the two `_hostile_vs_unit` is extra vs TS — a barb attacks a unit the TS
+barb does not (a barb-vs-unit adjacency/decision divergence under the
+shifted positions; no barb is on a farm at t57, so it is not pillage-vs-
+attack). NEXT: identify the unit at 522/523 (rival? the player builder/
+warrior?) and why the GPU barb attacks where TS pillages/marches — likely
+another position ripple, or a barb-vs-civilian (builder) attack the GPU
+handles differently. Instrument `combat.ts` `hostileUnitAct`/`meleeAttack`
+with a `globalThis.__barbLog` at t57 and diff against the GPU combat log.
+
+The tail is all this species (barb behaviour under the farm economy). Each
+fix so far pushed the wall ~6–13 turns later; a handful more likely
+finishes it.
