@@ -111,16 +111,20 @@ turn, `BatchSim.step(production, tech, civic)` accepts:
 - **tech / civic** `[B]` — applied when the research slot is empty;
   progress banks while the policy deliberates, exactly like manual
   research in the TS engine.
-- **units** `[B, P]` (phase 4b) — one order per player unit per turn:
-  step to a neighbor (0–5), melee-attack the barbarian there (6–11), or
-  hold (12). Orders execute in spawn order and are RE-validated at
+- **units** `[B, P, 14]` (phase 4b, +build in phase 6) — one order per
+  player unit per turn: step to a neighbor (0–5), melee-attack the
+  barbarian there (6–11), hold (12), or build a FARM (13 — builders on a
+  buildable tile). Orders execute in spawn order and are RE-validated at
   execution on both engines identically (an earlier unit's move can
   invalidate a later order — rejected orders are no-ops, not errors).
   Combat mirrors `meleeAttack`: terrain defense, the victor-survives
   rule on mutual kills, advancing into the emptied tile, and clearing a
   barbarian camp on entry (+50 gold, camp list splice). This goes BEYOND
   the TS `CivEnv`, which delegates units to an autopilot — here the
-  policy commands the army directly.
+  policy commands the army *and its builders* directly. The off-script
+  replay identifies each ordered unit by its tile + domain (not an
+  append-only slot), so a unit that spawns and dies in the same turn
+  can't desync the mapping.
 - **envoy** `[B]` (phase 4c) — back that met city-state with one banked
   envoy (influence accrues 3/turn; quests award more). Envoy tiers feed
   the capital's yields exactly like `csEnvoyBonuses` → `capitalYields`.

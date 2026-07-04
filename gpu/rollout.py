@@ -70,9 +70,10 @@ def main() -> None:
         # random pacifists would leave the kill/advance/camp-clear paths
         # (and the camp-list splice they exercise) untested.
         um = sim.unit_action_mask()
+        na = um.shape[2]  # 14: 0-5 move, 6-11 attack, 12 hold, 13 build
         has_attack = um[:, :, 6:12].any(dim=2, keepdim=True)
-        um = um & ~(has_attack & (torch.arange(13).view(1, 1, 13) < 6))  # drop moves when a fight is on
-        um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack  # and don't hold back either
+        um = um & ~(has_attack & (torch.arange(na).view(1, 1, na) < 6))  # drop moves when a fight is on
+        um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack  # and don't hold back either (builders' 13 unaffected)
         ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)  # [B, P]
         ea = masked_choice(sim.envoy_mask(), game_seed, turn, HEAD_ENVOY)  # [B]
         for b in range(B):
@@ -86,7 +87,13 @@ def main() -> None:
                 entry["c"] = int(ca[b])
             if ea[b] >= 0:
                 entry["e"] = int(ea[b])
-            orders = [[p, int(ua[b, p])] for p in range(P_MAX) if 0 <= ua[b, p] < HOLD]
+            # Log each order as [tile, action, civ] (not slot): the replay
+            # finds the unit by tile+domain, robust to same-turn spawn/death.
+            orders = [
+                [int(sim.p_tile[b, p]), int(ua[b, p]), int(sim._p_civ[sim.p_type[b, p]])]
+                for p in range(P_MAX)
+                if ua[b, p] >= 0 and ua[b, p] != HOLD
+            ]
             if orders:
                 entry["u"] = orders
             if len(entry) > 1:

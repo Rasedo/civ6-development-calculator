@@ -50,7 +50,7 @@ from civ6gpu import BatchEnv, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import P_MAX
 from civ6gpu.env import UNIT_FEATURES
 
-N_UNIT_ACTS = 13
+N_UNIT_ACTS = 14
 NEG = -1e9
 
 

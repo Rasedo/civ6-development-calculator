@@ -1105,10 +1105,11 @@ class BatchSim:
     # --- player unit actions (phase 4b) ---------------------------------------
 
     def unit_action_mask(self) -> torch.Tensor:
-        """[B, P_MAX, 13] valid orders per player unit: 0–5 step to that
-        neighbor, 6–11 melee-attack the barbarian there, 12 hold. Orders are
-        RE-validated at execution (both engines identically), because an
-        earlier unit's move can invalidate a later unit's order."""
+        """[B, P_MAX, 14] valid orders per player unit: 0–5 step to that
+        neighbor, 6–11 melee-attack the barbarian there, 12 hold, 13 build a
+        FARM (builders only, on a buildable tile). Orders are RE-validated at
+        execution (both engines identically), because an earlier unit's move
+        can invalidate a later unit's order."""
         B, dev = self.B, self.device
         nb = self.neigh[self.p_tile.clamp(min=0).reshape(-1)].reshape(B, P_MAX, 6)
         nbc = nb.clamp(min=0).reshape(B, -1)
@@ -1128,7 +1129,27 @@ class BatchSim:
         can_fight = (self._p_combat[self.p_type] > 0).unsqueeze(2)
         attack = on_map & (barb | rv_war) & can_fight & alive
         hold = self.p_alive.unsqueeze(2)
-        return torch.cat([move, attack, hold], dim=2)
+        # 13: build a FARM — a builder with charges standing on a buildable,
+        # unimproved, owned, non-center farm tile (mirrors validImprovements).
+        if self.improvements_on and self._builder_idx >= 0:
+            tc = self.p_tile.clamp(min=0)  # [B, P_MAX]
+            if self._hillfarms_civic >= 0:
+                civ_done = self.civics[:, self._hillfarms_civic].unsqueeze(1)
+            else:
+                civ_done = torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            farmable = self.farm_flat.gather(1, tc) | (self.farm_hill.gather(1, tc) & civ_done)
+            build = (
+                self.p_alive
+                & (self.p_type == self._builder_idx)
+                & (self.p_charges > 0)
+                & (self.owner.gather(1, tc) >= 0)
+                & (self.center_at.gather(1, tc) < 0)
+                & (self.improvement.gather(1, tc) < 0)
+                & farmable
+            ).unsqueeze(2)
+        else:
+            build = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
+        return torch.cat([move, attack, hold, build], dim=2)
 
     def _scripted_builder(self) -> None:
         """Scripted-policy builder (phase 6a): each player BUILDER with
@@ -1261,6 +1282,40 @@ class BatchSim:
                     self.p_tile[vr, p] = tgt[vr]
                     self.pmil_at[vr, tgt[vr]] = p
                     self._clear_camp_at(adv, tgt)
+
+            # --- build a FARM (13): a builder on a buildable tile ---------------
+            # No RNG, re-validated at execution (an earlier unit could have
+            # taken the tile / spent state), so an invalid build is a no-op —
+            # mirroring the replay's soft-failing builderImprove.
+            if self.improvements_on and self._builder_idx >= 0:
+                hc = here.clamp(min=0)
+                if self._hillfarms_civic >= 0:
+                    civ_done = self.civics[:, self._hillfarms_civic]
+                else:
+                    civ_done = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                farmable = self.farm_flat.gather(1, hc.unsqueeze(1)).squeeze(1) | (
+                    self.farm_hill.gather(1, hc.unsqueeze(1)).squeeze(1) & civ_done
+                )
+                bld = (
+                    self.p_alive[:, p]
+                    & (a == 13)
+                    & (self.p_type[:, p] == self._builder_idx)
+                    & (self.p_charges[:, p] > 0)
+                    & (self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0)
+                    & (self.center_at.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) < 0)
+                    & farmable
+                )
+                if bool(bld.any()):
+                    rows = bld.nonzero(as_tuple=True)[0]
+                    self.improvement[rows, here[rows]] = self.FARM
+                    self.p_charges[rows, p] -= 1
+                    self._eff_version += 1
+                    gone = bld & (self.p_charges[:, p] <= 0)
+                    if bool(gone.any()):
+                        gr = gone.nonzero(as_tuple=True)[0]
+                        self.pciv_at[gr, here[gr]] = -1
+                        self.p_alive[:, p] = self.p_alive[:, p] & ~gone
 
             # --- step to a neighbor (0..5) --------------------------------------
             mv = self.p_alive[:, p] & (a >= 0) & (a < 6)

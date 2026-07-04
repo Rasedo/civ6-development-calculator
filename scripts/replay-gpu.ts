@@ -19,11 +19,12 @@
 
 import { readFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler, setTechResearch, setCivicResearch } from '../src/core/game';
-import { queueUnit, walkPath } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove } from '../src/core/units';
 import { meleeAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import { neighborTile } from '../src/core/hex';
 import { traceRow, rowTolerance } from './gpu-trace';
+import { UNITS } from '../src/data/units';
 
 const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
@@ -41,7 +42,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
     seed: number;
     rng: number;
     sites: number[];
-    actions: { t: number; p?: [number, number][]; r?: number; c?: number; e?: number; u?: [number, number][] }[];
+    actions: { t: number; p?: [number, number][]; r?: number; c?: number; e?: number; u?: [number, number, number][] }[];
     trace: number[][];
   }[];
 };
@@ -74,19 +75,6 @@ for (const game of roll.games) {
   const tol = rowTolerance(C, csMax, rMax);
   const byTurn = new Map(game.actions.map((a) => [a.t, a]));
   const cityIds: number[] = state.cities.map((x) => x.id);
-  // GPU unit slots are append-only in spawn order and survive deaths;
-  // mirror that with a spawn log instead of indexing the live array.
-  const spawnLog: number[] = [];
-  const logged = new Set<number>();
-  const updateSpawnLog = () => {
-    for (const un of state.units) {
-      if (un.owner === 'player' && !logged.has(un.id)) {
-        logged.add(un.id);
-        spawnLog.push(un.id);
-      }
-    }
-  };
-
   const fail = (msg: string) => {
     console.log(`seed ${game.seed} rng ${game.rng}: ${msg}`);
     failures += 1;
@@ -100,12 +88,29 @@ for (const game of roll.games) {
     // execution time (an earlier unit's move can invalidate a later one's),
     // so a rejected order here must match a no-op there — any real
     // divergence surfaces in the trace comparison instead.
-    for (const [slot, a] of act?.u ?? []) {
-      const unit = state.units.find((un) => un.id === spawnLog[slot]);
+    for (const [tile, a, civ] of act?.u ?? []) {
+      // Identify the ordered unit by its (start-of-turn) tile and domain,
+      // NOT an append-only slot index: a unit that spawns and dies in the
+      // same turn would never enter a post-endTurn spawn log, desyncing the
+      // indices. A tile holds at most one player unit per domain (1 military
+      // + 1 civilian), so tile + civ is unambiguous, and orders execute in
+      // the logged order so no earlier move has vacated/entered this tile.
+      const unit = state.units.find(
+        (un) =>
+          un.owner === 'player' &&
+          un.tileIndex === tile &&
+          (UNITS[un.type]?.charges !== undefined) === (civ === 1),
+      );
       if (!unit) {
-        fail(`turn ${state.turn}: order for missing player unit ${slot}`);
+        fail(`turn ${state.turn}: no player unit at tile ${tile} (civ ${civ})`);
         bad = true;
         break;
+      }
+      if (a === 13) {
+        // Build a FARM on the builder's tile. Soft-fail (no-op) if invalid —
+        // the GPU re-validates identically, so a rejected build matches.
+        builderImprove(state, unit.id, 'FARM');
+        continue;
       }
       const dir = a % 6;
       const n = neighborTile(state.map, state.map.tiles[unit.tileIndex], dir);
@@ -183,7 +188,6 @@ for (const game of roll.games) {
     if (bad) break;
 
     endTurn(state);
-    updateSpawnLog();
     for (const c of state.cities) {
       if (!cityIds.includes(c.id)) cityIds.push(c.id);
     }
