@@ -311,9 +311,10 @@ card for the CUDA numbers.
      sequential-draw semantics (raider and rival unit acts).
 6. ✅ Improvements & builders (FARM). Builders train, move single-step and
    build farms (dynamic tile food + housing, resource farms, the
-   IRRIGATION eureka); barbarians and at-war rivals now march for your
-   farms and pillage them, city sacks pillage the center's neighbours, and
-   disasters scorch improvements — all behind the same two gates. Next
-   here: MINE/LUMBER_MILL (tech-gated, tech-boosted yields), an RL
-   build-improvement action so the *policy* commands builders (they idle
-   under random play today), and chop/harvest one-time yields.
+   IRRIGATION eureka); barbarians and at-war rivals march for your farms
+   and pillage them, city sacks pillage the center's neighbours, and
+   disasters scorch improvements. The RL units head gained a **build
+   action (13)** so the policy commands builders directly (50 build orders
+   across the 72-game off-script gate, 31 games building farms) — all
+   behind the same two gates. Next here: MINE/LUMBER_MILL (tech-gated,
+   tech-boosted yields) and chop/harvest one-time yields.
