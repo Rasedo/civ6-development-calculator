@@ -147,10 +147,14 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     const t = techIdx.get(c.id);
     if (t !== undefined) row = { kind: 'tech', t };
   } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
-  else if (c.kind === 'improvement' && c.id === 'FARM') {
-    // Only FARM is buildable in phase 6a, so only FARM-improvement eurekas
-    // (IRRIGATION: farm a resource) are reachable; the rest stay skipped.
-    row = { kind: 'improvement', imp: 0, count: c.count, onResource: c.onResource ? 1 : 0 };
+  else if (c.kind === 'improvement') {
+    // Improvement eurekas for the improvements a builder can actually place
+    // (FARM=0, MINE=1, LUMBER_MILL=2). WHEEL/STEEL want a mine ON a resource,
+    // APPRENTICESHIP three mines, MASS_PRODUCTION a lumber mill, IRRIGATION a
+    // farmed resource. Out-of-scope improvements (quarry/pasture/...) can't be
+    // built, so their eurekas never fire in either engine — left skipped.
+    const imp = c.id === 'FARM' ? 0 : c.id === 'MINE' ? 1 : c.id === 'LUMBER_MILL' ? 2 : -1;
+    if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
   }
   if (row) boostRows.push({ target, idx, ...row });
 }

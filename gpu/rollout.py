@@ -70,7 +70,7 @@ def main() -> None:
         # random pacifists would leave the kill/advance/camp-clear paths
         # (and the camp-list splice they exercise) untested.
         um = sim.unit_action_mask()
-        na = um.shape[2]  # 14: 0-5 move, 6-11 attack, 12 hold, 13 build
+        na = um.shape[2]  # 16: 0-5 move, 6-11 attack, 12 hold, 13/14/15 build FARM/MINE/LUMBER
         has_attack = um[:, :, 6:12].any(dim=2, keepdim=True)
         um = um & ~(has_attack & (torch.arange(na).view(1, 1, na) < 6))  # drop moves when a fight is on
         um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack  # and don't hold back either (builders' 13 unaffected)

@@ -106,10 +106,11 @@ for (const game of roll.games) {
         bad = true;
         break;
       }
-      if (a === 13) {
-        // Build a FARM on the builder's tile. Soft-fail (no-op) if invalid —
-        // the GPU re-validates identically, so a rejected build matches.
-        builderImprove(state, unit.id, 'FARM');
+      if (a >= 13) {
+        // Build an improvement on the builder's tile: 13 FARM, 14 MINE, 15
+        // LUMBER_MILL. Soft-fail (no-op) if invalid — the GPU re-validates
+        // identically, so a rejected build matches.
+        builderImprove(state, unit.id, a === 13 ? 'FARM' : a === 14 ? 'MINE' : 'LUMBER_MILL');
         continue;
       }
       const dir = a % 6;

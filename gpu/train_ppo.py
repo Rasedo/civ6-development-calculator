@@ -50,7 +50,7 @@ from civ6gpu import BatchEnv, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import P_MAX
 from civ6gpu.env import UNIT_FEATURES
 
-N_UNIT_ACTS = 14
+N_UNIT_ACTS = 16  # 0-5 move, 6-11 attack, 12 hold, 13/14/15 build FARM/MINE/LUMBER_MILL
 NEG = -1e9
 
 
