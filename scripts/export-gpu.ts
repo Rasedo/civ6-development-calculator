@@ -246,17 +246,38 @@ const rules = {
     charges: u.charges ?? 0,
     requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
   })),
-  // Tile improvements (phase 6a: FARM only). `ids` are the engine's
-  // improvement index (0 = FARM); a tile's improvement state is -1 = none.
-  // FARM is ungated (+1 food, +0.5 housing); the hill-farm sub-case needs
-  // the hillFarms civic (mirrors validImprovements), which the flat/
-  // floodplain case does not. builderIdx is BUILDER's roster position.
+  // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
+  // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a
+  // tile's improvement state is -1 = none. FARM is ungated (+1 food, +0.5
+  // housing); the hill-farm sub-case needs the hillFarms civic. MINE (+1⚙,
+  // MINING) and LUMBER_MILL (+1⚙, CONSTRUCTION) are tech-gated. A MINE is
+  // also tech-BOOSTED: Apprenticeship and Industrialization each add +1⚙ to
+  // every mine (improvementYields effects), so mineBoostTechs ships the
+  // [techIdx, prodAmount] pairs the engine sums over researched techs.
+  // builderIdx is BUILDER's roster position.
   improvements: {
-    ids: ['FARM'],
+    ids: ['FARM', 'MINE', 'LUMBER_MILL'],
     farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
     farmHousing: IMPROVEMENTS.FARM.housing,
+    mineProd: IMPROVEMENTS.MINE.yields.production ?? 1,
+    lumberProd: IMPROVEMENTS.LUMBER_MILL.yields.production ?? 1,
     builderIdx: Object.values(UNITS).findIndex((u) => u.id === 'BUILDER'),
     hillFarmsCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'hillFarms')),
+    mineUnlockTech: techList.findIndex((t) =>
+      t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE'),
+    ),
+    lumberUnlockTech: techList.findIndex((t) =>
+      t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL'),
+    ),
+    mineBoostTechs: techList
+      .map((t, i): [number, number] => {
+        let boost = 0;
+        for (const e of t.effects) {
+          if (e.kind === 'improvementYields' && e.improvement === 'MINE') boost += e.yields.production ?? 0;
+        }
+        return [i, boost];
+      })
+      .filter(([, boost]) => boost > 0),
   },
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
@@ -404,6 +425,23 @@ for (let s = 0; s < N_SEEDS; s++) {
       fa_h:
         !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
         t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'HILLS'
+          ? 1
+          : 0,
+      // MINE validity (STATIC part; tech-gated by MINING in the engine).
+      // Non-resource: hills, no feature. A resource tile accepts only the
+      // resource's own improvement, so it is MINE-buildable iff that resource
+      // is mined (iron, etc.) — ungated by terrain, like fa_f's rice/wheat.
+      mi:
+        !t.district && !t.wonder && !isImpassable(t) &&
+        (t.resource
+          ? RESOURCES[t.resource]?.improvement === 'MINE'
+          : !isWater(t) && t.elevation === 'HILLS' && t.feature === null)
+          ? 1
+          : 0,
+      // LUMBER_MILL validity (tech-gated by CONSTRUCTION). Woods, non-resource
+      // (a resource on woods takes the resource's improvement instead).
+      lu:
+        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) && t.feature === 'WOODS'
           ? 1
           : 0,
       // disaster statics: floodplain, drought-candidate (flat grass/plains),

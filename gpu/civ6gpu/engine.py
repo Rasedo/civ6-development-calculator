@@ -448,16 +448,29 @@ class BatchSim:
         self.fertility = torch.zeros(B, T, dtype=torch.long, device=device)
         self.drought = torch.zeros(B, T, dtype=torch.long, device=device)
 
-        # --- improvements (phase 6a: FARM) ---------------------------------------
+        # --- improvements (phase 6a: FARM; 6b: MINE, LUMBER_MILL) -----------------
         imp = rules.improvements or {}
-        self.improvements_on = bool(imp.get("ids"))
-        self.FARM = 0  # improvement index; -1 = none
+        ids = imp.get("ids", [])
+        self.improvements_on = bool(ids)
+        self.FARM = ids.index("FARM") if "FARM" in ids else 0
+        self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
+        self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
         self._farm_food = float(imp.get("farmFood", 1))
         self._farm_housing = float(imp.get("farmHousing", 0.5))
+        self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
+        self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
         self._builder_idx = int(imp.get("builderIdx", -1))
         self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
+        self._mine_unlock_tech = int(imp.get("mineUnlockTech", -1))       # MINING
+        self._lumber_unlock_tech = int(imp.get("lumberUnlockTech", -1))   # CONSTRUCTION
+        # techs that permanently lift a MINE's yield (Apprenticeship, Industrialization → +1⚙ each)
+        mbt = imp.get("mineBoostTechs", [])  # [[techIdx, prodAmount], ...]
+        self._mine_boost_tech = torch.tensor([x[0] for x in mbt], dtype=torch.long, device=device)
+        self._mine_boost_amt = torch.tensor([float(x[1]) for x in mbt], dtype=dtype, device=device)
         self.farm_flat = torch.tensor([[t.get("fa_f", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.farm_hill = torch.tensor([[t.get("fa_h", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.mine_ok = torch.tensor([[t.get("mi", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.lumber_ok = torch.tensor([[t.get("lu", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
@@ -676,19 +689,51 @@ class BatchSim:
         self._food_cache = (self._eff_version, food)
         return food
 
+    def _eff_prod(self) -> torch.Tensor:
+        """[B, T] tile PRODUCTION with improvement yields applied: a MINE or
+        LUMBER_MILL adds its production to the tile's base (mirrors the
+        improvement branch of tileYields), a pillaged improvement adds
+        nothing. MINE production is tech-boosted — each of Apprenticeship /
+        Industrialization adds +1⚙ to EVERY mine — so an existing mine's
+        yield RISES when a boost tech completes; _eff_version bumps there so
+        the eff/score caches follow. Production has no fertility/drought or
+        natural-wonder tail (those touch food only), so base + improvement
+        is the whole story."""
+        base = self.tile_yields[:, :, 1]
+        if not self.improvements_on:
+            return base
+        live = ~self.pillaged
+        out = base
+        if self.MINE >= 0:
+            if self._mine_boost_tech.numel() > 0:
+                researched = self.techs[:, self._mine_boost_tech].to(self.dtype)  # [B, K]
+                boost = (researched * self._mine_boost_amt).sum(dim=1)            # [B]
+            else:
+                boost = torch.zeros(self.B, dtype=self.dtype, device=self.device)
+            mine_prod = (self._mine_prod + boost).unsqueeze(1)                    # [B, 1]
+            out = out + ((self.improvement == self.MINE) & live).to(self.dtype) * mine_prod
+        if self.LUMBER >= 0:
+            out = out + ((self.improvement == self.LUMBER) & live).to(self.dtype) * self._lumber_prod
+        return out
+
     def _eff_yields(self) -> torch.Tensor:
-        """[B, T, 6] tile yields with disaster food — for consumers whose
-        cross-column float sums must keep the assembled row order.
+        """[B, T, 6] tile yields with disaster food AND improvement production
+        — for consumers whose cross-column float sums must keep the assembled
+        row order.
 
         Cached per disaster version: fertility/drought mutate ONLY inside
-        _disaster_phase (which bumps the version). The cache returns the
-        identical tensor, so downstream float behavior is unchanged."""
+        _disaster_phase, improvement/pillaged state inside the builder/raider
+        paths, and mine-boost techs inside research — each bumps the version.
+        The cache returns the identical tensor, so downstream float behavior
+        is unchanged."""
         if not self.disasters and not self.improvements_on:
             return self.tile_yields
         if self._eff_cache is not None and self._eff_cache[0] == self._eff_version:
             return self._eff_cache[1]
         ty = self.tile_yields.clone()
         ty[:, :, 0] = self._eff_food()
+        if self.improvements_on:
+            ty[:, :, 1] = self._eff_prod()
         self._eff_cache = (self._eff_version, ty)
         return ty
 
@@ -2566,6 +2611,8 @@ class BatchSim:
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.techs[rows, self.cur_tech[rows]] = True
+            if self.improvements_on and self._mine_boost_tech.numel() > 0 and torch.isin(self.cur_tech[rows], self._mine_boost_tech).any():
+                self._eff_version += 1  # a boost tech just lifted every existing mine's yield
             self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
             self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
             if tech is None:
