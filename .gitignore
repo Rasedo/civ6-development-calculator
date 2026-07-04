@@ -14,3 +14,4 @@ python/tb/
 python/*.zip
 gpu/fixtures/
 gpu/**/__pycache__/
+gpu/runs/

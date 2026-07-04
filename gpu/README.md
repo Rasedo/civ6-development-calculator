@@ -120,6 +120,50 @@ resumes. It drives the *policy* side (the random rollout actor); the
 on the mirrored in-state mulberry32, because those draws must match the
 TS engine draw for draw.
 
+## Training natively (phase 5)
+
+`gpu/train_ppo.py` closes the loop: policy inference, env stepping and
+the PPO update all run on one device — no numpy, no subprocess bridge,
+no host round-trips (the only sync points are logging scalars).
+
+```bash
+python gpu/train_ppo.py                            # CPU smoke settings
+python gpu/train_ppo.py --batch 1024 --updates 2000 --anneal-lr   # GPU box
+python gpu/eval.py --policy gpu/runs/ppo/best.pt   # 50-episode protocol
+```
+
+The policy is a shared MLP trunk with five masked-categorical heads
+mirroring the action surface — per-city production, tech, civic, envoy,
+and a per-unit-slot head that runs a small MLP on (trunk embedding ⊕
+that unit's features: position, hp, type, and the bearing/range to the
+nearest barbarian camp). Heads whose mask row is all-False (queue busy,
+research running, empty unit slot) contribute nothing to the log-prob,
+entropy or gradient; the composite action's log-prob is the sum over
+heads that actually decided something. Each update collects one full
+fixed-horizon episode per game with GAE (no bootstrap past the horizon
+— the telescoped score IS the objective), then runs minibatched
+clipped-surrogate epochs. Checkpoints, a CSV log and TensorBoard events
+land under `--out`.
+
+Worlds are re-seeded per episode: `BatchEnv.reset(scramble=seed)`
+re-hashes each game's in-state mulberry32 from (seed, game index,
+episode counter), so consecutive episodes see fresh barbarian spawns,
+quests, wars and disasters on the same fixture maps. Plain `reset()`
+keeps the fixture's recorded stream — the parity setting; the gates are
+untouched by training features. More map variety = export more
+fixtures (`npm run gpu:export -- 32`).
+
+`gpu/eval.py` is the benchmark protocol for this env (N independent
+episodes, fresh worlds, `empireScore` at the horizon). Numbers are
+comparable only WITHIN this table — the GPU env has direct unit control
+and the full hostile world, unlike the TS benchmark scenario:
+
+| policy (GPU env, 100 turns, 50 episodes) | score |
+|---|---|
+| random masked actions | 111.0 ± 12.2 |
+| engine scripted autopilot | 172.5 ± 17.3 |
+| PPO (native loop, CPU smoke run) | passes the autopilot inside ~70k steps (~10 updates at batch 64); train longer on a CUDA box |
+
 ## What phases 1–4d cover (and what they don't)
 
 | Ported & parity-checked | Not yet (runs in TS only) |
@@ -155,6 +199,8 @@ python gpu/parity_test.py     # 2. scripted parity
 python gpu/rollout.py         # 3. random-action games on this engine
 npm run gpu:replay            # 4. the TS oracle must reproduce them
 python gpu/bench.py           # 5. throughput (CUDA if available)
+python gpu/train_ppo.py       # 6. train natively (phase 5)
+python gpu/eval.py --policy gpu/runs/ppo/best.pt   # 7. evaluate
 ```
 
 Needs only `torch` (already in `python/requirements.txt`). Parity runs in
@@ -196,5 +242,13 @@ Run `python gpu/bench.py` on an RTX-class card for the CUDA numbers.
      each fertilizing (+1 food, cap 3) or drought-striking (−1 food,
      floored at 0) tiles; tile and city-center food become dynamic
      (`_eff_yields`, pre-clamp raw center food shipped in fixtures).
-5. Native GPU training loop: policy inference and env stepping never
-   leave the device (and kernelize the per-slot python loops).
+5. Native GPU training, in two steps:
+   - ✅ 5a. The training loop — masked multi-head PPO over `BatchEnv`
+     (per-city production, tech, civic, envoy, and a per-unit head fed
+     by unit features), per-episode world re-seeding, checkpoints +
+     CSV/TensorBoard, and the `gpu/eval.py` benchmark protocol with
+     random/scripted baselines.
+   - 5b. Kernelize the per-slot python loops. Per-phase profile at
+     B=512 (share of a step): rival phase ~26%, barbarian phase ~24%,
+     city totals ~12%, disasters ~11%, loyalty ~4% — the rival and
+     barbarian slot-walks are half the step and go first.

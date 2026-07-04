@@ -379,15 +379,19 @@ barbarian camps and raiders, a player-commanded military, city-states
 courting envoys, scripted rival civs that grow, settle, race beliefs,
 declare war and flip disloyal cities, and natural disasters (floods,
 volcanoes, droughts, storms) reshaping tile food — all with the
-in-state mulberry32 RNG mirrored draw for draw. See `gpu/README.md`
-for the covered/not-covered table and the phase roadmap.
+in-state mulberry32 RNG mirrored draw for draw. Phase 5 trains on it
+natively: `python gpu/train_ppo.py` runs a masked multi-head PPO whose
+inference, env stepping and updates never leave the device, with worlds
+re-seeded every episode; `gpu/eval.py` is the matching benchmark
+protocol (random 111.0, scripted autopilot 172.5 on this env). See
+`gpu/README.md` for the covered/not-covered table and the roadmap.
 
 ## Roadmap ideas (later stages)
 
 1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
-   with a learned value function (AlphaZero-lite); GPU-engine phase 5
-   (on-device training over the phase-4 hostile world) toward self-play
-   scale.
+   with a learned value function (AlphaZero-lite); GPU-engine phase 5b
+   (kernelize the rival/barbarian slot loops — half the step cost) and
+   long CUDA runs of the native trainer toward self-play scale.
 2. Opponent depth II: rival build queues and districts on the map, loyalty
    pressure working in your favor (flipping rival border cities), open
    borders and diplomacy beyond war/peace.
