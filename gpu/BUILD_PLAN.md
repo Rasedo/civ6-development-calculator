@@ -16,7 +16,7 @@ Only the City Center is ported; specialty districts + their buildings are the
 largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
 (inert plumbing → one type → adjacency → buildings → RL action).
 
-- [ ] **D1** Inert plumbing: engine district-state tensor ([B,T] type idx, -1=none),
+- [x] **D1** Inert plumbing: engine district-state tensor ([B,T] type idx, -1=none),
       exporter ships the district catalog (id, cost, adjacencyYield, adjacency
       rules, housing, placement flags) + STATIC per-tile adjacency contribution
       (mountain/rainforest/woods/reef/river/sea-resource/natural-wonder — known
@@ -55,6 +55,10 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
 - [ ] **C3** Self-play trainer + opponent league (PFSP, frozen snapshots).
 
 ## Status log
-- 2026-07-04 stage 0: plan committed (durable across rollbacks). Baseline at
-  `5a6f2b6`: districts absent from GPU scope (scripted export builds none), so
-  D1 plumbing is a verified no-op. Next: D1.
+- stage 0: plan committed (durable across rollbacks). Baseline `5a6f2b6`:
+  districts absent from GPU scope (scripted export builds none), so D1 is inert.
+- D1 [x]: district catalog (10 defs — cost/adjYield/adjacency-src/housing/
+  placement flags) exported; engine loads it inert + a [B,T] district tensor
+  (-1=none) in _MUTABLE (resets). Self-test green (Campus science/54, CH river+2
+  gold, Harbor coastal); both gates stay green. Next: D2 — scripted Campus
+  placement + static (terrain-based) adjacency yield, gate-verified.

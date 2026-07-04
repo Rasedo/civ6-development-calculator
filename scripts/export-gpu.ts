@@ -78,6 +78,7 @@ import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
+import { DISTRICTS, PLACEABLE_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
 import { TECHS } from '../src/data/techs';
@@ -158,6 +159,14 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   }
   if (row) boostRows.push({ target, idx, ...row });
 }
+
+// Adjacency-source order shared with the engine (indices into this list are
+// what `districts[].adjacency[].src` refers to). Static sources (known at t=0)
+// come first conceptually but the order here is just the stable wire encoding.
+const ADJ_SRC: AdjacencySource[] = [
+  'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
+  'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE', 'MINE_OR_QUARRY',
+];
 
 const rules = {
   focusBase: [2, 2, 1, 1, 1, 1], // food, production, gold, science, culture, faith
@@ -283,6 +292,28 @@ const rules = {
       })
       .filter(([, boost]) => boost > 0),
   },
+  // District catalog (D1 plumbing; inert until D2 places one). idx = engine
+  // district index; adjYield = the YIELD_KEYS column its adjacency feeds
+  // (-1 = none); adjacency `src` indexes ADJ_SRC (static: mountain/rainforest/
+  // woods/reef/naturalWonder/river/seaResource; dynamic: builtWonder/district/
+  // cityCenter/harbor/mineOrQuarry). Cost is flat in this model.
+  districts: PLACEABLE_DISTRICTS.map((id, idx) => {
+    const d = DISTRICTS[id];
+    return {
+      id,
+      idx,
+      cost: d.cost,
+      adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
+      adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
+      housing: d.housing,
+      countsTowardLimit: d.countsTowardLimit ? 1 : 0,
+      allowMultiple: d.allowMultiple ? 1 : 0,
+      onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
+      reqAdjCenter: d.placement.requiresAdjacentCityCenter ? 1 : 0,
+      reqWaterOrMountain: d.placement.requiresWaterSourceOrMountain ? 1 : 0,
+      notAdjCenter: d.placement.notAdjacentToCityCenter ? 1 : 0,
+    };
+  }),
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
     housing: BUILDINGS.PALACE?.housing ?? 0,

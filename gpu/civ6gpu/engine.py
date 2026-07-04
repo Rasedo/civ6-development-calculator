@@ -101,6 +101,7 @@ class Rules:
     cs: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     rivals: dict  # rival-civ pacing, loyalty, GP costs, belief-pool sizes
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
+    districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -142,6 +143,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         cs=r.get("cs", {}),
         rivals=r.get("rivals", {}),
         improvements=r.get("improvements", {}),
+        districts=r.get("districts", []),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -247,7 +249,7 @@ _MUTABLE = [
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
-    "fertility", "drought", "improvement", "pillaged", "p_charges",
+    "fertility", "drought", "improvement", "pillaged", "p_charges", "district",
 ]
 
 
@@ -474,6 +476,14 @@ class BatchSim:
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
+
+        # --- districts (D1: catalog + inert state tensor) ------------------------
+        # The catalog is loaded and a [B, T] district-type-index tensor is
+        # allocated (-1 = none). Nothing places a district yet, so this is a
+        # verified no-op — D2 adds scripted placement + static adjacency yields.
+        self.districts_cat = list(rules.districts or [])
+        self.districts_on = bool(self.districts_cat)
+        self.district = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else PLACEABLE_DISTRICTS idx
 
         self._eff_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None
