@@ -142,3 +142,5 @@ with a `globalThis.__barbLog` at t57 and diff against the GPU combat log.
 The tail is all this species (barb behaviour under the farm economy). Each
 fix so far pushed the wall ~6–13 turns later; a handful more likely
 finishes it.
+
+**Finding (t57):** tile 523 holds a RIVAL unit (slot 6), 522 a barb (slot 9); the extra GPU combat is a barb attacking the rival unit at 523. So it is a RIVAL-UNIT position ripple (rivals patrol/snipe/war-move under the shifted economy) → a barb finds a rival adjacent in the GPU that TS does not. Diff the rival-unit positions GPU vs TS at t56–57 next.
