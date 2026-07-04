@@ -4,8 +4,11 @@ A vectorized PyTorch port of the simulation core: thousands of games step
 in lockstep as `[B, C, …]` tensor operations (B games × C cities). The
 TypeScript engine remains the source of truth; this port exists for
 self-play-scale RL training — and since phase 3 it is *trainable against*:
-a masked macro-action surface drives production, research and civics,
-with barbarians (phase 4a) raiding the empire while it builds.
+a masked macro-action surface drives production, research, civics, unit
+orders and envoys, while the world fights back: barbarians raid (4a),
+the policy commands its own army (4b), and city-states and scripted
+rival civilizations live alongside — growing, settling, racing beliefs,
+declaring war and flipping disloyal cities (4c).
 
 ## The parity contract
 
@@ -43,26 +46,26 @@ half-to-even), and the damage curve's `30·e^(0.04·Δ)` table is computed
 in JS and shipped in the fixtures, since libm `exp()` may differ by an
 ulp between runtimes.
 
-Current status: scripted **10 seeds × 100 turns × 6 city slots** (with a
-warrior trained per city) and off-script **30 random games × 100 turns**
-with attack-preferring armies — ~10,000 unit moves, ~230 melee attacks,
-~170 barbarians killed, ~60 player units lost, camps cleared — all
-integer-exact with floats within 1 milli-unit. The harness catches
-planted bugs (settler cost nudges, dropped ring-1 claims, disabled
-eureka detection, swapped damage-roll order, a removed victor-survives
-rule), and caught real ones during development: `cityDefenseStrength`
-counts a military unit standing on the center as garrison *regardless of
-owner* (a barbarian a city is founded under becomes its accidental
-defender); `orderMove` to an *adjacent* tile can A*-route through cheaper
-intermediate tiles with different side effects, so the replay applies
-single-step orders as forced one-step `walkPath`s; and goody huts —
-placed by default and claimed with an untraced reward roll — had to be
-excluded from the reference maps. One honest caveat: a boost firing
-*earlier* than the TS engine is invisible until it crosses its target's
-completion boundary, so detection-timing coverage is only as strong as
-the random trajectories are varied. Fixtures are regenerated, not
-committed — they must always match the engine version you're comparing
-against.
+Current status: scripted **10 seeds × 100 turns × 6 city slots + 3
+city-states + 2 rival civs** and off-script **30 random games × 100
+turns** — across 21 rival war declarations, 3 loyalty flips, ~95 rival
+settlements, envoy assignments, quests and hundreds of fights — all
+integer-exact with floats within 1 milli-unit, the in-state RNG pinned
+every turn. The harness catches planted bugs (settler cost nudges,
+dropped ring-1 claims, disabled eureka detection, swapped damage-roll
+order, a removed victor-survives rule, a nudged war-declaration chance),
+and caught real ones during development, all of the same species:
+**floating-point associativity and indexing**. Site quality pre-summed
+per tile flipped a strict `>` between two sites that differ by one ulp
+(36.5 vs 36.49999999999999 — the exporter now ships per-SOURCE terms and
+the engine replays the exact four-add sequence); the rival tech level
+accumulated in two adds where the TS engine uses one (the ulp flipped a
+`floor(tech·1.5)` defense); and a `gather(1, tiles[g])` read rows
+0..|g|−1 instead of rows g, corrupting a phantom unit slot. One honest
+caveat remains: a boost firing *earlier* than the TS engine is invisible
+until it crosses its target's completion boundary. Fixtures are
+regenerated, not committed — they must always match the engine version
+you're comparing against.
 
 ## The action surface (phase 3)
 
@@ -88,6 +91,9 @@ turn, `BatchSim.step(production, tech, civic)` accepts:
   barbarian camp on entry (+50 gold, camp list splice). This goes BEYOND
   the TS `CivEnv`, which delegates units to an autopilot — here the
   policy commands the army directly.
+- **envoy** `[B]` (phase 4c) — back that met city-state with one banked
+  envoy (influence accrues 3/turn; quests award more). Envoy tiers feed
+  the capital's yields exactly like `csEnvoyBonuses` → `capitalYields`.
 
 Validity masks (`production_mask()`, `tech_mask()`, `civic_mask()`)
 mirror the TS availability rules; invalid or `-1` actions are no-ops.
@@ -107,7 +113,7 @@ counter-based RNG (splitmix64): every draw is a pure function of
 resumes — the random rollout actor uses it today, phase 4's stochastic
 systems (barbarians, disasters) will use it next.
 
-## What phases 1–4a cover (and what they don't)
+## What phases 1–4c cover (and what they don't)
 
 | Ported & parity-checked | Not yet (runs in TS only) |
 |---|---|
@@ -115,15 +121,19 @@ systems (barbarians, disasters) will use it next.
 | Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the City Center |
 | Growth/starvation, housing (water+buildings), amenity tiers | Luxury amenity sharing (inert until improvements) |
 | City Center buildings (unlocks, river gate, maintenance) | Ranged attacks, multi-tile moves (A* pathing) |
-| Settlers: rising cost, training, auto-founding | Rival civs, city-states, loyalty |
-| Multi-city: per-city queues, ring-1 claims at founding | Policies/governments/religion modifiers |
-| Shared-map border competition (exact per-city ordering) | Fog of war, disasters, trade |
-| Tech/civic research: manual picks, banking, auto-pick | Pillaging (needs improvements on the map) |
-| Eureka **detection** + discounts (covered-scope conditions) | Goody huts (reference maps exported without them) |
-| RL action masks, empireScore reward, batched env | Eureka conditions outside covered state |
-| Barbarians: camps, garrisons, raiders, sieges, sacks, healing | |
-| Player military: training, single-step moves, melee, camp clearing | |
+| Settlers: rising cost, training, auto-founding (with drops) | Conquest: capturing rival cities / city-states |
+| Multi-city: per-city queues, ring-1 claims at founding | Player-declared war and peace deals |
+| Shared-map border competition (exact per-city ordering) | Militaristic levies, CS trade-route quests |
+| Tech/civic research: manual picks, banking, auto-pick | Policies/governments/religion modifiers |
+| Eureka **detection** + discounts (covered-scope conditions) | Fog of war, disasters, trade |
+| RL action masks, empireScore reward, batched env | Pillaging (needs improvements on the map) |
+| Barbarians: camps, garrisons, raiders, sieges, sacks, healing | Goody huts (reference maps exported without them) |
+| Player military: training, single-step moves, melee, camp clearing | Eureka conditions outside covered state |
 | Per-side stacking (1 military + 1 civilian; foreign blocks) | |
+| City-states: influence, envoys, quests, capital yield tiers | |
+| Rivals: tile economies, border growth, settling, unit production | |
+| Rival wars: declarations, raids, sieges, auto-peace; barb↔rival | |
+| Loyalty pressure and city flips (capitals immune) | |
 | In-state mulberry32 RNG, mirrored draw for draw | |
 
 Each later phase moves a row from the right column to the left, extending
@@ -142,13 +152,16 @@ python gpu/bench.py           # 5. throughput (CUDA if available)
 Needs only `torch` (already in `python/requirements.txt`). Parity runs in
 float64 on CPU; training uses float32.
 
-Reference numbers on the same 4-core container, **identical
-6-city-slot + barbarians scenario** in both engines: the TS engine does
-~840 game-turns/sec per core (~3,400/sec across 4 cores); the vectorized
-engine does ~10,600 game-turns/sec in float64 (the parity dtype) and
-~16,000 in float32 (the training dtype) at batch 1024 — each game-turn
-simulating up to six cities plus the barbarian world. Run
-`python gpu/bench.py` on an RTX-class card for the CUDA numbers.
+Reference numbers on the same 4-core container, **identical full-world
+scenario** (6 city slots + barbarians + 3 city-states + 2 rivals) in
+both engines: the TS engine does ~520 game-turns/sec per core
+(~2,100/sec across 4 cores); the vectorized engine does ~3,900
+game-turns/sec in float64 (the parity dtype) and ~5,700 in float32 (the
+training dtype) at batch 1024. The rival machinery walks small python
+loops per civ/city/unit slot, which narrows the CPU margin — batch
+scaling and CUDA are the point, and those loops are the first
+optimization target for phase 5. Run `python gpu/bench.py` on an
+RTX-class card for the CUDA numbers.
 
 ## Phase roadmap
 
@@ -165,7 +178,11 @@ simulating up to six cities plus the barbarian world. Run
    - ✅ 4b. Player military — the trainable roster in the production
      head, per-unit move/attack/hold orders with execution-time
      revalidation, melee combat both directions, camp clearing.
-   - 4c. Rivals and city-states; 4d. disasters — each behind the same
-     parity gate.
+   - ✅ 4c. City-states and rival civs — envoys/quests/capital tiers;
+     rival tile economies, staggered border growth, site-quality
+     settling, unit production, GP/pantheon/belief races (draws
+     mirrored), war and auto-peace, at-war raids and peacetime patrols,
+     loyalty pressure and city flips.
+   - 4d. Disasters — the last stochastic system, behind the same gate.
 5. Native GPU training loop: policy inference and env stepping never
-   leave the device.
+   leave the device (and kernelize the per-slot python loops).

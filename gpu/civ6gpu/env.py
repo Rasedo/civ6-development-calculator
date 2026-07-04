@@ -38,6 +38,7 @@ class BatchEnv:
             "tech": self.sim.tech_mask(),
             "civic": self.sim.civic_mask(),
             "units": self.sim.unit_action_mask(),
+            "envoy": self.sim.envoy_mask(),
         }
 
     def step(
@@ -46,10 +47,11 @@ class BatchEnv:
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
         units: torch.Tensor | None = None,
+        envoy: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Returns (obs [B, F], reward [B], done). done is batch-wide —
         lockstep fixed-horizon episodes; the caller resets."""
-        self.sim.step(production=production, tech=tech, civic=civic, units=units)
+        self.sim.step(production=production, tech=tech, civic=civic, units=units, envoy=envoy)
         score = self.sim.empire_score()
         reward = score - self._last_score
         self._last_score = score

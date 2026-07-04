@@ -7,14 +7,21 @@
  *   npx vite-node scripts/replay-gpu.ts   # 2. this must print PARITY OK
  *
  * Every logged action is asserted legal here (queue empty, building
- * available, tech/civic selectable) — an illegal action means the GPU
- * masks diverged from the TS rules, which is itself a parity failure.
+ * available, tech/civic selectable, envoy spendable) — an illegal action
+ * means the GPU masks diverged from the TS rules, which is itself a
+ * parity failure. Unit orders are the exception: both engines re-validate
+ * those at execution time, so a rejected order is a mirrored no-op.
+ *
+ * City production slots and trace columns are keyed by FOUNDING ORDER
+ * (`cityIds`), not state.cities position — the array compacts when a city
+ * flips to a rival.
  */
 
 import { readFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler, setTechResearch, setCivicResearch } from '../src/core/game';
 import { queueUnit, walkPath } from '../src/core/units';
 import { meleeAttack } from '../src/core/combat';
+import { assignEnvoy } from '../src/core/cityStates';
 import { neighborTile } from '../src/core/hex';
 import { traceRow, rowTolerance } from './gpu-trace';
 
@@ -23,6 +30,8 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
   height: number;
   unitsMode?: number;
+  csMax?: number;
+  rMax?: number;
   unitIds: string[];
   buildings: string[];
   techs: string[];
@@ -31,7 +40,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
     seed: number;
     rng: number;
     sites: number[];
-    actions: { t: number; p?: [number, number][]; r?: number; c?: number; u?: [number, number][] }[];
+    actions: { t: number; p?: [number, number][]; r?: number; c?: number; e?: number; u?: [number, number][] }[];
     trace: number[][];
   }[];
 };
@@ -51,13 +60,18 @@ for (const game of roll.games) {
     withWonders: true,
     unitsMode: !!roll.unitsMode,
     withVillages: false, // must match the exporter — hut claiming is unported
+    cityStates: roll.csMax ? roll.csMax : undefined,
+    rivals: roll.rMax ? roll.rMax : undefined,
   });
   foundCity(state, game.sites[0]);
   state.plannedSettles = game.sites.slice(1);
   state.autoResearch = false; // picks come from the action log, as in CivEnv
   const C = game.sites.length;
-  const tol = rowTolerance(C);
+  const csMax = roll.csMax ?? 0;
+  const rMax = roll.rMax ?? 0;
+  const tol = rowTolerance(C, csMax, rMax);
   const byTurn = new Map(game.actions.map((a) => [a.t, a]));
+  const cityIds: number[] = state.cities.map((x) => x.id);
   // GPU unit slots are append-only in spawn order and survive deaths;
   // mirror that with a spawn log instead of indexing the live array.
   const spawnLog: number[] = [];
@@ -103,8 +117,15 @@ for (const game of roll.games) {
       } else if (a < 12) meleeAttack(state, unit.id, n.index);
     }
     if (bad) break;
+    if (act?.e !== undefined) {
+      const r = assignEnvoy(state, act.e);
+      if (!r.ok) {
+        fail(`turn ${state.turn}: assignEnvoy(${act.e}): ${r.reason}`);
+        break;
+      }
+    }
     for (const [slot, a] of act?.p ?? []) {
-      const city = state.cities[slot];
+      const city = state.cities.find((x) => x.id === cityIds[slot]);
       if (!city || city.queue.length > 0) {
         fail(`turn ${state.turn}: production for slot ${slot} but ${city ? 'queue busy' : 'city missing'}`);
         bad = true;
@@ -161,8 +182,11 @@ for (const game of roll.games) {
 
     endTurn(state);
     updateSpawnLog();
+    for (const c of state.cities) {
+      if (!cityIds.includes(c.id)) cityIds.push(c.id);
+    }
     const want = game.trace[t];
-    const got = traceRow(state, C);
+    const got = traceRow(state, cityIds, C, csMax, rMax);
     for (let i = 0; i < got.length; i++) {
       const diff = Math.abs(got[i] - want[i]);
       if (tol[i] > 0) worst = Math.max(worst, diff);

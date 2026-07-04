@@ -1,24 +1,25 @@
 /**
  * Fixture exporter for the GPU engine (gpu/): dumps the rule tables and,
  * per seed, a static map snapshot plus a reference trace of the TS engine
- * running the phase-2 scenario — a peaceful multi-city empire (no units
- * mode, no city-states/rivals/fog/disasters):
+ * running the phase-4 scenario — a contested multi-city world: barbarians
+ * raid, city-states court envoys, and scripted rival civilizations grow,
+ * settle, race beliefs and declare war.
  *
  *   - the capital trains settlers (pop >= gate) until every planned site
- *     is claimed, then falls back to cheapest-building production;
+ *     is claimed, then a warrior per city, then cheapest buildings;
  *   - settle SITES are chosen here at t=0 and fed to the engine via
  *     state.plannedSettles — the GPU engine consumes the same ordered list
  *     when its own simulated settlers complete (site choice is data, the
- *     founding turn is simulated);
- *   - every city runs the scripted cheapest-building policy and competes
- *     for tiles through cultural border growth on the shared map.
+ *     founding turn is simulated; a site failing canFoundCity is dropped
+ *     without spending the settler, exactly like the plannedSettles loop);
+ *   - envoys back the neediest met city-state (ties to the lowest id).
  *
- * Since phase 3 the rules also carry the boost-condition table (the GPU
- * engine detects eurekas itself — required for off-script action play)
- * and the empire-score weights (the RL reward), and the trace carries an
- * empireScore column. Site metadata is precomputed for every candidate
- * site up front, mirroring what foundCity would produce (it strips the
- * center tile's removable feature).
+ * The rules also carry the boost-condition table (the GPU engine detects
+ * eurekas itself), the empire-score weights (the RL reward), the
+ * JS-computed damage table (libm exp() may differ by an ulp between
+ * runtimes), and the city-state/rival pacing constants. rngInit is
+ * captured AFTER game creation: city-state and rival placement draw from
+ * the in-state RNG, so the reference loop starts mid-stream.
  *
  * The GPU engine must reproduce these traces exactly — the TS engine is
  * the oracle.
@@ -31,6 +32,37 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler } from '../src/core/game';
 import { queueUnit } from '../src/core/units';
 import { terrainDefense } from '../src/core/combat';
+import { assignEnvoy } from '../src/core/cityStates';
+import {
+  CITY_STATE_TYPES,
+  ENVOY_COST,
+  INFLUENCE_PER_TURN,
+  CS_CAPITAL_BONUS,
+  QUEST_COOLDOWN,
+  QUEST_ENVOYS,
+  CS_TYPE_YIELD,
+} from '../src/data/cityStates';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost } from '../src/data/greatPeople';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../src/data/religion';
+import { TERRAINS } from '../src/data/terrains';
+import {
+  RIVAL_GROWTH_FACTOR,
+  RIVAL_MAX_POP,
+  RIVAL_MAX_CITIES,
+  RIVAL_BORDER_PERIOD,
+  RIVAL_GPP_RATE,
+  RIVAL_PANTHEON_TURN,
+  RIVAL_RELIGION_TURN,
+  RIVAL_WAR_MIN_TURNS,
+  RIVAL_CITY_MAX_HP,
+  RIVAL_WORK_RADIUS,
+  RIVAL_PROD_TO_SETTLER,
+  RIVAL_PROD_TO_MILITARY,
+  LOYALTY_MAX,
+  LOYALTY_RANGE,
+  LOYALTY_PRESSURE_SCALE,
+  LOYALTY_AMENITY,
+} from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
 import { makeYieldCtx } from '../src/core/effects';
@@ -65,6 +97,8 @@ const N_SEEDS = Number(process.argv[2] ?? 10);
 const N_TURNS = Number(process.argv[3] ?? 100);
 const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler
+const CS_MAX = 3;
+const R_MAX = 2;
 const OUT = 'gpu/fixtures';
 
 mkdirSync(OUT, { recursive: true });
@@ -136,6 +170,47 @@ const rules = {
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   boosts: boostRows,
+  // City-state rules (mirrors data/cityStates.ts; covered scope only — the
+  // 3/6-envoy district tiers are inert without districts, and the CHIEFDOM
+  // influence tier is 0, so influence accrues at the flat base rate).
+  cs: {
+    envoyCost: ENVOY_COST,
+    influencePerTurn: INFLUENCE_PER_TURN,
+    capitalBonus: CS_CAPITAL_BONUS,
+    questCooldown: QUEST_COOLDOWN,
+    questEnvoys: QUEST_ENVOYS,
+    // per CS type (by index): which yield column its envoys boost
+    typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CS_TYPE_YIELD[t])),
+  },
+  // Rival-civ pacing (mirrors data/rivals.ts). loyaltyAmenity is keyed by
+  // amenity-tier INDEX in the same order as amenityTiers above. The
+  // pantheon/belief pools matter only as SIZES: a rival's pick consumes a
+  // draw and shrinks the pool, but the identity is inert in covered scope.
+  rivals: {
+    growthFactor: RIVAL_GROWTH_FACTOR,
+    maxPop: RIVAL_MAX_POP,
+    maxCities: RIVAL_MAX_CITIES,
+    settlerBase: 90, // RIVAL_SETTLER_COST(c) = 90 + 40·max(0, c − 1)
+    settlerPer: 40,
+    borderPeriod: RIVAL_BORDER_PERIOD,
+    gppRate: RIVAL_GPP_RATE,
+    pantheonTurn: RIVAL_PANTHEON_TURN,
+    religionTurn: RIVAL_RELIGION_TURN,
+    warMinTurns: RIVAL_WAR_MIN_TURNS,
+    cityMaxHp: RIVAL_CITY_MAX_HP,
+    workRadius: RIVAL_WORK_RADIUS,
+    prodToSettler: RIVAL_PROD_TO_SETTLER,
+    prodToMilitary: RIVAL_PROD_TO_MILITARY,
+    loyaltyMax: LOYALTY_MAX,
+    loyaltyRange: LOYALTY_RANGE,
+    loyaltyScale: LOYALTY_PRESSURE_SCALE,
+    loyaltyAmenity: ['Ecstatic', 'Happy', 'Content', 'Displeased', 'Unhappy'].map((n) => LOYALTY_AMENITY[n] ?? 0),
+    gpCosts: Array.from({ length: 8 }, (_, n) => gpCost(n)),
+    gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
+    pantheonPool: Object.keys(PANTHEONS).length,
+    followerPool: Object.keys(FOLLOWER_BELIEFS).length,
+    founderPool: Object.keys(FOUNDER_BELIEFS).length,
+  },
   // Barbarian rules (mirrors combat.ts). dmgBase[d+60] = 30·e^(0.04·d) is
   // computed HERE so both engines share the exact same doubles — libm exp()
   // may differ by an ulp between runtimes, and damage rounds to integers.
@@ -210,12 +285,37 @@ for (let s = 0; s < N_SEEDS; s++) {
   // withVillages: false — goody-hut claiming (a fog-era mechanic with its
   // own reward rolls) is outside the ported scope, so the reference maps
   // must not carry huts a moving unit could trip over.
-  const state = createGame({ width: 44, height: 26, seed, withResources: true, withWonders: true, unitsMode: true, withVillages: false });
+  const state = createGame({
+    width: 44,
+    height: 26,
+    seed,
+    withResources: true,
+    withWonders: true,
+    unitsMode: true,
+    withVillages: false,
+    cityStates: CS_MAX,
+    rivals: R_MAX,
+  });
   const site = scoreSettleSites(state, 1)[0];
   foundCity(state, site.tileIndex);
   const capital = state.cities[0];
   const ctx = makeYieldCtx(state);
   const map = state.map;
+  // Captured AFTER creation: city-state and rival placement draw from the
+  // in-state RNG, so the loop starts mid-stream, not at the seed.
+  const rngInit = state.rngState >>> 0;
+  const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
+  const rivalCitiesInit = new Map(
+    state.rivals.map((r) => [r.id, r.cities.map((rc) => ({ id: rc.id, center: rc.centerIndex, pop: rc.population }))]),
+  );
+  const rivalUnitsInit = new Map(
+    state.rivals.map((r) => [
+      r.id,
+      state.units
+        .filter((u) => u.owner === 'rival' && u.civId === r.id)
+        .map((u) => ({ type: unitRosterIdx.get(u.type) ?? 0, tile: u.tileIndex })),
+    ]),
+  );
 
   const tiles = map.tiles.map((t) => {
     const y = tileYields(ctx, t);
@@ -232,6 +332,33 @@ for (let s = 0; s < N_SEEDS; s++) {
       // statically camp-eligible (dynamic exclusions — ownership, distance
       // to cities/camps — are the engine's job; mirrors campCandidates)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
+      // city-state territory (static — placed at game creation)
+      cs: t.csId ?? -1,
+      // rival territory at t=0 (grows dynamically in the engine)
+      rv: t.rivalId ?? -1,
+      wt: isWater(t) ? 1 : 0,
+      fw: hasFreshWater(map, t) ? 1 : 0,
+      nw: t.wonder ? 1 : 0,
+      // statically settleable for rival expansion (mirrors siteQuality's -1s;
+      // ownership and dynamic districts are the engine's job)
+      st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' && !t.district ? 1 : 0,
+      // this tile's static contributions to a nearby site's quality, one
+      // per source (terrain, feature, resource) plus the hills flag —
+      // siteQuality adds them as FOUR SEPARATE += steps, and candidate
+      // qualities compare with strict >, so the engine must reproduce the
+      // exact same floating-point add sequence (pre-summing shifts results
+      // by an ulp and flips ties: 36.5 vs 36.49999999999999)
+      sq: (['terrain', 'feature', 'resource'] as const).map((kind) => {
+        const src =
+          kind === 'terrain'
+            ? TERRAINS[t.terrain]?.yields ?? {}
+            : kind === 'feature'
+              ? (t.feature ? FEATURES[t.feature]?.yields ?? {} : {})
+              : (t.resource ? RESOURCES[t.resource]?.yields ?? {} : {});
+        const s = src as { food?: number; production?: number; gold?: number };
+        return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
+      }),
+      hl: t.elevation === 'HILLS' ? 1 : 0,
     };
   });
   const landTiles = map.tiles.filter((t) => !isWater(t)).length;
@@ -252,7 +379,6 @@ for (let s = 0; s < N_SEEDS; s++) {
     const cy = tileYieldsForCenter(ctx, stripped);
     return {
       site: tileIndex,
-      foundedTurn: -1,
       centerYields: YIELD_KEYS.map((k) => cy[k]),
       freshWater: hasFreshWater(map, t) ? 1 : 0,
       coastal: isCoastalLand(map, t) ? 1 : 0,
@@ -268,11 +394,20 @@ for (let s = 0; s < N_SEEDS; s++) {
   // map can't fit N_EXTRA well-separated cities.
   const siteCands = scoreSettleSites(state, 60);
   const chosen: number[] = [];
-  for (const minDist of [6, 5, 4]) {
+  const capT = map.tiles[capital.centerIndex];
+  for (const [minDist, maxFromCapital] of [
+    [6, 9],
+    [5, 9],
+    [4, 11],
+    [4, 99],
+  ]) {
     for (const c of siteCands) {
       if (chosen.length >= N_EXTRA) break;
       if (chosen.includes(c.tileIndex)) continue;
       const t = map.tiles[c.tileIndex];
+      // Compact empires survive rival loyalty pressure — far-flung colonies
+      // planted next to a rival flip within a dozen turns.
+      if (hexDistance(capT.col, capT.row, t.col, t.row) > maxFromCapital) continue;
       const anchors = [capital.centerIndex, ...chosen];
       if (anchors.every((a) => hexDistance(map.tiles[a].col, map.tiles[a].row, t.col, t.row) >= minDist)) {
         chosen.push(c.tileIndex);
@@ -285,7 +420,6 @@ for (let s = 0; s < N_SEEDS; s++) {
 
   const cities = [siteMeta(capital.centerIndex, cityMaintenance(state, capital))];
   for (const c of chosen) cities.push(siteMeta(c, 0));
-  cities[0].foundedTurn = 0;
 
   const ownerInit = map.tiles.map((t) => t.cityId);
   const C_MAX = 1 + N_EXTRA;
@@ -296,7 +430,16 @@ for (let s = 0; s < N_SEEDS; s++) {
   let settlersQueued = 0;
 
   const warriorTrained = new Set<number>();
+  const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
+    // Envoys: greedily back the neediest met city-state (fewest envoys,
+    // ties to the lowest id) — the GPU scripted policy mirrors this.
+    while (state.envoysAvailable > 0 && state.cityStates.some((cs) => cs.met)) {
+      const pick = [...state.cityStates]
+        .filter((cs) => cs.met)
+        .sort((a, b) => a.envoys - b.envoys || a.id - b.id)[0];
+      assignEnvoy(state, pick.id);
+    }
     for (const city of state.cities) {
       if (city.queue.length > 0) continue;
       if (city.isCapital && settlersQueued < chosen.length && city.population >= SETTLER_POP_GATE) {
@@ -313,10 +456,9 @@ for (let s = 0; s < N_SEEDS; s++) {
         if (next) queueBuilding(state, city.id, next);
       }
     }
-    const citiesBefore = state.cities.length;
     endTurn(state);
-    for (let i = citiesBefore; i < state.cities.length; i++) {
-      cities[i].foundedTurn = state.turn - 1;
+    for (const c of state.cities) {
+      if (!cityIds.includes(c.id)) cityIds.push(c.id);
     }
     for (const id of state.research.boosted) {
       if (knownBoosts.has(id)) continue;
@@ -324,10 +466,12 @@ for (let s = 0; s < N_SEEDS; s++) {
       if (techIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'tech', idx: techIdx.get(id)! });
       else if (civicIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'civic', idx: civicIdx.get(id)! });
     }
-    trace.push(traceRow(state, C_MAX));
+    trace.push(traceRow(state, cityIds, C_MAX, CS_MAX, R_MAX));
   }
-  if (state.cities.length < 3) {
-    throw new Error(`seed ${seed}: only ${state.cities.length} cities founded by turn ${N_TURNS}`);
+  // A collapsed empire is a legitimate outcome — loyalty flips ARE the
+  // hostile world working (the capital itself can never flip).
+  if (state.cities.length < 1) {
+    throw new Error(`seed ${seed}: no cities left by turn ${N_TURNS}`);
   }
 
   const fixture = {
@@ -336,7 +480,21 @@ for (let s = 0; s < N_SEEDS; s++) {
     height: map.height,
     unitsMode: 1,
     maxCamps,
-    rngInit: (seed ^ 0x9e3779b9) >>> 0,
+    rngInit,
+    csMax: CS_MAX,
+    rMax: R_MAX,
+    cityStates: state.cityStates.map((cs) => ({
+      id: cs.id,
+      type: CITY_STATE_TYPES.indexOf(cs.type),
+      center: cs.centerIndex,
+      pop: 3,
+    })),
+    rivals: state.rivals.map((r) => ({
+      id: r.id,
+      aggression: r.aggression,
+      cities: rivalCitiesInit.get(r.id) ?? [],
+      units: rivalUnitsInit.get(r.id) ?? [],
+    })),
     cities,
     tiles,
     ownerInit,
@@ -344,8 +502,12 @@ for (let s = 0; s < N_SEEDS; s++) {
     trace,
   };
   writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));
-  const founded = cities.filter((c) => c.foundedTurn >= 0).map((c) => `t${c.foundedTurn}`).join(' ');
   const pops = state.cities.map((c) => c.population).join('/');
-  console.log(`seed${seed}.json: ${N_TURNS} turns, ${state.cities.length}/${C_MAX} cities (${founded}), pop ${pops}, ${boostSchedule.length} boosts`);
+  const envoys = state.cityStates.map((cs) => cs.envoys).join('/');
+  const wars = state.rivals.filter((r) => r.atWar).length;
+  console.log(
+    `seed${seed}.json: ${N_TURNS} turns, ${state.cities.length}/${C_MAX} cities, pop ${pops}, ` +
+      `${state.cityStates.length} CS (envoys ${envoys}), ${state.rivals.length} rivals (${wars} at war), ${boostSchedule.length} boosts`,
+  );
 }
 console.log(`\nFixtures in ${OUT}/ — run gpu/parity_test.py against them.`);

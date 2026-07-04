@@ -367,21 +367,19 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 
 `gpu/` holds a **vectorized PyTorch port** of the simulation core:
 thousands of games step in lockstep as `[games, cities, …]` tensor ops
-(several × the TS engine on the same CPU; built for CUDA). It is
-parity-proven against this engine both on-script (`npm run gpu:export` →
-`python gpu/parity_test.py` reproduces recorded traces integer-exact) and
-**off-script**: `python gpu/rollout.py` plays random masked actions and
-logs them, `npm run gpu:replay` feeds that log through the real engine
-and must match every turn. Phases 1–4b cover a multi-city economic core —
-settlers, founding, per-city queues, border competition — plus the RL
-surface (masked production/research/civic actions, detected eurekas,
-`empireScore` rewards, a batched env `civ6gpu.BatchEnv`) and a genuinely
-hostile world: barbarian camps, raiders and city sieges with the in-state
-mulberry32 RNG mirrored draw for draw, and a player military the policy
-commands directly — unit training, per-unit move/attack orders, melee
-combat and camp clearing (richer than `CivEnv`, whose autopilot owns the
-army). See `gpu/README.md` for the covered/not-covered table and the
-phase roadmap.
+(built for CUDA). It is parity-proven against this engine both on-script
+(`npm run gpu:export` → `python gpu/parity_test.py` reproduces recorded
+traces integer-exact) and **off-script**: `python gpu/rollout.py` plays
+random masked actions and logs them, `npm run gpu:replay` feeds that log
+through the real engine and must match every turn. Phases 1–4c cover a
+multi-city economy plus the RL surface (masked production/research/
+civic/unit/envoy actions, detected eurekas, `empireScore` rewards, a
+batched env `civ6gpu.BatchEnv`) inside a genuinely hostile world:
+barbarian camps and raiders, a player-commanded military, city-states
+courting envoys, and scripted rival civs that grow, settle, race
+beliefs, declare war and flip disloyal cities — all with the in-state
+mulberry32 RNG mirrored draw for draw. See `gpu/README.md` for the
+covered/not-covered table and the phase roadmap.
 
 ## Roadmap ideas (later stages)
 

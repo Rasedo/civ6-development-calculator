@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 from civ6gpu.rng import masked_choice
 
-HEAD_PROD, HEAD_TECH, HEAD_CIVIC, HEAD_UNIT = 101, 202, 303, 404
+HEAD_PROD, HEAD_TECH, HEAD_CIVIC, HEAD_UNIT, HEAD_ENVOY = 101, 202, 303, 404, 505
 
 
 def main() -> None:
@@ -74,6 +74,7 @@ def main() -> None:
         um = um & ~(has_attack & (torch.arange(13).view(1, 1, 13) < 6))  # drop moves when a fight is on
         um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack  # and don't hold back either
         ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)  # [B, P]
+        ea = masked_choice(sim.envoy_mask(), game_seed, turn, HEAD_ENVOY)  # [B]
         for b in range(B):
             entry: dict = {"t": turn}
             prods = [[c, int(pa[b, c])] for c in range(C) if pa[b, c] >= 0]
@@ -83,12 +84,14 @@ def main() -> None:
                 entry["r"] = int(ta[b])
             if ca[b] >= 0:
                 entry["c"] = int(ca[b])
+            if ea[b] >= 0:
+                entry["e"] = int(ea[b])
             orders = [[p, int(ua[b, p])] for p in range(P_MAX) if 0 <= ua[b, p] < HOLD]
             if orders:
                 entry["u"] = orders
             if len(entry) > 1:
                 games[b]["actions"].append(entry)
-        sim.step(production=pa, tech=ta, civic=ca, units=ua)
+        sim.step(production=pa, tech=ta, civic=ca, units=ua, envoy=ea)
         rows = sim.trace_row()
         for b in range(B):
             games[b]["trace"].append([float(x) for x in rows[b]])
@@ -97,6 +100,8 @@ def main() -> None:
         "width": sim.W,
         "height": sim.H,
         "unitsMode": int(fixtures[0].get("unitsMode", 0)),
+        "csMax": int(fixtures[0].get("csMax", 0)),
+        "rMax": int(fixtures[0].get("rMax", 0)),
         "unitIds": [u["id"] for u in rules_raw.get("units", [])],
         "buildings": [b["id"] for b in rules_raw["buildings"]],
         "techs": [t["id"] for t in rules_raw["techs"]],
