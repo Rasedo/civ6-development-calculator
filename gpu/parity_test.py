@@ -22,7 +22,7 @@ from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
 HEAD = [
     "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
-    "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought",
+    "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought", "imp",
 ]
 PER_CS = ["envoys", "csPop", "quest"]
 PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rTech", "rProd", "rMil"]
@@ -39,7 +39,7 @@ def columns(n_cities: int, n_cs: int, n_rivals: int) -> tuple[list[str], torch.T
     turn over turn); the drift check below catches those regardless.
     """
     cols = list(HEAD)
-    atol = [0.0] * 5 + [2.0] * 4 + [0.0] * 8
+    atol = [0.0] * 5 + [2.0] * 4 + [0.0] * 9
     for s in range(n_cs):
         cols += [f"{name}{s}" for name in PER_CS]
         atol += [0.0, 0.0, 0.0]

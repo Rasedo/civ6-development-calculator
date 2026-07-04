@@ -8,8 +8,11 @@ a masked macro-action surface drives production, research, civics, unit
 orders and envoys, while the world fights back: barbarians raid (4a),
 the policy commands its own army (4b), city-states and scripted
 rival civilizations live alongside — growing, settling, racing beliefs,
-declaring war and flipping disloyal cities (4c) — and the climate takes
-its cut: floods, droughts, storms and volcanoes reshape tile food (4d).
+declaring war and flipping disloyal cities (4c) — the climate takes
+its cut: floods, droughts, storms and volcanoes reshape tile food (4d) —
+and builders develop the land: farms lift tile food and housing, while
+barbarians, at-war rivals and disasters raid, sack and scorch them (6).
+Phase 5 trains on all of it with a native on-device PPO loop.
 
 ## The parity contract
 
@@ -48,10 +51,12 @@ in JS and shipped in the fixtures, since libm `exp()` may differ by an
 ulp between runtimes.
 
 Current status: scripted **24 seeds × 100 turns × 6 city slots + 3
-city-states + 2 rival civs + disasters** and off-script **72 random
-games × 100 turns** — across rival war declarations, loyalty flips,
-~95 rival settlements, envoy assignments, quests, hundreds of fights
-and a steady drip of floods, droughts, storms and eruptions — all
+city-states + 2 rival civs + disasters + builders** and off-script **72
+random games × 100 turns** — across rival war declarations, loyalty
+flips, ~95 rival settlements, envoy assignments, quests, hundreds of
+fights, a steady drip of floods, droughts, storms and eruptions, and
+builders farming ~3 tiles each (22 of 24 seeds) while barbarians and
+at-war rivals raid those farms and disasters scorch them — all
 integer-exact with floats within 1 milli-unit, the in-state RNG pinned
 every turn. The harness catches planted bugs (settler cost nudges,
 dropped ring-1 claims, disabled eureka detection, swapped damage-roll
@@ -77,11 +82,20 @@ occupancy); a city founded on woods/rainforest/marsh kept the feature's
 feature (defense now drops to the hills component at founding); and a
 natural-wonder tile inside a rival's radius let fertility/drought move
 its food, when `tileYields` early-returns the wonder's fixed yield before
-the disaster tail (wonder food now pinned). One honest caveat remains: a
-boost firing *earlier* than the TS engine is invisible until it crosses
-its target's completion boundary. Fixtures are regenerated, not committed
-— they must always
-match the engine version you're comparing against.
+the disaster tail (wonder food now pinned). A third family arrived with
+**builders and farms** (phase 6): raiders march for the nearest *player
+improvement* before the nearest city (`hostileUnitAct` step 3 — the GPU's
+barb **and** at-war-rival marches now target farms, which fixed a
+cascade where a rival unit spawned a tile off and a barb then found it);
+resource tiles are farmable (rice/wheat use FARM, so `fa_f` includes
+them, ungated); the IRRIGATION eureka ("farm a resource") had to be
+exported and detected once farms existed; and pillaging comes from three
+sources the GPU had to mirror — a raider standing on a farm, a city
+**sack** pillaging its center's six neighbours, and disaster **scorching**
+(floods/volcanoes/storms). One honest caveat remains: a boost firing
+*earlier* than the TS engine is invisible until it crosses its target's
+completion boundary. Fixtures are regenerated, not committed — they must
+always match the engine version you're comparing against.
 
 ## The action surface (phase 3)
 
@@ -183,28 +197,32 @@ The CPU demo passes the autopilot inside ~70k steps and is still
 climbing at 256k — a CUDA box at batch 1024 collects that much
 experience per handful of updates; long runs are the point.
 
-## What phases 1–4d cover (and what they don't)
+## What phases 1–5 cover (and what they don't)
 
 | Ported & parity-checked | Not yet (runs in TS only) |
 |---|---|
-| Tile yields (via exported per-tile tables) | Improvements/builders (yields are static) |
+| Tile yields (via exported per-tile tables) | Improvements beyond FARM (mine/pasture/chops) |
 | Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the City Center |
-| Growth/starvation, housing (water+buildings), amenity tiers | Luxury amenity sharing (inert until improvements) |
-| City Center buildings (unlocks, river gate, maintenance) | Ranged attacks, multi-tile moves (A* pathing) |
-| Settlers: rising cost, training, auto-founding (with drops) | Conquest: capturing rival cities / city-states |
-| Multi-city: per-city queues, ring-1 claims at founding | Player-declared war and peace deals |
-| Shared-map border competition (exact per-city ordering) | Militaristic levies, CS trade-route quests |
-| Tech/civic research: manual picks, banking, auto-pick | Policies/governments/religion modifiers |
-| Eureka **detection** + discounts (covered-scope conditions) | Fog of war, trade routes |
-| RL action masks, empireScore reward, batched env | Pillaging (needs improvements on the map) |
-| Barbarians: camps, garrisons, raiders, sieges, sacks, healing | Goody huts (reference maps exported without them) |
-| Player military: training, single-step moves, melee, camp clearing | Eureka conditions outside covered state |
+| Growth/starvation, housing (water+buildings+farms), amenity tiers | Ranged attacks, multi-tile A* moves |
+| City Center buildings (unlocks, river gate, maintenance) | Conquest: capturing rival cities / city-states |
+| Settlers: rising cost, training, auto-founding (with drops) | Player-declared war and peace deals |
+| Builders: training, single-step moves, FARM building, charges | Militaristic levies, CS trade-route quests |
+| Tile improvements (FARM): dynamic food + housing, resource farms | Policies/governments/religion modifiers |
+| Multi-city: per-city queues, ring-1 claims at founding | Fog of war, trade routes |
+| Shared-map border competition (exact per-city ordering) | Luxury amenity sharing (inert in covered scope) |
+| Tech/civic research: manual picks, banking, auto-pick | Goody huts (reference maps exported without them) |
+| Eureka **detection** + discounts (incl. IRRIGATION farm-a-resource) | Eureka conditions outside covered state |
+| RL action masks, empireScore reward, batched env | |
+| Barbarians: camps, garrisons, raiders, sieges, sacks, healing | |
+| Player military: training, single-step moves, melee, camp clearing | |
+| Pillaging: barbs & at-war rivals raid your farms; sack pillages | |
+| Disaster scorching: floods/volcanoes/storms pillage improvements | |
 | Per-side stacking (1 military + 1 civilian; foreign blocks) | |
 | City-states: influence, envoys, quests, capital yield tiers | |
 | Rivals: tile economies, border growth, settling, unit production | |
-| Rival wars: declarations, raids, sieges, auto-peace; barb↔rival | |
+| Rival wars: declarations, farm-raiding marches, sieges, auto-peace | |
 | Loyalty pressure and city flips (capitals immune) | |
-| Disasters: floods, volcanoes, droughts, storms; fertility & drought food shifts | |
+| Disasters: floods, volcanoes, droughts, storms; fertility & drought | |
 | In-state mulberry32 RNG, mirrored draw for draw | |
 
 Each later phase moves a row from the right column to the left, extending
@@ -227,11 +245,13 @@ float64 on CPU; training uses float32.
 
 Reference numbers on the same 4-core container, **identical full-world
 scenario** (6 city slots + barbarians + 3 city-states + 2 rivals +
-disasters) in both engines: the TS engine does ~520 game-turns/sec per
-core (~2,100/sec across 4 cores); after the 5b kernelization pass the
-vectorized engine does ~9,600 game-turns/sec in float64 (the parity
-dtype) and ~13,000 in float32 (the training dtype) at batch 1024 —
-3× the pre-5b numbers, from four families of parity-exact rewrites:
+disasters + builders) in both engines: the TS engine does ~520
+game-turns/sec per core (~2,100/sec across 4 cores); the vectorized
+engine does ~8,200 game-turns/sec in float64 (the parity dtype) and
+~16,000 in float32 (the training dtype) at batch 1024 — the phase-6
+improvement/pillage/scorch logic is nearly free on top of the 5b
+kernelization, itself 3× the pre-5b numbers from four families of
+parity-exact rewrites:
 pairwise distance indexing instead of `[B, …, T]` row materializations,
 per-turn caching of the disaster-adjusted yield planes, the citizen
 topk narrowed from the full map to the radius-3 window (same candidates,
@@ -285,3 +305,11 @@ card for the CUDA numbers.
      (guarded: it falls back to sequential adds if any tile yield is
      not an integer/half). Loops that survive carry genuine
      sequential-draw semantics (raider and rival unit acts).
+6. ✅ Improvements & builders (FARM). Builders train, move single-step and
+   build farms (dynamic tile food + housing, resource farms, the
+   IRRIGATION eureka); barbarians and at-war rivals now march for your
+   farms and pillage them, city sacks pillage the center's neighbours, and
+   disasters scorch improvements — all behind the same two gates. Next
+   here: MINE/LUMBER_MILL (tech-gated, tech-boosted yields), an RL
+   build-improvement action so the *policy* commands builders (they idle
+   under random play today), and chop/harvest one-time yields.

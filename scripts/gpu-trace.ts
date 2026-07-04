@@ -43,6 +43,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.influencePoints,
     state.map.tiles.reduce((n, t) => n + t.fertility, 0),
     state.map.tiles.reduce((n, t) => n + (t.droughtTurns > 0 ? 1 : 0), 0),
+    state.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0),
   ];
   for (let s = 0; s < csMax; s++) {
     const cs = state.cityStates[s];
@@ -91,7 +92,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0];
+  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
   for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 2, 2, 2);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2);

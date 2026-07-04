@@ -30,7 +30,8 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler } from '../src/core/game';
-import { queueUnit } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove } from '../src/core/units';
+import { validImprovements } from '../src/core/rules';
 import { terrainDefense } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import {
@@ -70,7 +71,7 @@ import { tileYields } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow } from './gpu-trace';
-import { hexDistance, neighbors } from '../src/core/hex';
+import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isImpassable, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
@@ -146,6 +147,11 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     const t = techIdx.get(c.id);
     if (t !== undefined) row = { kind: 'tech', t };
   } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
+  else if (c.kind === 'improvement' && c.id === 'FARM') {
+    // Only FARM is buildable in phase 6a, so only FARM-improvement eurekas
+    // (IRRIGATION: farm a resource) are reachable; the rest stay skipped.
+    row = { kind: 'improvement', imp: 0, count: c.count, onResource: c.onResource ? 1 : 0 };
+  }
   if (row) boostRows.push({ target, idx, ...row });
 }
 
@@ -382,11 +388,19 @@ for (let s = 0; s < N_SEEDS; s++) {
       // land. Ownership, the already-improved check and dynamically-founded
       // city centers stay the engine's job.
       fa_f:
-        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
-        ((t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT') ||
-          t.feature === 'FLOODPLAINS')
+        !t.district && !t.wonder && !isImpassable(t) &&
+        (t.resource
+          ? // resource tiles accept only the resource's improvement, ungated,
+            // with no terrain/water check (validImprovements' resource branch);
+            // rice/wheat are farmed, so those tiles are FARM-buildable
+            RESOURCES[t.resource]?.improvement === 'FARM'
+          : !isWater(t) &&
+            ((t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT') ||
+              t.feature === 'FLOODPLAINS'))
           ? 1
           : 0,
+      // hill farms are civic-gated and only for NON-resource tiles (resource
+      // tiles are ungated in fa_f regardless of elevation).
       fa_h:
         !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
         t.feature === null && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'HILLS'
@@ -473,6 +487,7 @@ for (let s = 0; s < N_SEEDS; s++) {
   let settlersQueued = 0;
 
   const warriorTrained = new Set<number>();
+  let builderTrained = false;
   const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
     // Envoys: greedily back the neediest met city-state (fewest envoys,
@@ -485,7 +500,12 @@ for (let s = 0; s < N_SEEDS; s++) {
     }
     for (const city of state.cities) {
       if (city.queue.length > 0) continue;
-      if (city.isCapital && settlersQueued < chosen.length && city.population >= SETTLER_POP_GATE) {
+      if (city.isCapital && !builderTrained && city.population >= 2) {
+        // One builder from the capital FIRST (phase 6a): the capital trains
+        // settlers for the rest of the game, so the builder must precede them.
+        queueUnit(state, city.id, 'BUILDER');
+        builderTrained = true;
+      } else if (city.isCapital && settlersQueued < chosen.length && city.population >= SETTLER_POP_GATE) {
         queueSettler(state, city.id);
         settlersQueued += 1;
       } else if (!warriorTrained.has(city.id) && city.population >= 2) {
@@ -497,6 +517,59 @@ for (let s = 0; s < N_SEEDS; s++) {
       } else {
         const next = cheapestBuilding(state, city);
         if (next) queueBuilding(state, city.id, next);
+      }
+    }
+    // Scripted builders (phase 6a): build a FARM on the current tile if it is
+    // a buildable, unimproved farm tile inside our borders; otherwise
+    // single-step toward the nearest farm job (nearest by distance, ties to
+    // lowest tile index; then the passable, civilian-free neighbour closest to
+    // it, ties to direction order, moving only if strictly closer). The GPU
+    // engine mirrors this exactly; none of it draws RNG.
+    const nTiles = state.map.tiles.length;
+    const blockedForBuilder = (ti: number): boolean =>
+      state.units.some(
+        (u2) =>
+          u2.tileIndex === ti &&
+          (u2.owner === 'barbarian' ||
+            u2.owner === 'rival' ||
+            (u2.owner === 'player' && UNITS[u2.type]?.charges !== undefined)),
+      );
+    for (const u of state.units) {
+      if (u.owner !== 'player' || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
+      const btile = state.map.tiles[u.tileIndex];
+      if (!btile.improvement && validImprovements(state, btile).includes('FARM')) {
+        builderImprove(state, u.id, 'FARM');
+        continue;
+      }
+      let best = -1;
+      let bestKey = Infinity;
+      for (const t of state.map.tiles) {
+        if (t.cityId === -1 || t.improvement) continue;
+        if (!validImprovements(state, t).includes('FARM')) continue;
+        const key = hexDistance(btile.col, btile.row, t.col, t.row) * (nTiles + 1) + t.index;
+        if (key < bestKey) {
+          bestKey = key;
+          best = t.index;
+        }
+      }
+      if (best < 0) continue;
+      const target = state.map.tiles[best];
+      const dHere = hexDistance(btile.col, btile.row, target.col, target.row);
+      let stepDir = -1;
+      let stepKey = Infinity;
+      for (let dir = 0; dir < 6; dir++) {
+        const n = neighborTile(state.map, btile, dir);
+        if (!n || !unitPassable(n) || blockedForBuilder(n.index)) continue;
+        const key = hexDistance(n.col, n.row, target.col, target.row) * 8 + dir;
+        if (key < stepKey) {
+          stepKey = key;
+          stepDir = dir;
+        }
+      }
+      if (stepDir >= 0 && Math.floor(stepKey / 8) < dHere) {
+        const n = neighborTile(state.map, btile, stepDir)!;
+        u.path = [n.index];
+        walkPath(state, u);
       }
     }
     endTurn(state);

@@ -236,7 +236,7 @@ _MUTABLE = [
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
     "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef",
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps",
-    "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained",
+    "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued",
@@ -568,6 +568,7 @@ class BatchSim:
         self.p_hp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
         self.p_next = torch.zeros(B, dtype=torch.long, device=device)
         self.warrior_trained = torch.zeros(B, C, dtype=torch.bool, device=device)  # scripted-policy flag
+        self.builder_trained = torch.zeros(B, dtype=torch.bool, device=device)  # scripted-policy flag (capital, once)
         self.tdef = torch.tensor([[t.get("tdef", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Damage table stays float64 regardless of sim dtype: the RNG factor
         # is float64 and damage rounds to integers the TS engine must match.
@@ -710,6 +711,13 @@ class BatchSim:
         flat = self.fertility.view(-1)
         flat[touched] = (flat[touched] + cnt[touched]).clamp(max=3)
 
+    def _scorch(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """Mirrors scorch(tile): pillage an improved, unpillaged tile.
+        Setting pillaged is idempotent, so duplicate (row, tile) pairs are
+        harmless."""
+        ok = (self.improvement[rows, tiles] >= 0) & ~self.pillaged[rows, tiles]
+        self.pillaged[rows[ok], tiles[ok]] = True
+
     def _pick_static(self, mask_hit: torch.Tensor, cand_list: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirror of pick(): one draw where mask_hit & candidates exist;
         returns (chosen mask, tile). The candidate sets are static, so the
@@ -742,6 +750,7 @@ class BatchSim:
         hit, tile = self._pick_static(r < 0.05, self._flood_list)
         if bool(hit.any()):
             rows = hit.nonzero(as_tuple=True)[0]
+            self._scorch(rows, tile[rows])
             self._fertilize(rows, tile[rows])
 
         # Per-volcano rolls stay sequential (draw order is the contract);
@@ -764,6 +773,7 @@ class BatchSim:
             rr6 = rows.unsqueeze(1).expand(-1, 6).reshape(-1)
             nbf = nb.reshape(-1)
             on = nbf >= 0
+            self._scorch(rr6[on], nbf[on])
             self._fertilize_counted(rr6[on], nbf[on])
 
         r = self._next_random(every)
@@ -787,8 +797,10 @@ class BatchSim:
             M = area.shape[1]
             rrm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
             af = area.reshape(-1)
-            on = (af >= 0) & self.desert[rrm, af.clamp(min=0)]
-            self._fertilize(rrm[on], af[on])
+            valid = af >= 0
+            self._scorch(rrm[valid], af[valid])  # a storm scorches its whole area
+            on = valid & self.desert[rrm, af.clamp(min=0)]
+            self._fertilize(rrm[on], af[on])  # ...and deposits silt on desert tiles
 
     def _buildable(self) -> torch.Tensor:
         """[B, C, NB] City Center buildings each city could queue now."""
@@ -873,6 +885,14 @@ class BatchSim:
         total[:, :, 2] -= maintenance
 
         housing = self.water_housing + self.palace_slot_housing.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_housing)
+        if self.improvements_on:
+            # +housing per owned improved tile within the work radius (all of
+            # them, pillaged or not — computeHousing does not gate on
+            # pillaged, unlike yields). FARM-only: each improvement = farm.
+            imp_win = self.improvement.gather(1, tcf).reshape(B, C, M)
+            owned_c = self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids
+            imp_owned = (tiles >= 0) & owned_c & (imp_win >= 0)
+            housing = housing + imp_owned.to(self.dtype).sum(dim=2) * self._farm_housing
 
         # Dead slots contribute nothing (their static center yields are preloaded).
         total = total * self.alive.unsqueeze(2).to(self.dtype)
@@ -943,6 +963,14 @@ class BatchSim:
                 pred = self.techs[:, row["t"]]
             elif kind == "nearNaturalWonder":
                 pred = ((self.owner >= 0) & self.wonder_near).any(dim=1)
+            elif kind == "improvement":
+                # count tiles with this improvement (on a resource, if the
+                # condition requires it) — pillaged still counts, like
+                # detectBoosts. Only FARM is buildable in covered scope.
+                on = self.improvement == row["imp"]
+                if row.get("onResource"):
+                    on = on & (self.res_priority > 0)
+                pred = on.sum(dim=1) >= row["count"]
             else:
                 continue
             if row["target"] == "tech":
@@ -1047,6 +1075,7 @@ class BatchSim:
         self.p_type[rows, slot] = type_idx[rows]
         self.p_tile[rows, slot] = spot[rows]
         self.p_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
+        self.p_charges[rows, slot] = self._p_charges[type_idx[rows]]
         civ_rows = civ[rows]
         mil_rows = rows[~civ_rows]
         if len(mil_rows) > 0:
@@ -1100,6 +1129,74 @@ class BatchSim:
         attack = on_map & (barb | rv_war) & can_fight & alive
         hold = self.p_alive.unsqueeze(2)
         return torch.cat([move, attack, hold], dim=2)
+
+    def _scripted_builder(self) -> None:
+        """Scripted-policy builder (phase 6a): each player BUILDER with
+        charges either builds a FARM on its tile (buildable unimproved farm
+        inside its borders) and spends a charge (disbanding at 0), or
+        single-steps toward the nearest farm job (nearest by distance, ties
+        to lowest tile index; then the passable, civilian-free neighbour
+        closest to it, ties to direction order, move only if strictly
+        closer). Draws no RNG. Scripted path only (units is None)."""
+        if self._builder_idx < 0 or not self.improvements_on:
+            return
+        active = self.p_alive & (self.p_type == self._builder_idx) & (self.p_charges > 0)
+        if not bool(active.any()):
+            return
+        dev, T = self.device, self.T
+        if self._hillfarms_civic >= 0:
+            civ_done = self.civics[:, self._hillfarms_civic]
+        else:
+            civ_done = torch.zeros(self.B, dtype=torch.bool, device=dev)
+        arangeT = torch.arange(T, device=dev)
+        arange6 = torch.arange(6, device=dev)
+        p_high = int(self.p_next.max().item())
+        for p in range(p_high):
+            act = active[:, p]
+            if not bool(act.any()):
+                continue
+            here = self.p_tile[:, p]
+            hc = here.clamp(min=0)
+            owned_here = self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
+            not_center = self.center_at.gather(1, hc.unsqueeze(1)).squeeze(1) < 0
+            unimproved = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) < 0
+            flat_h = self.farm_flat.gather(1, hc.unsqueeze(1)).squeeze(1)
+            hill_h = self.farm_hill.gather(1, hc.unsqueeze(1)).squeeze(1)
+            build = act & owned_here & not_center & unimproved & (flat_h | (hill_h & civ_done))
+            if bool(build.any()):
+                rows = build.nonzero(as_tuple=True)[0]
+                self.improvement[rows, here[rows]] = self.FARM
+                self.p_charges[rows, p] -= 1
+                self._eff_version += 1
+                gone = build & (self.p_charges[:, p] <= 0)
+                if bool(gone.any()):
+                    gr = gone.nonzero(as_tuple=True)[0]
+                    self.pciv_at[gr, here[gr]] = -1
+                    self.p_alive[gr, p] = False
+
+            march = act & ~build
+            if not bool(march.any()):
+                continue
+            farmable = self.farm_flat | (self.farm_hill & civ_done.unsqueeze(1))
+            job = (self.owner >= 0) & (self.center_at < 0) & (self.improvement < 0) & farmable
+            has_job = job.any(dim=1)
+            d_job = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
+            jkey = torch.where(job, d_job * (T + 1) + arangeT, torch.full_like(d_job, 10**9))
+            tgt = jkey.argmin(dim=1)
+            d_here = self.pair_dist[here.clamp(min=0), tgt].to(torch.long)
+            nb = self.neigh[hc]
+            nbc = nb.clamp(min=0)
+            step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "pciv")
+            d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
+            skey = torch.where(step_ok, d_nb * 8 + arange6, torch.full_like(d_nb, 10**9))
+            best = skey.min(dim=1).values
+            move = march & has_job & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
+            if bool(move.any()):
+                dest = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
+                rows = move.nonzero(as_tuple=True)[0]
+                self.pciv_at[rows, here[rows]] = -1
+                self.pciv_at[rows, dest[rows]] = p
+                self.p_tile[rows, p] = dest[rows]
 
     def _apply_unit_actions(self, actions: torch.Tensor) -> None:
         """Execute unit orders in slot (= spawn) order, exactly like a player
@@ -1312,21 +1409,53 @@ class BatchSim:
             if bool(rvc_att.any()):
                 self._attack_rival_city(rvc_att, ttc, u)
 
-            # March: nearest alive city (ties → founding order), then the
+            # Pillage: a raider that did not attack, standing on an owned,
+            # improved, unpillaged tile, pillages it (heals 25, holds — no
+            # march this turn), mirroring hostileUnitAct's pillage branch.
+            pillage = torch.zeros_like(act)
+            if self.improvements_on:
+                h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
+                h_unpil = ~self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
+                h_owned = self.owner.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
+                pillage = act & ~attack & h_imp & h_unpil & h_owned
+                if bool(pillage.any()):
+                    rows = pillage.nonzero(as_tuple=True)[0]
+                    self.pillaged[rows, here[rows]] = True
+                    self._eff_version += 1  # a farm's yield just dropped
+                    hp_cap = self.rules.combat.get("unitHp", 100)
+                    self.u_hp[rows, u] = (self.u_hp[rows, u] + 25).clamp(max=hp_cap)
+
+            # March target: the nearest unpillaged owned improvement within
+            # dist < 13 (ties → lowest tile index), else the nearest alive
+            # city (ties → founding order) — mirrors hostileUnitAct's target
+            # scan (raiders head for your farms to pillage them). Then the
             # passable free neighbor closest to it (ties → direction order),
             # moving only if strictly closer.
-            march = act & ~attack
+            march = act & ~attack & ~pillage
             if not bool(march.any()):
                 continue
-            dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C] dist to each slot's site
+            arangeT = torch.arange(T, device=dev)
+            if self.improvements_on:
+                imp_job = (self.improvement >= 0) & ~self.pillaged & (self.owner >= 0)  # [B, T]
+                d_imp = self.pair_dist[here.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
+                ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
+                imp_min, imp_tgt = ikey.min(dim=1)
+                has_imp = imp_min < 10**9
+            else:
+                has_imp = torch.zeros_like(act)
+                imp_tgt = here.clamp(min=0)
+            dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C]
             ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
-            tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+            city_min = ckey.min(dim=1).values
+            city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+            tgt = torch.where(has_imp, imp_tgt, city_tgt)
+            has_tgt = has_imp | (city_min < 10**9)
             d_here = self.pair_dist[here, tgt].to(torch.long)
             step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "barb")
             d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)  # dist(neighbor, target); symmetric
             skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
             best = skey.min(dim=1).values
-            move = march & (ckey.min(dim=1).values < 10**9) & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
+            move = march & has_tgt & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
             if bool(move.any()):
                 dest = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
                 rows = move.nonzero(as_tuple=True)[0]
@@ -1744,20 +1873,51 @@ class BatchSim:
         if bool(unit_att.any()):
             self._hostile_vs_unit(unit_att, ttc, "rival", v)
 
-        march = act & ~attack
+        # Pillage: a war unit that did not attack, standing on an owned
+        # improved unpillaged tile, pillages it (heal 25, hold — no march),
+        # mirroring hostileUnitAct's pillage branch.
+        hc = here.clamp(min=0)
+        pillage = torch.zeros_like(act)
+        if self.improvements_on:
+            h_imp = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
+            h_unpil = ~self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
+            h_owned = self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
+            pillage = act & ~attack & h_imp & h_unpil & h_owned
+            if bool(pillage.any()):
+                rows = pillage.nonzero(as_tuple=True)[0]
+                self.pillaged[rows, hc[rows]] = True
+                self._eff_version += 1
+                hp_cap = self.rules.combat.get("unitHp", 100)
+                self.v_hp[rows, v] = (self.v_hp[rows, v] + 25).clamp(max=hp_cap)
+
+        # March target: nearest unpillaged owned improvement within dist < 13
+        # (ties -> lowest tile index), else nearest player city — mirrors
+        # hostileUnitAct's target scan (rivals raid your farms too).
+        march = act & ~attack & ~pillage
         if not bool(march.any()):
             return
-        dc = self.pair_dist[here.clamp(min=0).unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
+        arangeT = torch.arange(T, device=dev)
+        if self.improvements_on:
+            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.owner >= 0)
+            d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
+            ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
+            imp_min, imp_tgt = ikey.min(dim=1)
+            has_imp = imp_min < 10**9
+        else:
+            has_imp = torch.zeros_like(act)
+            imp_tgt = hc
+        dc = self.pair_dist[hc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
         ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
-        best_k = ckey.min(dim=1).values
-        has_city = best_k < 10**9
-        tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-        d_here = self.pair_dist[here.clamp(min=0), tgt].to(torch.long)
+        city_min = ckey.min(dim=1).values
+        city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+        tgt = torch.where(has_imp, imp_tgt, city_tgt)
+        has_tgt = has_imp | (city_min < 10**9)
+        d_here = self.pair_dist[hc, tgt].to(torch.long)
         step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rival")
         d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
         skey = torch.where(step_ok, d_nb * 8 + torch.arange(6, device=dev), 10**9)
         best = skey.min(dim=1).values
-        move = march & has_city & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
+        move = march & has_tgt & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
         if bool(move.any()):
             dest = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
             rows = move.nonzero(as_tuple=True)[0]
@@ -1806,6 +1966,18 @@ class BatchSim:
             )
             self.treasury[sacked_rows] -= loss
             self.city_hp[sacked_rows, sc] = round(city_max_hp / 2)
+            if self.improvements_on:
+                # sackCity pillages the improvements on the 6 tiles adjacent
+                # to the sacked city's center.
+                centers = self.site[sacked_rows, sc]  # [K]
+                nb = self.neigh[centers]  # [K, 6]
+                for d in range(6):
+                    n_d = nb[:, d]
+                    on = n_d >= 0
+                    r2, t2 = sacked_rows[on], n_d[on]
+                    hit = (self.improvement[r2, t2] >= 0) & ~self.pillaged[r2, t2]
+                    self.pillaged[r2[hit], t2[hit]] = True
+                self._eff_version += 1
 
     def _rival_unit_peace_act(self, v: int, act: torch.Tensor, r: int) -> None:
         """Peacetime: snipe an adjacent barbarian, else drift home
@@ -2098,6 +2270,10 @@ class BatchSim:
         # --- player unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:
             self._apply_unit_actions(units)
+        elif self.units_mode:
+            # Scripted path: builders auto-improve (mirrors the exporter);
+            # military units hold (passive garrisons), as before.
+            self._scripted_builder()
 
         # --- envoys --------------------------------------------------------------
         if self.S > 0:
@@ -2125,8 +2301,20 @@ class BatchSim:
 
         # --- production choice ------------------------------------------------
         if production is None:
-            # Scripted: the capital trains a settler when sites remain and pop
-            # reached the gate (mirrors the exporter; cost mirrors settlerCost).
+            # Scripted, in the exporter's else-if order. One builder from the
+            # capital FIRST, once (pop >= 2): the capital trains settlers for
+            # the rest of the game, so the builder must precede them.
+            if self.units_mode and self._builder_idx >= 0 and self.improvements_on:
+                empty = self.alive & (self.current == -1)
+                want_b = empty[:, 0] & (self.pop[:, 0] >= 2) & ~self.builder_trained
+                bcode = self.UNIT_BASE + self._builder_idx
+                self.current[:, 0] = torch.where(want_b, torch.full_like(self.current[:, 0], bcode), self.current[:, 0])
+                self.cur_cost[:, 0] = torch.where(want_b, self._p_cost[self._builder_idx].expand_as(self.cur_cost[:, 0]), self.cur_cost[:, 0])
+                self.progress[:, 0] = torch.where(want_b, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
+                self.builder_trained = self.builder_trained | want_b
+
+            # Then a settler when sites remain and pop reached the gate
+            # (mirrors the exporter; cost mirrors settlerCost).
             empty = self.alive & (self.current == -1)
             n_cities = self.alive.sum(dim=1)
             queued_settlers = (self.current == self.SETTLER).sum(dim=1)
@@ -2449,6 +2637,7 @@ class BatchSim:
             self.influence,
             self.fertility.sum(dim=1).to(self.dtype),
             (self.drought > 0).sum(dim=1).to(self.dtype),
+            (self.improvement >= 0).sum(dim=1).to(self.dtype),
         ]
         for s in range(self.S):
             cols += [

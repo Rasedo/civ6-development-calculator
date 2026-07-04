@@ -371,15 +371,17 @@ thousands of games step in lockstep as `[games, cities, …]` tensor ops
 (`npm run gpu:export` → `python gpu/parity_test.py` reproduces recorded
 traces integer-exact) and **off-script**: `python gpu/rollout.py` plays
 random masked actions and logs them, `npm run gpu:replay` feeds that log
-through the real engine and must match every turn. Phases 1–4d cover a
+through the real engine and must match every turn. Phases 1–6 cover a
 multi-city economy plus the RL surface (masked production/research/
 civic/unit/envoy actions, detected eurekas, `empireScore` rewards, a
 batched env `civ6gpu.BatchEnv`) inside a genuinely hostile world:
 barbarian camps and raiders, a player-commanded military, city-states
 courting envoys, scripted rival civs that grow, settle, race beliefs,
-declare war and flip disloyal cities, and natural disasters (floods,
-volcanoes, droughts, storms) reshaping tile food — all with the
-in-state mulberry32 RNG mirrored draw for draw. Phase 5 trains on it
+declare war and flip disloyal cities, natural disasters (floods,
+volcanoes, droughts, storms) reshaping tile food, and builders that farm
+the land — with barbarians, at-war rivals and disasters raiding, sacking
+and scorching those farms — all with the in-state mulberry32 RNG
+mirrored draw for draw. Phase 5 trains on it
 natively: `python gpu/train_ppo.py` runs a masked multi-head PPO whose
 inference, env stepping and updates never leave the device, with worlds
 re-seeded every episode; `gpu/eval.py` is the matching benchmark
