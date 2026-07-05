@@ -167,19 +167,14 @@ for (const game of roll.games) {
           break;
         }
       } else if (a >= NB + 2 + NU) {
-        // District placement (D5b): the RL production head placed a scaffold
-        // district instantly (free) in the capital. Mirror the exporter's
-        // scaffold scan EXACTLY — capital-owned, unimproved, canPlaceDistrict,
-        // best floor(districtAdjacency) tile, ties to lowest index — and leave
-        // the build slot idle (queue nothing), as the GPU's RL block does.
+        // District placement (D5): the RL production head placed a scaffold
+        // district instantly (free) in THIS city (any city, slot order). Mirror
+        // the exporter's scaffold scan EXACTLY — owned by this city, unimproved,
+        // canPlaceDistrict, best floor(districtAdjacency) tile, ties to lowest
+        // index — and leave the build slot idle, as the GPU's RL block does.
         const districtId = SCAFFOLD[a - NB - 2 - NU] as DistrictId | undefined;
         if (!districtId) {
           fail(`turn ${state.turn}: district action ${a} in slot ${slot} but no scaffold[${a - NB - 2 - NU}]`);
-          bad = true;
-          break;
-        }
-        if (!city.isCapital) {
-          fail(`turn ${state.turn}: district action in slot ${slot} but city ${city.id} is not the capital`);
           bad = true;
           break;
         }

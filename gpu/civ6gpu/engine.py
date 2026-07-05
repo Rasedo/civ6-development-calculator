@@ -258,6 +258,7 @@ _MUTABLE = [
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
+    "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
 ]
 
 
@@ -512,7 +513,11 @@ class BatchSim:
         self.d_static_adj = torch.tensor(
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
-        )  # [B, T, nD] raw static-source adjacency, inert until D2b consumes it
+        )  # [B, T, nD] raw static-source adjacency; mutated when an in-game founding clears a center feature
+        self._feat_adj = torch.tensor(
+            [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
+            dtype=dtype, device=device,
+        )  # [B, T, nD] adjacency a tile's removable feature lends to neighbours (dropped on founding here)
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
@@ -520,6 +525,7 @@ class BatchSim:
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
+        self._rl_any_city = False  # D5c: True lets non-capital cities place districts too (needs the rival×disaster prodStock edge fixed — see BUILD_PLAN)
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -946,19 +952,20 @@ class BatchSim:
         is_d = ((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0) | (self.rvcity_at[:, nbc] >= 0)) & on_map
         return is_d.sum(dim=2)  # [B, T]
 
-    def _place_district_capital(self, di: int, want: torch.Tensor) -> torch.Tensor:
-        """Place district-type `di` in the capital (city slot 0) on its best tile,
-        for batch rows where `want` is set AND an eligible tile exists. Mirrors the
-        exporter's best-tile scan: eligible = owned by player, district-placeable,
-        empty (no district/improvement), within radius 3, not the city-center tile;
-        ranked by floor(static + 0.5·adjacent-completed-districts), ties to lowest
-        tile index. Shared by the scripted scaffold (D5a refactor) and the RL
-        production head (D5b). Returns the [B] bool mask of rows actually placed."""
+    def _place_district(self, di: int, want: torch.Tensor, c: int) -> torch.Tensor:
+        """Place district-type `di` in city slot `c` on its best tile, for batch
+        rows where `want` is set AND an eligible tile exists. Mirrors the exporter's
+        best-tile scan: eligible = owned by city c, district-placeable, empty (no
+        district/improvement), within radius 3, not the city-center tile; ranked by
+        floor(static + 0.5·adjacent-completed-districts), ties to lowest tile index.
+        Recomputes adjacency each call, so placing city-by-city in slot order
+        reproduces the replay's sequential act.p placement. Shared by the scripted
+        scaffold (capital) and the RL head (any city). Returns the [B] placed mask."""
         B, T, dev = self.B, self.T, self.device
-        site0 = self.site[:, 0].clamp(min=0)
+        site_c = self.site[:, c].clamp(min=0)
         adjc = self._adj_district_count().to(self.dtype)  # [B, T]
-        elig = ((self.owner == 0) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, 0] <= 3))
-        elig[torch.arange(B, device=dev), site0] = False
+        elig = ((self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3))
+        elig[torch.arange(B, device=dev), site_c] = False
         adjf = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
         arT = torch.arange(T, device=dev, dtype=self.dtype)
         key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))
@@ -1169,17 +1176,19 @@ class BatchSim:
         nS = len(self._scaffold)
         if nS:
             dcols = torch.zeros(B, C, nS, dtype=torch.bool, device=dev)
-            if self._rl_district_active:  # D5b: capital may place districts off-script
-                cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # [B]
-                spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # [B]
-                under_cap = spec_count < cap_max  # [B]
-                elig = (self.owner == 0) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, 0] <= 3)
-                elig[torch.arange(B, device=dev), self.site[:, 0].clamp(min=0)] = False
-                has_tile = elig.any(dim=1)  # [B] an empty placeable tile exists (type-independent for land districts)
-                for si, (di, utech) in enumerate(self._scaffold):
-                    has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                    not_owned = ~((self.district == di) & (self.owner == 0)).any(dim=1)  # one-per-type
-                    dcols[:, 0, si] = has_tech & under_cap & has_tile & not_owned  # capital (slot 0) only
+            if self._rl_district_active:  # D5b/c: capital (or any city if _rl_any_city) places districts off-script
+                ar = torch.arange(B, device=dev)
+                for c in range(C if self._rl_any_city else 1):
+                    cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
+                    spec_count = ((self.district >= 0) & (self.owner == c)).sum(dim=1)  # [B] city c's specialty count
+                    under_cap = spec_count < cap_c  # [B]
+                    elig = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
+                    elig[ar, self.site[:, c].clamp(min=0)] = False
+                    has_tile = elig.any(dim=1)  # [B] city c has an empty placeable tile
+                    for si, (di, utech) in enumerate(self._scaffold):
+                        has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                        not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
+                        dcols[:, c, si] = has_tech & under_cap & has_tile & not_owned
             cols.append(dcols)
         return torch.cat(cols, dim=2) & pend.unsqueeze(2)
 
@@ -2736,22 +2745,24 @@ class BatchSim:
             self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
             self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
 
-            # RL district placement (D5): the capital may spend its production
+            # RL district placement (D5): ANY city may spend its production
             # decision to instantly place a scaffold district (off-script; free,
             # via the scaffold simplification — leaves the build slot idle). The
-            # district codes sit above the unit range at NB+2+NU+si. Inert until
-            # D5b flips _rl_district_active on.
+            # district codes sit above the unit range at NB+2+NU+si. Cities are
+            # processed in slot order, recomputing adjacency each placement, to
+            # match the replay's sequential act.p loop. Inert until _rl flips on.
             if self.districts_on and self._scaffold and self._rl_district_active:
                 dbase = self.UNIT_BASE + self.NU  # district action base code (NB+2+NU)
-                a0 = act[:, 0]  # capital's chosen action (-1 where not idle/alive)
-                cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # [B]
-                for si, (di, utech) in enumerate(self._scaffold):
-                    has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                    spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # recomputed as districts land
-                    not_owned = ~((self.district == di) & (self.owner == 0)).any(dim=1)  # one-per-type
-                    want = (a0 == dbase + si) & has_tech & (spec_count < cap_max) & not_owned
-                    if bool(want.any()):
-                        self._place_district_capital(di, want)
+                for c in range(C if self._rl_any_city else 1):
+                    ac = act[:, c]  # city c's chosen action (-1 where not idle/alive)
+                    cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
+                    for si, (di, utech) in enumerate(self._scaffold):
+                        has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                        spec_count = ((self.district >= 0) & (self.owner == c)).sum(dim=1)  # city c's specialty count (recomputed)
+                        not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
+                        want = (ac == dbase + si) & has_tech & (spec_count < cap_c) & not_owned
+                        if bool(want.any()):
+                            self._place_district(di, want, c)
 
         # --- scripted districts (D3b): place each scaffold district IN ORDER,
         # once, when its unlock tech is in and the per-pop specialty cap allows
@@ -2766,7 +2777,7 @@ class BatchSim:
                 want = has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & (spec_count < cap_max)
                 if not bool(want.any()):
                     continue
-                place = self._place_district_capital(di, want)  # shared best-tile scan (D5a)
+                place = self._place_district(di, want, 0)  # scaffold is capital-only (slot 0)
                 self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | place
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------
@@ -3007,17 +3018,28 @@ class BatchSim:
             # city-state founding do NOT strip; the capital's statics were
             # exported post-founding, already stripped.)
             self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
+            # ...and drops the district adjacency that feature lent to neighbours:
+            # d_static_adj was baked post-capital-founding, so a NON-capital
+            # founding must subtract the center feature's contribution live (else
+            # a fresh city's own district over-counts). Mirrors districtAdjacency
+            # recomputing on the live map after foundCity clears the feature.
+            contrib = self._feat_adj[rows, s_idx]  # [R, nD]
             nb = self.neigh[s_idx]  # [R, 6]
             for d in range(6):
                 n_d = nb[:, d]
                 ndc = n_d.clamp(min=0)
+                on_map = n_d >= 0
+                if bool(on_map.any()):
+                    om = on_map.nonzero(as_tuple=True)[0]
+                    self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
                 free_nb = (
-                    (n_d >= 0)
+                    on_map
                     & (self.owner[rows, ndc] == -1)
                     & (self.cs_at[rows, ndc] < 0)
                     & (self.rival_at[rows, ndc] < 0)
                 )
                 self.owner[rows[free_nb], n_d[free_nb]] = c_new[free_nb]
+            self._eff_version += 1  # d_static_adj changed
 
         self.turn += 1
 

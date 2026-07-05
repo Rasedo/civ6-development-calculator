@@ -238,6 +238,28 @@ function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number
   return sum;
 }
 
+/** Adjacency this tile's OWN removable feature (woods/rainforest/reef) lends to
+ * a district on a NEIGHBOUR — the amount a fresh city drops when it founds here
+ * and foundCity clears the feature (game.ts:168). The engine subtracts this from
+ * each neighbour's d_static_adj on in-game founding, since the exported adjacency
+ * was baked after only the capital founded. 0 for non-removable / no feature. */
+function featureAdjContribution(tile: Tile, id: DistrictId): number {
+  const f = tile.feature;
+  if (!f || !FEATURES[f].removable) return 0;
+  const def = DISTRICTS[id];
+  if (!def.adjacencyYield) return 0;
+  let sum = 0;
+  for (const rule of def.adjacency) {
+    const m =
+      rule.source === 'RAINFOREST' ? f === 'RAINFOREST'
+      : rule.source === 'WOODS' ? f === 'WOODS'
+      : rule.source === 'REEF' ? f === 'REEF'
+      : false;
+    if (m) sum += rule.amount;
+  }
+  return sum;
+}
+
 const rules = {
   focusBase: [2, 2, 1, 1, 1, 1], // food, production, gold, science, culture, faith
   citizenScience: CITIZEN_SCIENCE,
@@ -552,6 +574,9 @@ for (let s = 0; s < N_SEEDS; s++) {
         }
         return raw;
       }),
+      // per placeable district: the adjacency this tile's removable feature lends
+      // to a neighbour, dropped when a city founds here (foundCity clears it).
+      fadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id)),
       // this tile's static contributions to a nearby site's quality, one
       // per source (terrain, feature, resource) plus the hills flag —
       // siteQuality adds them as FOUR SEPARATE += steps, and candidate

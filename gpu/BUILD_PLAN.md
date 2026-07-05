@@ -112,8 +112,16 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         (+50 science) — without it the GPU lagged one tech (col1) at turn 83.
         Both gates green (scripted 24×100, off-script 72×100). RL is now district-capable
         — ready to retrain with the wider action space.
-- [ ] **D6** Specials: Aqueduct/Neighborhood housing, Harbor coastal placement,
-      Encampment not-adjacent-to-center.
+- [—] **D6** Specials: DEFERRED after a reachability check (100-turn scripted, 24
+      seeds). Capital pop maxes at 9 (median 5) → specialty cap maxes at 3, already
+      filled by Campus/Holy Site/Commercial Hub; 0/24 reach a 4th slot (pop≥10) and
+      only 6/24 are coastal. So **Harbor, Encampment, Neighborhood** are structurally
+      unreachable in scope (a 4th specialty / a late civic never lands) — adding them
+      would be dead code. **Aqueduct** (non-specialty housing) IS reachable, but it
+      needs its own placement rule (adjacent to center + fresh water) and conditional
+      housing (+2 river / +6 otherwise) for a single district — deprioritized below
+      the MCTS lever. Revisit Aqueduct if a longer-horizon scenario makes the housing
+      swing matter.
 
 ## 2. Single-agent MCTS  (score lever over the existing net)
 Primitives already exist: deterministic batched forward model (in-state
@@ -295,18 +303,24 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   accrual/effects are structurally inert (0 points → never earned) — modeled
   generically but never exercised, like the deferred district yields. D6
   (Aqueduct/Neighborhood housing, Harbor coastal, Encampment) is still pending.
-- D5 is CAPITAL-ONLY (RL districts place in city slot 0 only, mirroring the
-  scaffold). An any-city generalization was implemented and DEFERRED: it lifted
-  off-script coverage from 51 placements/45 games to 89/54 (37 in non-capital
-  slots 1-3), but exposed a t=0-static-vs-live bug — foundCity (game.ts:168)
-  removes the center tile's removable feature (woods/rainforest/reef), which
-  drops the DISTRICT adjacency it contributed to neighbouring tiles; the GPU's
-  precomputed d_static_adj (baked at export, after only the CAPITAL founded) does
-  NOT reflect a non-capital city's founding, so a fresh city's own district
-  (adjacent to its just-founded center) over-counts by the removed feature's
-  amount (seed 9027: non-capital Holy Site TS adj 1 vs GPU 2 → +1 faith → score
-  col8 +0.75). Fix when picked up: export a per-tile removable-feature adjacency
-  contribution [T,nD] and, in the founding loop, subtract it from each neighbour's
-  d_static_adj (bumping _eff_version). Reverted to capital-only to keep D5 green;
-  the any-city mask/apply/replay generalization is straightforward to re-apply
-  once the founding-feature update lands.
+- D5c [~] ANY-CITY district placement — code-complete, gated behind
+  `_rl_any_city` (default False = capital-only, both gates green). Flipping it on
+  lets non-capital cities place districts (mask/apply loop over all slots in slot
+  order; replay drops its is-capital guard). Coverage jumps 51/45 games → 89/54
+  (37 in non-capital slots). Getting there required and LANDED the
+  founding-feature fix: foundCity (game.ts:168) clears the center tile's removable
+  feature (woods/rainforest/reef), dropping the DISTRICT adjacency it lent to
+  neighbours; the GPU's d_static_adj is baked post-capital-founding, so a
+  non-capital founding must subtract that live. Now the exporter emits a per-tile
+  `fadj` [T,nD] (the feature's contribution) and the founding loop subtracts it
+  from each neighbour's d_static_adj (d_static_adj moved into _MUTABLE, _eff_version
+  bumped). This dropped the any-city failures from 3 to 1 and is exercised in
+  scripted (foundings update d_static_adj; still green). Remaining blocker (why
+  `_rl_any_city` stays off): ONE game (seed 9027, disasters on) diverges at turn
+  100 col39 — rival-1 productionStock off by 0.615. Everything else (player, rival
+  cities/pop, RNG) matches exactly through turn 100; the rival's production sum
+  differs because _rival_city_yields sorts owned tiles by (eff_food + prod) and
+  fertility-boosted food shifts a tie, selecting a different top-pop tile. It's a
+  rival×disaster tile-sort float edge exposed by the any-city trajectory, NOT a
+  district bug. Fix: match the GPU's rival eff_food/sort tie-break to
+  rivalCityYields exactly at the fertility boundary, then flip `_rl_any_city=True`.
