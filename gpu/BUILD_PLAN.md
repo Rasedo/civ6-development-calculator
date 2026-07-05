@@ -303,24 +303,25 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   accrual/effects are structurally inert (0 points → never earned) — modeled
   generically but never exercised, like the deferred district yields. D6
   (Aqueduct/Neighborhood housing, Harbor coastal, Encampment) is still pending.
-- D5c [~] ANY-CITY district placement — code-complete, gated behind
-  `_rl_any_city` (default False = capital-only, both gates green). Flipping it on
-  lets non-capital cities place districts (mask/apply loop over all slots in slot
-  order; replay drops its is-capital guard). Coverage jumps 51/45 games → 89/54
-  (37 in non-capital slots). Getting there required and LANDED the
-  founding-feature fix: foundCity (game.ts:168) clears the center tile's removable
+- D5c [x] ANY-CITY district placement — DONE + LIVE (`_rl_any_city=True`, both
+  gates green). Non-capital cities place districts too (mask/apply loop over all
+  slots in slot order, recomputing adjacency each placement to match the replay's
+  sequential act.p loop; replay dropped its is-capital guard). Coverage 51/45 games
+  → 89/54 (37 placements in non-capital slots 1-3). Three latent bugs fixed to get
+  here, each exposed only by non-capital districts:
+  (1) FOUNDING-FEATURE — foundCity (game.ts:168) clears the center tile's removable
   feature (woods/rainforest/reef), dropping the DISTRICT adjacency it lent to
-  neighbours; the GPU's d_static_adj is baked post-capital-founding, so a
-  non-capital founding must subtract that live. Now the exporter emits a per-tile
-  `fadj` [T,nD] (the feature's contribution) and the founding loop subtracts it
-  from each neighbour's d_static_adj (d_static_adj moved into _MUTABLE, _eff_version
-  bumped). This dropped the any-city failures from 3 to 1 and is exercised in
-  scripted (foundings update d_static_adj; still green). Remaining blocker (why
-  `_rl_any_city` stays off): ONE game (seed 9027, disasters on) diverges at turn
-  100 col39 — rival-1 productionStock off by 0.615. Everything else (player, rival
-  cities/pop, RNG) matches exactly through turn 100; the rival's production sum
-  differs because _rival_city_yields sorts owned tiles by (eff_food + prod) and
-  fertility-boosted food shifts a tie, selecting a different top-pop tile. It's a
-  rival×disaster tile-sort float edge exposed by the any-city trajectory, NOT a
-  district bug. Fix: match the GPU's rival eff_food/sort tie-break to
-  rivalCityYields exactly at the fertility boundary, then flip `_rl_any_city=True`.
+  neighbours; the GPU's d_static_adj is baked post-capital-founding, so a non-capital
+  founding must subtract that live. Exporter emits per-tile `fadj` [T,nD]; the
+  founding loop subtracts it from each neighbour's d_static_adj (now in _MUTABLE,
+  _eff_version bumped).
+  (2) RIVAL-DISTRICT PAVING — a loyalty flip hands a rival a player's district
+  tile (rival_at set on the flipped city's tiles, self.district kept). TS's
+  rivalCityYields sees tileYields=0 there (a district paves the tile), but the GPU
+  paved only center_at/rvcity_at, so it credited the flipped Holy Site full
+  food/prod and picked it into the rival's top-pop tiles (seed 9027 t100: rival-1
+  prodStock +0.615). Added `| (self.district>=0)` to the rival-yield paved mask.
+  (3) (the slot-order placement + adjacency recompute, so two cities founding near
+  each other resolve districts in the same order as the replay.)
+  Both gates green (scripted 24×100, off-script 72×100). D5 fully complete —
+  the RL policy can place districts in ANY city under parity.

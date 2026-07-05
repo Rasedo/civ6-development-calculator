@@ -525,7 +525,7 @@ class BatchSim:
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
-        self._rl_any_city = False  # D5c: True lets non-capital cities place districts too (needs the rival×disaster prodStock edge fixed — see BUILD_PLAN)
+        self._rl_any_city = True  # D5c: True lets non-capital cities place districts too (needs the rival×disaster prodStock edge fixed — see BUILD_PLAN)
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -1961,7 +1961,9 @@ class BatchSim:
         # cities inside each other's work radius: the neighbor's center
         # stays a CANDIDATE — it occupies a sorted slot exactly like the
         # TS list — but contributes zero food/production.
-        paved = (self.center_at.gather(1, tc) >= 0) | (self.rvcity_at.gather(1, tc) >= 0)
+        # A player district also paves its tile (tileYields returns 0 there):
+        # reachable when a loyalty flip hands a rival a player's district tile.
+        paved = (self.center_at.gather(1, tc) >= 0) | (self.rvcity_at.gather(1, tc) >= 0) | (self.district.gather(1, tc) >= 0)
         f = torch.where(paved, torch.zeros_like(f), f)
         p = torch.where(paved, torch.zeros_like(p), p)
         M = tiles.shape[1]
