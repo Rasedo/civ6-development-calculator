@@ -116,10 +116,64 @@ def netsearch_play(env, policy, city, horizon, turns):
     return float(env.sim.empire_score()[0])
 
 
+# --- M2b-2: net-guided search over the full 5-head action tuple ---------------
+
+def _net_out(policy, env):
+    with torch.no_grad():
+        return policy(env.observe(), env.unit_features())
+
+
+def net_greedy_play(env, policy, turns):
+    """Full net policy baseline: the net drives ALL five heads greedily every turn
+    (production/tech/civic/units/envoy, all cities/slots) on this one matched world.
+    This is the policy the tuple search must improve on."""
+    from train_ppo import sample_heads
+    for _ in range(turns):
+        acts, _, _ = sample_heads(_net_out(policy, env), env.masks(), greedy=True)
+        env.step(**acts)
+    return float(env.sim.empire_score()[0])
+
+
+def tuplesearch_play(env, policy, k, horizon, leaf, turns):
+    """M2b-2: Sampled-AlphaZero-style search over the FULL action tuple. Each turn,
+    take the net's greedy tuple plus k-1 tuples sampled from its factored policy (the
+    net is the prior), evaluate each by either the net's value head (leaf='net' — a
+    cheap 1-ply bootstrap) or a scripted rollout (leaf='rollout' — reliable but ~k*H
+    steps/turn), and play the best. A one-step policy-improvement over the net's
+    greedy action across all five heads jointly. Seed torch beforehand for a
+    reproducible sample set."""
+    from train_ppo import sample_heads
+    for _ in range(turns):
+        out = _net_out(policy, env)
+        masks = env.masks()
+        cands = [sample_heads(out, masks, greedy=True)[0]]
+        for _ in range(k - 1):
+            cands.append(sample_heads(out, masks, greedy=False)[0])
+        snap = env.sim.snapshot()
+        best, bestv = cands[0], -1e30
+        for acts in cands:
+            env.step(**acts)  # commit the whole tuple (advances one turn)
+            if leaf == "net":
+                v = net_value(policy, env)
+            else:
+                for _ in range(horizon):
+                    env.sim.step()
+                v = float(env.sim.empire_score()[0])
+            env.sim.restore(snap)
+            if v > bestv:
+                best, bestv = acts, v
+        env.step(**best)
+    return float(env.sim.empire_score()[0])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--policy", default="search", choices=["search", "net", "netsearch"])
-    ap.add_argument("--checkpoint", default=None, help="net path (required for net/netsearch)")
+    ap.add_argument("--policy", default="search",
+                    choices=["search", "net", "netsearch", "netgreedy", "tuplesearch"])
+    ap.add_argument("--checkpoint", default=None, help="net path (required for net policies)")
+    ap.add_argument("--k", type=int, default=8, help="tuplesearch: candidate tuples sampled from the net per turn")
+    ap.add_argument("--tuple-leaf", default="net", choices=["net", "rollout"],
+                    help="tuplesearch leaf: the net value head (cheap) or a scripted rollout (reliable)")
     ap.add_argument("--episodes", type=int, default=6)
     ap.add_argument("--turns", type=int, default=100, help="game length actually played")
     ap.add_argument("--horizon", type=int, default=20, help="search lookahead per decision")
@@ -139,12 +193,15 @@ def main() -> None:
                          "compare different worlds. float32 matches the trained net.")
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args()
-    if args.policy in ("net", "netsearch") and not args.checkpoint:
+    NET_POLICIES = ("net", "netsearch", "netgreedy", "tuplesearch")
+    if args.policy in NET_POLICIES and not args.checkpoint:
         ap.error(f"--policy {args.policy} needs --checkpoint")
-    if args.all_cities and args.policy == "netsearch":
+    if args.all_cities and args.policy not in ("search", "net"):
         ap.error("--all-cities is implemented for search/net only")
     if args.loyalty_aware and args.policy != "search":
         ap.error("--loyalty-aware shapes the rollout leaf and applies to --policy search only")
+    if args.policy in NET_POLICIES and args.dtype != "float32":
+        ap.error("net policies require --dtype float32 (matches the trained net's weights)")
     vf = loyalty_shaped_value(args.loyalty_penalty, args.loyalty_thresh) if args.loyalty_aware else _empire_value
 
     rules = load_rules()
@@ -161,10 +218,13 @@ def main() -> None:
     policy = load_policy(args.checkpoint, build(0), args.device) if args.checkpoint else None
 
     base_scores, chal_scores, wins = [], [], 0
-    surface = "all cities" if args.all_cities else f"city {args.city}"
-    loy = f", loyalty-aware(pen={args.loyalty_penalty})" if args.loyalty_aware else ""
+    if args.policy in ("netgreedy", "tuplesearch"):
+        detail = "all 5 heads" + (f", k={args.k} leaf={args.tuple_leaf}" if args.policy == "tuplesearch" else "")
+    else:
+        detail = ("all cities" if args.all_cities else f"city {args.city}") + \
+                 (f", loyalty-aware(pen={args.loyalty_penalty})" if args.loyalty_aware else "")
     print(f"search-eval [{args.policy}]: {args.episodes} games x {args.turns} turns, "
-          f"horizon {args.horizon}, depth {args.depth}, production surface = {surface}{loy}\n")
+          f"horizon {args.horizon}, control = {detail}\n")
     for i in range(args.episodes):
         scr = None if args.scramble is None else args.scramble + i
 
@@ -184,8 +244,13 @@ def main() -> None:
         elif args.policy == "net":
             chal = (net_play_empire(env, policy, args.turns) if args.all_cities
                     else net_play(env, policy, args.city, args.turns))
-        else:
+        elif args.policy == "netsearch":
             chal = netsearch_play(env, policy, args.city, args.horizon, args.turns)
+        elif args.policy == "netgreedy":
+            chal = net_greedy_play(env, policy, args.turns)
+        else:  # tuplesearch
+            torch.manual_seed(20260705 + i)  # reproducible net sampling per game
+            chal = tuplesearch_play(env, policy, args.k, args.horizon, args.tuple_leaf, args.turns)
         dt = time.time() - t0
 
         base_scores.append(base)
