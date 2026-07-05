@@ -34,9 +34,14 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
   - [x] **D2b-activate** Campus placed live (SCRIPTED_CAMPUS=true); CS
         buildDistrict quest mirrored; builder excludes district tiles. Both gates
         green; canary (Campus science +1) breaks the gate. D2 COMPLETE.
-- [ ] **D3** Dynamic adjacency: adjacent-district (+0.5 each), city-center,
-      harbor, mine/quarry (IZ), built-wonder. Add the rest of the specialty
-      districts. Gate to green.
+- [~] **D3** Dynamic adjacency + other district types (split):
+  - [x] **D3a** dynamic DISTRICT source for Campus (+0.5 per adjacent completed
+        district/center incl. rival centers); placement relaxed to allow
+        center-adjacent tiles. Both gates green; canary (dyn 0.5→1.0) bites.
+  - [ ] **D3b** other adjacency district types (Holy Site, Commercial Hub,
+        Industrial Zone) — generalize the _city_totals yield loop + the scripted
+        placement + the CS-quest `already` beyond CAMPUS. Harbor (coastal) later.
+        Also: built-wonder / mine-quarry / harbor dynamic sources as needed.
 - [ ] **D4** District buildings (Library/University, Market/Bank, Shrine/Temple,
       Workshop/Factory, etc.): unlocks, yields, housing, specialist slots.
 - [ ] **D5** RL production head can queue districts (widen production action
@@ -149,3 +154,12 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   t53. **D2 (Campus economy) COMPLETE.** Next: D3 — relax placement + add the
   dynamic adjacency sources (adjacent district/center/mine/wonder) and the other
   district types (Holy Site, Commercial Hub, Industrial Zone, Harbor…).
+- D3a [x]: Campus adjacency is now floor(static + 0.5*adjacent completed
+  districts). A shared _adj_district_count() helper counts player centers
+  (center_at), player specialty districts (self.district) AND rival centers
+  (rvcity_at — rivals set tile.district='CITY_CENTER' in TS and matchesAdjacency
+  has no owner filter). Dropped the "no adjacent district" placement restriction
+  from both the exporter scan and the engine elig; both now score by the full
+  floor(static+dynamic), so a Campus may sit beside the center for +0.5. Both
+  gates green (scripted 24 seeds, off-script 72 games); canary (dyn amount
+  0.5→1.0) fails at seed 9014 t63. Next: D3b — the other adjacency district types.

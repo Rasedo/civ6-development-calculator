@@ -883,6 +883,18 @@ class BatchSim:
         )
         return unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
 
+    def _adj_district_count(self) -> torch.Tensor:
+        """[B, T] number of adjacent COMPLETED districts — the DISTRICT adjacency
+        source. Counts player city centers (center_at), player specialty
+        districts (self.district) and rival city centers (rvcity_at, which set
+        tile.district='CITY_CENTER' in the TS engine). No owner filter, mirroring
+        matchesAdjacency('DISTRICT')."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        on_map = (nb >= 0).unsqueeze(0)  # [1, T, 6]
+        is_d = ((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0) | (self.rvcity_at[:, nbc] >= 0)) & on_map
+        return is_d.sum(dim=2)  # [B, T]
+
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
         (total [B, C, 6] alive-masked, housing [B, C], growth_f [B, C]).
@@ -940,7 +952,11 @@ class BatchSim:
             # column, summed into the pre-amenity total.
             dt = self.district.gather(1, tcf).reshape(B, C, M)
             campus = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids) & (dt == self.CAMPUS)
-            d_sci = (torch.floor(self.d_static_adj[:, :, self.CAMPUS].gather(1, tcf).reshape(B, C, M)) * campus.to(self.dtype)).sum(dim=2)
+            # floor(static + 0.5 * adjacent completed districts) — D3a adds the
+            # dynamic DISTRICT source; mirrors districtAdjacency for the Campus.
+            adjc = self._adj_district_count().to(self.dtype)  # [B, T]
+            campus_adj = torch.floor(self.d_static_adj[:, :, self.CAMPUS] + 0.5 * adjc)  # [B, T]
+            d_sci = (campus_adj.gather(1, tcf).reshape(B, C, M) * campus.to(self.dtype)).sum(dim=2)
             total[:, :, 3] = total[:, :, 3] + d_sci
             d_maint = campus.to(self.dtype).sum(dim=2)  # +1 gold upkeep per completed Campus (districtMaintenance)
         popf = self.pop.to(self.dtype)
@@ -2562,11 +2578,6 @@ class BatchSim:
             has_w = self.techs[:, self.campus_unlock_tech]  # [B]
             want = has_w & ~self.campus_placed & self.alive[:, 0]
             if bool(want.any()):
-                nb = self.neigh                    # [T, 6]
-                nbc = nb.clamp(min=0)
-                on_map = (nb >= 0).unsqueeze(0)    # [1, T, 6]
-                # any neighbor is a completed district (city center or specialty)
-                adj_dist = (((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0)) & on_map).any(dim=2)  # [B, T]
                 site0 = self.site[:, 0].clamp(min=0)  # [B]
                 elig = (
                     (self.owner == 0)
@@ -2574,10 +2585,13 @@ class BatchSim:
                     & (self.district < 0)
                     & (self.improvement < 0)
                     & (self.dist[:, 0] <= 3)
-                    & ~adj_dist
                 )  # [B, T]
                 elig[torch.arange(B, device=dev), site0] = False  # not the center itself
-                adjf = torch.floor(self.d_static_adj[:, :, self.CAMPUS])  # [B, T]
+                # score by the FULL floor(static + 0.5*adjacent-districts) (D3a):
+                # placement now includes the dynamic DISTRICT source, so the Campus
+                # may sit next to the center/another district for its +0.5 each.
+                adjc = self._adj_district_count().to(self.dtype)  # [B, T]
+                adjf = torch.floor(self.d_static_adj[:, :, self.CAMPUS] + 0.5 * adjc)  # [B, T]
                 arT = torch.arange(T, device=dev, dtype=self.dtype)
                 key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))  # max adj, ties lowest index
                 best = key.argmax(dim=1)  # [B]

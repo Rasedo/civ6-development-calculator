@@ -741,7 +741,9 @@ for (let s = 0; s < N_SEEDS; s++) {
         for (const tile of map.tiles) {
           if (tile.cityId !== cap.id || tile.improvement) continue;
           if (!canPlaceDistrict(state, cap, 'CAMPUS', tile.index).ok) continue;
-          if (neighbors(map, tile).some((n) => n.district !== null && n.districtComplete)) continue;
+          // D3a: no longer skip district-adjacent tiles — districtAdjacency below
+          // includes the dynamic DISTRICT source (+0.5 per adjacent completed
+          // district/center), so the best tile may sit beside the city center.
           const adj = districtAdjacency(map, tile, 'CAMPUS');
           if (adj > bestAdj) {
             bestAdj = adj;
