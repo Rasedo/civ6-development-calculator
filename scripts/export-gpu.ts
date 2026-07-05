@@ -74,7 +74,7 @@ import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow } from './gpu-trace';
 import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
-import { hasFreshWater, hasRiver, isCoastalLand, isImpassable, isWater } from '../src/core/query';
+import { hasFreshWater, hasRiver, isCoastalLand, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
@@ -96,6 +96,8 @@ import {
   HOUSING_FRESH_WATER,
   HOUSING_COASTAL,
   HOUSING_NO_WATER,
+  AQUEDUCT_FRESH_BONUS,
+  AQUEDUCT_NO_FRESH_TOTAL,
 } from '../src/data/constants';
 
 const N_SEEDS = Number(process.argv[2] ?? 24);
@@ -201,10 +203,13 @@ const SCRIPTED_CAMPUS = true;
 
 // Districts the scripted policy places, in order (each once, when its unlock
 // tech is in and the per-pop specialty cap allows). The engine mirrors this.
-const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string }[] = [
+// placement 'aqueduct' = the non-specialty housing district (adjacent to the
+// city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
+const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
   { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
+  { id: 'AQUEDUCT', unlockId: 'ENGINEERING', placement: 'aqueduct' },
 ];
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
@@ -267,7 +272,7 @@ const rules = {
   foodPerCitizen: FOOD_PER_CITIZEN,
   centerMinFood: CITY_CENTER_MIN_FOOD,
   centerMinProduction: CITY_CENTER_MIN_PRODUCTION,
-  housing: { fresh: HOUSING_FRESH_WATER, coastal: HOUSING_COASTAL, none: HOUSING_NO_WATER },
+  housing: { fresh: HOUSING_FRESH_WATER, coastal: HOUSING_COASTAL, none: HOUSING_NO_WATER, aqFreshBonus: AQUEDUCT_FRESH_BONUS, aqNoFreshTotal: AQUEDUCT_NO_FRESH_TOTAL },
   boostFraction: BOOST_FRACTION,
   // amenityTier(balance) thresholds, highest first (see data/constants.ts)
   amenityTiers: [
@@ -412,6 +417,8 @@ const rules = {
       adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
       adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
       housing: d.housing,
+      // districtMaintenance: 0 for City Center / Neighborhood / Aqueduct, else 1.
+      maintenance: id === 'CITY_CENTER' || id === 'NEIGHBORHOOD' || id === 'AQUEDUCT' ? 0 : 1,
       countsTowardLimit: d.countsTowardLimit ? 1 : 0,
       allowMultiple: d.allowMultiple ? 1 : 0,
       onCoastalWater: d.placement.onCoastalWater ? 1 : 0,
@@ -429,9 +436,12 @@ const rules = {
     ),
     active: SCRIPTED_CAMPUS ? 1 : 0,
     // Districts the scripted policy places, IN ORDER (engine mirrors this list).
-    place: SCAFFOLD_DISTRICTS.map(({ id, unlockId }) => ({
+    // placement 0=land (best floor(static+0.5·adj) tile), 1=aqueduct (adjacent to
+    // center + water source, lowest tile, non-specialty + housing).
+    place: SCAFFOLD_DISTRICTS.map(({ id, unlockId, placement }) => ({
       idx: PLACEABLE_DISTRICTS.indexOf(id),
       unlockTech: techIdx.get(unlockId) ?? -1,
+      placement: placement === 'aqueduct' ? 1 : 0,
     })),
     // CS buildDistrict askable list → engine district-type indices, so the
     // `already`/satisfied checks generalize past CAMPUS.
@@ -577,6 +587,14 @@ for (let s = 0; s < N_SEEDS; s++) {
       // per placeable district: the adjacency this tile's removable feature lends
       // to a neighbour, dropped when a city founds here (foundCity clears it).
       fadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id)),
+      // Aqueduct water source (requiresWaterSourceOrMountain): on a river, or
+      // adjacent to a lake / oasis / mountain. Static — the adjacent-center part
+      // is dynamic (the engine checks it against the city's live center).
+      aqsrc:
+        hasRiver(t) ||
+        neighbors(map, t).some((n) => n.terrain === 'LAKE' || n.feature === 'OASIS' || isMountain(n))
+          ? 1
+          : 0,
       // this tile's static contributions to a nearby site's quality, one
       // per source (terrain, feature, resource) plus the hills flag —
       // siteQuality adds them as FOUR SEPARATE += steps, and candidate

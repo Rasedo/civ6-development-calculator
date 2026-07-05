@@ -112,16 +112,29 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         (+50 science) — without it the GPU lagged one tech (col1) at turn 83.
         Both gates green (scripted 24×100, off-script 72×100). RL is now district-capable
         — ready to retrain with the wider action space.
-- [—] **D6** Specials: DEFERRED after a reachability check (100-turn scripted, 24
-      seeds). Capital pop maxes at 9 (median 5) → specialty cap maxes at 3, already
-      filled by Campus/Holy Site/Commercial Hub; 0/24 reach a 4th slot (pop≥10) and
-      only 6/24 are coastal. So **Harbor, Encampment, Neighborhood** are structurally
-      unreachable in scope (a 4th specialty / a late civic never lands) — adding them
-      would be dead code. **Aqueduct** (non-specialty housing) IS reachable, but it
-      needs its own placement rule (adjacent to center + fresh water) and conditional
-      housing (+2 river / +6 otherwise) for a single district — deprioritized below
-      the MCTS lever. Revisit Aqueduct if a longer-horizon scenario makes the housing
-      swing matter.
+- **D6** Specials (housing/coastal/military districts):
+  - [x] **D6a AQUEDUCT** — DONE + green. The non-specialty housing district is now a
+        placeable RL/scaffold district. It has its own placement (adjacent to the city
+        center AND a water source — river / adjacent lake·oasis·mountain — no adjacency
+        yield → lowest tile), does NOT consume the specialty cap (spec_count now counts
+        only countsTowardLimit types), costs 0 upkeep (per-district `maintenance`
+        exported + summed), and applies conditional housing in _city_totals
+        (fresh city: +aqFreshBonus=2; non-fresh: water housing raised to
+        aqNoFreshTotal=6). Unlock is ENGINEERING (Classical) — NOT MASONRY (the initial
+        wiring bug: the scripted tech-includes check passed on MASONRY while
+        canPlaceDistrict gates on the ENGINEERING unlock, over-placing). Reachability:
+        ENGINEERING is 0/24 in the scripted policy (never reached in 100 turns) so
+        scripted coverage is vacuous, but off-script random tech play reaches it —
+        3/72 games place an Aqueduct, so housing/placement/cap/upkeep are all
+        non-vacuously verified. Both gates green.
+  - [ ] **D6b HARBOR** — coastal specialty (onCoastalWater; adjacency city-center +2,
+        sea-resource +1, harbor +2). Reachable: 42/83 cities coastal, unlock
+        (Celestial Navigation) 17/24. Needs coastal-water placement + the
+        city-center/sea-resource dynamic adjacency (the +2 center term, unlike the
+        economic districts' +0.5 DISTRICT term).
+  - [—] **Encampment / Neighborhood** — deferred: Encampment is a specialty district
+        competing for the ≤3 cap with the economic three (low value, military-only);
+        Neighborhood needs a late civic (Urbanization) unreached in 100 turns.
 
 ## 2. Single-agent MCTS  (score lever over the existing net)
 Primitives already exist: deterministic batched forward model (in-state

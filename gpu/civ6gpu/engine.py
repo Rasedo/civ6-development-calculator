@@ -88,6 +88,8 @@ class Rules:
     housing_fresh: float
     housing_coastal: float
     housing_none: float
+    housing_aq_fresh_bonus: float  # Aqueduct: +this to a fresh-water city
+    housing_aq_no_fresh: float  # Aqueduct: raise a non-fresh city's water housing to this
     amenity_tiers: list  # [(min, growth, yield)]
     center_min_food: float
     settler_base: float
@@ -134,6 +136,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         housing_fresh=r["housing"]["fresh"],
         housing_coastal=r["housing"]["coastal"],
         housing_none=r["housing"]["none"],
+        housing_aq_fresh_bonus=r["housing"].get("aqFreshBonus", 2),
+        housing_aq_no_fresh=r["housing"].get("aqNoFreshTotal", 6),
         amenity_tiers=[(t["min"], t["growth"], t["yield"]) for t in r["amenityTiers"]],
         center_min_food=r.get("centerMinFood", 2),
         settler_base=r["scenario"]["settlerBase"],
@@ -521,7 +525,7 @@ class BatchSim:
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
-        self._scaffold = [(int(p["idx"]), int(p["unlockTech"])) for p in sc.get("place", [])]  # (district idx, unlock tech idx), placement order
+        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("placement", 0))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, placement: 0 land / 1 aqueduct)
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
@@ -530,6 +534,17 @@ class BatchSim:
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] district-placeable land — static part of canPlaceDistrict
+        self.aqsrc = torch.tensor(
+            [[t.get("aqsrc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
+        )  # [B, T] Aqueduct water source (river / adjacent lake·oasis·mountain), static
+        # Which district types count toward the specialty cap (Aqueduct/Neighborhood
+        # do NOT). Aqueduct also carries housing, not an adjacency yield.
+        self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
+        self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
+        self._d_maint = torch.tensor([float(d.get("maintenance", 1)) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] gold upkeep per district type
+        self._h_fresh = float(rules.housing_fresh)
+        self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
+        self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
 
         self._eff_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None
@@ -952,21 +967,27 @@ class BatchSim:
         is_d = ((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0) | (self.rvcity_at[:, nbc] >= 0)) & on_map
         return is_d.sum(dim=2)  # [B, T]
 
-    def _place_district(self, di: int, want: torch.Tensor, c: int) -> torch.Tensor:
+    def _place_district(self, di: int, want: torch.Tensor, c: int, placement: int = 0) -> torch.Tensor:
         """Place district-type `di` in city slot `c` on its best tile, for batch
         rows where `want` is set AND an eligible tile exists. Mirrors the exporter's
         best-tile scan: eligible = owned by city c, district-placeable, empty (no
         district/improvement), within radius 3, not the city-center tile; ranked by
         floor(static + 0.5·adjacent-completed-districts), ties to lowest tile index.
+        placement=1 (Aqueduct): also require a tile adjacent to the city center AND
+        a water source (aqsrc); no adjacency yield, so ties → lowest index.
         Recomputes adjacency each call, so placing city-by-city in slot order
-        reproduces the replay's sequential act.p placement. Shared by the scripted
-        scaffold (capital) and the RL head (any city). Returns the [B] placed mask."""
+        reproduces the replay's sequential act.p placement. Returns the [B] placed mask."""
         B, T, dev = self.B, self.T, self.device
         site_c = self.site[:, c].clamp(min=0)
         adjc = self._adj_district_count().to(self.dtype)  # [B, T]
         elig = ((self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3))
         elig[torch.arange(B, device=dev), site_c] = False
-        adjf = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
+        if placement == 1:  # Aqueduct — adjacent to center + water source, no adjacency
+            adj_center = ((self.neigh.unsqueeze(0) >= 0) & (self.neigh.unsqueeze(0) == site_c.view(B, 1, 1))).any(dim=2)  # [B, T]
+            elig = elig & adj_center & self.aqsrc
+            adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield → lowest-index tie-break
+        else:
+            adjf = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
         arT = torch.arange(T, device=dev, dtype=self.dtype)
         key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))
         best = key.argmax(dim=1)  # [B]
@@ -1099,9 +1120,9 @@ class BatchSim:
                 mask = owned_d & (dt == di)
                 dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
                 total[:, :, yc] = total[:, :, yc] + (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2) + cs_dbonus[:, di].unsqueeze(1) * dcount
-            # districtMaintenance: 1 gold per completed specialty district (only
-            # CITY_CENTER/NEIGHBORHOOD/AQUEDUCT are 0, none placed in scope).
-            d_maint = (owned_d & (dt >= 0)).to(self.dtype).sum(dim=2)
+            # districtMaintenance: per-type upkeep (0 for City Center / Neighborhood
+            # / Aqueduct, else 1); sum over the city's owned completed districts.
+            d_maint = (self._d_maint[dt.clamp(min=0)] * (owned_d & (dt >= 0)).to(self.dtype)).sum(dim=2)
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
@@ -1128,7 +1149,19 @@ class BatchSim:
             maintenance = maintenance + d_maint  # specialty-district upkeep (Campus = 1 gold)
         total[:, :, 2] -= maintenance
 
-        housing = self.water_housing + self.palace_slot_housing.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_housing)
+        water_h = self.water_housing
+        if self.districts_on and self._aqueduct_idx >= 0:
+            # Aqueduct (computeHousing): a fresh-water city gets +aqFreshBonus;
+            # a non-fresh city's water housing is raised to aqNoFreshTotal.
+            has_aq = (owned_d & (dt == self._aqueduct_idx)).any(dim=2)  # [B, C] owns a completed Aqueduct
+            fresh = self.water_housing == self._h_fresh  # [B, C]
+            aq_h = torch.where(
+                fresh,
+                self.water_housing + self._aq_fresh_bonus,
+                torch.maximum(self.water_housing, torch.full_like(self.water_housing, self._aq_no_fresh_total)),
+            )
+            water_h = torch.where(has_aq, aq_h, self.water_housing)
+        housing = water_h + self.palace_slot_housing.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_housing)
         if self.improvements_on:
             # +housing per owned FARM tile within the work radius (pillaged or
             # not — computeHousing does not gate on pillaged, unlike yields).
@@ -1178,17 +1211,23 @@ class BatchSim:
             dcols = torch.zeros(B, C, nS, dtype=torch.bool, device=dev)
             if self._rl_district_active:  # D5b/c: capital (or any city if _rl_any_city) places districts off-script
                 ar = torch.arange(B, device=dev)
+                spec_tile = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]  # [B,T] specialty district tiles
                 for c in range(C if self._rl_any_city else 1):
+                    site_c = self.site[:, c].clamp(min=0)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
-                    spec_count = ((self.district >= 0) & (self.owner == c)).sum(dim=1)  # [B] city c's specialty count
-                    under_cap = spec_count < cap_c  # [B]
-                    elig = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
-                    elig[ar, self.site[:, c].clamp(min=0)] = False
-                    has_tile = elig.any(dim=1)  # [B] city c has an empty placeable tile
-                    for si, (di, utech) in enumerate(self._scaffold):
+                    under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
+                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
+                    base[ar, site_c] = False
+                    adj_center = ((self.neigh.unsqueeze(0) >= 0) & (self.neigh.unsqueeze(0) == site_c.view(B, 1, 1))).any(dim=2)
+                    has_land = base.any(dim=1)  # [B]
+                    has_aq = (base & adj_center & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
+                    for si, (di, utech, plc) in enumerate(self._scaffold):
                         has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
                         not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
-                        dcols[:, c, si] = has_tech & under_cap & has_tile & not_owned
+                        if plc == 1:  # Aqueduct: non-specialty (no cap), aqueduct-eligible tile
+                            dcols[:, c, si] = has_tech & has_aq & not_owned
+                        else:
+                            dcols[:, c, si] = has_tech & under_cap & has_land & not_owned
             cols.append(dcols)
         return torch.cat(cols, dim=2) & pend.unsqueeze(2)
 
@@ -2758,13 +2797,14 @@ class BatchSim:
                 for c in range(C if self._rl_any_city else 1):
                     ac = act[:, c]  # city c's chosen action (-1 where not idle/alive)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
-                    for si, (di, utech) in enumerate(self._scaffold):
+                    for si, (di, utech, plc) in enumerate(self._scaffold):
                         has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                        spec_count = ((self.district >= 0) & (self.owner == c)).sum(dim=1)  # city c's specialty count (recomputed)
+                        spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == c)).sum(dim=1)  # specialty only (recomputed)
                         not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
-                        want = (ac == dbase + si) & has_tech & (spec_count < cap_c) & not_owned
+                        under_cap = (plc == 1) | (spec_count < cap_c)  # Aqueduct is non-specialty → no cap
+                        want = (ac == dbase + si) & has_tech & under_cap & not_owned
                         if bool(want.any()):
-                            self._place_district(di, want, c)
+                            self._place_district(di, want, c, plc)
 
         # --- scripted districts (D3b): place each scaffold district IN ORDER,
         # once, when its unlock tech is in and the per-pop specialty cap allows
@@ -2773,13 +2813,14 @@ class BatchSim:
         # score by the FULL floor(static + 0.5*adjacent completed districts).
         if production is None and self.districts_on and self._campus_active and self._scaffold:
             cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
-            for si, (di, utech) in enumerate(self._scaffold):
+            for si, (di, utech, plc) in enumerate(self._scaffold):
                 has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # [B] capital specialty districts
-                want = has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & (spec_count < cap_max)
+                spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == 0)).sum(dim=1)  # specialty only
+                under_cap = (plc == 1) | (spec_count < cap_max)  # Aqueduct is non-specialty → no cap
+                want = has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & under_cap
                 if not bool(want.any()):
                     continue
-                place = self._place_district(di, want, 0)  # scaffold is capital-only (slot 0)
+                place = self._place_district(di, want, 0, plc)  # scaffold is capital-only (slot 0)
                 self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | place
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------
