@@ -251,7 +251,7 @@ _MUTABLE = [
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
-    "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "campus_placed",
+    "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
 ]
 
 
@@ -495,8 +495,9 @@ class BatchSim:
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
-        self.campus_placed = torch.zeros(B, dtype=torch.bool, device=device)  # D2b scaffold flag (activation is next stage)
-        self._campus_active = bool(sc.get("active", 0))  # D2b-activate off-switch (mirrors exporter SCRIPTED_CAMPUS)
+        self._scaffold = [(int(p["idx"]), int(p["unlockTech"])) for p in sc.get("place", [])]  # (district idx, unlock tech idx), placement order
+        self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
+        self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -2590,18 +2591,22 @@ class BatchSim:
             self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
             self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
 
-        # --- scripted Campus (D2b-activate) --------------------------------------
-        # Scripted path only (the off-script RL rollout gets a district action in
-        # D5). Mirrors the exporter: once WRITING is in, place ONE completed
-        # Campus in the capital on the best floor(static-adjacency) owned,
-        # unimproved, in-radius tile with NO adjacent completed district (center
-        # or specialty), ties to lowest tile index — so the yield is purely
-        # static (dynamic sources are D3).
-        if production is None and self.districts_on and self.campus_unlock_tech >= 0 and self._campus_active:
-            has_w = self.techs[:, self.campus_unlock_tech]  # [B]
-            want = has_w & ~self.campus_placed & self.alive[:, 0]
-            if bool(want.any()):
-                site0 = self.site[:, 0].clamp(min=0)  # [B]
+        # --- scripted districts (D3b): place each scaffold district IN ORDER,
+        # once, when its unlock tech is in and the per-pop specialty cap allows
+        # another (maxSpecialtyDistricts = floor((pop-1)/3)+1). Scripted path only
+        # (the RL district action is D5). Mirrors the exporter's scaffold list;
+        # score by the FULL floor(static + 0.5*adjacent completed districts).
+        if production is None and self.districts_on and self._campus_active and self._scaffold:
+            site0 = self.site[:, 0].clamp(min=0)  # [B]
+            cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
+            arT = torch.arange(T, device=dev, dtype=self.dtype)
+            for si, (di, utech) in enumerate(self._scaffold):
+                has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # [B] capital specialty districts
+                want = has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & (spec_count < cap_max)
+                if not bool(want.any()):
+                    continue
+                adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source (recomputed as districts land)
                 elig = (
                     (self.owner == 0)
                     & self.d_usable
@@ -2610,19 +2615,14 @@ class BatchSim:
                     & (self.dist[:, 0] <= 3)
                 )  # [B, T]
                 elig[torch.arange(B, device=dev), site0] = False  # not the center itself
-                # score by the FULL floor(static + 0.5*adjacent-districts) (D3a):
-                # placement now includes the dynamic DISTRICT source, so the Campus
-                # may sit next to the center/another district for its +0.5 each.
-                adjc = self._adj_district_count().to(self.dtype)  # [B, T]
-                adjf = torch.floor(self.d_static_adj[:, :, self.CAMPUS] + 0.5 * adjc)  # [B, T]
-                arT = torch.arange(T, device=dev, dtype=self.dtype)
+                adjf = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
                 key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))  # max adj, ties lowest index
                 best = key.argmax(dim=1)  # [B]
                 place = want & elig.any(dim=1)
                 if bool(place.any()):
                     rows = place.nonzero(as_tuple=True)[0]
-                    self.district[rows, best[rows]] = self.CAMPUS
-                    self.campus_placed = self.campus_placed | place
+                    self.district[rows, best[rows]] = di
+                    self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | place
                     self._eff_version += 1
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------

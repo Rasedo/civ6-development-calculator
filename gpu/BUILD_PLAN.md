@@ -42,8 +42,11 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         - [x] **D3b-1** generalized the yield loop, maintenance, and CS-quest
               `already`/satisfaction over district types (data-driven from the
               catalog + askable map); behavior-preserving, both gates green.
-        - [ ] **D3b-2** scripted policy places a HOLY_SITE too (per-pop cap),
-              gate-verified. Then D3b-3 Commercial Hub, D3b-4 Industrial Zone.
+        - [x] **D3b-2** scripted placement generalized to a scaffold LIST; places
+              a HOLY_SITE too (per-pop cap). Coverage: Campus 22/24, Holy Site
+              24/24 games; both gates green first try.
+        - [ ] **D3b-3** Commercial Hub (river static + DISTRICT dyn).
+        - [ ] **D3b-4** Industrial Zone (needs MINE_OR_QUARRY dynamic source).
 - [ ] **D4** District buildings (Library/University, Market/Bank, Shrine/Temple,
       Workshop/Factory, etc.): unlocks, yields, housing, specialist slots.
 - [ ] **D5** RL production head can queue districts (widen production action
@@ -165,3 +168,9 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   floor(static+dynamic), so a Campus may sit beside the center for +0.5. Both
   gates green (scripted 24 seeds, off-script 72 games); canary (dyn amount
   0.5→1.0) fails at seed 9014 t63. Next: D3b — the other adjacency district types.
+- D3b-2 [x]: scripted placement is now a scaffold LIST — engine _scaffold=
+  [(Campus,WRITING),(HolySite,ASTROLOGY)] + dscaffold_placed[B,n]; places each
+  in order when unlocked and the per-pop cap floor((pop-1)/3)+1 allows, on its
+  best floor(static+0.5*adj) tile. Coverage: Campus 22/24, Holy Site 24/24
+  games. Both gates green FIRST TRY — D3b-1's generalized yield/maintenance/
+  CS-quest handled Holy Site with no extra work. Next: D3b-3 Commercial Hub.

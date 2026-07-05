@@ -185,6 +185,13 @@ const ADJ_SRC: AdjacencySource[] = [
 // reads the same flag via districtScaffold.active.
 const SCRIPTED_CAMPUS = true;
 
+// Districts the scripted policy places, in order (each once, when its unlock
+// tech is in and the per-pop specialty cap allows). The engine mirrors this.
+const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string }[] = [
+  { id: 'CAMPUS', unlockId: 'WRITING' },
+  { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
+];
+
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
 ]);
@@ -370,6 +377,11 @@ const rules = {
       t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === 'CAMPUS'),
     ),
     active: SCRIPTED_CAMPUS ? 1 : 0,
+    // Districts the scripted policy places, IN ORDER (engine mirrors this list).
+    place: SCAFFOLD_DISTRICTS.map(({ id, unlockId }) => ({
+      idx: PLACEABLE_DISTRICTS.indexOf(id),
+      unlockTech: techIdx.get(unlockId) ?? -1,
+    })),
     // CS buildDistrict askable list → engine district-type indices, so the
     // `already`/satisfied checks generalize past CAMPUS.
     askable: (['CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB', 'THEATER_SQUARE'] as const).map((id) =>
@@ -647,7 +659,7 @@ for (let s = 0; s < N_SEEDS; s++) {
 
   const warriorTrained = new Set<number>();
   let builderTrained = false;
-  let campusPlaced = false;
+  const placedDistricts = new Set<number>();
   const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
     // Envoys: greedily back the neediest met city-state (fewest envoys,
@@ -732,35 +744,35 @@ for (let s = 0; s < N_SEEDS; s++) {
         walkPath(state, u);
       }
     }
-    // Scripted district (D2b): once WRITING unlocks the Campus, instant-place
-    // ONE completed Campus in the capital on the best static-adjacency owned,
-    // unimproved tile that has NO adjacent completed district (so the adjacency
-    // is purely static — dynamic sources are D3), ties to lowest tile index.
-    // The GPU mirrors this exact choice. Placed after the builders, before
-    // endTurn, so this turn's yields already reflect it.
-    if (SCRIPTED_CAMPUS && !campusPlaced && state.research.techs.includes('WRITING')) {
+    // Scripted districts (D2b/D3b): place each scaffold district IN ORDER, once,
+    // when its unlock tech is in and the per-pop specialty cap allows another
+    // (canPlaceDistrict enforces the cap). Best floor(districtAdjacency) tile,
+    // ties lowest index; after the builders, before endTurn so this turn's
+    // yields reflect it. The GPU mirrors this list and choice.
+    if (SCRIPTED_CAMPUS) {
       const cap = state.cities.find((c) => c.isCapital);
       if (cap) {
-        let best = -1;
-        let bestAdj = -1;
-        for (const tile of map.tiles) {
-          if (tile.cityId !== cap.id || tile.improvement) continue;
-          if (!canPlaceDistrict(state, cap, 'CAMPUS', tile.index).ok) continue;
-          // D3a: no longer skip district-adjacent tiles — districtAdjacency below
-          // includes the dynamic DISTRICT source (+0.5 per adjacent completed
-          // district/center), so the best tile may sit beside the city center.
-          const adj = districtAdjacency(map, tile, 'CAMPUS');
-          if (adj > bestAdj) {
-            bestAdj = adj;
-            best = tile.index;
+        for (const spec of SCAFFOLD_DISTRICTS) {
+          const di = PLACEABLE_DISTRICTS.indexOf(spec.id);
+          if (placedDistricts.has(di) || !state.research.techs.includes(spec.unlockId)) continue;
+          let best = -1;
+          let bestAdj = -1;
+          for (const tile of map.tiles) {
+            if (tile.cityId !== cap.id || tile.improvement) continue;
+            if (!canPlaceDistrict(state, cap, spec.id, tile.index).ok) continue;
+            const adj = districtAdjacency(map, tile, spec.id);
+            if (adj > bestAdj) {
+              bestAdj = adj;
+              best = tile.index;
+            }
           }
-        }
-        if (best >= 0) {
-          const tile = map.tiles[best];
-          tile.district = 'CAMPUS';
-          tile.districtComplete = true;
-          cap.districts.push({ type: 'CAMPUS', tileIndex: best });
-          campusPlaced = true;
+          if (best >= 0) {
+            const tile = map.tiles[best];
+            tile.district = spec.id;
+            tile.districtComplete = true;
+            cap.districts.push({ type: spec.id, tileIndex: best });
+            placedDistricts.add(di);
+          }
         }
       }
     }
