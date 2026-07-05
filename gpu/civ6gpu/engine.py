@@ -497,6 +497,7 @@ class BatchSim:
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
         self.campus_placed = torch.zeros(B, dtype=torch.bool, device=device)  # D2b scaffold flag (activation is next stage)
         self._campus_active = bool(sc.get("active", 0))  # D2b-activate off-switch (mirrors exporter SCRIPTED_CAMPUS)
+        self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] district-placeable land — static part of canPlaceDistrict
@@ -951,14 +952,23 @@ class BatchSim:
             # cityDistrictYields: floor(adjacency) into the district's yield
             # column, summed into the pre-amenity total.
             dt = self.district.gather(1, tcf).reshape(B, C, M)
-            campus = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids) & (dt == self.CAMPUS)
-            # floor(static + 0.5 * adjacent completed districts) — D3a adds the
-            # dynamic DISTRICT source; mirrors districtAdjacency for the Campus.
-            adjc = self._adj_district_count().to(self.dtype)  # [B, T]
-            campus_adj = torch.floor(self.d_static_adj[:, :, self.CAMPUS] + 0.5 * adjc)  # [B, T]
-            d_sci = (campus_adj.gather(1, tcf).reshape(B, C, M) * campus.to(self.dtype)).sum(dim=2)
-            total[:, :, 3] = total[:, :, 3] + d_sci
-            d_maint = campus.to(self.dtype).sum(dim=2)  # +1 gold upkeep per completed Campus (districtMaintenance)
+            owned_d = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
+            adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
+            # For each PLACED district with an adjacencyYield: floor(static +
+            # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
+            # sources (mine/quarry for IZ, city-center for Harbor, built-wonder
+            # for Theater) are added when those types are placed (D3b-4+).
+            for d in self.districts_cat:
+                yc = int(d.get("adjYield", -1))
+                if yc < 0:
+                    continue
+                di = int(d["idx"])
+                adjv = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
+                mask = owned_d & (dt == di)
+                total[:, :, yc] = total[:, :, yc] + (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2)
+            # districtMaintenance: 1 gold per completed specialty district (only
+            # CITY_CENTER/NEIGHBORHOOD/AQUEDUCT are 0, none placed in scope).
+            d_maint = (owned_d & (dt >= 0)).to(self.dtype).sum(dim=2)
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
@@ -1690,8 +1700,15 @@ class BatchSim:
             # and the player owns one; trade-route quests remain uncompletable.
             camp_gone = ~((self.camp_tile == self.cs_quest_camp[:, s].unsqueeze(1)) & (self.camp_tile >= 0)).any(dim=1)
             resolved_camp = act & (self.cs_quest[:, s] == 1) & camp_gone
-            has_campus_r = (self.district == self.CAMPUS).any(dim=1) if self.districts_on else torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            resolved_dist = act & (self.cs_quest[:, s] == 3) & (self.cs_quest_district[:, s] == 0) & has_campus_r
+            # a buildDistrict quest resolves when the player owns the asked
+            # district type (askable idx recorded in cs_quest_district).
+            if self._askable.numel() > 0 and self.districts_on:
+                qd = self.cs_quest_district[:, s].clamp(min=0, max=self._askable.numel() - 1)
+                asked_type = self._askable[qd]  # [B]
+                owns_asked = (self.district == asked_type.unsqueeze(1)).any(dim=1) & (self.cs_quest_district[:, s] >= 0)
+            else:
+                owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            resolved_dist = act & (self.cs_quest[:, s] == 3) & owns_asked
             resolved = resolved_camp | resolved_dist
             if bool(resolved.any()):
                 rows = resolved.nonzero(as_tuple=True)[0]
@@ -1706,8 +1723,14 @@ class BatchSim:
             due = act & (self.cs_quest[:, s] == 0) & (self.turn - self.cs_quest_issued[:, s] >= cooldown)
             r1 = self._next_random(due)  # the askable-district pick
             draw1 = torch.floor(r1 * 4.0).to(torch.long)
-            has_campus = (self.district == self.CAMPUS).any(dim=1) if self.districts_on else torch.zeros(self.B, dtype=torch.bool, device=self.device)
-            bd = ~((draw1 == 0) & has_campus)  # buildDistrict offered unless already-built CAMPUS
+            # buildDistrict offered unless the player already owns the DRAWN
+            # askable district (askable idx -> district type via self._askable).
+            if self._askable.numel() > 0 and self.districts_on:
+                drawn_type = self._askable[draw1.clamp(min=0, max=self._askable.numel() - 1)]  # [B]
+                already_bd = (self.district == drawn_type.unsqueeze(1)).any(dim=1)
+            else:
+                already_bd = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            bd = ~already_bd
             cdist = self.pair_dist[self.cs_center[:, s].unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
             near = (self.camp_tile >= 0) & (cdist <= 6)
             has_camp = near.any(dim=1)

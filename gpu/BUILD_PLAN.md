@@ -38,10 +38,12 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
   - [x] **D3a** dynamic DISTRICT source for Campus (+0.5 per adjacent completed
         district/center incl. rival centers); placement relaxed to allow
         center-adjacent tiles. Both gates green; canary (dyn 0.5→1.0) bites.
-  - [ ] **D3b** other adjacency district types (Holy Site, Commercial Hub,
-        Industrial Zone) — generalize the _city_totals yield loop + the scripted
-        placement + the CS-quest `already` beyond CAMPUS. Harbor (coastal) later.
-        Also: built-wonder / mine-quarry / harbor dynamic sources as needed.
+  - [~] **D3b** other adjacency district types (Holy Site, Commercial Hub, IZ):
+        - [x] **D3b-1** generalized the yield loop, maintenance, and CS-quest
+              `already`/satisfaction over district types (data-driven from the
+              catalog + askable map); behavior-preserving, both gates green.
+        - [ ] **D3b-2** scripted policy places a HOLY_SITE too (per-pop cap),
+              gate-verified. Then D3b-3 Commercial Hub, D3b-4 Industrial Zone.
 - [ ] **D4** District buildings (Library/University, Market/Bank, Shrine/Temple,
       Workshop/Factory, etc.): unlocks, yields, housing, specialist slots.
 - [ ] **D5** RL production head can queue districts (widen production action

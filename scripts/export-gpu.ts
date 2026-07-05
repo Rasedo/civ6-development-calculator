@@ -370,6 +370,11 @@ const rules = {
       t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === 'CAMPUS'),
     ),
     active: SCRIPTED_CAMPUS ? 1 : 0,
+    // CS buildDistrict askable list → engine district-type indices, so the
+    // `already`/satisfied checks generalize past CAMPUS.
+    askable: (['CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB', 'THEATER_SQUARE'] as const).map((id) =>
+      PLACEABLE_DISTRICTS.indexOf(id),
+    ),
   },
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
