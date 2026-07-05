@@ -1,0 +1,122 @@
+"""M1 single-agent search self-test.
+
+    npm run gpu:export        # (once) writes gpu/fixtures/
+    python gpu/mcts_test.py
+
+Two properties, both eval-only (never perturb the parity-checked forward model):
+
+  1. snapshot / restore round-trips the FULL mutable state (every _MUTABLE tensor
+     incl. the RNG stream + the turn counter) bit-exactly, and a step taken after
+     a restore reproduces the same next state (determinism).
+
+  2. search_production is deterministic, leaves the sim's state bit-identical, and
+     its horizon-15 choice's rollout value never trails the myopic (horizon-0)
+     greedy choice — and beats it outright on at least one seed.
+"""
+
+from __future__ import annotations
+
+import statistics
+import sys
+from pathlib import Path
+
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
+from civ6gpu.engine import _MUTABLE
+from civ6gpu.mcts import search_production, greedy_production, _rollout_value
+
+HORIZON = 15
+MIN_TURN = 30  # skip trivial turn-1 openings; find a real mid-game production choice
+
+
+def build(rules, path):
+    return BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+
+
+def advance_to_decision(sim):
+    """Scripted-step until the capital faces a >=2-way choice mid-game."""
+    for _ in range(160):
+        if int(sim.production_mask()[0, 0].sum()) >= 2 and sim.turn >= MIN_TURN:
+            break
+        sim.step()
+    return int(sim.production_mask()[0, 0].sum())
+
+
+def test_snapshot_restore(rules, paths):
+    sim = BatchSim([load_fixture(p) for p in paths[:4]], rules, device="cpu", dtype=torch.float64)
+    for _ in range(30):
+        sim.step()
+    snap = sim.snapshot()
+    before = sim.empire_score().clone()
+    for _ in range(10):
+        sim.step()
+    assert not torch.equal(before, sim.empire_score()), "advance didn't change state (vacuous)"
+    sim.restore(snap)
+    drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), snap["mut"][k])]
+    assert not drift, f"restore not bit-exact for: {drift}"
+    assert sim.turn == snap["turn"], "turn not restored"
+    assert torch.equal(sim.empire_score(), before), "empire_score not restored"
+
+    # determinism: two steps from the same restored state must match bit-for-bit.
+    sim.restore(snap)
+    sim.step()
+    a = {k: getattr(sim, k).clone() for k in _MUTABLE}
+    sim.restore(snap)
+    sim.step()
+    nd = [k for k in _MUTABLE if not torch.equal(a[k], getattr(sim, k))]
+    assert not nd, f"step-after-restore nondeterministic for: {nd}"
+    print(f"snapshot/restore bit-exact across {len(_MUTABLE)} mutable tensors + turn; "
+          f"step-after-restore deterministic")
+
+
+def test_search(rules, paths):
+    n_seeds = n_differ = n_disc = 0
+    for path in paths:
+        sim = build(rules, path)
+        if advance_to_decision(sim) < 2:
+            continue
+        n_seeds += 1
+        t = sim.turn
+
+        # eval-only: the search must not mutate the forward model.
+        pristine = {k: getattr(sim, k).clone() for k in _MUTABLE}
+        best, vals = search_production(sim, city=0, horizon=HORIZON)
+        drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), pristine[k])]
+        assert not drift, f"{path.name}: search mutated {drift}"
+
+        # determinism: rebuild + research reproduces best + values exactly.
+        sim2 = build(rules, path)
+        advance_to_decision(sim2)
+        best2, vals2 = search_production(sim2, city=0, horizon=HORIZON)
+        assert (best, vals) == (best2, vals2), f"{path.name}: nondeterministic search"
+
+        # improves on greedy: same horizon-15 yardstick for both choices.
+        snap = sim.snapshot()
+        g_best, _ = greedy_production(sim, city=0)
+        greedy_val = _rollout_value(sim, 0, g_best, HORIZON, snap)
+        assert vals[best] >= greedy_val - 1e-9, (
+            f"{path.name}: search {vals[best]} < greedy {greedy_val}")
+        n_differ += best != g_best
+        n_disc += len(vals) >= 3 and max(vals.values()) > statistics.median(vals.values()) + 1e-9
+        print(f"  {path.name}: t={t} cands={len(vals)} search={best}({vals[best]:.2f}) "
+              f"greedy={g_best}({greedy_val:.2f}) {'DIFFER' if best != g_best else 'same'}")
+
+    assert n_seeds >= 3, f"too few usable seeds ({n_seeds})"
+    assert n_differ >= 1, "search never improved on greedy"
+    assert n_disc >= 1, "search never discriminated best from median"
+    print(f"search: {n_seeds} seeds, >=greedy on all, differed on {n_differ}, discriminated on {n_disc}")
+
+
+def main():
+    rules = load_rules()
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    assert paths, "no fixtures — run `npm run gpu:export` first"
+    test_snapshot_restore(rules, paths)
+    test_search(rules, paths[:12])
+    print("M1 SEARCH SELF-TEST OK")
+
+
+if __name__ == "__main__":
+    main()

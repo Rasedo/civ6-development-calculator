@@ -160,10 +160,20 @@ Primitives already exist: deterministic batched forward model (in-state
 mulberry32), cheap clone/restore (`_MUTABLE` + `_pristine`), trained policy
 priors + value head (train_ppo `self.v`), legal-action masks.
 
-- [ ] **M1** PUCT driver over BatchSim (clone→step→backup) using policy priors +
-      value leaf eval. CPU smoke test.
+- [x] **M1** DONE — `snapshot`/`restore` (clone every `_MUTABLE` tensor + turn) +
+      an EXHAUSTIVE 1-ply `search_production` over one city's production head: score
+      each legal action by its horizon-15 scripted rollout, take the argmax. The
+      scripted forward model is deterministic (RNG lives in `rng_state`, round-tripped
+      by snapshot/restore), so ONE rollout per action is its exact value — a PUCT
+      bandit is pointless here and, unnormalized, actively wrong (its exploration term
+      is dwarfed by raw ~60–180 empire scores, so it sticks on the first-scored action
+      and never visits the rest). `gpu/mcts_test.py`: snapshot/restore bit-exact over
+      104 tensors + deterministic; search deterministic, eval-only (state bit-identical
+      after), >= greedy on all 12 seeds and strictly beats it on 9 (typically finding a
+      SETTLER/second-city line that compounds past the myopic building). Both gates green.
 - [ ] **M2** Factored action space (5 heads/turn): Gumbel/Sampled-AlphaZero style
-      search over sampled action-tuples. Eval vs the 213.6 policy.
+      search over sampled action-tuples — this is where the real PUCT lands (net
+      priors + value leaf + Q-normalization + RNG chance nodes). Eval vs the 213.6 policy.
 - [ ] **M3** (opt) Search-distilled policy improvement loop; handle RNG chance
       nodes (sample futures / expectimax) for robustness.
 
@@ -357,3 +367,25 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   each other resolve districts in the same order as the replay.)
   Both gates green (scripted 24×100, off-script 72×100). D5 fully complete —
   the RL policy can place districts in ANY city under parity.
+- M1 [x] single-agent search (score lever). Two eval-only primitives on BatchSim,
+  neither touched by the parity gates: (a) `snapshot()`/`restore()` clone every
+  `_MUTABLE` tensor (incl. `rng_state`) + the turn counter and copy_ them back,
+  bumping `_eff_version` so the derived caches recompute; (b) `search_production`
+  (gpu/civ6gpu/mcts.py) — exhaustive 1-ply over one city's production head: commit
+  each legal action (others idle, then tech/civic/units/production scripted), roll
+  out `horizon` scripted turns, read empire_score, restore; argmax over the actions.
+  Chose exhaustive over the planned PUCT bandit because the scripted forward model is
+  DETERMINISTIC (its only randomness is `rng_state`, which snapshot/restore round-
+  trips), so a single rollout per action is that action's exact value — nothing to
+  sample. A naive flat PUCT is not just redundant but WRONG here: Q is the raw empire
+  score (~60–180) while the exploration bonus is ~1–2, so once the first action scores
+  it dominates PUCT forever and the bandit never visits the rest (observed: 6 of 7
+  candidates left at 0 visits, best mis-picked). Real PUCT (net priors + value +
+  Q-normalization + RNG chance nodes) is deferred to M2 where leaves become expensive
+  and stochastic. `gpu/mcts_test.py` (new, follows the parity_test.py convention):
+  snapshot/restore bit-exact across 104 tensors + step-after-restore deterministic;
+  search deterministic, leaves state bit-identical, and its horizon-15 pick is >=
+  the greedy (horizon-0) pick on all 12 seeds — strictly better on 9, where it
+  favours a SETTLER/second-city line that out-compounds the myopic building over 15
+  turns. Both parity gates stay green (additive engine change; forward model
+  untouched). Next: M2.

@@ -704,6 +704,24 @@ class BatchSim:
         self._food_cache = None
         self._score_cache = None
 
+    def snapshot(self) -> dict:
+        """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
+        for cheap save/restore during search (MCTS). Eval-only — never touched by
+        the parity gates. The derived caches are keyed by _eff_version, which
+        restore() bumps, so they need not be captured."""
+        return {"mut": {k: getattr(self, k).clone() for k in _MUTABLE}, "turn": self.turn}
+
+    def restore(self, snap: dict) -> None:
+        """Restore a snapshot() in place. Bumps _eff_version + clears the derived
+        caches so a later compute recomputes against the restored state."""
+        for k, v in snap["mut"].items():
+            getattr(self, k).copy_(v)
+        self.turn = snap["turn"]
+        self._eff_version += 1
+        self._eff_cache = None
+        self._food_cache = None
+        self._score_cache = None
+
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
         m = torch.zeros(n, n, dtype=torch.bool)
