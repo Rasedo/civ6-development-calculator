@@ -489,3 +489,12 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   remaining search levers (tech/civic/unit heads, deeper trees) and the net-guided
   M2b-2 are GPU/effort-gated. Next: C1 (net-free symmetric-rival refactor → self-play)
   is the highest-value CPU-reachable direction.
+- Search arm capstone [x]: `gpu/SEARCH.md` documents the primitives (snapshot/restore,
+  1-ply/closed-loop/empire search), the tools (mcts_test.py, search_eval.py), the
+  benchmark table, and the reproduction commands. Includes the seed9053 investigation:
+  it is NOT a bug — the search led the whole game (95.9 @ t90, 4 cities from aggressive
+  SETTLERs) then lost 2 cities in the last 30 turns (→63.4) because it controls only
+  production, not military, so its undefended expansion is razed/flipped in a hostile
+  world (scripted stays at 2 cities and wins 94.5). Same instinct sinks the net there.
+  The honest fix is a wider control surface (search the unit head too) or an
+  expansion-risk penalty — future work. Doc-only; no code/parity impact.
