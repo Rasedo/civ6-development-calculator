@@ -498,3 +498,24 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   world (scripted stays at 2 cities and wins 94.5). Same instinct sinks the net there.
   The honest fix is a wider control surface (search the unit head too) or an
   expansion-risk penalty — future work. Doc-only; no code/parity impact.
+- C1 scoping [x] (investigation, no code change): mapped the rival-vs-player asymmetry
+  to size the "symmetric rivals" refactor honestly.
+  * PLAYER state is full: per-city pop / production queue (`current`,`cur_cost`) /
+    districts (`district[B,T]`) / buildings / food+culture boxes; techs bitmask +
+    `tech_prog`; civics + `civic_prog`; treasury; government; per-slot units
+    (position/hp/movement); envoys; great-people points.
+  * RIVAL state is a reduced heuristic (engine.py `_rival_phase` ~2513, src/core/
+    rivals.ts): `rival_at`/`rvcity_at` (tile + center ownership), a population scalar
+    per rival city, a rival-wide `militaryStock`, scalar tech/prod progression, and
+    heuristic behaviour (economy → border expand → found → spawn units → war/peace).
+    NO production queue, districts, buildings, tech/civic trees, government, envoys or GP.
+  * Therefore C1 = replicate the ENTIRE player subsystem across an owner dimension in
+    BOTH engines. The blocker is "keep TS parity": promoting rivals in the GPU alone
+    diverges from TS; promoting them in TS too changes every rival's behaviour, so all
+    24+72 parity fixtures change — it is a two-engine RE-ARCHITECTURE, not a refactor,
+    and its only payoff (self-play) needs a GPU training run C2/C3 later add. Verdict:
+    C1 is a poor fit for autonomous CPU work on a rollback-prone box — it wants a
+    deliberate, GPU-backed effort. Interim option if self-play is wanted sooner: a
+    separate SYMMETRIC mini-env (owner-indexed from the start) rather than promoting
+    the full-fidelity engine. This is a phase boundary worth a human decision, not
+    filler; the single-agent search arm (M1–M2b-1 + empire + SEARCH.md) is complete.
