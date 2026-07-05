@@ -140,9 +140,20 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         first `cw` omitted the non-bonus-resource / wonder exclusions, so the GPU
         placed a Harbor on a tile canPlaceDistrict rejects — displacing a Commercial
         Hub and swinging treasury ~18g (seed 9066). Both gates green (24×100, 72×100).
-  - [—] **Encampment / Neighborhood** — deferred: Encampment is a specialty district
-        competing for the ≤3 cap with the economic three (low value, military-only);
-        Neighborhood needs a late civic (Urbanization) unreached in 100 turns.
+  - [—] **Encampment** — wired end-to-end (placement 'encampment'/code 3:
+        notAdjacentToCityCenter, specialty, no yield) and reaches 21 placements
+        off-script, but HELD OUT of the scaffold. It left a subtle culture→civic
+        completion-timing edge (seed 9248, civics off by 1 at t98) that isn't worth
+        chasing for a no-yield military district that only competes for the scarce
+        cap. Re-add `{id:'ENCAMPMENT',unlockId:'BRONZE_WORKING',placement:'encampment'}`
+        to SCAFFOLD_DISTRICTS to re-enable. NOTE: the fix that landed here anyway —
+        requires/notAdjacentToCityCenter must test ALL adjacent CITY_CENTERs (player
+        AND rival, via `_adj_center_count()`), not just the placing city's own
+        center — also corrected a latent Aqueduct over/under-placement.
+  - [—] **Neighborhood** — needs a late civic (Urbanization) unreached in 100 turns.
+- **D6 COMPLETE (reachable specials):** Aqueduct (housing) + Harbor (coastal gold)
+  are live under both gates. The district action space now covers the economic
+  three + housing + coastal — enough for a district-rich retrain.
 
 ## 2. Single-agent MCTS  (score lever over the existing net)
 Primitives already exist: deterministic batched forward model (in-state

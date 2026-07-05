@@ -1026,9 +1026,9 @@ class BatchSim:
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
         elig = ((self.owner == c) & surface & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3))
         elig[torch.arange(B, device=dev), site_c] = False
-        if placement == 1:  # Aqueduct — adjacent to center + water source, no adjacency
-            adj_center = ((self.neigh.unsqueeze(0) >= 0) & (self.neigh.unsqueeze(0) == site_c.view(B, 1, 1))).any(dim=2)  # [B, T]
-            elig = elig & adj_center & self.aqsrc
+        if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
+            cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any player/rival) — matches TS requires/notAdjacentToCityCenter
+            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))  # Aqueduct: adjacent-center+water; Encampment: NOT adjacent-center
             adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield → lowest-index tie-break
         else:  # economic (land) or Harbor (coastal) — full districtAdjacency
             adjf = torch.floor(self._district_adj_raw(di, adjc))  # [B, T]
@@ -1256,18 +1256,19 @@ class BatchSim:
             if self._rl_district_active:  # D5b/c: capital (or any city if _rl_any_city) places districts off-script
                 ar = torch.arange(B, device=dev)
                 spec_tile = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]  # [B,T] specialty district tiles
+                cc = self._adj_center_count()  # [B,T] adjacent CITY_CENTERs (global) — Aqueduct requires, Encampment forbids
                 for c in range(C if self._rl_any_city else 1):
                     site_c = self.site[:, c].clamp(min=0)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
                     under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
                     base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
                     base[ar, site_c] = False
-                    adj_center = ((self.neigh.unsqueeze(0) >= 0) & (self.neigh.unsqueeze(0) == site_c.view(B, 1, 1))).any(dim=2)
                     cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
                     cbase[ar, site_c] = False
                     has_land = base.any(dim=1)  # [B]
-                    has_aq = (base & adj_center & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
+                    has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
                     has_coastal = cbase.any(dim=1)  # [B] a coastal-water tile (Harbor)
+                    has_enc = (base & (cc == 0)).any(dim=1)  # [B] a land tile NOT adjacent to any center (Encampment)
                     for si, (di, utech, plc) in enumerate(self._scaffold):
                         has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
                         not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
@@ -1275,6 +1276,8 @@ class BatchSim:
                             dcols[:, c, si] = has_tech & has_aq & not_owned
                         elif plc == 2:  # Harbor: specialty (cap), coastal-water tile
                             dcols[:, c, si] = has_tech & under_cap & has_coastal & not_owned
+                        elif plc == 3:  # Encampment: specialty (cap), not adjacent to the center
+                            dcols[:, c, si] = has_tech & under_cap & has_enc & not_owned
                         else:
                             dcols[:, c, si] = has_tech & under_cap & has_land & not_owned
             cols.append(dcols)

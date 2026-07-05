@@ -205,14 +205,18 @@ const SCRIPTED_CAMPUS = true;
 // tech is in and the per-pop specialty cap allows). The engine mirrors this.
 // placement 'aqueduct' = the non-specialty housing district (adjacent to the
 // city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
-const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' | 'coastal' }[] = [
+const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
   { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
   { id: 'AQUEDUCT', unlockId: 'ENGINEERING', placement: 'aqueduct' },
   { id: 'HARBOR', unlockId: 'CELESTIAL_NAVIGATION', placement: 'coastal' },
+  // ENCAMPMENT (placement:'encampment', code 3) is wired end-to-end but held out
+  // of the scaffold: it's a no-yield military specialty that competes for the
+  // scarce cap, and it leaves a subtle culture→civic-timing edge (seed 9248) not
+  // worth chasing for its value. Re-add here to re-enable.
 ];
-const PLACEMENT_CODE = { aqueduct: 1, coastal: 2 } as const;
+const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
