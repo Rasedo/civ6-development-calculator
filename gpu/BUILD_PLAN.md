@@ -182,16 +182,18 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       covers determinism, eval-only, and the win over scripted. Both gates green.
       `gpu/search_eval.py` benchmarks scripted-vs-search on matched B=1 worlds
       (the reproducible harness for this arm; net rows land in M2b).
-- [ ] **M2b** Wire a TRAINED net into the search: factored policy as the sampling
-      prior + value head at the leaf, Gumbel/Sampled-AlphaZero over sampled 5-head
-      action-tuples, Q-normalized PUCT, RNG chance nodes. UNBLOCKED for CPU: train_ppo.py
-      runs and LEARNS on the current district engine (verified — a 5-update CPU smoke
-      climbed 69→86 empire_score at ~350 steps/s), so a modest net is reachable here;
-      a strong net (the old 213.6 was a past overnight RTX-4070 run, 14-action farms-
-      only, not a saved checkpoint) still wants a GPU. Plan: train a CPU net (Phase B
-      bring-up) → establish it as the eval baseline → drop its policy/value into the
-      M2a search shape (search_production already exposes a `value_fn`/`prior` hook).
-      Checkpoints stay gitignored (gpu/runs/); the net-vs-search number is recorded here.
+- [x] **M2b-1** DONE — a TRAINED net wired into the search + benchmark harness. Proven
+      that train_ppo.py LEARNS on the district engine (a CPU run climbed empire_score
+      85→135, best 138.1) and plugged the net in two ways via `gpu/search_eval.py`:
+      `net` (policy head drives the capital) and `netsearch` (the M2a search with the
+      net's VALUE head as the 1-ply leaf, no rollout). On matched worlds all three
+      challengers crush scripted (net +68, netsearch +58, search +48); netsearch beats
+      rollout search at ~8x the speed (value head is a good cheap leaf — the M3 lever).
+      Table + caveats in the status log. Checkpoints stay gitignored (gpu/runs/).
+- [ ] **M2b-2** The full search: Gumbel/Sampled-AlphaZero over sampled 5-head action-
+      tuples (not just the capital's production), the net policy as the sampling prior,
+      Q-normalized PUCT, RNG chance nodes. Wants a stronger net (a GPU overnight run;
+      the old 213.6 was a past RTX-4070 result, 14-action farms-only, not a saved net).
 - [ ] **M3** (opt) Search-distilled policy improvement loop; handle RNG chance
       nodes (sample futures / expectimax) for robustness.
 
@@ -432,3 +434,41 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   depth>=2 full games are too slow on CPU (~7x/level; the B=1 float64 step is ~20 ms)
   so depth is a parameter, exercised at a single node, not run game-length here. Next:
   either Phase B (unblock M2b's net) or C1 (net-free symmetric-rival refactor).
+- Phase-B bring-up [x]: train_ppo.py runs and LEARNS on the district-capable engine as
+  is (no code change needed). A CPU run (batch 48, horizon 60, 62 updates, ~360
+  steps/s, ~8 min) climbed episode-mean empire_score 85→135 (best 138.1, max ~213),
+  entropy 4.2→0.6 — a clean learning curve. So the RL pipeline is intact on the wider
+  (district/unit) action space; a strong net still wants a GPU overnight run, but a
+  usable net is trainable here. Checkpoint gitignored under gpu/runs/.
+- M2b-1 [x]: net wired into the search + benchmark (search_eval.py gains --policy
+  net|netsearch and a uniform --dtype; mcts.py stays net-free, engine untouched).
+  `net` = the policy head drives the capital greedily; `netsearch` = the M2a search
+  with the net's VALUE head as the 1-ply leaf (no rollout). Benchmarked against
+  scripted on MATCHED float32 worlds (5 games x 100 turns, capital-production surface,
+  everything else scripted — the scripted baseline is identical across runs, so the
+  four columns are one table):
+      seed     scripted    net    search   netsearch
+      9001       137.4    242.0    256.3     220.9
+      9014        75.0    178.5     90.2     174.5
+      9027        77.8    166.8    132.2     164.8
+      9040       136.5    210.8    217.9     188.2
+      9053        94.5     63.4     63.4      61.3
+      mean       104.2    172.3    152.0     161.9   (gain +68 / +48 / +58, all 4/5)
+      s/game       ~1       ~2     28-58      3-7
+  Takeaways: (1) both the trained net and net-free rollout search crush the scripted
+  base policy — RL trains cleanly on the district engine and search is a real lever.
+  (2) net vs search is per-world complementary (search wins 9001/9040, net wins
+  9014/9027) and statistically tied at n=5 (CIs ±59/±72). (3) netsearch — the net's
+  value head as a 1-ply search leaf — beats rollout search on the mean at ~8x the
+  speed, so the value head is a good cheap rollout replacement (the M3 lever: net
+  value at the leaves buys depth within budget). (4) on 9053 ALL THREE (net 63.4,
+  search 63.4, netsearch 61.3) converge BELOW scripted (94.5): a shared blind spot
+  across the policy head, the rollout, AND the value head — a genuine objective/world
+  quirk (all misvalue the capital's expansion there), not a single-method artifact,
+  worth probing. Caveats: the net is used OUT OF DISTRIBUTION (trained to drive all 5
+  heads, here it only picks the capital's production, scripted elsewhere); n=5 is a
+  small, high-variance sample; float32 vs float64 trajectories diverge over 100 turns
+  so search_eval fixes one --dtype (float32, the net's) across a comparison. Both
+  parity gates unaffected (search_eval/train_ppo aren't imported by them; engine
+  untouched). Next: M2b-2 (full 5-head Gumbel/PUCT search, wants a stronger/GPU net)
+  or C1 (net-free symmetric-rival refactor toward self-play).
