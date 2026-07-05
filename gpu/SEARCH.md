@@ -40,8 +40,9 @@ belongs later (M2b-2), where leaves get expensive and stochastic.
   **matched** B=1 worlds (same fixture + scramble, played twice from the identical start).
   Policies: `search` (net-free rollout MPC), `net` (a trained policy head drives
   production), `netsearch` (the search with the net's value head as the leaf). `--all-cities`
-  controls every city's production. One fixed `--dtype` per run (float32/float64 diverge over
-  100 turns). Run: `python3 gpu/search_eval.py --policy search --episodes 5 --turns 100`.
+  controls every city's production; `--loyalty-aware` shapes the leaf against loyalty flips. One
+  fixed `--dtype` per run (float32/float64 diverge over 100 turns). Run:
+  `python3 gpu/search_eval.py --policy search --loyalty-aware --episodes 5 --turns 100`.
 
 ## Results (5 games × 100 turns, matched float32 worlds, capital production unless noted)
 
@@ -76,10 +77,18 @@ it is *not* a military/defense failure — controlling units would not save them
 founds cities near rivals whose loyalty it cannot sustain (amenity buildings raise loyalty,
 but the flip lands ~40–60 turns after founding, well past the 20-turn rollout, so neither the
 found-time rollout nor a myopic re-plan sees it coming). Scripted stays conservative (2 cities)
-and wins. The same expansion instinct sinks the trained net on the same world. Honest fixes are
-loyalty-shaped, not military: a much longer horizon (so the rollout foresees the flip), amenity/
-loyalty-aware production in fragile cities (needs empire-wide search, which exists), or pricing
-expansion risk into the objective — all future work.
+and wins. The same expansion instinct sinks the trained net on the same world.
+
+**Fix — loyalty-shaped leaf value (`--loyalty-aware`).** Rather than lengthen the (expensive)
+horizon, shape the leaf: `loyalty_shaped_value(penalty, thresh)` discounts the empire score by
+each own-city's loyalty erosion visible at the horizon (`penalty` per point below `thresh`). Even
+though the full flip lands past the rollout, the *erosion* is already visible at horizon-20 (~13
+points on a doomed city), so a large-enough penalty tips the search off over-expansion. Result on
+seed9053 (capital search, 100 turns): **63.4 → 89.0 (+25.6)** at `penalty=2`, nearly matching
+scripted's 94.5 — and it is close to free where expansion is safe (seed9001 −1.5 on 256, seed9014
+±0), because healthy cities keep loyalty ~100 and incur ~no penalty. Any `value_fn` can be threaded
+through `plan_production`/`mpc_play`/`mpc_play_empire`; this same hook is what `netsearch` uses for
+the net's value head.
 
 ## Roadmap (see `gpu/BUILD_PLAN.md`)
 

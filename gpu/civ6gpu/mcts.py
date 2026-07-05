@@ -91,25 +91,48 @@ def _commit(sim, city: int, action: int) -> None:
     sim.step(production=pa)
 
 
-def plan_value(sim, city: int, end_turn: int, depth: int) -> float:
-    """empire_score for game 0 at absolute `end_turn`, assuming `city` re-plans to
+def _empire_value(sim) -> float:
+    """Default leaf value: the raw balanced empire score for game 0."""
+    return float(sim.empire_score()[0])
+
+
+def loyalty_shaped_value(penalty: float = 2.0, thresh: float = 100.0):
+    """A leaf value that discounts empire_score by the loyalty-flip risk of the
+    player's own cities: each alive city loses `penalty` per loyalty point below
+    `thresh`. Because a doomed city bleeds loyalty steadily from founding (100 →
+    0 over ~40–60 turns) but only actually flips well past a 20-turn rollout, the
+    raw score never sees the loss; penalising the erosion visible AT the horizon
+    steers the search away from over-expanding into flip-bound cities and toward
+    loyalty-raising (amenity) production in the fragile ones. The capital is loyalty-
+    pinned to 100, so it is never penalised. Returns a value_fn(sim)->float."""
+    def v(sim) -> float:
+        loy = sim.loyalty[0]
+        alive = sim.alive[0].to(loy.dtype)
+        risk = float(((thresh - loy).clamp(min=0) * alive).sum())
+        return float(sim.empire_score()[0]) - penalty * risk
+    return v
+
+
+def plan_value(sim, city: int, end_turn: int, depth: int, value_fn=_empire_value) -> float:
+    """`value_fn(sim)` for game 0 at absolute `end_turn`, assuming `city` re-plans to
     `depth` at each of its future decisions before `end_turn` and every other
-    head/city stays scripted. depth==0 rolls out purely scripted. Self-restoring:
-    the sim is left exactly as it was passed in (eval-only)."""
+    head/city stays scripted. depth==0 rolls out purely scripted. `value_fn` defaults
+    to the raw empire score; pass e.g. `loyalty_shaped_value()` to shape the leaf.
+    Self-restoring: the sim is left exactly as it was passed in (eval-only)."""
     s0 = sim.snapshot()
     while sim.turn < end_turn and not _pending(sim, city):
         sim.step()  # scripted-advance to this city's next decision (or the horizon)
     if depth == 0 or sim.turn >= end_turn or not _pending(sim, city):
         while sim.turn < end_turn:
             sim.step()
-        v = float(sim.empire_score()[0])
+        v = value_fn(sim)
         sim.restore(s0)
         return v
     s1 = sim.snapshot()
     best = -float("inf")
     for a in _legal(sim, city):
         _commit(sim, city, a)
-        v = plan_value(sim, city, end_turn, depth - 1)
+        v = plan_value(sim, city, end_turn, depth - 1, value_fn)
         if v > best:
             best = v
         sim.restore(s1)
@@ -117,13 +140,13 @@ def plan_value(sim, city: int, end_turn: int, depth: int) -> float:
     return best
 
 
-def plan_production(sim, city: int = 0, horizon: int = 20, depth: int = 1):
+def plan_production(sim, city: int = 0, horizon: int = 20, depth: int = 1, value_fn=_empire_value):
     """Closed-loop depth-`depth` search over `city`'s current production decision
     for a B=1 sim. The leaf assumes future decisions are ALSO planned (depth-1),
     not scripted, so depth>1 sees setup moves that only pay off past the next
-    decision. Returns (best_action, {action: value}); deterministic, ties to the
-    lowest action index. depth=1 is the open-loop 1-ply search (== search_production
-    at the same effective horizon)."""
+    decision. `value_fn` scores the leaf (default: raw empire score). Returns
+    (best_action, {action: value}); deterministic, ties to the lowest action index.
+    depth=1 is the open-loop 1-ply search (== search_production at the same horizon)."""
     assert sim.B == 1, "planning searches one game at a time"
     cands = _legal(sim, city)
     if not cands:
@@ -133,21 +156,22 @@ def plan_production(sim, city: int = 0, horizon: int = 20, depth: int = 1):
     vals = {}
     for a in cands:
         _commit(sim, city, a)
-        vals[a] = plan_value(sim, city, end_turn, depth - 1)
+        vals[a] = plan_value(sim, city, end_turn, depth - 1, value_fn)
         sim.restore(s1)
     best = max(cands, key=lambda a: (vals[a], -a))
     return best, vals
 
 
-def mpc_play(sim, city: int = 0, horizon: int = 20, depth: int = 1, turns: int = 60) -> float:
+def mpc_play(sim, city: int = 0, horizon: int = 20, depth: int = 1, turns: int = 60,
+             value_fn=_empire_value) -> float:
     """Play `turns` real turns with `city`'s production chosen by plan_production at
     each of its decisions (model-predictive control) and everything else scripted.
-    Re-planning every turn adapts to the realized RNG futures. MUTATES sim — this is
-    the actual game, not a rollout, so pass a throwaway sim. Returns the final
-    empire_score for game 0."""
+    Re-planning every turn adapts to the realized RNG futures. `value_fn` shapes the
+    search leaf (e.g. loyalty_shaped_value); the RETURNED score is always the true
+    empire_score. MUTATES sim — pass a throwaway sim."""
     for _ in range(turns):
         if _pending(sim, city):
-            a, _ = plan_production(sim, city, horizon, depth)
+            a, _ = plan_production(sim, city, horizon, depth, value_fn)
             _commit(sim, city, a)
         else:
             sim.step()
@@ -165,14 +189,16 @@ def _commit_many(sim, actions: dict) -> None:
     sim.step(production=pa)
 
 
-def mpc_play_empire(sim, horizon: int = 20, depth: int = 1, turns: int = 60) -> float:
+def mpc_play_empire(sim, horizon: int = 20, depth: int = 1, turns: int = 60,
+                    value_fn=_empire_value) -> float:
     """Like mpc_play but the search controls EVERY city's production, not just the
     capital. Each turn, every pending city is searched INDEPENDENTLY from the shared
     pre-decision state (plan_production is self-restoring), then all their picks are
     committed together in one step. The independence is an approximation — a city's
     rollout idles its co-deciders for the commit turn — but production actions never
     collide (each city places only on tiles it owns), and re-planning every turn
-    corrects any within-turn drift. MUTATES sim; returns the final empire_score."""
+    corrects any within-turn drift. `value_fn` shapes the search leaf. MUTATES sim;
+    returns the true final empire_score."""
     for _ in range(turns):
         pend = [c for c in range(sim.C) if _pending(sim, c)]
         if not pend:
@@ -180,7 +206,7 @@ def mpc_play_empire(sim, horizon: int = 20, depth: int = 1, turns: int = 60) -> 
             continue
         chosen = {}
         for c in pend:
-            best, _ = plan_production(sim, city=c, horizon=horizon, depth=depth)
+            best, _ = plan_production(sim, city=c, horizon=horizon, depth=depth, value_fn=value_fn)
             chosen[c] = best  # plan_production restores sim, so each city sees the same base
         _commit_many(sim, chosen)
     return float(sim.empire_score()[0])

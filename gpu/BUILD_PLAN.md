@@ -521,3 +521,15 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
     separate SYMMETRIC mini-env (owner-indexed from the start) rather than promoting
     the full-fidelity engine. This is a phase boundary worth a human decision, not
     filler; the single-agent search arm (M1–M2b-1 + empire + SEARCH.md) is complete.
+- Loyalty-aware search [x]: fixes the seed9053 over-expansion class (verified as LOYALTY
+  flips, not razes). Threaded a `value_fn` through plan_value/plan_production/mpc_play/
+  mpc_play_empire (defaults to raw empire_score — backward-compatible, mcts_test green)
+  and added `loyalty_shaped_value(penalty, thresh)`: it discounts the leaf by each own
+  city's loyalty erosion visible AT the horizon (`penalty` per point below `thresh`).
+  The doomed city's full flip lands ~40–60 turns out, past the 20-turn rollout, but its
+  erosion is already ~13 pts by horizon-20, so `penalty=2` (≈26) outweighs the settler's
+  score gain and curbs the over-expansion. Measured (capital search, 100 turns): seed9053
+  63.4 → 89.0 (+25.6, ≈ scripted 94.5); near-free where safe (seed9001 −1.5/256, seed9014
+  ±0 — healthy cities hold loyalty ~100 so incur ~no penalty). `search_eval.py --loyalty-
+  aware [--loyalty-penalty]`; mcts_test asserts shaped ≤ empire value + deterministic +
+  eval-only. Same value_fn hook `netsearch` uses. No engine change; parity gates unaffected.

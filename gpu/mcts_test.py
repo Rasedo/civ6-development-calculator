@@ -27,7 +27,7 @@ from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import _MUTABLE
 from civ6gpu.mcts import (
     search_production, greedy_production, _rollout_value, plan_production, mpc_play,
-    mpc_play_empire,
+    mpc_play_empire, loyalty_shaped_value, _empire_value,
 )
 
 HORIZON = 15
@@ -159,6 +159,21 @@ def test_planning(rules, paths):
     assert e1 == e2, f"mpc_play_empire nondeterministic ({e1} vs {e2})"
     assert e1 >= base - 1e-6, f"empire search {e1:.2f} < scripted {base:.2f}"
     print(f"empire  : all-cities search deterministic, {e1:.1f} >= scripted {base:.1f}")
+
+    # loyalty-shaped leaf (value_fn path): never scores above the raw empire value
+    # (penalty >= 0), and a plan using it is deterministic + eval-only.
+    vf = loyalty_shaped_value(penalty=2.0, thresh=100.0)
+    s = build(rules, paths[4])
+    advance_to_decision(s)
+    assert vf(s) <= _empire_value(s) + 1e-6, "loyalty penalty must not raise the value"
+    pristine = {k: getattr(s, k).clone() for k in _MUTABLE}
+    lb1, _ = plan_production(s, 0, horizon=HZ, depth=1, value_fn=vf)
+    assert not [k for k in _MUTABLE if not torch.equal(getattr(s, k), pristine[k])], "loyalty plan mutated state"
+    s2 = build(rules, paths[4])
+    advance_to_decision(s2)
+    lb2, _ = plan_production(s2, 0, horizon=HZ, depth=1, value_fn=vf)
+    assert lb1 == lb2, "loyalty-shaped plan nondeterministic"
+    print(f"loyalty : shaped leaf <= empire value, plan deterministic + eval-only (pick={lb1})")
 
 
 def main():

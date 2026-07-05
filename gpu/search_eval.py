@@ -37,7 +37,10 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import load_rules, load_fixture, FIXTURES
 from civ6gpu.env import BatchEnv
-from civ6gpu.mcts import mpc_play, mpc_play_empire, search_production, _pending, _commit, _commit_many
+from civ6gpu.mcts import (
+    mpc_play, mpc_play_empire, search_production, loyalty_shaped_value, _empire_value,
+    _pending, _commit, _commit_many,
+)
 
 
 # --- trained-net inference (mirrors gpu/eval.py's load path) -----------------
@@ -124,6 +127,11 @@ def main() -> None:
     ap.add_argument("--city", type=int, default=0, help="which city's production the challenger controls")
     ap.add_argument("--all-cities", action="store_true",
                     help="control EVERY city's production, not just --city (search/net only)")
+    ap.add_argument("--loyalty-aware", action="store_true",
+                    help="shape the search leaf to penalize loyalty-fragile cities (search only) — "
+                         "curbs over-expansion into cities that later flip on loyalty")
+    ap.add_argument("--loyalty-penalty", type=float, default=2.0, help="per loyalty-point-under penalty")
+    ap.add_argument("--loyalty-thresh", type=float, default=100.0, help="loyalty level below which cities are penalized")
     ap.add_argument("--scramble", type=int, default=None, help="per-game world scramble seed (default: parity world)")
     ap.add_argument("--dtype", default="float32", choices=["float32", "float64"],
                     help="engine precision; keep it fixed across policies — float32 vs float64 "
@@ -135,6 +143,9 @@ def main() -> None:
         ap.error(f"--policy {args.policy} needs --checkpoint")
     if args.all_cities and args.policy == "netsearch":
         ap.error("--all-cities is implemented for search/net only")
+    if args.loyalty_aware and args.policy != "search":
+        ap.error("--loyalty-aware shapes the rollout leaf and applies to --policy search only")
+    vf = loyalty_shaped_value(args.loyalty_penalty, args.loyalty_thresh) if args.loyalty_aware else _empire_value
 
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -151,8 +162,9 @@ def main() -> None:
 
     base_scores, chal_scores, wins = [], [], 0
     surface = "all cities" if args.all_cities else f"city {args.city}"
+    loy = f", loyalty-aware(pen={args.loyalty_penalty})" if args.loyalty_aware else ""
     print(f"search-eval [{args.policy}]: {args.episodes} games x {args.turns} turns, "
-          f"horizon {args.horizon}, depth {args.depth}, production surface = {surface}\n")
+          f"horizon {args.horizon}, depth {args.depth}, production surface = {surface}{loy}\n")
     for i in range(args.episodes):
         scr = None if args.scramble is None else args.scramble + i
 
@@ -166,9 +178,9 @@ def main() -> None:
         env.reset(scramble=scr)
         t0 = time.time()
         if args.policy == "search":
-            chal = (mpc_play_empire(env.sim, horizon=args.horizon, depth=args.depth, turns=args.turns)
+            chal = (mpc_play_empire(env.sim, horizon=args.horizon, depth=args.depth, turns=args.turns, value_fn=vf)
                     if args.all_cities else
-                    mpc_play(env.sim, city=args.city, horizon=args.horizon, depth=args.depth, turns=args.turns))
+                    mpc_play(env.sim, city=args.city, horizon=args.horizon, depth=args.depth, turns=args.turns, value_fn=vf))
         elif args.policy == "net":
             chal = (net_play_empire(env, policy, args.turns) if args.all_cities
                     else net_play(env, policy, args.city, args.turns))
