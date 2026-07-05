@@ -502,6 +502,7 @@ class BatchSim:
         self._scaffold = [(int(p["idx"]), int(p["unlockTech"])) for p in sc.get("place", [])]  # (district idx, unlock tech idx), placement order
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
+        self._rl_district_active = False  # D5b flips on: the RL production head can place districts (off-script)
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -922,6 +923,30 @@ class BatchSim:
         is_d = ((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0) | (self.rvcity_at[:, nbc] >= 0)) & on_map
         return is_d.sum(dim=2)  # [B, T]
 
+    def _place_district_capital(self, di: int, want: torch.Tensor) -> torch.Tensor:
+        """Place district-type `di` in the capital (city slot 0) on its best tile,
+        for batch rows where `want` is set AND an eligible tile exists. Mirrors the
+        exporter's best-tile scan: eligible = owned by player, district-placeable,
+        empty (no district/improvement), within radius 3, not the city-center tile;
+        ranked by floor(static + 0.5·adjacent-completed-districts), ties to lowest
+        tile index. Shared by the scripted scaffold (D5a refactor) and the RL
+        production head (D5b). Returns the [B] bool mask of rows actually placed."""
+        B, T, dev = self.B, self.T, self.device
+        site0 = self.site[:, 0].clamp(min=0)
+        adjc = self._adj_district_count().to(self.dtype)  # [B, T]
+        elig = ((self.owner == 0) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, 0] <= 3))
+        elig[torch.arange(B, device=dev), site0] = False
+        adjf = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
+        arT = torch.arange(T, device=dev, dtype=self.dtype)
+        key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))
+        best = key.argmax(dim=1)  # [B]
+        place = want & elig.any(dim=1)
+        if bool(place.any()):
+            rows = place.nonzero(as_tuple=True)[0]
+            self.district[rows, best[rows]] = di
+            self._eff_version += 1
+        return place
+
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
         (total [B, C, 6] alive-masked, housing [B, C], growth_f [B, C]).
@@ -1049,20 +1074,38 @@ class BatchSim:
     # --- action masks (the macro-action surface) --------------------------------
 
     def production_mask(self) -> torch.Tensor:
-        """[B, C, NB+2+NU] valid production actions for idle cities: columns
-        0..NB-1 = City Center buildings, NB = settler (always trainable, as
-        queueSettler is), NB+1 = idle, NB+2.. = train that roster unit
-        (tech-gated like trainableUnits). All-False where no decision pends."""
+        """[B, C, NB+2+NU+nScaffold] valid production actions for idle cities:
+        columns 0..NB-1 = City Center buildings, NB = settler (always trainable,
+        as queueSettler is), NB+1 = idle, NB+2..NB+1+NU = train that roster unit
+        (tech-gated like trainableUnits), NB+2+NU.. = place that scaffold district
+        (capital-only, off-script; all-False unless _rl_district_active). All-False
+        where no decision pends."""
+        B, C, dev = self.B, self.C, self.device
         pend = self.alive & (self.current == -1)
-        always = torch.ones(self.B, self.C, 2, dtype=torch.bool, device=self.device)
+        always = torch.ones(B, C, 2, dtype=torch.bool, device=dev)
         cols = [self._buildable(), always]
         if self.units_mode:
             unit_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
-                1, self._p_tech.clamp(min=0).unsqueeze(0).expand(self.B, -1)
+                1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )
-            cols.append(unit_ok.unsqueeze(1).expand(-1, self.C, -1))
+            cols.append(unit_ok.unsqueeze(1).expand(-1, C, -1))
         else:
-            cols.append(torch.zeros(self.B, self.C, self.NU, dtype=torch.bool, device=self.device))
+            cols.append(torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev))
+        nS = len(self._scaffold)
+        if nS:
+            dcols = torch.zeros(B, C, nS, dtype=torch.bool, device=dev)
+            if self._rl_district_active:  # D5b: capital may place districts off-script
+                cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # [B]
+                spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # [B]
+                under_cap = spec_count < cap_max  # [B]
+                elig = (self.owner == 0) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, 0] <= 3)
+                elig[torch.arange(B, device=dev), self.site[:, 0].clamp(min=0)] = False
+                has_tile = elig.any(dim=1)  # [B] an empty placeable tile exists (type-independent for land districts)
+                for si, (di, utech) in enumerate(self._scaffold):
+                    has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                    not_owned = ~((self.district == di) & (self.owner == 0)).any(dim=1)  # one-per-type
+                    dcols[:, 0, si] = has_tech & under_cap & has_tile & not_owned  # capital (slot 0) only
+            cols.append(dcols)
         return torch.cat(cols, dim=2) & pend.unsqueeze(2)
 
     def tech_mask(self) -> torch.Tensor:
@@ -2616,39 +2659,38 @@ class BatchSim:
             self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
             self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
 
+            # RL district placement (D5): the capital may spend its production
+            # decision to instantly place a scaffold district (off-script; free,
+            # via the scaffold simplification — leaves the build slot idle). The
+            # district codes sit above the unit range at NB+2+NU+si. Inert until
+            # D5b flips _rl_district_active on.
+            if self.districts_on and self._scaffold and self._rl_district_active:
+                dbase = self.UNIT_BASE + self.NU  # district action base code (NB+2+NU)
+                a0 = act[:, 0]  # capital's chosen action (-1 where not idle/alive)
+                cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # [B]
+                for si, (di, utech) in enumerate(self._scaffold):
+                    has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                    spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # recomputed as districts land
+                    not_owned = ~((self.district == di) & (self.owner == 0)).any(dim=1)  # one-per-type
+                    want = (a0 == dbase + si) & has_tech & (spec_count < cap_max) & not_owned
+                    if bool(want.any()):
+                        self._place_district_capital(di, want)
+
         # --- scripted districts (D3b): place each scaffold district IN ORDER,
         # once, when its unlock tech is in and the per-pop specialty cap allows
         # another (maxSpecialtyDistricts = floor((pop-1)/3)+1). Scripted path only
         # (the RL district action is D5). Mirrors the exporter's scaffold list;
         # score by the FULL floor(static + 0.5*adjacent completed districts).
         if production is None and self.districts_on and self._campus_active and self._scaffold:
-            site0 = self.site[:, 0].clamp(min=0)  # [B]
             cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
-            arT = torch.arange(T, device=dev, dtype=self.dtype)
             for si, (di, utech) in enumerate(self._scaffold):
                 has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
                 spec_count = ((self.district >= 0) & (self.owner == 0)).sum(dim=1)  # [B] capital specialty districts
                 want = has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & (spec_count < cap_max)
                 if not bool(want.any()):
                     continue
-                adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source (recomputed as districts land)
-                elig = (
-                    (self.owner == 0)
-                    & self.d_usable
-                    & (self.district < 0)
-                    & (self.improvement < 0)
-                    & (self.dist[:, 0] <= 3)
-                )  # [B, T]
-                elig[torch.arange(B, device=dev), site0] = False  # not the center itself
-                adjf = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
-                key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))  # max adj, ties lowest index
-                best = key.argmax(dim=1)  # [B]
-                place = want & elig.any(dim=1)
-                if bool(place.any()):
-                    rows = place.nonzero(as_tuple=True)[0]
-                    self.district[rows, best[rows]] = di
-                    self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | place
-                    self._eff_version += 1
+                place = self._place_district_capital(di, want)  # shared best-tile scan (D5a)
+                self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | place
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------
         if tech is not None:

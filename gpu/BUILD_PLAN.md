@@ -68,8 +68,26 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
       so all citizens work tiles. Both gates green; canary (disable the gate →
       GPU builds an ungated Library, bldgs0 diverges) bites hard. Coverage thin
       (Library 1/24, Shrine 2/24 — buildings compete on cost) but non-vacuous.
-- [ ] **D5** RL production head can queue districts (widen production action
-      space); off-script coverage; retrain-ready.
+- [~] **D5** RL production head can place districts (widen production action space).
+  - [x] **D5a** Gated-off plumbing (behind `_rl_district_active=False`, inert):
+        shared `_place_district_capital(di, want)` best-tile helper (the scaffold's
+        eligibility/rank/place logic, extracted); the scripted scaffold refactored to
+        call it (behavior-preserving); `production_mask` widened from NB+2+NU to
+        NB+2+NU+nScaffold — the district columns are capital-only (slot 0) and gate on
+        has_tech & under specialty cap & an empty placeable tile exists & one-per-type,
+        but return all-False while `_rl_district_active` is off; a matching RL apply
+        block in `step()`'s production branch (district codes sit above the unit range;
+        placement is instant/free and leaves the build slot idle). Provably inert:
+        `masked_choice`'s argmax over valid entries is invariant to trailing all-False
+        columns and never touches the mulberry32 stream, so rollout picks the same
+        actions and logs the same trace; the GPU never emits a district code, so
+        replay-gpu.ts's existing dispatch is untouched. Both gates green
+        (scripted 24×100, off-script 72×100); inertness self-test confirms width
+        21→24 with district columns all-False.
+  - [ ] **D5b** Flip `_rl_district_active=True`; teach replay-gpu.ts the district
+        action (fix the unit branch bound to `a<NB+2+NU`, add an `a>=NB+2+NU` district
+        branch that places on the TS side via canPlaceDistrict + the same best-tile
+        scan); iterate the off-script gate to green with districts live. Then retrain.
 - [ ] **D6** Specials: Aqueduct/Neighborhood housing, Harbor coastal placement,
       Encampment not-adjacent-to-center.
 
@@ -201,3 +219,30 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   unexercised. Next: D4 (district buildings + specialists), which unlock with
   their districts (Library/WRITING, Shrine/ASTROLOGY, Market/CURRENCY) so they
   ARE covered; then D5 (RL district action) to enable a district-capable retrain.
+- D4 [x]: buildable set extended past the City Center. _buildable now gates each
+  building on tech-unlock + (for district buildings) the city owning a completed
+  district of that type (reqDistrict via a per-city has-district onehot) + a
+  prerequisite building (requiresAny → _b_has_reqs). Exporter tags each building
+  with reqDistrict/reqBuildings; cheapestBuilding filters to the exported set.
+  Specialists NOT modeled (effectiveSpecialists reads city.specialists, a manual
+  setting the scripted policy never touches → all citizens work tiles). Both
+  gates green; canary (if False on the gate → GPU builds an ungated Library,
+  bldgs0 TS 3 vs GPU 4 + cascade) bites. Coverage thin (Library 1/24, Shrine
+  2/24 — buildings compete on cost) but non-vacuous. Next: D5.
+- D5a [x]: gated-off plumbing for the RL district action (behind
+  _rl_district_active=False → inert). Extracted the scaffold's placement into a
+  shared _place_district_capital(di, want) (eligibility: owned, district-usable,
+  empty, radius<=3, not the center; rank floor(static+0.5*adjacent-completed),
+  ties to lowest tile index); refactored the scripted scaffold to call it
+  (behaviour-preserving). Widened production_mask 21→24 (NB=12,NU=7,+3 scaffold);
+  the district columns are capital-only and gate on has_tech & under the
+  per-pop specialty cap & an empty placeable tile exists & one-per-type, but are
+  all-False until the flip. Added the matching RL apply block in step()'s
+  production branch (district codes sit above the unit range at NB+2+NU+si;
+  placement is instant/free and leaves the build slot idle). Inert by
+  construction: masked_choice's argmax over valid entries ignores trailing
+  all-False columns and never consumes mulberry32, so rollout logs the identical
+  trace and the GPU never emits a district code (replay-gpu.ts untouched). Both
+  gates green (scripted 24×100, off-script 72×100); inertness self-test confirms
+  the widened mask's district columns are all-False. Next: D5b (flip it on + teach
+  replay-gpu.ts the district action + iterate the off-script gate, then retrain).
