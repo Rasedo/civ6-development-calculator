@@ -59,7 +59,7 @@ def main() -> None:
         from train_ppo import Policy, sample_heads
 
         ck = torch.load(args.policy, map_location=args.device)
-        policy = Policy(ck["obs_size"], ck["dims"]).to(args.device)
+        policy = Policy(ck["obs_size"], ck["dims"], hidden=ck.get("hidden", 256)).to(args.device)
         policy.load_state_dict(ck["model"])
         policy.eval()
         assert ck["obs_size"] == env.obs_size, "checkpoint obs layout doesn't match this env build"

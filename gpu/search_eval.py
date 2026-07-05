@@ -50,7 +50,7 @@ def load_policy(path, env, device):
 
     ck = torch.load(path, map_location=device)
     assert ck["obs_size"] == env.obs_size, "checkpoint obs layout doesn't match this env build"
-    policy = Policy(ck["obs_size"], ck["dims"]).to(device)
+    policy = Policy(ck["obs_size"], ck["dims"], hidden=ck.get("hidden", 256)).to(device)
     policy.load_state_dict(ck["model"])
     policy.eval()
     return policy

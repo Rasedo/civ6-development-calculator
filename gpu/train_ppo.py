@@ -169,6 +169,7 @@ def main() -> None:
     ap.add_argument("--clip", type=float, default=0.2)
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--minibatches", type=int, default=8)
+    ap.add_argument("--hidden", type=int, default=256, help="policy/value trunk width")
     ap.add_argument("--ent-coef", type=float, default=0.01)
     ap.add_argument("--vf-coef", type=float, default=0.5)
     ap.add_argument("--max-grad-norm", type=float, default=0.5)
@@ -197,7 +198,7 @@ def main() -> None:
         "NC": m0["civic"].shape[1],
         "S": m0["envoy"].shape[1],
     }
-    policy = Policy(env.obs_size, dims).to(dev)
+    policy = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
     opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
     start_update, best = 0, float("-inf")
     if args.resume:
@@ -351,6 +352,7 @@ def main() -> None:
             "best": max(best, row[2]),
             "obs_size": env.obs_size,
             "dims": dims,
+            "hidden": args.hidden,
             "config": vars(args),
         }
         if row[2] > best:
