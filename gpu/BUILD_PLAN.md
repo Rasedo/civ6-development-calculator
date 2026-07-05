@@ -45,8 +45,11 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         - [x] **D3b-2** scripted placement generalized to a scaffold LIST; places
               a HOLY_SITE too (per-pop cap). Coverage: Campus 22/24, Holy Site
               24/24 games; both gates green first try.
-        - [ ] **D3b-3** Commercial Hub (river static + DISTRICT dyn).
-        - [ ] **D3b-4** Industrial Zone (needs MINE_OR_QUARRY dynamic source).
+        - [x] **D3b-3** Commercial Hub added to the scaffold (one line, unlock
+              CURRENCY); river static + DISTRICT dyn via the generic loop. Both
+              gates green; coverage 4/24 games (needs pop 7 + Currency).
+        - [ ] **D3b-4** Industrial Zone (needs a MINE_OR_QUARRY dynamic source in
+              the yield loop + placement score).
 - [ ] **D4** District buildings (Library/University, Market/Bank, Shrine/Temple,
       Workshop/Factory, etc.): unlocks, yields, housing, specialist slots.
 - [ ] **D5** RL production head can queue districts (widen production action

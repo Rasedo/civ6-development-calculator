@@ -190,6 +190,7 @@ const SCRIPTED_CAMPUS = true;
 const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
+  { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
 ];
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
