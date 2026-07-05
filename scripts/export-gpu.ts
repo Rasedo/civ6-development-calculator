@@ -74,7 +74,7 @@ import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow } from './gpu-trace';
 import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
-import { hasFreshWater, hasRiver, isCoastalLand, isImpassable, isMountain, isWater } from '../src/core/query';
+import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
@@ -205,12 +205,14 @@ const SCRIPTED_CAMPUS = true;
 // tech is in and the per-pop specialty cap allows). The engine mirrors this.
 // placement 'aqueduct' = the non-specialty housing district (adjacent to the
 // city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
-const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' }[] = [
+const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' | 'coastal' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
   { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
   { id: 'AQUEDUCT', unlockId: 'ENGINEERING', placement: 'aqueduct' },
+  { id: 'HARBOR', unlockId: 'CELESTIAL_NAVIGATION', placement: 'coastal' },
 ];
+const PLACEMENT_CODE = { aqueduct: 1, coastal: 2 } as const;
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
@@ -441,7 +443,7 @@ const rules = {
     place: SCAFFOLD_DISTRICTS.map(({ id, unlockId, placement }) => ({
       idx: PLACEABLE_DISTRICTS.indexOf(id),
       unlockTech: techIdx.get(unlockId) ?? -1,
-      placement: placement === 'aqueduct' ? 1 : 0,
+      placement: placement ? PLACEMENT_CODE[placement] : 0,
     })),
     // CS buildDistrict askable list → engine district-type indices, so the
     // `already`/satisfied checks generalize past CAMPUS.
@@ -555,6 +557,12 @@ for (let s = 0; s < N_SEEDS; s++) {
       // rival territory at t=0 (grows dynamically in the engine)
       rv: t.rivalId ?? -1,
       wt: isWater(t) ? 1 : 0,
+      // Harbor placement surface (static part of canPlaceDistrict for a coastal
+      // district): coastal/lake water adjacent to land, no wonder, no non-bonus
+      // resource. Ownership/radius/district/improvement stay the engine's job.
+      cw:
+        isCoastalWater(map, t) && !t.wonder && !t.builtWonder &&
+        !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       fw: hasFreshWater(map, t) ? 1 : 0,
       nw: t.wonder ? 1 : 0,
       // statically settleable for rival expansion (mirrors siteQuality's -1s;

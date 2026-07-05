@@ -127,11 +127,19 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         scripted coverage is vacuous, but off-script random tech play reaches it —
         3/72 games place an Aqueduct, so housing/placement/cap/upkeep are all
         non-vacuously verified. Both gates green.
-  - [ ] **D6b HARBOR** — coastal specialty (onCoastalWater; adjacency city-center +2,
-        sea-resource +1, harbor +2). Reachable: 42/83 cities coastal, unlock
-        (Celestial Navigation) 17/24. Needs coastal-water placement + the
-        city-center/sea-resource dynamic adjacency (the +2 center term, unlike the
-        economic districts' +0.5 DISTRICT term).
+  - [x] **D6b HARBOR** — DONE + green. Coastal specialty district, placed 7×
+        off-script. Two new mechanisms landed: (1) a COASTAL-WATER placement surface
+        (per-tile `cw` = isCoastalWater & no wonder & no non-bonus resource — the
+        static part of canPlaceDistrict for a coastal district; the land `d_usable`
+        does NOT apply); _place_district picks `coastal_water` for placement=2.
+        (2) generalized dynamic adjacency: `_district_adj_raw` = static + 0.5·adjc +
+        CITY_CENTER·(adjacent centers) + HARBOR_DISTRICT·(adjacent harbors), with the
+        amounts derived from the catalog. Harbor gets +2.5/center (2 CITY_CENTER +
+        0.5 DISTRICT); and the previously-vacuous HARBOR_DISTRICT +2 on Commercial
+        Hub now fires when a CommHub sits next to a Harbor. Bug found on the way: the
+        first `cw` omitted the non-bonus-resource / wonder exclusions, so the GPU
+        placed a Harbor on a tile canPlaceDistrict rejects — displacing a Commercial
+        Hub and swinging treasury ~18g (seed 9066). Both gates green (24×100, 72×100).
   - [—] **Encampment / Neighborhood** — deferred: Encampment is a specialty district
         competing for the ≤3 cap with the economic three (low value, military-only);
         Neighborhood needs a late civic (Urbanization) unreached in 100 turns.
