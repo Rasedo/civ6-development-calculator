@@ -496,8 +496,10 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   SETTLERs) then lost 2 cities in the last 30 turns (→63.4) because it controls only
   production, not military, so its undefended expansion is razed/flipped in a hostile
   world (scripted stays at 2 cities and wins 94.5). Same instinct sinks the net there.
-  The honest fix is a wider control surface (search the unit head too) or an
-  expansion-risk penalty — future work. Doc-only; no code/parity impact.
+  VERIFIED mechanism (corrected): the lost cities were at FULL HP — they LOYALTY-FLIPPED
+  (loyalty decayed to 0 under rival pressure ~40 turns after founding), not razed. So the
+  fix is loyalty-shaped (longer horizon / amenity-aware empire production / expansion
+  restraint), NOT unit/military control. Doc-only; no code/parity impact.
 - C1 scoping [x] (investigation, no code change): mapped the rival-vs-player asymmetry
   to size the "symmetric rivals" refactor honestly.
   * PLAYER state is full: per-city pop / production queue (`current`,`cur_cost`) /

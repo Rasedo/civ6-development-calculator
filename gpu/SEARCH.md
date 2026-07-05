@@ -69,14 +69,17 @@ On seed9053 *every* learned/search method (net, search, netsearch ≈ 61–63) f
 scripted (94.5). The cause is not a bug: the search led the whole game (+44 at turn 70, 95.9
 at turn 90 with **4 cities**) by aggressively queuing SETTLERs, then **lost two cities in the
 final 30 turns** (nCities 4→3→2), crashing to 63.4. Because the search controls only
-*production* — units and military are scripted — it builds cities it cannot defend, and in a
-hostile world (barbarians / war / disasters) the undefended expansion is razed or flipped
-after the rollout horizon. Scripted stays conservative (2 cities) and wins. This is the
-signature of a limited control surface + a finite horizon, and it also explains why the
-trained net (which learned the same expansion instinct) fails on the same world. A longer
-horizon can help the rollout *see* the coming loss and expand less, but the structural fix
-is to widen the control surface (also search the unit/military head so the search can defend
-what it builds) or to price expansion risk into the objective — both future work.
+*production* — and the extra cities are lost. **Verified mechanism (not a raze): loyalty
+flips.** Both lost cities were at FULL HP (200) when they fell; their loyalty decayed to 0
+under rival pressure (city 1: 100→87→57→18→0 over ~40 turns) and they flipped to a rival. So
+it is *not* a military/defense failure — controlling units would not save them. The search
+founds cities near rivals whose loyalty it cannot sustain (amenity buildings raise loyalty,
+but the flip lands ~40–60 turns after founding, well past the 20-turn rollout, so neither the
+found-time rollout nor a myopic re-plan sees it coming). Scripted stays conservative (2 cities)
+and wins. The same expansion instinct sinks the trained net on the same world. Honest fixes are
+loyalty-shaped, not military: a much longer horizon (so the rollout foresees the flip), amenity/
+loyalty-aware production in fragile cities (needs empire-wide search, which exists), or pricing
+expansion risk into the objective — all future work.
 
 ## Roadmap (see `gpu/BUILD_PLAN.md`)
 
