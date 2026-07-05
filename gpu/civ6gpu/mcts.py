@@ -152,3 +152,35 @@ def mpc_play(sim, city: int = 0, horizon: int = 20, depth: int = 1, turns: int =
         else:
             sim.step()
     return float(sim.empire_score()[0])
+
+
+def _commit_many(sim, actions: dict) -> None:
+    """Advance one turn committing {city: action} for several cities at once (the
+    rest idle), matching how production is one simultaneous per-turn decision."""
+    import torch
+
+    pa = torch.full((1, sim.C), sim.IDLE, dtype=torch.long, device=sim.device)
+    for c, a in actions.items():
+        pa[0, c] = a
+    sim.step(production=pa)
+
+
+def mpc_play_empire(sim, horizon: int = 20, depth: int = 1, turns: int = 60) -> float:
+    """Like mpc_play but the search controls EVERY city's production, not just the
+    capital. Each turn, every pending city is searched INDEPENDENTLY from the shared
+    pre-decision state (plan_production is self-restoring), then all their picks are
+    committed together in one step. The independence is an approximation — a city's
+    rollout idles its co-deciders for the commit turn — but production actions never
+    collide (each city places only on tiles it owns), and re-planning every turn
+    corrects any within-turn drift. MUTATES sim; returns the final empire_score."""
+    for _ in range(turns):
+        pend = [c for c in range(sim.C) if _pending(sim, c)]
+        if not pend:
+            sim.step()
+            continue
+        chosen = {}
+        for c in pend:
+            best, _ = plan_production(sim, city=c, horizon=horizon, depth=depth)
+            chosen[c] = best  # plan_production restores sim, so each city sees the same base
+        _commit_many(sim, chosen)
+    return float(sim.empire_score()[0])

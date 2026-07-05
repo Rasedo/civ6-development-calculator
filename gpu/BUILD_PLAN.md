@@ -472,3 +472,20 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   parity gates unaffected (search_eval/train_ppo aren't imported by them; engine
   untouched). Next: M2b-2 (full 5-head Gumbel/PUCT search, wants a stronger/GPU net)
   or C1 (net-free symmetric-rival refactor toward self-play).
+- M2a empire extension [x]: the search now controls EVERY city's production, not just
+  the capital (mcts.py `mpc_play_empire`; search_eval.py `--all-cities` for search|net).
+  Each turn every pending city is searched INDEPENDENTLY from the shared pre-decision
+  state (plan_production self-restores, so all cities see the same base) and the picks
+  commit together in one step — production actions never collide (each city places only
+  on tiles it owns) and the per-turn re-plan corrects the independence approximation.
+  Benchmark (4 games x 60 turns, matched float32, net-free): capital-only search 99.5
+  (+24.7 over scripted, 3/4) → empire-wide 107.3 (+32.5, 4/4). The extra gain
+  concentrates where non-capital cities have real production choices (seed9001
+  125.8→154.8, +29) and is ~neutral where they don't (9027/9040 within 0.2); it also
+  turns seed9014's capital-only tie into a small win. Cost scales with city count — one
+  6-city late game took 246 s for a single 60-turn game — so it is opt-in (--all-cities).
+  mcts_test.py adds an empire determinism + >=scripted check (green). No engine change;
+  parity gates unaffected. The single-agent PRODUCTION search is now empire-complete;
+  remaining search levers (tech/civic/unit heads, deeper trees) and the net-guided
+  M2b-2 are GPU/effort-gated. Next: C1 (net-free symmetric-rival refactor → self-play)
+  is the highest-value CPU-reachable direction.

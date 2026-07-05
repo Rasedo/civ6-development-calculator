@@ -27,6 +27,7 @@ from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import _MUTABLE
 from civ6gpu.mcts import (
     search_production, greedy_production, _rollout_value, plan_production, mpc_play,
+    mpc_play_empire,
 )
 
 HORIZON = 15
@@ -145,6 +146,19 @@ def test_planning(rules, paths):
         print(f"  {p.name}: scripted={base:.1f} mpc-d1={got:.1f} gain={got - base:+.1f}")
     assert wins >= 2, f"mpc-d1 only beat scripted on {wins}/{n} (expected a clear edge)"
     print(f"planning: mpc-d1 >= scripted on all {n}, strictly better on {wins}")
+
+    # empire-wide search (every city's production): deterministic, and not worse than
+    # the scripted baseline on a sample game.
+    ep = 45
+    s = build(rules, paths[0])
+    for _ in range(ep):
+        s.step()
+    base = float(s.empire_score()[0])
+    e1 = mpc_play_empire(build(rules, paths[0]), horizon=15, depth=1, turns=ep)
+    e2 = mpc_play_empire(build(rules, paths[0]), horizon=15, depth=1, turns=ep)
+    assert e1 == e2, f"mpc_play_empire nondeterministic ({e1} vs {e2})"
+    assert e1 >= base - 1e-6, f"empire search {e1:.2f} < scripted {base:.2f}"
+    print(f"empire  : all-cities search deterministic, {e1:.1f} >= scripted {base:.1f}")
 
 
 def main():
