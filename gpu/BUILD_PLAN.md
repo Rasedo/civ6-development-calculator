@@ -295,3 +295,18 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   accrual/effects are structurally inert (0 points → never earned) — modeled
   generically but never exercised, like the deferred district yields. D6
   (Aqueduct/Neighborhood housing, Harbor coastal, Encampment) is still pending.
+- D5 is CAPITAL-ONLY (RL districts place in city slot 0 only, mirroring the
+  scaffold). An any-city generalization was implemented and DEFERRED: it lifted
+  off-script coverage from 51 placements/45 games to 89/54 (37 in non-capital
+  slots 1-3), but exposed a t=0-static-vs-live bug — foundCity (game.ts:168)
+  removes the center tile's removable feature (woods/rainforest/reef), which
+  drops the DISTRICT adjacency it contributed to neighbouring tiles; the GPU's
+  precomputed d_static_adj (baked at export, after only the CAPITAL founded) does
+  NOT reflect a non-capital city's founding, so a fresh city's own district
+  (adjacent to its just-founded center) over-counts by the removed feature's
+  amount (seed 9027: non-capital Holy Site TS adj 1 vs GPU 2 → +1 faith → score
+  col8 +0.75). Fix when picked up: export a per-tile removable-feature adjacency
+  contribution [T,nD] and, in the founding loop, subtract it from each neighbour's
+  d_static_adj (bumping _eff_version). Reverted to capital-only to keep D5 green;
+  the any-city mask/apply/replay generalization is straightforward to re-apply
+  once the founding-feature update lands.
