@@ -183,7 +183,7 @@ const ADJ_SRC: AdjacencySource[] = [
 // RNG stream (envoy/quest cascade). Kept OFF until that CS-quest interaction is
 // mirrored (D2b-activate round 2). Flip to true to re-activate; the engine
 // reads the same flag via districtScaffold.active.
-const SCRIPTED_CAMPUS = false;
+const SCRIPTED_CAMPUS = true;
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',

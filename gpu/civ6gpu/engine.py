@@ -243,7 +243,7 @@ _MUTABLE = [
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
-    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued",
+    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
     "r_atwar", "r_warturns", "r_peaceturns", "r_tech", "r_prodstock", "r_milstock",
@@ -354,6 +354,7 @@ class BatchSim:
         self.cs_quest = torch.zeros(B, s_pad, dtype=torch.long, device=device)  # 0 none / 1 clearCamp / 2 trade / 3 district
         self.cs_quest_camp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.cs_quest_issued = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        self.cs_quest_district = torch.full((B, s_pad), -1, dtype=torch.long, device=device)  # askable idx of a buildDistrict quest (0=CAMPUS)
         self.influence = torch.zeros(B, dtype=dtype, device=device)
         self.envoys_avail = torch.zeros(B, dtype=torch.long, device=device)
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
@@ -1284,7 +1285,8 @@ class BatchSim:
             unimproved = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) < 0
             flat_h = self.farm_flat.gather(1, hc.unsqueeze(1)).squeeze(1)
             hill_h = self.farm_hill.gather(1, hc.unsqueeze(1)).squeeze(1)
-            build = act & owned_here & not_center & unimproved & (flat_h | (hill_h & civ_done))
+            district_free = self.district.gather(1, hc.unsqueeze(1)).squeeze(1) < 0  # a district paves the tile (validImprovements returns [] there)
+            build = act & owned_here & not_center & unimproved & district_free & (flat_h | (hill_h & civ_done))
             if bool(build.any()):
                 rows = build.nonzero(as_tuple=True)[0]
                 self.improvement[rows, here[rows]] = self.FARM
@@ -1300,7 +1302,7 @@ class BatchSim:
             if not bool(march.any()):
                 continue
             farmable = self.farm_flat | (self.farm_hill & civ_done.unsqueeze(1))
-            job = (self.owner >= 0) & (self.center_at < 0) & (self.improvement < 0) & farmable
+            job = (self.owner >= 0) & (self.center_at < 0) & (self.improvement < 0) & (self.district < 0) & farmable
             has_job = job.any(dim=1)
             d_job = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
             jkey = torch.where(job, d_job * (T + 1) + arangeT, torch.full_like(d_job, 10**9))
@@ -1666,31 +1668,43 @@ class BatchSim:
         cooldown = int(r.get("questCooldown", 12))
         for s in range(self.S):
             act = self.cs_alive[:, s] & self.cs_met[:, s]
-            # Resolve: only clear-the-camp is completable in covered scope
-            # (no trade routes, no specialty districts).
+            # Resolve: clear-the-camp, or a buildDistrict quest for a district the
+            # player has since completed. Only CAMPUS is buildable in covered
+            # scope, so a district quest resolves iff it asked for CAMPUS (idx 0)
+            # and the player owns one; trade-route quests remain uncompletable.
             camp_gone = ~((self.camp_tile == self.cs_quest_camp[:, s].unsqueeze(1)) & (self.camp_tile >= 0)).any(dim=1)
-            resolved = act & (self.cs_quest[:, s] == 1) & camp_gone
+            resolved_camp = act & (self.cs_quest[:, s] == 1) & camp_gone
+            has_campus_r = (self.district == self.CAMPUS).any(dim=1) if self.districts_on else torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            resolved_dist = act & (self.cs_quest[:, s] == 3) & (self.cs_quest_district[:, s] == 0) & has_campus_r
+            resolved = resolved_camp | resolved_dist
             if bool(resolved.any()):
                 rows = resolved.nonzero(as_tuple=True)[0]
                 self.cs_quest[rows, s] = 0
                 self.cs_quest_issued[rows, s] = self.turn
                 self.cs_envoys[rows, s] += int(r.get("questEnvoys", 1))
-            # Issue on cooldown: 2 draws (the district identity is inert here —
-            # such a quest can never be satisfied — but the DRAW is not).
+            # Issue on cooldown (mirrors issueQuest, 2 draws): DRAW 1 picks the
+            # askable district (0=CAMPUS); buildDistrict is an option only if the
+            # player has NOT already completed that district (only CAMPUS is
+            # buildable here). DRAW 2 picks among the options in order
+            # [clearCamp?, sendTradeRoute, buildDistrict?].
             due = act & (self.cs_quest[:, s] == 0) & (self.turn - self.cs_quest_issued[:, s] >= cooldown)
-            self._next_random(due)  # the askable-district pick
+            r1 = self._next_random(due)  # the askable-district pick
+            draw1 = torch.floor(r1 * 4.0).to(torch.long)
+            has_campus = (self.district == self.CAMPUS).any(dim=1) if self.districts_on else torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            bd = ~((draw1 == 0) & has_campus)  # buildDistrict offered unless already-built CAMPUS
             cdist = self.pair_dist[self.cs_center[:, s].unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
             near = (self.camp_tile >= 0) & (cdist <= 6)
             has_camp = near.any(dim=1)
             first_k = near.long().argmax(dim=1)
             camp_idx = self.camp_tile.gather(1, first_k.unsqueeze(1)).squeeze(1)
-            n_opts = has_camp.long() + 2
+            n_opts = has_camp.long() + 1 + bd.long()  # clearCamp? + sendTradeRoute + buildDistrict?
             r2 = self._next_random(due)
             pick = torch.floor(r2 * n_opts.to(torch.float64)).to(torch.long)
+            st_pos = has_camp.long()  # sendTradeRoute index (clearCamp takes 0 when present)
             kind = torch.where(
-                has_camp,
-                torch.where(pick == 0, 1, torch.where(pick == 1, 2, 3)),
-                torch.where(pick == 0, 2, 3),
+                has_camp & (pick == 0),
+                torch.ones_like(pick),
+                torch.where(pick == st_pos, torch.full_like(pick, 2), torch.full_like(pick, 3)),
             )
             if bool(due.any()):
                 rows = due.nonzero(as_tuple=True)[0]
@@ -1700,6 +1714,10 @@ class BatchSim:
                 if bool(take_camp.any()):
                     cr = take_camp.nonzero(as_tuple=True)[0]
                     self.cs_quest_camp[cr, s] = camp_idx[cr]
+                take_dist = due & (kind == 3)
+                if bool(take_dist.any()):
+                    dr = take_dist.nonzero(as_tuple=True)[0]
+                    self.cs_quest_district[dr, s] = draw1[dr]
 
         if self.turn % 12 == 0:
             self.cs_pop = torch.where(self.cs_alive, (self.cs_pop + 1).clamp(max=10), self.cs_pop)

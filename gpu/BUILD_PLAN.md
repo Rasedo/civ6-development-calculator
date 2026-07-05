@@ -21,7 +21,8 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
       rules, housing, placement flags) + STATIC per-tile adjacency contribution
       (mountain/rainforest/woods/reef/river/sea-resource/natural-wonder — known
       at t=0). Self-test; both gates stay green (nothing builds districts yet).
-- [~] **D2** Campus placement + adjacency yield (split):
+- [x] **D2** Campus placement + adjacency yield (COMPLETE — a Campus is placed
+      live and yields, both gates green, canary bites):
   - [x] **D2a** raw static-source adjacency table [B,T,10] exported (in-exporter
         self-check: floor(static)==districtAdjacency on every non-dynamic tile) +
         engine loads it inert.
@@ -30,9 +31,9 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         owned Campus tiles (pre-amenity, mirrors cityDistrictYields); exporter
         ships the `du` placeable-land mask + campusUnlockTech/campusIdx. Inert,
         poke-verified, both gates green.
-  - [~] **D2b-activate** placement mirror + fixes DONE and correct, but gated OFF
-        (SCRIPTED_CAMPUS=false) pending the city-state buildDistrict-quest RNG
-        mirror (see status log). Flip on + fix CS quest, then gate to green.
+  - [x] **D2b-activate** Campus placed live (SCRIPTED_CAMPUS=true); CS
+        buildDistrict quest mirrored; builder excludes district tiles. Both gates
+        green; canary (Campus science +1) breaks the gate. D2 COMPLETE.
 - [ ] **D3** Dynamic adjacency: adjacent-district (+0.5 each), city-center,
       harbor, mine/quarry (IZ), built-wonder. Add the rest of the specialty
       districts. Gate to green.
@@ -136,3 +137,15 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   pick (engine ~ln 1668-1701). NEXT (D2b-activate rd 2): record the drawn
   district, model the `!already` option-removal so the quest RNG matches, satisfy
   the quest on district completion (+envoy); then flip SCRIPTED_CAMPUS=true, gate.
+- D2b-activate [x] DONE — SCRIPTED_CAMPUS=true, a Campus is placed live per game
+  (seed 9079 by t53). Round-2 fixes: (1) CS buildDistrict-quest mirror — record
+  draw1's district in cs_quest_district, drop buildDistrict from the option count
+  when draw1==CAMPUS & the player owns one (quest-pick RNG now matches), and
+  satisfy a CAMPUS district quest (+envoy). (2) scripted builder excludes district
+  tiles from its farm-job mask + build check (a district paves the tile;
+  validImprovements returns [] there) — fixed seed 9066 (builder had mis-targeted
+  the Campus tile → +1 unit, −1 farm). Both gates green (scripted 24 seeds with
+  Campuses, off-script 72 games); canary (Campus science +1) fails at seed 9079
+  t53. **D2 (Campus economy) COMPLETE.** Next: D3 — relax placement + add the
+  dynamic adjacency sources (adjacent district/center/mine/wonder) and the other
+  district types (Holy Site, Commercial Hub, Industrial Zone, Harbor…).
