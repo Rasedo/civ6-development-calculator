@@ -113,6 +113,7 @@ class Rules:
     b_maintenance: torch.Tensor
     b_river: torch.Tensor  # bool
     b_unlock: torch.Tensor  # tech index or -1
+    b_unlock_civic: torch.Tensor  # civic index or -1 (Temple/Amphitheater/… gate on a civic, not a tech)
     b_req_district: torch.Tensor  # required district idx (-1 = City Center / none)
     b_req_buildings: list  # per building: list of prerequisite building indices (requiresAny)
     t_cost: torch.Tensor  # [NT]
@@ -158,6 +159,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_maintenance=torch.tensor([b["maintenance"] for b in B], dtype=torch.float64),
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),
         b_unlock=torch.tensor([b["unlockTech"] for b in B], dtype=torch.long),
+        b_unlock_civic=torch.tensor([b.get("unlockCivic", -1) for b in B], dtype=torch.long),
         b_req_district=torch.tensor([b.get("reqDistrict", -1) for b in B], dtype=torch.long),
         b_req_buildings=[b.get("reqBuildings", []) for b in B],
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
@@ -254,7 +256,7 @@ _MUTABLE = [
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
-    "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
+    "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
 ]
 
@@ -363,6 +365,9 @@ class BatchSim:
         self.envoys_avail = torch.zeros(B, dtype=torch.long, device=device)
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
         self._cs_yidx = torch.tensor(cs_yidx, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
+        cs_didx = rules.cs.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
+        self._cs_didx = torch.tensor(cs_didx, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
+        self._cs_district_bonus = float(rules.cs.get("districtBonus", 2))  # per-district amount at each of the 3-/6-envoy thresholds
         self.loyalty = torch.full((B, C), 100.0, dtype=dtype, device=device)
 
         # --- rival civs (phase 4c) ---------------------------------------------
@@ -434,6 +439,18 @@ class BatchSim:
                     self.v_next[b] += 1
         self._gp_costs = torch.tensor(rr.get("gpCosts", [60 * 2**n for n in range(8)]), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
+        # Player great people (advanceGreatPeople): points accrue per class from
+        # its district + that district's buildings; earning the n-th person costs
+        # gp_costs[n] and applies gp_effects[cls, n]. Draws from the SAME gp_earned
+        # pool as the rival race (which claims first each turn). Only the 5 raced
+        # classes (0-4) matter; the player's reachable ones are Scientist(0),
+        # Merchant(2), Prophet(3) — the rest have unplaceable districts.
+        gp_cd = rr.get("gpClassDistrict", [])
+        self._gp_class_district = torch.tensor(gp_cd[:5] if gp_cd else [-1] * 5, dtype=torch.long, device=device)  # [5]
+        gp_fx = rr.get("gpEffects", [])
+        self._gp_effects = torch.tensor(gp_fx[:5] if gp_fx else [[[0, 0, 0, 0]] * 4] * 5, dtype=dtype, device=device)  # [5, maxN, 4]
+        self._gp_nc = int(self._gp_class_district.numel())
+        self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [3, 1.5, 0, -1.5, -3]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
@@ -502,7 +519,7 @@ class BatchSim:
         self._scaffold = [(int(p["idx"]), int(p["unlockTech"])) for p in sc.get("place", [])]  # (district idx, unlock tech idx), placement order
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
-        self._rl_district_active = False  # D5b flips on: the RL production head can place districts (off-script)
+        self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -895,6 +912,12 @@ class BatchSim:
             self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
             torch.ones(B, NB, dtype=torch.bool, device=dev),
         )
+        unlocked_civic = torch.where(
+            rd.b_unlock_civic.unsqueeze(0) >= 0,
+            self.civics.gather(1, rd.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.ones(B, NB, dtype=torch.bool, device=dev),
+        )  # Temple/Amphitheater/… gate on a civic (mirrors availableBuildings' unlocks.buildings)
+        unlocked = unlocked & unlocked_civic
         base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
@@ -946,6 +969,45 @@ class BatchSim:
             self.district[rows, best[rows]] = di
             self._eff_version += 1
         return place
+
+    def _advance_player_great_people(self) -> None:
+        """Mirrors advanceGreatPeople (runs after research, after rivalPhase has
+        claimed): each class accrues 1 + (its district's built buildings) per
+        city owning a completed district of its type, earns the n-th person at
+        gp_costs[n] from the shared gp_earned pool, and applies its effect —
+        science→current tech, culture→current civic, gold→treasury,
+        production→capital build head. Only Campus/Holy Site/Commercial Hub are
+        placeable, so only Scientist/Prophet/Merchant ever accrue."""
+        if not self.districts_on or self._gp_nc == 0:
+            return
+        B, C, dev, nCls = self.B, self.C, self.device, self._gp_nc
+        owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & (self.owner >= 0).unsqueeze(2)  # [B,T,C]
+        for cls in range(nCls):
+            d = int(self._gp_class_district[cls])
+            if d < 0:
+                continue
+            has_d = ((self.district == d).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed district d
+            in_d = self._b_req_district == d  # [NB] buildings of district d
+            bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
+            self.player_gp_points[:, cls] = self.player_gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
+        maxN = self._gp_effects.shape[1]
+        for _ in range(maxN):  # usually one earn per class per turn; loop covers the roster
+            earned = self.gp_earned[:, :nCls]
+            cost = self._gp_costs[earned.clamp(max=self._gp_costs.shape[0] - 1)]  # [B,nCls] gpCost(earned)
+            can = (earned < self._gp_roster[:nCls].unsqueeze(0)) & (self.player_gp_points >= cost)
+            if not bool(can.any()):
+                break
+            eff = self._gp_effects[torch.arange(nCls, device=dev).view(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,4]
+            cf = can.to(self.dtype)
+            self.tech_prog = self.tech_prog + (eff[:, :, 0] * cf).sum(dim=1)  # science → current tech (banks for next turn)
+            self.civic_prog = self.civic_prog + (eff[:, :, 1] * cf).sum(dim=1)  # culture → current civic
+            self.treasury = self.treasury + (eff[:, :, 2] * cf).sum(dim=1)  # gold → treasury
+            prod = (eff[:, :, 3] * cf).sum(dim=1)  # production → capital's current build head
+            if bool((prod != 0).any()):
+                has_build = self.alive[:, 0] & (self.current[:, 0] >= 0)
+                self.progress[:, 0] = self.progress[:, 0] + torch.where(has_build, prod, torch.zeros_like(prod))
+            self.player_gp_points = self.player_gp_points - cost * cf
+            self.gp_earned[:, :nCls] = earned + can.long()
 
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
@@ -1005,6 +1067,18 @@ class BatchSim:
             dt = self.district.gather(1, tcf).reshape(B, C, M)
             owned_d = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
             adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
+            # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
+            # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
+            # completed district of its type. Sum per district idx here; the CS
+            # yield equals that district's adjYield for every CS-associated type
+            # (Campus→science, Holy Site→faith, Commercial Hub→gold, …), so it
+            # lands in the same column as the adjacency below, pre-amenity-factor.
+            nD = len(self.districts_cat)
+            cs_dbonus = torch.zeros(B, nD, dtype=self.dtype, device=dev)
+            if self.S > 0:
+                perD = ((self.cs_envoys >= 3).to(self.dtype) + (self.cs_envoys >= 6).to(self.dtype)) * self._cs_district_bonus
+                perD = perD * self.cs_alive.to(self.dtype)  # [B, S]
+                cs_dbonus.scatter_add_(1, self._cs_didx.clamp(min=0), perD)
             # For each PLACED district with an adjacencyYield: floor(static +
             # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
             # sources (mine/quarry for IZ, city-center for Harbor, built-wonder
@@ -1016,7 +1090,8 @@ class BatchSim:
                 di = int(d["idx"])
                 adjv = torch.floor(self.d_static_adj[:, :, di] + 0.5 * adjc)  # [B, T]
                 mask = owned_d & (dt == di)
-                total[:, :, yc] = total[:, :, yc] + (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2)
+                dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
+                total[:, :, yc] = total[:, :, yc] + (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2) + cs_dbonus[:, di].unsqueeze(1) * dcount
             # districtMaintenance: 1 gold per completed specialty district (only
             # CITY_CENTER/NEIGHBORHOOD/AQUEDUCT are 0, none placed in scope).
             d_maint = (owned_d & (dt >= 0)).to(self.dtype).sum(dim=2)
@@ -1338,6 +1413,7 @@ class BatchSim:
                 & (self.owner.gather(1, tc) >= 0)
                 & (self.center_at.gather(1, tc) < 0)
                 & (self.improvement.gather(1, tc) < 0)
+                & (self.district.gather(1, tc) < 0)  # can't improve a district tile (mirrors validImprovements; matters once off-script districts land, D5b)
             )
             farmable = self.farm_flat.gather(1, tc) | (self.farm_hill.gather(1, tc) & civ_done)
             build_f = (here_ok & farmable).unsqueeze(2)
@@ -1505,6 +1581,7 @@ class BatchSim:
                     & (self.owner.gather(1, hc).squeeze(1) >= 0)
                     & (self.center_at.gather(1, hc).squeeze(1) < 0)
                     & (self.improvement.gather(1, hc).squeeze(1) < 0)
+                    & (self.district.gather(1, hc).squeeze(1) < 0)  # not a district tile (mirrors validImprovements; D5b)
                 )
                 for act, valid, imp in ((13, farmable, self.FARM), (14, mineable, self.MINE), (15, woodsy, self.LUMBER)):
                     if imp < 0:
@@ -2863,6 +2940,11 @@ class BatchSim:
                 self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
         no_civic = (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
         self.civic_prog = torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog)
+
+        # Player great people (advanceGreatPeople) — after research, mirroring
+        # endTurn's order (rivalPhase claimed earlier this step). Science/culture
+        # bank toward the next turn's tech/civic; gold/production apply now.
+        self._advance_player_great_people()
 
         # --- founding (mirrors the plannedSettles loop at the end of endTurn) ------
         # Consume the planned-site list in order while settlers remain; a

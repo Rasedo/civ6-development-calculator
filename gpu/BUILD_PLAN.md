@@ -68,7 +68,7 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
       so all citizens work tiles. Both gates green; canary (disable the gate →
       GPU builds an ungated Library, bldgs0 diverges) bites hard. Coverage thin
       (Library 1/24, Shrine 2/24 — buildings compete on cost) but non-vacuous.
-- [~] **D5** RL production head can place districts (widen production action space).
+- [x] **D5** RL production head can place districts (widen production action space).
   - [x] **D5a** Gated-off plumbing (behind `_rl_district_active=False`, inert):
         shared `_place_district_capital(di, want)` best-tile helper (the scaffold's
         eligibility/rank/place logic, extracted); the scripted scaffold refactored to
@@ -84,10 +84,34 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         replay-gpu.ts's existing dispatch is untouched. Both gates green
         (scripted 24×100, off-script 72×100); inertness self-test confirms width
         21→24 with district columns all-False.
-  - [ ] **D5b** Flip `_rl_district_active=True`; teach replay-gpu.ts the district
-        action (fix the unit branch bound to `a<NB+2+NU`, add an `a>=NB+2+NU` district
-        branch that places on the TS side via canPlaceDistrict + the same best-tile
-        scan); iterate the off-script gate to green with districts live. Then retrain.
+  - [x] **D5b** Flipped `_rl_district_active=True`; replay-gpu.ts now handles the
+        district action (unit branch bounded to `a<NB+2+NU`; `a>=NB+2+NU` places on
+        the TS side via canPlaceDistrict + the same best-tile scan); rollout.py emits
+        the scaffold id map. Driving the off-script gate to green (72×100, 51 district
+        actions across 45 games) surfaced FIVE latent bugs, all vacuous until off-script
+        districts existed — each fixed by mirroring the TS rule:
+        (1) **builder-district** — `unit_action_mask`/execution let a builder improve a
+        district tile; added `& district<0` (TS validImprovements forbids it).
+        (2) **civic-unlocked buildings** — Temple/Amphitheater/… gate on a CIVIC, not a
+        tech; the exporter only mapped tech `unlockBuilding`. Added `unlockCivic` +
+        `_buildable` civic gate.
+        (3) **Commercial-Hub building maintenance** — Market/Bank/Stock Exchange are
+        upkeep-free (city.ts buildingMaintenance); the exporter's cost formula charged
+        1 gold. Added the `district==='COMMERCIAL_HUB' → 0` case.
+        (4) **CS per-district envoy bonus** — a scientific/religious/… CS at ≥3 (again
+        ≥6) envoys adds +districtBonus to each owned district of its type
+        (csEnvoyBonuses.districtAdd); the GPU only had the flat capital bonus. Exported
+        typeDistrictIdx/districtBonus, added `cs_dbonus` into the district-yield loop.
+        (5) **player great people** — a Campus/Holy Site/Commercial Hub accrues
+        Scientist/Prophet/Merchant points (1 + its buildings/turn); the n-th costs
+        gpCost(n) from the SAME gp_earned pool the rival race consumes (rivals claim
+        first in rivalPhase, then the player after research — the GPU order matches).
+        Effects apply advanceGreatPeople-style: science→current tech, culture→current
+        civic, gold→treasury, production→capital. Modeled `player_gp_points` +
+        `_advance_player_great_people`. Canary: seed 9196 earns Aryabhata at turn 64
+        (+50 science) — without it the GPU lagged one tech (col1) at turn 83.
+        Both gates green (scripted 24×100, off-script 72×100). RL is now district-capable
+        — ready to retrain with the wider action space.
 - [ ] **D6** Specials: Aqueduct/Neighborhood housing, Harbor coastal placement,
       Encampment not-adjacent-to-center.
 
@@ -246,3 +270,28 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   gates green (scripted 24×100, off-script 72×100); inertness self-test confirms
   the widened mask's district columns are all-False. Next: D5b (flip it on + teach
   replay-gpu.ts the district action + iterate the off-script gate, then retrain).
+- D5b [x] COMPLETE: `_rl_district_active=True`; districts are a live off-script
+  action (51 placements across 45/72 games). replay-gpu.ts places the same tile
+  on the TS side (canPlaceDistrict + best floor(districtAdjacency), ties lowest
+  index) and leaves the slot idle; rollout.py exports the scaffold id map. The
+  gate surfaced 5 latent bugs, each vacuous until off-script districts existed,
+  all fixed by mirroring TS: (1) builders could improve a district tile —
+  unit_action_mask + build execution now gate `& district<0`; (2) Temple &c are
+  civic-unlocked, not tech — exporter emits unlockCivic, _buildable ANDs a civic
+  gate; (3) Commercial-Hub buildings (Market/Bank/Stock Exchange) are upkeep-free
+  — exporter maintenance formula special-cases them to 0; (4) CS per-district
+  envoy bonus (≥3/≥6 envoys → +2 to each district of the CS's type) — exported
+  typeDistrictIdx/districtBonus, engine sums cs_dbonus into the district-yield
+  loop; (5) player great people — Campus/Holy Site/Commercial Hub accrue
+  Scientist/Merchant/Prophet points (1 + district buildings), earned from the
+  SAME gp_earned pool the rival race drains (rivals first in rivalPhase, player
+  after research — GPU order already matches), effects science→tech / gold→
+  treasury / culture→civic / prod→capital. Reachability: 45/72 games place a
+  district; the great-people fix is bit by seed 9196 (earns Aryabhata @t64, +50
+  science) which else lagged a tech at t83. Both gates green FIRST-TRY after the
+  5th fix. D5 DONE — the RL action space now includes districts; retrain next.
+- Note on scope honesty: IZ/Theater/Harbor/Encampment districts and their great-
+  people classes (Engineer/Artist/Admiral/General) remain unplaceable, so their
+  accrual/effects are structurally inert (0 points → never earned) — modeled
+  generically but never exercised, like the deferred district yields. D6
+  (Aqueduct/Neighborhood housing, Harbor coastal, Encampment) is still pending.

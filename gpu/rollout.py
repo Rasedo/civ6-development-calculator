@@ -103,6 +103,13 @@ def main() -> None:
         for b in range(B):
             games[b]["trace"].append([float(x) for x in rows[b]])
 
+    # Scaffold district ids in placement order — replay maps a district action
+    # (a >= NB+2+NU) back to a DistrictId (D5b). Same source as the engine's
+    # _scaffold: districtScaffold.place[si].idx into the district catalog.
+    _dsc = rules_raw.get("districtScaffold", {})
+    _dcat = rules_raw.get("districts", [])
+    scaffold_ids = [_dcat[p["idx"]]["id"] for p in _dsc.get("place", [])]
+
     out = {
         "width": sim.W,
         "height": sim.H,
@@ -114,6 +121,7 @@ def main() -> None:
         "buildings": [b["id"] for b in rules_raw["buildings"]],
         "techs": [t["id"] for t in rules_raw["techs"]],
         "civics": [c["id"] for c in rules_raw["civics"]],
+        "scaffold": scaffold_ids,
         "games": games,
     }
     Path(args.out).write_text(json.dumps(out))

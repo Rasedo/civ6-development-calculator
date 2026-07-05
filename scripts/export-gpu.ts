@@ -42,8 +42,10 @@ import {
   QUEST_COOLDOWN,
   QUEST_ENVOYS,
   CS_TYPE_YIELD,
+  CS_TYPE_DISTRICT,
+  CS_DISTRICT_BONUS,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../src/data/religion';
 import { TERRAINS } from '../src/data/terrains';
 import {
@@ -126,6 +128,14 @@ const buildingUnlockTech = new Map<string, number>();
 techList.forEach((t, i) => {
   for (const fx of t.effects ?? []) {
     if (fx.kind === 'unlockBuilding') buildingUnlockTech.set(fx.building, i);
+  }
+});
+// Some buildings (Temple, Amphitheater, Museum, Zoo, Stadium, Arena) are
+// unlocked by a CIVIC, not a tech — availableBuildings gates on both.
+const buildingUnlockCivic = new Map<string, number>();
+civicList.forEach((c, i) => {
+  for (const fx of c.effects ?? []) {
+    if (fx.kind === 'unlockBuilding') buildingUnlockCivic.set(fx.building, i);
   }
 });
 
@@ -261,6 +271,11 @@ const rules = {
     questEnvoys: QUEST_ENVOYS,
     // per CS type (by index): which yield column its envoys boost
     typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CS_TYPE_YIELD[t])),
+    // per CS type: the district whose count carries the 3-/6-envoy bonus, and
+    // the per-district amount (csEnvoyBonuses: +CS_DISTRICT_BONUS at >=3, again
+    // at >=6, added to each owned completed district of that type).
+    typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CS_TYPE_DISTRICT[t])),
+    districtBonus: CS_DISTRICT_BONUS,
   },
   // Rival-civ pacing (mirrors data/rivals.ts). loyaltyAmenity is keyed by
   // amenity-tier INDEX in the same order as amenityTiers above. The
@@ -287,6 +302,15 @@ const rules = {
     loyaltyAmenity: ['Ecstatic', 'Happy', 'Content', 'Displeased', 'Unhappy'].map((n) => LOYALTY_AMENITY[n] ?? 0),
     gpCosts: Array.from({ length: 8 }, (_, n) => gpCost(n)),
     gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
+    // Player great-people (advanceGreatPeople): per class, the PLACEABLE_DISTRICTS
+    // idx that accrues its points, and each person's instant effect
+    // [science→tech, culture→civic, gold→treasury, production→capital]. The player
+    // draws from the SAME gp_earned pool the rival race consumes (rivals claim in
+    // rivalPhase first, then the player), so only classDistrict + effects are new.
+    gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
+    gpEffects: GP_CLASSES.map((c) =>
+      GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0]),
+    ),
     pantheonPool: Object.keys(PANTHEONS).length,
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,
     founderPool: Object.keys(FOUNDER_BELIEFS).length,
@@ -405,10 +429,12 @@ const rules = {
     yields: YIELD_KEYS.map((k) => b.yields?.[k] ?? 0),
     housing: b.housing ?? 0,
     amenities: b.amenities ?? 0,
-    // Mirrors city.ts buildingMaintenance (derived, not stored).
-    maintenance: b.cost === 0 ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1,
+    // Mirrors city.ts buildingMaintenance (derived, not stored): Commercial Hub
+    // buildings (Market/Bank/Stock Exchange) are upkeep-free, like cost-0 ones.
+    maintenance: b.cost === 0 || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1,
     river: b.special === 'WATER_MILL',
     unlockTech: buildingUnlockTech.get(b.id) ?? -1,
+    unlockCivic: buildingUnlockCivic.get(b.id) ?? -1,
     // District buildings are gated (mirrors availableBuildings) on the city
     // owning a completed district of this type and having a prerequisite.
     reqDistrict: b.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(b.district),

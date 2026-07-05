@@ -22,9 +22,12 @@ import { createGame, endTurn, foundCity, queueBuilding, queueSettler, setTechRes
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
 import { meleeAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
+import { canPlaceDistrict } from '../src/core/rules';
+import { districtAdjacency } from '../src/core/yields';
 import { neighborTile } from '../src/core/hex';
 import { traceRow, rowTolerance } from './gpu-trace';
 import { UNITS } from '../src/data/units';
+import type { DistrictId } from '../src/core/types';
 
 const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
@@ -38,6 +41,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   buildings: string[];
   techs: string[];
   civics: string[];
+  scaffold?: string[];
   games: {
     seed: number;
     rng: number;
@@ -48,6 +52,8 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
 };
 
 const NB = roll.buildings.length;
+const NU = roll.unitIds.length;
+const SCAFFOLD = roll.scaffold ?? [];
 let failures = 0;
 let games = 0;
 let worst = 0;
@@ -153,13 +159,50 @@ for (const game of roll.games) {
           bad = true;
           break;
         }
-      } else if (a >= NB + 2) {
+      } else if (a >= NB + 2 && a < NB + 2 + NU) {
         const r = queueUnit(state, city.id, roll.unitIds[a - NB - 2]);
         if (!r.ok) {
           fail(`turn ${state.turn}: queueUnit(${roll.unitIds[a - NB - 2]}) in slot ${slot}: ${r.reason}`);
           bad = true;
           break;
         }
+      } else if (a >= NB + 2 + NU) {
+        // District placement (D5b): the RL production head placed a scaffold
+        // district instantly (free) in the capital. Mirror the exporter's
+        // scaffold scan EXACTLY — capital-owned, unimproved, canPlaceDistrict,
+        // best floor(districtAdjacency) tile, ties to lowest index — and leave
+        // the build slot idle (queue nothing), as the GPU's RL block does.
+        const districtId = SCAFFOLD[a - NB - 2 - NU] as DistrictId | undefined;
+        if (!districtId) {
+          fail(`turn ${state.turn}: district action ${a} in slot ${slot} but no scaffold[${a - NB - 2 - NU}]`);
+          bad = true;
+          break;
+        }
+        if (!city.isCapital) {
+          fail(`turn ${state.turn}: district action in slot ${slot} but city ${city.id} is not the capital`);
+          bad = true;
+          break;
+        }
+        let best = -1;
+        let bestAdj = -1;
+        for (const tile of state.map.tiles) {
+          if (tile.cityId !== city.id || tile.improvement) continue;
+          if (!canPlaceDistrict(state, city, districtId, tile.index).ok) continue;
+          const adj = districtAdjacency(state.map, tile, districtId);
+          if (adj > bestAdj) {
+            bestAdj = adj;
+            best = tile.index;
+          }
+        }
+        if (best < 0) {
+          fail(`turn ${state.turn}: GPU placed ${districtId} in slot ${slot} but TS found no eligible tile`);
+          bad = true;
+          break;
+        }
+        const tile = state.map.tiles[best];
+        tile.district = districtId;
+        tile.districtComplete = true;
+        city.districts.push({ type: districtId, tileIndex: best });
       } // a === NB+1: idle — queue nothing
     }
     if (!bad && act?.r !== undefined) {
