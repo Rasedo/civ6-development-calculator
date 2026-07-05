@@ -34,7 +34,10 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
   - [x] **D2b-activate** Campus placed live (SCRIPTED_CAMPUS=true); CS
         buildDistrict quest mirrored; builder excludes district tiles. Both gates
         green; canary (Campus science +1) breaks the gate. D2 COMPLETE.
-- [~] **D3** Dynamic adjacency + other district types (split):
+- [x] **D3** Dynamic adjacency + other district types (COMPLETE for the district
+      types reachable in 100-turn scripted games — Campus/Holy Site/Commercial
+      Hub; IZ/Theater/Harbor are pop-10+ 4th-slot districts, deferred as
+      unexercised — see status log):
   - [x] **D3a** dynamic DISTRICT source for Campus (+0.5 per adjacent completed
         district/center incl. rival centers); placement relaxed to allow
         center-adjacent tiles. Both gates green; canary (dyn 0.5→1.0) bites.
@@ -48,8 +51,13 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         - [x] **D3b-3** Commercial Hub added to the scaffold (one line, unlock
               CURRENCY); river static + DISTRICT dyn via the generic loop. Both
               gates green; coverage 4/24 games (needs pop 7 + Currency).
-        - [ ] **D3b-4** Industrial Zone (needs a MINE_OR_QUARRY dynamic source in
-              the yield loop + placement score).
+        - [—] **D3b-4** Industrial Zone / Theater / Harbor — DEFERRED (unexercised).
+              Reachability check: capital pop maxes at 9 (median 5), 0/24 games
+              reach the 4th specialty slot (pop≥10) and APPRENTICESHIP (IZ unlock)
+              is never researched in 100 turns. Adding them = vacuous code. Revisit
+              only with a longer horizon or a forced high-pop scenario. The
+              MINE_OR_QUARRY / CITY_CENTER / BUILT_WONDER dynamic sources come with
+              them.
 - [ ] **D4** District buildings (Library/University, Market/Bank, Shrine/Temple,
       Workshop/Factory, etc.): unlocks, yields, housing, specialist slots.
 - [ ] **D5** RL production head can queue districts (widen production action
@@ -177,3 +185,11 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   best floor(static+0.5*adj) tile. Coverage: Campus 22/24, Holy Site 24/24
   games. Both gates green FIRST TRY — D3b-1's generalized yield/maintenance/
   CS-quest handled Holy Site with no extra work. Next: D3b-3 Commercial Hub.
+- D3 [x] COMPLETE (reachable districts): Campus/Holy Site/Commercial Hub place
+  and yield under full parity (dynamic adjacency, per-pop cap, maintenance,
+  eurekas, CS quests). Reachability check (100-turn scripted, 24 seeds):
+  capital pop max 9 / median 5; 0/24 reach the 4th specialty slot (pop>=10);
+  APPRENTICESHIP never researched. So IZ/Theater/Harbor are DEFERRED as
+  unexercised. Next: D4 (district buildings + specialists), which unlock with
+  their districts (Library/WRITING, Shrine/ASTROLOGY, Market/CURRENCY) so they
+  ARE covered; then D5 (RL district action) to enable a district-capable retrain.
