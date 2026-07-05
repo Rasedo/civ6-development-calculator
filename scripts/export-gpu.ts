@@ -31,7 +31,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
-import { validImprovements } from '../src/core/rules';
+import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import {
@@ -156,6 +156,12 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     // built, so their eurekas never fire in either engine — left skipped.
     const imp = c.id === 'FARM' ? 0 : c.id === 'MINE' ? 1 : c.id === 'LUMBER_MILL' ? 2 : -1;
     if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
+  } else if (c.kind === 'district' && !c.distinctTypes) {
+    // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
+    // MATHEMATICS: 3; per-type ones). distinctTypes conditions (7 different
+    // districts) wait for D3, when more than one district type can exist.
+    const dtype = c.type ? PLACEABLE_DISTRICTS.indexOf(c.type) : -1;
+    row = { kind: 'district', dtype, count: c.count };
   }
   if (row) boostRows.push({ target, idx, ...row });
 }
@@ -171,6 +177,14 @@ const ADJ_SRC: AdjacencySource[] = [
 // Terrain-permanent adjacency sources (known at t=0). The dynamic ones
 // (adjacent district/center/harbor/mine, built wonder) are added live by the
 // engine before the floor.
+// D2b-activate off-switch: the scripted Campus placement + its parity are
+// correct for maintenance/adjacency/eurekas, but building a district flips the
+// city-state buildDistrict quest's `!already` check, which changes the quest
+// RNG stream (envoy/quest cascade). Kept OFF until that CS-quest interaction is
+// mirrored (D2b-activate round 2). Flip to true to re-activate; the engine
+// reads the same flag via districtScaffold.active.
+const SCRIPTED_CAMPUS = false;
+
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
 ]);
@@ -355,6 +369,7 @@ const rules = {
     campusUnlockTech: techList.findIndex((t) =>
       t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === 'CAMPUS'),
     ),
+    active: SCRIPTED_CAMPUS ? 1 : 0,
   },
   palace: {
     yields: YIELD_KEYS.map((k) => BUILDINGS.PALACE?.yields?.[k] ?? 0),
@@ -627,6 +642,7 @@ for (let s = 0; s < N_SEEDS; s++) {
 
   const warriorTrained = new Set<number>();
   let builderTrained = false;
+  let campusPlaced = false;
   const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
     // Envoys: greedily back the neediest met city-state (fewest envoys,
@@ -709,6 +725,36 @@ for (let s = 0; s < N_SEEDS; s++) {
         const n = neighborTile(state.map, btile, stepDir)!;
         u.path = [n.index];
         walkPath(state, u);
+      }
+    }
+    // Scripted district (D2b): once WRITING unlocks the Campus, instant-place
+    // ONE completed Campus in the capital on the best static-adjacency owned,
+    // unimproved tile that has NO adjacent completed district (so the adjacency
+    // is purely static — dynamic sources are D3), ties to lowest tile index.
+    // The GPU mirrors this exact choice. Placed after the builders, before
+    // endTurn, so this turn's yields already reflect it.
+    if (SCRIPTED_CAMPUS && !campusPlaced && state.research.techs.includes('WRITING')) {
+      const cap = state.cities.find((c) => c.isCapital);
+      if (cap) {
+        let best = -1;
+        let bestAdj = -1;
+        for (const tile of map.tiles) {
+          if (tile.cityId !== cap.id || tile.improvement) continue;
+          if (!canPlaceDistrict(state, cap, 'CAMPUS', tile.index).ok) continue;
+          if (neighbors(map, tile).some((n) => n.district !== null && n.districtComplete)) continue;
+          const adj = districtAdjacency(map, tile, 'CAMPUS');
+          if (adj > bestAdj) {
+            bestAdj = adj;
+            best = tile.index;
+          }
+        }
+        if (best >= 0) {
+          const tile = map.tiles[best];
+          tile.district = 'CAMPUS';
+          tile.districtComplete = true;
+          cap.districts.push({ type: 'CAMPUS', tileIndex: best });
+          campusPlaced = true;
+        }
       }
     }
     endTurn(state);

@@ -495,6 +495,7 @@ class BatchSim:
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
         self.campus_placed = torch.zeros(B, dtype=torch.bool, device=device)  # D2b scaffold flag (activation is next stage)
+        self._campus_active = bool(sc.get("active", 0))  # D2b-activate off-switch (mirrors exporter SCRIPTED_CAMPUS)
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
         )  # [B, T] district-placeable land — static part of canPlaceDistrict
@@ -940,6 +941,7 @@ class BatchSim:
             campus = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids) & (dt == self.CAMPUS)
             d_sci = (torch.floor(self.d_static_adj[:, :, self.CAMPUS].gather(1, tcf).reshape(B, C, M)) * campus.to(self.dtype)).sum(dim=2)
             total[:, :, 3] = total[:, :, 3] + d_sci
+            d_maint = campus.to(self.dtype).sum(dim=2)  # +1 gold upkeep per completed Campus (districtMaintenance)
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
@@ -962,6 +964,8 @@ class BatchSim:
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
         total[:, :, 1:] *= yield_f.unsqueeze(2)  # non-food × amenity factor
         maintenance = self.base_maintenance + torch.einsum("bcn,n->bc", bf, rd.b_maintenance)
+        if self.districts_on:
+            maintenance = maintenance + d_maint  # specialty-district upkeep (Campus = 1 gold)
         total[:, :, 2] -= maintenance
 
         housing = self.water_housing + self.palace_slot_housing.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_housing)
@@ -1052,6 +1056,12 @@ class BatchSim:
                 on = self.improvement == row["imp"]
                 if row.get("onResource"):
                     on = on & (self.res_priority > 0)
+                pred = on.sum(dim=1) >= row["count"]
+            elif kind == "district":
+                # completed districts of a type (dtype>=0) or any specialty
+                # (dtype<0). Only specialty districts live in self.district (>=0).
+                dtype = row.get("dtype", -1)
+                on = (self.district >= 0) if dtype < 0 else (self.district == dtype)
                 pred = on.sum(dim=1) >= row["count"]
             else:
                 continue
@@ -2522,6 +2532,43 @@ class BatchSim:
             self.current = torch.where(valid_b | valid_u, act, self.current)
             self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
             self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
+
+        # --- scripted Campus (D2b-activate) --------------------------------------
+        # Scripted path only (the off-script RL rollout gets a district action in
+        # D5). Mirrors the exporter: once WRITING is in, place ONE completed
+        # Campus in the capital on the best floor(static-adjacency) owned,
+        # unimproved, in-radius tile with NO adjacent completed district (center
+        # or specialty), ties to lowest tile index — so the yield is purely
+        # static (dynamic sources are D3).
+        if production is None and self.districts_on and self.campus_unlock_tech >= 0 and self._campus_active:
+            has_w = self.techs[:, self.campus_unlock_tech]  # [B]
+            want = has_w & ~self.campus_placed & self.alive[:, 0]
+            if bool(want.any()):
+                nb = self.neigh                    # [T, 6]
+                nbc = nb.clamp(min=0)
+                on_map = (nb >= 0).unsqueeze(0)    # [1, T, 6]
+                # any neighbor is a completed district (city center or specialty)
+                adj_dist = (((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0)) & on_map).any(dim=2)  # [B, T]
+                site0 = self.site[:, 0].clamp(min=0)  # [B]
+                elig = (
+                    (self.owner == 0)
+                    & self.d_usable
+                    & (self.district < 0)
+                    & (self.improvement < 0)
+                    & (self.dist[:, 0] <= 3)
+                    & ~adj_dist
+                )  # [B, T]
+                elig[torch.arange(B, device=dev), site0] = False  # not the center itself
+                adjf = torch.floor(self.d_static_adj[:, :, self.CAMPUS])  # [B, T]
+                arT = torch.arange(T, device=dev, dtype=self.dtype)
+                key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))  # max adj, ties lowest index
+                best = key.argmax(dim=1)  # [B]
+                place = want & elig.any(dim=1)
+                if bool(place.any()):
+                    rows = place.nonzero(as_tuple=True)[0]
+                    self.district[rows, best[rows]] = self.CAMPUS
+                    self.campus_placed = self.campus_placed | place
+                    self._eff_version += 1
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------
         if tech is not None:

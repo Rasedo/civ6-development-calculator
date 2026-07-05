@@ -30,9 +30,9 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         owned Campus tiles (pre-amenity, mirrors cityDistrictYields); exporter
         ships the `du` placeable-land mask + campusUnlockTech/campusIdx. Inert,
         poke-verified, both gates green.
-  - [ ] **D2b-activate** scripted instant-place ONE Campus on the best-static-adj
-        owned tile with no adjacent city center (GPU mirrors the exact choice),
-        gate to green. Then D3 relaxes placement + adds dynamic adjacency.
+  - [~] **D2b-activate** placement mirror + fixes DONE and correct, but gated OFF
+        (SCRIPTED_CAMPUS=false) pending the city-state buildDistrict-quest RNG
+        mirror (see status log). Flip on + fix CS quest, then gate to green.
 - [ ] **D3** Dynamic adjacency: adjacent-district (+0.5 each), city-center,
       harbor, mine/quarry (IZ), built-wonder. Add the rest of the specialty
       districts. Gate to green.
@@ -116,3 +116,23 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   (nothing places a Campus) → both gates green; poke-test: a poked Campus
   (floor adj 2) lifts capital science 3.57→5.67. Next: D2b-activate (scripted
   instant-place on the best non-center-adjacent tile; mirror the choice; gate).
+- D2b-activate [~] IMPLEMENTED BUT GATED OFF (SCRIPTED_CAMPUS=false → district
+  Scaffold.active=0 → engine _campus_active=False → no Campus placed → both
+  gates green). The placement MIRROR WORKS (verified this turn: TS exporter +
+  GPU pick the identical tile), and two real bugs were found and FIXED (correct,
+  currently inert):
+  * District maintenance — a completed Campus costs 1 gold/turn
+    (districtMaintenance); added to _city_totals maintenance. (Symptom: GPU
+    treasury +1 gold/turn, score +1; seed 9079 t51.)
+  * kind:'district' eurekas/inspirations (STATE_WORKFORCE "build any specialty
+    district", MATHEMATICS 3, per-type ones) — exported (non-distinct) + detected
+    in _detect_boosts from self.district counts. (Symptom: civics diverged.)
+  REMAINING BLOCKER: building a district flips the city-state buildDistrict
+  quest's `!already` check (cityStates.ts issueQuest ~ln 216-219) → removes
+  buildDistrict from the quest options once the player has that district →
+  changes the quest-selection nextRandom → diverges the whole CS quest/envoy RNG
+  stream (envoys/quest/culture/units cascade, seeds 9014/9066 t56-58). The GPU
+  stubs district quests as never-satisfiable and draws-then-discards the district
+  pick (engine ~ln 1668-1701). NEXT (D2b-activate rd 2): record the drawn
+  district, model the `!already` option-removal so the quest RNG matches, satisfy
+  the quest on district completion (+envoy); then flip SCRIPTED_CAMPUS=true, gate.
