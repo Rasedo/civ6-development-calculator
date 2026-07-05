@@ -180,13 +180,18 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       Result: closed-loop depth-1 beats the scripted base policy on final empire_score
       on 5/6 seeds (mean +28, never worse), ~14 s/game on CPU. `gpu/mcts_test.py`
       covers determinism, eval-only, and the win over scripted. Both gates green.
-- [ ] **M2b** Wire a TRAINED net (needs Phase B): factored policy as the sampling
+      `gpu/search_eval.py` benchmarks scripted-vs-search on matched B=1 worlds
+      (the reproducible harness for this arm; net rows land in M2b).
+- [ ] **M2b** Wire a TRAINED net into the search: factored policy as the sampling
       prior + value head at the leaf, Gumbel/Sampled-AlphaZero over sampled 5-head
-      action-tuples, Q-normalized PUCT, RNG chance nodes. Eval vs the 213.6 policy.
-      BLOCKED: no checkpoint in-repo — the 213.6 figure is a documented past overnight
-      RTX-4070 run (14-action, farms-only), not a saved net, and a fresh 40M-step run
-      needs a GPU. Build Phase B (training infra) first; the net leaf/prior then drop
-      into M2a's shape (search_production already exposes a `value_fn`/`prior` hook).
+      action-tuples, Q-normalized PUCT, RNG chance nodes. UNBLOCKED for CPU: train_ppo.py
+      runs and LEARNS on the current district engine (verified — a 5-update CPU smoke
+      climbed 69→86 empire_score at ~350 steps/s), so a modest net is reachable here;
+      a strong net (the old 213.6 was a past overnight RTX-4070 run, 14-action farms-
+      only, not a saved checkpoint) still wants a GPU. Plan: train a CPU net (Phase B
+      bring-up) → establish it as the eval baseline → drop its policy/value into the
+      M2a search shape (search_production already exposes a `value_fn`/`prior` hook).
+      Checkpoints stay gitignored (gpu/runs/); the net-vs-search number is recorded here.
 - [ ] **M3** (opt) Search-distilled policy improvement loop; handle RNG chance
       nodes (sample futures / expectimax) for robustness.
 
