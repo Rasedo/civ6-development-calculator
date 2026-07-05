@@ -64,6 +64,40 @@ cities have real production choices. The net is used *out of distribution* here 
 drive all five heads; benchmarked driving only production), and n=5 is a small, high-variance
 sample — treat the gains as directional.
 
+### M2b-2 — net-guided search over the full 5-head action tuple
+
+With a trained net in hand (a 135.6-mean net trained locally on an RTX 4070 SUPER in ~15 min —
+see below), the search can improve the WHOLE action tuple, not just production. `netgreedy`
+plays the net's greedy policy across all five heads (production/tech/civic/units/envoy);
+`tuplesearch` draws the greedy tuple plus k−1 tuples sampled from the net's factored policy (the
+net is the prior) and plays the one with the best leaf value. On 6 matched worlds (100 turns):
+
+| policy | mean | gain vs scripted | vs netgreedy | s/game |
+|--------|------|------------------|--------------|--------|
+| scripted | 126.7 | — | — | ~1 |
+| netgreedy (all 5 heads) | 165.0 | +38.2 (4/6) | — | ~4 |
+| tuplesearch (net-value leaf, k=8) | 163.2 | +36.5 (4/6) | tied (2W/4L) | ~35 |
+
+The full net policy strongly beats scripted (+38) — RL trains well on the district/unit engine.
+But **net-value-leaf tuple search only ties the net's own greedy** (163 vs 165; 2 wins / 4 losses
+head-to-head — e.g. +19 on seed9001 and +23 on seed9027, but −26 on seed9040): searching against
+a mid-strength net's value head amplifies its ranking errors about as often as it helps. Search
+is only as good as the value function it optimizes. (A `--tuple-leaf rollout` variant evaluates
+each tuple by an actual rollout — reliable but ~25×+ slower, and its *scripted* continuation is a
+policy mismatch.) Both net and net-search also inherit the loyalty over-expansion weakness
+(seed9053 fails for both). The takeaway is the standard AlphaZero one: net-guided search needs an
+ACCURATE net (sharp policy + calibrated value) to beat greedy — a stronger net is the next step,
+now a ~2-hour job locally (see the GPU note below). The machinery is `search_eval.py --policy
+netgreedy|tuplesearch --k --tuple-leaf`; sampling is seeded per game (reproducible).
+
+### GPU / local compute
+
+The engine fires many small kernels per step, so it is launch-bound at small batch (a GPU ≈ CPU
+at B≤128) but scales well once the batch amortizes launch overhead: on an RTX 4070 SUPER,
+`train_ppo.py --device cuda` hits ~2,000 steps/s at B=1024 and **~5,760 at B=4096 (~15× a 4-core
+cloud CPU)**, using a small fraction of 12 GB VRAM. So a 40M-step run is ~2 hours. The single-
+agent B=1 searches here don't benefit from the GPU (launch-bound) but do fan out across CPU cores.
+
 ### Known limitation — production-only search over-expands (seed9053)
 
 On seed9053 *every* learned/search method (net, search, netsearch ≈ 61–63) falls **below**
@@ -93,7 +127,8 @@ the net's value head.
 ## Roadmap (see `gpu/BUILD_PLAN.md`)
 
 - **Done:** M1 (snapshot/restore + 1-ply), M2a (closed-loop depth + MPC), M2b-1 (trained net
-  wired into the search + benchmark), empire-wide production search. RL training verified to
-  learn on the district engine (`gpu/train_ppo.py`).
-- **Next:** M2b-2 (net-guided 5-head Gumbel/PUCT search — wants a stronger/GPU net); C1–C3
-  (symmetric rivals → multi-civ self-play).
+  wired into the search + benchmark), empire-wide production search, loyalty-aware leaf, and
+  M2b-2 (net-guided search over the full 5-head tuple — `netgreedy`/`tuplesearch`). RL trains
+  on the district engine on GPU at ~15× a cloud CPU.
+- **Next:** a STRONG net (a ~2-hour GPU run) so `tuplesearch` can actually beat greedy — the
+  value-head accuracy is the current bottleneck; then C1–C3 (symmetric rivals → self-play).

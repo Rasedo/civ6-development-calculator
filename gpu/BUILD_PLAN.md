@@ -190,10 +190,13 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       challengers crush scripted (net +68, netsearch +58, search +48); netsearch beats
       rollout search at ~8x the speed (value head is a good cheap leaf — the M3 lever).
       Table + caveats in the status log. Checkpoints stay gitignored (gpu/runs/).
-- [ ] **M2b-2** The full search: Gumbel/Sampled-AlphaZero over sampled 5-head action-
-      tuples (not just the capital's production), the net policy as the sampling prior,
-      Q-normalized PUCT, RNG chance nodes. Wants a stronger net (a GPU overnight run;
-      the old 213.6 was a past RTX-4070 result, 14-action farms-only, not a saved net).
+- [x] **M2b-2** DONE (machinery + benchmark) — Sampled-AlphaZero search over the full
+      5-head action tuple: `netgreedy` (net drives all heads greedily) + `tuplesearch`
+      (net-prior tuple sampling, net-value or rollout leaf, play the best). On a 135.6
+      GPU-trained net over 6 matched worlds the full net policy beats scripted +38, but
+      net-value-leaf tuplesearch only TIES greedy (163 vs 165, 2W/4L) — the mid-net's
+      value head is too noisy to search against. Needs a STRONG net (Q-normalized PUCT /
+      chance nodes deferred until then). See the M2b-2 + Phase-B(local) status entries.
 - [ ] **M3** (opt) Search-distilled policy improvement loop; handle RNG chance
       nodes (sample futures / expectimax) for robustness.
 
@@ -533,3 +536,35 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   ±0 — healthy cities hold loyalty ~100 so incur ~no penalty). `search_eval.py --loyalty-
   aware [--loyalty-penalty]`; mcts_test asserts shaped ≤ empire value + deterministic +
   eval-only. Same value_fn hook `netsearch` uses. No engine change; parity gates unaffected.
+- LOCAL/GPU [x]: session teleported (`--teleport`) from the 4-vCPU cloud box to local
+  hardware (Ryzen 9 3900X 24-thread, 32 GB, RTX 4070 SUPER 12 GB, torch 2.12.1+cu132).
+  train_ppo.py runs on CUDA unchanged. Throughput: the engine is launch-bound at small
+  batch (GPU ≈ CPU at B≤128) but scales — ~2020 steps/s @ B=1024, ~5760 @ B=4096 (~15× the
+  cloud CPU), <1 GB of 12 GB VRAM. A 40M-step run is now ~2 h. B=1 searches stay CPU (launch-
+  bound) but fan out across 24 cores. So the GPU-gated roadmap (strong net, self-play) is
+  unblocked locally; the old 213.6 was a past RTX-4070 result on a simpler 14-action engine.
+- M2b-2 [x] net-guided search over the full 5-head tuple (search_eval.py; mcts.py stays
+  net-free). `netgreedy` = the trained net drives production/tech/civic/units/envoy greedily;
+  `tuplesearch` = draw the greedy tuple + k−1 tuples sampled from the net's factored policy
+  (net = prior), score each by the net value head (--tuple-leaf net) or a scripted rollout
+  (--tuple-leaf rollout), play the best. Seeded per game (reproducible; verified). Trained a
+  quick net on GPU (25 updates B=4096, ~15 min → 135.6 mean, entropy 0.67) and benchmarked on
+  6 matched worlds x 100 turns:
+      seed    scripted   netgreedy   tuplesearch(net,k8)
+      9001      146.0      257.3        275.9   (+18.6 vs greedy)
+      9014       84.5      165.0        156.5
+      9027      109.8      126.0        148.7   (+22.7)
+      9040      136.5      126.5        100.5   (−26.0)
+      9053       93.5       68.5         62.9   (loyalty over-expansion — both fail)
+      9066      190.3      246.5        234.9
+      mean      126.7      165.0        163.2   (+38 / +37 vs scripted; both 4/6)
+  Findings: (1) the full net policy strongly beats scripted (+38) — RL trains well on the
+  district/unit engine. (2) net-value-leaf tuplesearch only TIES greedy (163 vs 165; 2 wins
+  4 losses head-to-head): searching against a mid-strength net's value head amplifies its
+  ranking errors as often as it helps — the standard "search is only as good as its value
+  function". (3) both net and net-search inherit the loyalty over-expansion weakness (9053).
+  (4) `--tuple-leaf rollout` is reliable but ~25×+ slower and its scripted continuation is a
+  policy mismatch. Conclusion: the machinery works; net-guided search needs a STRONG net
+  (accurate value + sharp policy) to beat greedy — now a ~2 h GPU job. Next: train a strong
+  net, re-run tuplesearch (expect it to pull ahead), then M3 / C1. No engine change; parity
+  gates unaffected (search_eval/train_ppo aren't imported by them).
