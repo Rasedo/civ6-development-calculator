@@ -58,8 +58,16 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
               only with a longer horizon or a forced high-pop scenario. The
               MINE_OR_QUARRY / CITY_CENTER / BUILT_WONDER dynamic sources come with
               them.
-- [ ] **D4** District buildings (Library/University, Market/Bank, Shrine/Temple,
-      Workshop/Factory, etc.): unlocks, yields, housing, specialist slots.
+- [x] **D4** District buildings (Library/University/Research Lab, Shrine/Temple,
+      Market/Bank/Stock Exchange): buildable set extended past City-Center;
+      _buildable gates each on tech-unlock + the city owning a completed district
+      of that type (reqDistrict, via a per-city has-district onehot) + a
+      prerequisite building (requiresAny). Yields/housing flow through the
+      existing b_yields/b_housing. Specialists NOT modeled — effectiveSpecialists
+      reads city.specialists (a manual setting the scripted policy never sets),
+      so all citizens work tiles. Both gates green; canary (disable the gate →
+      GPU builds an ungated Library, bldgs0 diverges) bites hard. Coverage thin
+      (Library 1/24, Shrine 2/24 — buildings compete on cost) but non-vacuous.
 - [ ] **D5** RL production head can queue districts (widen production action
       space); off-script coverage; retrain-ready.
 - [ ] **D6** Specials: Aqueduct/Neighborhood housing, Harbor coastal placement,

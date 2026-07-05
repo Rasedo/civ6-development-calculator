@@ -113,6 +113,8 @@ class Rules:
     b_maintenance: torch.Tensor
     b_river: torch.Tensor  # bool
     b_unlock: torch.Tensor  # tech index or -1
+    b_req_district: torch.Tensor  # required district idx (-1 = City Center / none)
+    b_req_buildings: list  # per building: list of prerequisite building indices (requiresAny)
     t_cost: torch.Tensor  # [NT]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
@@ -156,6 +158,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_maintenance=torch.tensor([b["maintenance"] for b in B], dtype=torch.float64),
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),
         b_unlock=torch.tensor([b["unlockTech"] for b in B], dtype=torch.long),
+        b_req_district=torch.tensor([b.get("reqDistrict", -1) for b in B], dtype=torch.long),
+        b_req_buildings=[b.get("reqBuildings", []) for b in B],
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
@@ -560,6 +564,9 @@ class BatchSim:
         self.tiles_acquired = torch.zeros(B, C, dtype=torch.long, device=device)
         self.owner = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         self.buildings = torch.zeros(B, C, NB, dtype=torch.bool, device=device)
+        self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
+        self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
+        self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings)
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
         self.progress = z(B, C)
@@ -876,14 +883,32 @@ class BatchSim:
             self._fertilize(rrm[on], af[on])  # ...and deposits silt on desert tiles
 
     def _buildable(self) -> torch.Tensor:
-        """[B, C, NB] City Center buildings each city could queue now."""
+        """[B, C, NB] buildings each city could queue now: unlocked (tech), not
+        already built, river gate — and for district buildings, the city owns a
+        completed district of the required type and has a prerequisite building
+        (mirrors availableBuildings)."""
         rd = self.rules_dev
+        B, C, NB, dev = self.B, self.C, self.NB, self.device
         unlocked = torch.where(
             rd.b_unlock.unsqueeze(0) >= 0,
-            self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(self.B, -1)),
-            torch.ones(self.B, self.NB, dtype=torch.bool, device=self.device),
+            self.techs.gather(1, rd.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.ones(B, NB, dtype=torch.bool, device=dev),
         )
-        return unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
+        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
+        if self.districts_on and self._b_has_reqs:
+            nD = len(self.districts_cat)
+            valid = (self.district >= 0) & (self.owner >= 0)  # [B, T]
+            ow_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & valid.unsqueeze(2)  # [B, T, C]
+            dt_oh = torch.nn.functional.one_hot(self.district.clamp(min=0), nD).bool()  # [B, T, nD]
+            has_dtype = (ow_oh.unsqueeze(3) & dt_oh.unsqueeze(2)).any(dim=1)  # [B, C, nD] city owns a district of type d
+            rq = self._b_req_district  # [NB]
+            district_ok = (rq < 0).view(1, 1, NB) | has_dtype[:, :, rq.clamp(min=0)]  # [B, C, NB]
+            prereq_ok = torch.ones(B, C, NB, dtype=torch.bool, device=dev)
+            for nb, reqs in enumerate(self._b_req_buildings):
+                if reqs:
+                    prereq_ok[:, :, nb] = self.buildings[:, :, reqs].any(dim=2)
+            base = base & district_ok & prereq_ok
+        return base
 
     def _adj_district_count(self) -> torch.Tensor:
         """[B, T] number of adjacent COMPLETED districts — the DISTRICT adjacency

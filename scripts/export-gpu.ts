@@ -113,9 +113,13 @@ const civicList = Object.values(CIVICS);
 const techIdx = new Map(techList.map((t, i) => [t.id, i]));
 const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 
-// Phase 1/2 buildable set: City Center buildings only (no other districts exist).
+// Buildable set: City Center buildings + the buildings of the districts the
+// scaffold actually places (Campus/Holy Site/Commercial Hub). Other districts
+// (Theater/Harbor/Industrial Zone/...) aren't placed in scope, and worship
+// buildings need the religion pick — both excluded. (Name kept for churn.)
+const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', 'CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB']);
 const centerBuildings = Object.values(BUILDINGS)
-  .filter((b) => b.district === 'CITY_CENTER' && b.id !== 'PALACE' && !b.worship)
+  .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !b.worship)
   .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
 const buildingUnlockTech = new Map<string, number>();
@@ -405,6 +409,10 @@ const rules = {
     maintenance: b.cost === 0 ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1,
     river: b.special === 'WATER_MILL',
     unlockTech: buildingUnlockTech.get(b.id) ?? -1,
+    // District buildings are gated (mirrors availableBuildings) on the city
+    // owning a completed district of this type and having a prerequisite.
+    reqDistrict: b.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(b.district),
+    reqBuildings: (b.requiresAny ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
   })),
   techs: techList.map((t) => ({
     id: t.id,
@@ -426,7 +434,7 @@ console.log(
 
 function cheapestBuilding(state: GameState, city: City): string | null {
   const avail = availableBuildings(state, city)
-    .filter((b) => b.district === 'CITY_CENTER')
+    .filter((b) => buildingIdx.has(b.id)) // only the exported buildable set (availableBuildings gates district+prereq)
     .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
   return avail[0]?.id ?? null;
 }
