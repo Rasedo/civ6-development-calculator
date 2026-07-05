@@ -171,9 +171,22 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       104 tensors + deterministic; search deterministic, eval-only (state bit-identical
       after), >= greedy on all 12 seeds and strictly beats it on 9 (typically finding a
       SETTLER/second-city line that compounds past the myopic building). Both gates green.
-- [ ] **M2** Factored action space (5 heads/turn): Gumbel/Sampled-AlphaZero style
-      search over sampled action-tuples — this is where the real PUCT lands (net
-      priors + value leaf + Q-normalization + RNG chance nodes). Eval vs the 213.6 policy.
+- [x] **M2a** DONE — net-free planning lever (needs no checkpoint): DEPTH
+      (`plan_production` — the rollout leaf may assume `city` keeps PLANNING at its
+      future decisions instead of reverting to scripted, so depth>1 sees setup moves
+      that pay off past the next decision) + CLOSED LOOP (`mpc_play` re-searches at
+      EVERY decision of the real game — model-predictive control — adapting to the
+      realized RNG futures). Both stay eval-only during search (snapshot/restore).
+      Result: closed-loop depth-1 beats the scripted base policy on final empire_score
+      on 5/6 seeds (mean +28, never worse), ~14 s/game on CPU. `gpu/mcts_test.py`
+      covers determinism, eval-only, and the win over scripted. Both gates green.
+- [ ] **M2b** Wire a TRAINED net (needs Phase B): factored policy as the sampling
+      prior + value head at the leaf, Gumbel/Sampled-AlphaZero over sampled 5-head
+      action-tuples, Q-normalized PUCT, RNG chance nodes. Eval vs the 213.6 policy.
+      BLOCKED: no checkpoint in-repo — the 213.6 figure is a documented past overnight
+      RTX-4070 run (14-action, farms-only), not a saved net, and a fresh 40M-step run
+      needs a GPU. Build Phase B (training infra) first; the net leaf/prior then drop
+      into M2a's shape (search_production already exposes a `value_fn`/`prior` hook).
 - [ ] **M3** (opt) Search-distilled policy improvement loop; handle RNG chance
       nodes (sample futures / expectimax) for robustness.
 
@@ -389,3 +402,28 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   favours a SETTLER/second-city line that out-compounds the myopic building over 15
   turns. Both parity gates stay green (additive engine change; forward model
   untouched). Next: M2.
+- M2 scoped against reality: M2 as written wants a TRAINED net (policy prior + value
+  head) and to "eval vs the 213.6 policy", but there is NO checkpoint in the repo —
+  213.6 is a documented past overnight RTX-4070 result (14-action farms-only, see
+  README/TRAINING), not a saved net, and a fresh run needs a GPU (this container is
+  CPU). So M2 splits: M2b (net wiring) is BLOCKED on Phase B (training infra + a GPU
+  run); M2a is the net-free planning lever I can build and verify here now.
+- M2a [x] net-free closed-loop planning (mcts.py, pure additions — no engine change).
+  Two levers over M1's open-loop 1-ply: (1) DEPTH — `plan_value`/`plan_production`
+  make the rollout leaf assume `city` keeps PLANNING (to `depth`) at its future
+  decisions rather than reverting to scripted, so depth>1 can value setup moves that
+  only pay off past the next decision; depth=1 reduces exactly to M1. (2) CLOSED LOOP
+  — `mpc_play` re-runs the search at EVERY decision of the actual game (model-
+  predictive control), so the per-decision edge compounds and the plan adapts to the
+  realized disaster/barb RNG. All search stays eval-only (snapshot/restore round-
+  trips; the game itself advances only through legal production actions already
+  covered by the D5/D6 off-script gate). Measured: closed-loop depth-1 vs the scripted
+  base policy over 60-turn games (horizon 20) — final empire_score beats scripted on
+  5/6 seeds (+61.5/+26.3/+35.8/+13.1/+30.5, one tie, never worse), ~14 s/game on CPU
+  (search fires only at the ~10 decision turns, not every turn). `gpu/mcts_test.py`
+  extended: plan_production deterministic + eval-only (incl. one depth-2 node), and
+  mpc-d1 >= scripted on all sampled seeds / strictly better on the majority. Both
+  parity gates unaffected (mcts.py isn't imported by the gates) and re-verified green.
+  depth>=2 full games are too slow on CPU (~7x/level; the B=1 float64 step is ~20 ms)
+  so depth is a parameter, exercised at a single node, not run game-length here. Next:
+  either Phase B (unblock M2b's net) or C1 (net-free symmetric-rival refactor).

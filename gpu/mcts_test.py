@@ -25,7 +25,9 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import _MUTABLE
-from civ6gpu.mcts import search_production, greedy_production, _rollout_value
+from civ6gpu.mcts import (
+    search_production, greedy_production, _rollout_value, plan_production, mpc_play,
+)
 
 HORIZON = 15
 MIN_TURN = 30  # skip trivial turn-1 openings; find a real mid-game production choice
@@ -109,13 +111,50 @@ def test_search(rules, paths):
     print(f"search: {n_seeds} seeds, >=greedy on all, differed on {n_differ}, discriminated on {n_disc}")
 
 
+def test_planning(rules, paths):
+    """M2a: closed-loop planning must beat the scripted base policy on final score,
+    stay deterministic, and never mutate the forward model during search."""
+    HZ, TURNS = 20, 60
+
+    # eval-only + determinism at one mid-game decision, exercising depth 1 and 2.
+    sim = build(rules, paths[4])
+    advance_to_decision(sim)
+    pristine = {k: getattr(sim, k).clone() for k in _MUTABLE}
+    b1, v1 = plan_production(sim, 0, horizon=HZ, depth=1)
+    b2, _ = plan_production(sim, 0, horizon=HZ, depth=2)  # depth-2 (one call; slower)
+    drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), pristine[k])]
+    assert not drift, f"plan mutated forward model for {drift}"
+    sim2 = build(rules, paths[4])
+    advance_to_decision(sim2)
+    assert plan_production(sim2, 0, horizon=HZ, depth=1) == (b1, v1), "depth-1 nondeterministic"
+    print(f"  plan eval-only + deterministic; depth1 pick={b1} depth2 pick={b2} "
+          f"({'depth changes the pick' if b1 != b2 else 'same pick at this node'})")
+
+    # closed-loop MPC vs scripted final empire_score (the headline).
+    wins = n = 0
+    for p in paths[:4]:
+        s = build(rules, p)
+        for _ in range(TURNS):
+            s.step()
+        base = float(s.empire_score()[0])
+        s = build(rules, p)
+        got = mpc_play(s, 0, horizon=HZ, depth=1, turns=TURNS)
+        n += 1
+        wins += got > base + 1e-6
+        assert got >= base - 1e-6, f"{p.name}: mpc {got:.2f} < scripted {base:.2f}"
+        print(f"  {p.name}: scripted={base:.1f} mpc-d1={got:.1f} gain={got - base:+.1f}")
+    assert wins >= 2, f"mpc-d1 only beat scripted on {wins}/{n} (expected a clear edge)"
+    print(f"planning: mpc-d1 >= scripted on all {n}, strictly better on {wins}")
+
+
 def main():
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run gpu:export` first"
     test_snapshot_restore(rules, paths)
     test_search(rules, paths[:12])
-    print("M1 SEARCH SELF-TEST OK")
+    test_planning(rules, paths)
+    print("M1/M2a SEARCH SELF-TEST OK")
 
 
 if __name__ == "__main__":
