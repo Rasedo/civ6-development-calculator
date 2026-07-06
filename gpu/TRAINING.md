@@ -128,8 +128,11 @@ RTX 4070 SUPER, district engine (2026-07):
 C1-B1 (real rival tile-working) re-baselined the world — rivals starve,
 grow on the unscaled curve and lost their flat base, so the player's
 side got friendlier: **random 122.8 ± 11.2, scripted 192.2 ± 13.6**.
-Every pre-B1 net (tune1/tune2) is stale by construction; tune3 is the
-first reference net on this world.
+Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
+the first reference net on this world: 50 updates / 20.5M steps on the
+46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
+238.9), vs scripted 192.2 / random 122.8; matched-world netgreedy 240.3
+vs scripted 167.5 (+72.8, 6/6).
 
 tune2 (same recipe on the purchase-capable head, resumed to 50 updates)
 edges tune1 by +4.7 with overlapping CIs and ties it on the matched-world
