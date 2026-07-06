@@ -203,23 +203,34 @@ priors + value head (train_ppo `self.v`), legal-action masks.
 - [ ] **M3** Search-distilled training — the AlphaZero loop, research-informed
       (`gpu/RESEARCH_RL.md`; our value-leaf failure and raw-score PUCT pathology
       are both predicted by published work). Sub-stages, each green on its own:
-      - [ ] **M3a** Per-node min-max Q normalization as shared search plumbing —
+      - [x] **M3a** min-max Q normalization (`minmax_normalize`, degenerate-
+            range guard) — shipped with the Gumbel package. Original spec: —
             mandatory under unbounded empire scores (SameGame); systematizes the
             ad-hoc M1 finding before any PUCT/Gumbel machinery lands.
-      - [ ] **M3b** Gumbel top-k + Sequential Halving root selection over sampled
-            tuples (Gumbel MuZero): guaranteed policy improvement at 2–16
-            simulations — replaces tuplesearch's plain prior-sampling, which
-            cannot beat greedy (measured at every temperature).
-      - [ ] **M3c** Batched candidate evaluation: the k candidate tuples become
-            the batch dimension (per-game snapshot → k-wide clone → lockstep
-            step) instead of the sequential B=1 python loop — the throughput
-            unlock for search-generated training data.
+      - [x] **M3b** `gumbelsearch` (search_eval): greedy + (k−1) sampled tuples
+            with Gumbel noise g+logp, Sequential Halving over ROLLOUT DEPTH
+            (deterministic env ⇒ budget buys depth, not revisits; rungs
+            [1,6,12] at k=8), cut by g + logp + (50+d)·q̄. **FIRST eval-time
+            tuple search to beat the greedy net: 243.7 vs netgreedy 240.3,
+            5/6 head-to-head (tune3, matched worlds)** — plain-sampling
+            tuplesearch lost at every temperature. k=16 ties (3W/3L); the
+            one loss (9066, −54) is a value-blend misrank over an excellent
+            greedy line — per ICLR'21, eval-time gains stay marginal; the
+            machinery's real payoff is M3d training targets.
+      - [x] **M3c** Batched candidate evaluation (`stack_tuples`/`clone_state`/
+            `eval_tuples` in mcts.py): the k tuples ARE the batch dim of one
+            lockstep k-wide sim; restore()'s copy_ broadcasts the B=1
+            snapshot. Self-test proves batched == sequential BIT-EXACTLY
+            (both dtypes, padding, rehash). ~1/k the sequential wall-clock —
+            the M3d data-generation unlock.
       - [ ] **M3d** Training targets: search-derived OFF-POLICY value targets
             (soft-Z root-value first; A0C/A0GB variants if needed),
             AWPO/importance-corrected policy distillation instead of visit-count
             cloning (MAZero / Sampled MuZero), reanalyze-style target refresh as
-            the net improves, and leaf RNG re-hash so targets aren't
-            RNG-clairvoyant.
+            the net improves. The leaf RNG re-hash SHIPPED as `rehash_rng` +
+            `--honest-rng` (keyed on each row's own rng_state so common random
+            numbers survive batching; clairvoyance bonus measured ≈ 4 mean
+            points at identical runtime).
 
 ## 3. Multi-civ symmetry  (unlocks self-play + AlphaZero)
 Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
