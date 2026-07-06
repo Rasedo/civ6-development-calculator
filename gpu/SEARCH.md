@@ -111,6 +111,16 @@ search-improved play instead of only its own on-policy returns (AlphaZero's actu
 trick). Reproduce: `search_eval.py --policy netgreedy|tuplesearch --checkpoint
 gpu/runs/tune1/best.pt --episodes 6 --turns 100 [--k 8 --tuple-leaf net]`.
 
+**Temperature closes the question.** `--temperature` sharpens the prior for the k−1
+sampled candidates (logits/τ; the greedy tuple is invariant). Same 6 worlds, tune1:
+τ=1.0 → 182.3, τ=0.5 → 189.6, τ=0.25 → 192.2 — monotone toward netgreedy's 195.4
+and never crossing it. At τ=0.25 two seeds tie greedy exactly (the candidate set has
+collapsed onto it) and every remaining deviation loses a little. So the value head's
+ranking among plausible alternatives is, at best, neutral — 1-ply value-leaf tuple
+search cannot beat the policy it searches, at any sharpness, until the VALUE improves.
+That is M3's actual job: distill search/rollout-verified targets into the value head
+(AlphaZero), or pay for rollout leaves with a net-driven continuation.
+
 ### GPU / local compute
 
 The engine fires many small kernels per step, so it is launch-bound at small batch (a GPU ≈ CPU
