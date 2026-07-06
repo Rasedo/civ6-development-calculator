@@ -200,8 +200,26 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       net-value-leaf tuplesearch only TIES greedy (163 vs 165, 2W/4L) — the mid-net's
       value head is too noisy to search against. Needs a STRONG net (Q-normalized PUCT /
       chance nodes deferred until then). See the M2b-2 + Phase-B(local) status entries.
-- [ ] **M3** (opt) Search-distilled policy improvement loop; handle RNG chance
-      nodes (sample futures / expectimax) for robustness.
+- [ ] **M3** Search-distilled training — the AlphaZero loop, research-informed
+      (`gpu/RESEARCH_RL.md`; our value-leaf failure and raw-score PUCT pathology
+      are both predicted by published work). Sub-stages, each green on its own:
+      - [ ] **M3a** Per-node min-max Q normalization as shared search plumbing —
+            mandatory under unbounded empire scores (SameGame); systematizes the
+            ad-hoc M1 finding before any PUCT/Gumbel machinery lands.
+      - [ ] **M3b** Gumbel top-k + Sequential Halving root selection over sampled
+            tuples (Gumbel MuZero): guaranteed policy improvement at 2–16
+            simulations — replaces tuplesearch's plain prior-sampling, which
+            cannot beat greedy (measured at every temperature).
+      - [ ] **M3c** Batched candidate evaluation: the k candidate tuples become
+            the batch dimension (per-game snapshot → k-wide clone → lockstep
+            step) instead of the sequential B=1 python loop — the throughput
+            unlock for search-generated training data.
+      - [ ] **M3d** Training targets: search-derived OFF-POLICY value targets
+            (soft-Z root-value first; A0C/A0GB variants if needed),
+            AWPO/importance-corrected policy distillation instead of visit-count
+            cloning (MAZero / Sampled MuZero), reanalyze-style target refresh as
+            the net improves, and leaf RNG re-hash so targets aren't
+            RNG-clairvoyant.
 
 ## 3. Multi-civ symmetry  (unlocks self-play + AlphaZero)
 Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
@@ -216,7 +234,18 @@ and baselines legitimately regenerate at each activation); (4) the old
 scripted-rival heuristic is re-expressed as a scripted POLICY driving a
 full civ — it remains the parity anchor and becomes self-play's baseline
 opponent; (5) the verbs arm (war/capture) folds in where symmetric state
-makes it natural.
+makes it natural. Research-informed additions (`gpu/RESEARCH_RL.md`):
+(6) the owner dimension **O is a parameter** — self-play starts at
+**O=2 (duel)**, the theoretically safe regime (2-player-zero-sum-adjacent
+guarantees; half the tensor width; faster league iteration), and scales
+to the 4-player FFA as a second phase on the SAME code; (7) **reward
+phases**: dense per-turn score delta for single-agent bootstrap (proven),
+SYMMETRIZED relative score (own delta minus opponents' — OpenAI Five's
+zero-sum restoration) for self-play, optionally sparse win/objective
+later — four independent score-maximizers would otherwise converge on
+peaceful co-farming; (8) n-player league telemetry targets **CCE via
+α-Rank**, not Nash (PPAD-complete, ill-posed selection), decided BEFORE
+C3's matchmaking is built.
 
 - **C1-A. TS unification groundwork (behavior-preserving; fixtures unchanged):**
   - [ ] A1. One `civId` space (player = 0, rivals 1..R): unify tile ownership
@@ -241,11 +270,23 @@ makes it natural.
         loyalty flips BOTH ways, and city capture in owner terms (a captured
         city changes `civId` — absorbing V-W2 cleanly, no slot growth hack).
 - **C1-C = C2. Egocentric RL surface:** per-seat obs (each civ sees itself as
-  seat 0), owner-parameterized masks/action routing, per-civ empire-score
-  reward; BatchEnv gains a seat axis.
-- **C1-D = C3. Self-play trainer:** seat-swapped PPO first (both seats, one
-  net), then the league (frozen snapshot pool, PFSP matchmaking), and the
-  eval protocol: head-to-head vs frozen refs + vs the scripted-policy civ.
+  seat 0), owner-parameterized masks/action routing, per-civ reward with the
+  reward-phase switch built in (dense own-score for bootstrap; symmetrized
+  relative score for self-play); BatchEnv gains a seat axis, O parametric.
+- **C1-D = C3. Self-play trainer, staged:**
+  - [ ] C3a. Seat-swapped PPO at **O=2**, plain self-play with an EMA
+        opponent + a frozen-snapshot mixture (OpenAI Five's 80/20 sufficed
+        before any league; Generals.io'26 confirms on one GPU) — cheap PPO
+        upgrades ride along (top-advantage filtering, horizon/γ annealing).
+  - [ ] C3b. League when plain self-play plateaus or cycles: frozen snapshot
+        pool + PFSP matchmaking + exploiters; eval protocol = head-to-head
+        vs frozen refs + vs the scripted-policy civ, ranked by **α-Rank**.
+  - [ ] C3c. Scale to **O=4 FFA**: α-Rank/CCE meta-solver, piKL-style
+        ANCHORING of search/training toward the scripted policy or last
+        checkpoint (Diplodocus's fix for mixed-motive self-play collapse),
+        kingmaking telemetry (per-seat win vs score distributions), and
+        Pluribus-style multi-continuation leaf evaluation once opponents
+        are learned policies.
 
 ## 4. Agency verbs  (depth-of-control: give the policy the missing decisions)
 Evidence says training value comes from verbs, not content breadth: the TS ~310
