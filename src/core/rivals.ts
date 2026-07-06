@@ -5,24 +5,26 @@
  * — at-war units raid like barbarians, and cities can be conquered.
  */
 
-import type { City, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import type { City, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
-import { defaultModifiers } from './effects';
+import { defaultModifiers, availableTechsIn, availableCivicsIn } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS } from '../data/units';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
-import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN } from '../data/constants';
+import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE } from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
 import {
   RIVAL_LEADERS,
@@ -155,6 +157,7 @@ export function placeRivals(state: GameState, count?: number): void {
       warTurns: 0,
       peaceTurns: 0,
       techLevel: 0,
+      research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
       pantheonClaimed: false,
       religionFounded: false,
@@ -508,7 +511,7 @@ export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
   rc: RivalCity,
-): { food: number; production: number } {
+): Yields {
   // C1-B1: the REAL citizen path, under defaultModifiers (rivals get no
   // player techs/policies). Candidates mirror workableTiles — owned tiles
   // in the work radius, no district/wonder tiles, impassable excluded
@@ -536,14 +539,12 @@ export function rivalCityYields(
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, rc.population);
   const centerY = tileYieldsForCenter(ctx, center);
-  let food = centerY.food;
-  let production = centerY.production;
+  const total = { ...centerY };
   for (const w of worked) {
-    food += w.y.food;
-    production += w.y.production;
+    for (const k of Object.keys(total) as (keyof Yields)[]) total[k] += w.y[k];
   }
-  production *= 1 + rival.techLevel / 25;
-  return { food, production };
+  total.production *= 1 + rival.techLevel / 25;
+  return total;
 }
 
 export function rivalPhase(state: GameState): void {
@@ -591,8 +592,16 @@ export function rivalPhase(state: GameState): void {
     // Iterate a SNAPSHOT — a settler completing mid-loop founds a city,
     // and the newborn must not act this turn (the GPU gates on the
     // pre-turn alive mask the same way).
+    let sciSum = 0;
+    let culSum = 0;
     for (const rc of [...rival.cities]) {
-      const { food, production } = rivalCityYields(state, rival, rc);
+      const y = rivalCityYields(state, rival, rc);
+      const food = y.food;
+      const production = y.production;
+      // C1-B3a: rival science/culture streams — tile+center columns plus
+      // the citizens' contribution, exactly like the player path.
+      sciSum += y.science + CITIZEN_SCIENCE * rc.population;
+      culSum += y.culture + CITIZEN_CULTURE * rc.population;
       // C1-B1: the real growth accounting — true surplus (can be negative),
       // the unscaled Civ 6 growth curve, grow subtracts the need instead of
       // zeroing the box, and starvation shrinks the city exactly like the
@@ -624,6 +633,34 @@ export function rivalPhase(state: GameState): void {
       }
       rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
     }
+
+    // C1-B3a: REAL research — cheapest-first auto-pick at RAW cost (no
+    // eurekas for rivals until B6; ties keep the tech-table order via the
+    // stable sort, mirroring the player's autoPickResearch), progress
+    // banks and drains exactly like advanceResearch. techLevel still
+    // drives every consumer until B3b swaps them one by one.
+    const rsr = rival.research;
+    const pickNext = () => {
+      if (rsr.tech === null) rsr.tech = availableTechsIn(rsr).sort((a, b) => a.cost - b.cost)[0]?.id ?? null;
+      if (rsr.civic === null) rsr.civic = availableCivicsIn(rsr).sort((a, b) => a.cost - b.cost)[0]?.id ?? null;
+    };
+    pickNext();
+    rsr.techProgress += sciSum;
+    while (rsr.tech && rsr.techProgress >= TECHS[rsr.tech].cost) {
+      rsr.techProgress -= TECHS[rsr.tech].cost;
+      rsr.techs.push(rsr.tech);
+      rsr.tech = null;
+      pickNext();
+    }
+    if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
+    rsr.civicProgress += culSum;
+    while (rsr.civic && rsr.civicProgress >= CIVICS[rsr.civic].cost) {
+      rsr.civicProgress -= CIVICS[rsr.civic].cost;
+      rsr.civics.push(rsr.civic);
+      rsr.civic = null;
+      pickNext();
+    }
+    if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
 
     // Races: great people, pantheons, beliefs.
     claimGreatPeople(state, rival);

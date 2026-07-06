@@ -28,6 +28,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     warTurns: 0,
     peaceTurns: 0,
     techLevel: 0,
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
     pantheonClaimed: true,
     religionFounded: true,

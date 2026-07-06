@@ -35,6 +35,7 @@ function addRival(
     warTurns: 0,
     peaceTurns: 0,
     techLevel: 0,
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
     pantheonClaimed: true, // opt out of belief races unless a test opts in
     religionFounded: true,

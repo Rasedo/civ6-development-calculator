@@ -820,6 +820,8 @@ export function deserialize(json: string): GameState {
   // fields in place — a current-shape save must round-trip byte-identically
   // (the rival determinism test serializes and compares).
   for (const r of state.rivals) {
+    // C1-B3: older saves lack the rival research trees.
+    r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
     for (const rc of r.cities as (RivalCity & { growthBox?: number })[]) {
       rc.civId ??= civOfRival(r.id);
       rc.foodBox ??= rc.growthBox ?? 0;

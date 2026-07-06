@@ -295,8 +295,11 @@ export interface RivalCiv {
   atWar: boolean;
   warTurns: number;
   peaceTurns: number;
-  /** Abstract research progress (unit quality, city defense). */
+  /** Abstract research progress (unit quality, city defense) — consumers
+   * migrate to `research` in C1-B3b, then this field dies. */
   techLevel: number;
+  /** Real tech/civic trees (C1-B3): same shape as the player's. */
+  research: ResearchState;
 
   /** Great-person race points per class. */
   gpp: Partial<Record<GreatPersonClass, number>>;

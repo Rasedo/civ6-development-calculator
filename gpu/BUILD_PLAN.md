@@ -320,6 +320,15 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
+  - [~] B3. Rival research (real trees): **B3a DONE** — RivalCiv.research
+        (same shape as the player's), rival science/culture streams
+        (tile+center columns + citizen 0.7/0.3), cheapest-first advance at
+        RAW cost through the shared _auto_pick (table-order ties), banked
+        progress with multi-completion + exhaustion drain; trace widened
+        with nTechs/nCivics/techProg/civicProg (gate-checked from day one).
+        techLevel STILL drives every consumer until B3b. Both gates green.
+        B3b next: consumer swap (prod stand-in K≈12, unit-type tech gates,
+        city defense) + techLevel deleted + calibration.
   - [x] B2. Per-city REAL production queues (settlers + units at real
         UNITS costs) replace BOTH pooled stocks, the pace/split constants,
         and the home-city RNG draw; capital-prefers-settler picker; strength

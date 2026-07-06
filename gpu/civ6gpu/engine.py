@@ -280,7 +280,8 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "r_tech", "rc_current", "rc_progress", "rc_cost",
+    "r_atwar", "r_warturns", "r_peaceturns", "r_tech", "r_techs", "r_civics",
+    "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
@@ -442,6 +443,16 @@ class BatchSim:
         self.rc_current = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
         self.rc_progress = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
         self.rc_cost = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
+        # C1-B3a: real per-rival research trees — the SAME tech/civic tables
+        # as the player, cheapest-first at raw cost. techLevel still drives
+        # every consumer until B3b swaps them one by one.
+        nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
+        self.r_techs = torch.zeros(B, r_pad, nt_b3, dtype=torch.bool, device=device)
+        self.r_civics = torch.zeros(B, r_pad, nc_b3, dtype=torch.bool, device=device)
+        self.r_cur_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.r_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.r_tech_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        self.r_civic_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
@@ -2263,7 +2274,9 @@ class BatchSim:
         Scored by the real tileScore ('balanced' focus_base weights over all
         six yields, ties to the lowest index), topped by population; the
         center adds its real floored yields (tileYieldsForCenter) instead of
-        the old flat 3🍞/2⚙; the tech production scaler stays until B3.
+        the old flat 3🍞/2⚙; the tech production scaler stays until B3b.
+        Returns (food, production, science, culture) — the C1-B3 research
+        streams ride the same worked-tile selection (C1-B3a).
         Food takes the disaster/farm tail; production takes improvement BASE
         yields via the defaultModifiers plane (never the player's boosts)."""
         rd = self.rules_dev
@@ -2303,25 +2316,46 @@ class BatchSim:
         take = (torch.arange(kk, device=self.device).unsqueeze(0) < self.rc_pop[:, r, j].unsqueeze(1)) & (top_vals > -1e17)
         f_sel = f.gather(1, top_idx) * take.double()
         p_sel = p.gather(1, top_idx) * take.double()
+        # C1-B3a: science/culture columns ride the same selection (static
+        # planes — no dynamic tail touches them in scope); the center's
+        # science/culture pass through unclamped like the TS center.
+        sc = self.tile_yields[:, :, 3].gather(1, tc).double()
+        cu = self.tile_yields[:, :, 4].gather(1, tc).double()
+        sc_sel = sc.gather(1, top_idx) * take.double()
+        cu_sel = cu.gather(1, top_idx) * take.double()
         # center: real floored yields (tileYieldsForCenter) — food after the
         # fertility/drought tail, production from the neutral plane
         sitec = center.clamp(min=0).unsqueeze(1)
         r_ = self.rules
         cf = torch.maximum(f_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
         cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
+        c_sc = self.tile_yields[:, :, 3].gather(1, sitec).squeeze(1).double()
+        c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double()
         if self._dyadic_fp:
             # every term is an exact dyadic, so .sum() is bit-identical to
             # the TS reduce
             food = cf + f_sel.sum(dim=1)
             prod = cp + p_sel.sum(dim=1)
+            sci = c_sc + sc_sel.sum(dim=1)
+            cul = c_cu + cu_sel.sum(dim=1)
         else:
             food = cf.clone()
             prod = cp.clone()
+            sci = c_sc.clone()
+            cul = c_cu.clone()
             for m in range(kk):  # sequential adds mirror the TS loop's rounding
                 food = food + f_sel[:, m]
                 prod = prod + p_sel[:, m]
+                sci = sci + sc_sel[:, m]
+                cul = cul + cu_sel[:, m]
         prod = prod * (1 + self.r_tech[:, r] / 25)
-        return torch.where(mask, food, torch.zeros_like(food)), torch.where(mask, prod, torch.zeros_like(prod))
+        z = torch.zeros_like(food)
+        return (
+            torch.where(mask, food, z),
+            torch.where(mask, prod, z),
+            torch.where(mask, sci, z),
+            torch.where(mask, cul, z),
+        )
 
     def _expand_rival_border(self, r: int, j: int, due: torch.Tensor) -> None:
         """Mirrors expandRivalBorder: best unowned passable non-wonder tile
@@ -2794,13 +2828,20 @@ class BatchSim:
                     unit_count = unit_count + want_u.long()
 
             prod_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+            sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+            cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             heal = torch.where(self.r_atwar[:, r], 5, 15)
             for j in range(self.RC):
                 cact = active & alive0[:, j]
                 if not bool(cact.any()):
                     continue
-                food, prod = self._rival_city_yields(r, j, cact)
+                food, prod, sci, cul = self._rival_city_yields(r, j, cact)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
+                # C1-B3a: tile/center columns plus the citizens' contribution,
+                # left-associated exactly like the TS `sciSum += y.science +
+                # CITIZEN_SCIENCE * rc.population`.
+                sci_sum = torch.where(cact, sci_sum + sci + self.rules.citizen_science * self.rc_pop[:, r, j].double(), sci_sum)
+                cul_sum = torch.where(cact, cul_sum + cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double(), cul_sum)
                 # C1-B1: the real growth accounting — true surplus (can be
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
                 # need, starvation shrinks (pop floor 1, box reset). maxPop
@@ -2840,6 +2881,49 @@ class BatchSim:
                 )
 
             n_cities2 = self.rc_alive[:, r].sum(dim=1)
+
+            # C1-B3a: REAL research — cheapest-first at RAW cost (boosted =
+            # all-False through the shared _auto_pick, so ties keep table
+            # order exactly like the TS stable sort); progress banks and
+            # drains like the player loop. techLevel still drives every
+            # consumer until B3b.
+            rdv = self.rules_dev
+            nb_t = torch.zeros(B, rdv.t_cost.shape[0], dtype=torch.bool, device=dev)
+            nb_c = torch.zeros(B, rdv.c_cost.shape[0], dtype=torch.bool, device=dev)
+            picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
+            self.r_cur_tech[:, r] = torch.where(active, picked, self.r_cur_tech[:, r])
+            self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
+            for _ in range(RESEARCH_LOOPS):
+                curt = self.r_cur_tech[:, r]
+                cost_t = rdv.t_cost.gather(0, curt.clamp(min=0)).double()
+                fin = active & (curt >= 0) & (self.r_tech_prog[:, r] >= cost_t)
+                if not bool(fin.any()):
+                    break
+                rows = fin.nonzero(as_tuple=True)[0]
+                self.r_techs[rows, r, curt[rows]] = True
+                self.r_tech_prog[:, r] = torch.where(fin, self.r_tech_prog[:, r] - cost_t, self.r_tech_prog[:, r])
+                self.r_cur_tech[:, r] = torch.where(fin, torch.full_like(curt, -1), self.r_cur_tech[:, r])
+                picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
+                self.r_cur_tech[:, r] = torch.where(active, picked, self.r_cur_tech[:, r])
+            no_t = active & (self.r_cur_tech[:, r] == -1) & ~self._available_mask(self.r_techs[:, r], self._prereq_t).any(dim=1)
+            self.r_tech_prog[:, r] = torch.where(no_t, torch.minimum(self.r_tech_prog[:, r], torch.zeros_like(self.r_tech_prog[:, r])), self.r_tech_prog[:, r])
+            picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
+            self.r_cur_civic[:, r] = torch.where(active, picked, self.r_cur_civic[:, r])
+            self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])
+            for _ in range(RESEARCH_LOOPS):
+                curc = self.r_cur_civic[:, r]
+                cost_c = rdv.c_cost.gather(0, curc.clamp(min=0)).double()
+                fin = active & (curc >= 0) & (self.r_civic_prog[:, r] >= cost_c)
+                if not bool(fin.any()):
+                    break
+                rows = fin.nonzero(as_tuple=True)[0]
+                self.r_civics[rows, r, curc[rows]] = True
+                self.r_civic_prog[:, r] = torch.where(fin, self.r_civic_prog[:, r] - cost_c, self.r_civic_prog[:, r])
+                self.r_cur_civic[:, r] = torch.where(fin, torch.full_like(curc, -1), self.r_cur_civic[:, r])
+                picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
+                self.r_cur_civic[:, r] = torch.where(active, picked, self.r_cur_civic[:, r])
+            no_c = active & (self.r_cur_civic[:, r] == -1) & ~self._available_mask(self.r_civics[:, r], self._prereq_c).any(dim=1)
+            self.r_civic_prog[:, r] = torch.where(no_c, torch.minimum(self.r_civic_prog[:, r], torch.zeros_like(self.r_civic_prog[:, r])), self.r_civic_prog[:, r])
 
             # Great-people race (no draws): accrue, claim from the shared pool.
             for cls in range(5):
@@ -3576,6 +3660,10 @@ class BatchSim:
                 (self.v_alive & (self.v_civ == r)).sum(dim=1).to(self.dtype),
                 torch.where(live & self.r_atwar[:, r], torch.ones_like(zero), zero),
                 torch.where(live, torch.round(self.r_tech[:, r] * 1000).to(self.dtype), zero),
+                torch.where(live, self.r_techs[:, r].sum(dim=1).to(self.dtype), zero),
+                torch.where(live, self.r_civics[:, r].sum(dim=1).to(self.dtype), zero),
+                torch.where(live, torch.round(self.r_tech_prog[:, r] * 1000).to(self.dtype), zero),
+                torch.where(live, torch.round(self.r_civic_prog[:, r] * 1000).to(self.dtype), zero),
                 torch.where(live, torch.round((self.rc_progress[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
                 torch.where(live, torch.round((self.rc_cost[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
             ]
