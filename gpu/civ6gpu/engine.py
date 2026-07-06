@@ -280,7 +280,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "r_techs", "r_civics",
+    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "r_techs", "r_civics",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
@@ -568,6 +568,12 @@ class BatchSim:
         self.districts_cat = list(rules.districts or [])
         self.districts_on = bool(self.districts_cat)
         self.district = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else PLACEABLE_DISTRICTS idx
+        # C1-B4a (inert): completion joins the model. Every current writer
+        # completes instantly (True at placement) so gating consumers on it
+        # is bit-inert TODAY; rival QUEUED districts (B4) write False first.
+        # Paving/eligibility/cap consumers deliberately stay placement-based
+        # (TS paves and caps on tile.district regardless of completeness).
+        self.district_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         self.d_static_adj = torch.tensor(
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
@@ -1108,7 +1114,7 @@ class BatchSim:
         base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
-            valid = (self.district >= 0) & (self.owner >= 0)  # [B, T]
+            valid = (self.district >= 0) & self.district_complete & (self.owner >= 0)  # [B, T] (buildingCompletable: district DONE)
             ow_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & valid.unsqueeze(2)  # [B, T, C]
             dt_oh = torch.nn.functional.one_hot(self.district.clamp(min=0), nD).bool()  # [B, T, nD]
             has_dtype = (ow_oh.unsqueeze(3) & dt_oh.unsqueeze(2)).any(dim=1)  # [B, C, nD] city owns a district of type d
@@ -1130,7 +1136,7 @@ class BatchSim:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)  # [1, T, 6]
-        is_d = ((self.center_at[:, nbc] >= 0) | (self.district[:, nbc] >= 0) | (self.rvcity_at[:, nbc] >= 0)) & on_map
+        is_d = ((self.center_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc]) | (self.rvcity_at[:, nbc] >= 0)) & on_map
         return is_d.sum(dim=2)  # [B, T]
 
     def _adj_center_count(self) -> torch.Tensor:
@@ -1150,7 +1156,7 @@ class BatchSim:
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
-        is_h = (self.district[:, nbc] == self._harbor_idx) & on_map
+        is_h = (self.district[:, nbc] == self._harbor_idx) & self.district_complete[:, nbc] & on_map
         return is_h.sum(dim=2)
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
@@ -1194,6 +1200,7 @@ class BatchSim:
         if bool(place.any()):
             rows = place.nonzero(as_tuple=True)[0]
             self.district[rows, best[rows]] = di
+            self.district_complete[rows, best[rows]] = True  # instant-complete (queued rival districts arrive with B4)
             self._eff_version += 1
         return place
 
@@ -1213,7 +1220,7 @@ class BatchSim:
             d = int(self._gp_class_district[cls])
             if d < 0:
                 continue
-            has_d = ((self.district == d).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed district d
+            has_d = (((self.district == d) & self.district_complete).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed district d
             in_d = self._b_req_district == d  # [NB] buildings of district d
             bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
             self.player_gp_points[:, cls] = self.player_gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
@@ -1293,6 +1300,8 @@ class BatchSim:
             # column, summed into the pre-amenity total.
             dt = self.district.gather(1, tcf).reshape(B, C, M)
             owned_d = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
+            # yields/maintenance/Aqueduct housing all count COMPLETED districts
+            owned_d = owned_d & self.district_complete.gather(1, tcf).reshape(B, C, M)
             adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
             # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
             # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
@@ -1539,7 +1548,7 @@ class BatchSim:
                 # completed districts of a type (dtype>=0) or any specialty
                 # (dtype<0). Only specialty districts live in self.district (>=0).
                 dtype = row.get("dtype", -1)
-                on = (self.district >= 0) if dtype < 0 else (self.district == dtype)
+                on = ((self.district >= 0) if dtype < 0 else (self.district == dtype)) & self.district_complete
                 pred = on.sum(dim=1) >= row["count"]
             else:
                 continue
@@ -2192,7 +2201,7 @@ class BatchSim:
             if self._askable.numel() > 0 and self.districts_on:
                 qd = self.cs_quest_district[:, s].clamp(min=0, max=self._askable.numel() - 1)
                 asked_type = self._askable[qd]  # [B]
-                owns_asked = (self.district == asked_type.unsqueeze(1)).any(dim=1) & (self.cs_quest_district[:, s] >= 0)
+                owns_asked = ((self.district == asked_type.unsqueeze(1)) & self.district_complete).any(dim=1) & (self.cs_quest_district[:, s] >= 0)
             else:
                 owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             resolved_dist = act & (self.cs_quest[:, s] == 3) & owns_asked
@@ -2214,7 +2223,7 @@ class BatchSim:
             # askable district (askable idx -> district type via self._askable).
             if self._askable.numel() > 0 and self.districts_on:
                 drawn_type = self._askable[draw1.clamp(min=0, max=self._askable.numel() - 1)]  # [B]
-                already_bd = (self.district == drawn_type.unsqueeze(1)).any(dim=1)
+                already_bd = ((self.district == drawn_type.unsqueeze(1)) & self.district_complete).any(dim=1)
             else:
                 already_bd = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             bd = ~already_bd
