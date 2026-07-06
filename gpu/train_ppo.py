@@ -114,6 +114,25 @@ def _masked_dist(logits: torch.Tensor, mask: torch.Tensor) -> tuple[Categorical,
     return Categorical(logits=ml), valid
 
 
+def fit_env_to_checkpoint(env, ck) -> bool:
+    """Narrow the env's action surface to a checkpoint trained before a gated
+    action-space widening — e.g. a 26-column production head from before
+    V-P2's purchases. Flips the engine's purchase flag OFF when that exactly
+    explains the width mismatch (returns True); any other mismatch still
+    asserts. Scripted stepping ignores the flag, so matched-world baselines
+    are unaffected."""
+    ap_ck = int(ck["dims"]["AP"])
+    narrowed = False
+    if int(env.masks()["production"].shape[2]) != ap_ck and env.sim._rl_purchase_active:
+        env.sim._rl_purchase_active = False
+        narrowed = int(env.masks()["production"].shape[2]) == ap_ck
+        if not narrowed:
+            env.sim._rl_purchase_active = True
+    ap_env = int(env.masks()["production"].shape[2])
+    assert ap_env == ap_ck, f"checkpoint production head {ap_ck} != env {ap_env}"
+    return narrowed
+
+
 def sample_heads(out: dict, masks: dict, greedy: bool = False):
     """→ (actions dict with -1 no-ops, joint logp [B], joint entropy [B])."""
     actions, logp, ent = {}, 0.0, 0.0

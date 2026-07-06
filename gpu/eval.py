@@ -56,13 +56,15 @@ def main() -> None:
 
     policy = None
     if args.policy not in ("random", "scripted"):
-        from train_ppo import Policy, sample_heads
+        from train_ppo import Policy, sample_heads, fit_env_to_checkpoint
 
         ck = torch.load(args.policy, map_location=args.device)
         policy = Policy(ck["obs_size"], ck["dims"], hidden=ck.get("hidden", 256)).to(args.device)
         policy.load_state_dict(ck["model"])
         policy.eval()
         assert ck["obs_size"] == env.obs_size, "checkpoint obs layout doesn't match this env build"
+        if fit_env_to_checkpoint(env, ck):
+            print("note: checkpoint pre-dates purchases — purchase columns disabled for this run")
 
     game_seed = torch.tensor([args.seed * 7_368_787 + i for i in range(B)], dtype=torch.int64)
     slots = torch.arange(env.sim.C, dtype=torch.int64).view(1, -1)

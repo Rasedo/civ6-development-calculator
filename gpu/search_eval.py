@@ -46,6 +46,8 @@ from civ6gpu.mcts import (
 # --- trained-net inference (mirrors gpu/eval.py's load path) -----------------
 
 def load_policy(path, env, device):
+    """→ (policy, ck). Keep ck around: episode envs must be re-fitted to the
+    checkpoint's action-space vintage via fit_env_to_checkpoint."""
     from train_ppo import Policy
 
     ck = torch.load(path, map_location=device)
@@ -53,7 +55,7 @@ def load_policy(path, env, device):
     policy = Policy(ck["obs_size"], ck["dims"], hidden=ck.get("hidden", 256)).to(device)
     policy.load_state_dict(ck["model"])
     policy.eval()
-    return policy
+    return policy, ck
 
 
 def net_production_action(policy, env, city):
@@ -134,19 +136,27 @@ def net_greedy_play(env, policy, turns):
     return float(env.sim.empire_score()[0])
 
 
-def tuplesearch_play(env, policy, k, horizon, leaf, turns):
+def tuplesearch_play(env, policy, k, horizon, leaf, turns, tau=1.0):
     """M2b-2: Sampled-AlphaZero-style search over the FULL action tuple. Each turn,
     take the net's greedy tuple plus k-1 tuples sampled from its factored policy (the
     net is the prior), evaluate each by either the net's value head (leaf='net' — a
     cheap 1-ply bootstrap) or a scripted rollout (leaf='rollout' — reliable but ~k*H
     steps/turn), and play the best. A one-step policy-improvement over the net's
     greedy action across all five heads jointly. Seed torch beforehand for a
-    reproducible sample set."""
+    reproducible sample set.
+
+    tau < 1 sharpens the prior for the k-1 SAMPLED candidates (logits/tau):
+    a healthy-entropy net (tune1: 2.15) samples diffuse tuples at tau=1 and
+    the 1-ply value leaf can't rank them — cooler candidates stay near the
+    net's own play, so the search explores plausible deviations instead of
+    noise. The greedy tuple is temperature-invariant."""
     from train_ppo import sample_heads
     for _ in range(turns):
         out = _net_out(policy, env)
         masks = env.masks()
         cands = [sample_heads(out, masks, greedy=True)[0]]
+        if tau != 1.0:
+            out = {kk: (v if kk == "value" else v / tau) for kk, v in out.items()}
         for _ in range(k - 1):
             cands.append(sample_heads(out, masks, greedy=False)[0])
         snap = env.sim.snapshot()
@@ -174,6 +184,8 @@ def main() -> None:
     ap.add_argument("--k", type=int, default=8, help="tuplesearch: candidate tuples sampled from the net per turn")
     ap.add_argument("--tuple-leaf", default="net", choices=["net", "rollout"],
                     help="tuplesearch leaf: the net value head (cheap) or a scripted rollout (reliable)")
+    ap.add_argument("--temperature", type=float, default=1.0,
+                    help="tuplesearch: sharpen (<1) the net prior when sampling the k-1 candidates")
     ap.add_argument("--episodes", type=int, default=6)
     ap.add_argument("--turns", type=int, default=100, help="game length actually played")
     ap.add_argument("--horizon", type=int, default=20, help="search lookahead per decision")
@@ -215,11 +227,20 @@ def main() -> None:
     def build(i):
         return BatchEnv([pool[i % len(pool)]], rules, device=args.device, dtype=dtype, horizon=args.turns)
 
-    policy = load_policy(args.checkpoint, build(0), args.device) if args.checkpoint else None
+    policy, ck = (load_policy(args.checkpoint, build(0), args.device) if args.checkpoint else (None, None))
+    if ck is not None:
+        from train_ppo import fit_env_to_checkpoint
+
+        if fit_env_to_checkpoint(build(0), ck):
+            print("note: checkpoint pre-dates purchases — purchase columns disabled for its envs\n")
 
     base_scores, chal_scores, wins = [], [], 0
     if args.policy in ("netgreedy", "tuplesearch"):
-        detail = "all 5 heads" + (f", k={args.k} leaf={args.tuple_leaf}" if args.policy == "tuplesearch" else "")
+        detail = "all 5 heads" + (
+            f", k={args.k} leaf={args.tuple_leaf}"
+            + (f" tau={args.temperature}" if args.temperature != 1.0 else "")
+            if args.policy == "tuplesearch" else ""
+        )
     else:
         detail = ("all cities" if args.all_cities else f"city {args.city}") + \
                  (f", loyalty-aware(pen={args.loyalty_penalty})" if args.loyalty_aware else "")
@@ -235,6 +256,10 @@ def main() -> None:
         base = float(env.sim.empire_score()[0])
 
         env = build(i)
+        if ck is not None:
+            from train_ppo import fit_env_to_checkpoint
+
+            fit_env_to_checkpoint(env, ck)
         env.reset(scramble=scr)
         t0 = time.time()
         if args.policy == "search":
@@ -250,7 +275,8 @@ def main() -> None:
             chal = net_greedy_play(env, policy, args.turns)
         else:  # tuplesearch
             torch.manual_seed(20260705 + i)  # reproducible net sampling per game
-            chal = tuplesearch_play(env, policy, args.k, args.horizon, args.tuple_leaf, args.turns)
+            chal = tuplesearch_play(env, policy, args.k, args.horizon, args.tuple_leaf, args.turns,
+                                    tau=args.temperature)
         dt = time.time() - t0
 
         base_scores.append(base)
