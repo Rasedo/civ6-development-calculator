@@ -544,6 +544,13 @@ class BatchSim:
         # is ignored while False, so nothing samples or applies it. The head
         # is not wired into BatchEnv until activation (+ retrain).
         self._rl_war_active = False
+        # V-R: ranged units (rangedStrength > 0) execute attack codes 6-11 as
+        # a RANGED strike — one damage roll, no retaliation, no advance, no
+        # camp clear (mirrors rangedAttack; range-1 targets only, legal for
+        # both Slinger rng-1 and Archer rng-2). The replay dispatches by the
+        # same rule via rollout.json's rangedActive flag. Off = the old
+        # weak-melee behavior, for replaying pre-V-R action logs.
+        self._rl_ranged_active = True
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -695,6 +702,7 @@ class BatchSim:
         self._p_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._p_maint = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
         self._p_civ = torch.tensor([bool(u["civilian"]) for u in ru], dtype=torch.bool, device=device)
+        self._p_rng_str = torch.tensor([u.get("rangedStrength", 0) for u in ru], dtype=torch.long, device=device)  # V-R: 0 = melee-only
         self._p_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
@@ -1724,6 +1732,15 @@ class BatchSim:
             v_civ = self.v_civ.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(max=max(self.R - 1, 0))
             v_ok = (vslot >= 0) & self.r_atwar.gather(1, v_civ.unsqueeze(1)).squeeze(1)
             att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
+            # V-R: ranged units strike instead of meleeing (rangedAttack —
+            # one roll, no retaliation, no advance). The mask above is
+            # unchanged: legality is the same adjacent-hostile condition.
+            if self._rl_ranged_active:
+                rngd = self._p_rng_str[self.p_type[:, p]] > 0
+            else:
+                rngd = torch.zeros_like(att)
+            r_att = att & rngd
+            att = att & ~rngd
             if bool(att.any()):
                 is_b = bslot >= 0
                 atk_cs = self._p_combat[self.p_type[:, p]]
@@ -1764,6 +1781,31 @@ class BatchSim:
                     self.p_tile[vr, p] = tgt[vr]
                     self.pmil_at[vr, tgt[vr]] = p
                     self._clear_camp_at(adv, tgt)
+
+            # --- ranged strike (V-R, same codes 6..11 for ranged units):
+            # mirrors rangedAttack — ONE damage roll against the defender
+            # (combat + terrain defense), no retaliation, no advance, no
+            # camp clear; the attacker never moves or takes damage.
+            if bool(r_att.any()):
+                is_b = bslot >= 0
+                atk_rs = self._p_rng_str[self.p_type[:, p]]
+                b_cs = self._unit_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
+                v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
+                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1)
+                d_def = self._damage_roll(r_att, atk_rs - def_cs)
+                rows = r_att.nonzero(as_tuple=True)[0]
+                for grp, at_map, hp_t, alive_t, slot_t in (
+                    (is_b, self.barb_at, self.u_hp, self.u_alive, bslot),
+                    (~is_b, self.rv_at, self.v_hp, self.v_alive, vslot),
+                ):
+                    g = rows[grp[rows]]
+                    if len(g) == 0:
+                        continue
+                    ds = slot_t[g]
+                    hp_t[g, ds] -= d_def[g]
+                    dead = hp_t[g, ds] <= 0
+                    at_map[g[dead], tc[g[dead]]] = -1
+                    alive_t[g[dead], ds[dead]] = False
 
             # --- build FARM/MINE/LUMBER_MILL (13/14/15): a builder on a tile
             # where that improvement is valid. No RNG, re-validated at

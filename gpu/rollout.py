@@ -114,6 +114,7 @@ def main() -> None:
         "width": sim.W,
         "height": sim.H,
         "unitsMode": int(fixtures[0].get("unitsMode", 0)),
+        "rangedActive": int(bool(getattr(sim, "_rl_ranged_active", False))),  # V-R: replay must dispatch 6-11 identically
         "disasters": int(fixtures[0].get("disasters", 0)),
         "csMax": int(fixtures[0].get("csMax", 0)),
         "rMax": int(fixtures[0].get("rMax", 0)),

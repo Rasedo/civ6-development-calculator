@@ -384,6 +384,9 @@ const rules = {
     civilian: u.charges !== undefined ? 1 : 0,
     charges: u.charges ?? 0,
     requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
+    // V-R: ranged strike stats (Slinger 15/1, Archer 25/2); 0 = melee-only.
+    rangedStrength: u.ranged?.strength ?? 0,
+    rangedRange: u.ranged?.range ?? 0,
   })),
   // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
   // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a

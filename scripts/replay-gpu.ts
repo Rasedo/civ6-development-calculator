@@ -31,7 +31,7 @@ import {
   purchaseUnit,
 } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
-import { meleeAttack } from '../src/core/combat';
+import { meleeAttack, rangedAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import { canPlaceDistrict } from '../src/core/rules';
 import { districtAdjacency } from '../src/core/yields';
@@ -45,6 +45,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
   height: number;
   unitsMode?: number;
+  rangedActive?: number;
   disasters?: number;
   csMax?: number;
   rMax?: number;
@@ -139,7 +140,12 @@ for (const game of roll.games) {
         // through cheaper intermediate tiles (different side effects).
         unit.path = [n.index];
         walkPath(state, unit);
-      } else if (a < 12) meleeAttack(state, unit.id, n.index);
+      } else if (a < 12) {
+        // V-R: ranged units strike (one roll, no retaliation) when the GPU
+        // engine ran with ranged active — same type-based dispatch rule.
+        if (roll.rangedActive && UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, n.index);
+        else meleeAttack(state, unit.id, n.index);
+      }
     }
     if (bad) break;
     if (act?.e !== undefined) {

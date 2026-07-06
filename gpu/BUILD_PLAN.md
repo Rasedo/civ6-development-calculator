@@ -232,8 +232,12 @@ behind the off-script gate — the D5 pattern.
       activation. Self-test `gpu/war_test.py`; both gates green.
 - [ ] **V-W2** City capture: player melee vs rival city centers
       (attackCity/captureRivalCity semantics), gated.
-- [ ] **V-R** Ranged attacks (export the dropped `ranged` field; Slinger/Archer
-      strike without retaliation), gated.
+- [x] **V-R** Ranged attacks ACTIVE: `rangedStrength/rangedRange` exported;
+      ranged units execute codes 6-11 as rangedAttack (one roll, no
+      retaliation, no advance, no camp clear; range-1 targets — legal for
+      rng-1 and rng-2 alike). Mask unchanged; replay dispatches by unit type
+      via rollout.json's `rangedActive`. Self-test `gpu/ranged_test.py`;
+      both gates + tsc green.
 
 ## Status log
 - stage 0: plan committed (durable across rollbacks). Baseline `5a6f2b6`:
@@ -669,3 +673,24 @@ behind the off-script gate — the D5 pattern.
   RETRAIN NOTE: tune1 and every older checkpoint are 26-column nets — they no
   longer load against the live mask; flip `_rl_purchase_active=False` to
   benchmark them, or retrain (next: a tune2 on the 46-action head).
+- V-R [x] ranged strikes ACTIVE (`_rl_ranged_active=True`). The exporter ships the
+  previously-dropped `ranged` field (Slinger 15/1, Archer 25/2 → rangedStrength/
+  rangedRange; engine `_p_rng_str`, torch.long — the damage table indexes by the
+  strength diff). Execution of attack codes 6-11 splits by unit type: ranged units
+  run the rangedAttack mirror — ONE damage roll vs (defender combat + terrain
+  defense), no retaliation, no advance, no camp clear, attacker never moves — and
+  melee units keep the proven path byte-identically. The action MASK is unchanged
+  (same adjacent-hostile legality), so no checkpoint-width impact; the policy just
+  stops paying the melee-retaliation tax on its ranged roster. Range-1 targets
+  only for now (legal for both rng-1/rng-2; Archer's 12-tile ring-2 target set is
+  an action-space widening deferred to a later stage). replay-gpu.ts dispatches by
+  the SAME rule — unit type has `ranged` AND rollout.json's `rangedActive` flag —
+  so pre-V-R action logs still replay as melee. RNG contract: ranged consumes ONE
+  mulberry32 draw where melee consumes two; both engines branch on identical
+  state, preserving draw-for-draw parity. `gpu/ranged_test.py` isolates the
+  unit-action phase (a full step lets the world hit back and confounds hp
+  assertions): ranged attacker untouched + stationary while the defender drops
+  (100→83 on the probe), the SAME attack under flag-off gets the slinger KILLED
+  by melee retaliation, and the mask is flag-invariant. Both gates green
+  (off-script mean rose 115.7→116.5 — ranged units survive their attacks now);
+  tsc + purchase/war self-tests green.
