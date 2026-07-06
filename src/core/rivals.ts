@@ -89,10 +89,20 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: nextCityName(rival),
+    civId: civOfRival(rival.id),
     centerIndex: tile.index,
     population: rival.cities.length === 0 ? 3 : 1,
-    growthBox: 0,
+    foodBox: 0,
+    cultureBox: 0,
     tilesAcquired: 0,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: rival.cities.length === 0,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
+    wonders: [],
+    specialists: {},
     hp: RIVAL_CITY_MAX_HP,
     foundedTurn: state.turn,
   };
@@ -339,10 +349,20 @@ export function flipCityToRival(state: GameState, city: City): void {
   winner.cities.push({
     id: winner.nextCityId++,
     name: city.name,
+    civId: civOfRival(winner.id),
     centerIndex: city.centerIndex,
     population: Math.max(1, Math.floor(city.population * 0.75)),
-    growthBox: 0,
+    foodBox: 0,
+    cultureBox: 0,
     tilesAcquired: city.tilesAcquired,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: city.centerIndex }],
+    wonders: [],
+    specialists: {},
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
@@ -526,11 +546,11 @@ export function rivalPhase(state: GameState): void {
     for (const rc of rival.cities) {
       const { food, production } = rivalCityYields(state, rival, rc);
       prodSum += production;
-      rc.growthBox += Math.max(0.5, food - 2 * rc.population);
+      rc.foodBox += Math.max(0.5, food - 2 * rc.population);
       const need = growthFoodNeeded(rc.population) * RIVAL_GROWTH_FACTOR;
-      if (rc.growthBox >= need && rc.population < RIVAL_MAX_POP) {
+      if (rc.foodBox >= need && rc.population < RIVAL_MAX_POP) {
         rc.population += 1;
-        rc.growthBox = 0;
+        rc.foodBox = 0;
       }
       if ((state.turn + rc.id * 3) % RIVAL_BORDER_PERIOD === 0) {
         expandRivalBorder(state, rival, rc);

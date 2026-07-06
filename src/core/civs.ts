@@ -12,7 +12,7 @@
  * precedence), and the GPU exporter and all fixtures stay byte-identical.
  */
 
-import type { Tile, Unit } from './types';
+import type { City, Tile, Unit } from './types';
 
 /** The human/agent seat in the unified civ space. */
 export const PLAYER_CIV = 0;
@@ -70,4 +70,9 @@ export function unitCiv(u: Unit): number | null {
   if (u.owner === 'player') return PLAYER_CIV;
   if (u.owner === 'rival') return civOfRival(u.civId ?? 0);
   return null;
+}
+
+/** Civ owning this city (absent civId = the player, C1-A2). */
+export function cityCiv(c: City): number {
+  return c.civId ?? PLAYER_CIV;
 }

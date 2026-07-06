@@ -45,10 +45,20 @@ function addRival(
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: 'Roma',
+    civId: rival.id + 1,
     centerIndex: tile.index,
     population: 3,
-    growthBox: 0,
+    foodBox: 0,
+    cultureBox: 0,
     tilesAcquired: 0,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
+    wonders: [],
+    specialists: {},
     hp: 200,
     foundedTurn: 1,
   };
@@ -94,7 +104,7 @@ describe('rival placement and expansion', () => {
     const claimedAfter = state.map.tiles.filter((t) => (t.rivalId ?? -1) !== -1).length;
     expect(claimedAfter).toBeGreaterThan(claimedBefore);
     // growth box fills toward pop 4
-    expect(rival.cities[0].growthBox).toBeGreaterThan(0);
+    expect(rival.cities[0].foodBox).toBeGreaterThan(0);
   });
 
   it('their land blocks settling and the advisor penalty keeps distance', () => {

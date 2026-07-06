@@ -4,7 +4,7 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, Tile } from './types';
+import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, Tile, RivalCity } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
@@ -32,7 +32,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGI
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed } from './civs';
+import { tileClaimed, civOfRival } from './civs';
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
@@ -815,6 +815,26 @@ export function deserialize(json: string): GameState {
   state.influencePoints ??= 0;
   state.envoysAvailable ??= 0;
   state.rivals ??= [];
+  // C1-A2: rival cities became full City objects; older saves carry the
+  // scalar shape (growthBox, no queue/districts/…). Fill ONLY the missing
+  // fields in place — a current-shape save must round-trip byte-identically
+  // (the rival determinism test serializes and compares).
+  for (const r of state.rivals) {
+    for (const rc of r.cities as (RivalCity & { growthBox?: number })[]) {
+      rc.civId ??= civOfRival(r.id);
+      rc.foodBox ??= rc.growthBox ?? 0;
+      delete rc.growthBox;
+      rc.cultureBox ??= 0;
+      rc.lockedTiles ??= [];
+      rc.focus ??= 'balanced';
+      rc.queue ??= [];
+      rc.isCapital ??= false;
+      rc.buildings ??= [];
+      rc.districts ??= [{ type: 'CITY_CENTER', tileIndex: rc.centerIndex }];
+      rc.wonders ??= [];
+      rc.specialists ??= {};
+    }
+  }
   state.claimedPantheons ??= [];
   state.claimedBeliefs ??= [];
   for (const u of state.units) {

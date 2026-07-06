@@ -131,6 +131,12 @@ export type GreatPersonClass =
 export interface City {
   id: number;
   name: string;
+  /**
+   * Owning civ in the unified civ space (C1-A2): absent = the player
+   * (civ 0); rival cities carry civOfRival(rival.id). Ids stay per-owner
+   * sequences until C1-B7 unifies them (rival ids drive border pacing).
+   */
+  civId?: number;
   centerIndex: number;
   population: number;
   /** Accumulated food toward next citizen. */
@@ -263,15 +269,16 @@ export interface Unit {
   mission?: 'explore' | null;
 }
 
-export interface RivalCity {
-  id: number;
-  name: string;
-  centerIndex: number;
-  population: number;
-  /** Abstract food box driving scheduled growth. */
-  growthBox: number;
-  /** Tiles claimed beyond ring 1 (border pacing). */
-  tilesAcquired: number;
+/**
+ * A rival's city is a real City object (C1-A2): the same shape the player
+ * uses, so the C1-B stages can swap the heuristic economy for the real
+ * machinery field by field. Until then the City fields beyond the old
+ * scalar set (queue, buildings, districts, focus, …) are inert defaults —
+ * the heuristic in rivalPhase still drives everything. `foodBox` carries
+ * what the heuristic used to call growthBox.
+ */
+export interface RivalCity extends City {
+  /** City HP (player cities keep theirs in state.cityHp until C1-B7 unifies). */
   hp: number;
   foundedTurn: number;
 }

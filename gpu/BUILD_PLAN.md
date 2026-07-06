@@ -251,8 +251,11 @@ C3's matchmaking is built.
   - [x] A1. One `civId` space (player = 0, rivals 1..R): `src/core/civs.ts`
         defines the numbering + owner-qualified accessors; ownership reads
         migrated. Proof: 232 tests, fixtures BYTE-IDENTICAL, both gates green.
-  - [ ] A2. Rival cities become real `City` objects (civId-tagged) carrying
-        their current scalar economy behind the same heuristic — trace-identical.
+  - [x] A2. Rival cities ARE real `City` objects (`RivalCity extends City` +
+        {hp, foundedTurn}; growthBox → foodBox; inert queue/buildings/districts
+        defaults; per-rival ids KEPT — they drive border pacing). Save
+        migration fills only missing fields (round-trip byte-identical).
+        Proof: 232 tests, fixtures BYTE-IDENTICAL, both gates green.
   - [ ] A3. GPU mirror of A1/A2's layout: owner-dimensioned city tensors
         `[B, O, C', …]` with the player seat mapping onto today's semantics
         bit-exactly (the old [B, C] views become seat-0 slices).
@@ -802,3 +805,26 @@ behind the off-script gate — the D5 pattern.
   refactored TS oracle replays all 72 off-script GPU games turn-exactly. tsc
   green. Next: A2 — rival cities as civId-tagged City objects behind the same
   heuristic, trace-identical.
+- C1-A2 [x] rival cities are real City objects (behavior-preserving). Types:
+  `RivalCity extends City` + rival-only {hp, foundedTurn} (player city hp stays
+  in state.cityHp until B7 unifies); `City.civId?: number` (absent = player,
+  `cityCiv()` accessor in civs.ts); the heuristic's `growthBox` RENAMED to the
+  real `foodBox` (5 sites — exporter never shipped it, so fixtures can't move).
+  Both constructors (foundRivalCity + the loyalty-flip transfer) now write the
+  full City shape with inert defaults (empty queue/buildings/lockedTiles/
+  specialists, focus 'balanced', cultureBox 0, districts = [CITY_CENTER at the
+  center] mirroring foundCity, civId = civOfRival). CRITICALLY KEPT: per-rival
+  `nextCityId` counters — rc.id values feed `(turn + rc.id·3) % borderPeriod`
+  (border pacing) and the exported rc ids; renumbering would shift traces. Id
+  collisions with player ids remain harmless (rival cities never enter
+  state.cities / state.cityHp) until B7 unifies the id space deliberately.
+  deserialize() migrates OLD saves by filling only MISSING fields in place
+  (`??=`) — the first rebuild-the-object attempt broke the rival determinism
+  test by reordering JSON keys; current-shape saves must round-trip
+  byte-identically. Test literals in deeper/rivals tests updated to the City
+  shape. Proof: tsc + 232/232 vitest green, `gpu:export` fixtures
+  BYTE-IDENTICAL (md5 bed511d5… — third consecutive stage on the same bytes),
+  scripted parity green, off-script replay of all 72 GPU games turn-exact.
+  Next: A3 — the GPU engine's owner-dimensioned mirror of A1/A2's layout
+  (seat-0 slices bit-equal to today's tensors), then B1 (rival tile-working
+  on the real citizen/yield path — the first behavior-CHANGING promotion).
