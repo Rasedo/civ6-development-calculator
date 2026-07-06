@@ -155,7 +155,7 @@ const FOCUS_BASE: Record<YieldKey, number> = {
   faith: 1,
 };
 
-function tileScore(y: Yields, focus: FocusId): number {
+export function tileScore(y: Yields, focus: FocusId): number {
   let score = 0;
   for (const k of Object.keys(FOCUS_BASE) as YieldKey[]) {
     let w = FOCUS_BASE[k];

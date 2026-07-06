@@ -125,6 +125,12 @@ RTX 4070 SUPER, district engine (2026-07):
 | random / scripted / tune1 (12M steps, ~80 min) | 115.1 / 162.2 / **216.9** |
 | tune2 — 46-action purchase head, 50 updates (20.5M steps) | **221.6 ± 14.5** |
 
+C1-B1 (real rival tile-working) re-baselined the world — rivals starve,
+grow on the unscaled curve and lost their flat base, so the player's
+side got friendlier: **random 122.8 ± 11.2, scripted 192.2 ± 13.6**.
+Every pre-B1 net (tune1/tune2) is stale by construction; tune3 is the
+first reference net on this world.
+
 tune2 (same recipe on the purchase-capable head, resumed to 50 updates)
 edges tune1 by +4.7 with overlapping CIs and ties it on the matched-world
 netgreedy protocol (195.4) — the gold economy is a small, real positive.

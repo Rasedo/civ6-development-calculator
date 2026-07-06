@@ -256,6 +256,39 @@ C3's matchmaking is built.
         defaults; per-rival ids KEPT — they drive border pacing). Save
         migration fills only missing fields (round-trip byte-identical).
         Proof: 232 tests, fixtures BYTE-IDENTICAL, both gates green.
+  (B1 status detail) C1-B1 [x] — the FIRST behavior-changing promotion; fixtures
+  legitimately regenerated. TS: rivalCityYields now runs the real citizen path
+  under defaultModifiers — candidates mirror workableTiles (owned, in-radius,
+  no district/wonder tiles EXCLUDED-not-zeroed, impassable out, WATER IN),
+  scored by the exported tileScore ('balanced' focus_base over all six yields,
+  ties by GLOBAL tile index), topped by population; the center adds real
+  floored yields (tileYieldsForCenter) instead of the flat 3🍞/2⚙; growth uses
+  the real accounting (true surplus incl. negative, unscaled growthFoodNeeded —
+  RIVAL_GROWTH_FACTOR retired — grow SUBTRACTS the need, starvation shrinks with
+  pop floor 1). techLevel×(1+t/25) stays as the research stand-in until B3;
+  RIVAL_MAX_POP stays as the housing stand-in until B2+. GPU mirror iterated
+  through THREE gate catches: (1) tie-break — the new TS sort ties by global
+  tile index (assignWorkedTiles) where the old heuristic kept tilesWithin
+  order; the GPU key now subtracts the global id, not the window position
+  (probe: 4 tiles tied at score 6, engines picked different thirds). (2) the
+  static yield plane now exports UNPAVED (district-nulled) values — paving is
+  a runtime mask in every GPU consumer, and rival centers need their real
+  yields live (probe: hills centers gave TS 2⚙ vs GPU's floor 1⚙ → prodstock
+  drift on seeds 9131/9209). (3) LUXURY AMENITY SHARING — a pre-existing,
+  documented-as-inert gap that phase-6b mines silently made reachable: a
+  random game's builder MINED DIAMONDS at t91 and the TS amenity tier shifted
+  every yield multiplier (seed 9144, all accumulators drifting together).
+  Now modeled: exporter ships per-tile lux/luxreq planes + luxAmenityCities;
+  engine `_luxury_amenities` mirrors luxuryAmenities exactly (unique improved
+  luxuries inside borders — pillage faithfully does NOT suspend — iterative +1
+  to the 4 neediest, need desc / slot asc, grants feed back into the ranking).
+  replay-gpu.ts gained a REPLAY_DEBUG env flag printing ALL differing columns
+  (found the amenity signature: every accumulator drifting at one turn).
+  Proof: both gates green on the NEW fixtures (scripted 24×100, off-script
+  72×100 mean 130.2), 232/232 tests, tsc, all four self-tests. FRESH BASELINES
+  (world friendlier — weaker rivals, less loyalty pressure): eval random
+  122.8 ± 11.2 (was 115.1), scripted 192.2 ± 13.6 (was 162.2). All pre-B1
+  nets/benchmarks are stale by construction; tune3 trains on this world next.
   - [x] A3. GPU adopts the civ numbering (behavior-preserving): exporter
         asserts rival ids contiguous 0..R-1 and ships `civs: {player: 0,
         rivalBase: 1}` in rules.json; engine gains PLAYER_CIV /
@@ -269,8 +302,13 @@ C3's matchmaking is built.
         purchase/mcts self-tests green.
 - **C1-B. Subsystem promotion, one at a time (each: TS change → export →
   both gates → GPU mirror → new baselines):**
-  - [ ] B1. Rival tile-working via the real citizen/yield path (housing,
-        amenities) — replaces best-pop-tiles × tech-multiplier.
+  - [x] B1. Rival tile-working via the REAL citizen/yield path: tileScore
+        selection (balanced focus, global-index ties), real floored center
+        yields, real growth curve (unscaled, subtract-need, starvation);
+        housing/amenities for rivals defer to B2+ (maxPop stays the stand-in).
+        Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
+        Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
+        AMENITY SHARING (pre-existing gap, now modeled). See status log.
   - [ ] B2. Rival production queues on the real catalog (buildings, settlers
         at real costs) — replaces prodstock/milstock scalars.
   - [ ] B3. Rival research: real tech/civic trees + eurekas — replaces r_tech.

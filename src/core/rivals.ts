@@ -22,10 +22,10 @@ import { RESOURCES } from '../data/resources';
 import { UNITS } from '../data/units';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
-import { growthFoodNeeded, CITY_MIN_DIST } from '../data/constants';
+import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN } from '../data/constants';
+import { tileScore, tileYieldsForCenter } from './city';
 import {
   RIVAL_LEADERS,
-  RIVAL_GROWTH_FACTOR,
   RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
@@ -512,18 +512,38 @@ export function rivalCityYields(
   rival: RivalCiv,
   rc: RivalCity,
 ): { food: number; production: number } {
+  // C1-B1: the REAL citizen path, under defaultModifiers (rivals get no
+  // player techs/policies). Candidates mirror workableTiles — owned tiles
+  // in the work radius, no district/wonder tiles, impassable excluded
+  // (water IS workable, exactly like player citizens) — scored by the real
+  // tileScore ('balanced' focus, ties to the lowest index, mirroring
+  // assignWorkedTiles with no locks), topped by population. The center
+  // contributes its real floored yields (tileYieldsForCenter) instead of
+  // the old flat 3🍞/2⚙ base. The techLevel production multiplier remains
+  // the stand-in for rival research until C1-B3.
   const center = state.map.tiles[rc.centerIndex];
   const ctx = { map: state.map, mods: defaultModifiers() };
-  const workable = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
-    .filter((t) => tileOwnedByCiv(t, civOfRival(rival.id)) && !isWater(t) && !isImpassable(t) && t.index !== rc.centerIndex)
-    .map((t) => tileYields(ctx, t))
-    .sort((a, b) => b.food + b.production - (a.food + a.production))
+  const worked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
+    .filter(
+      (t) =>
+        tileOwnedByCiv(t, civOfRival(rival.id)) &&
+        t.index !== rc.centerIndex &&
+        !t.district &&
+        !t.builtWonder &&
+        !isImpassable(t),
+    )
+    .map((t) => {
+      const y = tileYields(ctx, t);
+      return { y, index: t.index, score: tileScore(y, 'balanced') };
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, rc.population);
-  let food = 3;
-  let production = 2;
-  for (const y of workable) {
-    food += y.food;
-    production += y.production;
+  const centerY = tileYieldsForCenter(ctx, center);
+  let food = centerY.food;
+  let production = centerY.production;
+  for (const w of worked) {
+    food += w.y.food;
+    production += w.y.production;
   }
   production *= 1 + rival.techLevel / 25;
   return { food, production };
@@ -546,10 +566,18 @@ export function rivalPhase(state: GameState): void {
     for (const rc of rival.cities) {
       const { food, production } = rivalCityYields(state, rival, rc);
       prodSum += production;
-      rc.foodBox += Math.max(0.5, food - 2 * rc.population);
-      const need = growthFoodNeeded(rc.population) * RIVAL_GROWTH_FACTOR;
+      // C1-B1: the real growth accounting — true surplus (can be negative),
+      // the unscaled Civ 6 growth curve, grow subtracts the need instead of
+      // zeroing the box, and starvation shrinks the city exactly like the
+      // player turn loop. RIVAL_MAX_POP stays as the housing stand-in until
+      // C1-B2+ gives rivals real housing.
+      rc.foodBox += food - FOOD_PER_CITIZEN * rc.population;
+      const need = growthFoodNeeded(rc.population);
       if (rc.foodBox >= need && rc.population < RIVAL_MAX_POP) {
         rc.population += 1;
+        rc.foodBox -= need;
+      } else if (rc.foodBox < 0) {
+        rc.population = Math.max(1, rc.population - 1);
         rc.foodBox = 0;
       }
       if ((state.turn + rc.id * 3) % RIVAL_BORDER_PERIOD === 0) {

@@ -92,6 +92,7 @@ class Rules:
     housing_aq_no_fresh: float  # Aqueduct: raise a non-fresh city's water housing to this
     amenity_tiers: list  # [(min, growth, yield)]
     center_min_food: float
+    center_min_production: float  # C1-B1: rival centers floor production live (player centers ship post-clamp)
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
@@ -142,6 +143,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         housing_aq_no_fresh=r["housing"].get("aqNoFreshTotal", 6),
         amenity_tiers=[(t["min"], t["growth"], t["yield"]) for t in r["amenityTiers"]],
         center_min_food=r.get("centerMinFood", 2),
+        center_min_production=r.get("centerMinProduction", 1),
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
@@ -320,6 +322,16 @@ class BatchSim:
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # C1-B1: citizen-workability (= !isImpassable — water IS workable,
+        # unlike unit passability). Defaults to `pass` for pre-B1 fixtures.
+        self.work_ok = torch.tensor([[t.get("work", t["pass"]) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # Luxury amenity source (mirrors luxuryAmenities; C1-B1 gate catch):
+        # per tile, the luxury's catalog index (-1 none) and the improvement
+        # index that activates it (-9 = outside the GPU roster, never matches).
+        self.lux_id = torch.tensor([[t.get("lux", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self.lux_req = torch.tensor([[t.get("luxreq", -9) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self._n_lux = int(self.lux_id.max().item()) + 1 if int(self.lux_id.max().item()) >= 0 else 0
+        self._lux_k = int((rules.improvements or {}).get("luxAmenityCities", 4))
         self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
         self.pair_dist = pair_distances(self.W, self.H).to(device)  # [T, T] int16
@@ -621,12 +633,13 @@ class BatchSim:
         self._flood_list = cand_list(self.floodplain)
         self._droughtc_list = cand_list(self.drought_cand)
         self._land_list = cand_list(~self.water)
-        # Rival yields sum the picked tiles' food/production sequentially to
-        # mirror the TS reduce. When every value is a dyadic rational
-        # (integers and halves — true for all shipped rules), every partial
-        # sum is exact in f64, so ANY summation order gives the identical
-        # bits and one .sum() replaces the per-tile add loop.
-        fp2 = self.tile_yields[:, :, :2].double() * 2
+        # Rival yields sum the picked tiles' yields sequentially to mirror
+        # the TS reduce. When every value is a dyadic rational (integers and
+        # halves — true for all shipped rules), every partial sum is exact
+        # in f64, so ANY summation order gives the identical bits and one
+        # .sum() replaces the per-tile add loop. C1-B1 scores tiles over all
+        # SIX columns (tileScore), so the guard now covers the full table.
+        fp2 = self.tile_yields.double() * 2
         self._dyadic_fp = bool((fp2 == fp2.round()).all())
 
         # The Palace exists only in the capital (slot 0).
@@ -784,6 +797,37 @@ class BatchSim:
         return m
 
     # --- helpers ---------------------------------------------------------------
+
+    def _luxury_amenities(self, amen_have: torch.Tensor, amen_need: torch.Tensor) -> torch.Tensor:
+        """[B, C] luxuryAmenities mirror (C1-B1 gate catch — a random game's
+        builder mined Diamonds and the TS amenity tier shifted): each UNIQUE
+        improved luxury inside player borders — tile.improvement equals the
+        resource's OWN improvement; pillage does NOT suspend it, faithfully —
+        grants +1 amenity to the luxAmenityCities NEEDIEST cities. Grants
+        feed back into the ranking (need desc, ties city id == slot asc), and
+        rounds are homogeneous, so only the per-game COUNT of active luxuries
+        matters."""
+        B, C = self.B, self.C
+        out = torch.zeros(B, C, dtype=self.dtype, device=self.device)
+        if self._n_lux == 0 or not self.improvements_on:
+            return out
+        improved = (self.lux_id >= 0) & (self.owner >= 0) & (self.improvement == self.lux_req)
+        counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
+        counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+        rounds = (counts > 0).long().sum(dim=1)  # [B] unique improved luxuries
+        mx = int(rounds.max().item())
+        if mx == 0:
+            return out
+        slot = torch.arange(C, device=self.device, dtype=self.dtype).view(1, C)
+        k = min(self._lux_k, C)
+        for rnd in range(mx):
+            act = rounds > rnd
+            need = amen_need - (amen_have + out)
+            key = torch.where(self.alive, need * 64 - slot, torch.full_like(need, -1e9))
+            top_v, top_i = key.topk(k, dim=1)
+            grant = (top_v > -1e8) & act.unsqueeze(1)
+            out.scatter_add_(1, top_i, grant.to(self.dtype))
+        return out
 
     def _amenity_factors(self, balance: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         growth = torch.full_like(balance, self.rules.amenity_tiers[-1][1])
@@ -1274,6 +1318,7 @@ class BatchSim:
 
         amen_have = self.palace_slot_amenities.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_amenities)
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
+        amen_have = amen_have + self._luxury_amenities(amen_have, amen_need)  # C1-B1: improved luxuries
         balance = amen_have - amen_need
         growth_f, yield_f = self._amenity_factors(balance)
         # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
@@ -2208,51 +2253,67 @@ class BatchSim:
         self.v_next[rows] += 1
 
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Mirrors rivalCityYields: best `pop` owned tiles within the work
-        radius, sorted by food+production (ties keep tilesWithin order),
-        summed IN SORTED ORDER (the TS reduce order — float parity), plus
-        the base 3🍞/2⚙ and the tech production scaler."""
+        """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
+        defaultModifiers). Candidates = owned, citizen-workable (water yes,
+        impassable no), non-district tiles in the work radius — district/
+        center tiles are EXCLUDED like workableTiles, not zero-slot-wasted.
+        Scored by the real tileScore ('balanced' focus_base weights over all
+        six yields, ties to the lowest index), topped by population; the
+        center adds its real floored yields (tileYieldsForCenter) instead of
+        the old flat 3🍞/2⚙; the tech production scaler stays until B3.
+        Food takes the disaster/farm tail; production takes improvement BASE
+        yields via the defaultModifiers plane (never the player's boosts)."""
+        rd = self.rules_dev
         center = self.rc_center[:, r, j]
         tiles = tiles_from_offsets(center, self._off3, self.W, self.H)  # [B, M]
         tc = tiles.clamp(min=0)
+        # !t.district in TS: player districts, player centers AND rival
+        # centers (founding sets tile.district) all disqualify a candidate.
+        districted = (
+            (self.center_at.gather(1, tc) >= 0)
+            | (self.rvcity_at.gather(1, tc) >= 0)
+            | (self.district.gather(1, tc) >= 0)
+        )
         valid = (
             (tiles >= 0)
             & (self.rival_at.gather(1, tc) == r)
-            & self.passable.gather(1, tc)
+            & self.work_ok.gather(1, tc)
             & (tiles != center.unsqueeze(1))
+            & ~districted
         )
-        # per-column reads (no [B, T, 6] assembly): food takes the disaster/
-        # farm tail; production takes improvement BASE yields via the
-        # defaultModifiers plane — a rival working a player-built mine gets
-        # the mine's +1⚙ but NOT the player's Apprenticeship/Industrialization
-        # boosts (V-P2 gate catch: purchases put builder mines in rival reach)
-        f = (self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]).gather(1, tc).double()
-        p = self._neutral_prod().gather(1, tc).double()
-        # ANY city center is paved (tile.district set at founding) and
-        # yields nothing. Reachable when a loyalty flip parks two same-civ
-        # cities inside each other's work radius: the neighbor's center
-        # stays a CANDIDATE — it occupies a sorted slot exactly like the
-        # TS list — but contributes zero food/production.
-        # A player district also paves its tile (tileYields returns 0 there):
-        # reachable when a loyalty flip hands a rival a player's district tile.
-        paved = (self.center_at.gather(1, tc) >= 0) | (self.rvcity_at.gather(1, tc) >= 0) | (self.district.gather(1, tc) >= 0)
-        f = torch.where(paved, torch.zeros_like(f), f)
-        p = torch.where(paved, torch.zeros_like(p), p)
+        f_plane = self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]
+        p_plane = self._neutral_prod()
+        f = f_plane.gather(1, tc).double()
+        p = p_plane.gather(1, tc).double()
+        # tileScore('balanced') = Σ yields · focus_base — food/production from
+        # the dynamic (defaultModifiers) planes, the other four columns static.
+        # All shipped yields are dyadic (asserted via _dyadic_fp over all six
+        # columns), so this sum order is bit-equal to the TS per-key loop.
+        w = rd.focus_base.double()
+        s = f * w[0] + p * w[1] + (self.tile_yields[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2).gather(1, tc)
         M = tiles.shape[1]
-        key = torch.where(valid, (f + p) * 1e6 - torch.arange(M, device=self.device, dtype=torch.float64), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
+        # ties break by GLOBAL tile index (assignWorkedTiles' a.index - b.index),
+        # NOT window position — the pre-B1 heuristic kept tilesWithin order.
+        key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         kk = min(int(self.rules.rivals.get("maxPop", 12)), M)
         top_vals, top_idx = key.topk(kk, dim=1)
         take = (torch.arange(kk, device=self.device).unsqueeze(0) < self.rc_pop[:, r, j].unsqueeze(1)) & (top_vals > -1e17)
         f_sel = f.gather(1, top_idx) * take.double()
         p_sel = p.gather(1, top_idx) * take.double()
+        # center: real floored yields (tileYieldsForCenter) — food after the
+        # fertility/drought tail, production from the neutral plane
+        sitec = center.clamp(min=0).unsqueeze(1)
+        r_ = self.rules
+        cf = torch.maximum(f_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
+        cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
         if self._dyadic_fp:
-            # every term is an exact dyadic (disasters shift food by
-            # integers), so this .sum() is bit-identical to the TS reduce
-            food = 3.0 + f_sel.sum(dim=1)
-            prod = 2.0 + p_sel.sum(dim=1)
+            # every term is an exact dyadic, so .sum() is bit-identical to
+            # the TS reduce
+            food = cf + f_sel.sum(dim=1)
+            prod = cp + p_sel.sum(dim=1)
         else:
-            food = torch.full((self.B,), 3.0, dtype=torch.float64, device=self.device)
-            prod = torch.full((self.B,), 2.0, dtype=torch.float64, device=self.device)
+            food = cf.clone()
+            prod = cp.clone()
             for m in range(kk):  # sequential adds mirror the TS loop's rounding
                 food = food + f_sel[:, m]
                 prod = prod + p_sel[:, m]
@@ -2700,15 +2761,20 @@ class BatchSim:
                     continue
                 food, prod = self._rival_city_yields(r, j, cact)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
-                surplus = torch.maximum(
-                    torch.tensor(0.5, dtype=torch.float64, device=dev), food - 2 * self.rc_pop[:, r, j].double()
-                )
+                # C1-B1: the real growth accounting — true surplus (can be
+                # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
+                # need, starvation shrinks (pop floor 1, box reset). maxPop
+                # stays as the housing stand-in until B2+.
+                surplus = food - self.rules.food_per_citizen * self.rc_pop[:, r, j].double()
                 self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + surplus, self.rc_growth[:, r, j])
                 p64 = self.rc_pop[:, r, j].double()
-                need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5) * rr.get("growthFactor", 0.75)
+                need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
                 grow = cact & (self.rc_growth[:, r, j] >= need) & (self.rc_pop[:, r, j] < rr.get("maxPop", 12))
                 self.rc_pop[:, r, j] = self.rc_pop[:, r, j] + grow.long()
-                self.rc_growth[:, r, j] = torch.where(grow, torch.zeros_like(self.rc_growth[:, r, j]), self.rc_growth[:, r, j])
+                self.rc_growth[:, r, j] = torch.where(grow, self.rc_growth[:, r, j] - need, self.rc_growth[:, r, j])
+                starve = cact & ~grow & (self.rc_growth[:, r, j] < 0)
+                self.rc_pop[:, r, j] = torch.where(starve, (self.rc_pop[:, r, j] - 1).clamp(min=1), self.rc_pop[:, r, j])
+                self.rc_growth[:, r, j] = torch.where(starve, torch.zeros_like(self.rc_growth[:, r, j]), self.rc_growth[:, r, j])
                 due = cact & (((self.turn + self.rc_id[:, r, j] * 3) % rr.get("borderPeriod", 9)) == 0)
                 self._expand_rival_border(r, j, due)
                 self.rc_hp[:, r, j] = torch.where(

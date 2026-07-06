@@ -266,6 +266,11 @@ for (const game of roll.games) {
     }
     const want = game.trace[t];
     const got = traceRow(state, cityIds, C, csMax, rMax);
+    if (process.env.REPLAY_DEBUG) {
+      const bads = [];
+      for (let i = 0; i < got.length; i++) if (Math.abs(got[i] - want[i]) > tol[i]) bads.push(`col${i} TS=${got[i]} GPU=${want[i]}`);
+      if (bads.length) console.log(`DEBUG seed ${game.seed} rng ${game.rng} turn ${state.turn - 1}: ${bads.join('; ')}`);
+    }
     for (let i = 0; i < got.length; i++) {
       const diff = Math.abs(got[i] - want[i]);
       if (tol[i] > 0) worst = Math.max(worst, diff);

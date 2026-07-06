@@ -49,7 +49,6 @@ import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../src/data/religion';
 import { TERRAINS } from '../src/data/terrains';
 import {
-  RIVAL_GROWTH_FACTOR,
   RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
   RIVAL_BORDER_PERIOD,
@@ -101,7 +100,15 @@ import {
   AQUEDUCT_FRESH_BONUS,
   AQUEDUCT_NO_FRESH_TOTAL,
   GOLD_PURCHASE_MULT,
+  LUXURY_AMENITY_CITIES,
 } from '../src/data/constants';
+
+// The GPU improvement index space (tile.improvement values, build codes 13-15).
+const IMPROVEMENT_IDS = ['FARM', 'MINE', 'LUMBER_MILL'];
+// Canonical luxury catalog order for the per-tile `lux` plane.
+const LUXURY_IDS = Object.values(RESOURCES)
+  .filter((r) => r.category === 'luxury')
+  .map((r) => r.id);
 
 const N_SEEDS = Number(process.argv[2] ?? 24);
 const N_TURNS = Number(process.argv[3] ?? 100);
@@ -323,7 +330,6 @@ const rules = {
   // pantheon/belief pools matter only as SIZES: a rival's pick consumes a
   // draw and shrinks the pool, but the identity is inert in covered scope.
   rivals: {
-    growthFactor: RIVAL_GROWTH_FACTOR,
     maxPop: RIVAL_MAX_POP,
     maxCities: RIVAL_MAX_CITIES,
     settlerBase: 90, // RIVAL_SETTLER_COST(c) = 90 + 40·max(0, c − 1)
@@ -402,7 +408,10 @@ const rules = {
   // [techIdx, prodAmount] pairs the engine sums over researched techs.
   // builderIdx is BUILDER's roster position.
   improvements: {
-    ids: ['FARM', 'MINE', 'LUMBER_MILL'],
+    ids: IMPROVEMENT_IDS,
+    // C1-B1 gate catch: an improved luxury (its OWN improvement, e.g. a mine
+    // on Diamonds) grants +1 amenity to this many neediest cities.
+    luxAmenityCities: LUXURY_AMENITY_CITIES,
     farmFood: IMPROVEMENTS.FARM.yields.food ?? 1,
     farmHousing: IMPROVEMENTS.FARM.housing,
     mineProd: IMPROVEMENTS.MINE.yields.production ?? 1,
@@ -558,7 +567,12 @@ for (let s = 0; s < N_SEEDS; s++) {
   );
 
   const tiles = map.tiles.map((t) => {
-    const y = tileYields(ctx, t);
+    // C1-B1: the static plane ships UNPAVED yields — what the tile would
+    // yield without its district — because paving is a runtime mask in every
+    // GPU consumer, and rival centers need their real (district-nulled)
+    // yields live (tileYieldsForCenter). Only t=0 district tiles (capitals)
+    // differ from the old export.
+    const y = tileYields(ctx, t.district ? { ...t, district: null } : t);
     return {
       y: YIELD_KEYS.map((k) => Math.round(y[k] * 1000) / 1000),
       workable: !isImpassable(t) && !t.district ? 1 : 0,
@@ -567,6 +581,16 @@ for (let s = 0; s < N_SEEDS; s++) {
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
       // land units may stand here (mirrors unitPassable)
       pass: unitPassable(t) ? 1 : 0,
+      work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)
+      // Luxury amenity source (mirrors luxuryAmenities): the luxury's catalog
+      // index + the improvement index that activates it (-9 = its improvement
+      // is outside the GPU roster, so it can never activate in either engine).
+      lux: t.resource && RESOURCES[t.resource].category === 'luxury' ? LUXURY_IDS.indexOf(t.resource) : -1,
+      luxreq: (() => {
+        if (!t.resource || RESOURCES[t.resource].category !== 'luxury') return -9;
+        const ri = IMPROVEMENT_IDS.indexOf(RESOURCES[t.resource].improvement ?? '');
+        return ri >= 0 ? ri : -9;
+      })(),
       // defender bonus (mirrors terrainDefense: hills / woods / rainforest / marsh)
       tdef: terrainDefense(t),
       // statically camp-eligible (dynamic exclusions — ownership, distance
