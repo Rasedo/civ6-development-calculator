@@ -18,7 +18,18 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { createGame, endTurn, foundCity, queueBuilding, queueSettler, setTechResearch, setCivicResearch } from '../src/core/game';
+import {
+  createGame,
+  endTurn,
+  foundCity,
+  queueBuilding,
+  queueSettler,
+  setTechResearch,
+  setCivicResearch,
+  purchaseBuilding,
+  purchaseSettler,
+  purchaseUnit,
+} from '../src/core/game';
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
 import { meleeAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
@@ -163,6 +174,23 @@ for (const game of roll.games) {
         const r = queueUnit(state, city.id, roll.unitIds[a - NB - 2]);
         if (!r.ok) {
           fail(`turn ${state.turn}: queueUnit(${roll.unitIds[a - NB - 2]}) in slot ${slot}: ${r.reason}`);
+          bad = true;
+          break;
+        }
+      } else if (a >= NB + 2 + NU + SCAFFOLD.length) {
+        // Gold purchase (V-P2): the GPU bought a building / settler / unit
+        // outright at GOLD_PURCHASE_MULT× cost. Failures are SOFT no-ops,
+        // like unit orders: both engines re-validate at execution — the
+        // shared treasury drains in logged slot order, and a bought unit
+        // needs a free spawn tile (TS refunds when spawnUnit finds none) —
+        // so a rejected purchase here must match the GPU's no-op there. Any
+        // real divergence surfaces in the trace comparison instead.
+        const pb = a - (NB + 2 + NU + SCAFFOLD.length);
+        if (pb < NB) purchaseBuilding(state, city.id, roll.buildings[pb]);
+        else if (pb === NB) purchaseSettler(state, city.id);
+        else if (pb <= NB + NU) purchaseUnit(state, city.id, roll.unitIds[pb - NB - 1]);
+        else {
+          fail(`turn ${state.turn}: unknown production code ${a} in slot ${slot}`);
           bad = true;
           break;
         }

@@ -221,9 +221,11 @@ behind the off-script gate — the D5 pattern.
       purchaseUnit) behind `_rl_purchase_active=False`. Sequential slot walk for
       the order-coupled parts (settler prices, shared treasury). Self-test
       `gpu/purchase_test.py`; both gates green.
-- [ ] **V-P2** Activate purchases off-script: flip the flag, teach
-      replay-gpu.ts purchase codes, rollout emits the map; drive the gate
-      green. AFTER the tune1 benchmarks (width change breaks old checkpoints).
+- [x] **V-P2** Purchases ACTIVE off-script: flag flipped (mask 26→46),
+      replay-gpu.ts dispatches purchase codes as soft-fail no-ops (both
+      engines re-validate at execution). Gate coverage: 158 purchases across
+      69/72 games. Caught + fixed a LATENT rival-economy bug (see status log:
+      rival-worked mine production). Both gates + tsc green.
 - [x] **V-W1** Player-initiated war/peace (declare on a rival; peace-for-gold
       mirroring the TS deal), plumbed + gated OFF: a NEW `war` head
       (`war_mask()` [B,2R], `step(war=…)`), not wired into BatchEnv until
@@ -637,3 +639,33 @@ behind the off-script gate — the D5 pattern.
   wiring + replay dispatch (act.w) land at activation with the V-P2-style retrain.
   Both gates green (rollout summary bit-identical to pre-change: 43.8/115.2/224.8);
   tsc green.
+- V-P2 [x] purchases ACTIVE + a latent rival-economy bug caught by the gate.
+  `_rl_purchase_active=True` (production head 26→46), replay-gpu.ts dispatches
+  `a >= NB+2+NU+nScaffold` to purchaseBuilding/purchaseSettler/purchaseUnit as
+  SOFT-FAIL no-ops (the district branch is now bounded above; both engines
+  re-validate at execution: slot-order treasury drain, spawn-tile refund), and
+  the off-script gate runs 158 purchases (4 buildings / 1 settler / 153 units,
+  69/72 games — units dominate because they're cheapest vs a mostly-thin
+  treasury; buildings/settlers are deterministically covered by
+  purchase_test.py). FIRST RUN FAILED — seed9001 t88 col32 (rival prodStock,
+  TS 38.782 vs GPU 38.235) — and the diagnosis is a textbook family-2 latent
+  bug, invisible until purchases put player improvements in rival reach:
+  **rival-worked tiles missed improvement BASE production**. TS rivalCityYields
+  calls tileYields with defaultModifiers(), so a rival working a player-built
+  MINE/LUMBER_MILL gets its base +1⚙ (but NOT the player's Apprenticeship/
+  Industrialization boosts — those ride ctx.mods); the GPU read the raw static
+  production plane (a pre-6b comment still said "production is static").
+  Repro: the purchased t32 BUILDER's mine landed where rival 0's t87 FOUNDING
+  (city4, tile 907) claimed it; the first worked-turn accrual differed by
+  1⚙ × techmult(1.876) × prodToSettler × pace = 0.547. Fix: `_neutral_prod()`
+  — improvement base production, pillage-suspended, NO tech boosts, cached per
+  _eff_version (reset/restore clear it) — used by _rival_city_yields; the
+  player path keeps the boosted `_eff_prod()`. The farm FOOD side was already
+  correct (`_eff_food` is modifier-free, matching defaultModifiers). Note the
+  gate's rollout summary is unchanged (45.0/115.7/244.6) — the fix moves rival
+  prodStock accounting, not the action stream, on these seeds; the trace
+  comparator is what caught it. Both gates green after the fix (scripted
+  24×100, off-script 72×100); tsc green; purchase/war/mcts self-tests green.
+  RETRAIN NOTE: tune1 and every older checkpoint are 26-column nets — they no
+  longer load against the live mask; flip `_rl_purchase_active=False` to
+  benchmark them, or retrain (next: a tune2 on the 46-action head).

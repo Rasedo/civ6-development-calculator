@@ -1,16 +1,17 @@
-"""V-P1 gold-purchase plumbing self-test.
+"""V-P1/2 gold-purchase self-test.
 
     npm run gpu:export        # (once) writes gpu/fixtures/
     python gpu/purchase_test.py
 
-The purchase columns are GATED OFF in the shipped engine (_rl_purchase_active
-= False): the production mask keeps its NB+2+NU+nScaffold width and a
-purchase-range code is a no-op, so rollouts and checkpoints are untouched —
-test 1 proves that inertness bit-exactly. Tests 2-5 flip the flag on a
-throwaway sim and check the TS-mirroring semantics: buy = production cost ×
-goldPurchaseMult, buildings need _buildable, units need tech + a free spawn
-tile, settler prices ride the live `cities-1 + settlers + queued` counter and
-are order-coupled across slots in the same turn (slot walk, like the replay).
+Purchases ship ACTIVE since V-P2 (_rl_purchase_active = True → 46-column
+production head, covered by the off-script gate). The gated-OFF path must
+stay available for benchmarking 26-column checkpoints (tune1 and older):
+test 1 flips the flag off and proves the mask narrows back to
+NB+2+NU+nScaffold and a purchase-range code is a bit-exact no-op. Tests 2-5
+check the TS-mirroring semantics: buy = production cost × goldPurchaseMult,
+buildings need _buildable, units need tech + a free spawn tile, settler
+prices ride the live `cities-1 + settlers + queued` counter and are
+order-coupled across slots in the same turn (slot walk, like the replay).
 """
 
 from __future__ import annotations
@@ -52,7 +53,8 @@ def prod(sim, city, code) -> torch.Tensor:
 def test_inert_when_off(rules, path):
     sim = build(rules, path)
     idle_capital(sim)
-    assert not sim._rl_purchase_active, "flag must ship OFF"
+    assert sim._rl_purchase_active, "flag ships ON since V-P2"
+    sim._rl_purchase_active = False  # the benchmark-old-checkpoints path
     w = sim.production_mask().shape[2]
     assert w == pbase(sim), f"gated-off mask width {w} != {pbase(sim)}"
     # a purchase-range code behaves exactly like IDLE (invalid = no-op)

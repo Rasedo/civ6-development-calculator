@@ -532,12 +532,13 @@ class BatchSim:
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
         self._rl_any_city = True  # D5c: True lets non-capital cities place districts too (needs the rival×disaster prodStock edge fixed — see BUILD_PLAN)
-        # V-P1: gold purchases (buy a building / settler / unit outright at
+        # V-P1/2: gold purchases (buy a building / settler / unit outright at
         # gold_purchase_mult× production cost, mirroring purchaseBuilding/
-        # purchaseSettler/purchaseUnit). Plumbed but OFF: while False the
-        # production mask keeps its NB+2+NU+nScaffold width, so existing
-        # checkpoints stay loadable and rollouts are bit-identical.
-        self._rl_purchase_active = False
+        # purchaseSettler/purchaseUnit). ACTIVE since V-P2: the production
+        # mask carries NB+1+NU purchase columns (width 26→46) — checkpoints
+        # trained on the 26-column head (tune1 and older) no longer match;
+        # retrain, or flip this off to benchmark them.
+        self._rl_purchase_active = True
         # V-W1: player diplomacy (declareWar / sueForPeace on a rival) as a
         # NEW head, plumbed but OFF: war_mask() is all-False and step(war=…)
         # is ignored while False, so nothing samples or applies it. The head
@@ -574,6 +575,7 @@ class BatchSim:
         self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._score_cache: tuple[int, torch.Tensor] | None = None
+        self._nprod_cache: tuple[int, torch.Tensor] | None = None
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
         def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -716,6 +718,7 @@ class BatchSim:
         self._eff_cache = None
         self._food_cache = None
         self._score_cache = None
+        self._nprod_cache = None
 
     def snapshot(self) -> dict:
         """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
@@ -734,6 +737,7 @@ class BatchSim:
         self._eff_cache = None
         self._food_cache = None
         self._score_cache = None
+        self._nprod_cache = None
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -830,6 +834,28 @@ class BatchSim:
             out = out + ((self.improvement == self.MINE) & live).to(self.dtype) * mine_prod
         if self.LUMBER >= 0:
             out = out + ((self.improvement == self.LUMBER) & live).to(self.dtype) * self._lumber_prod
+        return out
+
+    def _neutral_prod(self) -> torch.Tensor:
+        """[B, T] tile PRODUCTION as a RIVAL works it. rivalCityYields calls
+        tileYields with defaultModifiers(): the improvement's BASE production
+        applies (the mine/lumber mill is physically on the tile; pillage
+        suspends it) but the PLAYER's mine-boost techs do NOT — those ride
+        ctx.mods, which defaultModifiers zeroes. Distinct from _eff_prod(),
+        the player-context plane that adds the boosts. Cached per
+        _eff_version (improvement/pillage changes bump it)."""
+        base = self.tile_yields[:, :, 1]
+        if not self.improvements_on:
+            return base
+        if self._nprod_cache is not None and self._nprod_cache[0] == self._eff_version:
+            return self._nprod_cache[1]
+        live = ~self.pillaged
+        out = base
+        if self.MINE >= 0:
+            out = out + ((self.improvement == self.MINE) & live).to(self.dtype) * self._mine_prod
+        if self.LUMBER >= 0:
+            out = out + ((self.improvement == self.LUMBER) & live).to(self.dtype) * self._lumber_prod
+        self._nprod_cache = (self._eff_version, out)
         return out
 
     def _eff_yields(self) -> torch.Tensor:
@@ -2125,10 +2151,13 @@ class BatchSim:
             & self.passable.gather(1, tc)
             & (tiles != center.unsqueeze(1))
         )
-        # food is the only disaster-dynamic column; production is static —
-        # no [B, T, 6] assembly needed here (the sums below are per-column)
+        # per-column reads (no [B, T, 6] assembly): food takes the disaster/
+        # farm tail; production takes improvement BASE yields via the
+        # defaultModifiers plane — a rival working a player-built mine gets
+        # the mine's +1⚙ but NOT the player's Apprenticeship/Industrialization
+        # boosts (V-P2 gate catch: purchases put builder mines in rival reach)
         f = (self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]).gather(1, tc).double()
-        p = self.tile_yields[:, :, 1].gather(1, tc).double()
+        p = self._neutral_prod().gather(1, tc).double()
         # ANY city center is paved (tile.district set at founding) and
         # yields nothing. Reachable when a loyalty flip parks two same-civ
         # cities inside each other's work radius: the neighbor's center
