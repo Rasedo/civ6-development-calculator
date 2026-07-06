@@ -3,7 +3,7 @@
  * `Modifiers` object that the yield/housing/amenity code consumes.
  */
 
-import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResourceCategory, Yields } from './types';
+import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, type PolicyEffects } from '../data/policies';
@@ -89,16 +89,29 @@ export function isCivicComplete(state: GameState, id: string): boolean {
   return state.research.civics.includes(id);
 }
 
-export function availableTechs(state: GameState): TechDef[] {
+/**
+ * Techs researchable from an arbitrary research state (C1-B3: rivals run the
+ * SAME trees through their own ResearchState; the player wrappers below keep
+ * their exact signatures and behavior).
+ */
+export function availableTechsIn(research: ResearchState): TechDef[] {
   return Object.values(TECHS).filter(
-    (t) => !isTechComplete(state, t.id) && t.prereqs.every((p) => isTechComplete(state, p)),
+    (t) => !research.techs.includes(t.id) && t.prereqs.every((p) => research.techs.includes(p)),
   );
 }
 
-export function availableCivics(state: GameState): CivicDef[] {
+export function availableCivicsIn(research: ResearchState): CivicDef[] {
   return Object.values(CIVICS).filter(
-    (c) => !isCivicComplete(state, c.id) && c.prereqs.every((p) => isCivicComplete(state, p)),
+    (c) => !research.civics.includes(c.id) && c.prereqs.every((p) => research.civics.includes(p)),
   );
+}
+
+export function availableTechs(state: GameState): TechDef[] {
+  return availableTechsIn(state.research);
+}
+
+export function availableCivics(state: GameState): CivicDef[] {
+  return availableCivicsIn(state.research);
 }
 
 // ---------------------------------------------------------------------------
