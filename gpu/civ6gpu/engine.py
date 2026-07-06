@@ -95,6 +95,7 @@ class Rules:
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
+    gold_purchase_mult: float  # V-P1: gold price = production cost × this (GOLD_PURCHASE_MULT)
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — covered-scope eureka conditions
@@ -143,6 +144,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
+        gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
@@ -530,6 +532,12 @@ class BatchSim:
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
         self._rl_any_city = True  # D5c: True lets non-capital cities place districts too (needs the rival×disaster prodStock edge fixed — see BUILD_PLAN)
+        # V-P1: gold purchases (buy a building / settler / unit outright at
+        # gold_purchase_mult× production cost, mirroring purchaseBuilding/
+        # purchaseSettler/purchaseUnit). Plumbed but OFF: while False the
+        # production mask keeps its NB+2+NU+nScaffold width, so existing
+        # checkpoints stay loadable and rollouts are bit-identical.
+        self._rl_purchase_active = False
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -1251,12 +1259,15 @@ class BatchSim:
     # --- action masks (the macro-action surface) --------------------------------
 
     def production_mask(self) -> torch.Tensor:
-        """[B, C, NB+2+NU+nScaffold] valid production actions for idle cities:
-        columns 0..NB-1 = City Center buildings, NB = settler (always trainable,
-        as queueSettler is), NB+1 = idle, NB+2..NB+1+NU = train that roster unit
-        (tech-gated like trainableUnits), NB+2+NU.. = place that scaffold district
-        (capital-only, off-script; all-False unless _rl_district_active). All-False
-        where no decision pends."""
+        """[B, C, NB+2+NU+nScaffold(+NB+1+NU)] valid production actions for idle
+        cities: columns 0..NB-1 = City Center buildings, NB = settler (always
+        trainable, as queueSettler is), NB+1 = idle, NB+2..NB+1+NU = train that
+        roster unit (tech-gated like trainableUnits), NB+2+NU.. = place that
+        scaffold district (capital-only, off-script; all-False unless
+        _rl_district_active). With _rl_purchase_active the mask WIDENS by
+        NB+1+NU gold-purchase columns (buy building / settler / unit at
+        gold_purchase_mult× cost — V-P1); while off those columns don't exist,
+        keeping old checkpoints loadable. All-False where no decision pends."""
         B, C, dev = self.B, self.C, self.device
         pend = self.alive & (self.current == -1)
         always = torch.ones(B, C, 2, dtype=torch.bool, device=dev)
@@ -1299,6 +1310,33 @@ class BatchSim:
                         else:
                             dcols[:, c, si] = has_tech & under_cap & has_land & not_owned
             cols.append(dcols)
+        if self._rl_purchase_active:
+            # V-P1 purchases. Eligibility mirrors the TS functions at a pending
+            # decision (queue empty, so availableBuildings ∧ buildingCompletable
+            # collapses to _buildable): building = _buildable & gold; settler =
+            # gold at the live settlerCost; unit = trainableUnits & gold. Gold is
+            # checked optimistically here and RE-validated at apply in slot
+            # order (earlier slots' purchases drain the shared treasury and a
+            # bought settler raises the next slot's price, exactly like the
+            # replay's sequential act.p loop; a unit also needs a free spawn
+            # tile there — TS refunds when spawnUnit finds none).
+            mult = self.rules.gold_purchase_mult
+            tre = self.treasury
+            pb = cols[0] & (tre.view(B, 1, 1) >= self.rules_dev.b_cost.view(1, 1, -1) * mult)
+            n_cities = self.alive.sum(dim=1, keepdim=True)
+            queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
+            s_cost = self.rules.settler_base + self.rules.settler_per_city * (
+                n_cities - 1 + self.settlers.unsqueeze(1) + queued_s
+            ).clamp(min=0).to(self.dtype)
+            ps = (tre.unsqueeze(1) >= s_cost * mult).unsqueeze(2).expand(B, C, 1)
+            if self.units_mode:
+                u_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
+                    1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
+                )
+                pu = (u_ok & (tre.unsqueeze(1) >= self._p_cost.unsqueeze(0) * mult)).unsqueeze(1).expand(-1, C, -1)
+            else:
+                pu = torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
+            cols.append(torch.cat([pb, ps, pu], dim=2))
         return torch.cat(cols, dim=2) & pend.unsqueeze(2)
 
     def tech_mask(self) -> torch.Tensor:
@@ -2725,6 +2763,80 @@ class BatchSim:
                 self.r_next_city_id[b, w_] += 1
                 self.rvcity_at[b, self.site[b, c]] = w_
 
+    def _apply_settlers_and_purchases(self, act: torch.Tensor, buildable: torch.Tensor) -> None:
+        """RL settler queueing + gold purchases, walked in city-slot order (V-P1).
+
+        Only runs when _rl_purchase_active. Settler prices and the treasury are
+        order-coupled across cities deciding in the same turn: queueing OR
+        buying a settler raises the next slot's settlerCost (both feed the same
+        `cities-1 + settlers + queued` counter, mirroring settlerCost /
+        purchaseSettler), and every purchase drains the shared treasury. The TS
+        replay applies act.p entries sequentially in slot order, so this walk
+        mirrors it exactly. Failed purchases (gold ran out by this slot, or a
+        unit with no free spawn tile — TS spawnUnit refunds) are no-ops, not
+        errors, matching the units-head revalidation convention. Purchased
+        buildings/units land instantly (before _city_totals), so they take
+        effect this very turn — exactly when a CivEnv purchase does in endTurn.
+        """
+        r, rd, C = self.rules, self.rules_dev, self.C
+        mult = r.gold_purchase_mult
+        pbase = self.UNIT_BASE + self.NU + len(self._scaffold)
+        n_cities = self.alive.sum(dim=1)
+        # live counters: settlers-in-production from EARLIER turns (pending
+        # cities are -1 and building/unit codes never write SETTLER)…
+        queued_live = (self.current == self.SETTLER).sum(dim=1)
+        # …and the settler stock, which purchases grow as the walk proceeds
+        settlers_live = self.settlers.clone()
+        for c in range(C):
+            ac = act[:, c]
+            # --- queue a settler (cost from the live counters, queueSettler)
+            is_s = ac == self.SETTLER
+            if bool(is_s.any()):
+                s_cost = r.settler_base + r.settler_per_city * (
+                    n_cities - 1 + settlers_live + queued_live
+                ).clamp(min=0).to(self.dtype)
+                self.progress[:, c] = torch.where(is_s, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
+                self.cur_cost[:, c] = torch.where(is_s, s_cost, self.cur_cost[:, c])
+                self.current[:, c] = torch.where(is_s, torch.full_like(self.current[:, c], self.SETTLER), self.current[:, c])
+                queued_live = queued_live + is_s.long()
+                self.settlers_queued = self.settlers_queued + is_s.long()
+            pi = ac - pbase
+            # --- buy a building (purchaseBuilding: _buildable ∧ gold; instant)
+            is_pb = (pi >= 0) & (pi < self.NB)
+            if bool(is_pb.any()):
+                idx = pi.clamp(min=0, max=self.NB - 1)
+                cost = rd.b_cost[idx] * mult
+                can = is_pb & buildable[:, c].gather(1, idx.unsqueeze(1)).squeeze(1) & (self.treasury >= cost)
+                if bool(can.any()):
+                    rows = can.nonzero(as_tuple=True)[0]
+                    self.buildings[rows, c, idx[rows]] = True
+                    self.treasury = torch.where(can, self.treasury - cost, self.treasury)
+            # --- buy a settler (purchaseSettler: settlers += 1 immediately,
+            # which raises every later slot's price)
+            is_ps = pi == self.NB
+            if bool(is_ps.any()):
+                s_cost = (
+                    r.settler_base + r.settler_per_city * (n_cities - 1 + settlers_live + queued_live).clamp(min=0).to(self.dtype)
+                ) * mult
+                can = is_ps & (self.treasury >= s_cost)
+                self.treasury = torch.where(can, self.treasury - s_cost, self.treasury)
+                self.settlers = self.settlers + can.long()
+                settlers_live = settlers_live + can.long()
+            # --- buy a unit (purchaseUnit: trainable ∧ gold ∧ a free spawn
+            # tile at/near the center — no tile means refund, i.e. a no-op)
+            pu = pi - (self.NB + 1)
+            is_pu = (pu >= 0) & (pu < self.NU)
+            if bool(is_pu.any()):
+                utp = pu.clamp(min=0, max=self.NU - 1)
+                p_tech = self._p_tech[utp]
+                tech_ok = (p_tech < 0) | self.techs.gather(1, p_tech.clamp(min=0).unsqueeze(1)).squeeze(1)
+                cost = self._p_cost[utp] * mult
+                found, _ = self._first_free_spot(self.site[:, c], "player", self._p_civ[utp])
+                can = is_pu & tech_ok & (self.treasury >= cost) & found
+                if bool(can.any()):
+                    self.treasury = torch.where(can, self.treasury - cost, self.treasury)
+                    self._spawn_player(can, self.site[:, c], utp)
+
     # --- one full turn -----------------------------------------------------------
 
     def step(
@@ -2738,8 +2850,10 @@ class BatchSim:
         """Advance every game one turn.
 
         production: [B, C] long — per-city action (0..NB-1 building, NB
-        settler, NB+1 idle, NB+2.. train that roster unit; masked-invalid =
-        no-op), or None for the scripted policy. tech/civic: [B] long picks
+        settler, NB+1 idle, NB+2..NB+1+NU train that roster unit,
+        NB+2+NU.. place that scaffold district; with _rl_purchase_active,
+        NB+2+NU+nScaffold.. buy that building / a settler / that unit with
+        gold — V-P1; masked-invalid = no-op), or None for the scripted policy. tech/civic: [B] long picks
         applied where the research slot is empty (validated against the
         masks; -1 = no pick), or None for cheapest-first auto-research.
         units: [B, P_MAX] long unit orders (0–5 move, 6–11 attack, 12 hold),
@@ -2835,26 +2949,36 @@ class BatchSim:
             is_b = (act >= 0) & (act < self.NB)
             valid_b = is_b & buildable.gather(2, act.clamp(min=0, max=self.NB - 1).unsqueeze(2)).squeeze(2)
             is_s = act == self.SETTLER
-            # The TS engine queues city-by-city in slot order, and each queued
-            # settler raises the next one's price — an exclusive prefix sum
-            # reproduces that sequential cost exactly.
-            base_q = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
-            prefix = is_s.long().cumsum(dim=1) - is_s.long()
-            n_cities = self.alive.sum(dim=1, keepdim=True)
-            s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers.unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
             is_u = (act >= self.UNIT_BASE) & (act < self.UNIT_BASE + self.NU)
             ut = (act - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
             trainable = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
             valid_u = is_u & trainable.gather(1, ut)
-            self.progress = torch.where(valid_b | is_s | valid_u, torch.zeros_like(self.progress), self.progress)
+            self.progress = torch.where(valid_b | valid_u, torch.zeros_like(self.progress), self.progress)
             self.cur_cost = torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost)
-            self.cur_cost = torch.where(is_s, s_cost, self.cur_cost)
             self.cur_cost = torch.where(valid_u, self._p_cost[ut], self.cur_cost)
             self.current = torch.where(valid_b | valid_u, act, self.current)
-            self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
-            self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
+            if not self._rl_purchase_active:
+                # The TS engine queues city-by-city in slot order, and each queued
+                # settler raises the next one's price — an exclusive prefix sum
+                # reproduces that sequential cost exactly. (Building/unit codes
+                # above never write SETTLER, so counting current==SETTLER after
+                # them sees exactly the pre-decision queue.)
+                base_q = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
+                prefix = is_s.long().cumsum(dim=1) - is_s.long()
+                n_cities = self.alive.sum(dim=1, keepdim=True)
+                s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers.unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
+                self.progress = torch.where(is_s, torch.zeros_like(self.progress), self.progress)
+                self.cur_cost = torch.where(is_s, s_cost, self.cur_cost)
+                self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
+                self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
+            else:
+                # V-P1: with purchases live, settler prices and the treasury are
+                # order-coupled across slots (a queued OR bought settler raises
+                # the next slot's price; every purchase drains shared gold), so
+                # walk slots sequentially like the replay's act.p loop.
+                self._apply_settlers_and_purchases(act, buildable)
 
             # RL district placement (D5): ANY city may spend its production
             # decision to instantly place a scaffold district (off-script; free,

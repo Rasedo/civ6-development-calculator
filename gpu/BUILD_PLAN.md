@@ -208,6 +208,29 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
 - [ ] **C2** Per-civ egocentric obs, per-civ action routing, per-civ reward.
 - [ ] **C3** Self-play trainer + opponent league (PFSP, frozen snapshots).
 
+## 4. Agency verbs  (depth-of-control: give the policy the missing decisions)
+Evidence says training value comes from verbs, not content breadth: the TS ~310
+plateau was an action-space ceiling, and gold/faith are dead yields the policy
+can only watch accumulate. Each verb lands as gated-off plumbing (mask width
+unchanged while off, so existing checkpoints stay loadable), then activates
+behind the off-script gate — the D5 pattern.
+
+- [x] **V-P1** Gold purchases, plumbed + gated OFF: production head grows
+      NB+1+NU purchase columns (buy building / settler / unit at
+      goldPurchaseMult× cost, mirroring purchaseBuilding/purchaseSettler/
+      purchaseUnit) behind `_rl_purchase_active=False`. Sequential slot walk for
+      the order-coupled parts (settler prices, shared treasury). Self-test
+      `gpu/purchase_test.py`; both gates green.
+- [ ] **V-P2** Activate purchases off-script: flip the flag, teach
+      replay-gpu.ts purchase codes, rollout emits the map; drive the gate
+      green. AFTER the tune1 benchmarks (width change breaks old checkpoints).
+- [ ] **V-W1** Player-initiated war/peace (declare on a rival; peace-for-gold
+      mirroring the TS deal), gated.
+- [ ] **V-W2** City capture: player melee vs rival city centers
+      (attackCity/captureRivalCity semantics), gated.
+- [ ] **V-R** Ranged attacks (export the dropped `ranged` field; Slinger/Archer
+      strike without retaliation), gated.
+
 ## Status log
 - stage 0: plan committed (durable across rollbacks). Baseline `5a6f2b6`:
   districts absent from GPU scope (scripted export builds none), so D1 is inert.
@@ -568,3 +591,27 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
   (accurate value + sharp policy) to beat greedy — now a ~2 h GPU job. Next: train a strong
   net, re-run tuplesearch (expect it to pull ahead), then M3 / C1. No engine change; parity
   gates unaffected (search_eval/train_ppo aren't imported by them).
+- V-P1 [x] gold purchases, plumbed + gated OFF (`_rl_purchase_active=False`). The
+  production head learns NB+1+NU new codes above the district range — buy building j /
+  a settler / unit u outright at goldPurchaseMult× production cost (exported from
+  GOLD_PURCHASE_MULT; engine defaults 4 for older fixtures) — mirroring
+  purchaseBuilding/purchaseSettler/purchaseUnit: buildings need `_buildable` (==
+  availableBuildings ∧ buildingCompletable at a pending decision, since the queue is
+  empty and GPU districts are complete-on-place), units need trainableUnits + a free
+  spawn tile (TS refunds when spawnUnit fails → no-op here, no deduction), settlers pay
+  settlerCost×mult and bump state.settlers immediately. Order-coupling mirrored by a
+  sequential slot walk (`_apply_settlers_and_purchases`): queued OR bought settlers
+  raise later slots' prices and purchases drain the shared treasury in slot order,
+  exactly like the replay's act.p loop; the gated-off path keeps the vectorized
+  prefix-sum settler block byte-identical (building/unit assignments never write the
+  SETTLER code, so splitting them out is provably behavior-preserving). While OFF the
+  mask KEEPS its 26-column width (unlike D5a's all-False columns) so tune1-era
+  checkpoints stay loadable for the pending benchmarks; ON widens 26→46.
+  `gpu/purchase_test.py`: gated-off inertness is bit-exact (a purchase code == IDLE
+  across all _MUTABLE), width 26/46, building purchase instant + slot idle + exact
+  gold delta (incl. the same-turn upkeep a TS purchase also pays), unit spawn + tech
+  gate, and two same-turn settler buys pricing sequentially (440 then 560). Both gates
+  green (scripted 24×100, off-script 72×100); tsc green. Purchased-settler founding
+  and treasury timing are exercised by the self-test, not the gates, until V-P2 flips
+  the flag — the replay-side purchase dispatch is V-P2 scope. tune1 finished meanwhile
+  (30/30 updates, train mean 209.9, best 210.9): benchmarks next, THEN V-P2.

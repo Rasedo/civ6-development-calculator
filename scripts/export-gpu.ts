@@ -98,6 +98,7 @@ import {
   HOUSING_NO_WATER,
   AQUEDUCT_FRESH_BONUS,
   AQUEDUCT_NO_FRESH_TOTAL,
+  GOLD_PURCHASE_MULT,
 } from '../src/data/constants';
 
 const N_SEEDS = Number(process.argv[2] ?? 24);
@@ -289,7 +290,8 @@ const rules = {
     { min: -999, growth: 0.7, yield: 0.9 },
   ],
   // Mirrors settlerCost(): 80 + 30 × (cities − 1 + settlers banked + settlers queued).
-  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE },
+  // goldPurchaseMult mirrors GOLD_PURCHASE_MULT (V-P1: buy = production cost × 4).
+  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT },
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   boosts: boostRows,
