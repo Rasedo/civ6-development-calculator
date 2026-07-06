@@ -23,6 +23,17 @@ real game (model-predictive control), which adapts to the realized disaster/barb
 futures and compounds the per-decision edge. depth=1 reduces exactly to the
 open-loop 1-ply search. Both remain eval-only during search: every rollout
 restores its snapshot, so the parity-checked forward model is never perturbed.
+
+M3 (`minmax_normalize` / `stack_tuples` / `clone_state` / `rehash_rng` /
+`eval_tuples`) is the net-free plumbing under the Gumbel tuple search
+(search_eval.py's `gumbelsearch` — the net wiring stays out of this module):
+per-decision min-max Q normalization (M3a — mandatory under unbounded empire
+scores), batched candidate evaluation where the k candidate tuples become the
+BATCH dimension of one lockstep k-wide sim instead of a sequential B=1 loop
+(M3c — restore()'s tensor.copy_ broadcasts a B=1 snapshot across all k rows, so
+one snapshot clones k ways; bit-equal to the sequential loop, see
+gumbel_test.py), and an honest-leaf RNG re-hash so continuations stop replaying
+the exact realized future stream (M3d-lite).
 """
 from __future__ import annotations
 
@@ -210,3 +221,88 @@ def mpc_play_empire(sim, horizon: int = 20, depth: int = 1, turns: int = 60,
             chosen[c] = best  # plan_production restores sim, so each city sees the same base
         _commit_many(sim, chosen)
     return float(sim.empire_score()[0])
+
+
+# --- M3: shared plumbing for batched tuple search (net-free) -----------------
+
+HEAD_ORDER = ("production", "tech", "civic", "units", "envoy")
+
+
+def minmax_normalize(q, eps: float = 1e-9):
+    """[M3a] Per-decision min-max normalization of candidate values to [0, 1]:
+    (q - min) / (max - min) over the candidates competing at one root. Mandatory
+    wherever Q mixes with prior/noise terms — raw empire scores (~60–280) dwarf
+    log-prob-scale quantities (the M1 pathology; SameGame's published fix). A
+    degenerate range (all values within eps) carries no ranking information and
+    returns flat 0.5s, so selection falls back to the prior + Gumbel noise."""
+    import torch
+
+    lo, hi = q.min(), q.max()
+    if float(hi - lo) <= eps:
+        return torch.full_like(q, 0.5)
+    return (q - lo) / (hi - lo)
+
+
+def tuple_key(acts: dict) -> tuple:
+    """Hashable identity of a B=1 five-head action tuple (candidate dedup)."""
+    return tuple(v for h in HEAD_ORDER for v in acts[h].reshape(-1).tolist())
+
+
+def stack_tuples(cands: list, k: int) -> dict:
+    """Row-stack m <= k candidate action dicts (B=1 rows, sample_heads layout)
+    into k-wide per-head tensors: candidate i becomes batch row i. Rows m..k-1
+    repeat candidate 0, so one fixed k-wide sim serves any m — the pad rows step
+    in lockstep but their values are never read."""
+    import torch
+
+    return {h: torch.cat([c[h] for c in cands] + [cands[0][h]] * (k - len(cands)), dim=0)
+            for h in HEAD_ORDER if h in cands[0]}
+
+
+def clone_state(sim_wide, snap: dict) -> None:
+    """[M3c] Broadcast-restore a B=1 snapshot into a k-wide sim, cloning one
+    state k ways: restore()'s tensor.copy_ broadcasts each [1, ...] snapshot
+    tensor across all k rows (bit-exact per row — gumbel_test.py proves it, and
+    proves the k-wide lockstep evolution stays row-identical to B=1)."""
+    assert snap["mut"]["alive"].shape[0] == 1, "clone_state broadcasts a B=1 snapshot"
+    sim_wide.restore(snap)
+
+
+def rehash_rng(sim, salt: int = 0) -> None:
+    """[M3d-lite] Honest leaves: re-hash each game's mulberry32 state in place
+    (splitmix64 of the current value + salt, masked back to u32) so a search
+    continuation stops replaying the exact RNG future the real game will
+    realize. Deliberately a pure function of the row's OWN state — not the batch
+    row index — so identical candidates draw identical perturbed futures (common
+    random numbers: fair across candidates) and a batched evaluation stays
+    bit-equal to the sequential one. Mutates rng_state only; snapshot/restore
+    round-trips it like any other mutable tensor."""
+    from .rng import hash_keys
+
+    sim.rng_state.copy_(hash_keys(sim.rng_state, salt) & ((1 << 32) - 1))
+
+
+def eval_tuples(env_wide, snap: dict, cands: list, horizon: int = 0,
+                step_fn=None, rehash: bool = False):
+    """[M3c] Evaluate m <= k candidate action tuples from ONE B=1 state in a
+    single lockstep k-wide env (build it once per search run — the same fixture
+    k times — and reuse it): broadcast-restore the snapshot, commit the tuples
+    as row-wise actions in one step, optionally roll `horizon` continuation
+    turns (step_fn(env_wide) per turn; default fully scripted), and return the
+    per-candidate empire scores [m]. Bit-equal to the sequential
+    snapshot/commit/restore loop over the same candidates (gumbel_test.py) at
+    ~1/m the wall-clock — the throughput unlock for search-generated training
+    data. rehash=True applies rehash_rng after the commit (M3d-lite). Leaves
+    env_wide dirty (it is scratch); never touches the snapshot's source sim."""
+    sim = env_wide.sim
+    assert len(cands) <= sim.B, f"{len(cands)} candidates > sim width {sim.B}"
+    clone_state(sim, snap)
+    sim.step(**stack_tuples(cands, sim.B))
+    if rehash:
+        rehash_rng(sim)
+    for _ in range(horizon):
+        if step_fn is None:
+            sim.step()
+        else:
+            step_fn(env_wide)
+    return sim.empire_score()[: len(cands)]
