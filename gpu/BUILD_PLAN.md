@@ -256,19 +256,17 @@ C3's matchmaking is built.
         defaults; per-rival ids KEPT — they drive border pacing). Save
         migration fills only missing fields (round-trip byte-identical).
         Proof: 232 tests, fixtures BYTE-IDENTICAL, both gates green.
-  - [ ] A3. GPU mirror of A1/A2's layout: owner-dimensioned city tensors
-        `[B, O, C', …]` with the player seat mapping onto today's semantics
-        bit-exactly (the old [B, C] views become seat-0 slices).
-        DESIGN NOTES (from the A1/A2 work): adopt the civ numbering first
-        (exporter ships it; engine constants + rival_at values stay r, the
-        +1 mapping lives at the boundary). Two re-layout roads: (i) one big
-        [B, O, Cmax] block per field family up front, or (ii) per-subsystem
-        unification INSIDE each B-stage (B1 moves worked-tile fields, B2
-        queues, …) — lean (ii): every B-stage regenerates fixtures anyway,
-        the re-layout risk amortizes, and seat-0 bit-exactness is provable
-        per family instead of across 104 tensors at once. Also mirror A2's
-        kept-per-rival ids (rc_id semantics unchanged) and the rc growthBox→
-        foodBox rename is invisible here (never exported).
+  - [x] A3. GPU adopts the civ numbering (behavior-preserving): exporter
+        asserts rival ids contiguous 0..R-1 and ships `civs: {player: 0,
+        rivalBase: 1}` in rules.json; engine gains PLAYER_CIV /
+        civ_of_rival / rival_of_civ, `self.O = 1 + R` seat metadata, and a
+        load-time assert that fixture numbering matches the constants
+        (exercised by every gate run). Tensor re-layout deliberately
+        deferred INTO each B-stage (road ii): every B-stage regenerates
+        fixtures anyway, the risk amortizes, and seat-0 bit-exactness is
+        provable per family. Proof: seed fixtures BYTE-IDENTICAL, rules.json
+        delta = exactly the `civs` key, both gates + 232 tests +
+        purchase/mcts self-tests green.
 - **C1-B. Subsystem promotion, one at a time (each: TS change → export →
   both gates → GPU mirror → new baselines):**
   - [ ] B1. Rival tile-working via the real citizen/yield path (housing,

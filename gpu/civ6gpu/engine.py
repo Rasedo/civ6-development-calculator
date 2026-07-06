@@ -96,6 +96,7 @@ class Rules:
     settler_per_city: float
     settler_pop_gate: int
     gold_purchase_mult: float  # V-P1: gold price = production cost × this (GOLD_PURCHASE_MULT)
+    civs: dict  # C1-A3: {player: 0, rivalBase: 1} — the unified civ-id space (asserted vs engine constants)
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — covered-scope eureka conditions
@@ -145,6 +146,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
+        civs=r.get("civs", {"player": 0, "rivalBase": 1}),
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
@@ -187,6 +189,24 @@ BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 4
 U_MAX = 96  # barbarian unit slots per game (append-only; runtime-asserted)
 P_MAX = 96  # player unit slots per game (append-only; runtime-asserted)
+
+# --- one civ-id space (C1-A3, mirrors src/core/civs.ts) -----------------------
+# The player is civ 0; rival r (fixture array index == TS rival.id, asserted
+# at export) is civ r+1. City-states and barbarians stay outside the
+# numbering. Tensor families keep their existing layouts for now — the [B, C]
+# city tensors ARE civ 0's seat, and rival tensors' dim-1 index r means civ
+# r+1 — until each C1-B stage re-lays its subsystem out per-owner (the
+# per-subsystem road chosen in BUILD_PLAN §3 A3). NB: the pre-existing
+# `_p_civ` unit tensor means "unit type is CIVILIAN" and is unrelated.
+PLAYER_CIV = 0
+
+
+def civ_of_rival(r: int) -> int:
+    return r + 1
+
+
+def rival_of_civ(c: int) -> int:
+    return c - 1
 M32 = 0xFFFFFFFF
 
 _PAIR_DIST_CACHE: dict[tuple[int, int], torch.Tensor] = {}
@@ -380,6 +400,14 @@ class BatchSim:
         # --- rival civs (phase 4c) ---------------------------------------------
         rr = rules.rivals
         self.R = int(f0.get("rMax", 0))
+        # C1-A3: seats. Civ 0 = the player ([B, C] tensors); civ r+1 = rival
+        # index r. O becomes a real tensor axis per-subsystem in the C1-B
+        # stages; until then it is metadata for the seat convention.
+        self.O = 1 + self.R
+        cv = rules.civs or {}
+        assert int(cv.get("player", PLAYER_CIV)) == PLAYER_CIV and int(cv.get("rivalBase", 1)) == 1, (
+            "fixture civ numbering disagrees with engine constants (civs.ts drift?)"
+        )
         self.RC = 10  # rival city slots per civ (settling caps at maxCities; flips can exceed)
         r_pad, rc_pad = max(self.R, 1), self.RC
         self.rival_at = torch.tensor([[t.get("rv", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)

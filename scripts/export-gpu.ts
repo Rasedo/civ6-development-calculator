@@ -294,6 +294,10 @@ const rules = {
   // Mirrors settlerCost(): 80 + 30 × (cities − 1 + settlers banked + settlers queued).
   // goldPurchaseMult mirrors GOLD_PURCHASE_MULT (V-P1: buy = production cost × 4).
   scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT },
+  // One civ-id space (C1-A3, mirrors src/core/civs.ts): the player is civ 0,
+  // rival r (array index == rival.id, asserted at export) is civ r+1.
+  // City-states and barbarians stay outside the numbering.
+  civs: { player: 0, rivalBase: 1 },
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   boosts: boostRows,
@@ -913,12 +917,17 @@ for (let s = 0; s < N_SEEDS; s++) {
       center: cs.centerIndex,
       pop: 3,
     })),
-    rivals: state.rivals.map((r) => ({
-      id: r.id,
-      aggression: r.aggression,
-      cities: rivalCitiesInit.get(r.id) ?? [],
-      units: rivalUnitsInit.get(r.id) ?? [],
-    })),
+    rivals: state.rivals.map((r, i) => {
+      // C1-A3: the GPU maps rival ARRAY INDEX r to civ r+1 (src/core/civs.ts
+      // numbering), which is only sound while ids stay contiguous 0..R-1.
+      if (r.id !== i) throw new Error(`rival ids must be contiguous 0..R-1 (got id ${r.id} at index ${i})`);
+      return {
+        id: r.id,
+        aggression: r.aggression,
+        cities: rivalCitiesInit.get(r.id) ?? [],
+        units: rivalUnitsInit.get(r.id) ?? [],
+      };
+    }),
     cities,
     tiles,
     ownerInit,
