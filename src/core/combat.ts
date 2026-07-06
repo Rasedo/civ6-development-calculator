@@ -26,6 +26,7 @@ import {
 } from './units';
 import { revealAround } from './fog';
 import { CITY_WORK_RADIUS } from '../data/constants';
+import { RIVAL_DEF_PER_TECH } from '../data/rivals';
 import type { RuleResult } from './rules';
 import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
 
@@ -224,7 +225,8 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 // ---------------------------------------------------------------------------
 
 function rivalCityDefense(rival: RivalCiv, city: RivalCity): number {
-  return 15 + city.population + Math.floor(rival.techLevel * 1.5);
+  // C1-B3b: defense reads the real tree (was techLevel × 1.5).
+  return 15 + city.population + Math.floor(rival.research.techs.length * RIVAL_DEF_PER_TECH);
 }
 
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {

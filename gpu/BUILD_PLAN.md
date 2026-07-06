@@ -320,7 +320,22 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [~] B3. Rival research (real trees): **B3a DONE** — RivalCiv.research
+  - [x] B3. Rival research COMPLETE. B3a: real trees/streams/advance
+        (status below). B3b: all four consumers swapped — production
+        ×(1 + nTechs/RIVAL_PROD_DIV=12), unit types gate on the rival's real
+        BRONZE_WORKING/HORSEBACK_RIDING, city defense 15+pop+nTechs×3
+        (exported research params) — and techLevel is DELETED (accrual,
+        field, trace column, r_tech tensor). Two gate catches: (1) a
+        batch-collapsed `.sum()` (no dim) in the defense read summed tech
+        counts across the whole BATCH — B=1 probes were clean, only the
+        B=24 harness exposed it; (2) flipped-center feature strip — player
+        founding removes the removable feature (and improvement), the
+        static plane didn't know, so loyalty-flipped centers over-yielded
+        for their new rival owners: new per-tile `fy` plane + mutable
+        `feat_stripped` mask written at player founding, subtracted before
+        the center floors. Founding now also clears improvement/pillage in
+        the GPU (mirroring foundCity — latent, structurally rare pre-B3).
+        Fresh baselines in TRAINING.md. Prior stage notes: **B3a DONE** — RivalCiv.research
         (same shape as the player's), rival science/culture streams
         (tile+center columns + citizen 0.7/0.3), cheapest-first advance at
         RAW cost through the shared _auto_pick (table-order ties), banked

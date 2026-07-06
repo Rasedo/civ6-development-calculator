@@ -64,6 +64,8 @@ import {
   LOYALTY_AMENITY,
   PEACE_MIN_WAR_TURNS,
   PEACE_GOLD_COST,
+  RIVAL_PROD_DIV,
+  RIVAL_DEF_PER_TECH,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -339,6 +341,14 @@ const rules = {
     warMinTurns: RIVAL_WAR_MIN_TURNS,
     // Player diplomacy (V-W1): sueForPeace gates on warTurns >= peaceMinWarTurns
     // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
+    // C1-B3b: research consumers — the production divisor, defense per
+    // tech, and the real unit-type gates.
+    research: {
+      prodDiv: RIVAL_PROD_DIV,
+      defPerTech: RIVAL_DEF_PER_TECH,
+      spearTech: techIdx.get('BRONZE_WORKING') ?? -1,
+      horseTech: techIdx.get('HORSEBACK_RIDING') ?? -1,
+    },
     peaceMinWarTurns: PEACE_MIN_WAR_TURNS,
     peaceGold0: PEACE_GOLD_COST(0),
     peaceGoldSlope: PEACE_GOLD_COST(1) - PEACE_GOLD_COST(0),
@@ -635,6 +645,11 @@ for (let s = 0; s < N_SEEDS; s++) {
       // per placeable district: the adjacency this tile's removable feature lends
       // to a neighbour, dropped when a city founds here (foundCity clears it).
       fadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id)),
+      // The removable feature's OWN yields (C1-B3 gate catch): PLAYER founding
+      // strips the feature, so a later loyalty-flip must read this center
+      // stripped — rival founding does NOT strip, and the t=0 capitals were
+      // exported already-stripped.
+      fy: t.feature && FEATURES[t.feature].removable ? YIELD_KEYS.map((k) => FEATURES[t.feature!].yields?.[k] ?? 0) : [0, 0, 0, 0, 0, 0],
       // Aqueduct water source (requiresWaterSourceOrMountain): on a river, or
       // adjacent to a lake / oasis / mountain. Static — the adjacent-center part
       // is dynamic (the engine checks it against the city's live center).

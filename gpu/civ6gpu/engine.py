@@ -280,7 +280,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "r_tech", "r_techs", "r_civics",
+    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "r_techs", "r_civics",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
@@ -437,7 +437,6 @@ class BatchSim:
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.r_peaceturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
-        self.r_tech = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # C1-B2: per-city production queues replace the pooled stocks.
         # rc_current: -1 idle, 0 settler, 1+u trains roster unit u.
         self.rc_current = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
@@ -574,6 +573,11 @@ class BatchSim:
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
         )  # [B, T, nD] raw static-source adjacency; mutated when an in-game founding clears a center feature
+        self.feat_yields = torch.tensor(
+            [[t.get("fy", [0.0] * 6) for t in f["tiles"]] for f in fixtures],
+            dtype=dtype, device=device,
+        )  # [B, T, 6] the removable feature's own yields (stripped at player founding)
+        self.feat_stripped = torch.zeros(B, T, dtype=torch.bool, device=device)  # player-founded centers (flips read them stripped)
         self._feat_adj = torch.tensor(
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
@@ -2327,10 +2331,15 @@ class BatchSim:
         # fertility/drought tail, production from the neutral plane
         sitec = center.clamp(min=0).unsqueeze(1)
         r_ = self.rules
-        cf = torch.maximum(f_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
-        cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
-        c_sc = self.tile_yields[:, :, 3].gather(1, sitec).squeeze(1).double()
-        c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double()
+        # A PLAYER-founded center (reachable via loyalty flips) was stripped
+        # of its removable feature at founding — subtract the feature's own
+        # yields before the floors (rival-founded centers keep theirs).
+        strip = self.feat_stripped.gather(1, sitec).squeeze(1).double()
+        fy_c = self.feat_yields.gather(1, sitec.unsqueeze(2).expand(-1, 1, 6)).squeeze(1).double()  # [B, 6]
+        cf = torch.maximum(f_plane.gather(1, sitec).squeeze(1).double() - fy_c[:, 0] * strip, torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
+        cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double() - fy_c[:, 1] * strip, torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
+        c_sc = self.tile_yields[:, :, 3].gather(1, sitec).squeeze(1).double() - fy_c[:, 3] * strip
+        c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double() - fy_c[:, 4] * strip
         if self._dyadic_fp:
             # every term is an exact dyadic, so .sum() is bit-identical to
             # the TS reduce
@@ -2348,7 +2357,8 @@ class BatchSim:
                 prod = prod + p_sel[:, m]
                 sci = sci + sc_sel[:, m]
                 cul = cul + cu_sel[:, m]
-        prod = prod * (1 + self.r_tech[:, r] / 25)
+        # C1-B3b: the research stand-in reads the REAL tree (retires at B5)
+        prod = prod * (1 + self.r_techs[:, r].sum(dim=1).double() / self.rules.rivals.get("research", {}).get("prodDiv", 12))
         z = torch.zeros_like(food)
         return (
             torch.where(mask, food, z),
@@ -2565,8 +2575,8 @@ class BatchSim:
             slot = torch.where(att & hit, torch.full_like(slot, j), slot)
         bidx = torch.arange(self.B, device=self.device)
         pop = self.rc_pop[bidx, civ, slot]
-        tech = self.r_tech[bidx, civ]
-        def_cs = 15 + pop + torch.floor(tech * 1.5).long()
+        ntech = self.r_techs[bidx, civ].sum(dim=1)  # [B] — per-game tree size
+        def_cs = 15 + pop + torch.floor(ntech.double() * self.rules.rivals.get("research", {}).get("defPerTech", 3)).long()
         atk_cs = self._unit_combat[self.u_type[:, u]]
         d_city = self._damage_roll(att, atk_cs - def_cs)
         d_atk = self._damage_roll(att, def_cs - atk_cs)
@@ -2788,12 +2798,6 @@ class BatchSim:
             active = self.r_alive[:, r] & (n_cities > 0)
             if not bool(active.any()):
                 continue
-            # ONE add of the precomputed increment — techLevel feeds floor()s,
-            # so (tech + 0.15) + 0.05n and tech + (0.15 + 0.05n) differ by an
-            # ulp that flips them.
-            tech_inc = 0.15 + 0.05 * n_cities.double()
-            self.r_tech[:, r] = torch.where(active, self.r_tech[:, r] + tech_inc, self.r_tech[:, r])
-
             # C1-B2: queue PICKS for the PRE-TURN city set, in slot order —
             # the capital (slot 0, always the first-founded; flips are never
             # capitals) prefers the settler with one in flight per civ,
@@ -2804,10 +2808,16 @@ class BatchSim:
             unit_count = n_units + (self.rc_current[:, r] >= 1).sum(dim=1)
             settler_q = (alive0 & (self.rc_current[:, r] == 0)).any(dim=1)
             cap = n_cities * 2 + torch.where(self.r_atwar[:, r], 3, 1)
+            # C1-B3b: unit type gates on the rival's REAL techs
+            rres = rr.get("research", {})
+            sp_t, ho_t = int(rres.get("spearTech", -1)), int(rres.get("horseTech", -1))
+            zb = torch.zeros(B, dtype=torch.bool, device=dev)
+            has_h = self.r_techs[:, r, ho_t] if ho_t >= 0 else zb
+            has_s = self.r_techs[:, r, sp_t] if sp_t >= 0 else zb
             ty = torch.where(
-                self.r_tech[:, r] > 12,
+                has_h,
                 torch.tensor(self._r_horseman, device=dev),
-                torch.where(self.r_tech[:, r] > 6, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
+                torch.where(has_s, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
             )
             settle_cost = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities - 1).clamp(min=0).double()
             for j in range(self.RC):
@@ -3597,6 +3607,13 @@ class BatchSim:
             # city-state founding do NOT strip; the capital's statics were
             # exported post-founding, already stripped.)
             self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
+            # ...and the feature's own yields + any improvement die with the
+            # founding (tile.improvement = null; feature = null) — a later
+            # loyalty flip reads this center STRIPPED (C1-B3 gate catch).
+            self.feat_stripped[rows, s_idx] = True
+            self.improvement[rows, s_idx] = -1
+            self.pillaged[rows, s_idx] = False
+            self._eff_version += 1
             # ...and drops the district adjacency that feature lent to neighbours:
             # d_static_adj was baked post-capital-founding, so a NON-capital
             # founding must subtract the center feature's contribution live (else
@@ -3659,7 +3676,6 @@ class BatchSim:
                 torch.where(live, (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype), zero),
                 (self.v_alive & (self.v_civ == r)).sum(dim=1).to(self.dtype),
                 torch.where(live & self.r_atwar[:, r], torch.ones_like(zero), zero),
-                torch.where(live, torch.round(self.r_tech[:, r] * 1000).to(self.dtype), zero),
                 torch.where(live, self.r_techs[:, r].sum(dim=1).to(self.dtype), zero),
                 torch.where(live, self.r_civics[:, r].sum(dim=1).to(self.dtype), zero),
                 torch.where(live, torch.round(self.r_tech_prog[:, r] * 1000).to(self.dtype), zero),

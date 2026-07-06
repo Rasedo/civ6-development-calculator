@@ -14,6 +14,11 @@ export const RIVAL_LEADERS: { name: string; color: string; cityNames: string[] }
 /** Rival city pop growth: fraction of the player's growth threshold. */
 export const RIVAL_GROWTH_FACTOR = 0.75;
 export const RIVAL_MAX_POP = 12;
+// C1-B3b: research consumers — production scales ×(1 + nTechs/PROD_DIV),
+// city defense gains DEF_PER_TECH per researched tech (calibrated to land
+// near the old techLevel formulas at turn 100).
+export const RIVAL_PROD_DIV = 12;
+export const RIVAL_DEF_PER_TECH = 3;
 export const RIVAL_MAX_CITIES = 6;
 /** Production stock gained per pop per turn (settlers). */
 export const RIVAL_PROD_RATE = 0.5;

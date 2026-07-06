@@ -29,6 +29,7 @@ import { tileScore, tileYieldsForCenter } from './city';
 import {
   RIVAL_LEADERS,
   RIVAL_MAX_POP,
+  RIVAL_PROD_DIV,
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
   RIVAL_BORDER_PERIOD,
@@ -156,7 +157,6 @@ export function placeRivals(state: GameState, count?: number): void {
       atWar: false,
       warTurns: 0,
       peaceTurns: 0,
-      techLevel: 0,
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
       pantheonClaimed: false,
@@ -519,8 +519,8 @@ export function rivalCityYields(
   // tileScore ('balanced' focus, ties to the lowest index, mirroring
   // assignWorkedTiles with no locks), topped by population. The center
   // contributes its real floored yields (tileYieldsForCenter) instead of
-  // the old flat 3🍞/2⚙ base. The techLevel production multiplier remains
-  // the stand-in for rival research until C1-B3.
+  // the old flat 3🍞/2⚙ base. The nTechs production multiplier remains
+  // the research→production stand-in until C1-B5's real improvements.
   const center = state.map.tiles[rc.centerIndex];
   const ctx = { map: state.map, mods: defaultModifiers() };
   const worked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
@@ -543,7 +543,10 @@ export function rivalCityYields(
   for (const w of worked) {
     for (const k of Object.keys(total) as (keyof Yields)[]) total[k] += w.y[k];
   }
-  total.production *= 1 + rival.techLevel / 25;
+  // C1-B3b: the research stand-in reads the REAL tree — nTechs/RIVAL_PROD_DIV
+  // (K=12 calibrated so t100 production lands near the old techLevel curve);
+  // it retires entirely at B5 when rival improvements carry production.
+  total.production *= 1 + rival.research.techs.length / RIVAL_PROD_DIV;
   return total;
 }
 
@@ -557,15 +560,14 @@ export function rivalPhase(state: GameState): void {
 
   for (const rival of state.rivals) {
     if (rival.cities.length === 0) continue; // eliminated
-    rival.techLevel += 0.15 + 0.05 * rival.cities.length;
 
     // C1-B2: per-city REAL production queues (settler + units at real
     // costs) replace the pooled prodstock/milstock, their pace/split
     // constants and the random home-city draw. Each city queues ONE item —
     // the capital prefers the settler (one in flight per civ), everyone
     // else trains units up to the cap — funds it with its OWN production,
-    // and resolves it on completion at that city. Unit TYPE keeps the
-    // techLevel thresholds until B3; buildings arrive with B4. Picks
+    // and resolves it on completion at that city. Unit TYPE gates on the
+    // rival's REAL techs (C1-B3b); buildings arrive with B4. Picks
     // happen for the PRE-TURN city set, in founding order, before any
     // same-turn completion can found a new city.
     const unitCap = rival.cities.length * 2 + (rival.atWar ? 3 : 1);
@@ -582,7 +584,11 @@ export function rivalPhase(state: GameState): void {
         rc.queue.push({ kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
         settlerQueued = true;
       } else if (unitCount < unitCap) {
-        const type = rival.techLevel > 12 ? 'HORSEMAN' : rival.techLevel > 6 ? 'SPEARMAN' : 'WARRIOR';
+        const type = rival.research.techs.includes('HORSEBACK_RIDING')
+          ? 'HORSEMAN'
+          : rival.research.techs.includes('BRONZE_WORKING')
+            ? 'SPEARMAN'
+            : 'WARRIOR';
         rc.queue.push({ kind: 'unit', unit: type, progress: 0 });
         unitCount += 1;
       }

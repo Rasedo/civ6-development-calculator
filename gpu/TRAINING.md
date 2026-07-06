@@ -130,8 +130,11 @@ grow on the unscaled curve and lost their flat base, so the player's
 side got friendlier: **random 122.8 ± 11.2, scripted 192.2 ± 13.6**.
 C1-B2 (per-city rival queues) re-baselined again: **random 106.4 ±
 11.1, scripted 156.1 ± 11.3** — harder than the B1 world (every rival
-city produces continuously). tune3 is stale in turn; the next reference
-net trains on the B2 world.
+city produces continuously). C1-B3 (real rival research) re-baselined
+once more: **random 115.7 ± 10.5, scripted 156.8 ± 11.2** — rival
+armies stay warrior-heavy until real BRONZE_WORKING/HORSEBACK_RIDING
+land (~t70+/unreached), which softens the world mostly against random
+play. The next reference net trains on the B3 world.
 
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the

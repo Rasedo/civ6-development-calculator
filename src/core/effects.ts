@@ -30,18 +30,24 @@ const BASELINE = {
   buildings: ['MONUMENT'],
 };
 
-function* completedEffects(state: GameState): Generator<ResearchEffect> {
-  for (const id of state.research.techs) {
+function* completedEffectsIn(research: ResearchState): Generator<ResearchEffect> {
+  for (const id of research.techs) {
     const t = TECHS[id];
     if (t) yield* t.effects;
   }
-  for (const id of state.research.civics) {
+  for (const id of research.civics) {
     const c = CIVICS[id];
     if (c) yield* c.effects;
   }
 }
 
-export function computeUnlocks(state: GameState): Unlocks {
+function* completedEffects(state: GameState): Generator<ResearchEffect> {
+  yield* completedEffectsIn(state.research);
+}
+
+/** Unlocks from an arbitrary research state (C1-B4 prep: rival districts/
+ * buildings gate on the RIVAL's own trees). Player wrapper below. */
+export function computeUnlocksIn(research: ResearchState): Unlocks {
   const u: Unlocks = {
     improvements: new Set(BASELINE.improvements),
     districts: new Set(),
@@ -51,7 +57,7 @@ export function computeUnlocks(state: GameState): Unlocks {
     policies: new Set(),
     hillFarms: false,
   };
-  for (const fx of completedEffects(state)) {
+  for (const fx of completedEffectsIn(research)) {
     switch (fx.kind) {
       case 'unlockImprovement':
         u.improvements.add(fx.improvement);
@@ -79,6 +85,10 @@ export function computeUnlocks(state: GameState): Unlocks {
     }
   }
   return u;
+}
+
+export function computeUnlocks(state: GameState): Unlocks {
+  return computeUnlocksIn(state.research);
 }
 
 export function isTechComplete(state: GameState, id: string): boolean {

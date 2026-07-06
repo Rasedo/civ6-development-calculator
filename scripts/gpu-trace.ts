@@ -8,8 +8,8 @@
  *           science·ms, culture·ms, score·ms, rngState, nCamps, nBarbs,
  *           nPlayerUnits, envoysAvailable, influence]
  *   per city-state slot (csMax) — [envoys, pop, questKind+1]
- *   per rival slot (rMax) — [nCities, popSum, nUnits, atWar, tech·ms,
- *           prodStock·ms, milStock·ms]
+ *   per rival slot (rMax) — [nCities, popSum, nUnits, atWar, nTechs,
+ *           nCivics, techProg·ms, civicProg·ms, ΣqueueProg·ms, ΣqueueCost·ms]
  *   per city slot (cMax) — [pop, ownedTiles, buildings, tilesAcquired,
  *           foodBox·ms, cultureBox·ms, cityHp, loyalty·ms]
  *
@@ -58,7 +58,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       continue;
     }
     row.push(
@@ -66,7 +66,6 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       rival.cities.reduce((s, rc) => s + rc.population, 0),
       state.units.filter((u) => u.owner === 'rival' && u.civId === rival.id).length,
       rival.atWar ? 1 : 0,
-      Math.round(rival.techLevel * 1000),
       rival.research.techs.length,
       rival.research.civics.length,
       Math.round(rival.research.techProgress * 1000),
@@ -107,7 +106,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
   const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 2, 0, 0, 2, 2, 2, 2);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2);
   return tol;
 }
