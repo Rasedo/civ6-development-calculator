@@ -4,6 +4,7 @@ policy on MATCHED worlds, over one control surface: the capital's production.
     python gpu/search_eval.py                                   # net-free depth-1 MPC
     python gpu/search_eval.py --policy net    --checkpoint gpu/runs/cpu150/best.pt
     python gpu/search_eval.py --policy netsearch --checkpoint gpu/runs/cpu150/best.pt
+    python gpu/search_eval.py --policy gumbelsearch --checkpoint gpu/runs/tune3/best.pt --k 8
 
 Every episode builds a B=1 world from a fixture (+ optional scramble) and plays it
 twice from the IDENTICAL start: once fully scripted (the baseline), once with the
@@ -40,6 +41,7 @@ from civ6gpu.env import BatchEnv
 from civ6gpu.mcts import (
     mpc_play, mpc_play_empire, search_production, loyalty_shaped_value, _empire_value,
     _pending, _commit, _commit_many,
+    minmax_normalize, tuple_key, stack_tuples, clone_state, rehash_rng,
 )
 
 
@@ -176,16 +178,131 @@ def tuplesearch_play(env, policy, k, horizon, leaf, turns, tau=1.0):
     return float(env.sim.empire_score()[0])
 
 
+# --- M3b: Gumbel tuple search (top-k + Sequential Halving over rollout depth) --
+
+def _gumbel_like(t):
+    """Standard Gumbel(0,1) noise shaped like t, from torch's global RNG (seeded
+    per game, like tuplesearch's candidate sampling)."""
+    return -torch.log(-torch.log(torch.rand_like(t).clamp_(min=1e-12)))
+
+
+def sh_depths(k: int, max_depth: int) -> list[int]:
+    """The Sequential-Halving rung schedule: ceil(log2(k)) (min 2) evaluation
+    depths spread evenly over [1, max_depth]. Round r evaluates every surviving
+    candidate at depth d_r, then cuts the bottom half. This is Gumbel MuZero's
+    SH with the budget spent on DEPTH instead of repeated visits: the env is
+    deterministic, so one evaluation per (candidate, depth) is already exact —
+    revisiting a node adds nothing, and what refines a candidate's value is
+    rolling its continuation deeper."""
+    import math
+
+    rounds = max(2, math.ceil(math.log2(max(k, 2))))
+    return [max(1, round(1 + (max_depth - 1) * r / (rounds - 1))) for r in range(rounds)]
+
+
+def gumbel_decide(env, envk, policy, k, depths, remaining, reward_scale,
+                  honest_rng=False, c_visit=50.0, c_scale=1.0):
+    """One Gumbel/Sequential-Halving root decision over the full 5-head tuple.
+
+    Candidates: the net's greedy tuple + (k-1) tuples sampled from its factored
+    policy, deduped; each carries g_i + logp_i (fresh Gumbel noise + the joint
+    log-prob — the sampled-action-space stand-in for exact Gumbel top-k without
+    replacement, which is infeasible over the exponential tuple space). All
+    still-alive candidates are evaluated IN LOCKSTEP in the k-wide scratch envk
+    (M3c: broadcast-restore env's snapshot, commit the tuples as one batched
+    step, deepen with a net-driven greedy continuation), and each SH round cuts
+    the bottom half by
+
+        g_i + logp_i + (c_visit + depth) * c_scale * q̄_i,
+
+    Gumbel MuZero's root score with its default constants (c_visit=50,
+    c_scale=1) and the visit count replaced by rollout depth — deeper (exact)
+    evaluations earn more trust, mirroring the paper's max-visit term. q̄ is the
+    per-round min-max-normalized (M3a) q_d = empire_score(d) + value(d) /
+    reward_scale: the value head was trained on reward_scale-scaled score
+    deltas (γ≈1), so q_d is a depth-d bootstrapped estimate of the FINAL score,
+    keeping every round in the same units. The deepest evaluation supersedes
+    shallower ones rather than averaging (the paper's visit-mean collapses to
+    the latest read when each revisit is exact and deeper). Because the
+    lockstep batch steps all k rows regardless, halving is a selection
+    schedule, not a compute saver — so at least 2 candidates ride to the
+    deepest rung and the final argmax lands on the most informed values.
+    Depths clamp to `remaining` so rollouts never value score past the game's
+    last real turn. honest_rng re-hashes the committed rows' RNG (M3d-lite).
+
+    Deterministic given torch's RNG state; env is left bit-identical (only the
+    scratch envk mutates). Returns the chosen action tuple."""
+    from train_ppo import sample_heads
+
+    out = _net_out(policy, env)
+    masks = env.masks()
+    g0, lp0, _ = sample_heads(out, masks, greedy=True)
+    cands, logps, seen = [g0], [lp0], {tuple_key(g0)}
+    for _ in range(k - 1):
+        a, lp, _ = sample_heads(out, masks, greedy=False)
+        key = tuple_key(a)
+        if key not in seen:
+            seen.add(key)
+            cands.append(a)
+            logps.append(lp)
+    m = len(cands)
+    if m == 1:
+        return g0  # every draw collapsed to the greedy tuple — a forced move
+    logp = torch.cat(logps)
+    base = _gumbel_like(logp) + logp  # g_i + logp_i, fixed for the whole decision
+    sim = envk.sim
+    clone_state(sim, env.sim.snapshot())
+    sim.step(**stack_tuples(cands, sim.B))  # commit all m candidates in ONE step
+    if honest_rng:
+        rehash_rng(sim)
+    depth = 1
+    kout = _net_out(policy, envk)
+    alive = torch.arange(m, device=base.device)
+    for r, d in enumerate(depths):
+        while depth < min(d, remaining):
+            acts, _, _ = sample_heads(kout, envk.masks(), greedy=True)
+            sim.step(**acts)
+            depth += 1
+            kout = _net_out(policy, envk)
+        q = sim.empire_score() + kout["value"] / reward_scale
+        score = base[alive] + (c_visit + depth) * c_scale * minmax_normalize(q[alive])
+        if r == len(depths) - 1:
+            return cands[int(alive[int(score.argmax())])]
+        keep = max(2, (len(alive) + 1) // 2)
+        if keep < len(alive):
+            alive = alive[score.topk(keep).indices]
+
+
+def gumbelsearch_play(env, envk, policy, k, max_depth, turns, reward_scale,
+                      honest_rng=False):
+    """M3b driver: at EVERY turn of the real game, run one Gumbel/SH decision
+    over the full action tuple and commit its pick (closed loop, like mpc_play).
+    envk is the k-wide scratch env — the same fixture k times, built once per
+    game and broadcast-restored at each decision. Forced moves (all samples
+    dedup to the greedy tuple) skip the machinery entirely."""
+    depths = sh_depths(k, max_depth)
+    for t in range(turns):
+        acts = gumbel_decide(env, envk, policy, k, depths, turns - t, reward_scale,
+                             honest_rng=honest_rng)
+        env.step(**acts)
+    return float(env.sim.empire_score()[0])
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default="search",
-                    choices=["search", "net", "netsearch", "netgreedy", "tuplesearch"])
+                    choices=["search", "net", "netsearch", "netgreedy", "tuplesearch", "gumbelsearch"])
     ap.add_argument("--checkpoint", default=None, help="net path (required for net policies)")
-    ap.add_argument("--k", type=int, default=8, help="tuplesearch: candidate tuples sampled from the net per turn")
+    ap.add_argument("--k", type=int, default=8, help="tuplesearch/gumbelsearch: candidate tuples sampled from the net per turn")
     ap.add_argument("--tuple-leaf", default="net", choices=["net", "rollout"],
                     help="tuplesearch leaf: the net value head (cheap) or a scripted rollout (reliable)")
     ap.add_argument("--temperature", type=float, default=1.0,
                     help="tuplesearch: sharpen (<1) the net prior when sampling the k-1 candidates")
+    ap.add_argument("--max-depth", type=int, default=12,
+                    help="gumbelsearch: deepest SH rollout depth in turns (rungs spread evenly over [1, max-depth])")
+    ap.add_argument("--honest-rng", action="store_true",
+                    help="gumbelsearch: re-hash rng_state after committing candidates so continuation "
+                         "rollouts don't replay the realized future RNG (M3d-lite; default off for comparability)")
     ap.add_argument("--episodes", type=int, default=6)
     ap.add_argument("--turns", type=int, default=100, help="game length actually played")
     ap.add_argument("--horizon", type=int, default=20, help="search lookahead per decision")
@@ -205,13 +322,15 @@ def main() -> None:
                          "compare different worlds. float32 matches the trained net.")
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args()
-    NET_POLICIES = ("net", "netsearch", "netgreedy", "tuplesearch")
+    NET_POLICIES = ("net", "netsearch", "netgreedy", "tuplesearch", "gumbelsearch")
     if args.policy in NET_POLICIES and not args.checkpoint:
         ap.error(f"--policy {args.policy} needs --checkpoint")
     if args.all_cities and args.policy not in ("search", "net"):
         ap.error("--all-cities is implemented for search/net only")
     if args.loyalty_aware and args.policy != "search":
         ap.error("--loyalty-aware shapes the rollout leaf and applies to --policy search only")
+    if args.honest_rng and args.policy != "gumbelsearch":
+        ap.error("--honest-rng perturbs the search continuations and applies to --policy gumbelsearch only")
     if args.policy in NET_POLICIES and args.dtype != "float32":
         ap.error("net policies require --dtype float32 (matches the trained net's weights)")
     vf = loyalty_shaped_value(args.loyalty_penalty, args.loyalty_thresh) if args.loyalty_aware else _empire_value
@@ -235,7 +354,10 @@ def main() -> None:
             print("note: checkpoint pre-dates purchases — purchase columns disabled for its envs\n")
 
     base_scores, chal_scores, wins = [], [], 0
-    if args.policy in ("netgreedy", "tuplesearch"):
+    if args.policy == "gumbelsearch":
+        detail = (f"all 5 heads, k={args.k} SH depths {sh_depths(args.k, args.max_depth)}"
+                  + (" honest-rng" if args.honest_rng else ""))
+    elif args.policy in ("netgreedy", "tuplesearch"):
         detail = "all 5 heads" + (
             f", k={args.k} leaf={args.tuple_leaf}"
             + (f" tau={args.temperature}" if args.temperature != 1.0 else "")
@@ -273,6 +395,17 @@ def main() -> None:
             chal = netsearch_play(env, policy, args.city, args.horizon, args.turns)
         elif args.policy == "netgreedy":
             chal = net_greedy_play(env, policy, args.turns)
+        elif args.policy == "gumbelsearch":
+            torch.manual_seed(20260705 + i)  # reproducible candidate sampling + Gumbel draws per game
+            envk = BatchEnv([pool[i % len(pool)]] * args.k, rules, device=args.device,
+                            dtype=dtype, horizon=args.turns)  # the k-wide scratch, once per game
+            if ck is not None:
+                from train_ppo import fit_env_to_checkpoint
+
+                fit_env_to_checkpoint(envk, ck)
+            rs = float(ck.get("config", {}).get("reward_scale", 0.01))
+            chal = gumbelsearch_play(env, envk, policy, args.k, args.max_depth, args.turns,
+                                     rs, honest_rng=args.honest_rng)
         else:  # tuplesearch
             torch.manual_seed(20260705 + i)  # reproducible net sampling per game
             chal = tuplesearch_play(env, policy, args.k, args.horizon, args.tuple_leaf, args.turns,
