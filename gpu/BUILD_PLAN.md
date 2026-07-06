@@ -320,6 +320,27 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
+  - [~] B4. Rival districts: **B4a DONE** (placement + queued completion).
+        Step 1 (inert): district_complete [B,T] plane, all 11 consumers
+        gated per their exact TS rule, both gates green on UNCHANGED
+        fixtures (hash 878b1b03). Step 2: canPlaceDistrictIn (owner-
+        qualified via {unlocks, ownsTile}), districtCostIn, shared
+        SCAFFOLD_DISTRICTS in data/districts.ts; rival picker branch
+        settler → district → unit (tile = best floor(districtAdjacency),
+        ties lowest index; queue paves + clears improvement, completion
+        flips the plane); GPU _place_district_rival + rc_qtile/rc_dist_tile
+        registries. Catches this stage: (1) queued-unit count treated
+        district codes as units (GPU starved its army while building);
+        (2) rival districts leaked into three PLAYER-scoped checks (CS
+        quest already/satisfaction, district eurekas) — owner-gated;
+        (3) sibling rival centers were placeable (TS rejects via
+        district='CITY_CENTER'); (4) LATENT B3a float-association bug:
+        TS `sum += a + b` is sum + (a + b), GPU had (sum + a) + b — one
+        ulp apart, flipped a civic completion when cost 70 landed inside
+        it (seed 9079 t98). B4b next: adjacency yields into rival streams
+        + rival housing; B4c: rival GP accrual from districts. Baselines
+        statistically unchanged (random 116.0 ± 10.6, scripted 156.2 ±
+        11.1) — placement-only, yields arrive with B4b.
   - [x] B3. Rival research COMPLETE. B3a: real trees/streams/advance
         (status below). B3b: all four consumers swapped — production
         ×(1 + nTechs/RIVAL_PROD_DIV=12), unit types gate on the rival's real

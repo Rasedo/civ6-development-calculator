@@ -58,7 +58,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       continue;
     }
     row.push(
@@ -80,6 +80,8 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
           return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? UNITS[q.unit]?.cost ?? 0 : 0);
         }, 0) * 1000,
       ),
+      // C1-B4: COMPLETED rival districts (queued ones pave but don't count).
+      rival.cities.reduce((s2, rc) => s2 + rc.districts.filter((d) => d.type !== 'CITY_CENTER' && state.map.tiles[d.tileIndex].districtComplete).length, 0),
     );
   }
   for (let c = 0; c < cMax; c++) {
@@ -106,7 +108,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
   const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2);
   return tol;
 }

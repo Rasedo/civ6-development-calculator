@@ -81,7 +81,7 @@ import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
-import { DISTRICTS, PLACEABLE_DISTRICTS, type AdjacencySource } from '../src/data/districts';
+import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
 import { TECHS } from '../src/data/techs';
@@ -215,17 +215,8 @@ const SCRIPTED_CAMPUS = true;
 // tech is in and the per-pop specialty cap allows). The engine mirrors this.
 // placement 'aqueduct' = the non-specialty housing district (adjacent to the
 // city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
-const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
-  { id: 'CAMPUS', unlockId: 'WRITING' },
-  { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
-  { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
-  { id: 'AQUEDUCT', unlockId: 'ENGINEERING', placement: 'aqueduct' },
-  { id: 'HARBOR', unlockId: 'CELESTIAL_NAVIGATION', placement: 'coastal' },
-  // ENCAMPMENT (placement:'encampment', code 3) is wired end-to-end but held out
-  // of the scaffold: it's a no-yield military specialty that competes for the
-  // scarce cap, and it leaves a subtle culture→civic-timing edge (seed 9248) not
-  // worth chasing for its value. Re-add here to re-enable.
-];
+// SCAFFOLD_DISTRICTS moved to data/districts.ts (C1-B4: the rival picker
+// shares it). ENCAMPMENT stays held out — see the note there and BUILD_PLAN D6.
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
@@ -305,6 +296,9 @@ const rules = {
   // rival r (array index == rival.id, asserted at export) is civ r+1.
   // City-states and barbarians stay outside the numbering.
   civs: { player: 0, rivalBase: 1 },
+  // Mirrors districtCost(): round(54 · (1 + 8 · done/total)) — rivals pay it
+  // from THEIR research counts (C1-B4).
+  districtCost: { base: 54, scale: 8 },
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   boosts: boostRows,

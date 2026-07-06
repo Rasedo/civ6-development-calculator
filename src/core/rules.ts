@@ -120,23 +120,29 @@ export function canRemoveFeature(state: GameState, tile: Tile): RuleResult {
 
 // ---------------------------------------------------------------------------
 
-export function canPlaceDistrict(
+/**
+ * Owner-qualified placement (C1-B4): the same rule body over an arbitrary
+ * unlock set and tile-ownership test, so rival cities place districts under
+ * THEIR research. The player wrapper below keeps the exact old behavior.
+ */
+export function canPlaceDistrictIn(
   state: GameState,
   city: City,
   type: DistrictId,
   tileIndex: number,
+  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
 ): RuleResult {
   const map = state.map;
   const def = DISTRICTS[type];
   const tile = map.tiles[tileIndex];
   const center = map.tiles[city.centerIndex];
 
-  const unlocks = gates(state);
+  const unlocks = opts.unlocks;
   if (unlocks && type !== 'CITY_CENTER' && !unlocks.districts.has(type)) {
     return no(`${def.name} requires research.`);
   }
 
-  if (tile.cityId !== city.id) return no('Tile not owned by this city.');
+  if (!opts.ownsTile(tile)) return no('Tile not owned by this city.');
   const dist = hexDistance(center.col, center.row, tile.col, tile.row);
   if (dist === 0) return no('City center occupies this tile.');
   if (dist > CITY_WORK_RADIUS) return no('Too far from the city center.');
@@ -189,6 +195,18 @@ export function canPlaceDistrict(
 }
 
 /** All tiles where the district could go (for map highlighting). */
+export function canPlaceDistrict(
+  state: GameState,
+  city: City,
+  type: DistrictId,
+  tileIndex: number,
+): RuleResult {
+  return canPlaceDistrictIn(state, city, type, tileIndex, {
+    unlocks: gates(state),
+    ownsTile: (t) => t.cityId === city.id,
+  });
+}
+
 export function districtPlacementTiles(state: GameState, city: City, type: DistrictId): number[] {
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];

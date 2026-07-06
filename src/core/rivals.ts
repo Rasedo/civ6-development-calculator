@@ -11,7 +11,7 @@ import { isWater, isImpassable, hasFreshWater } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
-import { defaultModifiers, availableTechsIn, availableCivicsIn } from './effects';
+import { defaultModifiers, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -26,6 +26,10 @@ import { GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
 import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE } from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
+import { canPlaceDistrictIn } from './rules';
+import { districtCostIn } from './game';
+import { districtAdjacency } from './yields';
+import { SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
   RIVAL_LEADERS,
   RIVAL_MAX_POP,
@@ -507,6 +511,41 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
  * `population` owned tiles within working range (no-modifier yields, plus
  * a base and a small tech scaler). Good land now means strong rivals.
  */
+/**
+ * C1-B4: queue the best placeable scaffold district for this rival city, if
+ * any — the rival's own unlocks, the shared placement rules
+ * (canPlaceDistrictIn), tile = best floor(districtAdjacency) with ties to
+ * the LOWEST tile index (map order, mirroring the exporter scan and the GPU
+ * key). Queueing paves the tile immediately (tile.district set, complete
+ * false, improvement cleared — exactly queueDistrict's writes) and locks
+ * districtCostIn(rival.research).
+ */
+function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity, unlocks: Unlocks): boolean {
+  const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
+  for (const { id } of SCAFFOLD_DISTRICTS) {
+    let best = -1;
+    let bestAdj = -1;
+    for (const t of state.map.tiles) {
+      if (!owns(t) || t.improvement) continue;
+      if (!canPlaceDistrictIn(state, rc, id, t.index, { unlocks, ownsTile: owns }).ok) continue;
+      const adj = Math.floor(districtAdjacency(state.map, t, id));
+      if (adj > bestAdj) {
+        bestAdj = adj;
+        best = t.index;
+      }
+    }
+    if (best < 0) continue;
+    const tile = state.map.tiles[best];
+    tile.district = id;
+    tile.districtComplete = false;
+    tile.improvement = null;
+    rc.districts.push({ type: id, tileIndex: best });
+    rc.queue.push({ kind: 'district', district: id, tileIndex: best, progress: 0, cost: districtCostIn(rival.research) });
+    return true;
+  }
+  return false;
+}
+
 export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
@@ -578,11 +617,14 @@ export function rivalPhase(state: GameState): void {
       if (q?.kind === 'unit') unitCount += 1;
       if (q?.kind === 'settler') settlerQueued = true;
     }
+    const rivalUnlocks = computeUnlocksIn(rival.research);
     for (const rc of rival.cities) {
       if (rc.queue.length > 0) continue;
       if (!settlerQueued && rc.isCapital && rival.cities.length < RIVAL_MAX_CITIES) {
         rc.queue.push({ kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
         settlerQueued = true;
+      } else if (tryQueueRivalDistrict(state, rival, rc, rivalUnlocks)) {
+        // C1-B4: districts outrank units — the economy compounds.
       } else if (unitCount < unitCap) {
         const type = rival.research.techs.includes('HORSEBACK_RIDING')
           ? 'HORSEMAN'
@@ -625,12 +667,13 @@ export function rivalPhase(state: GameState): void {
       // Queue progress + completion (settler founds via the site scan; a
       // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = rc.queue[0];
-      if (q && (q.kind === 'settler' || q.kind === 'unit')) {
+      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district')) {
         q.progress += production;
-        const cost = q.kind === 'settler' ? q.cost : UNITS[q.unit]?.cost ?? 54;
+        const cost = q.kind === 'unit' ? UNITS[q.unit]?.cost ?? 54 : q.cost ?? 54;
         if (q.progress >= cost) {
           rc.queue.shift();
           if (q.kind === 'settler') tryFoundCity(state, rival);
+          else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
           else spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
         }
       }

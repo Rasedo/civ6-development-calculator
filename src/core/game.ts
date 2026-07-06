@@ -4,7 +4,7 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, Tile, RivalCity } from './types';
+import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
@@ -45,10 +45,14 @@ export function effectiveResearchCost(state: GameState, id: string, baseCost: nu
  * Districts get pricier as the game advances (Civ 6 scales with overall
  * research progress). Cost is locked in when the district is queued.
  */
-export function districtCost(state: GameState): number {
+export function districtCostIn(research: ResearchState): number {
   const total = Object.keys(TECHS).length + Object.keys(CIVICS).length;
-  const done = state.research.techs.length + state.research.civics.length;
+  const done = research.techs.length + research.civics.length;
   return Math.round(54 * (1 + 8 * (done / total)));
+}
+
+export function districtCost(state: GameState): number {
+  return districtCostIn(state.research);
 }
 
 export function createGame(

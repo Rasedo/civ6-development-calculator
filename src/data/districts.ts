@@ -240,3 +240,17 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
   'ENTERTAINMENT_COMPLEX',
   'NEIGHBORHOOD',
 ];
+
+/**
+ * The districts scripted policies place, in priority order — shared by the
+ * GPU fixture exporter's scaffold, the GPU engine, and the rival district
+ * picker (C1-B4). Encampment is wired but held out (no-yield specialty that
+ * competes for the scarce cap; see BUILD_PLAN D6).
+ */
+export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
+  { id: 'CAMPUS', unlockId: 'WRITING' },
+  { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
+  { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
+  { id: 'AQUEDUCT', unlockId: 'ENGINEERING', placement: 'aqueduct' },
+  { id: 'HARBOR', unlockId: 'CELESTIAL_NAVIGATION', placement: 'coastal' },
+];

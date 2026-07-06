@@ -98,6 +98,7 @@ class Rules:
     settler_pop_gate: int
     gold_purchase_mult: float  # V-P1: gold price = production cost × this (GOLD_PURCHASE_MULT)
     civs: dict  # C1-A3: {player: 0, rivalBase: 1} — the unified civ-id space (asserted vs engine constants)
+    district_cost: dict  # C1-B4: districtCost params {base: 54, scale: 8} — rivals pay it from THEIR research
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
     boosts: list  # [{target, idx, kind, ...}] — covered-scope eureka conditions
@@ -149,6 +150,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_pop_gate=r["scenario"]["settlerPopGate"],
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         civs=r.get("civs", {"player": 0, "rivalBase": 1}),
+        district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
         boosts=r.get("boosts", []),
@@ -281,7 +283,7 @@ _MUTABLE = [
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
     "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "r_techs", "r_civics",
-    "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost",
+    "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
@@ -452,6 +454,13 @@ class BatchSim:
         self.r_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.r_tech_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_civic_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        # C1-B4: rival districts — the in-flight queued tile per city (the
+        # completion target) and the per-city registry [.., nD] of placed
+        # district tiles (one per type; queued counts for cap/one-per-type,
+        # exactly like city.districts in TS).
+        nd_b4 = max(len(rules.districts or []), 1)
+        self.rc_qtile = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
+        self.rc_dist_tile = torch.full((B, r_pad, rc_pad, nd_b4), -1, dtype=torch.long, device=device)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
@@ -1204,6 +1213,47 @@ class BatchSim:
             self._eff_version += 1
         return place
 
+    def _place_district_rival(self, r: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
+        """C1-B4: the rival twin of _place_district — same rank (best
+        floor(static + 0.5·adjacent-completed), ties lowest tile index), rival
+        eligibility (civ-owned via rival_at, district-usable, empty,
+        unimproved, within radius 3 of THIS city's center, not the center) —
+        and it QUEUES rather than completes: tile paved (district set,
+        complete stays False), rc_qtile remembers the completion target, the
+        per-city registry gains the type. Returns the placed mask."""
+        B, T, dev = self.B, self.T, self.device
+        center = self.rc_center[:, r, j].clamp(min=0)
+        adjc = self._adj_district_count().to(self.dtype)
+        surface = self.coastal_water if placement == 2 else self.d_usable
+        d_center = self.pair_dist[center]  # [B, T]
+        elig = (
+            (self.rival_at == r)
+            & surface
+            & (self.district < 0)
+            & (self.rvcity_at < 0)  # sibling centers carry district='CITY_CENTER' in TS
+            & (self.improvement < 0)
+            & (d_center <= 3)
+        )
+        elig[torch.arange(B, device=dev), center] = False
+        if placement in (1, 3):
+            cc = self._adj_center_count()
+            elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))
+            adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)
+        else:
+            adjf = torch.floor(self._district_adj_raw(di, adjc))
+        arT = torch.arange(T, device=dev, dtype=self.dtype)
+        key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))
+        best = key.argmax(dim=1)
+        place = want & elig.any(dim=1)
+        if bool(place.any()):
+            rows = place.nonzero(as_tuple=True)[0]
+            self.district[rows, best[rows]] = di
+            self.rc_qtile[rows, r, j] = best[rows]
+            self.rc_dist_tile[rows, r, j, di] = best[rows]
+            self.improvement[rows, best[rows]] = -1  # queueDistrict clears it
+            self._eff_version += 1
+        return place
+
     def _advance_player_great_people(self) -> None:
         """Mirrors advanceGreatPeople (runs after research, after rivalPhase has
         claimed): each class accrues 1 + (its district's built buildings) per
@@ -1548,7 +1598,7 @@ class BatchSim:
                 # completed districts of a type (dtype>=0) or any specialty
                 # (dtype<0). Only specialty districts live in self.district (>=0).
                 dtype = row.get("dtype", -1)
-                on = ((self.district >= 0) if dtype < 0 else (self.district == dtype)) & self.district_complete
+                on = ((self.district >= 0) if dtype < 0 else (self.district == dtype)) & self.district_complete & (self.owner >= 0)  # player eurekas count PLAYER districts
                 pred = on.sum(dim=1) >= row["count"]
             else:
                 continue
@@ -2201,7 +2251,7 @@ class BatchSim:
             if self._askable.numel() > 0 and self.districts_on:
                 qd = self.cs_quest_district[:, s].clamp(min=0, max=self._askable.numel() - 1)
                 asked_type = self._askable[qd]  # [B]
-                owns_asked = ((self.district == asked_type.unsqueeze(1)) & self.district_complete).any(dim=1) & (self.cs_quest_district[:, s] >= 0)
+                owns_asked = ((self.district == asked_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0)).any(dim=1) & (self.cs_quest_district[:, s] >= 0)  # PLAYER districts only (state.cities)
             else:
                 owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             resolved_dist = act & (self.cs_quest[:, s] == 3) & owns_asked
@@ -2223,7 +2273,7 @@ class BatchSim:
             # askable district (askable idx -> district type via self._askable).
             if self._askable.numel() > 0 and self.districts_on:
                 drawn_type = self._askable[draw1.clamp(min=0, max=self._askable.numel() - 1)]  # [B]
-                already_bd = ((self.district == drawn_type.unsqueeze(1)) & self.district_complete).any(dim=1)
+                already_bd = ((self.district == drawn_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0)).any(dim=1)  # PLAYER districts only
             else:
                 already_bd = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             bd = ~already_bd
@@ -2476,6 +2526,8 @@ class BatchSim:
         self.rc_current[rows, r, slot] = -1
         self.rc_progress[rows, r, slot] = 0
         self.rc_cost[rows, r, slot] = 0
+        self.rc_qtile[rows, r, slot] = -1
+        self.rc_dist_tile[rows, r, slot, :] = -1
         self.rc_id[rows, r, slot] = self.r_next_city_id[rows, r]
         self.r_next_city_id[rows, r] += 1
         self.rvcity_at[rows, s_idx] = r
@@ -2814,7 +2866,7 @@ class BatchSim:
             # sequentially, exactly like the TS pick loop.
             alive0 = self.rc_alive[:, r].clone()  # newborns must not act this turn
             n_units = (self.v_alive & (self.v_civ == r)).sum(dim=1)
-            unit_count = n_units + (self.rc_current[:, r] >= 1).sum(dim=1)
+            unit_count = n_units + ((self.rc_current[:, r] >= 1) & (self.rc_current[:, r] <= self.NU)).sum(dim=1)  # units only — district codes sit above NU
             settler_q = (alive0 & (self.rc_current[:, r] == 0)).any(dim=1)
             cap = n_cities * 2 + torch.where(self.r_atwar[:, r], 3, 1)
             # C1-B3b: unit type gates on the rival's REAL techs
@@ -2839,7 +2891,32 @@ class BatchSim:
                     self.rc_cost[:, r, j] = torch.where(want_s, settle_cost, self.rc_cost[:, r, j])
                     self.rc_progress[:, r, j] = torch.where(want_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                     settler_q = settler_q | want_s
-                want_u = idle & ~want_s & (unit_count < cap)
+                # C1-B4: districts outrank units (the economy compounds).
+                rem = idle & ~want_s
+                if self.districts_on and self._scaffold and bool(rem.any()):
+                    dcp = self.rules.district_cost
+                    done_rc = self.r_techs[:, r].sum(dim=1) + self.r_civics[:, r].sum(dim=1)
+                    total_rc = float(self.rules_dev.t_cost.shape[0] + self.rules_dev.c_cost.shape[0])
+                    d_cost = js_round(dcp.get("base", 54) * (1 + dcp.get("scale", 8) * (done_rc.double() / total_rc)))
+                    cap_max = torch.div(self.rc_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
+                    spec_cnt = ((self.rc_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
+                    for si, (di, utech, plc) in enumerate(self._scaffold):
+                        if not bool(rem.any()):
+                            break
+                        has_tech = self.r_techs[:, r, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                        not_owned = self.rc_dist_tile[:, r, j, di] < 0
+                        under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
+                        want_d = rem & has_tech & not_owned & under_cap
+                        if not bool(want_d.any()):
+                            continue
+                        placed = self._place_district_rival(r, j, di, want_d, plc)
+                        if bool(placed.any()):
+                            self.rc_current[:, r, j] = torch.where(placed, torch.full_like(self.rc_current[:, r, j], 1 + self.NU + si), self.rc_current[:, r, j])
+                            self.rc_cost[:, r, j] = torch.where(placed, d_cost, self.rc_cost[:, r, j])
+                            self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                            spec_cnt = spec_cnt + (placed & torch.tensor(bool(self._is_specialty[di]), device=dev)).long()
+                            rem = rem & ~placed
+                want_u = rem & (unit_count < cap)
                 if bool(want_u.any()):
                     self.rc_current[:, r, j] = torch.where(want_u, ty + 1, self.rc_current[:, r, j])
                     self.rc_cost[:, r, j] = torch.where(want_u, self._p_cost[ty].double(), self.rc_cost[:, r, j])
@@ -2856,11 +2933,13 @@ class BatchSim:
                     continue
                 food, prod, sci, cul = self._rival_city_yields(r, j, cact)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
-                # C1-B3a: tile/center columns plus the citizens' contribution,
-                # left-associated exactly like the TS `sciSum += y.science +
-                # CITIZEN_SCIENCE * rc.population`.
-                sci_sum = torch.where(cact, sci_sum + sci + self.rules.citizen_science * self.rc_pop[:, r, j].double(), sci_sum)
-                cul_sum = torch.where(cact, cul_sum + cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double(), cul_sum)
+                # C1-B3a: tile/center columns plus the citizens' contribution.
+                # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
+                # desugars to sciSum + (y.science + 0.7*pop) — the city term
+                # sums FIRST. (cul_sum + cul) + 0.3*pop is one ulp off and
+                # flips completions when a cost lands inside it (seed 9079).
+                sci_sum = torch.where(cact, sci_sum + (sci + self.rules.citizen_science * self.rc_pop[:, r, j].double()), sci_sum)
+                cul_sum = torch.where(cact, cul_sum + (cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double()), cul_sum)
                 # C1-B1: the real growth accounting — true surplus (can be
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
                 # need, starvation shrinks (pop floor 1, box reset). maxPop
@@ -2890,9 +2969,17 @@ class BatchSim:
                         found_s = done_q & (cur == 0)
                         if bool(found_s.any()):
                             self._rival_try_found(r, found_s)
-                        spawn_u = done_q & (cur >= 1)
+                        spawn_u = done_q & (cur >= 1) & (cur <= self.NU)
                         if bool(spawn_u.any()):
                             self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r)
+                        # C1-B4: a finished district completes its paved tile
+                        done_d = done_q & (cur > self.NU)
+                        if bool(done_d.any()):
+                            dr = done_d.nonzero(as_tuple=True)[0]
+                            dtile = self.rc_qtile[:, r, j]
+                            self.district_complete[dr, dtile[dr].clamp(min=0)] = True
+                            self.rc_qtile[dr, r, j] = -1
+                            self._eff_version += 1
                 due = cact & (((self.turn + self.rc_id[:, r, j] * 3) % rr.get("borderPeriod", 9)) == 0)
                 self._expand_rival_border(r, j, due)
                 self.rc_hp[:, r, j] = torch.where(
@@ -3092,6 +3179,8 @@ class BatchSim:
                 self.rc_current[b, w_, slot] = -1
                 self.rc_progress[b, w_, slot] = 0.0
                 self.rc_cost[b, w_, slot] = 0.0
+                self.rc_qtile[b, w_, slot] = -1
+                self.rc_dist_tile[b, w_, slot, :] = -1  # flipped districts are NOT adopted (paved-but-dead)
                 self.r_next_city_id[b, w_] += 1
                 self.rvcity_at[b, self.site[b, c]] = w_
 
@@ -3691,6 +3780,14 @@ class BatchSim:
                 torch.where(live, torch.round(self.r_civic_prog[:, r] * 1000).to(self.dtype), zero),
                 torch.where(live, torch.round((self.rc_progress[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
                 torch.where(live, torch.round((self.rc_cost[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
+                torch.where(
+                    live,
+                    (
+                        (self.rc_dist_tile[:, r] >= 0)
+                        & self.district_complete.gather(1, self.rc_dist_tile[:, r].clamp(min=0).reshape(self.B, -1)).reshape(self.B, self.RC, -1)
+                    ).sum(dim=(1, 2)).to(self.dtype),
+                    zero,
+                ),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):
