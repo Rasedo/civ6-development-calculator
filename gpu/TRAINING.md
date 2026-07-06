@@ -66,11 +66,19 @@ python gpu/train_ppo.py --resume gpu/runs/overnight/latest.pt --out gpu/runs/ove
 tensorboard --logdir gpu/runs/overnight/tb     # or read gpu/runs/overnight/log.csv
 ```
 
-- `score/mean` — the number that matters. Baselines on THIS env
-  (50-episode eval): random 111.0 ± 12.2, scripted autopilot
-  172.5 ± 17.3. The CPU smoke run hit 186.4 after 256k steps; a 40M-step
-  overnight run on an RTX 4070 SUPER reached 213.6 ± 13.5 greedy (14-action,
-  farms-only build space) — ~20% over the autopilot, plateauing by ~10M.
+- `score/mean` — the number that matters. Baselines on the CURRENT
+  district engine (50-episode eval, re-run 2026-07): random 115.1 ± 11.8,
+  scripted autopilot 162.2 ± 13.0, and the reference net **tune1** at
+  **216.9 ± 13.5** greedy (26-action district engine; 12M steps ≈ 80 min
+  on an RTX 4070 SUPER: `--batch 4096 --updates 30 --horizon 100
+  --ent-coef 0.02 --anneal-lr`). Historical, pre-district engine:
+  random 111.0 ± 12.2, scripted 172.5 ± 17.3, CPU smoke 186.4 at 256k
+  steps, 40M-step overnight 213.6 ± 13.5 (14-action, farms only).
+  tune1's recipe notes: horizon 100 (matches the eval protocol — the
+  60-turn quicknet trained fast but evaluated weak), ent-coef 0.02 kept
+  entropy at 2.15 instead of quicknet's 0.67 collapse, and the anneal
+  flatlined learning by update ~28 — extending past 30 updates needs a
+  fresh (non-zero) lr schedule, not a longer anneal.
 - `policy/approx_kl` — healthy is ~0.002–0.01. Pinned above ~0.03 for
   many updates → halve `--lr`.
 - `policy/entropy` — should decline slowly over the whole run. A crash
@@ -92,10 +100,20 @@ python gpu/eval.py --policy random --episodes 50                      # re-basel
 Greedy (default) is usually a few points above sampled. Same `--seed`
 reproduces the same eval worlds, so before/after comparisons are fair.
 
-## Reference numbers (4-core CPU container, engine v5b)
+## Reference numbers
+
+4-core CPU container, engine v5b (historical):
 
 | | |
 |---|---|
 | env only, f32, batch 1024 | ~13,000 game-turns/sec |
 | trainer end-to-end, CPU, batch 64 | ~370 steps/sec |
 | random / scripted / 256k-step PPO | 111.0 / 172.5 / 186.4 |
+
+RTX 4070 SUPER, district engine (2026-07):
+
+| | |
+|---|---|
+| trainer end-to-end, CUDA, batch 4096, horizon 100 | ~2,100–2,600 steps/sec |
+| trainer end-to-end, CUDA, batch 4096, horizon 60 | ~5,700–6,200 steps/sec |
+| random / scripted / tune1 (12M steps, ~80 min) | 115.1 / 162.2 / **216.9** |

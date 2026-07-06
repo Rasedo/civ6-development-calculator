@@ -385,8 +385,12 @@ mirrored draw for draw. Phase 5 trains on it
 natively: `python gpu/train_ppo.py` runs a masked multi-head PPO whose
 inference, env stepping and updates never leave the device, with worlds
 re-seeded every episode; `gpu/eval.py` is the matching benchmark
-protocol (random 111.0, scripted autopilot 172.5 on this env). See
-`gpu/README.md` for the covered/not-covered table and the roadmap.
+protocol (district engine: random 115.1, scripted autopilot 162.2, and
+the tune1 reference net 216.9 after ~80 min on an RTX 4070 SUPER). On
+top of the forward model sits a single-agent search arm (`gpu/SEARCH.md`):
+snapshot/restore, closed-loop MPC, empire-wide production search and
+net-guided full-tuple search. See `gpu/README.md` for the
+covered/not-covered table and the roadmap.
 
 ## Roadmap ideas (later stages)
 

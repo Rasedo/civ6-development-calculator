@@ -90,6 +90,27 @@ ACCURATE net (sharp policy + calibrated value) to beat greedy — a stronger net
 now a ~2-hour job locally (see the GPU note below). The machinery is `search_eval.py --policy
 netgreedy|tuplesearch --k --tuple-leaf`; sampling is seeded per game (reproducible).
 
+### The strong-net answer (tune1) — greedy still wins
+
+The strong net arrived: **tune1** (30 updates, B=4096, horizon 100, ent-coef 0.02,
+anneal-lr, ~80 min on the RTX 4070 SUPER) evaluates at **216.9 ± 13.5** on the
+50-episode protocol vs scripted 162.2 ± 13.0 and random 115.1 ± 11.8 (re-baselined on
+the district engine) — and its all-heads greedy hits **195.4 on the 6 matched worlds
+(+68.7, 6/6)**, up from quicknet's 165.0 (4/6), *including* seed9053 (108.5 vs
+scripted 93.5): the stronger net learned the expansion restraint the loyalty-aware
+leaf had to hand-shape. But the M2b-2 hypothesis is **refuted**: tuplesearch under
+tune1 scores 182.3 — it still loses to the net's own greedy head-to-head (1W/5L;
+−40.8 on seed9001, +8.7 on seed9027). A 1-ply value-head read remains too noisy to
+rank sampled candidate tuples, and tune1's healthier entropy (2.15 vs quicknet's
+0.67 — the very thing the doubled ent-coef bought) makes its k−1 sampled candidates
+MORE diffuse, handing the value head harder discriminations. So more net strength
+alone does not make naive 1-ply tuple search pay. The levers that remain are the M3
+ones: candidate-sampling temperature (sharpen the prior at search time), deeper /
+rollout leaves with a net continuation, and above all TRAINING the value head on
+search-improved play instead of only its own on-policy returns (AlphaZero's actual
+trick). Reproduce: `search_eval.py --policy netgreedy|tuplesearch --checkpoint
+gpu/runs/tune1/best.pt --episodes 6 --turns 100 [--k 8 --tuple-leaf net]`.
+
 ### GPU / local compute
 
 The engine fires many small kernels per step, so it is launch-bound at small batch (a GPU ≈ CPU
