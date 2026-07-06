@@ -11,6 +11,7 @@ import { tileYields } from './yields';
 import { fogActive, isExplored } from './fog';
 import { unitsHostile, unitDomain } from './units';
 import { RESOURCES } from '../data/resources';
+import { tileForeignTo, PLAYER_CIV } from './civs';
 
 export const SPATIAL_PLANES = [
   'water',
@@ -75,7 +76,7 @@ export function spatialObservation(state: GameState): Uint8Array {
     }
     if (tile.riverMask !== 0) out[at(P.river, i)] = 1;
     if (tile.cityId !== -1) out[at(P.ownedMine, i)] = 1;
-    if ((tile.csId ?? -1) !== -1 || (tile.rivalId ?? -1) !== -1) out[at(P.ownedForeign, i)] = 1;
+    if (tileForeignTo(tile, PLAYER_CIV)) out[at(P.ownedForeign, i)] = 1;
     if (tile.district || tile.builtWonder) {
       if (tile.cityId !== -1) out[at(P.myDistrict, i)] = 1;
     }

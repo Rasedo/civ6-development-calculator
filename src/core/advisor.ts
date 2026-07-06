@@ -19,6 +19,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { computeUnlocks } from './effects';
 import { CITY_WORK_RADIUS } from '../data/constants';
+import { tileForeignTo, PLAYER_CIV } from './civs';
 
 /** Balanced yield weights used to value a tile's raw output. */
 const YIELD_WEIGHTS: Yields = {
@@ -108,7 +109,7 @@ export function scoreSettleSites(state: GameState, limit = 8): SettleSiteScore[]
     let resourceScore = 0;
     for (const t of tilesWithin(state.map, site.col, site.row, CITY_WORK_RADIUS)) {
       if (t.index === site.index || t.cityId !== -1) continue; // don't count claimed tiles
-      if ((t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1) continue; // foreign land
+      if (tileForeignTo(t, PLAYER_CIV)) continue; // foreign land
       const ring = hexDistance(site.col, site.row, t.col, t.row);
       yieldScore += weightedSum(tileYields(ctx, t)) * (RING_WEIGHT[ring] ?? 0);
       if (t.resource) {

@@ -15,6 +15,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
+import { tileRivalCiv } from './civs';
 
 export interface RuleResult {
   ok: boolean;
@@ -40,7 +41,7 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
   if (tile.feature === 'OASIS') return no('Cannot settle on an oasis.');
   if (tile.district) return no('Tile already occupied.');
   if ((tile.csId ?? -1) !== -1) return no('City-state territory.');
-  if ((tile.rivalId ?? -1) !== -1) return no('Rival territory.');
+  if (tileRivalCiv(tile) !== null) return no('Rival territory.');
   for (const c of state.cities) {
     const center = state.map.tiles[c.centerIndex];
     if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {

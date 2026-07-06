@@ -45,6 +45,7 @@ import {
   LOYALTY_PRESSURE_SCALE,
   LOYALTY_AMENITY,
 } from '../data/rivals';
+import { tileClaimed, tileOwnedByCiv, civOfRival } from './civs';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -56,7 +57,7 @@ const RIVAL_SPACING = 10;
 // ---------------------------------------------------------------------------
 
 function tileOwned(t: Tile): boolean {
-  return t.cityId !== -1 || (t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1;
+  return tileClaimed(t);
 }
 
 function siteQuality(state: GameState, tile: Tile): number {
@@ -359,7 +360,7 @@ function expandRivalBorder(state: GameState, rival: RivalCiv, city: RivalCity): 
   for (const t of tilesWithin(state.map, center.col, center.row, 3)) {
     if (tileOwned(t) || isWater(t) || isImpassable(t) || t.wonder) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
-      (n) => n.index !== t.index && (n.rivalId ?? -1) === rival.id,
+      (n) => n.index !== t.index && tileOwnedByCiv(n, civOfRival(rival.id)),
     );
     if (!adjOwn) continue;
     const dist = hexDistance(center.col, center.row, t.col, t.row);
@@ -494,7 +495,7 @@ export function rivalCityYields(
   const center = state.map.tiles[rc.centerIndex];
   const ctx = { map: state.map, mods: defaultModifiers() };
   const workable = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
-    .filter((t) => (t.rivalId ?? -1) === rival.id && !isWater(t) && !isImpassable(t) && t.index !== rc.centerIndex)
+    .filter((t) => tileOwnedByCiv(t, civOfRival(rival.id)) && !isWater(t) && !isImpassable(t) && t.index !== rc.centerIndex)
     .map((t) => tileYields(ctx, t))
     .sort((a, b) => b.food + b.production - (a.food + a.production))
     .slice(0, rc.population);

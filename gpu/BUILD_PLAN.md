@@ -248,9 +248,9 @@ peaceful co-farming; (8) n-player league telemetry targets **CCE via
 C3's matchmaking is built.
 
 - **C1-A. TS unification groundwork (behavior-preserving; fixtures unchanged):**
-  - [ ] A1. One `civId` space (player = 0, rivals 1..R): unify tile ownership
-        (`cityId`/`rivalId` → owner-qualified), typed accessors, no behavior
-        change — all TS tests + both gates green on UNCHANGED fixtures.
+  - [x] A1. One `civId` space (player = 0, rivals 1..R): `src/core/civs.ts`
+        defines the numbering + owner-qualified accessors; ownership reads
+        migrated. Proof: 232 tests, fixtures BYTE-IDENTICAL, both gates green.
   - [ ] A2. Rival cities become real `City` objects (civId-tagged) carrying
         their current scalar economy behind the same heuristic — trace-identical.
   - [ ] A3. GPU mirror of A1/A2's layout: owner-dimensioned city tensors
@@ -782,3 +782,23 @@ behind the off-script gate — the D5 pattern.
   training curve ran ahead of tune1's throughout (183.6 vs ~172 at update 9).
   Ranged value awaits a tune3 trained under ranged semantics. Reference net for
   the 46-column head: gpu/runs/tune2/best.pt (train-best 218.3).
+- C1-A1 [x] one civ-id space (behavior-preserving). New `src/core/civs.ts`: the
+  player is civ 0, rival r is civ r+1 (city-states and barbarians deliberately
+  OUTSIDE the civ numbering — never promoted); accessors `tileOwnerCiv` /
+  `tileRivalCiv` / `tileOwnedByCiv` / `tileClaimed` / `tileForeignTo(t, civ)` /
+  `unitCiv`, each implemented as the EXACT pre-C1 per-field test (incl. field
+  precedence and the both-fields-set corner: `tileOwnedByCiv` reads only the
+  civ's own field, `tileForeignTo(·, PLAYER_CIV)` is literally `csId || rivalId`).
+  Ten ownership-READ sites migrated across rivals/rules/game/advisor/city/
+  spatial/combat (tileOwned delegates to tileClaimed; founding ring-1 claim;
+  settle blocking; settle-advisor + border-growth + camp-spawn foreign tests;
+  spatial's ownedForeign plane; capture-transfer + border-adjacency +
+  rival-worked-tile rival.id equality tests). WRITES stay raw field writes —
+  they restructure in A2 when rival cities become real City objects. Unit
+  `owner` string tests (26 sites) also deferred to A2; `unitCiv` ships now so
+  A3's GPU mirror + exporter adopt the same numbering. Proof of behavior
+  preservation: 232/232 vitest, `npm run gpu:export` produces BYTE-IDENTICAL
+  fixtures (md5 bed511d5… before and after), scripted parity green, and the
+  refactored TS oracle replays all 72 off-script GPU games turn-exactly. tsc
+  green. Next: A2 — rival cities as civId-tagged City objects behind the same
+  heuristic, trace-identical.

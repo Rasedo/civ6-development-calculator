@@ -40,6 +40,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
+import { tileForeignTo, PLAYER_CIV } from './civs';
 
 export interface CityStats {
   city: City;
@@ -297,7 +298,7 @@ export function borderCandidates(state: GameState, city: City): number[] {
   const out: number[] = [];
   for (const t of tilesWithin(state.map, center.col, center.row, BORDER_MAX_RADIUS)) {
     if (t.cityId !== -1) continue;
-    if ((t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1) continue; // foreign territory
+    if (tileForeignTo(t, PLAYER_CIV)) continue; // foreign territory
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && n.cityId === city.id,
     );

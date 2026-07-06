@@ -27,6 +27,7 @@ import {
 import { revealAround } from './fog';
 import { CITY_WORK_RADIUS } from '../data/constants';
 import type { RuleResult } from './rules';
+import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -298,7 +299,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   const id = state.nextCityId++;
   // Their territory within working range transfers to the new owner.
   for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
-    if ((t.rivalId ?? -1) === rival.id) {
+    if (tileOwnedByCiv(t, civOfRival(rival.id))) {
       t.rivalId = undefined;
       if (t.cityId === -1) t.cityId = id;
     }
@@ -341,7 +342,7 @@ function campCandidates(state: GameState): Tile[] {
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
     if (t.cityId !== -1 || t.goodyHut) return false;
-    if ((t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1) return false;
+    if (tileForeignTo(t, PLAYER_CIV)) return false;
     if (preferFog && state.explored[t.index] === 1) return false; // camps rise in the fog
     for (const c of state.cities) {
       const ct = state.map.tiles[c.centerIndex];

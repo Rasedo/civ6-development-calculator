@@ -32,6 +32,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGI
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
 import { applyLumpYield } from './economy';
+import { tileClaimed } from './civs';
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
@@ -170,7 +171,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   // Civ 6: a new city starts with its center plus the first ring only;
   // everything beyond comes from culture growth or tile purchase.
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1 && (t.rivalId ?? -1) === -1) t.cityId = id;
+    if (!tileClaimed(t)) t.cityId = id;
   }
   tile.cityId = id;
   revealAround(state, tileIndex, 3);
