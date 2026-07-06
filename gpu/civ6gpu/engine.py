@@ -280,7 +280,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "r_tech", "r_prodstock", "r_milstock",
+    "r_atwar", "r_warturns", "r_peaceturns", "r_tech", "rc_current", "rc_progress", "rc_cost",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
@@ -437,8 +437,11 @@ class BatchSim:
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.r_peaceturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.r_tech = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
-        self.r_prodstock = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
-        self.r_milstock = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        # C1-B2: per-city production queues replace the pooled stocks.
+        # rc_current: -1 idle, 0 settler, 1+u trains roster unit u.
+        self.rc_current = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
+        self.rc_progress = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
+        self.rc_cost = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
@@ -2345,7 +2348,7 @@ class BatchSim:
             self.rival_at[rows, spot] = r
             self.rc_acquired[rows, r, j] += 1
 
-    def _rival_try_found(self, r: int, want: torch.Tensor, cost: torch.Tensor) -> None:
+    def _rival_try_found(self, r: int, want: torch.Tensor) -> None:
         """Mirrors tryFoundCity: scan each own city's 7-ring in city order ×
         tilesWithin order; quality = fresh-water 8 + the ring-2 sum of
         static contributions over passable unowned members (summed in ring
@@ -2408,7 +2411,6 @@ class BatchSim:
         if not bool(found.any()):
             return
         rows = found.nonzero(as_tuple=True)[0]
-        self.r_prodstock[rows, r] -= cost[rows]
         slot = self.rc_alive[rows, r].sum(dim=1)
         assert int(slot.max()) < self.RC, "rival city slots exhausted — raise RC"
         s_idx = best_site[rows]
@@ -2418,6 +2420,9 @@ class BatchSim:
         self.rc_growth[rows, r, slot] = 0
         self.rc_acquired[rows, r, slot] = 0
         self.rc_hp[rows, r, slot] = rrr.get("cityMaxHp", 200)
+        self.rc_current[rows, r, slot] = -1
+        self.rc_progress[rows, r, slot] = 0
+        self.rc_cost[rows, r, slot] = 0
         self.rc_id[rows, r, slot] = self.r_next_city_id[rows, r]
         self.r_next_city_id[rows, r] += 1
         self.rvcity_at[rows, s_idx] = r
@@ -2735,10 +2740,12 @@ class BatchSim:
             self.v_tile[rows, v] = dest[rows]
 
     def _rival_phase(self) -> None:
-        """Mirrors rivalPhase, rival by rival in id order — economy, border
-        growth, settling, unit production (one draw for the home pick),
-        great-people/pantheon/belief races (draws), then war or peace acts
-        with their end-of-branch rolls."""
+        """Mirrors rivalPhase, rival by rival in id order — queue picks for
+        the pre-turn city set, then per-city economy (yields, growth, queue
+        progress/completion: settlers found, units spawn at their city — the
+        old pooled stocks and their home-pick draw are gone, C1-B2), border
+        growth, great-people/pantheon/belief races (draws), then war or
+        peace acts with their end-of-branch rolls."""
         if self.R == 0:
             return
         rr, B, dev = self.rules.rivals, self.B, self.device
@@ -2753,10 +2760,43 @@ class BatchSim:
             tech_inc = 0.15 + 0.05 * n_cities.double()
             self.r_tech[:, r] = torch.where(active, self.r_tech[:, r] + tech_inc, self.r_tech[:, r])
 
+            # C1-B2: queue PICKS for the PRE-TURN city set, in slot order —
+            # the capital (slot 0, always the first-founded; flips are never
+            # capitals) prefers the settler with one in flight per civ,
+            # everyone else trains units up to the cap. Counts update
+            # sequentially, exactly like the TS pick loop.
+            alive0 = self.rc_alive[:, r].clone()  # newborns must not act this turn
+            n_units = (self.v_alive & (self.v_civ == r)).sum(dim=1)
+            unit_count = n_units + (self.rc_current[:, r] >= 1).sum(dim=1)
+            settler_q = (alive0 & (self.rc_current[:, r] == 0)).any(dim=1)
+            cap = n_cities * 2 + torch.where(self.r_atwar[:, r], 3, 1)
+            ty = torch.where(
+                self.r_tech[:, r] > 12,
+                torch.tensor(self._r_horseman, device=dev),
+                torch.where(self.r_tech[:, r] > 6, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
+            )
+            settle_cost = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities - 1).clamp(min=0).double()
+            for j in range(self.RC):
+                idle = active & alive0[:, j] & (self.rc_current[:, r, j] == -1)
+                if not bool(idle.any()):
+                    continue
+                want_s = (idle & ~settler_q & (n_cities < rr.get("maxCities", 6))) if j == 0 else torch.zeros_like(idle)
+                if bool(want_s.any()):
+                    self.rc_current[:, r, j] = torch.where(want_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
+                    self.rc_cost[:, r, j] = torch.where(want_s, settle_cost, self.rc_cost[:, r, j])
+                    self.rc_progress[:, r, j] = torch.where(want_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                    settler_q = settler_q | want_s
+                want_u = idle & ~want_s & (unit_count < cap)
+                if bool(want_u.any()):
+                    self.rc_current[:, r, j] = torch.where(want_u, ty + 1, self.rc_current[:, r, j])
+                    self.rc_cost[:, r, j] = torch.where(want_u, self._p_cost[ty].double(), self.rc_cost[:, r, j])
+                    self.rc_progress[:, r, j] = torch.where(want_u, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                    unit_count = unit_count + want_u.long()
+
             prod_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             heal = torch.where(self.r_atwar[:, r], 5, 15)
             for j in range(self.RC):
-                cact = active & self.rc_alive[:, r, j]
+                cact = active & alive0[:, j]
                 if not bool(cact.any()):
                     continue
                 food, prod = self._rival_city_yields(r, j, cact)
@@ -2775,37 +2815,31 @@ class BatchSim:
                 starve = cact & ~grow & (self.rc_growth[:, r, j] < 0)
                 self.rc_pop[:, r, j] = torch.where(starve, (self.rc_pop[:, r, j] - 1).clamp(min=1), self.rc_pop[:, r, j])
                 self.rc_growth[:, r, j] = torch.where(starve, torch.zeros_like(self.rc_growth[:, r, j]), self.rc_growth[:, r, j])
+                # C1-B2: queue progress + completion (settler completion runs
+                # the site scan; a unit spawns at THIS city — no RNG draw).
+                # Clear-then-resolve mirrors the TS shift-then-act order.
+                cur = self.rc_current[:, r, j].clone()
+                has_q = cact & (cur >= 0)
+                if bool(has_q.any()):
+                    self.rc_progress[:, r, j] = torch.where(has_q, self.rc_progress[:, r, j] + prod, self.rc_progress[:, r, j])
+                    done_q = has_q & (self.rc_progress[:, r, j] >= self.rc_cost[:, r, j])
+                    if bool(done_q.any()):
+                        self.rc_current[:, r, j] = torch.where(done_q, torch.full_like(cur, -1), self.rc_current[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_cost[:, r, j]), self.rc_cost[:, r, j])
+                        found_s = done_q & (cur == 0)
+                        if bool(found_s.any()):
+                            self._rival_try_found(r, found_s)
+                        spawn_u = done_q & (cur >= 1)
+                        if bool(spawn_u.any()):
+                            self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r)
                 due = cact & (((self.turn + self.rc_id[:, r, j] * 3) % rr.get("borderPeriod", 9)) == 0)
                 self._expand_rival_border(r, j, due)
                 self.rc_hp[:, r, j] = torch.where(
                     cact, (self.rc_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.rc_hp[:, r, j]
                 )
 
-            pace = 0.7 + self.r_aggression[:, r] * 0.6
-            self.r_prodstock[:, r] = torch.where(active, self.r_prodstock[:, r] + prod_sum * rr.get("prodToSettler", 0.3) * pace, self.r_prodstock[:, r])
-            self.r_milstock[:, r] = torch.where(active, self.r_milstock[:, r] + prod_sum * rr.get("prodToMilitary", 0.22) * pace, self.r_milstock[:, r])
-
-            settle_cost = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities - 1).clamp(min=0).double()
-            want = active & (n_cities < rr.get("maxCities", 6)) & (self.r_prodstock[:, r] >= settle_cost)
-            if bool(want.any()):
-                self._rival_try_found(r, want, settle_cost)
-
             n_cities2 = self.rc_alive[:, r].sum(dim=1)
-            n_units = (self.v_alive & (self.v_civ == r)).sum(dim=1)
-            cap = n_cities2 * 2 + torch.where(self.r_atwar[:, r], 3, 1)
-            ucost = 45 + self.r_tech[:, r] * 2
-            can_u = active & (n_units < cap) & (self.r_milstock[:, r] >= ucost)
-            ru = self._next_random(can_u)
-            if bool(can_u.any()):
-                self.r_milstock[:, r] = torch.where(can_u, self.r_milstock[:, r] - ucost, self.r_milstock[:, r])
-                ty = torch.where(
-                    self.r_tech[:, r] > 12,
-                    torch.tensor(self._r_horseman, device=dev),
-                    torch.where(self.r_tech[:, r] > 6, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
-                )
-                pick = torch.floor(ru * n_cities2.double()).to(torch.long).clamp(min=0)
-                home = self.rc_center[:, r].gather(1, pick.clamp(max=self.RC - 1).unsqueeze(1)).squeeze(1)
-                self._spawn_rival(can_u, home, ty, r)
 
             # Great-people race (no draws): accrue, claim from the shared pool.
             for cls in range(5):
@@ -2859,7 +2893,8 @@ class BatchSim:
             # War declaration: strength/proximity gates first, the roll last.
             p_str = self.alive.sum(dim=1) * 10 + (self.p_alive.to(torch.long) * self._p_combat[self.p_type]).sum(dim=1)
             own_cs = (self.v_alive & (self.v_civ == r)).to(torch.long) * self._p_combat[self.v_type]
-            r_str = js_round(n_cities2.double() * 8 + self.r_milstock[:, r] * 0.2 + own_cs.sum(dim=1).double())
+            # C1-B2: strength counts what exists (cities + fielded units)
+            r_str = js_round(n_cities2.double() * 8 + own_cs.sum(dim=1).double())
             d_pr = self.pair_dist[
                 self.site.clamp(min=0).unsqueeze(2), self.rc_center[:, r].clamp(min=0).unsqueeze(1)
             ].to(torch.long)  # [B, C, RC] pairwise — no [B, C, T] intermediate
@@ -2951,6 +2986,9 @@ class BatchSim:
                 self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
                 self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
                 self.rc_id[b, w_, slot] = int(self.r_next_city_id[b, w_])
+                self.rc_current[b, w_, slot] = -1
+                self.rc_progress[b, w_, slot] = 0.0
+                self.rc_cost[b, w_, slot] = 0.0
                 self.r_next_city_id[b, w_] += 1
                 self.rvcity_at[b, self.site[b, c]] = w_
 
@@ -3538,8 +3576,8 @@ class BatchSim:
                 (self.v_alive & (self.v_civ == r)).sum(dim=1).to(self.dtype),
                 torch.where(live & self.r_atwar[:, r], torch.ones_like(zero), zero),
                 torch.where(live, torch.round(self.r_tech[:, r] * 1000).to(self.dtype), zero),
-                torch.where(live, torch.round(self.r_prodstock[:, r] * 1000).to(self.dtype), zero),
-                torch.where(live, torch.round(self.r_milstock[:, r] * 1000).to(self.dtype), zero),
+                torch.where(live, torch.round((self.rc_progress[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
+                torch.where(live, torch.round((self.rc_cost[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

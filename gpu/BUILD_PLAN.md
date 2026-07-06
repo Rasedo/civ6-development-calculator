@@ -309,8 +309,15 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [ ] B2. Rival production queues on the real catalog (buildings, settlers
-        at real costs) — replaces prodstock/milstock scalars.
+  - [x] B2. Per-city REAL production queues (settlers + units at real
+        UNITS costs) replace BOTH pooled stocks, the pace/split constants,
+        and the home-city RNG draw; capital-prefers-settler picker; strength
+        = cities×8 + Σ fielded combat; trace ships Σ queue progress/cost.
+        Buildings enter at B4 (they need B3's research). BOTH GATES GREEN
+        FIRST TRY. Fresh baselines: random 106.4, scripted 156.1 — the world
+        got HARDER (every city produces continuously). tune3 now stale.
+        Detailed designs for B3/B4/B5: gpu/C1_B3-B5_DESIGN.md (agent-drafted,
+        reconciled against B2 as built).
   - [ ] B3. Rival research: real tech/civic trees + eurekas — replaces r_tech.
   - [ ] B4. Rival districts/buildings with real adjacency (owner-dim D-stages).
   - [ ] B5. Rival builders + improvements; unit training on the real path.

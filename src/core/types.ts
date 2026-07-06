@@ -297,10 +297,7 @@ export interface RivalCiv {
   peaceTurns: number;
   /** Abstract research progress (unit quality, city defense). */
   techLevel: number;
-  /** Production banked toward the next settler. */
-  productionStock: number;
-  /** Production banked toward the next military unit. */
-  militaryStock: number;
+
   /** Great-person race points per class. */
   gpp: Partial<Record<GreatPersonClass, number>>;
   pantheonClaimed: boolean;

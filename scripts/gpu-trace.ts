@@ -22,6 +22,7 @@
 
 import { empireScore } from '../src/core/empirePlanner';
 import { getCityHp } from '../src/core/combat';
+import { UNITS } from '../src/data/units';
 import type { GameState } from '../src/core/types';
 
 export function traceRow(state: GameState, cityIds: number[], cMax: number, csMax: number, rMax: number): number[] {
@@ -66,8 +67,16 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       state.units.filter((u) => u.owner === 'rival' && u.civId === rival.id).length,
       rival.atWar ? 1 : 0,
       Math.round(rival.techLevel * 1000),
-      Math.round(rival.productionStock * 1000),
-      Math.round(rival.militaryStock * 1000),
+      // C1-B2: the pooled stocks died — trace the queues instead (Σ front-item
+      // progress and Σ front-item cost across the civ's cities).
+      Math.round(rival.cities.reduce((s2, rc) => s2 + (rc.queue[0]?.progress ?? 0), 0) * 1000),
+      Math.round(
+        rival.cities.reduce((s2, rc) => {
+          const q = rc.queue[0];
+          if (!q) return s2;
+          return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? UNITS[q.unit]?.cost ?? 0 : 0);
+        }, 0) * 1000,
+      ),
     );
   }
   for (let c = 0; c < cMax; c++) {

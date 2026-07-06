@@ -28,8 +28,6 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     warTurns: 0,
     peaceTurns: 0,
     techLevel: 0,
-    productionStock: 0,
-    militaryStock: 0,
     gpp: {},
     pantheonClaimed: true,
     religionFounded: true,
@@ -104,7 +102,13 @@ describe('rival tile economies', () => {
       rivalPhase(poor);
     }
     expect(a.cities[0].population).toBeGreaterThan(b.cities[0].population);
-    expect(a.productionStock + a.militaryStock).toBeGreaterThan(b.productionStock + b.militaryStock);
+    // C1-B2: production output is queue COMPLETIONS — richer land fields
+    // more (units + cities + in-flight progress), not a bigger stock.
+    const output = (st: GameState, r: RivalCiv) =>
+      st.units.filter((u) => u.owner === 'rival' && u.civId === r.id).length * 40 +
+      (r.cities.length - 1) * 90 +
+      r.cities.reduce((n, rc) => n + (rc.queue[0]?.progress ?? 0), 0);
+    expect(output(rich, a)).toBeGreaterThan(output(poor, b));
   });
 });
 

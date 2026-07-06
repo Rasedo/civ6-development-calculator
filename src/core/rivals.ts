@@ -38,8 +38,6 @@ import {
   PEACE_GOLD_COST,
   RIVAL_CITY_MAX_HP,
   RIVAL_WORK_RADIUS,
-  RIVAL_PROD_TO_SETTLER,
-  RIVAL_PROD_TO_MILITARY,
   LOYALTY_MAX,
   LOYALTY_RANGE,
   LOYALTY_PRESSURE_SCALE,
@@ -157,8 +155,6 @@ export function placeRivals(state: GameState, count?: number): void {
       warTurns: 0,
       peaceTurns: 0,
       techLevel: 0,
-      productionStock: 0,
-      militaryStock: 0,
       gpp: {},
       pantheonClaimed: false,
       religionFounded: false,
@@ -189,7 +185,9 @@ export function playerStrength(state: GameState): number {
 }
 
 export function rivalStrength(state: GameState, rival: RivalCiv): number {
-  let s = rival.cities.length * 8 + rival.militaryStock * 0.2;
+  // C1-B2: strength counts what actually exists — cities and fielded units.
+  // The old militaryStock×0.2 term died with the pooled stocks.
+  let s = rival.cities.length * 8;
   for (const u of rivalUnits(state, rival.id)) s += UNITS[u.type]?.combat ?? 0;
   return Math.round(s);
 }
@@ -429,7 +427,6 @@ function tryFoundCity(state: GameState, rival: RivalCiv): void {
     }
   }
   if (best) {
-    rival.productionStock -= RIVAL_SETTLER_COST(rival.cities.length);
     const city = foundRivalCity(state, rival, best);
     state.eventLog.push(`${rival.name} founded ${city.name}.`);
   }
@@ -561,11 +558,41 @@ export function rivalPhase(state: GameState): void {
     if (rival.cities.length === 0) continue; // eliminated
     rival.techLevel += 0.15 + 0.05 * rival.cities.length;
 
-    // Cities: real tile yields drive growth and the production stocks.
-    let prodSum = 0;
+    // C1-B2: per-city REAL production queues (settler + units at real
+    // costs) replace the pooled prodstock/milstock, their pace/split
+    // constants and the random home-city draw. Each city queues ONE item —
+    // the capital prefers the settler (one in flight per civ), everyone
+    // else trains units up to the cap — funds it with its OWN production,
+    // and resolves it on completion at that city. Unit TYPE keeps the
+    // techLevel thresholds until B3; buildings arrive with B4. Picks
+    // happen for the PRE-TURN city set, in founding order, before any
+    // same-turn completion can found a new city.
+    const unitCap = rival.cities.length * 2 + (rival.atWar ? 3 : 1);
+    let unitCount = rivalUnits(state, rival.id).length;
+    let settlerQueued = false;
     for (const rc of rival.cities) {
+      const q = rc.queue[0];
+      if (q?.kind === 'unit') unitCount += 1;
+      if (q?.kind === 'settler') settlerQueued = true;
+    }
+    for (const rc of rival.cities) {
+      if (rc.queue.length > 0) continue;
+      if (!settlerQueued && rc.isCapital && rival.cities.length < RIVAL_MAX_CITIES) {
+        rc.queue.push({ kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
+        settlerQueued = true;
+      } else if (unitCount < unitCap) {
+        const type = rival.techLevel > 12 ? 'HORSEMAN' : rival.techLevel > 6 ? 'SPEARMAN' : 'WARRIOR';
+        rc.queue.push({ kind: 'unit', unit: type, progress: 0 });
+        unitCount += 1;
+      }
+    }
+
+    // Cities: real tile yields drive growth and the production queues.
+    // Iterate a SNAPSHOT — a settler completing mid-loop founds a city,
+    // and the newborn must not act this turn (the GPU gates on the
+    // pre-turn alive mask the same way).
+    for (const rc of [...rival.cities]) {
       const { food, production } = rivalCityYields(state, rival, rc);
-      prodSum += production;
       // C1-B1: the real growth accounting — true surplus (can be negative),
       // the unscaled Civ 6 growth curve, grow subtracts the need instead of
       // zeroing the box, and starvation shrinks the city exactly like the
@@ -580,32 +607,22 @@ export function rivalPhase(state: GameState): void {
         rc.population = Math.max(1, rc.population - 1);
         rc.foodBox = 0;
       }
+      // Queue progress + completion (settler founds via the site scan; a
+      // unit spawns at THIS city — no home-city RNG draw anymore).
+      const q = rc.queue[0];
+      if (q && (q.kind === 'settler' || q.kind === 'unit')) {
+        q.progress += production;
+        const cost = q.kind === 'settler' ? q.cost : UNITS[q.unit]?.cost ?? 54;
+        if (q.progress >= cost) {
+          rc.queue.shift();
+          if (q.kind === 'settler') tryFoundCity(state, rival);
+          else spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
+        }
+      }
       if ((state.turn + rc.id * 3) % RIVAL_BORDER_PERIOD === 0) {
         expandRivalBorder(state, rival, rc);
       }
       rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
-    }
-
-    // Stocks and spending.
-    const pace = 0.7 + rival.aggression * 0.6;
-    rival.productionStock += prodSum * RIVAL_PROD_TO_SETTLER * pace;
-    rival.militaryStock += prodSum * RIVAL_PROD_TO_MILITARY * pace;
-
-    if (
-      rival.cities.length < RIVAL_MAX_CITIES &&
-      rival.productionStock >= RIVAL_SETTLER_COST(rival.cities.length)
-    ) {
-      tryFoundCity(state, rival);
-    }
-
-    const units = rivalUnits(state, rival.id);
-    const unitCap = rival.cities.length * 2 + (rival.atWar ? 3 : 1);
-    const unitCost = 45 + rival.techLevel * 2;
-    if (units.length < unitCap && rival.militaryStock >= unitCost) {
-      rival.militaryStock -= unitCost;
-      const type = rival.techLevel > 12 ? 'HORSEMAN' : rival.techLevel > 6 ? 'SPEARMAN' : 'WARRIOR';
-      const homeCity = rival.cities[Math.floor(nextRandom(state) * rival.cities.length)];
-      spawnUnit(state, type, homeCity.centerIndex, 'rival', rival.id);
     }
 
     // Races: great people, pantheons, beliefs.

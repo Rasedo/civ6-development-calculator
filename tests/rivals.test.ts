@@ -35,8 +35,6 @@ function addRival(
     warTurns: 0,
     peaceTurns: 0,
     techLevel: 0,
-    productionStock: 0,
-    militaryStock: 0,
     gpp: {},
     pantheonClaimed: true, // opt out of belief races unless a test opts in
     religionFounded: true,
@@ -96,7 +94,8 @@ describe('rival placement and expansion', () => {
   it('rivals grow, expand borders and found further cities', () => {
     const state = makeState();
     const rival = addRival(state, 6, 6);
-    rival.productionStock = 500; // settler ready
+    // C1-B2: settlers are per-city queue items — queue one about to finish
+    rival.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
     const claimedBefore = state.map.tiles.filter((t) => (t.rivalId ?? -1) !== -1).length;
     state.turn = 9; // border-expansion tick for city id 0
     rivalPhase(state);
