@@ -123,3 +123,13 @@ RTX 4070 SUPER, district engine (2026-07):
 | trainer end-to-end, CUDA, batch 4096, horizon 100 | ~2,100–2,600 steps/sec |
 | trainer end-to-end, CUDA, batch 4096, horizon 60 | ~5,700–6,200 steps/sec |
 | random / scripted / tune1 (12M steps, ~80 min) | 115.1 / 162.2 / **216.9** |
+| tune2 — 46-action purchase head, 50 updates (20.5M steps) | **221.6 ± 14.5** |
+
+tune2 (same recipe on the purchase-capable head, resumed to 50 updates)
+edges tune1 by +4.7 with overlapping CIs and ties it on the matched-world
+netgreedy protocol (195.4) — the gold economy is a small, real positive.
+Note the verbs pay on RETRAIN, not retroactively: ranged strikes went
+live after both nets trained, and tune1 re-evals to the decimal on the
+ranged engine because its policy learned to never attack with (then
+weak, melee-locked) Slingers/Archers. A tune3 trained with ranged live
+is where that verb's value should appear.

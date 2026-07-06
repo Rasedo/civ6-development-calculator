@@ -733,3 +733,11 @@ behind the off-script gate — the D5 pattern.
   by melee retaliation, and the mask is flag-invariant. Both gates green
   (off-script mean rose 115.7→116.5 — ranged units survive their attacks now);
   tsc + purchase/war self-tests green.
+- tune2 [x] benchmarked (the 46-action purchase head; user-extended to 50 updates,
+  20.5M steps): eval 221.6 ± 14.5 vs tune1's 216.9 ± 13.5 on the identical engine
+  (tune1 re-evaluated bit-identically post-V-R — its policy never attacks with
+  ranged units, so the buff is unrealized by old nets), matched-world netgreedy a
+  dead-even 195.4. Verdict: purchases are a small real positive on retrain; the
+  training curve ran ahead of tune1's throughout (183.6 vs ~172 at update 9).
+  Ranged value awaits a tune3 trained under ranged semantics. Reference net for
+  the 46-column head: gpu/runs/tune2/best.pt (train-best 218.3).
