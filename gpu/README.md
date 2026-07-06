@@ -10,9 +10,15 @@ the policy commands its own army (4b), city-states and scripted
 rival civilizations live alongside — growing, settling, racing beliefs,
 declaring war and flipping disloyal cities (4c) — the climate takes
 its cut: floods, droughts, storms and volcanoes reshape tile food (4d) —
-and builders develop the land: farms lift tile food and housing, while
-barbarians, at-war rivals and disasters raid, sack and scorch them (6).
-Phase 5 trains on all of it with a native on-device PPO loop.
+and builders develop the land: farms, mines and lumber mills lift tile
+yields, while barbarians, at-war rivals and disasters raid, sack and
+scorch them (6). The district economy is live (D1–D6: Campus, Holy
+Site, Commercial Hub, Aqueduct and Harbor place off-script in any city,
+with real adjacency, their building chains and great people), and the
+policy owns real agency verbs: gold purchases of buildings/settlers/
+units (V-P), ranged strikes (V-R), and player war/peace plumbed behind
+a gate (V-W1). Phase 5 trains on all of it with a native on-device PPO
+loop, and `gpu/SEARCH.md` is the search arm on the same forward model.
 
 ## The parity contract
 
@@ -92,40 +98,54 @@ them, ungated); the IRRIGATION eureka ("farm a resource") had to be
 exported and detected once farms existed; and pillaging comes from three
 sources the GPU had to mirror — a raider standing on a farm, a city
 **sack** pillaging its center's six neighbours, and disaster **scorching**
-(floods/volcanoes/storms). One honest caveat remains: a boost firing
-*earlier* than the TS engine is invisible until it crosses its target's
-completion boundary. Fixtures are regenerated, not committed — they must
-always match the engine version you're comparing against.
+(floods/volcanoes/storms). The newest family-2 catch came from the
+purchase verbs (V-P2): a rival working a player-built MINE got zero
+production on the GPU (a stale "production is static" plane) where the
+TS engine pays the mine's BASE yield under defaultModifiers — invisible
+until purchases put builder improvements inside rival borders. One
+honest caveat remains: a boost firing *earlier* than the TS engine is
+invisible until it crosses its target's completion boundary. Fixtures
+are regenerated, not committed — they must always match the engine
+version you're comparing against.
 
 ## The action surface (phase 3)
 
 Mirrors `CivEnv`'s decision set, restricted to the covered scope. Each
 turn, `BatchSim.step(production, tech, civic)` accepts:
 
-- **production** `[B, C]` — per idle city: a City Center building
-  (`0..NB-1`), a settler (`NB`; always trainable, price rising per city
-  exactly like `settlerCost`, including several cities queueing in the
-  same turn), idle (`NB+1`), or train a roster unit (`NB+2..`,
-  tech-gated like `trainableUnits`). Founding consumes the fixture's
+- **production** `[B, C]` — per idle city: a City Center or district
+  building (`0..NB-1`), a settler (`NB`; always trainable, price rising
+  per city exactly like `settlerCost`, including several cities queueing
+  in the same turn), idle (`NB+1`), train a roster unit
+  (`NB+2..NB+1+NU`, tech-gated like `trainableUnits`), place a scaffold
+  district (`NB+2+NU..` — Campus/Holy Site/Commercial Hub/Aqueduct/
+  Harbor, instantly on its best adjacency tile, any city), or **buy
+  outright with gold** (`NB+2+NU+nScaffold..`: that building / a settler
+  / that unit at `GOLD_PURCHASE_MULT`× cost, mirroring purchaseBuilding/
+  purchaseSettler/purchaseUnit — the shared treasury re-validates in
+  slot order at execution). Founding consumes the fixture's
   advisor-ranked site list in order, like the TS autopilot.
 - **tech / civic** `[B]` — applied when the research slot is empty;
   progress banks while the policy deliberates, exactly like manual
   research in the TS engine.
-- **units** `[B, P, 16]` (phase 4b, +build in phase 6) — one order per
-  player unit per turn: step to a neighbor (0–5), melee-attack the
-  barbarian there (6–11), hold (12), or build a FARM / MINE / LUMBER_MILL
-  (13/14/15 — builders on a tile where that improvement is valid). Orders
-  execute in spawn order and are RE-validated at
-  execution on both engines identically (an earlier unit's move can
-  invalidate a later order — rejected orders are no-ops, not errors).
-  Combat mirrors `meleeAttack`: terrain defense, the victor-survives
-  rule on mutual kills, advancing into the emptied tile, and clearing a
-  barbarian camp on entry (+50 gold, camp list splice). This goes BEYOND
-  the TS `CivEnv`, which delegates units to an autopilot — here the
-  policy commands the army *and its builders* directly. The off-script
-  replay identifies each ordered unit by its tile + domain (not an
-  append-only slot), so a unit that spawns and dies in the same turn
-  can't desync the mapping.
+- **units** `[B, P, 16]` (phase 4b, +build in phase 6, +ranged in V-R) —
+  one order per player unit per turn: step to a neighbor (0–5), attack
+  the barbarian or at-war-rival unit there (6–11), hold (12), or build a
+  FARM / MINE / LUMBER_MILL (13/14/15 — builders on a tile where that
+  improvement is valid). Orders execute in spawn order and are
+  RE-validated at execution on both engines identically (an earlier
+  unit's move can invalidate a later order — rejected orders are no-ops,
+  not errors). Melee mirrors `meleeAttack`: terrain defense, the
+  victor-survives rule on mutual kills, advancing into the emptied tile,
+  and clearing a barbarian camp on entry (+50 gold, camp list splice);
+  **ranged units (Slinger/Archer) execute the same codes as
+  `rangedAttack`** — one roll, no retaliation, no advance (range-1
+  targets; Archer's ring-2 target set is a deferred widening). This goes
+  BEYOND the TS `CivEnv`, which delegates units to an autopilot — here
+  the policy commands the army *and its builders* directly. The
+  off-script replay identifies each ordered unit by its tile + domain
+  (not an append-only slot), so a unit that spawns and dies in the same
+  turn can't desync the mapping.
 - **envoy** `[B]` (phase 4c) — back that met city-state with one banked
   envoy (influence accrues 3/turn; quests award more). Envoy tiers feed
   the capital's yields exactly like `csEnvoyBonuses` → `capitalYields`.
@@ -192,48 +212,57 @@ episodes, fresh worlds, `empireScore` at the horizon). Numbers are
 comparable only WITHIN this table — the GPU env has direct unit control
 and the full hostile world, unlike the TS benchmark scenario:
 
-| policy (GPU env, 100 turns, 50 episodes) | score |
+| policy (GPU env, 100 turns, 50 episodes, district engine) | score |
 |---|---|
-| random masked actions | 111.0 ± 12.2 |
-| engine scripted autopilot | 172.5 ± 17.3 |
-| PPO, native loop — 256k steps on the 4-core CPU (~35 min) | 186.4 ± 16.0 |
-| PPO, 40M steps overnight on an RTX 4070 SUPER (14-action, farms only) | 213.6 ± 13.5 |
+| random masked actions | 115.1 ± 11.8 |
+| engine scripted autopilot | 162.2 ± 13.0 |
+| PPO **tune1** — 12M steps, ~80 min on an RTX 4070 SUPER | **216.9 ± 13.5** |
 
-The overnight run beats the scripted autopilot by ~20% with non-overlapping
-95% CIs, and lifts the whole distribution (its worst game, 116.8, more than
-doubles scripted's worst, 53.0). It used the phase-6a action space — no mines
-or lumber mills — so a 16-action phase-6b retrain is the natural next step.
-The CPU demo passes the autopilot inside ~70k steps and is still
-climbing at 256k — a CUDA box at batch 1024 collects that much
-experience per handful of updates; long runs are the point.
+tune1 beats the scripted autopilot with non-overlapping 95% CIs on the
+26-action district engine (recipe in `gpu/TRAINING.md`; what a strong
+net does — and doesn't do — for search is in `gpu/SEARCH.md`). The
+46-action purchase head and ranged strikes are newer than tune1;
+`fit_env_to_checkpoint` auto-narrows the env so older checkpoints stay
+benchmarkable. Historical baselines from earlier, simpler engines:
+random 111.0 / scripted 172.5 / 256k-step CPU PPO 186.4 (v5b), and the
+40M-step overnight 213.6 (14-action, farms-only) — the CPU demo passed
+the autopilot inside ~70k steps; a CUDA box at batch 4096 collects that
+much experience per handful of updates. Long runs are the point.
 
 ## What phases 1–5 cover (and what they don't)
 
 | Ported & parity-checked | Not yet (runs in TS only) |
 |---|---|
-| Tile yields (via exported per-tile tables) | Improvements beyond FARM/MINE/LUMBER_MILL (pasture/camp/plantation/chops) |
-| Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the City Center |
-| Growth/starvation, housing (water+buildings+farms), amenity tiers | Ranged attacks, multi-tile A* moves |
-| City Center buildings (unlocks, river gate, maintenance) | Conquest: capturing rival cities / city-states |
-| Settlers: rising cost, training, auto-founding (with drops) | Player-declared war and peace deals |
-| Builders: training, single-step moves, FARM building, charges | Militaristic levies, CS trade-route quests |
-| Tile improvements (FARM): dynamic food + housing, resource farms | Policies/governments/religion modifiers |
-| Multi-city: per-city queues, ring-1 claims at founding | Fog of war, trade routes |
-| Shared-map border competition (exact per-city ordering) | Luxury amenity sharing (inert in covered scope) |
-| Tech/civic research: manual picks, banking, auto-pick | Goody huts (reference maps exported without them) |
-| Eureka **detection** + discounts (incl. IRRIGATION farm-a-resource) | Eureka conditions outside covered state |
+| Tile yields (via exported per-tile tables) | Improvements beyond FARM/MINE/LUMBER_MILL (pasture/camp/plantation, chops/harvests) |
+| Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the covered five (Theater, IZ, Encampment*, Entertainment, Neighborhood) |
+| Growth/starvation, housing (water+buildings+farms+Aqueduct), amenity tiers | Archer range-2 targets; multi-tile A* moves |
+| City Center + district buildings (12; tech/civic unlocks, river gate, prereqs, maintenance) | Conquest: capturing rival cities / city-states (→ C1-B7) |
+| Districts: Campus/Holy Site/Commercial Hub/Aqueduct/Harbor — RL placement any-city, dynamic adjacency, specialty cap | Militaristic levies, CS trade-route quests |
+| Great people: Scientist/Merchant/Prophet accrual + effects, shared race pool | Policies/governments/religion modifiers |
+| **Gold purchases** (buy building/settler/unit at 4×, slot-order treasury) | Fog of war, trade routes |
+| Settlers: rising cost, training, purchase, auto-founding (with drops) | Luxury amenity sharing (inert in covered scope) |
+| Builders: training, single-step moves, FARM/MINE/LUMBER building, charges | Goody huts (reference maps exported without them) |
+| Tile improvements: dynamic food/production, resource farms, tech-boosted mines | Eureka conditions outside covered state |
+| **Ranged strikes** (Slinger/Archer: one roll, no retaliation, range-1) | Specialists |
+| Player war/peace: plumbed + self-tested, gated OFF until C1-B7 wiring | |
+| Multi-city: per-city queues, ring-1 claims at founding | |
+| Shared-map border competition (exact per-city ordering) | |
+| Tech/civic research: manual picks, banking, auto-pick | |
+| Eureka **detection** + discounts (incl. IRRIGATION farm-a-resource) | |
 | RL action masks, empireScore reward, batched env | |
 | Barbarians: camps, garrisons, raiders, sieges, sacks, healing | |
 | Player military: training, single-step moves, melee, camp clearing | |
 | Pillaging: barbs & at-war rivals raid your farms; sack pillages | |
 | Disaster scorching: floods/volcanoes/storms pillage improvements | |
 | Per-side stacking (1 military + 1 civilian; foreign blocks) | |
-| City-states: influence, envoys, quests, capital yield tiers | |
-| Rivals: tile economies, border growth, settling, unit production | |
+| City-states: influence, envoys, quests, capital + district yield tiers | |
+| Rivals: tile economies (improvement base yields, no player boosts), border growth, settling, unit production | |
 | Rival wars: declarations, farm-raiding marches, sieges, auto-peace | |
 | Loyalty pressure and city flips (capitals immune) | |
 | Disasters: floods, volcanoes, droughts, storms; fertility & drought | |
 | In-state mulberry32 RNG, mirrored draw for draw | |
+
+\* Encampment is wired end-to-end but held out of the scaffold (see BUILD_PLAN D6).
 
 Each later phase moves a row from the right column to the left, extending
 the same fixtures/traces mechanism.
@@ -248,6 +277,11 @@ npm run gpu:replay            # 4. the TS oracle must reproduce them
 python gpu/bench.py           # 5. throughput (CUDA if available)
 python gpu/train_ppo.py       # 6. train natively (phase 5)
 python gpu/eval.py --policy gpu/runs/ppo/best.pt   # 7. evaluate
+
+python gpu/purchase_test.py   # deterministic self-tests: verbs…
+python gpu/war_test.py        #   (war/peace is gated off; test flips it)
+python gpu/ranged_test.py
+python gpu/mcts_test.py       # …and the search primitives
 ```
 
 Needs only `torch` (already in `python/requirements.txt`). Parity runs in
@@ -330,6 +364,23 @@ card for the CUDA numbers.
    raided/pillaged like any improvement and fire the WHEEL/APPRENTICESHIP
    eurekas; housing stays FARM-only. The off-script gate builds ~15 mines
    across 11 games; lumber mills (CONSTRUCTION lands after 3-charge builders
-   act) are covered by a deterministic build-action self-test. Next here:
-   chop/harvest one-time yields, then the resource improvements
+   act) are covered by a deterministic build-action self-test. Still open
+   here: chop/harvest one-time yields, then the resource improvements
    (pasture/camp/plantation).
+8. ✅ Districts D1–D6 + agency verbs (V arm). Campus/Holy Site/Commercial
+   Hub/Aqueduct/Harbor place off-script in any city (dynamic adjacency,
+   building chains, great people); gold purchases live in the production
+   head (V-P — whose gate caught a latent rival-economy bug: rivals now
+   get improvement BASE yields, never the player's tech boosts); ranged
+   strikes live (V-R); player war/peace plumbed behind a gate (V-W1).
+   City capture deliberately waits for C1-B7, where owner-indexed cities
+   make it a civId change.
+9. Single-agent search (M arm) — `gpu/SEARCH.md`: snapshot/restore,
+   exhaustive 1-ply, closed-loop MPC, empire-wide search, net-guided
+   tuple search. Strong-net verdict: a 1-ply value leaf cannot beat the
+   net's own greedy at any sampling temperature — M3 (search-distilled
+   value training, batched candidate evaluation) is the open lever.
+10. **DECIDED 2026-07-06: Road A** — promote rivals to full symmetric
+   civs in BOTH engines under the parity contract, then per-seat RL and
+   a self-play league. Ordered stages in `BUILD_PLAN.md` §3
+   (C1-A groundwork → C1-B subsystem promotion → C2 seats → C3 league).

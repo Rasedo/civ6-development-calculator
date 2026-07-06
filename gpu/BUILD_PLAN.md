@@ -1,7 +1,10 @@
 # GPU engine — autonomous build plan
 
-Ordered roadmap toward the district economy, single-agent search, and
-self-play. Worked in **small stages, each committed + pushed green** so a
+Ordered roadmap: the district economy (§1, done), single-agent search
+(§2, done through M2b-2), full-fidelity symmetric rivals → self-play
+(§3, Road A decided 2026-07-06), and the agency verbs (§4, purchases +
+ranged live, war/peace gated). Worked in **small stages, each committed
++ pushed green** so a
 container rollback never loses more than the in-flight stage. Every stage
 re-syncs first (`git stash -u; git fetch; git merge --ff-only origin/<branch>`),
 mirrors the TS oracle, and must pass BOTH parity gates + `tsc` before commit:

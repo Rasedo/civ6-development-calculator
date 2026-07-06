@@ -348,10 +348,13 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
   or legacy bonuses.
 - Border-growth tile picking approximates Civ 6's priorities; no tile swapping
   between cities.
-- Rivals are *scripted*, not full AIs: real cities/units/territory but an
-  abstract economy (no real yields/queues underneath); they don't fight each
-  other or the barbarians; losing one of your cities means a sack, not a
-  capture. City-states are peaceful (no levies, no conquest of them yet).
+- Rivals are *scripted*, not full AIs: real cities/units/territory with a
+  tile-driven but abstract economy (no real queues/research underneath);
+  they don't fight each other; losing one of your cities means a sack or a
+  loyalty flip, not a capture. (Barbarians DO raid rivals, city-states CAN
+  be conquered, and militaristic suzerains levy troops — see the feature
+  list above.) The GPU arm is replacing this wholesale: Road A promotes
+  rivals to full symmetric civs (`gpu/C1_DECISION.md`).
 - Great-person effects are instant only; the wonder list is a 13-wonder
   subset. Religion has no spread/pressure (your cities always follow) and no
   enhancer beliefs; rival religions only contest the belief pools. Trade
@@ -371,16 +374,20 @@ thousands of games step in lockstep as `[games, cities, …]` tensor ops
 (`npm run gpu:export` → `python gpu/parity_test.py` reproduces recorded
 traces integer-exact) and **off-script**: `python gpu/rollout.py` plays
 random masked actions and logs them, `npm run gpu:replay` feeds that log
-through the real engine and must match every turn. Phases 1–6 cover a
-multi-city economy plus the RL surface (masked production/research/
+through the real engine and must match every turn. The covered scope is
+a multi-city economy plus the RL surface (masked production/research/
 civic/unit/envoy actions, detected eurekas, `empireScore` rewards, a
 batched env `civ6gpu.BatchEnv`) inside a genuinely hostile world:
-barbarian camps and raiders, a player-commanded military, city-states
-courting envoys, scripted rival civs that grow, settle, race beliefs,
-declare war and flip disloyal cities, natural disasters (floods,
-volcanoes, droughts, storms) reshaping tile food, and builders that farm
-the land — with barbarians, at-war rivals and disasters raiding, sacking
-and scorching those farms — all with the in-state mulberry32 RNG
+barbarian camps and raiders, a player-commanded military (melee and
+true ranged strikes), city-states courting envoys, scripted rival civs
+that grow, settle, race beliefs, declare war and flip disloyal cities,
+natural disasters (floods, volcanoes, droughts, storms) reshaping tile
+food, builders that farm, mine and log the land — with barbarians,
+at-war rivals and disasters raiding, sacking and scorching those
+improvements — plus the district economy (Campus, Holy Site, Commercial
+Hub, Aqueduct and Harbor placeable by the policy in any city, with real
+adjacency, building chains and great people) and gold purchases of
+buildings/settlers/units, all with the in-state mulberry32 RNG
 mirrored draw for draw. Phase 5 trains on it
 natively: `python gpu/train_ppo.py` runs a masked multi-head PPO whose
 inference, env stepping and updates never leave the device, with worlds
@@ -392,15 +399,22 @@ snapshot/restore, closed-loop MPC, empire-wide production search and
 net-guided full-tuple search. See `gpu/README.md` for the
 covered/not-covered table and the roadmap.
 
-## Roadmap ideas (later stages)
+## Roadmap (later stages)
 
-1. RL escalation beyond the shipped PPO/CNN stages: planner-guided search
-   with a learned value function (AlphaZero-lite); long CUDA runs of the
-   native GPU trainer (phase 5 complete: on-device PPO + a 3× kernelized
-   engine, ~13k game-turns/sec on 4 CPU cores) toward self-play scale.
-2. Opponent depth II: rival build queues and districts on the map, loyalty
-   pressure working in your favor (flipping rival border cities), open
-   borders and diplomacy beyond war/peace.
+1. RL escalation, in flight on the GPU engine: strong nets train locally
+   in ~80 minutes (`gpu/TRAINING.md`), and a single-agent search arm sits
+   on the same forward model (`gpu/SEARCH.md`). Verdict so far: a 1-ply
+   value-leaf search cannot beat the net's own greedy play at any
+   sampling temperature — the open lever is M3, training the value head
+   on search-improved targets (AlphaZero's actual trick), plus batching
+   the candidate evaluation.
+2. **Decided 2026-07-06: Road A** — promote rivals to full symmetric
+   civs in BOTH engines under the parity contract, then per-seat RL and
+   a self-play league (`gpu/C1_DECISION.md`; ordered stages in
+   `gpu/BUILD_PLAN.md` §3). This absorbs the old "opponent depth" ideas:
+   rival build queues and districts on the map, loyalty pressure working
+   in your favor, symmetric war — and city capture lands there too,
+   as a `civId` change on owner-indexed cities.
 
 ## Code layout
 

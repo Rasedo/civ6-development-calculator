@@ -39,9 +39,13 @@ belongs later (M2b-2), where leaves get expensive and stochastic.
 - **`gpu/search_eval.py`** — benchmark a challenger vs the scripted base policy on
   **matched** B=1 worlds (same fixture + scramble, played twice from the identical start).
   Policies: `search` (net-free rollout MPC), `net` (a trained policy head drives
-  production), `netsearch` (the search with the net's value head as the leaf). `--all-cities`
-  controls every city's production; `--loyalty-aware` shapes the leaf against loyalty flips. One
-  fixed `--dtype` per run (float32/float64 diverge over 100 turns). Run:
+  production), `netsearch` (the search with the net's value head as the leaf),
+  `netgreedy` (the net drives all five heads), `tuplesearch` (net-prior tuple sampling
+  with a net-value or rollout leaf; `--k`, `--tuple-leaf`, `--temperature` to sharpen
+  the sampled candidates). `--all-cities` controls every city's production;
+  `--loyalty-aware` shapes the leaf against loyalty flips; `--checkpoint` nets from
+  older action-space vintages auto-narrow the env. One fixed `--dtype` per run
+  (float32/float64 diverge over 100 turns). Run:
   `python3 gpu/search_eval.py --policy search --loyalty-aware --episodes 5 --turns 100`.
 
 ## Results (5 games × 100 turns, matched float32 worlds, capital production unless noted)
@@ -158,8 +162,14 @@ the net's value head.
 ## Roadmap (see `gpu/BUILD_PLAN.md`)
 
 - **Done:** M1 (snapshot/restore + 1-ply), M2a (closed-loop depth + MPC), M2b-1 (trained net
-  wired into the search + benchmark), empire-wide production search, loyalty-aware leaf, and
-  M2b-2 (net-guided search over the full 5-head tuple — `netgreedy`/`tuplesearch`). RL trains
-  on the district engine on GPU at ~15× a cloud CPU.
-- **Next:** a STRONG net (a ~2-hour GPU run) so `tuplesearch` can actually beat greedy — the
-  value-head accuracy is the current bottleneck; then C1–C3 (symmetric rivals → self-play).
+  wired into the search + benchmark), empire-wide production search, loyalty-aware leaf,
+  M2b-2 (net-guided search over the full 5-head tuple — `netgreedy`/`tuplesearch`), the
+  STRONG net (tune1: 216.9 eval, 195.4 netgreedy, 6/6 incl. the loyalty world), and the
+  temperature sweep that CLOSED the 1-ply value-leaf question — greedy stays ahead at
+  every τ. Old checkpoints stay benchmarkable via `fit_env_to_checkpoint` (the engine's
+  action surface has since widened with purchases).
+- **Next:** M3 — train the value head on search-improved targets (and/or rollout leaves
+  with a NET-driven continuation); the throughput unlock for both is batching the
+  candidate evaluation across the batch dimension instead of the sequential B=1 loop.
+  The multi-agent road is **decided: Road A, full-fidelity symmetric rivals** —
+  ordered stages in `BUILD_PLAN.md` §3, analysis in `C1_DECISION.md`.

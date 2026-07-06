@@ -100,6 +100,12 @@ python gpu/eval.py --policy random --episodes 50                      # re-basel
 Greedy (default) is usually a few points above sampled. Same `--seed`
 reproduces the same eval worlds, so before/after comparisons are fair.
 
+Checkpoints carry their action-space vintage: a pre-purchase 26-column
+net (tune1 and older) auto-narrows the env at load
+(`fit_env_to_checkpoint` prints a note and disables the purchase
+columns), so old nets stay benchmarkable against the live 46-column
+engine; matched-world scripted baselines are unaffected either way.
+
 ## Reference numbers
 
 4-core CPU container, engine v5b (historical):
