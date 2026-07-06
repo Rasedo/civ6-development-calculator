@@ -224,8 +224,10 @@ behind the off-script gate — the D5 pattern.
 - [ ] **V-P2** Activate purchases off-script: flip the flag, teach
       replay-gpu.ts purchase codes, rollout emits the map; drive the gate
       green. AFTER the tune1 benchmarks (width change breaks old checkpoints).
-- [ ] **V-W1** Player-initiated war/peace (declare on a rival; peace-for-gold
-      mirroring the TS deal), gated.
+- [x] **V-W1** Player-initiated war/peace (declare on a rival; peace-for-gold
+      mirroring the TS deal), plumbed + gated OFF: a NEW `war` head
+      (`war_mask()` [B,2R], `step(war=…)`), not wired into BatchEnv until
+      activation. Self-test `gpu/war_test.py`; both gates green.
 - [ ] **V-W2** City capture: player melee vs rival city centers
       (attackCity/captureRivalCity semantics), gated.
 - [ ] **V-R** Ranged attacks (export the dropped `ranged` field; Slinger/Archer
@@ -615,3 +617,23 @@ behind the off-script gate — the D5 pattern.
   and treasury timing are exercised by the self-test, not the gates, until V-P2 flips
   the flag — the replay-side purchase dispatch is V-P2 scope. tune1 finished meanwhile
   (30/30 updates, train mean 209.9, best 210.9): benchmarks next, THEN V-P2.
+- V-W1 [x] player war/peace, plumbed + gated OFF (`_rl_war_active=False`). A NEW
+  diplomacy head rather than production codes: `war_mask()` [B, 2R] (cols 0..R-1
+  declareWar — rival alive & not at war, free, no RNG; cols R..2R-1 sueForPeace —
+  at war ≥ peaceMinWarTurns(8) & treasury ≥ peaceGold0(150) + peaceGoldSlope(10)·
+  warTurns, params exported from PEACE_MIN_WAR_TURNS / PEACE_GOLD_COST) and a
+  `step(war=[B])` arg applied FIRST in the turn (before unit orders, so a same-turn
+  declaration legalizes attacks at execution; the pre-step masks the policy sampled
+  simply lag one turn — execution revalidation keeps both engines identical). Peace
+  clears atWar/warTurns/peaceTurns exactly like makePeace, so the rival redeclare
+  gate (peaceturns > 20) applies automatically; the war-roll RNG stream shifts
+  identically in both engines because it is state-driven (skipped when already at
+  war), preserving draw-for-draw parity. Gated-off: mask all-False, step(war=…)
+  ignored — `gpu/war_test.py` proves a war code is a bit-exact no-op across all
+  _MUTABLE, and proves the ACTIVE transitions equal hand-poked declareWar/
+  sueForPeace + a plain step (bit-identical over every tensor — the strongest
+  equivalence, immune to same-turn rival-phase confounds; peace cost 240 at
+  warTurns 9 on seed9001). The head is NOT in BatchEnv.masks()/train_ppo yet —
+  wiring + replay dispatch (act.w) land at activation with the V-P2-style retrain.
+  Both gates green (rollout summary bit-identical to pre-change: 43.8/115.2/224.8);
+  tsc green.

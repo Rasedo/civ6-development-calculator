@@ -538,6 +538,11 @@ class BatchSim:
         # production mask keeps its NB+2+NU+nScaffold width, so existing
         # checkpoints stay loadable and rollouts are bit-identical.
         self._rl_purchase_active = False
+        # V-W1: player diplomacy (declareWar / sueForPeace on a rival) as a
+        # NEW head, plumbed but OFF: war_mask() is all-False and step(war=…)
+        # is ignored while False, so nothing samples or applies it. The head
+        # is not wired into BatchEnv until activation (+ retrain).
+        self._rl_war_active = False
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -1350,6 +1355,27 @@ class BatchSim:
     def envoy_mask(self) -> torch.Tensor:
         """[B, S] city-states an available envoy could back right now."""
         return self.cs_alive & self.cs_met & (self.envoys_avail > 0).unsqueeze(1)
+
+    def war_mask(self) -> torch.Tensor:
+        """[B, 2R] player diplomacy actions (V-W1): columns 0..R-1 declare war
+        on that rival (declareWar: alive & not already at war — free, no RNG),
+        R..2R-1 sue for peace (sueForPeace: at war for >= peaceMinWarTurns and
+        treasury covers peaceGold0 + peaceGoldSlope·warTurns). All-False while
+        _rl_war_active is off — the head exists but nothing samples it."""
+        B, dev = self.B, self.device
+        R = max(self.R, 1)
+        if self.R == 0 or not self._rl_war_active:
+            return torch.zeros(B, 2 * R, dtype=torch.bool, device=dev)
+        rr = self.rules.rivals
+        declare = self.r_alive & ~self.r_atwar
+        cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.r_warturns.to(self.dtype)
+        peace = (
+            self.r_alive
+            & self.r_atwar
+            & (self.r_warturns >= rr.get("peaceMinWarTurns", 8))
+            & (self.treasury.unsqueeze(1) >= cost)
+        )
+        return torch.cat([declare, peace], dim=1)
 
     # --- eureka detection --------------------------------------------------------
 
@@ -2846,6 +2872,7 @@ class BatchSim:
         civic: torch.Tensor | None = None,
         units: torch.Tensor | None = None,
         envoy: torch.Tensor | None = None,
+        war: torch.Tensor | None = None,
     ) -> None:
         """Advance every game one turn.
 
@@ -2862,9 +2889,37 @@ class BatchSim:
         envoy: [B] long — back that city-state with one available envoy
         (validated; -1 = none), or None for the scripted greedy assignment
         (neediest met city-state, ties to the lowest id, until spent).
+        war: [B] long (V-W1, ignored while _rl_war_active is off) — 0..R-1
+        declare war on that rival, R..2R-1 sue for peace with it, -1 none.
+        Applied FIRST, before unit orders, so a same-turn declaration
+        legalizes attacks at execution (the replay applies it at the same
+        point); the pre-step masks the policy sampled from simply lag it.
         """
         r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
         rd = self.rules_dev
+
+        # --- player diplomacy (V-W1; gated) --------------------------------------
+        if war is not None and self._rl_war_active and self.R > 0:
+            w = war.to(torch.long)
+            ok = (w >= 0) & self.war_mask().gather(1, w.clamp(min=0).unsqueeze(1)).squeeze(1)
+            if bool(ok.any()):
+                decl = ok & (w < self.R)
+                if bool(decl.any()):
+                    oh = torch.nn.functional.one_hot(w.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
+                    self.r_atwar = self.r_atwar | oh
+                    self.r_warturns = torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns)
+                pea = ok & (w >= self.R)
+                if bool(pea.any()):
+                    ri = (w - self.R).clamp(min=0, max=self.R - 1)
+                    rr = self.rules.rivals
+                    cost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.r_warturns.gather(
+                        1, ri.unsqueeze(1)
+                    ).squeeze(1).to(self.dtype)
+                    oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
+                    self.treasury = torch.where(pea, self.treasury - cost, self.treasury)
+                    self.r_atwar = self.r_atwar & ~oh
+                    self.r_warturns = torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns)
+                    self.r_peaceturns = torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns)
 
         # --- player unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:

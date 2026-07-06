@@ -65,6 +65,8 @@ import {
   LOYALTY_RANGE,
   LOYALTY_PRESSURE_SCALE,
   LOYALTY_AMENITY,
+  PEACE_MIN_WAR_TURNS,
+  PEACE_GOLD_COST,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -327,6 +329,11 @@ const rules = {
     pantheonTurn: RIVAL_PANTHEON_TURN,
     religionTurn: RIVAL_RELIGION_TURN,
     warMinTurns: RIVAL_WAR_MIN_TURNS,
+    // Player diplomacy (V-W1): sueForPeace gates on warTurns >= peaceMinWarTurns
+    // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
+    peaceMinWarTurns: PEACE_MIN_WAR_TURNS,
+    peaceGold0: PEACE_GOLD_COST(0),
+    peaceGoldSlope: PEACE_GOLD_COST(1) - PEACE_GOLD_COST(0),
     cityMaxHp: RIVAL_CITY_MAX_HP,
     workRadius: RIVAL_WORK_RADIUS,
     prodToSettler: RIVAL_PROD_TO_SETTLER,
