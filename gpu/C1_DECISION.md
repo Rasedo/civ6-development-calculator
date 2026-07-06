@@ -1,4 +1,10 @@
-# C1 — the self-play architecture decision (human call needed)
+# C1 — the self-play architecture decision
+
+> **DECIDED 2026-07-06: Road A — full-fidelity C1.** The user chose to
+> promote rivals to full symmetric civs in BOTH engines under the parity
+> contract. The staged plan lives in `BUILD_PLAN.md` §3 (C1-A groundwork →
+> C1-B subsystem promotion → C2 egocentric surface → C3 self-play trainer).
+> The analysis below is kept for the record.
 
 Self-play with tree search needs a second **policy-driven** civilization.
 Today both engines have exactly one: the player is a full citizen

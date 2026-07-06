@@ -203,10 +203,46 @@ priors + value head (train_ppo `self.v`), legal-action masks.
 ## 3. Multi-civ symmetry  (unlocks self-play + AlphaZero)
 Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
 
-- [ ] **C1** Promote rivals to full symmetric per-owner state (owner dimension on
-      cities/economy/research/gov); keep TS parity.
-- [ ] **C2** Per-civ egocentric obs, per-civ action routing, per-civ reward.
-- [ ] **C3** Self-play trainer + opponent league (PFSP, frozen snapshots).
+**DECIDED 2026-07-06 (user): Road A — full-fidelity C1.** Promote rivals to
+full symmetric civs in BOTH engines, keeping the two-gate parity contract.
+See `gpu/C1_DECISION.md`. Plan principles: (1) never a big-bang rewrite —
+every stage lands with both gates green; (2) TS stays the oracle at every
+step; (3) behavior-preserving refactors FIRST (fixtures unchanged), then
+one rival subsystem at a time swaps heuristic → real machinery (fixtures
+and baselines legitimately regenerate at each activation); (4) the old
+scripted-rival heuristic is re-expressed as a scripted POLICY driving a
+full civ — it remains the parity anchor and becomes self-play's baseline
+opponent; (5) the verbs arm (war/capture) folds in where symmetric state
+makes it natural.
+
+- **C1-A. TS unification groundwork (behavior-preserving; fixtures unchanged):**
+  - [ ] A1. One `civId` space (player = 0, rivals 1..R): unify tile ownership
+        (`cityId`/`rivalId` → owner-qualified), typed accessors, no behavior
+        change — all TS tests + both gates green on UNCHANGED fixtures.
+  - [ ] A2. Rival cities become real `City` objects (civId-tagged) carrying
+        their current scalar economy behind the same heuristic — trace-identical.
+  - [ ] A3. GPU mirror of A1/A2's layout: owner-dimensioned city tensors
+        `[B, O, C', …]` with the player seat mapping onto today's semantics
+        bit-exactly (the old [B, C] views become seat-0 slices).
+- **C1-B. Subsystem promotion, one at a time (each: TS change → export →
+  both gates → GPU mirror → new baselines):**
+  - [ ] B1. Rival tile-working via the real citizen/yield path (housing,
+        amenities) — replaces best-pop-tiles × tech-multiplier.
+  - [ ] B2. Rival production queues on the real catalog (buildings, settlers
+        at real costs) — replaces prodstock/milstock scalars.
+  - [ ] B3. Rival research: real tech/civic trees + eurekas — replaces r_tech.
+  - [ ] B4. Rival districts/buildings with real adjacency (owner-dim D-stages).
+  - [ ] B5. Rival builders + improvements; unit training on the real path.
+  - [ ] B6. Unified GP/pantheon/belief races on the real machinery.
+  - [ ] B7. Symmetric conflict: war/peace both ways (V-W1 head activates),
+        loyalty flips BOTH ways, and city capture in owner terms (a captured
+        city changes `civId` — absorbing V-W2 cleanly, no slot growth hack).
+- **C1-C = C2. Egocentric RL surface:** per-seat obs (each civ sees itself as
+  seat 0), owner-parameterized masks/action routing, per-civ empire-score
+  reward; BatchEnv gains a seat axis.
+- **C1-D = C3. Self-play trainer:** seat-swapped PPO first (both seats, one
+  net), then the league (frozen snapshot pool, PFSP matchmaking), and the
+  eval protocol: head-to-head vs frozen refs + vs the scripted-policy civ.
 
 ## 4. Agency verbs  (depth-of-control: give the policy the missing decisions)
 Evidence says training value comes from verbs, not content breadth: the TS ~310
