@@ -261,6 +261,24 @@ next. The distillation MACHINERY works as built; the target SOURCE was
 beneath the student. Champion unchanged (the c3a-11 checkpoint is
 discarded from the lineage).
 
+**Second distillation (c3a-12-gdistill, net-guided gumbel targets) —
+ALSO negative, two NEW mechanisms**: eval 193.5, and the probe shows
+catastrophic forgetting, not scripted fingerprints (districts 4.7 →
+1.4, buildings 7.5 → 2.3, civics halved, treasury ballooned to 126) —
+600 states hammered every minibatch for 40 updates = the net overfit
+the tape and forgot its queue policy everywhere else. AND the teacher
+edge was STALE: the searcher's own six games scored 182-208 on this
+world — BELOW the 225 champion. The 243.7-vs-240.3 gumbelsearch result
+was measured on the tune3-era world; it was never re-verified against
+THIS champion on THIS world. Two standing rules join the methodology:
+(1) MEASURE THE TEACHER IN THE TARGET SETTING immediately before
+distilling — a searcher's edge is world- and checkpoint-relative;
+(2) distillation data must be large or reweighted — a small tape
+repeated per-minibatch is a forgetting hazard (mix at low weight,
+early-stop on eval). c3a-12 discarded. Next: benchmark gumbelsearch
+WITH c3a-10 on the current world (raise k/depth if needed) — distill
+again only once a real, measured edge exists.
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts
