@@ -42,6 +42,8 @@ def main() -> None:
     ap.add_argument("--k", type=int, default=8)
     ap.add_argument("--max-depth", type=int, default=12)
     ap.add_argument("--reward-scale", type=float, default=100.0, help="must match the checkpoint's training reward scale")
+    ap.add_argument("--offset", type=int, default=0, help="fixture-pool offset (parallel workers use disjoint offsets)")
+    ap.add_argument("--at-war-only", action="store_true", help="record only at-war states (the siege curriculum: captures are ~1/1000 in generic tape)")
     args = ap.parse_args()
 
     rules = load_rules()
@@ -53,11 +55,11 @@ def main() -> None:
         assert args.policy, "--search gumbel needs --policy (the net guides the search)"
         depths = sh_depths(args.k, args.max_depth)
         for ep in range(args.episodes):
-            fx = load_fixture(pool[ep % len(pool)])
+            fx = load_fixture(pool[(args.offset + ep) % len(pool)])
             env = BatchEnv([fx], rules, device="cpu", dtype=torch.float32, horizon=args.horizon)
             envk = BatchEnv([fx] * args.k, rules, device="cpu", dtype=torch.float32, horizon=args.horizon)
-            env.reset(scramble=999 + ep)
-            envk.reset(scramble=999 + ep)
+            env.reset(scramble=999 + args.offset + ep)
+            envk.reset(scramble=999 + args.offset + ep)
             if net is None:
                 ck = torch.load(args.policy, map_location="cpu")
                 m0 = env.masks()
@@ -75,11 +77,12 @@ def main() -> None:
                 obs, uf = env.observe()[0].float(), env.unit_features()[0].float()
                 score_now = float(env.sim.empire_score()[0])
                 acts = gumbel_decide(env, envk, net, args.k, depths, args.horizon - t, args.reward_scale)
-                ep_rows.append({
-                    "obs": obs, "ufeat": uf, "score_now": score_now,
-                    **{f"m_{h}": m[h][0] for h in m},
-                    **{f"a_{h}": acts[h][0] for h in acts},
-                })
+                if not args.at_war_only or bool(env.sim.r_atwar[0].any()):
+                    ep_rows.append({
+                        "obs": obs, "ufeat": uf, "score_now": score_now,
+                        **{f"m_{h}": m[h][0] for h in m},
+                        **{f"a_{h}": acts[h][0] for h in acts},
+                    })
                 env.step(**acts)
             final = float(env.sim.empire_score()[0])
             for r in ep_rows:
