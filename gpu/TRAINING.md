@@ -203,6 +203,15 @@ throughput cost without its seat starvation), plus a fresh non-zero LR
 schedule per the tune1 note. Meanwhile the first O=4 FFA run takes the
 GPU.
 
+**The O=4 chapter opened**: ffa-1 (dense bootstrap, 40 updates, all
+four civs learning over the fixtures_o4 pool) trains stably to a
+4-seat mean of 153.1; ffa-2 (the C3c headline regime — RELATIVE
+zero-sum across four seats, piKL-anchored to ffa-1) holds 154.1 with
+healthy KL/entropy and NO mixed-motive collapse. The FFA ladder is
+live; next rungs are longer anchored runs, kingmaking telemetry
+(per-seat win vs score distributions), and alpha-rank over FFA
+checkpoints.
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts
