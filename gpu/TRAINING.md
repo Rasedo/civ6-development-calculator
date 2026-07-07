@@ -336,7 +336,20 @@ but SIEGE-STATE UPSAMPLING: generate targets from at-war states
 specifically (gen_targets gains a --at-war-only filter, or oversample
 games ending with eliminations), so the rare event carries curriculum
 weight. The M3d loop is functionally closed: teacher finds, tape
-carries, student absorbs — the remaining work is aiming it. V-H1
+carries, student absorbs — the remaining work is aiming it.
+
+**The four-way family alpha-rank (c3a-4 / c3a-10 / c3a-15 / c3a-16)**:
+c3a-4 keeps the crown at **1.000 mass, 0.62 mean win** — the pre-war
+economist beats the ENTIRE war-era lineage head-to-head on the
+current world (all three at 0.45-0.47, mutually interchangeable). The
+mechanism is now measured from both ends: the war-era nets pay for
+armies (10+ units of upkeep and lost hammers) that never convert into
+cities, and un-cashed deterrence is dead weight against a clean
+economist. Everything funnels to ONE bottleneck — the capture event
+must enter the curriculum (siege-state upsampled tape, or reward
+shaping on city HP) — or this world's true optimum is
+economist-with-minimum-deterrence and the war verbs stay situational.
+Either outcome is a clean result; the next rung decides it. V-H1
 note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
 now pad pre-chop 16-wide unit heads via load_compat.
 
