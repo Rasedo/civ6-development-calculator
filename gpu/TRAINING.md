@@ -156,6 +156,14 @@ plain O=2 self-play cannot yet discriminate net strength. C3-prep
 meaningful self-play pressure and for C3b's league metric — it lands
 before more relative-phase compute.
 
+c3a-3 (40 updates WITH the units head live) stays family-flat on the
+standard world (211.4 ± 12.9) and the seat still dominates duels
+(92%/+75 both orderings) — which exposes the deeper cause: in EMA mode
+the learner trains ONLY on seat-0 rows, so seat-1 play never receives
+gradient; the EMA opponent drives seat 1 out-of-distribution. c3a-4
+switches to --opponent self (both seats learn, true seat-swapped
+self-play) to build dual-seat competence before EMA/PFSP resume.
+
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
 46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
