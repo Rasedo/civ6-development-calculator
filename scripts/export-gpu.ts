@@ -116,6 +116,24 @@ const N_TURNS = Number(process.argv[3] ?? 100);
 const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler
 const CS_MAX = 3;
+
+// --- V-H1 chop plane helpers -------------------------------------------------
+function chopKeyCode(t: any): number {
+  if (!t.feature) return 0;
+  const def = (FEATURES as any)[t.feature];
+  if (!def?.removable || !def?.chopYield) return 0;
+  if (t.resource) {
+    const res = (RESOURCES as any)[t.resource];
+    if (res?.requiresFeature?.includes(t.feature)) return 0;
+  }
+  return def.chopYield === 'food' ? 1 : def.chopYield === 'production' ? 2 : 0;
+}
+function chopUnlockTech(t: any): number {
+  if (!t.feature) return -1;
+  return Object.values(TECHS).findIndex((tech: any) =>
+    (tech.effects ?? []).some((fx: any) => fx.kind === 'unlockFeatureRemoval' && fx.feature === t.feature));
+}
+
 const R_MAX = Number(process.argv[5] ?? 2);  // C3c-i: parametric (the default 2 IS the parity-contract pool)
 // C3c-i: argv[5] = rival count (default 2 — THE PARITY CONTRACT POOL);
 // argv[6] = output dir. The O=4 pool: `-- 24 100 5 3 gpu/fixtures_o4`.
@@ -619,6 +637,12 @@ for (let s = 0; s < N_SEEDS; s++) {
       // C1-B5b-iii: water housing IF a center stood here (fresh 5 /
       // coastal 3 / dry 2) — rival housing reads it at their centers.
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
+      // V-H1 chop planes: ftr = the chop grant key when this tile's feature
+      // is removable AND carries a chopYield AND no resource depends on it
+      // (0 none, 1 food, 2 production); ftu = the tech whose effect unlocks
+      // that feature's removal (-1 = never removable).
+      ftr: chopKeyCode(t),
+      ftu: chopUnlockTech(t),
       wt: isWater(t) ? 1 : 0,
       // Harbor placement surface (static part of canPlaceDistrict for a coastal
       // district): coastal/lake water adjacent to land, no wonder, no non-bonus

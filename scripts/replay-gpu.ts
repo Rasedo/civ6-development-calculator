@@ -30,7 +30,7 @@ import {
   purchaseSettler,
   purchaseUnit,
 } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove, builderRemoveFeature } from '../src/core/units';
 import { meleeAttack, rangedAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import { canPlaceDistrict } from '../src/core/rules';
@@ -123,6 +123,11 @@ for (const game of roll.games) {
         fail(`turn ${state.turn}: no player unit at tile ${tile} (civ ${civ})`);
         bad = true;
         break;
+      }
+      if (a === 16) {
+        // V-H1: chop the feature under the builder (soft-fail like builds).
+        builderRemoveFeature(state, unit.id);
+        continue;
       }
       if (a >= 13) {
         // Build an improvement on the builder's tile: 13 FARM, 14 MINE, 15

@@ -282,7 +282,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics",
+    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "rvciv_at", "v_charges",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
@@ -607,6 +607,9 @@ class BatchSim:
         self.feat_stripped = torch.zeros(B, T, dtype=torch.bool, device=device)  # player-founded centers (flips read them stripped)
         self.tile_river = torch.tensor([[bool(t.get("riv", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # C1-B4b-2: Water Mill at rival centers
         self.tile_wh = torch.tensor([[float(t.get("wh", 2)) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device)  # C1-B5b-iii: water housing at a hypothetical center
+        # V-H1 chop planes: grant key (0 none/1 food/2 prod) + removal-unlock tech
+        self.tile_ftr = torch.tensor([[int(t.get("ftr", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self.tile_ftu = torch.tensor([[int(t.get("ftu", -1)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self._feat_adj = torch.tensor(
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
@@ -730,6 +733,7 @@ class BatchSim:
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
         self.progress = z(B, C)
+        self.prod_bank = z(B, C)  # V-H1: chop production banked while the queue is empty
         self.settlers = torch.zeros(B, dtype=torch.long, device=device)
         self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
         self.treasury = z(B)
@@ -995,7 +999,7 @@ class BatchSim:
         paths, and mine-boost techs inside research — each bumps the version.
         The cache returns the identical tensor, so downstream float behavior
         is unchanged."""
-        if not self.disasters and not self.improvements_on:
+        if not self.disasters and not self.improvements_on and not bool(self.feat_stripped.any()):
             return self.tile_yields
         if self._eff_cache is not None and self._eff_cache[0] == self._eff_version:
             return self._eff_cache[1]
@@ -1003,6 +1007,13 @@ class BatchSim:
         ty[:, :, 0] = self._eff_food()
         if self.improvements_on:
             ty[:, :, 1] = self._eff_prod()
+        # V-H1: a chopped (or founding-stripped) tile loses its feature's own
+        # yields on every column — TS reads tile.feature === null live. The
+        # center path is untouched (it reads the neutral planes and applies
+        # its own strip), and _eff_food/_eff_prod rebuild cols 0/1 feature-
+        # inclusive, so the subtraction comes after the overwrites.
+        if bool(self.feat_stripped.any()):
+            ty = ty - self.feat_yields.to(ty.dtype) * self.feat_stripped.unsqueeze(-1).to(ty.dtype)
         self._eff_cache = (self._eff_version, ty)
         return ty
 
@@ -1852,7 +1863,12 @@ class BatchSim:
         else:
             zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = zc
-        return torch.cat([move, attack, hold, build_f, build_m, build_l], dim=2)
+        ftr_t = self.tile_ftr.gather(1, tc)
+        ftu_t = self.tile_ftu.gather(1, tc).clamp(min=0)
+        ft_unlocked = self.techs.gather(1, ftu_t) & (self.tile_ftu.gather(1, tc) >= 0)
+        not_stripped = ~self.feat_stripped.gather(1, tc)
+        chop = (here_ok & (ftr_t > 0) & ft_unlocked & not_stripped).unsqueeze(2)
+        return torch.cat([move, attack, hold, build_f, build_m, build_l, chop], dim=2)
 
     def rival_slot_map(self, r: int) -> torch.Tensor:
         """[B, P_MAX] the v-slot index behind each rival-r unit row (slot
@@ -1924,7 +1940,8 @@ class BatchSim:
         else:
             zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = zc
-        return torch.cat([move, attack, hold, build_f, build_m, build_l], dim=2)
+        chop = torch.zeros_like(hold)  # rivals do not chop yet (scripted parity)
+        return torch.cat([move, attack, hold, build_f, build_m, build_l, chop], dim=2)
 
     def _apply_rival_unit_actions(self, r: int, actions: torch.Tensor) -> None:
         """C3-prep: execute a CONTROLLED rival's unit orders in slot order
@@ -2172,6 +2189,22 @@ class BatchSim:
         if len(cap_rows) > 0:
             self._capture_rival_city(cap_rows, civ[cap_rows], slot[cap_rows], ttc[cap_rows])
 
+    def _strip_feature_at(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """V-H1 chop: remove the removable feature physically — mark
+        feat_stripped and withdraw the adjacency it lent to neighbours
+        (the founding strip does the same inline, entangled with its
+        tile-grab loop — keep the two twins in sync)."""
+        self.feat_stripped[rows, tiles] = True
+        contrib = self._feat_adj[rows, tiles]
+        nb = self.neigh[tiles]
+        for d in range(6):
+            n_d = nb[:, d]
+            on_map = n_d >= 0
+            if bool(on_map.any()):
+                om = on_map.nonzero(as_tuple=True)[0]
+                self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
+        self._eff_version += 1
+
     def _apply_unit_actions(self, actions: torch.Tensor) -> None:
         """Execute unit orders in slot (= spawn) order, exactly like a player
         issuing them one by one before ending the turn. Combat draws from
@@ -2281,6 +2314,54 @@ class BatchSim:
             # state), so an invalid build is a no-op — mirroring the replay's
             # soft-failing builderImprove. Each row's action is one value, so
             # at most one improvement builds per unit (charges spend once).
+            # --- V-H1 chop (16): a builder on a removable-feature tile whose
+            # removal tech is in — mirrors builderRemoveFeature exactly:
+            # canRemoveFeature has NO ownership test (the grant checks the
+            # owner itself), the LUMBER_MILL dies with its WOODS, the lump
+            # goes food -> foodBox / production -> head progress (bank when
+            # idle), and the charge spends (disband at 0).
+            if self._builder_idx >= 0:
+                hc0 = here.clamp(min=0)
+                ftr_t = self.tile_ftr.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                ftu_t = self.tile_ftu.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                unlocked = (ftu_t >= 0) & self.techs.gather(1, ftu_t.clamp(min=0).unsqueeze(1)).squeeze(1)
+                ok_c = (
+                    (a == 16)
+                    & self.p_alive[:, p]
+                    & (self.p_type[:, p] == self._builder_idx)
+                    & (self.p_charges[:, p] > 0)
+                    & (ftr_t > 0)
+                    & unlocked
+                    & ~self.feat_stripped.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                )
+                if bool(ok_c.any()):
+                    rows_c = ok_c.nonzero(as_tuple=True)[0]
+                    tiles_c = hc0[rows_c]
+                    self._strip_feature_at(rows_c, tiles_c)
+                    if self.LUMBER >= 0:
+                        was_l = self.improvement[rows_c, tiles_c] == self.LUMBER
+                        self.improvement[rows_c, tiles_c] = torch.where(was_l, torch.full_like(self.improvement[rows_c, tiles_c], -1), self.improvement[rows_c, tiles_c])
+                    done = (self.techs.sum(dim=1) + self.civics.sum(dim=1)).to(self.dtype)
+                    amount = js_round(20.0 + 2.5 * done)
+                    own_c = self.owner[rows_c, tiles_c]
+                    for i2 in range(len(rows_c)):
+                        b2, c2 = int(rows_c[i2]), int(own_c[i2])
+                        if c2 < 0:
+                            continue  # outside borders: chopped, no lump
+                        amt = float(amount[b2])
+                        if int(ftr_t[rows_c[i2]]) == 1:
+                            self.food_box[b2, c2] += amt
+                        elif int(self.current[b2, c2]) >= 0:
+                            self.progress[b2, c2] += amt
+                        else:
+                            self.prod_bank[b2, c2] += amt
+                    self.p_charges[:, p] = torch.where(ok_c, self.p_charges[:, p] - 1, self.p_charges[:, p])
+                    spent = ok_c & (self.p_charges[:, p] <= 0)
+                    if bool(spent.any()):
+                        dr = spent.nonzero(as_tuple=True)[0]
+                        self.pciv_at[dr, self.p_tile[dr, p]] = -1
+                        self.p_alive[dr, p] = False
+
             if self.improvements_on and self._builder_idx >= 0:
                 hc = here.clamp(min=0).unsqueeze(1)
                 if self._hillfarms_civic >= 0:
@@ -4312,7 +4393,10 @@ class BatchSim:
 
         # --- production ------------------------------------------------------------
         has_item = self.current >= 0
-        self.progress = torch.where(has_item, self.progress + total[:, :, 1], self.progress)
+        # V-H1: banked chop production pays into the head the moment a build
+        # exists (game.ts consumes productionBank inside the production add).
+        self.progress = torch.where(has_item, self.progress + total[:, :, 1] + self.prod_bank, self.progress)
+        self.prod_bank = torch.where(has_item, torch.zeros_like(self.prod_bank), self.prod_bank)
         done = has_item & (self.progress >= self.cur_cost)
         made_settler = done & (self.current == self.SETTLER)
         self.settlers = self.settlers + made_settler.sum(dim=1)

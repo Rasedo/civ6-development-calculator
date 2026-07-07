@@ -50,12 +50,12 @@ from civ6gpu.mcts import (
 def load_policy(path, env, device):
     """→ (policy, ck). Keep ck around: episode envs must be re-fitted to the
     checkpoint's action-space vintage via fit_env_to_checkpoint."""
-    from train_ppo import Policy
+    from train_ppo import Policy, load_compat
 
     ck = torch.load(path, map_location=device)
     assert ck["obs_size"] == env.obs_size, "checkpoint obs layout doesn't match this env build"
     policy = Policy(ck["obs_size"], ck["dims"], hidden=ck.get("hidden", 256)).to(device)
-    policy.load_state_dict(ck["model"])
+    load_compat(policy, ck["model"])  # pads pre-chop 16-wide unit heads (V-H1)
     policy.eval()
     return policy, ck
 

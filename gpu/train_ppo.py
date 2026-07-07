@@ -50,7 +50,7 @@ from civ6gpu import BatchEnv, DuelEnv, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import P_MAX
 from civ6gpu.env import UNIT_FEATURES
 
-N_UNIT_ACTS = 16  # 0-5 move, 6-11 attack, 12 hold, 13/14/15 build FARM/MINE/LUMBER_MILL
+N_UNIT_ACTS = 17  # 0-5 move, 6-11 attack, 12 hold, 13/14/15 build FARM/MINE/LUMBER_MILL, 16 chop (V-H1)
 NEG = -1e9
 
 
@@ -117,7 +117,15 @@ def _masked_dist(logits: torch.Tensor, mask: torch.Tensor) -> tuple[Categorical,
 
 
 def load_compat(policy, state: dict) -> None:
-    """V-W1: pre-war 5-head checkpoints load with a fresh war head."""
+    """V-W1: pre-war 5-head checkpoints load with a fresh war head.
+    V-H1: pre-chop unit heads (16 cols) pad to 17 with a fresh row."""
+    own = policy.state_dict()
+    state = dict(state)
+    for k, v in list(state.items()):
+        if k in own and own[k].shape != v.shape and v.dim() > 0 and own[k].shape[0] > v.shape[0] and own[k].shape[1:] == v.shape[1:]:
+            pad = own[k].clone()
+            pad[: v.shape[0]] = v
+            state[k] = pad
     missing, unexpected = policy.load_state_dict(state, strict=False)
     keep = [k for k in missing if not k.startswith("war.")]
     assert not keep and not unexpected, f"checkpoint mismatch: {keep} {unexpected}"

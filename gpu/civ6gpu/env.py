@@ -26,7 +26,7 @@ import torch
 
 from .engine import BatchSim, Rules, P_MAX
 
-N_UNIT_ACTS = 16  # keep in sync with the unit head (train_ppo)
+N_UNIT_ACTS = 17  # keep in sync with the unit head (train_ppo); 16 = V-H1 chop
 from .rng import hash_keys
 
 _M32 = (1 << 32) - 1
