@@ -1848,6 +1848,78 @@ class BatchSim:
             build_f = build_m = build_l = zc
         return torch.cat([move, attack, hold, build_f, build_m, build_l], dim=2)
 
+    def rival_slot_map(self, r: int) -> torch.Tensor:
+        """[B, P_MAX] the v-slot index behind each rival-r unit row (slot
+        order = spawn order, padded with -1) — the seat-1 units head rides
+        the same P_MAX row layout as the player's."""
+        B = self.B
+        civ_units = self.v_alive & (self.v_civ == r)  # [B, U_MAX]
+        rank = civ_units.long().cumsum(dim=1) - 1  # rank among the civ's alive slots
+        out = torch.full((B, P_MAX), -1, dtype=torch.long, device=self.device)
+        take = civ_units & (rank < P_MAX)
+        bs, slots = take.nonzero(as_tuple=True)
+        out[bs, rank[bs, slots]] = slots
+        return out
+
+    def rival_unit_mask(self, r: int) -> torch.Tensor:
+        """[B, P_MAX, 16] valid orders per CONTROLLED rival-r unit, in the
+        player head layout: 0-5 step (civ-aware blocking), 6-11 attack the
+        barbarian there or — at war — the player unit/center there, 12
+        hold, 13/14/15 build FARM/MINE/LUMBER (builders, B5b rules under
+        the rival's own unlocks). Execution re-validates, like the
+        player's."""
+        B, dev = self.B, self.device
+        smap = self.rival_slot_map(r)
+        present = smap >= 0
+        sc = smap.clamp(min=0)
+        tile = self.v_tile.gather(1, sc)  # [B, P_MAX]
+        nb = self.neigh[tile.clamp(min=0).reshape(-1)].reshape(B, P_MAX, 6)
+        nbc = nb.clamp(min=0).reshape(B, -1)
+        barb = (self.barb_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
+        pmil = (self.pmil_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
+        pciv = (self.pciv_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
+        rvn = self.rv_at.gather(1, nbc)
+        rv_own = ((rvn >= 0) & (self.v_civ.gather(1, rvn.clamp(min=0)) == r)).reshape(B, P_MAX, 6)
+        rv_any = (rvn >= 0).reshape(B, P_MAX, 6)
+        rcn = self.rvciv_at.gather(1, nbc)
+        rc_own = ((rcn >= 0) & (self.v_civ.gather(1, rcn.clamp(min=0)) == r)).reshape(B, P_MAX, 6)
+        rc_any = (rcn >= 0).reshape(B, P_MAX, 6)
+        passable = self.passable.gather(1, nbc).reshape(B, P_MAX, 6)
+        on_map = nb >= 0
+        is_civ = (self._p_charges[self.v_type.gather(1, sc)] > 0).unsqueeze(2)  # builders
+        # blocking mirrors tileFreeForUnit for the moving unit's domain
+        own_dom = torch.where(is_civ, rc_own, rv_own)
+        foreign = barb | pmil | pciv | (rv_any & ~rv_own) | (rc_any & ~rc_own)
+        alive = present.unsqueeze(2)
+        move = on_map & passable & ~foreign & ~own_dom & alive
+        can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
+        at_war = self.r_atwar[:, r].view(B, 1, 1)
+        p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war
+        attack = on_map & (barb | p_target) & can_fight & alive
+        hold = present.unsqueeze(2)
+        if self.improvements_on and self._builder_idx >= 0:
+            tc = tile.clamp(min=0)
+            hf = self.r_civics[:, r, self._hillfarms_civic].unsqueeze(1) if self._hillfarms_civic >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            mining = self.r_techs[:, r, self._mine_unlock_tech].unsqueeze(1) if self._mine_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            constr = self.r_techs[:, r, self._lumber_unlock_tech].unsqueeze(1) if self._lumber_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            here_ok = (
+                present
+                & (self.v_type.gather(1, sc) == self._builder_idx)
+                & (self.v_charges.gather(1, sc) > 0)
+                & (self.rival_at.gather(1, tc) == r)
+                & (self.rvcity_at.gather(1, tc) < 0)
+                & (self.improvement.gather(1, tc) < 0)
+                & (self.district.gather(1, tc) < 0)
+            )
+            farmable = self.farm_flat.gather(1, tc) | (self.farm_hill.gather(1, tc) & hf)
+            build_f = (here_ok & farmable).unsqueeze(2)
+            build_m = (here_ok & self.mine_ok.gather(1, tc) & mining).unsqueeze(2)
+            build_l = (here_ok & self.lumber_ok.gather(1, tc) & constr).unsqueeze(2)
+        else:
+            zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
+            build_f = build_m = build_l = zc
+        return torch.cat([move, attack, hold, build_f, build_m, build_l], dim=2)
+
     def _scripted_builder(self) -> None:
         """Scripted-policy builder (phase 6a): each player BUILDER with
         charges either builds a FARM on its tile (buildable unimproved farm
