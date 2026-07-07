@@ -173,6 +173,16 @@ discriminates; the C3b gate is OPEN and c3a-5 activates PFSP (the
 pool/EMA opponents inherit c3a-4's dual-seat weights, so learner-vs-
 pool pressure is meaningful).
 
+c3a-5 (40 PFSP updates) is the protocol's proof: standard eval reaches
+a new family best (**225.0 ± 13.1**) but **alpha-rank hands c3a-4
+0.978 of the stationary mass** — c3a-5's seat-1 play collapsed (0.08
+as-seat1 vs c3a-4) because PFSP mode trains learner rows only, starving
+seat-1 gradient exactly like the EMA phase did. Raw eval would have
+crowned c3a-5; the seat-averaged round-robin caught the regression.
+c3a-6 fixes the structure: seat-ALTERNATING league play (the learner
+swaps seats across updates while the pool drives the other side), so
+both seats keep receiving gradient under pool pressure.
+
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
 46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
