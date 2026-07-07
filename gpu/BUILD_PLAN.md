@@ -551,7 +551,15 @@ behind the off-script gate — the D5 pattern.
       (`war_mask()` [B,2R], `step(war=…)`), not wired into BatchEnv until
       activation. Self-test `gpu/war_test.py`; both gates green.
 - [ ] **V-W2** City capture: player melee vs rival city centers
-      (attackCity/captureRivalCity semantics), gated.
+      (attackCity/captureRivalCity semantics), gated. DESIGN CONSTRAINT
+      (recorded at C3-prep): capture INTO the player breaks the static
+      player-city-slot assumption (C sites are pre-planned) — the clean
+      landing is the §3 owner-dimension note at line ~472 (captured city
+      changes civId on the RIVAL side of the tensors, i.e. capture-as-
+      civ-transfer between rc pools first: player-capture = transfer to a
+      reserved player-civ rc pool, rendered into obs; true player-slot
+      absorption comes with the [B,O,C] unification). Needs its own
+      design round + war-head symmetry (see C3-prep v-REVISED).
 - [x] **V-R** Ranged attacks ACTIVE: `rangedStrength/rangedRange` exported;
       ranged units execute codes 6-11 as rangedAttack (one roll, no
       retaliation, no advance, no camp clear; range-1 targets — legal for
