@@ -192,6 +192,16 @@ the c3a-5 AND c3a-6 regressions that standard eval missed) and returns
 as TRAINING structure when self mode genuinely plateaus, with longer
 budgets. c3a-7 is the long self-mode run from c3a-4.
 
+**What self-play changed behaviorally** (behavior_probe.py, matched
+worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
+units, c3a-4/5 keep ~7, with the freed production going into districts
+(3.6 → 4.2) and buildings (6.8 → 8.7/9.2); c3a-4 runs its treasury
+near-empty (68 → 16 gold — it learned to SPEND through the purchase
+head) and carries the deepest tech (14.0). Cities stay ~4.5 (the site
+plan's shape), camps stay uncleared (armies are for defense, not
+hunting), wars stay rare. Self-play's lesson on this world: compounding
+infrastructure beats standing milita
+
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
 46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
