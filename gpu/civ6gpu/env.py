@@ -97,7 +97,7 @@ class BatchEnv:
                 pad = torch.zeros(s.B, prod.shape[1], pw - prod.shape[2], dtype=torch.bool, device=s.device)
                 prod = torch.cat([prod, pad], dim=2)
             return {
-                "war": torch.zeros(s.B, 2 * max(s.R, 1), dtype=torch.bool, device=s.device),  # rival war stays scripted
+                "war": m["war"],  # C3-sym: the rival's war head (declare/peace vs the player)
                 "production": prod,
                 "tech": m["tech"],
                 "civic": m["civic"],
@@ -130,7 +130,7 @@ class BatchEnv:
         if seat != 0:
             r = self._seat_rival(seat)
             self.sim.controlled[:, r] = True
-            self.sim.apply_rival_actions(r, production=production, tech=tech, civic=civic)
+            self.sim.apply_rival_actions(r, production=production, tech=tech, civic=civic, war=war)
             if units is not None:
                 self.sim._apply_rival_unit_actions(r, units)
             prev = getattr(self, "_last_rival_score", None)

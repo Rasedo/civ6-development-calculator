@@ -65,7 +65,7 @@ class DuelEnv:
         Returns (obs [B, 2, F], rewards [B, 2], done)."""
         s = self.sim
         a1 = seat1 or {}
-        s.apply_rival_actions(0, production=a1.get("production"), tech=a1.get("tech"), civic=a1.get("civic"))
+        s.apply_rival_actions(0, production=a1.get("production"), tech=a1.get("tech"), civic=a1.get("civic"), war=a1.get("war"))
         if a1.get("units") is not None:
             s._apply_rival_unit_actions(0, a1["units"])
         a0 = seat0 or {}

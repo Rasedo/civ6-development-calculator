@@ -212,7 +212,7 @@ def split_actions(actions: dict, B: int) -> tuple[dict, dict]:
     # stay masked off — rivals have none)
     return (
         {"production": a0["production"], "tech": a0["tech"], "civic": a0["civic"], "units": a0["units"], "envoy": a0["envoy"]},
-        {"production": a1["production"], "tech": a1["tech"], "civic": a1["civic"], "units": a1["units"]},
+        {"production": a1["production"], "tech": a1["tech"], "civic": a1["civic"], "units": a1["units"], "war": a1.get("war")},
     )
 
 

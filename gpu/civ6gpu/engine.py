@@ -2736,7 +2736,15 @@ class BatchSim:
         production = torch.stack(prod_cols, dim=1)  # [B, RC, NB+2+NU+nS]
         tech = self._available_mask(self.r_techs[:, r], self._prereq_t) & (self.r_cur_tech[:, r] == -1).unsqueeze(1)
         civic = self._available_mask(self.r_civics[:, r], self._prereq_c) & (self.r_cur_civic[:, r] == -1).unsqueeze(1)
-        return {"production": production, "tech": tech, "civic": civic}
+        # symmetric war head (seat-invariant [B, 2R] layout): a controlled
+        # rival's only opponent-with-war-rules is THE PLAYER — column 0 =
+        # declare (alive, at peace), column R = sue for peace (warTurns >=
+        # min; rivals hold no gold, so peace is free like the scripted roll)
+        Rw = max(self.R, 1)
+        war = torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
+        war[:, 0] = self.r_alive[:, r] & ~self.r_atwar[:, r]
+        war[:, Rw] = self.r_alive[:, r] & self.r_atwar[:, r] & (self.r_warturns[:, r] >= self.rules.rivals.get("warMinTurns", 14))
+        return {"production": production, "tech": tech, "civic": civic, "war": war}
 
     def apply_rival_actions(
         self,
@@ -2744,6 +2752,7 @@ class BatchSim:
         production: torch.Tensor | None = None,
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
+        war: torch.Tensor | None = None,
     ) -> None:
         """C2b: write a controlled rival's choices BEFORE step(). Codes use
         the rival_masks layout; -1 = no action. Queue writes mirror the
@@ -2760,6 +2769,18 @@ class BatchSim:
         if civic is not None:
             ok = (civic >= 0) & self.controlled[:, r] & (self.r_cur_civic[:, r] == -1)
             self.r_cur_civic[:, r] = torch.where(ok, civic.clamp(min=0), self.r_cur_civic[:, r])
+        if war is not None:
+            Rw = max(self.R, 1)
+            w = war.to(torch.long)
+            declare = (w == 0) & self.controlled[:, r] & self.r_alive[:, r] & ~self.r_atwar[:, r]
+            if bool(declare.any()):
+                self.r_atwar[:, r] = self.r_atwar[:, r] | declare
+                self.r_warturns[:, r] = torch.where(declare, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
+            peace = (w == Rw) & self.controlled[:, r] & self.r_atwar[:, r] & (self.r_warturns[:, r] >= self.rules.rivals.get("warMinTurns", 14))
+            if bool(peace.any()):
+                self.r_atwar[:, r] = self.r_atwar[:, r] & ~peace
+                self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
+                self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
         if production is None:
             return
         for j in range(min(int(production.shape[1]), self.RC)):
@@ -3834,7 +3855,7 @@ class BatchSim:
                 a = atw & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_war_act(v, a)
-            peace_roll = atw & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))
+            peace_roll = atw & ~self.controlled[:, r] & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))  # C3-sym: controlled rivals leave war via the head
             rp = self._next_random(peace_roll)
             made_peace = peace_roll & (rp < 0.25)
             if bool(made_peace.any()):
@@ -3851,6 +3872,10 @@ class BatchSim:
                 if bool(a.any()):
                     self._rival_unit_peace_act(v, a, r)
             # War declaration: strength/proximity gates first, the roll last.
+            # C3-sym: controlled rivals own their war choices — the scripted
+            # declaration below gates on ~controlled; the peace ROLL above
+            # already ran only for atw rows (controlled rivals leave war via
+            # the head, so their roll is masked too)
             p_str = self.alive.sum(dim=1) * 10 + (self.p_alive.to(torch.long) * self._p_combat[self.p_type]).sum(dim=1)
             own_cs = (self.v_alive & (self.v_civ == r)).to(torch.long) * self._p_combat[self.v_type]
             # C1-B2: strength counts what exists (cities + fielded units)
@@ -3866,6 +3891,7 @@ class BatchSim:
                 & (self.r_peaceturns[:, r] > 20)
                 & (prox <= 9)
                 & (r_str > p_str.double() * 1.3)
+                & ~self.controlled[:, r]
             )
             rw = self._next_random(cond)
             declare = cond & (rw < 0.08 * (0.5 + self.r_aggression[:, r]))

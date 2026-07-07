@@ -74,7 +74,7 @@ class MeleeEnv:
         assert len(actions) == self.O
         for k in range(1, self.O):
             a = actions[k] or {}
-            s.apply_rival_actions(k - 1, production=a.get("production"), tech=a.get("tech"), civic=a.get("civic"))
+            s.apply_rival_actions(k - 1, production=a.get("production"), tech=a.get("tech"), civic=a.get("civic"), war=a.get("war"))
             if a.get("units") is not None:
                 s._apply_rival_unit_actions(k - 1, a["units"])
         a0 = actions[0] or {}
