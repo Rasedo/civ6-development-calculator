@@ -253,6 +253,8 @@ def main() -> None:
     ap.add_argument("--fixtures", default=None, help="C3c: alternate fixture pool dir (e.g. gpu/fixtures_o4 for 3-rival FFA worlds)")
     ap.add_argument("--anchor", default=None, help="C3c piKL: checkpoint whose policy anchors the learner (KL penalty on learner rows). MUST be same-world (obs width follows the rival count: an O=2 net cannot anchor an O=4 run - bootstrap an O=4 anchor first)")
     ap.add_argument("--anchor-kl", type=float, default=0.1, help="piKL coefficient")
+    ap.add_argument("--distill", default=None, help="M3d: search-target file from gen_targets.py — adds an aux CE (policy toward the search pick) + value regression on those states")
+    ap.add_argument("--distill-coef", type=float, default=0.5)
     ap.add_argument("--reward", default="dense", choices=("dense", "relative"), help="per-seat reward phase (seats=2)")
     ap.add_argument("--opponent", default="self", choices=("self", "ema", "pfsp"), help="C3a: seat-1 driver — the learner (naive), an EMA copy + uniform frozen mixture, or C3b PFSP (hardest-first pool matchmaking)")
     ap.add_argument("--ema-tau", type=float, default=0.99, help="opponent EMA decay per update")
@@ -289,6 +291,12 @@ def main() -> None:
     }
     policy = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
     opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
+    # M3d: search-derived targets (distillation)
+    targets = None
+    if args.distill:
+        targets = torch.load(args.distill, map_location=dev)
+        print(f"M3d distillation: {targets['obs'].shape[0]} search targets from {args.distill}")
+
     # C3c piKL: an anchor policy whose action distribution regularizes the
     # learner (mixed-motive collapse guard for FFA runs).
     anchor = None
@@ -530,6 +538,13 @@ def main() -> None:
                 loss_v = 0.5 * (pout["value"] - f_ret[idx]).pow(2).mean()
                 loss_ent = ent.mean()
                 loss = loss_pi + args.vf_coef * loss_v - args.ent_coef * loss_ent
+                if targets is not None:
+                    tout = policy(targets["obs"], targets["ufeat"])
+                    tdist, tvalid = _masked_dist(tout["production"], targets["m_production"])
+                    # the search pick lives on the CAPITAL row (slot 0)
+                    ce = -(tdist.log_prob(targets["a_production"].unsqueeze(1).clamp(min=0))[:, 0] * tvalid[:, 0].float()).mean()
+                    vreg = 0.5 * (tout["value"] - targets["value"] * args.reward_scale).pow(2).mean()
+                    loss = loss + args.distill_coef * (ce + vreg)
                 if anchor is not None:
                     with torch.no_grad():
                         aout = anchor(flat["obs"][idx], flat["ufeat"][idx])
