@@ -313,7 +313,7 @@ def main() -> None:
     if args.anchor:
         ck_a = torch.load(args.anchor, map_location=dev)
         anchor = Policy(env.obs_size, dims, hidden=ck_a.get("hidden", args.hidden)).to(dev)
-        anchor.load_state_dict(ck_a["model"])
+        load_compat(anchor, ck_a["model"])  # pre-chop anchors pad like everything else
         for q in anchor.parameters():
             q.requires_grad_(False)
         print(f"piKL anchor: {args.anchor} (coef {args.anchor_kl})")
