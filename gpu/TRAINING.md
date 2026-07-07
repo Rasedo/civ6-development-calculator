@@ -222,6 +222,17 @@ empirically validates BUILD_PLAN's ordering: V-W2 (capture) is what
 makes aggression meaningful, and it is the last designed engine round
 (capture-as-civ-transfer, constraints at §4 V-W2).
 
+**The conquest rung (c3a-9-conquest, V-W2 live)**: the net keeps
+warring (1.0), ARMS UP (units 6.2 → 7.5, improvements up, probe score
+at the family top 231.0) — but cities stay 4.6 and rival cities 8.3:
+forty updates never discover an actual CAPTURE. Finishing a siege
+means many coordinated attack turns against 40-60 defense before any
+reward arrives — a deep credit-assignment gap plain PPO exploration
+won't cross quickly. This is precisely the M3d thesis, now empirical:
+SEARCH can find the siege line (MPC over the capture payoff), and
+search-derived targets can distill it into the policy. The engine
+roadmap is complete; conquest is a training-methodology frontier.
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts
