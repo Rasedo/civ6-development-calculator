@@ -183,6 +183,15 @@ c3a-6 fixes the structure: seat-ALTERNATING league play (the learner
 swaps seats across updates while the pool drives the other side), so
 both seats keep receiving gradient under pool pressure.
 
+c3a-6's read closes the O=2 methodology question: alternation halves
+per-seat experience per update and c3a-4 KEEPS 0.978 of the stationary
+mass (c3a-6: 0.006, eval 215.1). **Plain self mode — both seats
+learning every update against the mirror — is the O=2 workhorse**; the
+league infrastructure stands validated as PROTOCOL (alpha-rank caught
+the c3a-5 AND c3a-6 regressions that standard eval missed) and returns
+as TRAINING structure when self mode genuinely plateaus, with longer
+budgets. c3a-7 is the long self-mode run from c3a-4.
+
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
 46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
