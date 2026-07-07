@@ -1940,7 +1940,12 @@ class BatchSim:
         else:
             zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = zc
-        chop = torch.zeros_like(hold)  # rivals do not chop yet (scripted parity)
+        # C3-sym V-H1: controlled rival builders chop like the player —
+        # removable feature present, THAT RIVAL's removal tech in, unstripped.
+        ftr_t = self.tile_ftr.gather(1, tc)
+        ftu_t = self.tile_ftu.gather(1, tc)
+        unlocked = self.r_techs[:, r, :].gather(1, ftu_t.clamp(min=0)) & (ftu_t >= 0)
+        chop = (is_civ.squeeze(2) & (self.v_charges.gather(1, sc) > 0) & (ftr_t > 0) & unlocked & ~self.feat_stripped.gather(1, tc)).unsqueeze(2)
         return torch.cat([move, attack, hold, build_f, build_m, build_l, chop], dim=2)
 
     def _apply_rival_unit_actions(self, r: int, actions: torch.Tensor) -> None:
@@ -2011,6 +2016,54 @@ class BatchSim:
                         elif bool(city_att[b_]):
                             self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "rival", v)
             # --- builds 13-15 (builders) ---
+            # C3-sym V-H1: rival chop (16) — strip + grant into the owning
+            # rival's NEAREST alive city (food -> rc_growth, production ->
+            # rc_progress), mirroring the player branch; charge spends via
+            # the applier's slot-gather pattern, disband at 0.
+            ftr_c = self.tile_ftr.gather(1, here.unsqueeze(1)).squeeze(1)
+            ftu_c = self.tile_ftu.gather(1, here.unsqueeze(1)).squeeze(1)
+            unlocked_c = (ftu_c >= 0) & self.r_techs[:, r, :].gather(1, ftu_c.clamp(min=0).unsqueeze(1)).squeeze(1)
+            chp = (
+                act
+                & (a == 16)
+                & is_civ
+                & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
+                & (ftr_c > 0)
+                & unlocked_c
+                & ~self.feat_stripped.gather(1, here.unsqueeze(1)).squeeze(1)
+            )
+            if bool(chp.any()):
+                rows_c = chp.nonzero(as_tuple=True)[0]
+                tiles_c = here[rows_c]
+                self._strip_feature_at(rows_c, tiles_c)
+                if self.LUMBER >= 0:
+                    was_l = self.improvement[rows_c, tiles_c] == self.LUMBER
+                    self.improvement[rows_c, tiles_c] = torch.where(was_l, torch.full_like(self.improvement[rows_c, tiles_c], -1), self.improvement[rows_c, tiles_c])
+                done_r = (self.r_techs[:, r, :].sum(dim=1) + self.r_civics[:, r, :].sum(dim=1)).to(self.dtype)
+                amount_r = js_round(20.0 + 2.5 * done_r)
+                own_r = self.rival_at[rows_c, tiles_c]
+                for i2 in range(len(rows_c)):
+                    b2 = int(rows_c[i2])
+                    if int(own_r[i2]) != r:
+                        continue  # outside this rival's borders: chopped, no lump
+                    aliv = self.rc_alive[b2, r]
+                    if not bool(aliv.any()):
+                        continue
+                    ctrs = self.rc_center[b2, r].clamp(min=0)
+                    d = self.pair_dist[int(tiles_c[i2])][ctrs].float()
+                    d = torch.where(aliv, d, torch.full_like(d, 1e9))
+                    j = int(d.argmin())
+                    amt = float(amount_r[b2])
+                    if int(ftr_c[rows_c[i2]]) == 1:
+                        self.rc_growth[b2, r, j] += amt
+                    else:
+                        self.rc_progress[b2, r, j] += amt
+                self.v_charges[rows_c, sc[rows_c]] -= 1
+                spent_c = chp & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
+                if bool(spent_c.any()):
+                    dr = spent_c.nonzero(as_tuple=True)[0]
+                    self.v_alive[dr, sc[dr]] = False
+                    self.rvciv_at[dr, here[dr]] = -1
             bld = act & (a >= 13) & (a < 16) & is_civ
             if bool(bld.any()):
                 tc = here.clamp(min=0)
