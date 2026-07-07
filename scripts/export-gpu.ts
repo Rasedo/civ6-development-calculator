@@ -31,6 +31,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueSettler } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
+import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
@@ -342,6 +343,17 @@ const rules = {
       defPerTech: RIVAL_DEF_PER_TECH,
       spearTech: techIdx.get('BRONZE_WORKING') ?? -1,
       horseTech: techIdx.get('HORSEBACK_RIDING') ?? -1,
+    },
+    // C1-B5b: rival builder gates — improvement unlock indices in the tech
+    // table (FARM is baseline; hillFarms rides the civic the engine already
+    // indexes) and the balanced-weight gain per option for the Δ-tileScore
+    // pick (flat catalog yields ⇒ the Δ is a constant per improvement).
+    builder: {
+      mineTech: Object.values(TECHS).findIndex((td) => td.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE')),
+      lumberTech: Object.values(TECHS).findIndex((td) => td.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL')),
+      gains: ['FARM', 'MINE', 'LUMBER_MILL'].map((imp) =>
+        YIELD_KEYS.reduce((g, k) => g + (BALANCED_WEIGHTS[k] ?? 0) * (IMPROVEMENTS[imp as ImprovementId].yields[k] ?? 0), 0),
+      ),
     },
     peaceMinWarTurns: PEACE_MIN_WAR_TURNS,
     peaceGold0: PEACE_GOLD_COST(0),

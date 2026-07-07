@@ -6,7 +6,7 @@
  */
 
 import type { City, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
-import { tilesWithin, hexDistance } from './hex';
+import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
@@ -27,8 +27,9 @@ import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/gre
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
 import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE } from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
-import { canPlaceDistrictIn } from './rules';
+import { canPlaceDistrictIn, validImprovementsIn } from './rules';
 import { hasRiver } from './query';
+import { disbandUnit, tileFreeForUnit } from './units';
 import { districtCostIn } from './game';
 import { districtAdjacency } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -586,6 +587,97 @@ function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks
   return true;
 }
 
+/** C1-B5b: does this rival already have a builder (alive or queued)? One at a time. */
+function rivalHasBuilder(state: GameState, rival: RivalCiv): boolean {
+  // NB: rival UNIT civId is the RAW rival id (rivalUnits' convention) —
+  // only TILE ownership lives in the unified civ space.
+  if (state.units.some((u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'BUILDER')) return true;
+  return rival.cities.some((rc) => rc.queue[0]?.kind === 'unit' && rc.queue[0].unit === 'BUILDER');
+}
+
+/** C1-B5b: any owned, unimproved tile a rival builder could work right now? */
+function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boolean {
+  const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
+  // Design scope: rival builders place FARM/MINE/LUMBER_MILL only (resource
+  // improvements like PASTURE/CAMP are a later stage) — mirrors the GPU's
+  // farm/mine/lumber job masks exactly.
+  return state.map.tiles.some(
+    (t) =>
+      owns(t) &&
+      !t.improvement &&
+      validImprovementsIn(t, { unlocks, ownsTile: owns }).some((i) => i === 'FARM' || i === 'MINE' || i === 'LUMBER_MILL'),
+  );
+}
+
+/**
+ * C1-B5b: rival builder actions — on a valid owned unimproved tile, build the
+ * option with the best Δ tileScore under defaultModifiers (owner boosts land
+ * in B5b-iii); Δ per improvement is its flat catalog yields, so ties resolve
+ * by validImprovementsIn's FARM > MINE > LUMBER_MILL order via strict `>`.
+ * Otherwise single-step toward the nearest job (dist·(T+1)+index key, then
+ * the tileFreeForUnit neighbor closest to it, ties to direction order,
+ * moving only if strictly closer) — the exporter's player builder walk with
+ * the civ-aware stacking rules. Zero RNG.
+ */
+function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks): void {
+  const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
+  const vopts = { unlocks, ownsTile: owns };
+  const ctx = { map: state.map, mods: defaultModifiers() };
+  const nTiles = state.map.tiles.length;
+  for (const u of [...state.units]) {
+    // unit civId = RAW rival id; tile ownership = unified civ space
+    if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
+    const bt = state.map.tiles[u.tileIndex];
+    const options = (!bt.improvement ? validImprovementsIn(bt, vopts) : []).filter(
+      (i) => i === 'FARM' || i === 'MINE' || i === 'LUMBER_MILL',
+    );
+    if (options.length > 0) {
+      let bestImp = options[0];
+      let bestGain = -Infinity;
+      for (const imp of options) {
+        const gain =
+          tileScore(tileYields(ctx, { ...bt, improvement: imp }), 'balanced') -
+          tileScore(tileYields(ctx, bt), 'balanced');
+        if (gain > bestGain) {
+          bestGain = gain;
+          bestImp = imp;
+        }
+      }
+      bt.improvement = bestImp;
+      bt.pillaged = false;
+      u.charges = (u.charges ?? 1) - 1;
+      if (u.charges <= 0) disbandUnit(state, u.id);
+      continue;
+    }
+    // walk toward the nearest job
+    let best = -1;
+    let bestKey = Infinity;
+    for (const t of state.map.tiles) {
+      if (!owns(t) || t.improvement) continue;
+      if (!validImprovementsIn(t, vopts).some((i) => i === 'FARM' || i === 'MINE' || i === 'LUMBER_MILL')) continue;
+      const key = hexDistance(bt.col, bt.row, t.col, t.row) * (nTiles + 1) + t.index;
+      if (key < bestKey) {
+        bestKey = key;
+        best = t.index;
+      }
+    }
+    if (best < 0) continue;
+    const jt = state.map.tiles[best];
+    const dHere = hexDistance(bt.col, bt.row, jt.col, jt.row);
+    let dest = -1;
+    let destD = dHere;
+    for (const n of neighbors(state.map, bt)) {
+      if (!tileFreeForUnit(state, n.index, u)) continue;
+      const d = hexDistance(n.col, n.row, jt.col, jt.row);
+      if (d < destD) {
+        destD = d;
+        dest = n.index;
+      }
+    }
+    if (dest >= 0) u.tileIndex = dest;
+  }
+}
+
 export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
@@ -690,6 +782,11 @@ export function rivalPhase(state: GameState): void {
         // C1-B4: districts outrank units — the economy compounds.
       } else if (tryQueueRivalBuilding(state, rc, rivalUnlocks)) {
         // C1-B4b-2: then buildings, then the army.
+      } else if (!rivalHasBuilder(state, rival) && rivalHasJob(state, rival, rivalUnlocks) && unitCount < unitCap) {
+        // C1-B5b: one builder per civ at a time, only while jobs exist.
+        // A builder is a unit — it takes a cap slot like any other.
+        rc.queue.push({ kind: 'unit', unit: 'BUILDER', progress: 0 });
+        unitCount += 1;
       } else if (unitCount < unitCap) {
         const type = rival.research.techs.includes('HORSEBACK_RIDING')
           ? 'HORSEMAN'
@@ -782,6 +879,9 @@ export function rivalPhase(state: GameState): void {
     }
     if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
 
+    // C1-B5b: builder actions (build best-Δ improvement or walk to a job).
+    rivalBuilderActions(state, rival, rivalUnlocks);
+
     // Races: great people, pantheons, beliefs.
     claimGreatPeople(state, rival);
     claimBeliefs(state, rival);
@@ -790,6 +890,7 @@ export function rivalPhase(state: GameState): void {
     if (rival.atWar) {
       rival.warTurns += 1;
       for (const unit of rivalUnits(state, rival.id)) {
+        if (UNITS[unit.type]?.charges !== undefined) continue; // C1-B5b: civilians act in rivalBuilderActions, never march
         if (unit.movesLeft > 0) hostileUnitAct(state, unit);
       }
       if (rival.warTurns >= RIVAL_WAR_MIN_TURNS && nextRandom(state) < 0.25) {
@@ -798,6 +899,7 @@ export function rivalPhase(state: GameState): void {
     } else {
       rival.peaceTurns += 1;
       for (const unit of rivalUnits(state, rival.id)) {
+        if (UNITS[unit.type]?.charges !== undefined) continue; // C1-B5b: builders don't patrol
         // Self-defense first: kill adjacent barbarians, then drift home.
         const targets = attackTargets(state, unit);
         if (targets.length > 0) {

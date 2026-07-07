@@ -320,7 +320,29 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [~] B5. Rival builders/housing/occupancy: **B5a DONE** (inert) —
+  - [~] B5. Rival builders/housing/occupancy: **B5a + B5b-i + B5b-ii DONE**.
+        B5b-ii: rival BUILDERS end-to-end — trained through the queues (one
+        per civ while jobs exist, cap-slotted), spawned as civilians (rciv
+        probe, roster charges), best-gain improvement on valid tiles
+        (constant Δ-score gains, FARM>MINE>LUMBER ties), deterministic walk
+        to the nearest job, disband at zero charges. EIGHT parity catches —
+        the richest hunt of the project: (1) TS rival-unit civId is the RAW
+        rival id, not the unified civ space; (2) job scope had to intersect
+        validImprovementsIn with {FARM,MINE,LUMBER} (resource-improvement
+        jobs are a later stage); (3) GPU hostiles couldn't see rival
+        civilians (scan + roll-free lone-civilian kill); (4) TS
+        patrol/war-march moved builders (civilians filtered both engines);
+        (5) GPU patrol mask missed rvciv blocking; (6) GPU rival-military
+        spawn probe blanket-blocked own-civ builders (TS stacks
+        cross-domain); (7) builder gates must evaluate under the PHASE-TOP
+        unlock snapshot (TS computes rivalUnlocks pre-advance — divergent
+        exactly on unlock-completion turns); (8) the random-action player
+        move path had inline blocking without the rvciv term (off-script
+        gate catch). occupancy_test extended with organic-population,
+        plane/slot coherence and spawn-over-own-builder cases. Both gates +
+        full battery green. B5b-iii next: modifiersFromResearch into
+        rivalCityYields + rival housing (retire RIVAL_MAX_POP + the prod
+        stand-in). Earlier: **B5a DONE** (inert) —
         rvciv_at civilian-occupancy plane + v_charges join _MUTABLE;
         _blocked_for/_first_free_spot grow civ-aware rival probes ('rmil'/
         'rciv': rival civs are FOREIGN to each other, own-civ cross-domain

@@ -1669,7 +1669,7 @@ class BatchSim:
         # 'barb': anything standing there blocks.
         return barb | pmil | pciv | rv | rvc
 
-    def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
         first free neighbor in direction order (the stable distance sort
         keeps exactly that order). side: 'barb' | 'player' | 'rival';
@@ -1681,13 +1681,18 @@ class BatchSim:
         pmil = self.pmil_at.gather(1, okc) >= 0
         pciv = self.pciv_at.gather(1, okc) >= 0
         rv = self.rv_at.gather(1, okc) >= 0
-        rvc = self.rvciv_at.gather(1, okc) >= 0
+        rvc_slot = self.rvciv_at.gather(1, okc)
+        rvc = rvc_slot >= 0
         if side == "player":
             dom = torch.where(civ_mask.unsqueeze(1), pciv, pmil)
             blocked = barb | rv | rvc | dom
-        else:  # barb or rival military: every other unit blocks (C1-B5a:
-            # rival civilians included — own-civ spawn probes stay blanket
-            # like spawnUnit's, which only relaxes for the PLAYER's civ_mask)
+        elif side == "rival" and civ is not None:
+            # C1-B5b: spawnUnit probes through tileFreeForUnit — an OWN-CIV
+            # civilian stacks with a fresh military unit (cross-domain);
+            # foreign civilians block.
+            rvc_foreign = rvc & (self.v_civ.gather(1, rvc_slot.clamp(min=0)) != civ)
+            blocked = barb | pmil | pciv | rv | rvc_foreign
+        else:  # barb: every other unit blocks
             blocked = barb | pmil | pciv | rv | rvc
         ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~blocked
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
@@ -2037,6 +2042,7 @@ class BatchSim:
                 & self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
                 & (self.barb_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)
                 & (self.rv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)
+                & (self.rvciv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)  # C1-B5b: rival builders block player moves (foreign)
                 & (side < 0)
             )
             if bool(ok.any()):
@@ -2143,6 +2149,7 @@ class BatchSim:
                 (self.pmil_at.gather(1, nbc) >= 0)
                 | (self.pciv_at.gather(1, nbc) >= 0)
                 | (self.rv_at.gather(1, nbc) >= 0)
+                | (self.rvciv_at.gather(1, nbc) >= 0)
             )
             rvc = self.rvcity_at.gather(1, nbc) >= 0
             valid = (nb >= 0) & ((ctr >= 0) | has_unit | rvc)
@@ -2158,6 +2165,7 @@ class BatchSim:
                 (self.pmil_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0)
                 | (self.pciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0)
                 | (self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0)
+                | (self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0)
             )
             city_att = attack & (tgt_city >= 0)
             unit_att = attack & (tgt_city < 0) & has_u
@@ -2339,7 +2347,7 @@ class BatchSim:
         order = state.units order filtered by civ, which per-civ loops use)."""
         if not bool(mask.any()):
             return
-        found, spot = self._first_free_spot(at_tile, "rival")
+        found, spot = self._first_free_spot(at_tile, "rival", civ=civ)
         can = mask & found
         if not bool(can.any()):
             return
@@ -2354,6 +2362,129 @@ class BatchSim:
         self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
+
+    def _rival_job_mask(self, r: int, techs: torch.Tensor | None = None, civics: torch.Tensor | None = None) -> torch.Tensor:
+        """[B, T] tiles a rival-r builder could improve NOW: civ-owned,
+        unimproved, un-districted, not a center — FARM (baseline; hills gate
+        on the rival's hillFarms civic), MINE/LUMBER on the rival's unlock
+        techs. Mirrors validImprovementsIn under the rival's unlocks."""
+        B = self.B
+        # TS computes rivalUnlocks ONCE at phase top (pre-research-advance);
+        # callers past the advance must pass that snapshot or diverge on the
+        # exact turn an unlock completes (seed 9274 t100).
+        tk = techs if techs is not None else self.r_techs[:, r]
+        cv = civics if civics is not None else self.r_civics[:, r]
+        farm = self.farm_flat | (self.farm_hill & cv[:, self._hillfarms_civic].unsqueeze(1)) if self._hillfarms_civic >= 0 else self.farm_flat
+        ok = farm
+        if self.MINE >= 0 and self._mine_unlock_tech >= 0:
+            ok = ok | (self.mine_ok & tk[:, self._mine_unlock_tech].unsqueeze(1))
+        if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
+            ok = ok | (self.lumber_ok & tk[:, self._lumber_unlock_tech].unsqueeze(1))
+        return (
+            (self.rival_at == r)
+            & (self.improvement < 0)
+            & (self.district < 0)
+            & (self.rvcity_at < 0)
+            & ok
+        )
+
+    def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int) -> None:
+        """C1-B5b: spawn a rival BUILDER — the civilian twin of _spawn_rival
+        (rciv blocking; charges seeded from the roster like the player's)."""
+        if not bool(mask.any()):
+            return
+        cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
+        okc = cand7.clamp(min=0)
+        ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~self._blocked_for(cand7, "rciv", civ=civ)
+        first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
+        spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
+        can = mask & (first < 7)
+        if not bool(can.any()):
+            return
+        rows = can.nonzero(as_tuple=True)[0]
+        slot = self.v_next[rows]
+        assert int(slot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
+        self.v_alive[rows, slot] = True
+        self.v_civ[rows, slot] = civ
+        self.v_type[rows, slot] = self._builder_idx
+        self.v_tile[rows, slot] = spot[rows]
+        self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
+        self.v_charges[rows, slot] = self._p_charges[self._builder_idx]
+        self.rvciv_at[rows, spot[rows]] = slot
+        self.v_next[rows] += 1
+
+    def _rival_builder_actions(self, r: int, active: torch.Tensor, techs0: torch.Tensor | None = None, civics0: torch.Tensor | None = None) -> None:
+        """C1-B5b: mirrors rivalBuilderActions — per builder (slot order =
+        units order): build the best-gain valid improvement HERE (gains are
+        constants per option since improvement yields are flat adds; strict >
+        keeps FARM > MINE > LUMBER on ties), else single-step toward the
+        nearest job (dist·(T+1)+idx target key; neighbor strictly closer,
+        rciv-blocked, ties to direction order). Zero RNG."""
+        B, T, dev = self.B, self.T, self.device
+        gains = self.rules.rivals.get("builder", {}).get("gains", [1.0, 1.0, 1.0])
+        opts = [(self.FARM, float(gains[0])), (self.MINE, float(gains[1])), (self.LUMBER, float(gains[2]))]
+        cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx) & (self.v_charges > 0)
+        if not bool(cand.any()):
+            return
+        for u in cand.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            act = cand[:, u] & active
+            if not bool(act.any()):
+                continue
+            here = self.v_tile[:, u].clamp(min=0)
+            jobm = self._rival_job_mask(r, techs=techs0, civics=civics0)
+            here_ok = jobm.gather(1, here.unsqueeze(1)).squeeze(1)
+            build = act & here_ok
+            if bool(build.any()):
+                # per-tile validity of each option HERE (unlock-gated like the mask)
+                tk0 = techs0 if techs0 is not None else self.r_techs[:, r]
+                cv0 = civics0 if civics0 is not None else self.r_civics[:, r]
+                farm_h = (self.farm_flat | (self.farm_hill & cv0[:, self._hillfarms_civic].unsqueeze(1))).gather(1, here.unsqueeze(1)).squeeze(1)
+                mine_h = (self.mine_ok.gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._mine_unlock_tech]) if self.MINE >= 0 and self._mine_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+                lum_h = (self.lumber_ok.gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._lumber_unlock_tech]) if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+                valid = [farm_h, mine_h, lum_h]
+                pick = torch.full((B,), -1, dtype=torch.long, device=dev)
+                best_g = torch.full((B,), float("-inf"), dtype=torch.float64, device=dev)
+                for (imp_i, g), v in zip(opts, valid):
+                    if imp_i < 0:
+                        continue
+                    better = v & (torch.full((B,), g, dtype=torch.float64, device=dev) > best_g)
+                    pick = torch.where(better, torch.full_like(pick, imp_i), pick)
+                    best_g = torch.where(better, torch.full_like(best_g, g), best_g)
+                rows = (build & (pick >= 0)).nonzero(as_tuple=True)[0]
+                if len(rows):
+                    self.improvement[rows, here[rows]] = pick[rows]
+                    self.pillaged[rows, here[rows]] = False
+                    self.v_charges[rows, u] -= 1
+                    self._eff_version += 1
+                    spent = torch.zeros(B, dtype=torch.bool, device=dev)
+                    spent[rows] = self.v_charges[rows, u] <= 0
+                    if bool(spent.any()):
+                        dr = spent.nonzero(as_tuple=True)[0]
+                        self.v_alive[dr, u] = False
+                        self.rvciv_at[dr, here[dr]] = -1
+                continue_mask = act & ~build
+            else:
+                continue_mask = act
+            walk = continue_mask & jobm.any(dim=1)
+            if not bool(walk.any()):
+                continue
+            arT = torch.arange(T, device=dev, dtype=torch.float64)
+            tkey = torch.where(jobm, self.pair_dist[here].double() * (T + 1) + arT, torch.full((B, T), float("inf"), dtype=torch.float64, device=dev))
+            tgt = tkey.argmin(dim=1)
+            d_here = self.pair_dist[here, tgt].to(torch.long)
+            nb = self.neigh[here]  # [B, 6]
+            nbc = nb.clamp(min=0)
+            step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rciv", civ=r)
+            d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
+            skey = torch.where(step_ok, d_nb * 8 + torch.arange(6, device=dev), 10**9)
+            best = skey.min(dim=1).values
+            move = walk & (best < 10**9) & (torch.div(best, 8, rounding_mode="floor") < d_here)
+            if bool(move.any()):
+                dest = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
+                rows = move.nonzero(as_tuple=True)[0]
+                self.rvciv_at[rows, here[rows]] = -1
+                self.rvciv_at[rows, dest[rows]] = u
+                self.v_tile[rows, u] = dest[rows]
 
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
@@ -2635,8 +2766,10 @@ class BatchSim:
         dc_ = self.pciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         db = self.barb_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "rival" else torch.full_like(dm, -1)
         dv = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "barb" else torch.full_like(dm, -1)
+        dvc = self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "barb" else torch.full_like(dm, -1)
         mil_att = att & ((dm >= 0) | (db >= 0) | (dv >= 0))
         civ_att = att & (dm < 0) & (db < 0) & (dv < 0) & (dc_ >= 0)
+        rvciv_att = att & (dm < 0) & (db < 0) & (dv < 0) & (dc_ < 0) & (dvc >= 0)  # C1-B5b: lone rival civilian
         if bool(mil_att.any()):
             def_is_barb = db >= 0
             def_is_rv = (dv >= 0) & ~def_is_barb & (dm < 0)
@@ -2682,7 +2815,15 @@ class BatchSim:
             ds = dc_[rows]
             self.pciv_at[rows, ttc[rows]] = -1
             self.p_alive[rows, ds] = False
-            adv = civ_att & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1)
+        if bool(rvciv_att.any()):
+            # C1-B5b: a lone rival civilian dies the same roll-free death
+            rows = rvciv_att.nonzero(as_tuple=True)[0]
+            ds = dvc[rows]
+            self.rvciv_at[rows, ttc[rows]] = -1
+            self.v_alive[rows, ds] = False
+        kill_adv = civ_att | rvciv_att
+        if bool(kill_adv.any()):
+            adv = kill_adv & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1)
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
@@ -2900,6 +3041,7 @@ class BatchSim:
             & (self.pmil_at.gather(1, nbpc) < 0)
             & (self.pciv_at.gather(1, nbpc) < 0)
             & (self.rv_at.gather(1, nbpc) < 0)
+            & (self.rvciv_at.gather(1, nbpc) < 0)  # C1-B5b: TS patrol blocks on ANY unit — builders included
         )
         d_nb = self.pair_dist[home.unsqueeze(1), nbpc].to(torch.long)
         skey = torch.where(free, d_nb * 8 + torch.arange(6, device=dev), 10**9)
@@ -3024,6 +3166,18 @@ class BatchSim:
                         self.rc_cost[:, r, j] = torch.where(want_b, rdv3.b_cost.gather(0, bi).double(), self.rc_cost[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(want_b, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         rem = rem & ~want_b
+                # C1-B5b: one BUILDER per civ at a time, while a job exists.
+                # A builder is a unit — it takes a cap slot like any other.
+                if self.improvements_on and self._builder_idx >= 0 and bool(rem.any()):
+                    has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
+                    has_q = (self.rc_current[:, r] == self._builder_idx + 1).any(dim=1)
+                    want_bd = rem & ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1) & (unit_count < cap)
+                    if bool(want_bd.any()):
+                        self.rc_current[:, r, j] = torch.where(want_bd, torch.full_like(self.rc_current[:, r, j], self._builder_idx + 1), self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(want_bd, self._p_cost[self._builder_idx].double(), self.rc_cost[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(want_bd, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                        unit_count = unit_count + want_bd.long()
+                        rem = rem & ~want_bd
                 want_u = rem & (unit_count < cap)
                 if bool(want_u.any()):
                     self.rc_current[:, r, j] = torch.where(want_u, ty + 1, self.rc_current[:, r, j])
@@ -3031,6 +3185,9 @@ class BatchSim:
                     self.rc_progress[:, r, j] = torch.where(want_u, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                     unit_count = unit_count + want_u.long()
 
+            # phase-top unlock snapshot (TS computes rivalUnlocks here)
+            r_techs0 = self.r_techs[:, r].clone()
+            r_civics0 = self.r_civics[:, r].clone()
             prod_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
@@ -3078,6 +3235,10 @@ class BatchSim:
                         if bool(found_s.any()):
                             self._rival_try_found(r, found_s)
                         spawn_u = done_q & (cur >= 1) & (cur <= self.NU)
+                        is_bldr = spawn_u & (cur - 1 == self._builder_idx)
+                        if bool(is_bldr.any()):
+                            self._spawn_rival_civ(is_bldr, self.rc_center[:, r, j], r)
+                        spawn_u = spawn_u & ~is_bldr
                         if bool(spawn_u.any()):
                             self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r)
                         # C1-B4: a finished district completes its paved tile
@@ -3146,6 +3307,11 @@ class BatchSim:
             no_c = active & (self.r_cur_civic[:, r] == -1) & ~self._available_mask(self.r_civics[:, r], self._prereq_c).any(dim=1)
             self.r_civic_prog[:, r] = torch.where(no_c, torch.minimum(self.r_civic_prog[:, r], torch.zeros_like(self.r_civic_prog[:, r])), self.r_civic_prog[:, r])
 
+            # C1-B5b: builder actions (build best-gain improvement or walk) —
+            # under the PRE-advance unlock snapshot, like TS's rivalUnlocks
+            if self.improvements_on and self._builder_idx >= 0:
+                self._rival_builder_actions(r, active, techs0=r_techs0, civics0=r_civics0)
+
             # Great-people race (no draws): accrue, claim from the shared pool.
             for cls in range(5):
                 # C1-B4c: real accrual — 1 + (that district's buildings) per
@@ -3191,7 +3357,8 @@ class BatchSim:
             self.r_warturns[:, r] = self.r_warturns[:, r] + atw.long()
             v_high = int(self.v_next.max().item())
             for v in range(v_high):
-                a = atw & self.v_alive[:, v] & (self.v_civ[:, v] == r)
+                # C1-B5b: civilians never act in the war loop (charges mark them)
+                a = atw & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_war_act(v, a)
             peace_roll = atw & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))
@@ -3205,7 +3372,8 @@ class BatchSim:
             pea = active & ~atw
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
             for v in range(v_high):
-                a = pea & self.v_alive[:, v] & (self.v_civ[:, v] == r)
+                # C1-B5b: builders neither snipe nor patrol
+                a = pea & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_peace_act(v, a, r)
             # War declaration: strength/proximity gates first, the roll last.

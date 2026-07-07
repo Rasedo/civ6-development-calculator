@@ -72,13 +72,31 @@ def main() -> None:
     assert int(sim.rvciv_at[0, t]) == slot, "rvciv_at not in snapshot"
     assert int(sim.v_charges[0, slot]) == 3, "v_charges not in snapshot"
 
-    # the plane is inert in real play: nothing populates it pre-B5b
+    # C1-B5b: builders exist organically now — the plane must be POPULATED
+    # somewhere in a 70-turn run, and every alive civilian slot must be
+    # indexed by it (plane/slot coherence).
     sim2 = BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64)
-    for _ in range(60):
+    seen = False
+    for _ in range(70):
         sim2.step()
-    assert not bool((sim2.rvciv_at >= 0).any()), "no organic rival civilian should exist before B5b"
+        seen = seen or bool((sim2.rvciv_at >= 0).any())
+    assert seen, "no rival builder ever existed in 70 turns (B5b broken?)"
+    b2 = sim2._builder_idx
+    for u in range(int(sim2.v_next[0])):
+        if bool(sim2.v_alive[0, u]) and int(sim2.v_type[0, u]) == b2:
+            tt2 = int(sim2.v_tile[0, u])
+            assert int(sim2.rvciv_at[0, tt2]) == u, "alive builder not indexed by rvciv_at"
 
-    print("B5a OCCUPANCY OK")
+    # spawn-over-own-builder (the seed-9131 catch): a fresh own-civ MILITARY
+    # spawn stacks with a standing builder (cross-domain, tileFreeForUnit);
+    # a foreign spawn probe bounces.
+    anchor = torch.tensor([t])
+    f_own, spot_own = sim._first_free_spot(anchor, "rival", civ=0)
+    assert bool(f_own[0]) and int(spot_own[0]) == t, "own-civ military spawn must land ON the builder tile"
+    f_for, spot_for = sim._first_free_spot(anchor, "rival", civ=1)
+    assert bool(f_for[0]) and int(spot_for[0]) != t, "foreign spawn must bounce off the builder tile"
+
+    print("B5 OCCUPANCY OK")
 
 
 if __name__ == "__main__":
