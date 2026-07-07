@@ -123,6 +123,25 @@ the α-Rank champion.
    routes, more districts) — content without agency has never moved the
    needle here.
 
+## Skills (invoke them — they ARE the procedures above, operationalized)
+
+Three project skills live in `.claude/skills/` and encode this program's
+proven procedures. Prefer invoking them over improvising:
+
+- **`/gate-stage`** — land any engine change (src/core or
+  gpu/civ6gpu/engine.py) as a gate-serialized stage: design → inert
+  plumbing → patch-file edits → lockstep RNG/float discipline → battery →
+  baselines → commit. Includes the paid-for trap list.
+- **`/parity-hunt`** — diagnose a parity-gate failure to the exact
+  divergent decision: reading the failure shape, paired TS/GPU probes
+  with end-of-turn alignment, the escalation ladder (bit-level sums →
+  position diffs → batch-collapse checks → stale-harness false
+  positives).
+- **`/training-rung`** — the launch/assess/record loop for every
+  training run: the four-part assessment (eval, both duel orderings,
+  α-Rank, behavior probe), the resume/best.pt/anneal gotchas, and the
+  settled mode choices.
+
 ## Session mechanics
 
 - Long trainings run in the background; assess on landing with
