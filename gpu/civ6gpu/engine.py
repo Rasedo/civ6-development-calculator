@@ -3455,6 +3455,13 @@ class BatchSim:
             a_at[dr, a_tile[dr, u]] = -1
             a_alive[:, u] = a_alive[:, u] & ~died
         sacked_rows = rows[self.city_hp[rows, cs] <= 0]
+        # V-W2 symmetric: a RIVAL conqueror TAKES the city (the loyalty-flip
+        # transfer, mirroring transferCityToRival); barbarians still sack.
+        if atk_kind == "rival" and len(sacked_rows) > 0:
+            w_civ = self.v_civ[sacked_rows, u]
+            for i in range(len(sacked_rows)):
+                self._transfer_city_to_rival(int(sacked_rows[i]), int(slot[sacked_rows[i]]), int(w_civ[i]))
+            sacked_rows = sacked_rows[:0]  # transferred, not sacked
         if len(sacked_rows) > 0:
             sc = slot[sacked_rows]
             self.pop[sacked_rows, sc] = ((self.pop[sacked_rows, sc] * 3) // 4).clamp(min=1)
@@ -3952,34 +3959,38 @@ class BatchSim:
             winner = press_r.argmax(dim=1)
             rows = fc.nonzero(as_tuple=True)[0]
             for b in rows.tolist():
-                w_ = int(winner[b])
-                old_pop = int(self.pop[b, c])
-                # the city leaves the empire
-                self.alive[b, c] = False
-                self.pop[b, c] = 0
-                self.current[b, c] = -1
-                owned = self.owner[b] == c
-                self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
-                self.rival_at[b] = torch.where(owned, torch.full_like(self.rival_at[b], w_), self.rival_at[b])
-                self.center_at[b, self.site[b, c]] = -1
-                # ...and joins the winner
-                slot = int(self.rc_alive[b, w_].sum())
-                assert slot < self.RC, "rival city slots exhausted — raise RC"
-                self.rc_alive[b, w_, slot] = True
-                self.rc_center[b, w_, slot] = self.site[b, c]
-                self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
-                self.rc_growth[b, w_, slot] = 0
-                self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
-                self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
-                self.rc_id[b, w_, slot] = int(self.r_next_city_id[b, w_])
-                self.rc_current[b, w_, slot] = -1
-                self.rc_progress[b, w_, slot] = 0.0
-                self.rc_cost[b, w_, slot] = 0.0
-                self.rc_qtile[b, w_, slot] = -1
-                self.rc_dist_tile[b, w_, slot, :] = -1  # flipped districts are NOT adopted (paved-but-dead)
-                self.rc_bldg[b, w_, slot, :] = False  # nor buildings
-                self.r_next_city_id[b, w_] += 1
-                self.rvcity_at[b, self.site[b, c]] = w_
+                self._transfer_city_to_rival(b, c, int(winner[b]))
+
+    def _transfer_city_to_rival(self, b: int, c: int, w_: int) -> None:
+        """The player-city -> rival-city transfer (shared by loyalty flips
+        and V-W2's reverse capture — mirrors transferCityToRival)."""
+        old_pop = int(self.pop[b, c])
+        # the city leaves the empire
+        self.alive[b, c] = False
+        self.pop[b, c] = 0
+        self.current[b, c] = -1
+        owned = self.owner[b] == c
+        self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
+        self.rival_at[b] = torch.where(owned, torch.full_like(self.rival_at[b], w_), self.rival_at[b])
+        self.center_at[b, self.site[b, c]] = -1
+        # ...and joins the winner
+        slot = int(self.rc_alive[b, w_].sum())
+        assert slot < self.RC, "rival city slots exhausted — raise RC"
+        self.rc_alive[b, w_, slot] = True
+        self.rc_center[b, w_, slot] = self.site[b, c]
+        self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
+        self.rc_growth[b, w_, slot] = 0
+        self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
+        self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
+        self.rc_id[b, w_, slot] = int(self.r_next_city_id[b, w_])
+        self.rc_current[b, w_, slot] = -1
+        self.rc_progress[b, w_, slot] = 0.0
+        self.rc_cost[b, w_, slot] = 0.0
+        self.rc_qtile[b, w_, slot] = -1
+        self.rc_dist_tile[b, w_, slot, :] = -1  # flipped districts are NOT adopted (paved-but-dead)
+        self.rc_bldg[b, w_, slot, :] = False  # nor buildings
+        self.r_next_city_id[b, w_] += 1
+        self.rvcity_at[b, self.site[b, c]] = w_
 
     def _apply_settlers_and_purchases(self, act: torch.Tensor, buildable: torch.Tensor) -> None:
         """RL settler queueing + gold purchases, walked in city-slot order (V-P1).

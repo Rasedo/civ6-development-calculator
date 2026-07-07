@@ -27,6 +27,7 @@ import {
 import { revealAround } from './fog';
 import { CITY_WORK_RADIUS } from '../data/constants';
 import { RIVAL_DEF_PER_TECH } from '../data/rivals';
+import { transferCityToRival } from './rivals';
 import type { RuleResult } from './rules';
 import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
 
@@ -86,7 +87,18 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
-  if (getCityHp(state, city.id) <= 0) sackCity(state, city);
+  if (getCityHp(state, city.id) <= 0) {
+    // V-W2 symmetric: a RIVAL conqueror takes the city (the loyalty-flip
+    // transfer); barbarians still merely sack.
+    if (attacker.owner === 'rival' && attacker.civId !== undefined) {
+      const rival = state.rivals.find((r) => r.id === attacker.civId);
+      if (rival) {
+        transferCityToRival(state, city, rival, 'conquered');
+        return;
+      }
+    }
+    sackCity(state, city);
+  }
 }
 
 /** Melee attack an adjacent enemy unit or city tile. */

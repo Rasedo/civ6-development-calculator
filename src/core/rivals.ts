@@ -355,7 +355,12 @@ export function flipCityToRival(state: GameState, city: City): void {
     }
   }
   if (!winner) return;
+  transferCityToRival(state, city, winner, 'loyalty collapsed');
+}
 
+/** The player-city → rival-city transfer (shared by loyalty flips and
+ * V-W2's reverse capture — a rival melee finishing a player city). */
+export function transferCityToRival(state: GameState, city: City, winner: RivalCiv, why: string): void {
   state.cities = state.cities.filter((c) => c.id !== city.id);
   delete state.cityHp[String(city.id)];
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.from !== city.id && r.to !== city.id);
@@ -385,7 +390,7 @@ export function flipCityToRival(state: GameState, city: City): void {
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
-  state.eventLog.push(`${city.name} has defected to ${winner.name}! (loyalty collapsed)`);
+  state.eventLog.push(`${city.name} has defected to ${winner.name}! (${why})`);
 }
 
 // ---------------------------------------------------------------------------
