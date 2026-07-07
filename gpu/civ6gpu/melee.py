@@ -84,6 +84,7 @@ class MeleeEnv:
             civic=a0.get("civic"),
             units=a0.get("units"),
             envoy=a0.get("envoy"),
+            war=a0.get("war"),
         )
         score = self._scores()
         delta = score - self._last

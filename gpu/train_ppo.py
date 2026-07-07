@@ -85,6 +85,7 @@ class Policy(nn.Module):
         self.tech = _layer(nn.Linear(hidden, dims["NT"]), 0.01)
         self.civic = _layer(nn.Linear(hidden, dims["NC"]), 0.01)
         self.envoy = _layer(nn.Linear(hidden, dims["S"]), 0.01)
+        self.war = _layer(nn.Linear(hidden, dims.get("W", 0)), 0.01) if dims.get("W", 0) > 0 else None  # V-W1
         self.uproj = _layer(nn.Linear(hidden, uhidden), 2**0.5)
         self.umlp = nn.Sequential(
             _layer(nn.Linear(uhidden + UNIT_FEATURES, uhidden), 2**0.5), nn.Tanh(),
@@ -100,6 +101,7 @@ class Policy(nn.Module):
             "tech": self.tech(h),
             "civic": self.civic(h),
             "envoy": self.envoy(h),
+            **({"war": self.war(h)} if self.war is not None else {}),
             "units": self.umlp(torch.cat([ue, ufeat], dim=-1)),
         }
 
@@ -112,6 +114,13 @@ def _masked_dist(logits: torch.Tensor, mask: torch.Tensor) -> tuple[Categorical,
     ml = logits.masked_fill(~mask, NEG)
     ml = torch.where(valid.unsqueeze(-1), ml, torch.zeros_like(ml))
     return Categorical(logits=ml), valid
+
+
+def load_compat(policy, state: dict) -> None:
+    """V-W1: pre-war 5-head checkpoints load with a fresh war head."""
+    missing, unexpected = policy.load_state_dict(state, strict=False)
+    keep = [k for k in missing if not k.startswith("war.")]
+    assert not keep and not unexpected, f"checkpoint mismatch: {keep} {unexpected}"
 
 
 def fit_env_to_checkpoint(env, ck) -> bool:
@@ -133,10 +142,14 @@ def fit_env_to_checkpoint(env, ck) -> bool:
     return narrowed
 
 
+def _heads_in(out: dict):
+    return [k for k in ("production", "tech", "civic", "units", "envoy", "war") if k in out]
+
+
 def sample_heads(out: dict, masks: dict, greedy: bool = False):
     """→ (actions dict with -1 no-ops, joint logp [B], joint entropy [B])."""
     actions, logp, ent = {}, 0.0, 0.0
-    for k in ("production", "tech", "civic", "units", "envoy"):
+    for k in _heads_in(out):
         dist, valid = _masked_dist(out[k], masks[k])
         a = dist.probs.argmax(-1) if greedy else dist.sample()
         lp = dist.log_prob(a) * valid
@@ -153,7 +166,7 @@ def evaluate_heads(out: dict, masks: dict, actions: dict):
     """Joint logp/entropy of STORED actions under CURRENT logits (the PPO
     re-evaluation) — masks come from the buffer, never recomputed."""
     logp, ent = 0.0, 0.0
-    for k in ("production", "tech", "civic", "units", "envoy"):
+    for k in _heads_in(out):
         dist, valid = _masked_dist(out[k], masks[k])
         lp = dist.log_prob(actions[k].clamp(min=0)) * valid
         en = dist.entropy() * valid
@@ -272,6 +285,7 @@ def main() -> None:
         "NT": m0["tech"].shape[1],
         "NC": m0["civic"].shape[1],
         "S": m0["envoy"].shape[1],
+        "W": m0.get("war", torch.zeros(1, 0)).shape[1],
     }
     policy = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
     opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
@@ -306,9 +320,12 @@ def main() -> None:
     start_update, best = 0, float("-inf")
     if args.resume:
         ck = torch.load(args.resume, map_location=dev)
-        policy.load_state_dict(ck["model"])
+        load_compat(policy, ck["model"])
         if "optim" in ck:
-            opt.load_state_dict(ck["optim"])
+            try:
+                opt.load_state_dict(ck["optim"])
+            except ValueError:
+                print("optimizer state predates the war head - starting Adam fresh")
         start_update = ck.get("update", 0)
         best = ck.get("best", best)
         print(f"resumed {args.resume} at update {start_update}")
@@ -336,11 +353,13 @@ def main() -> None:
         "m_civic": torch.zeros(T, B, dims["NC"], dtype=torch.bool, device=dev),
         "m_units": torch.zeros(T, B, P_MAX, N_UNIT_ACTS, dtype=torch.bool, device=dev),
         "m_envoy": torch.zeros(T, B, dims["S"], dtype=torch.bool, device=dev),
+        "m_war": torch.zeros(T, B, dims.get("W", 0), dtype=torch.bool, device=dev),
         "a_production": torch.zeros(T, B, dims["C"], dtype=torch.long, device=dev),
         "a_tech": torch.zeros(T, B, dtype=torch.long, device=dev),
         "a_civic": torch.zeros(T, B, dtype=torch.long, device=dev),
         "a_units": torch.zeros(T, B, P_MAX, dtype=torch.long, device=dev),
         "a_envoy": torch.zeros(T, B, dtype=torch.long, device=dev),
+        "a_war": torch.zeros(T, B, dtype=torch.long, device=dev),
         "logp": torch.zeros(T, B, device=dev),
         "value": torch.zeros(T, B, device=dev),
         "reward": torch.zeros(T, B, device=dev),
@@ -434,7 +453,7 @@ def main() -> None:
                     actions, logp, _ = sample_heads(pout, masks)
                 buf["obs"][t] = obs
                 buf["ufeat"][t] = ufeat
-                for k in ("production", "tech", "civic", "units", "envoy"):
+                for k in ("production", "tech", "civic", "units", "envoy") + (("war",) if "war" in actions else ()):
                     buf[f"m_{k}"][t] = masks[k]
                     buf[f"a_{k}"][t] = actions[k]
                 buf["logp"][t] = logp
@@ -500,8 +519,8 @@ def main() -> None:
             for i in range(0, N, mb):
                 idx = perm[i : i + mb]
                 pout = policy(flat["obs"][idx], flat["ufeat"][idx])
-                masks = {k: flat[f"m_{k}"][idx] for k in ("production", "tech", "civic", "units", "envoy")}
-                acts = {k: flat[f"a_{k}"][idx] for k in ("production", "tech", "civic", "units", "envoy")}
+                masks = {k: flat[f"m_{k}"][idx] for k in _heads_in(pout)}
+                acts = {k: flat[f"a_{k}"][idx] for k in _heads_in(pout)}
                 logp, ent = evaluate_heads(pout, masks, acts)
                 ratio = (logp - flat["logp"][idx]).exp()
                 a = f_adv[idx]
@@ -514,7 +533,7 @@ def main() -> None:
                 if anchor is not None:
                     with torch.no_grad():
                         aout = anchor(flat["obs"][idx], flat["ufeat"][idx])
-                    a_logp, _ = evaluate_heads(aout, {k: flat[f"m_{k}"][idx] for k in ("production", "tech", "civic", "units", "envoy")}, {k: flat[f"a_{k}"][idx] for k in ("production", "tech", "civic", "units", "envoy")})
+                    a_logp, _ = evaluate_heads(aout, {k: flat[f"m_{k}"][idx] for k in _heads_in(aout)}, {k: flat[f"a_{k}"][idx] for k in _heads_in(aout)})
                     # piKL surrogate: pull the learner's action logp toward the
                     # anchor's on the sampled actions (logp - a_logp >= 0 when
                     # the learner overcommits relative to the anchor)

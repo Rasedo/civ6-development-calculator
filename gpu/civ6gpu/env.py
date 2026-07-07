@@ -97,6 +97,7 @@ class BatchEnv:
                 pad = torch.zeros(s.B, prod.shape[1], pw - prod.shape[2], dtype=torch.bool, device=s.device)
                 prod = torch.cat([prod, pad], dim=2)
             return {
+                "war": torch.zeros(s.B, 2 * max(s.R, 1), dtype=torch.bool, device=s.device),  # rival war stays scripted
                 "production": prod,
                 "tech": m["tech"],
                 "civic": m["civic"],
@@ -104,6 +105,7 @@ class BatchEnv:
                 "envoy": torch.zeros(s.B, s.S, dtype=torch.bool, device=s.device),
             }
         return {
+            "war": self.sim.war_mask(),  # V-W1 active: [B, 2R] declare/peace
             "production": self.sim.production_mask(),
             "tech": self.sim.tech_mask(),
             "civic": self.sim.civic_mask(),
@@ -118,6 +120,7 @@ class BatchEnv:
         civic: torch.Tensor | None = None,
         units: torch.Tensor | None = None,
         envoy: torch.Tensor | None = None,
+        war: torch.Tensor | None = None,
         seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Returns (obs [B, F], reward [B], done). done is batch-wide —
@@ -138,7 +141,7 @@ class BatchEnv:
             reward = score - prev["score"]
             self._last_rival_score = {"r": r, "score": score}
             return self.observe(seat), reward, self.sim.turn > self.horizon
-        self.sim.step(production=production, tech=tech, civic=civic, units=units, envoy=envoy)
+        self.sim.step(production=production, tech=tech, civic=civic, units=units, envoy=envoy, war=war)
         score = self.sim.empire_score()
         reward = score - self._last_score
         self._last_score = score

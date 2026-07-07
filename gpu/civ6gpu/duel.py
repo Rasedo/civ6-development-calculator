@@ -75,6 +75,7 @@ class DuelEnv:
             civic=a0.get("civic"),
             units=a0.get("units"),
             envoy=a0.get("envoy"),
+            war=a0.get("war"),
         )
         score = torch.stack([s.empire_score(), s.rival_score(0)], dim=1)
         delta = score - self._last
