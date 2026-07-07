@@ -289,6 +289,20 @@ rung (~15 updates) with eval immediately after — the anti-forgetting
 protocol. The M3d avenue is alive; the teacher just has to be paid
 for.
 
+**The fourth attempt (c3a-14-ce, CE-only) — the poison confirmed and
+cured**: with the value regression gated out of relative mode, eval
+recovers to 212.5 and the probe is HEALTHY (districts 5.0, civics 8.0
+— no forgetting signature; the two 193-collapses were the value-mode
+mismatch, now proven by ablation). Verdict on M3d as of this rung: the
+pipeline is CORRECT but not yet ADDITIVE — 212.5 sits at/just under
+the champion band, cities stay 4.5 (no conquest transfer). The two
+unbought levers: TAPE SCALE (800 states is thin; GPU-side generation
+would buy thousands) and TEACHER INSTRUMENTATION (nobody has verified
+the k16/d16 searcher actually finishes sieges in its own games — add a
+captures column to gen_targets before spending more compute). V-H1
+note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
+now pad pre-chop 16-wide unit heads via load_compat.
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts

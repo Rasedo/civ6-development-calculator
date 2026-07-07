@@ -18,7 +18,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchEnv, load_rules, load_fixture, FIXTURES
-from train_ppo import Policy, sample_heads, fit_env_to_checkpoint
+from train_ppo import Policy, sample_heads, fit_env_to_checkpoint, load_compat
 
 
 def run(path: str, episodes: int, horizon: int, dev: str) -> dict:
@@ -32,7 +32,7 @@ def run(path: str, episodes: int, horizon: int, dev: str) -> dict:
         "NT": m0["tech"].shape[1], "NC": m0["civic"].shape[1], "S": m0["envoy"].shape[1],
     }
     pol = Policy(env.obs_size, dims, hidden=ck.get("hidden", 256)).to(dev)
-    pol.load_state_dict(ck["model"])
+    load_compat(pol, ck["model"])
     pol.eval()
     fit_env_to_checkpoint(env, ck)
     obs = env.reset(scramble=1234)

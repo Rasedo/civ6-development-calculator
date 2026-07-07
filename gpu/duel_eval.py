@@ -21,7 +21,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import load_rules, load_fixture, FIXTURES
 from civ6gpu.duel import DuelEnv
-from train_ppo import Policy, sample_heads, fit_env_to_checkpoint
+from train_ppo import Policy, sample_heads, fit_env_to_checkpoint, load_compat
 
 
 def load_policy(path: str, env, dev: str):
@@ -38,7 +38,7 @@ def load_policy(path: str, env, dev: str):
         }
     hidden = ck.get("hidden", 256)
     pol = Policy(env.obs_size, dims, hidden=hidden).to(dev)
-    pol.load_state_dict(ck["model"])
+    load_compat(pol, ck["model"])
     pol.eval()
     return pol
 

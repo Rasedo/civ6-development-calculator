@@ -56,11 +56,11 @@ def main() -> None:
 
     policy = None
     if args.policy not in ("random", "scripted"):
-        from train_ppo import Policy, sample_heads, fit_env_to_checkpoint
+        from train_ppo import Policy, sample_heads, fit_env_to_checkpoint, load_compat
 
         ck = torch.load(args.policy, map_location=args.device)
         policy = Policy(ck["obs_size"], ck["dims"], hidden=ck.get("hidden", 256)).to(args.device)
-        policy.load_state_dict(ck["model"])
+        load_compat(policy, ck["model"])
         policy.eval()
         assert ck["obs_size"] == env.obs_size, "checkpoint obs layout doesn't match this env build"
         if fit_env_to_checkpoint(env, ck):
