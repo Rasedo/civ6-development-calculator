@@ -190,7 +190,18 @@ learning every update against the mirror — is the O=2 workhorse**; the
 league infrastructure stands validated as PROTOCOL (alpha-rank caught
 the c3a-5 AND c3a-6 regressions that standard eval missed) and returns
 as TRAINING structure when self mode genuinely plateaus, with longer
-budgets. c3a-7 is the long self-mode run from c3a-4.
+budgets. c3a-7 is the long self-mode run from c3a-4. Its read: 140 annealed
+updates reach a training-duel best of 190.6 and a standard eval of
+**225.5 ± 13.3** (record-tying) — but c3a-4 RETAINS the alpha-rank
+crown (0.971 vs 0.029; c3a-4's seat-averaged head-to-head 0.53) and
+the KL flatlined to 0.0000 as the anneal died. **Plain self-play has
+plateaued at the c3a-4 frontier under this recipe** — the staged
+plan's league criterion is met. Next structural step when O=2 resumes:
+mixed self+pool updates (half the games self-mode for both-seat
+gradient, half vs pool members for league pressure — alternation's
+throughput cost without its seat starvation), plus a fresh non-zero LR
+schedule per the tune1 note. Meanwhile the first O=4 FFA run takes the
+GPU.
 
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
