@@ -375,7 +375,22 @@ attack pays ~0.1 reward against ~5-8/turn economy deltas — an order
 of magnitude under the opportunity cost. ONE analysis-justified
 escalation runs (coef 5.0: ~1-2 per attack, 50 per elimination); if
 that also reads flat, the economist-optimum conclusion stands as
-measured across imitation AND shaping, and the chapter rests. V-H1
+measured across imitation AND shaping, and the chapter rests.
+
+**V-WS rung 2 (c3a-19-siegepay, coef 5.0) — FLAT: the chapter's final
+measurement.** Cities 4.6, rival cities 8.3 with conquest income at
+economy scale. The residual mechanism, for the record: shaping pays
+the ATTACK but not the APPROACH — reaching a siege position costs
+turns of movement and exposure that remain unpaid, so the multi-turn
+chain stays an exploration cliff even with dense terminal pay. THE
+CONCLUSION, measured across five distillation rungs and two shaping
+rungs: on this world, at these budgets and city defenses,
+ECONOMIST-WITH-MINIMUM-DETERRENCE IS THE OPTIMUM; conquest is
+search-findable but not learning-stable, and the war verbs are
+situational insurance. c3a-4 retains the crown on merit. Future
+theses (a new chapter, not this one): approach-phase shaping
+(potential-based distance-to-enemy-city), longer horizons, or lower
+city defenses as a world variant. V-H1
 note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
 now pad pre-chop 16-wide unit heads via load_compat.
 
