@@ -470,7 +470,20 @@ C3's matchmaking is built.
   - [ ] B7. Symmetric conflict: war/peace both ways (V-W1 head activates),
         loyalty flips BOTH ways, and city capture in owner terms (a captured
         city changes `civId` — absorbing V-W2 cleanly, no slot growth hack).
-- **C1-C = C2. Egocentric RL surface:** per-seat obs (each civ sees itself as
+- [x] **C1-C = C2. Egocentric RL surface — COMPLETE** (design in
+  gpu/C2_DESIGN.md; four gate-serialized stages): **C2a** (66895c9) the
+  surface is seat-parametrized, seat 0 bit-preserved (seat_test twin-env
+  equality); **C2b** (aa25f70 + ed10ec5 + 1822316) the controlled-rivals
+  mask (scripted decisions skip, mechanics honor external writes),
+  rival_masks/apply_rival_actions in the PLAYER head layout (one net
+  serves every seat), seat-k obs rendered schema-invariant from the rival
+  tensor family, rival_score as the per-seat reward source; the rival
+  unit AI stays SCRIPTED for controlled seats until C3-prep's war verbs;
+  **C2c** (d16bb52) DuelEnv — O=2 over one sim, dense|relative reward
+  phases, relative EXACTLY zero-sum, dense seat-0 bit-equal to BatchEnv
+  on twin worlds; **C2d** seat-swapped PPO plumbing (--seats 2, seats
+  ride the batch axis; checkpoints record seats/reward_mode; CPU smoke
+  green). Original spec: per-seat obs (each civ sees itself as
   seat 0), owner-parameterized masks/action routing, per-civ reward with the
   reward-phase switch built in (dense own-score for bootstrap; symmetrized
   relative score for self-play); BatchEnv gains a seat axis, O parametric.
