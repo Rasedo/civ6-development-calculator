@@ -229,6 +229,7 @@ def main() -> None:
     ap.add_argument("--ema-tau", type=float, default=0.99, help="opponent EMA decay per update")
     ap.add_argument("--pool-every", type=int, default=10, help="freeze a snapshot into the opponent pool every N updates")
     ap.add_argument("--pool-frac", type=float, default=0.2, help="fraction of updates whose opponent is a random frozen snapshot (else the EMA)")
+    ap.add_argument("--seat-alternate", action="store_true", help="c3a-6: the learner swaps seats per update (both seats keep gradient under ema/pfsp pool pressure)")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -339,6 +340,7 @@ def main() -> None:
         # random frozen snapshot (pool_frac), per update
         opp_net = None
         opp_pick = -1  # pool index driving this update (for PFSP stats)
+        learner_seat = (update % 2) if (args.seat_alternate and opponent is not None) else 0
         if opponent is not None:
             opp_net = opponent
             if pool_meta and torch.rand(1).item() < args.pool_frac:
@@ -369,17 +371,25 @@ def main() -> None:
                     ufeat = env.unit_features()
                     masks = env.masks()
                 if opp_net is not None:
-                    # learner rows [0:B), opponent rows [B:2B)
+                    # the learner holds rows [0:B) (seat 0) on even updates,
+                    # rows [B:2B) (seat 1) when --seat-alternate flips it
                     Bh = args.batch
-                    pout = policy(obs[:Bh], ufeat[:Bh])
-                    l_masks = {k: v[:Bh] for k, v in masks.items()}
-                    o_masks = {k: v[Bh:] for k, v in masks.items()}
-                    l_actions, logp_l, _ = sample_heads(pout, l_masks)
-                    oout = opp_net(obs[Bh:], ufeat[Bh:])
+                    lo, hi = (0, Bh) if learner_seat == 0 else (Bh, 2 * Bh)
+                    olo, ohi = (Bh, 2 * Bh) if learner_seat == 0 else (0, Bh)
+                    pout_l = policy(obs[lo:hi], ufeat[lo:hi])
+                    l_masks = {k: v[lo:hi] for k, v in masks.items()}
+                    o_masks = {k: v[olo:ohi] for k, v in masks.items()}
+                    l_actions, logp_l, _ = sample_heads(pout_l, l_masks)
+                    oout = opp_net(obs[olo:ohi], ufeat[olo:ohi])
                     o_actions, _, _ = sample_heads(oout, o_masks)
-                    actions = {k: torch.cat([l_actions[k], o_actions[k]], dim=0) for k in l_actions}
-                    logp = torch.cat([logp_l, torch.zeros_like(logp_l)], dim=0)
-                    pout = {"value": torch.cat([pout["value"], torch.zeros_like(pout["value"])], dim=0)}
+                    if learner_seat == 0:
+                        actions = {k: torch.cat([l_actions[k], o_actions[k]], dim=0) for k in l_actions}
+                        logp = torch.cat([logp_l, torch.zeros_like(logp_l)], dim=0)
+                        pout = {"value": torch.cat([pout_l["value"], torch.zeros_like(pout_l["value"])], dim=0)}
+                    else:
+                        actions = {k: torch.cat([o_actions[k], l_actions[k]], dim=0) for k in l_actions}
+                        logp = torch.cat([torch.zeros_like(logp_l), logp_l], dim=0)
+                        pout = {"value": torch.cat([torch.zeros_like(pout_l["value"]), pout_l["value"]], dim=0)}
                 else:
                     pout = policy(obs, ufeat)
                     actions, logp, _ = sample_heads(pout, masks)
@@ -419,8 +429,9 @@ def main() -> None:
         # opponent rows carry placeholder logp/value and must not update
         if opp_net is not None:
             Bh = args.batch
-            flat = {k: v[:, :Bh].reshape(T * Bh, *v.shape[2:]) for k, v in buf.items()}
-            f_adv, f_ret = adv[:, :Bh].reshape(-1), ret[:, :Bh].reshape(-1)
+            lo, hi = (0, Bh) if learner_seat == 0 else (Bh, 2 * Bh)
+            flat = {k: v[:, lo:hi].reshape(T * Bh, *v.shape[2:]) for k, v in buf.items()}
+            f_adv, f_ret = adv[:, lo:hi].reshape(-1), ret[:, lo:hi].reshape(-1)
         else:
             flat = {k: v.reshape(T * B, *v.shape[2:]) for k, v in buf.items()}
             f_adv, f_ret = adv.reshape(-1), ret.reshape(-1)
