@@ -238,7 +238,7 @@ def main() -> None:
     ap.add_argument("--resume", default=None)
     ap.add_argument("--seats", type=int, default=1, choices=(1, 2, 3, 4), help="C2d/C3c: 2 = DuelEnv; 3-4 = MeleeEnv FFA (needs --fixtures gpu/fixtures_o4 for seats 4)")
     ap.add_argument("--fixtures", default=None, help="C3c: alternate fixture pool dir (e.g. gpu/fixtures_o4 for 3-rival FFA worlds)")
-    ap.add_argument("--anchor", default=None, help="C3c piKL: checkpoint whose policy anchors the learner (KL penalty on learner rows)")
+    ap.add_argument("--anchor", default=None, help="C3c piKL: checkpoint whose policy anchors the learner (KL penalty on learner rows). MUST be same-world (obs width follows the rival count: an O=2 net cannot anchor an O=4 run - bootstrap an O=4 anchor first)")
     ap.add_argument("--anchor-kl", type=float, default=0.1, help="piKL coefficient")
     ap.add_argument("--reward", default="dense", choices=("dense", "relative"), help="per-seat reward phase (seats=2)")
     ap.add_argument("--opponent", default="self", choices=("self", "ema", "pfsp"), help="C3a: seat-1 driver — the learner (naive), an EMA copy + uniform frozen mixture, or C3b PFSP (hardest-first pool matchmaking)")
