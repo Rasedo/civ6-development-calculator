@@ -1808,14 +1808,20 @@ class BatchSim:
         rv_civ = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=max(self.R - 1, 0))
         rv_war = ((rvn >= 0) & self.r_atwar.gather(1, rv_civ)).reshape(B, P_MAX, 6)
         rv_any = (rvn >= 0).reshape(B, P_MAX, 6)
+        # V-W2: at-war rival CITY CENTERS are melee targets (attackTargets'
+        # rivalCity branch) — the siege the mask previously never offered.
+        rcn = self.rvcity_at.gather(1, nbc)
+        rc_war = ((rcn >= 0) & self.r_atwar.gather(1, rcn.clamp(min=0).clamp(max=max(self.R - 1, 0)))).reshape(B, P_MAX, 6)
+        rvc_civ_n = (self.rvciv_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
         passable = self.passable.gather(1, nbc).reshape(B, P_MAX, 6)
         on_map = nb >= 0
         civ = self._p_civ[self.p_type]
         dom = torch.where(civ.unsqueeze(2), pciv, pmil)
         alive = self.p_alive.unsqueeze(2)
-        move = on_map & passable & ~barb & ~rv_any & ~dom & alive
+        move = on_map & passable & ~barb & ~rv_any & ~rvc_civ_n & ~dom & alive
         can_fight = (self._p_combat[self.p_type] > 0).unsqueeze(2)
-        attack = on_map & (barb | rv_war) & can_fight & alive
+        melee_only = (self._p_rng_str[self.p_type] == 0).unsqueeze(2)  # rangedAttack refuses city tiles
+        attack = on_map & (barb | rv_war | (rc_war & melee_only)) & can_fight & alive
         hold = self.p_alive.unsqueeze(2)
         # 13/14/15: build FARM / MINE / LUMBER_MILL — a builder with charges
         # standing on an owned, unimproved, non-center tile where that
@@ -2092,6 +2098,80 @@ class BatchSim:
                 self.pciv_at[rows, dest[rows]] = p
                 self.p_tile[rows, p] = dest[rows]
 
+    def _capture_rival_city(self, rows: torch.Tensor, civ: torch.Tensor, slot: torch.Tensor, ctr: torch.Tensor) -> None:
+        """V-W2: captureRivalCity — the rival city transfers to the PLAYER.
+        Into a FREE player slot when one exists (TS gains the matching cap:
+        beyond C cities the capture razes instead); tiles within the work
+        radius move rivalId -> cityId, pop lands at x0.75 (min 1), the slot
+        initializes from the live planes (site = the center, water housing
+        from wh, river from riv, dist from the pair_dist row)."""
+        for i in range(len(rows)):
+            b = int(rows[i]); r = int(civ[i]); j = int(slot[i]); c_t = int(ctr[i])
+            pop = max(1, (int(self.rc_pop[b, r, j]) * 3) // 4)
+            # the rival city dies either way
+            self.rc_alive[b, r, j] = False
+            self.rvcity_at[b, c_t] = -1
+            free = (~self.alive[b]).nonzero(as_tuple=True)[0]
+            # territory within radius 3 leaves the rival
+            ring = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r)
+            self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
+            if len(free) == 0:
+                continue  # razed: no slot (TS mirrors this cap)
+            c_new = int(free[0])
+            self.alive[b, c_new] = True
+            self.site[b, c_new] = c_t
+            self.center_at[b, c_t] = c_new
+            self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
+            self.owner[b, c_t] = c_new
+            self.pop[b, c_new] = pop
+            self.food_box[b, c_new] = 0.0
+            self.culture_box[b, c_new] = 0.0
+            self.tiles_acquired[b, c_new] = int(self.rc_acquired[b, r, j]) if hasattr(self, "rc_acquired") else 0
+            self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
+            self.current[b, c_new] = -1
+            self.buildings[b, c_new] = False
+            self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
+            self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
+            self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
+            self.loyalty[b, c_new] = 100.0
+        self._eff_version += 1
+
+    def _player_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:
+        """V-W2: a PLAYER melee unit besieging a rival city — mirrors
+        attackRivalCity for attacker.owner === 'player': defender-first
+        rolls with the real defense formula, attacker consumed, CAPTURE at
+        0 HP (never the barb sack)."""
+        if not bool(att.any()):
+            return
+        ttc = tgt.clamp(min=0)
+        civ = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
+        slot = torch.zeros_like(civ)
+        for j in range(self.RC):
+            hit = self.rc_center[torch.arange(self.B, device=self.device), civ, j] == ttc
+            hit = hit & self.rc_alive[torch.arange(self.B, device=self.device), civ, j]
+            slot = torch.where(att & hit, torch.full_like(slot, j), slot)
+        bidx = torch.arange(self.B, device=self.device)
+        pop = self.rc_pop[bidx, civ, slot]
+        ntech = self.r_techs[bidx, civ].sum(dim=1)
+        def_cs = 15 + pop + torch.floor(ntech.double() * self.rules.rivals.get("research", {}).get("defPerTech", 3)).long()
+        atk_cs = self._p_combat[self.p_type[:, p]]
+        d_city = self._damage_roll(att, atk_cs - def_cs)
+        d_atk = self._damage_roll(att, def_cs - atk_cs)
+        rows = att.nonzero(as_tuple=True)[0]
+        self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows]
+        self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
+        died = att & (self.p_hp[:, p] <= 0)
+        if bool(died.any()):
+            dr = died.nonzero(as_tuple=True)[0]
+            here_d = self.p_tile[dr, p]
+            self.pmil_at[dr, here_d] = -1
+            self.p_alive[dr, p] = False
+        cap = att & ~died
+        cap_rows = cap.nonzero(as_tuple=True)[0]
+        cap_rows = cap_rows[self.rc_hp[cap_rows, civ[cap_rows], slot[cap_rows]] <= 0]
+        if len(cap_rows) > 0:
+            self._capture_rival_city(cap_rows, civ[cap_rows], slot[cap_rows], ttc[cap_rows])
+
     def _apply_unit_actions(self, actions: torch.Tensor) -> None:
         """Execute unit orders in slot (= spawn) order, exactly like a player
         issuing them one by one before ending the turn. Combat draws from
@@ -2114,6 +2194,11 @@ class BatchSim:
             vslot = self.rv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
             v_civ = self.v_civ.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(max=max(self.R - 1, 0))
             v_ok = (vslot >= 0) & self.r_atwar.gather(1, v_civ.unsqueeze(1)).squeeze(1)
+            rc_civ_t = self.rvcity_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+            rc_ok = (rc_civ_t >= 0) & self.r_atwar.gather(1, rc_civ_t.clamp(min=0).clamp(max=max(self.R - 1, 0)).unsqueeze(1)).squeeze(1)
+            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
+            if bool(siege.any()):
+                self._player_attack_rival_city(siege, tgt, p)  # V-W2
             att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
             # V-R: ranged units strike instead of meleeing (rangedAttack —
             # one roll, no retaliation, no advance). The mask above is

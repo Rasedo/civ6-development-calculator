@@ -298,6 +298,17 @@ export function captureCityState(state: GameState, cs: CityState): void {
 export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity): void {
   rival.cities = rival.cities.filter((c) => c.id !== city.id);
   const center = state.map.tiles[city.centerIndex];
+  // V-W2 slot cap (mirrors the GPU's fixed city slots): a full empire
+  // RAZES instead — the rival city and its claim simply cease.
+  if (state.cities.length >= 6) {
+    for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
+      if (tileOwnedByCiv(t, civOfRival(rival.id))) t.rivalId = undefined;
+    }
+    center.district = null;
+    center.districtComplete = false;
+    state.eventLog.push(`${city.name} razed — the empire cannot govern more cities.`);
+    return;
+  }
   const id = state.nextCityId++;
   // Their territory within working range transfers to the new owner.
   for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
