@@ -496,6 +496,20 @@ C3's matchmaking is built.
         opponent + a frozen-snapshot mixture (OpenAI Five's 80/20 sufficed
         before any league; Generals.io'26 confirms on one GPU) — cheap PPO
         upgrades ride along (top-advantage filtering, horizon/γ annealing).
+  - [ ] **C3-prep (NEXT): the rival units head** — the c3a-2 duels proved
+        the seat asymmetry dominates (seat 0 wins 88% both orderings), so
+        controlled rivals need unit control before more self-play compute:
+        (i) rival_unit_masks(r)/unit features over the civ's v-slots in
+        slot order padded to P_MAX (the player units-head layout: move
+        0-5 / attack 6-11 / hold 12 / build 13-15 with the B5b job rules
+        for builders); (ii) _apply_rival_unit_actions mirroring
+        _apply_unit_actions (slot order, shared-stream combat draws — off
+        the parity path since controlled=∅ in gates); (iii) re-add the
+        C2b-1 war/peace-AI skips for controlled rivals (correct once the
+        net drives units); (iv) env: masks/unit_features/step seat-1
+        routing; (v) V-W1 ACTIVATION for rival seats rides along (the war
+        head exists, gated off). Then re-run the c3a ladder and require
+        the duel metric to discriminate nets before C3b.
   - [ ] C3b. League when plain self-play plateaus or cycles: frozen snapshot
         pool + PFSP matchmaking + exploiters; eval protocol = head-to-head
         vs frozen refs + vs the scripted-policy civ, ranked by **α-Rank**.
