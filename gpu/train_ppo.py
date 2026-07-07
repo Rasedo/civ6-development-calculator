@@ -540,10 +540,19 @@ def main() -> None:
                 loss = loss_pi + args.vf_coef * loss_v - args.ent_coef * loss_ent
                 if targets is not None:
                     tout = policy(targets["obs"], targets["ufeat"])
-                    tdist, tvalid = _masked_dist(tout["production"], targets["m_production"])
-                    # the search pick lives on the CAPITAL row (slot 0)
-                    ce = -(tdist.log_prob(targets["a_production"].unsqueeze(1).clamp(min=0))[:, 0] * tvalid[:, 0].float()).mean()
-                    vreg = 0.5 * (tout["value"] - targets["value"] * args.reward_scale).pow(2).mean()
+                    if "a_tech" in targets:  # full-tuple gumbel targets: CE over every head
+                        t_logp, _ = evaluate_heads(
+                            tout,
+                            {h: targets[f"m_{h}"] for h in _heads_in(tout) if f"m_{h}" in targets},
+                            {h: targets[f"a_{h}"] for h in _heads_in(tout) if f"a_{h}" in targets},
+                        )
+                        ce = -t_logp.mean()
+                    else:  # legacy M1 capital-production targets (ablation only)
+                        tdist, tvalid = _masked_dist(tout["production"], targets["m_production"])
+                        ce = -(tdist.log_prob(targets["a_production"].unsqueeze(1).clamp(min=0))[:, 0] * tvalid[:, 0].float()).mean()
+                    # value target is RETURN-TO-GO in score units; the head
+                    # predicts it scaled by reward_scale
+                    vreg = 0.5 * (tout["value"] - targets["value"] / args.reward_scale).pow(2).mean()
                     loss = loss + args.distill_coef * (ce + vreg)
                 if anchor is not None:
                     with torch.no_grad():
