@@ -1,0 +1,76 @@
+"""C2b controlled-rival self-test.
+
+The `controlled [B, R]` mask hands a rival's DECISIONS to an external
+writer while every mechanic keeps running: the scripted picker, research
+auto-pick and unit AI must skip controlled rivals; choices written
+directly into rc_current / r_cur_tech must persist, progress, and
+complete through the ordinary machinery. Poked directly (no organic
+controller exists until C2c's duel env).
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import torch
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
+
+
+def main() -> None:
+    rules = load_rules()
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    for _ in range(25):
+        sim.step()
+
+    r = 0
+    assert bool(sim.rc_alive[0, r, 0]), "rival 0 capital must exist by t25"
+    sim.controlled[0, r] = True
+
+    # 1. research: clear the current pick; auto-pick must NOT refill it
+    sim.r_cur_tech[0, r] = -1
+    prog0 = float(sim.r_tech_prog[0, r])
+    sim.step()
+    assert int(sim.r_cur_tech[0, r]) == -1, "auto-pick must skip a controlled rival"
+    assert float(sim.r_tech_prog[0, r]) >= prog0, "progress must still BANK while undecided (manual-mode mirror)"
+
+    # 2. write a tech pick; the advance must honor it
+    avail = sim._available_mask(sim.r_techs[:, r], sim._prereq_t)[0]
+    pick = int(avail.nonzero(as_tuple=True)[0][0])
+    sim.r_cur_tech[0, r] = pick
+    sim.step()
+    assert int(sim.r_cur_tech[0, r]) == pick or bool(sim.r_techs[0, r, pick]), "written tech pick must persist or complete"
+
+    # 3. production: idle a city, confirm the picker leaves it idle
+    j = 0
+    sim.rc_current[0, r, j] = -1
+    sim.rc_progress[0, r, j] = 0.0
+    sim.rc_cost[0, r, j] = 0.0
+    sim.step()
+    assert int(sim.rc_current[0, r, j]) == -1, "picker must not queue for a controlled rival"
+
+    # 4. write a WARRIOR queue item; the completion machinery must run it
+    w = sim._warrior_idx
+    sim.rc_current[0, r, j] = w + 1
+    sim.rc_cost[0, r, j] = float(sim._p_cost[w])
+    sim.rc_progress[0, r, j] = float(sim._p_cost[w]) - 0.5  # one turn from done
+    units_before = int((sim.v_alive[0] & (sim.v_civ[0] == r)).sum())
+    sim.step()
+    done = int(sim.rc_current[0, r, j]) == -1
+    units_after = int((sim.v_alive[0] & (sim.v_civ[0] == r)).sum())
+    assert done and units_after == units_before + 1, "written queue item must complete and spawn through the ordinary machinery"
+
+    # 5. the OTHER rival stays fully scripted (its queue keeps working)
+    other = 1 if sim.R > 1 else 0
+    if other != r:
+        busy = int((sim.rc_current[0, other] >= 0).sum())
+        assert busy > 0, "the scripted rival must keep queueing"
+
+    print("C2b CONTROLLED-RIVAL OK")
+
+
+if __name__ == "__main__":
+    main()

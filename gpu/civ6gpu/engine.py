@@ -282,7 +282,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "r_techs", "r_civics",
+    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "rvciv_at", "v_charges",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
@@ -454,6 +454,11 @@ class BatchSim:
         self.r_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.r_tech_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_civic_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        # C2b: net-controlled rival seats — the scripted PICKER, research
+        # auto-pick and unit AI skip these rivals; externally written
+        # choices (rc_current, r_cur_*) are honored by the existing
+        # mechanics. Empty by default = bit-inert.
+        self.controlled = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         # C1-B4: rival districts — the in-flight queued tile per city (the
         # completion target) and the per-city registry [.., nD] of placed
         # district tiles (one per type; queued counts for cap/one-per-type,
@@ -3098,8 +3103,9 @@ class BatchSim:
                 torch.where(has_s, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
             )
             settle_cost = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities - 1).clamp(min=0).double()
+            scripted_r = ~self.controlled[:, r]  # C2b: the picker only drives scripted rivals
             for j in range(self.RC):
-                idle = active & alive0[:, j] & (self.rc_current[:, r, j] == -1)
+                idle = active & scripted_r & alive0[:, j] & (self.rc_current[:, r, j] == -1)
                 if not bool(idle.any()):
                     continue
                 want_s = (idle & ~settler_q & (n_cities < rr.get("maxCities", 6))) if j == 0 else torch.zeros_like(idle)
@@ -3299,8 +3305,9 @@ class BatchSim:
             rdv = self.rules_dev
             nb_t = torch.zeros(B, rdv.t_cost.shape[0], dtype=torch.bool, device=dev)
             nb_c = torch.zeros(B, rdv.c_cost.shape[0], dtype=torch.bool, device=dev)
+            auto_r = active & ~self.controlled[:, r]  # C2b: controlled rivals pick via the net
             picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
-            self.r_cur_tech[:, r] = torch.where(active, picked, self.r_cur_tech[:, r])
+            self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
             for _ in range(RESEARCH_LOOPS):
                 curt = self.r_cur_tech[:, r]
@@ -3313,11 +3320,11 @@ class BatchSim:
                 self.r_tech_prog[:, r] = torch.where(fin, self.r_tech_prog[:, r] - cost_t, self.r_tech_prog[:, r])
                 self.r_cur_tech[:, r] = torch.where(fin, torch.full_like(curt, -1), self.r_cur_tech[:, r])
                 picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
-                self.r_cur_tech[:, r] = torch.where(active, picked, self.r_cur_tech[:, r])
+                self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             no_t = active & (self.r_cur_tech[:, r] == -1) & ~self._available_mask(self.r_techs[:, r], self._prereq_t).any(dim=1)
             self.r_tech_prog[:, r] = torch.where(no_t, torch.minimum(self.r_tech_prog[:, r], torch.zeros_like(self.r_tech_prog[:, r])), self.r_tech_prog[:, r])
             picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
-            self.r_cur_civic[:, r] = torch.where(active, picked, self.r_cur_civic[:, r])
+            self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])
             for _ in range(RESEARCH_LOOPS):
                 curc = self.r_cur_civic[:, r]
@@ -3330,7 +3337,7 @@ class BatchSim:
                 self.r_civic_prog[:, r] = torch.where(fin, self.r_civic_prog[:, r] - cost_c, self.r_civic_prog[:, r])
                 self.r_cur_civic[:, r] = torch.where(fin, torch.full_like(curc, -1), self.r_cur_civic[:, r])
                 picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
-                self.r_cur_civic[:, r] = torch.where(active, picked, self.r_cur_civic[:, r])
+                self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             no_c = active & (self.r_cur_civic[:, r] == -1) & ~self._available_mask(self.r_civics[:, r], self._prereq_c).any(dim=1)
             self.r_civic_prog[:, r] = torch.where(no_c, torch.minimum(self.r_civic_prog[:, r], torch.zeros_like(self.r_civic_prog[:, r])), self.r_civic_prog[:, r])
 
@@ -3385,7 +3392,8 @@ class BatchSim:
             v_high = int(self.v_next.max().item())
             for v in range(v_high):
                 # C1-B5b: civilians never act in the war loop (charges mark them)
-                a = atw & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                # C2b: the unit AI only drives scripted rivals
+                a = atw & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_war_act(v, a)
             peace_roll = atw & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))
@@ -3400,7 +3408,8 @@ class BatchSim:
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
             for v in range(v_high):
                 # C1-B5b: builders neither snipe nor patrol
-                a = pea & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                # C2b: the unit AI only drives scripted rivals
+                a = pea & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_peace_act(v, a, r)
             # War declaration: strength/proximity gates first, the roll last.
