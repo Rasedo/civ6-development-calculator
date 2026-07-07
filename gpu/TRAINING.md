@@ -299,7 +299,19 @@ the champion band, cities stay 4.5 (no conquest transfer). The two
 unbought levers: TAPE SCALE (800 states is thin; GPU-side generation
 would buy thousands) and TEACHER INSTRUMENTATION (nobody has verified
 the k16/d16 searcher actually finishes sieges in its own games — add a
-captures column to gen_targets before spending more compute). V-H1
+captures column to gen_targets before spending more compute).
+
+**Teacher instrumentation (two full k16/d16 games)**: the searcher
+PROSECUTES WAR — seed 9079 ends with a rival city ELIMINATED (8 -> 7)
+behind an 18-unit army at score 277.4; seed 9001 scores 310.0 with a
+5th city settled. The conquest/expansion knowledge demonstrably lives
+in the teacher at this budget; the remaining M3d gap is pure DATA
+SCALE (8 games -> ~1 sieging game in an 800-state tape). The avenue's
+next buy: GPU-side batched target generation (gumbel_decide already
+vectorizes over the k axis; batch the GAME axis too), thousands of
+states, re-distill CE-only. Conquest is a discovery problem with a
+working teacher — NOT a rules ceiling; the richer-mechanics question
+stays open on its own merits, not as a war-fix. V-H1
 note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
 now pad pre-chop 16-wide unit heads via load_compat.
 
