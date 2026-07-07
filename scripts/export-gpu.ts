@@ -116,8 +116,10 @@ const N_TURNS = Number(process.argv[3] ?? 100);
 const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler
 const CS_MAX = 3;
-const R_MAX = 2;
-const OUT = 'gpu/fixtures';
+const R_MAX = Number(process.argv[5] ?? 2);  // C3c-i: parametric (the default 2 IS the parity-contract pool)
+// C3c-i: argv[5] = rival count (default 2 — THE PARITY CONTRACT POOL);
+// argv[6] = output dir. The O=4 pool: `-- 24 100 5 3 gpu/fixtures_o4`.
+const OUT = process.argv[6] ?? 'gpu/fixtures';
 
 mkdirSync(OUT, { recursive: true });
 
