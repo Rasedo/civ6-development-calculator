@@ -212,6 +212,16 @@ live; next rungs are longer anchored runs, kingmaking telemetry
 (per-seat win vs score distributions), and alpha-rank over FFA
 checkpoints.
 
+**The war-head rung (c3a-8-war)** — the six-head trainer resumed from
+c3a-4 with V-W1 live: the net USES the verb (wars seen 0.1 -> 1.0,
+essentially every game) and even hoards gold as peace-exit liquidity
+(treasury 16 -> 40), but the standard eval stays on the family plateau
+(217-225): declaring war neither helps nor hurts, because war has NO
+PAYOFF yet — beating rival units buys attrition, not territory. This
+empirically validates BUILD_PLAN's ordering: V-W2 (capture) is what
+makes aggression meaningful, and it is the last designed engine round
+(capture-as-civ-transfer, constraints at §4 V-W2).
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts
