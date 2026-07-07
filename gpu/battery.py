@@ -98,6 +98,7 @@ def main() -> int:
                 ("war", [py, "gpu/war_test.py"], 6),
                 ("ranged", [py, "gpu/ranged_test.py"], 6),
                 ("occupancy", [py, "gpu/occupancy_test.py"], 6),
+                ("seat", [py, "gpu/seat_test.py"], 6),
                 ("mcts", mcts_cmd, 6),
                 ("gumbel", [py, "gpu/gumbel_test.py"], 6),
             ],

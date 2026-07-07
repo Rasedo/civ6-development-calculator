@@ -72,10 +72,17 @@ class BatchEnv:
         self._last_score = self.sim.empire_score()
         return self.observe()
 
-    def masks(self) -> dict[str, torch.Tensor]:
+    def _require_seat0(self, seat: int) -> None:
+        # C2a: the surface is seat-parametrized; only seat 0 (the player
+        # civ) is implemented. Rival-seat rendering + routing land with C2b.
+        if seat != 0:
+            raise NotImplementedError("rival seats land with C2b (rendering + routing)")
+
+    def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
         """production [B, C, NB+2+NU], tech [B, NT], civic [B, NC], units
         [B, P, 13], envoy [B, S] — all-False rows mean no decision pends
         there this turn."""
+        self._require_seat0(seat)
         return {
             "production": self.sim.production_mask(),
             "tech": self.sim.tech_mask(),
@@ -91,18 +98,23 @@ class BatchEnv:
         civic: torch.Tensor | None = None,
         units: torch.Tensor | None = None,
         envoy: torch.Tensor | None = None,
+        seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Returns (obs [B, F], reward [B], done). done is batch-wide —
         lockstep fixed-horizon episodes; the caller resets."""
+        self._require_seat0(seat)
         self.sim.step(production=production, tech=tech, civic=civic, units=units, envoy=envoy)
         score = self.sim.empire_score()
         reward = score - self._last_score
         self._last_score = score
-        return self.observe(), reward, self.sim.turn > self.horizon
+        return self.observe(seat), reward, self.sim.turn > self.horizon
 
-    def observe(self) -> torch.Tensor:
+    def observe(self, seat: int = 0) -> torch.Tensor:
         """[B, obs_size] — empire globals, city-state courtship, rival
-        posture, and per-city-slot economy/defense, all roughly unit-scaled."""
+        posture, and per-city-slot economy/defense, all roughly unit-scaled.
+        The schema is seat-invariant by design (C2): seat k>0 renders the
+        same layout from the rival tensor family (C2b)."""
+        self._require_seat0(seat)
         s = self.sim
         d = s.dtype
         B, C = s.B, s.C
@@ -161,7 +173,7 @@ class BatchEnv:
         )  # [B, R, 3]
         return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1)], dim=1)
 
-    def unit_features(self) -> torch.Tensor:
+    def unit_features(self, seat: int = 0) -> torch.Tensor:
         """[B, P, 8] per player-unit-slot features for the units head:
         alive, type, hp, map position, and range/bearing to the nearest
         barbarian camp (zeros when no camp stands — the head then has
