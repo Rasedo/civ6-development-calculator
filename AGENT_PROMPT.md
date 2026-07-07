@@ -141,6 +141,19 @@ proven procedures. Prefer invoking them over improvising:
   training run: the four-part assessment (eval, both duel orderings,
   α-Rank, behavior probe), the resume/best.pt/anneal gotchas, and the
   settled mode choices.
+- **`/rl-research`** — how avenues are chosen and judged: start from a
+  named failure, cheapest falsifying rung, one variable per rung,
+  success criteria as behavioral/ranking facts defined BEFORE launch,
+  the diagnosis catalog (eval-up-mass-down, seat dominance, verb-
+  without-payoff, rational-behavior-flat-objective, dead KL), and the
+  mechanism-not-numbers reporting rule.
+- **`/port-mechanic`** — the Civ6 mechanic promotion craft (use with
+  /gate-stage): spec-reading order (rule → consumers → RNG footprint →
+  phase position), the promotion checklist (state/_MUTABLE, ??=-only
+  save migration, planes-by-calling-the-TS-rule, trace columns so the
+  mechanic is gate-checked from turn one, the owner-scoping leak list,
+  float association and js_round, index tie-breaks), and the canary
+  rule — name the observable that MUST diverge if the mechanic breaks.
 
 ## Session mechanics
 
