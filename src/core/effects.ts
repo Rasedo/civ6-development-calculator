@@ -41,10 +41,6 @@ function* completedEffectsIn(research: ResearchState): Generator<ResearchEffect>
   }
 }
 
-function* completedEffects(state: GameState): Generator<ResearchEffect> {
-  yield* completedEffectsIn(state.research);
-}
-
 /** Unlocks from an arbitrary research state (C1-B4 prep: rival districts/
  * buildings gate on the RIVAL's own trees). Player wrapper below. */
 export function computeUnlocksIn(research: ResearchState): Unlocks {
@@ -223,11 +219,15 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.housingAll) mods.housingAll += fx.housingAll;
 }
 
-export function getModifiers(state: GameState): Modifiers {
+/**
+ * The research-driven modifier head only (C1-B5b: rival cities apply THEIR
+ * OWN tech boosts — mine yields, farm adjacency, hill farms; government/
+ * religion/CS blocks are player machinery and stay out). The player's
+ * getModifiers builds on top of this.
+ */
+export function modifiersFromResearch(research: ResearchState): Modifiers {
   const mods = defaultModifiers();
-
-  // Tech/civic boosts
-  for (const fx of completedEffects(state)) {
+  for (const fx of completedEffectsIn(research)) {
     if (fx.kind === 'improvementYields') {
       const cur = (mods.improvementYields[fx.improvement] ??= {});
       addPartial(cur, fx.yields);
@@ -237,6 +237,11 @@ export function getModifiers(state: GameState): Modifiers {
       mods.hillFarms = true;
     }
   }
+  return mods;
+}
+
+export function getModifiers(state: GameState): Modifiers {
+  const mods = modifiersFromResearch(state.research);
 
   // Government + slotted policies
   const gov = state.government.current ? GOVERNMENTS[state.government.current] : null;

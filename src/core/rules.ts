@@ -68,11 +68,19 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
 // ---------------------------------------------------------------------------
 
 /** Improvements that may be built on this tile right now (research-gated). */
-export function validImprovements(state: GameState, tile: Tile): ImprovementId[] {
-  if (tile.cityId === -1) return []; // must be inside your borders
+/**
+ * Owner-qualified improvement rules (C1-B5b): the same body over an
+ * arbitrary unlock set and ownership test so rival builders place under
+ * THEIR research. Player wrapper below keeps the exact old behavior.
+ */
+export function validImprovementsIn(
+  tile: Tile,
+  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
+): ImprovementId[] {
+  if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
   if (tile.district || tile.wonder || isImpassable(tile)) return [];
 
-  const unlocks = gates(state);
+  const unlocks = opts.unlocks;
   const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);
 
   if (tile.resource) {
@@ -99,6 +107,13 @@ export function validImprovements(state: GameState, tile: Tile): ImprovementId[]
   if (unlocked('MINE') && hills && tile.feature === null) out.push('MINE');
   if (unlocked('LUMBER_MILL') && tile.feature === 'WOODS') out.push('LUMBER_MILL');
   return out;
+}
+
+export function validImprovements(state: GameState, tile: Tile): ImprovementId[] {
+  return validImprovementsIn(tile, {
+    unlocks: gates(state),
+    ownsTile: (t) => t.cityId !== -1,
+  });
 }
 
 export function canRemoveFeature(state: GameState, tile: Tile): RuleResult {
