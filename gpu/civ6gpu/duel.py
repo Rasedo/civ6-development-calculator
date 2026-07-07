@@ -37,6 +37,8 @@ class DuelEnv:
         self.env = BatchEnv(fixtures, rules, device=device, dtype=dtype, horizon=horizon)
         self.reward_mode = reward
         self.horizon = horizon
+        self.war_shaping = 0.0  # V-WS: set by the trainer (--war-shaping)
+        self._ws_prev = None
 
     @property
     def sim(self):
@@ -51,6 +53,7 @@ class DuelEnv:
         s = self.sim
         s.controlled[:, 0] = True
         self._last = torch.stack([s.empire_score(), s.rival_score(0)], dim=1)  # [B, 2]
+        self._ws_prev = None
         return self.observe_all()
 
     def observe_all(self) -> torch.Tensor:
@@ -84,4 +87,23 @@ class DuelEnv:
             rew = delta - delta.flip(1)  # own minus opponent — zero-sum by construction
         else:
             rew = delta
+        if self.war_shaping > 0.0:
+            # V-WS: a DENSE siege gradient — seat 0 is paid for rival-city HP
+            # damage and (heavily) for eliminations; seat 1 symmetrically for
+            # player-city damage/eliminations. Shaping rides on TOP of the
+            # game reward (potential-free, so it biases exploration, not the
+            # final objective's sign).
+            rc_hp = s.rc_hp.clamp(min=0).sum(dim=(1, 2)).to(rew.dtype)
+            rc_n = s.rc_alive.sum(dim=(1, 2)).to(rew.dtype)
+            p_hp = s.city_hp.sum(dim=1).to(rew.dtype)
+            p_n = s.alive.sum(dim=1).to(rew.dtype)
+            if self._ws_prev is not None:
+                dmg0 = (self._ws_prev[0] - rc_hp).clamp(min=0) / 100.0
+                elim0 = (self._ws_prev[1] - rc_n).clamp(min=0)
+                dmg1 = (self._ws_prev[2] - p_hp).clamp(min=0) / 100.0
+                elim1 = (self._ws_prev[3] - p_n).clamp(min=0)
+                rew = rew.clone()
+                rew[:, 0] += self.war_shaping * (dmg0 + 10.0 * elim0)
+                rew[:, 1] += self.war_shaping * (dmg1 + 10.0 * elim1)
+            self._ws_prev = (rc_hp, rc_n, p_hp, p_n)
         return self.observe_all(), rew, s.turn > self.horizon

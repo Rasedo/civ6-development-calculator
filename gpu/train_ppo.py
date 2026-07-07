@@ -263,6 +263,7 @@ def main() -> None:
     ap.add_argument("--anchor-kl", type=float, default=0.1, help="piKL coefficient")
     ap.add_argument("--distill", default=None, help="M3d: search-target file from gen_targets.py — adds an aux CE (policy toward the search pick) + value regression on those states")
     ap.add_argument("--distill-coef", type=float, default=0.5)
+    ap.add_argument("--war-shaping", type=float, default=0.0, help="V-WS: dense siege gradient - reward city-HP damage (/100) and eliminations (x10) per seat symmetrically (duel mode)")
     ap.add_argument("--reward", default="dense", choices=("dense", "relative"), help="per-seat reward phase (seats=2)")
     ap.add_argument("--opponent", default="self", choices=("self", "ema", "pfsp"), help="C3a: seat-1 driver — the learner (naive), an EMA copy + uniform frozen mixture, or C3b PFSP (hardest-first pool matchmaking)")
     ap.add_argument("--ema-tau", type=float, default=0.99, help="opponent EMA decay per update")
@@ -280,6 +281,7 @@ def main() -> None:
     fix_dir = Path(args.fixtures) if args.fixtures else None
     if args.seats == 2:
         duel = build_duel(args.batch, dev, args.horizon, args.reward, fix_dir)
+        duel.war_shaping = args.war_shaping
         env = duel.env  # dims/obs probing go through the seat surface
     elif args.seats > 2:
         melee = build_melee(args.batch, dev, args.horizon, args.reward, args.seats, fix_dir)
