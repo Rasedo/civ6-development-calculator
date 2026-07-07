@@ -630,7 +630,7 @@ class BatchSim:
         # NEW head, plumbed but OFF: war_mask() is all-False and step(war=…)
         # is ignored while False, so nothing samples or applies it. The head
         # is not wired into BatchEnv until activation (+ retrain).
-        self._rl_war_active = False
+        self._rl_war_active = True  # V-W1 ACTIVE (2026-07-08): the war/peace head samples live; scripted/parity paths never pass war= so the gates stay untouched
         # V-R: ranged units (rangedStrength > 0) execute attack codes 6-11 as
         # a RANGED strike — one damage roll, no retaliation, no advance, no
         # camp clear (mirrors rangedAttack; range-1 targets only, legal for

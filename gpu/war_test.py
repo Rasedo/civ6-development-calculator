@@ -44,20 +44,23 @@ def war_vec(sim, code) -> torch.Tensor:
 
 
 def test_inert_when_off(rules, path):
+    """V-W1 ACTIVE (2026-07-08): the flag ships ON. The gate-safety
+    property becomes: the SCRIPTED path (war=None) is bit-identical to a
+    sim with the head forced off — the gates never pass war=, so parity
+    is untouched by activation."""
     sim = build(rules, path)
-    for _ in range(20):
+    assert sim._rl_war_active, "V-W1 ships ACTIVE now"
+    ref = build(rules, path)
+    ref._rl_war_active = False
+    for _ in range(30):
         sim.step()
-    assert not sim._rl_war_active, "flag must ship OFF"
-    assert not bool(sim.war_mask().any()), "war_mask must be all-False while off"
-    snap = sim.snapshot()
-    sim.step(war=war_vec(sim, 0))  # would declare war on rival 0 if live
-    after = snap_all(sim)
-    sim.restore(snap)
-    sim.step()
-    d = drift(sim, after)
-    assert not d, f"war code perturbed gated-off state: {d}"
-    assert not bool(sim.r_atwar.any()), "no war should exist yet on this seed/turn"
-    print("  inert-when-off OK (mask all-False + bit-exact no-op)")
+        ref.step()
+    d = drift(sim, snap_all(ref))
+    assert not d, f"war=None path must not depend on the flag: {d}"
+    # the live mask offers declarations at peace (rivals exist on this seed)
+    if bool(sim.r_alive.any()):
+        assert bool(sim.war_mask().any()), "live war_mask should offer choices with rivals alive"
+    print("  activation OK (scripted path flag-independent; live mask non-degenerate)")
 
 
 def test_declare(rules, path):
