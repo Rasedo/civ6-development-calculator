@@ -488,7 +488,11 @@ C3's matchmaking is built.
   reward-phase switch built in (dense own-score for bootstrap; symmetrized
   relative score for self-play); BatchEnv gains a seat axis, O parametric.
 - **C1-D = C3. Self-play trainer, staged:**
-  - [ ] C3a. Seat-swapped PPO at **O=2**, plain self-play with an EMA
+  - [~] C3a IN FLIGHT: machinery SHIPPED (--opponent ema: EMA + frozen
+        pool 80/20, learner-rows-only updates); RUN 1 (dense, 30 updates)
+        evaluates at **215.6 ± 11.8 — +43 over scripted (172.7)**; run 2
+        (relative phase, resumed) training. Original spec:
+        Seat-swapped PPO at **O=2**, plain self-play with an EMA
         opponent + a frozen-snapshot mixture (OpenAI Five's 80/20 sufficed
         before any league; Generals.io'26 confirms on one GPU) — cheap PPO
         upgrades ride along (top-advantage filtering, horizon/γ annealing).

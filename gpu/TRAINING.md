@@ -141,6 +141,13 @@ the finished B-arc world: **random 114.4 ± 11.6, scripted 172.7 ±
 soften rivals vs the old stand-ins. The next reference net trains on
 the B5 world (every earlier net is stale).
 
+**C3a-1** is that net and the first SELF-PLAY one: 30 updates of
+seat-swapped PPO over the O=2 DuelEnv (dense phase, EMA opponent +
+80/20 frozen pool, the learner training on its own rows only) reached a
+training-duel mean of 169.8 and **evaluates at 215.6 ± 11.8 on the
+standard scripted world — +43 over the scripted policy (172.7)**.
+The relative-reward phase (c3a-2) continues from this checkpoint.
+
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
 46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
