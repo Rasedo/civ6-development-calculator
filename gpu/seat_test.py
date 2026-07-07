@@ -32,12 +32,34 @@ def main() -> None:
         oa, ra, da = a.step()
         ob, rb, db = b.step(seat=0)
         assert torch.equal(oa, ob) and torch.equal(ra, rb) and da == db, f"step outputs differ at t{t}"
-    try:
-        a.observe(seat=1)
-        raise SystemExit("seat 1 must raise until C2b")
-    except NotImplementedError:
-        pass
-    print("C2a SEAT SURFACE OK")
+    # C2b: seat 1 renders the SAME schema from rival tensors, its masks
+    # drive legal control, and rival-score rewards flow
+    o1 = a.observe(seat=1)
+    assert o1.shape == oa.shape, "seat-1 obs must match the seat-0 schema"
+    assert not torch.isnan(o1).any()
+    g = torch.Generator().manual_seed(3)
+    for _ in range(20):
+        m = a.masks(seat=1)
+        B, C, W = m["production"].shape
+        pa = torch.full((B, C), -1, dtype=torch.long)
+        for b in range(B):
+            for j in range(C):
+                row = m["production"][b, j]
+                if row.any():
+                    opts = row.nonzero(as_tuple=True)[0]
+                    pa[b, j] = opts[torch.randint(len(opts), (1,), generator=g)]
+        ta = torch.full((B,), -1, dtype=torch.long)
+        ca = torch.full((B,), -1, dtype=torch.long)
+        for b in range(B):
+            if m["tech"][b].any():
+                o = m["tech"][b].nonzero(as_tuple=True)[0]
+                ta[b] = o[torch.randint(len(o), (1,), generator=g)]
+            if m["civic"][b].any():
+                o = m["civic"][b].nonzero(as_tuple=True)[0]
+                ca[b] = o[torch.randint(len(o), (1,), generator=g)]
+        obs1, rew1, done1 = a.step(production=pa, tech=ta, civic=ca, seat=1)
+        assert obs1.shape == oa.shape and not torch.isnan(obs1).any() and not torch.isnan(rew1).any()
+    print("C2 SEAT SURFACE OK")
 
 
 if __name__ == "__main__":

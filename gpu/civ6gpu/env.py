@@ -72,17 +72,35 @@ class BatchEnv:
         self._last_score = self.sim.empire_score()
         return self.observe()
 
-    def _require_seat0(self, seat: int) -> None:
-        # C2a: the surface is seat-parametrized; only seat 0 (the player
-        # civ) is implemented. Rival-seat rendering + routing land with C2b.
-        if seat != 0:
-            raise NotImplementedError("rival seats land with C2b (rendering + routing)")
+    def _seat_rival(self, seat: int) -> int:
+        """Seat k>0 maps to rival k-1; seat 0 is the player civ."""
+        r = seat - 1
+        if r < 0 or r >= self.sim.R:
+            raise ValueError(f"seat {seat} out of range (O = {self.sim.R + 1})")
+        return r
 
     def masks(self, seat: int = 0) -> dict[str, torch.Tensor]:
         """production [B, C, NB+2+NU], tech [B, NT], civic [B, NC], units
         [B, P, 13], envoy [B, S] — all-False rows mean no decision pends
-        there this turn."""
-        self._require_seat0(seat)
+        there this turn. Seat k>0 (C2b): the controlled rival's decision
+        space in the same layouts; units/envoy all-False (the rival unit
+        AI stays scripted until C3-prep; rivals have no envoys)."""
+        if seat != 0:
+            r = self._seat_rival(seat)
+            s = self.sim
+            m = s.rival_masks(r)
+            prod = m["production"][:, : s.C]  # city axis mirrors the player width
+            pw = s.production_mask().shape[2]
+            if prod.shape[2] < pw:  # purchase block active: pad all-False
+                pad = torch.zeros(s.B, prod.shape[1], pw - prod.shape[2], dtype=torch.bool, device=s.device)
+                prod = torch.cat([prod, pad], dim=2)
+            return {
+                "production": prod,
+                "tech": m["tech"],
+                "civic": m["civic"],
+                "units": torch.zeros(s.B, P_MAX, 13, dtype=torch.bool, device=s.device),
+                "envoy": torch.zeros(s.B, s.S, dtype=torch.bool, device=s.device),
+            }
         return {
             "production": self.sim.production_mask(),
             "tech": self.sim.tech_mask(),
@@ -101,8 +119,21 @@ class BatchEnv:
         seat: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor, bool]:
         """Returns (obs [B, F], reward [B], done). done is batch-wide —
-        lockstep fixed-horizon episodes; the caller resets."""
-        self._require_seat0(seat)
+        lockstep fixed-horizon episodes; the caller resets. Seat k>0
+        (C2b): actions route into the controlled rival BEFORE the world
+        steps; reward is that rival's score delta."""
+        if seat != 0:
+            r = self._seat_rival(seat)
+            self.sim.controlled[:, r] = True
+            self.sim.apply_rival_actions(r, production=production, tech=tech, civic=civic)
+            prev = getattr(self, "_last_rival_score", None)
+            if prev is None or prev.get("r") != r:
+                prev = {"r": r, "score": self.sim.rival_score(r)}
+            self.sim.step()
+            score = self.sim.rival_score(r)
+            reward = score - prev["score"]
+            self._last_rival_score = {"r": r, "score": score}
+            return self.observe(seat), reward, self.sim.turn > self.horizon
         self.sim.step(production=production, tech=tech, civic=civic, units=units, envoy=envoy)
         score = self.sim.empire_score()
         reward = score - self._last_score
@@ -114,7 +145,8 @@ class BatchEnv:
         posture, and per-city-slot economy/defense, all roughly unit-scaled.
         The schema is seat-invariant by design (C2): seat k>0 renders the
         same layout from the rival tensor family (C2b)."""
-        self._require_seat0(seat)
+        if seat != 0:
+            return self._observe_rival(self._seat_rival(seat))
         s = self.sim
         d = s.dtype
         B, C = s.B, s.C
@@ -171,6 +203,83 @@ class BatchEnv:
             ],
             dim=2,
         )  # [B, R, 3]
+        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1)], dim=1)
+
+    def _observe_rival(self, r: int) -> torch.Tensor:
+        """The seat-invariant obs layout rendered from rival r's tensors:
+        my empire = the rc_*/r_* family (slots beyond C invisible — RC>C by
+        flips only), the CS block zeros (no rival courtship), the rival
+        block's slot 0 = THE PLAYER viewed as an opponent, then the other
+        rivals. Fields without a rival analog (treasury, envoys, influence)
+        render zero; loyalty renders full."""
+        s = self.sim
+        d = s.dtype
+        B, C = s.B, s.C
+        dev = s.device
+        pop = s.rc_pop[:, r, :C].to(d)
+        alive = s.rc_alive[:, r, :C]
+        needs = s._growth_needed(s.rc_pop[:, r, :C]).clamp(min=1)
+        denom = s.rc_cost[:, r, :C].clamp(min=1)
+        per_city = torch.stack(
+            [
+                alive.to(d),
+                pop / 10.0,
+                s.rc_growth[:, r, :C].to(d) / needs.to(d),
+                torch.where(s.rc_current[:, r, :C] >= 0, s.rc_progress[:, r, :C].to(d) / denom.to(d), torch.zeros_like(pop)),
+                torch.zeros(B, C, dtype=d, device=dev),  # no per-city border box
+                s.rc_acquired[:, r, :C].to(d) / 20.0 if hasattr(s, "rc_acquired") else torch.zeros(B, C, dtype=d, device=dev),
+                torch.where(alive, s.rc_hp[:, r, :C].to(d), torch.zeros_like(pop)) / 200.0,
+                torch.ones(B, C, dtype=d, device=dev),  # rivals hold full loyalty
+                (s.rc_current[:, r, :C] >= 0).to(d),
+            ],
+            dim=2,
+        )  # [B, C, 9]
+        n_own_units = (s.v_alive & (s.v_civ == r)).sum(dim=1).to(d)
+        emp = torch.stack(
+            [
+                torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
+                s.r_techs[:, r].sum(dim=1).to(d) / max(s.r_techs.shape[2], 1),
+                s.r_civics[:, r].sum(dim=1).to(d) / max(s.r_civics.shape[2], 1),
+                s.r_tech_prog[:, r].to(d) / 50.0,
+                s.r_civic_prog[:, r].to(d) / 50.0,
+                (s.rc_current[:, r] == 0).sum(dim=1).to(d),  # settlers in production
+                (s.rc_current[:, r] == 0).any(dim=1).to(d),
+                s.rc_alive[:, r].sum(dim=1).to(d) / C,
+                torch.zeros(B, dtype=d, device=dev),  # no rival treasury
+                torch.zeros(B, dtype=d, device=dev),  # no envoys
+                torch.zeros(B, dtype=d, device=dev),  # no influence
+                s.n_camps.to(d) / 5.0,
+                s.u_alive.sum(dim=1).to(d) / 10.0,
+                n_own_units / 10.0,
+            ],
+            dim=1,
+        )  # [B, 14]
+        cs = torch.zeros(B, s.S, _PER_CS_F, dtype=d, device=dev)
+        # opponents: slot 0 = the player, then the other rivals in order
+        opp_cols = [
+            torch.stack(
+                [
+                    (s.r_alive[:, r] & s.r_atwar[:, r]).to(d),  # the war IS vs the player
+                    s.r_warturns[:, r].to(d) / 14.0,
+                    s.alive.sum(dim=1).to(d) / 6.0,
+                ],
+                dim=1,
+            )
+        ]
+        for o in range(s.R):
+            if o == r:
+                continue
+            opp_cols.append(
+                torch.stack(
+                    [
+                        (s.r_alive[:, o] & s.r_atwar[:, o]).to(d),
+                        s.r_warturns[:, o].to(d) / 14.0,
+                        (s.rc_alive[:, o].sum(dim=1) * s.r_alive[:, o].long()).to(d) / 6.0,
+                    ],
+                    dim=1,
+                )
+            )
+        riv = torch.stack(opp_cols, dim=1)  # [B, R, 3]
         return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1)], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:

@@ -1459,6 +1459,28 @@ class BatchSim:
         yield_term = torch.einsum("bck,k->b", total, rd.score_yield_weights)
         return pop_term + yield_term
 
+    def rival_score(self, r: int) -> torch.Tensor:
+        """[B] — the empire_score analog for rival r's seat: pop x
+        popWeight + per-city (food, production, science, culture) dotted
+        with the balanced weights, plus building gold/faith (the only
+        rival sources of those columns in scope). Comparable in scale to
+        empire_score for the C2 relative-reward phase; the sparse win/loss
+        phase (C3) supersedes any residual asymmetry."""
+        rd = self.rules_dev
+        w = rd.score_yield_weights
+        B = self.B
+        pop_term = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
+        yt = torch.zeros(B, dtype=torch.float64, device=self.device)
+        for j in range(self.RC):
+            mask = self.rc_alive[:, r, j]
+            if not bool(mask.any()):
+                continue
+            f, pr, sc, cu = self._rival_city_yields(r, j, mask)
+            yt = yt + f * float(w[0]) + pr * float(w[1]) + sc * float(w[3]) + cu * float(w[4])
+            bgf = self.rc_bldg[:, r, j].double() @ rd.b_yields.double()  # [B, 6]
+            yt = yt + bgf[:, 2] * float(w[2]) + bgf[:, 5] * float(w[5])
+        return pop_term + yt.to(self.dtype)
+
     # --- action masks (the macro-action surface) --------------------------------
 
     def production_mask(self) -> torch.Tensor:
@@ -2480,7 +2502,7 @@ class BatchSim:
             self.r_cur_civic[:, r] = torch.where(ok, civic.clamp(min=0), self.r_cur_civic[:, r])
         if production is None:
             return
-        for j in range(self.RC):
+        for j in range(min(int(production.shape[1]), self.RC)):
             a = production[:, j].to(torch.long)
             act = (a >= 0) & self.controlled[:, r] & self.rc_alive[:, r, j] & (self.rc_current[:, r, j] == -1)
             if not bool(act.any()):
@@ -3547,8 +3569,9 @@ class BatchSim:
             v_high = int(self.v_next.max().item())
             for v in range(v_high):
                 # C1-B5b: civilians never act in the war loop (charges mark them)
-                # C2b: the unit AI only drives scripted rivals
-                a = atw & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                # C2: controlled rivals keep the SCRIPTED unit AI — the units
+                # head for rival seats lands with C3-prep (war verbs)
+                a = atw & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_war_act(v, a)
             peace_roll = atw & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))
@@ -3563,8 +3586,8 @@ class BatchSim:
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
             for v in range(v_high):
                 # C1-B5b: builders neither snipe nor patrol
-                # C2b: the unit AI only drives scripted rivals
-                a = pea & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                # C2: controlled rivals keep the SCRIPTED unit AI (see above)
+                a = pea & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_peace_act(v, a, r)
             # War declaration: strength/proximity gates first, the roll last.
