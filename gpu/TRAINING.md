@@ -245,6 +245,22 @@ gumbelsearch finds siege lines, distillation teaches them) is the last
 implementation item on the roadmap, fully scoped in task #18 and
 ARCHIVE.md's research synthesis.
 
+**M3d first distillation (c3a-11-distill) — a first-class NEGATIVE
+result with a named mechanism**: 77 targets from the M1 search
+(plan_production, SCRIPTED-continuation rollouts) distilled into the
+225-strength champion dropped it to 190.3, with the behavior probe
+showing exactly the scripted planner's fingerprints (improvements 0.7
+→ 2.4, buildings/techs down, treasury hoarded). The mechanism is the
+AlphaZero rule violated: distillation only helps when the SEARCH is
+stronger than the policy — plan_production's scripted rollouts value
+positions like the 172-strength scripted player, so its preferences
+are a regression for a 225-strength net. The corrected path (already
+proven on the eval side): generate targets with NET-GUIDED gumbelsearch
+(243.7 > netgreedy 240.3), which is exactly what gen_targets must call
+next. The distillation MACHINERY works as built; the target SOURCE was
+beneath the student. Champion unchanged (the c3a-11 checkpoint is
+discarded from the lineage).
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts

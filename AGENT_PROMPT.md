@@ -102,11 +102,15 @@ the α-Rank champion.
 
 1. **Conquest via distillation** — the standing empirical problem: three
    war-capable runs learned deterrence but never discovered multi-turn
-   sieges (cities flat at 4.6). Scale M3d: extend `gen_targets.py` to
-   net-driven states and full 5-head gumbelsearch tuples, generate
-   targets in at-war states specifically, distill, and check
-   `behavior_probe` for cities > 4.6. This is the highest-leverage open
-   thread and the AlphaZero-style loop's first real test.
+   sieges (cities flat at 4.6). The first distillation attempt (c3a-11)
+   PROVED the teacher rule: targets from the M1 scripted-continuation
+   search REGRESSED the 225-champion to 190 (the student was stronger
+   than the teacher — see TRAINING.md's read). The corrected path:
+   `gen_targets.py --policy` already samples net-driven states; the
+   target CHOICES must now come from NET-GUIDED gumbelsearch (the only
+   searcher that beat the net: 243.7 vs 240.3), emitting full 5-head
+   tuples, generated in at-war states specifically. Success criterion
+   unchanged: `behavior_probe` cities > 4.6.
 2. **The long league campaign** — resume O=2 with mixed self+pool
    updates (half the games self mode for both-seat gradient, half vs
    PFSP pool — alternation halves throughput, avoid) and a fresh LR
