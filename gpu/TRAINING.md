@@ -233,6 +233,18 @@ SEARCH can find the siege line (MPC over the capture payoff), and
 search-derived targets can distill it into the policy. The engine
 roadmap is complete; conquest is a training-methodology frontier.
 
+**The war trilogy's conclusion (c3a-10-total, the fully symmetric
+world)**: with capture live BOTH ways, the net arms up further (8.2
+units — rational deterrence now that its own cities are takeable),
+keeps warring, holds the family score band (215.3 eval) — and still
+never captures (cities 4.6, rival cities 8.3, three war-capable rungs
+in a row). The conquest credit-assignment gap is maximally
+established: the multi-turn siege barrier is beyond plain PPO
+exploration at these budgets. M3d (search-derived targets —
+gumbelsearch finds siege lines, distillation teaches them) is the last
+implementation item on the roadmap, fully scoped in task #18 and
+ARCHIVE.md's research synthesis.
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts
