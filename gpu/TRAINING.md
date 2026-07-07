@@ -349,7 +349,24 @@ economist. Everything funnels to ONE bottleneck — the capture event
 must enter the curriculum (siege-state upsampled tape, or reward
 shaping on city HP) — or this world's true optimum is
 economist-with-minimum-deterrence and the war verbs stay situational.
-Either outcome is a clean result; the next rung decides it. V-H1
+Either outcome is a clean result; the next rung decides it.
+
+**The siege-curriculum rung (c3a-17-siege, ~2.3k at-war states) — the
+war chapter's closing measurement**: eval holds (215.0), the probe
+stays healthy and style-shifts further toward the teacher (districts
+5.2) — but cities stay 4.5: THE CAPTURE EVENT DOES NOT IMPRINT even
+from a pure at-war curriculum. Three post-fix distillation rungs
+converge on the same shape: imitation transfers DISPOSITIONS, not
+rare multi-step events at these budgets. The remaining escalations
+are a different thesis, recorded for a future chapter: (a) reward
+shaping — a dense city-HP-damage reward makes the siege gradient
+local to PPO itself (the likeliest winner); (b) order-of-magnitude
+bigger tapes (GPU-batched gumbel_decide over the game axis); (c)
+accept the measured optimum — economist-with-minimum-deterrence rules
+this world, and the war verbs stay situational insurance. The war arc
+closes with every question answered by measurement: verbs live, both
+captures work, the teacher sieges, the student absorbs style, the
+event needs a denser signal than imitation provides. V-H1
 note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
 now pad pre-chop 16-wide unit heads via load_compat.
 
