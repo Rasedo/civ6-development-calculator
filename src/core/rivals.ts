@@ -18,6 +18,7 @@ import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
+import { BUILDINGS } from '../data/buildings';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -27,6 +28,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '..
 import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE } from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
 import { canPlaceDistrictIn } from './rules';
+import { hasRiver } from './query';
 import { districtCostIn } from './game';
 import { districtAdjacency } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -546,6 +548,35 @@ function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity,
   return false;
 }
 
+/**
+ * C1-B4b-2: queue the CHEAPEST building available under the rival's own
+ * gates — catalog order breaks cost ties (mirrors the GPU's argmin over
+ * cost·1024+index). Single-slot queues mean no queued-set bookkeeping; the
+ * required district must already be COMPLETE (a one-slot queue can't wait
+ * on an in-flight district like the player's multi-item queue can).
+ * Worship buildings are religion-locked (no rival religion machinery).
+ */
+function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks): boolean {
+  const have = new Set(rc.buildings);
+  const center = state.map.tiles[rc.centerIndex];
+  const done = new Set(
+    rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
+  );
+  let best: (typeof BUILDINGS)[string] | null = null;
+  for (const def of Object.values(BUILDINGS)) {
+    if (have.has(def.id) || def.worship) continue;
+    if (!done.has(def.district)) continue;
+    if (!unlocks.buildings.has(def.id)) continue;
+    if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
+    if (def.exclusiveWith?.some((x) => have.has(x))) continue;
+    if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+    if (!best || def.cost < best.cost) best = def;
+  }
+  if (!best) return false;
+  rc.queue.push({ kind: 'building', building: best.id, progress: 0 });
+  return true;
+}
+
 export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
@@ -600,6 +631,15 @@ export function rivalCityYields(
     if (!col) continue;
     total[col] += Math.floor(districtAdjacency(state.map, dt, d.type));
   }
+  // C1-B4b-2: building yields under empty modifiers (mult 1, no belief
+  // adds; the exported scope has no regional/SHIPYARD buildings and
+  // worship never queues, so the plain def.yields sum IS
+  // cityBuildingYields here).
+  for (const id of rc.buildings) {
+    const bd = BUILDINGS[id];
+    if (!bd?.yields) continue;
+    for (const [k, v] of Object.entries(bd.yields)) total[k as keyof Yields] += v ?? 0;
+  }
   return total;
 }
 
@@ -639,6 +679,8 @@ export function rivalPhase(state: GameState): void {
         settlerQueued = true;
       } else if (tryQueueRivalDistrict(state, rival, rc, rivalUnlocks)) {
         // C1-B4: districts outrank units — the economy compounds.
+      } else if (tryQueueRivalBuilding(state, rc, rivalUnlocks)) {
+        // C1-B4b-2: then buildings, then the army.
       } else if (unitCount < unitCap) {
         const type = rival.research.techs.includes('HORSEBACK_RIDING')
           ? 'HORSEMAN'
@@ -681,13 +723,19 @@ export function rivalPhase(state: GameState): void {
       // Queue progress + completion (settler founds via the site scan; a
       // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = rc.queue[0];
-      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district')) {
+      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building')) {
         q.progress += production;
-        const cost = q.kind === 'unit' ? UNITS[q.unit]?.cost ?? 54 : q.cost ?? 54;
+        const cost =
+          q.kind === 'unit'
+            ? UNITS[q.unit]?.cost ?? 54
+            : q.kind === 'building'
+              ? BUILDINGS[q.building]?.cost ?? 54
+              : q.cost ?? 54;
         if (q.progress >= cost) {
           rc.queue.shift();
           if (q.kind === 'settler') tryFoundCity(state, rival);
           else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
+          else if (q.kind === 'building') rc.buildings.push(q.building);
           else spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
         }
       }

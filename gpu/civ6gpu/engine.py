@@ -283,7 +283,7 @@ _MUTABLE = [
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
     "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "r_techs", "r_civics",
-    "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile",
+    "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
@@ -461,6 +461,9 @@ class BatchSim:
         nd_b4 = max(len(rules.districts or []), 1)
         self.rc_qtile = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
         self.rc_dist_tile = torch.full((B, r_pad, rc_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # C1-B4b-2: per-city built-buildings registry (queue codes above
+        # NU + nScaffold complete into it)
+        self.rc_bldg = torch.zeros(B, r_pad, rc_pad, max(len(rules.b_cost), 1), dtype=torch.bool, device=device)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
@@ -593,6 +596,7 @@ class BatchSim:
             dtype=dtype, device=device,
         )  # [B, T, 6] the removable feature's own yields (stripped at player founding)
         self.feat_stripped = torch.zeros(B, T, dtype=torch.bool, device=device)  # player-founded centers (flips read them stripped)
+        self.tile_river = torch.tensor([[bool(t.get("riv", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # C1-B4b-2: Water Mill at rival centers
         self._feat_adj = torch.tensor(
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
@@ -2448,6 +2452,17 @@ class BatchSim:
                         food = food + add
                     elif yc == 1:
                         prod = prod + add
+        # C1-B4b-2: building yields under empty modifiers (the exported
+        # catalog has no regional/SHIPYARD scope and worship never queues,
+        # so the plain def.yields sum IS cityBuildingYields here).
+        if self.districts_on:
+            selb = self.rc_bldg[:, r, j]
+            if bool(selb.any()):
+                add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, 6] (int-valued: dtype roundtrip is exact)
+                food = food + add6[:, 0]
+                prod = prod + add6[:, 1]
+                sci = sci + add6[:, 3]
+                cul = cul + add6[:, 4]
         z = torch.zeros_like(food)
         return (
             torch.where(mask, food, z),
@@ -2558,6 +2573,7 @@ class BatchSim:
         self.rc_cost[rows, r, slot] = 0
         self.rc_qtile[rows, r, slot] = -1
         self.rc_dist_tile[rows, r, slot, :] = -1
+        self.rc_bldg[rows, r, slot, :] = False
         self.rc_id[rows, r, slot] = self.r_next_city_id[rows, r]
         self.r_next_city_id[rows, r] += 1
         self.rvcity_at[rows, s_idx] = r
@@ -2946,6 +2962,46 @@ class BatchSim:
                             self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                             spec_cnt = spec_cnt + (placed & torch.tensor(bool(self._is_specialty[di]), device=dev)).long()
                             rem = rem & ~placed
+                # C1-B4b-2: then the CHEAPEST available building (catalog
+                # order breaks cost ties, mirroring the TS scan). Gates: the
+                # rival's own tech/civic unlocks, required district COMPLETE
+                # (single-slot queues can't wait on one in flight), prereq
+                # buildings, river for the Water Mill.
+                if self.districts_on and bool(rem.any()):
+                    rdv3 = self.rules_dev
+                    NBn = rdv3.b_cost.shape[0]
+                    have_b = self.rc_bldg[:, r, j]  # [B, NB]
+                    ones_nb = torch.ones(B, NBn, dtype=torch.bool, device=dev)
+                    unl_b = torch.where(
+                        rdv3.b_unlock.unsqueeze(0) >= 0,
+                        self.r_techs[:, r].gather(1, rdv3.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                        ones_nb,
+                    ) & torch.where(
+                        rdv3.b_unlock_civic.unsqueeze(0) >= 0,
+                        self.r_civics[:, r].gather(1, rdv3.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                        ones_nb,
+                    )
+                    ctile = self.rc_center[:, r, j].clamp(min=0)
+                    riv_c = self.tile_river.gather(1, ctile.unsqueeze(1)).squeeze(1)
+                    ok_b = unl_b & ~have_b & (~rdv3.b_river.view(1, -1) | riv_c.unsqueeze(1))
+                    reqd_b = rdv3.b_req_district  # [NB]
+                    reg_t = self.rc_dist_tile[:, r, j].gather(1, reqd_b.clamp(min=0).unsqueeze(0).expand(B, -1))
+                    dcomp = (reg_t >= 0) & self.district_complete.gather(1, reg_t.clamp(min=0))
+                    ok_b &= torch.where(reqd_b.unsqueeze(0) >= 0, dcomp, ones_nb)
+                    for bi2, reqs in enumerate(self.rules.b_req_buildings):
+                        if reqs:
+                            ok_b[:, bi2] &= have_b[:, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=1)
+                    want_b = rem & ok_b.any(dim=1)
+                    if bool(want_b.any()):
+                        arNB = torch.arange(NBn, device=dev, dtype=rdv3.b_cost.dtype)
+                        inf_b = torch.full((B, NBn), float("inf"), dtype=rdv3.b_cost.dtype, device=dev)
+                        key_b = torch.where(ok_b, rdv3.b_cost.unsqueeze(0) * 1024 + arNB, inf_b)
+                        bi = key_b.argmin(dim=1)
+                        code_b = 1 + self.NU + len(self._scaffold) + bi
+                        self.rc_current[:, r, j] = torch.where(want_b, code_b, self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(want_b, rdv3.b_cost.gather(0, bi).double(), self.rc_cost[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(want_b, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                        rem = rem & ~want_b
                 want_u = rem & (unit_count < cap)
                 if bool(want_u.any()):
                     self.rc_current[:, r, j] = torch.where(want_u, ty + 1, self.rc_current[:, r, j])
@@ -3003,13 +3059,20 @@ class BatchSim:
                         if bool(spawn_u.any()):
                             self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r)
                         # C1-B4: a finished district completes its paved tile
-                        done_d = done_q & (cur > self.NU)
+                        nS_b4 = len(self._scaffold)
+                        done_d = done_q & (cur > self.NU) & (cur <= self.NU + nS_b4)
                         if bool(done_d.any()):
                             dr = done_d.nonzero(as_tuple=True)[0]
                             dtile = self.rc_qtile[:, r, j]
                             self.district_complete[dr, dtile[dr].clamp(min=0)] = True
                             self.rc_qtile[dr, r, j] = -1
                             self._eff_version += 1
+                        # C1-B4b-2: a finished building joins the registry
+                        done_b = done_q & (cur > self.NU + nS_b4)
+                        if bool(done_b.any()):
+                            br = done_b.nonzero(as_tuple=True)[0]
+                            bi_done = (cur - 1 - self.NU - nS_b4).clamp(min=0)
+                            self.rc_bldg[br, r, j, bi_done[br]] = True
                 due = cact & (((self.turn + self.rc_id[:, r, j] * 3) % rr.get("borderPeriod", 9)) == 0)
                 self._expand_rival_border(r, j, due)
                 self.rc_hp[:, r, j] = torch.where(
@@ -3211,6 +3274,7 @@ class BatchSim:
                 self.rc_cost[b, w_, slot] = 0.0
                 self.rc_qtile[b, w_, slot] = -1
                 self.rc_dist_tile[b, w_, slot, :] = -1  # flipped districts are NOT adopted (paved-but-dead)
+                self.rc_bldg[b, w_, slot, :] = False  # nor buildings
                 self.r_next_city_id[b, w_] += 1
                 self.rvcity_at[b, self.site[b, c]] = w_
 
@@ -3818,6 +3882,7 @@ class BatchSim:
                     ).sum(dim=(1, 2)).to(self.dtype),
                     zero,
                 ),
+                torch.where(live, self.rc_bldg[:, r].sum(dim=(1, 2)).to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

@@ -320,7 +320,23 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [~] B4. Rival districts: **B4a + B4b-1 DONE**. B4b-1: COMPLETED rival
+  - [~] B4. Rival districts: **B4a + B4b-1 + B4b-2 DONE**. B4b-2: rival
+        BUILDINGS — picker queues the cheapest available (catalog-order
+        ties) under the rival's own tech/civic unlocks, required district
+        COMPLETE (single-slot queues can't wait like the player's
+        multi-item queue), prereq chains, Water Mill river gate (new
+        per-tile `riv` plane); completions land in rc_bldg and their
+        def.yields join the streams (exported catalog has no
+        regional/SHIPYARD/worship scope, so the plain sum IS
+        cityBuildingYields). Trace gains rNBldg + rQCost now reads
+        building costs from the catalog (the one "mismatch" this stage
+        was a TRACE false positive — both engines queued the same
+        Monument; the trace column just couldn't price building items).
+        One CUDA catch: the yields matmul read a CPU rules tensor — CPU
+        parity green, evals crashed; the battery's eval lane is what
+        covers device placement. Baselines: random 108.7 ± 11.4 (HARDER
+        — rival buildings compound), scripted 154.9 ± 11.5 (flat). B4c
+        (GP accrual 1 + #district-buildings) remains. B4b-1: COMPLETED rival
         districts add floor(districtAdjacency) into their yield column —
         the rival cityDistrictYields under empty modifiers (adjacencyMult 1,
         no envoys, no Work Ethic); gold/faith land in columns without rival

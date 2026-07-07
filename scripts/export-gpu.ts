@@ -600,6 +600,8 @@ for (let s = 0; s < N_SEEDS; s++) {
       cs: t.csId ?? -1,
       // rival territory at t=0 (grows dynamically in the engine)
       rv: t.rivalId ?? -1,
+      // C1-B4b-2: Water Mill gates on a river at RIVAL centers too
+      riv: hasRiver(t) ? 1 : 0,
       wt: isWater(t) ? 1 : 0,
       // Harbor placement surface (static part of canPlaceDistrict for a coastal
       // district): coastal/lake water adjacent to land, no wonder, no non-bonus
