@@ -134,7 +134,12 @@ city produces continuously). C1-B3 (real rival research) re-baselined
 once more: **random 115.7 ± 10.5, scripted 156.8 ± 11.2** — rival
 armies stay warrior-heavy until real BRONZE_WORKING/HORSEBACK_RIDING
 land (~t70+/unreached), which softens the world mostly against random
-play. The next reference net trains on the B3 world.
+play. C1-B4 (districts/buildings) landed at random 108.7 ± 11.4 / scripted
+154.9 ± 11.5; C1-B5 (builders, real production, housing) re-baselined
+the finished B-arc world: **random 114.4 ± 11.6, scripted 172.7 ±
+12.4** — terrain-honest rival production and housing-throttled growth
+soften rivals vs the old stand-ins. The next reference net trains on
+the B5 world (every earlier net is stale).
 
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the

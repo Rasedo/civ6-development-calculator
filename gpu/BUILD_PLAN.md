@@ -320,7 +320,30 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [~] B5. Rival builders/housing/occupancy: **B5a + B5b-i + B5b-ii DONE**.
+  - [x] B5. Rival builders/housing/occupancy COMPLETE — the B-arc is done:
+        rivals are full-fidelity symmetric civs within the engine scope.
+        **B5b-iii-a** (3e04aa6): rivalCityYields under
+        modifiersFromResearch — OWNER mine boosts on worked tiles (and the
+        selection score); the B3 prod stand-in DELETED; production is
+        terrain-honest (baselines 113.2/164.5 — rivals softened as real
+        mines under-replace the flat multiplier). **B5b-iii-b** (a9d7d84):
+        real housing (wh plane, Aqueduct rule, building housing, radius-3
+        improvement housing) with housingGrowthFactor on positive surplus;
+        RIVAL_MAX_POP + the kk selection-width coupling retired (baselines
+        114.4/172.7 — housing throttles harder than the old cap). Gate
+        catch: computeHousing counts PILLAGED improvements (shelter, not
+        yields) — reachable only via a flipped city inheriting an ex-player
+        pillaged farm, which the off-script gate manufactured (seed 9001,
+        one pop at t100). **B5c audits**: war-gate healthy post-B3-B5 (21
+        declarations across 19/24 seeds, t21-61 — 1.3x threshold stands);
+        luxury amenities verified player-borders-only in BOTH engines
+        (rival-mined diamonds feed neither); deferred with notes: ranged
+        rivals (needs a ranged hostile-AI path, B7), pillage asymmetry
+        (nobody pillages rival improvements until B7's war verbs). Every
+        pre-B5 reference net is stale; the next trains on the B5 world.
+        NEXT: C2 — the per-seat egocentric RL surface (O parametric, O=2
+        duel first) per §3.
+  - [~] WAS: B5 in progress. **B5a + B5b-i + B5b-ii DONE**.
         B5b-ii: rival BUILDERS end-to-end — trained through the queues (one
         per civ while jobs exist, cap-slotted), spawned as civilians (rciv
         probe, roster charges), best-gain improvement on valid tiles
