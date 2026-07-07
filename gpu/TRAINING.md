@@ -366,7 +366,16 @@ accept the measured optimum — economist-with-minimum-deterrence rules
 this world, and the war verbs stay situational insurance. The war arc
 closes with every question answered by measurement: verbs live, both
 captures work, the teacher sieges, the student absorbs style, the
-event needs a denser signal than imitation provides. V-H1
+event needs a denser signal than imitation provides.
+
+**V-WS shaping rung 1 (c3a-18-shaped, coef 0.5)**: probe score hits a
+new high (230.2), eval 219.3 — but cities stay 4.6. The coefficient
+arithmetic explains the flat read: at 0.5 with damage/100, one siege
+attack pays ~0.1 reward against ~5-8/turn economy deltas — an order
+of magnitude under the opportunity cost. ONE analysis-justified
+escalation runs (coef 5.0: ~1-2 per attack, 50 per elimination); if
+that also reads flat, the economist-optimum conclusion stands as
+measured across imitation AND shaping, and the chapter rests. V-H1
 note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
 now pad pre-chop 16-wide unit heads via load_compat.
 
