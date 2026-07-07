@@ -147,6 +147,11 @@ proven procedures. Prefer invoking them over improvising:
   the diagnosis catalog (eval-up-mass-down, seat dominance, verb-
   without-payoff, rational-behavior-flat-objective, dead KL), and the
   mechanism-not-numbers reporting rule.
+- **`/session-continuity`** — operating long autonomous sessions that
+  survive context compaction: the memory contract (entry points not
+  narrative, applied-uncommitted flags, recon-the-moment-it's-proven),
+  background-job bookkeeping, safe chain design (verification inside
+  chains; the vacuous-battery trap), and goal-loop discipline.
 - **`/port-mechanic`** — the Civ6 mechanic promotion craft (use with
   /gate-stage): spec-reading order (rule → consumers → RNG footprint →
   phase position), the promotion checklist (state/_MUTABLE, ??=-only
