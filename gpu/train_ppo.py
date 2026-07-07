@@ -182,10 +182,11 @@ def stack_seat_masks(m0: dict, m1: dict) -> dict:
 def split_actions(actions: dict, B: int) -> tuple[dict, dict]:
     a0 = {k: v[:B] for k, v in actions.items()}
     a1 = {k: v[B:] for k, v in actions.items()}
-    # seat 1 acts through the economic heads only
+    # C3-prep: seat 1 acts through economics + research + UNITS (envoys
+    # stay masked off — rivals have none)
     return (
         {"production": a0["production"], "tech": a0["tech"], "civic": a0["civic"], "units": a0["units"], "envoy": a0["envoy"]},
-        {"production": a1["production"], "tech": a1["tech"], "civic": a1["civic"]},
+        {"production": a1["production"], "tech": a1["tech"], "civic": a1["civic"], "units": a1["units"]},
     )
 
 
