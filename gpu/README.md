@@ -394,3 +394,10 @@ card for the CUDA numbers.
    civs in BOTH engines under the parity contract, then per-seat RL and
    a self-play league. Ordered stages in `BUILD_PLAN.md` §3
    (C1-A groundwork → C1-B subsystem promotion → C2 seats → C3 league).
+
+## Docs
+
+Living: `BUILD_PLAN.md` (roadmap + per-stage status log), `TRAINING.md`
+(training guide + all baselines/results), `SEARCH.md` (search results).
+Historical: `ARCHIVE.md` (the C1 decision, the B3-B5/C2/C3c designs and
+the RL research synthesis, consolidated verbatim).
