@@ -212,6 +212,18 @@ live; next rungs are longer anchored runs, kingmaking telemetry
 (per-seat win vs score distributions), and alpha-rank over FFA
 checkpoints.
 
+**The first kingmaking read (melee_eval.py, ffa-2 driving all four
+seats, 24 games)**: a strict STRUCTURAL seat ladder — seat 0 wins 58%
+(mean 192), seats 1-3 descend 155/143/126; seat 3 NEVER wins and is
+last 46% of games; the seat spread is 66.3 points, dwarfing net
+effects. The seat decides the FFA: the O=2 asymmetry lesson at O=4
+scale, quantified. Implications, in order: (1) any FFA ranking must be
+seat-averaged over all four seatings (never raw); (2) rival seats lack
+envoys/purchases/chop — verb parity is the prerequisite for FFA
+results to measure NETS rather than SEATS; (3) kingmaking proper
+(cross-seat influence) is only readable after the structural ladder
+flattens.
+
 **The war-head rung (c3a-8-war)** — the six-head trainer resumed from
 c3a-4 with V-W1 live: the net USES the verb (wars seen 0.1 -> 1.0,
 essentially every game) and even hoards gold as peace-exit liquidity
