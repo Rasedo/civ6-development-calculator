@@ -7,7 +7,7 @@
 
 import type { City, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
 import { tilesWithin, hexDistance, neighbors } from './hex';
-import { isWater, isImpassable, hasFreshWater } from './query';
+import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
@@ -19,23 +19,36 @@ import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
 import { BUILDINGS } from '../data/buildings';
+import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
-import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE } from '../data/constants';
+import {
+  growthFoodNeeded,
+  housingGrowthFactor,
+  CITY_MIN_DIST,
+  CITY_WORK_RADIUS,
+  FOOD_PER_CITIZEN,
+  CITIZEN_SCIENCE,
+  CITIZEN_CULTURE,
+  HOUSING_FRESH_WATER,
+  HOUSING_COASTAL,
+  HOUSING_NO_WATER,
+  AQUEDUCT_FRESH_BONUS,
+  AQUEDUCT_NO_FRESH_TOTAL,
+} from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
-import { hasRiver } from './query';
+import { hasRiver, hasFreshWater, isCoastalLand } from './query';
 import { disbandUnit, tileFreeForUnit } from './units';
 import { districtCostIn } from './game';
 import { districtAdjacency } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
   RIVAL_LEADERS,
-  RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
   RIVAL_BORDER_PERIOD,
@@ -681,6 +694,33 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
   }
 }
 
+/**
+ * C1-B5b-iii: rival housing, mods-free — the computeHousing core: center
+ * water (fresh/coastal/dry + the Aqueduct rule), building housing, and
+ * improvement housing on civ-owned tiles within the work radius. Specialty
+ * districts all carry 0 housing in scope, so no district term.
+ */
+export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): number {
+  const map = state.map;
+  const center = map.tiles[rc.centerIndex];
+  const fresh = hasFreshWater(map, center);
+  let water = fresh ? HOUSING_FRESH_WATER : isCoastalLand(map, center) ? HOUSING_COASTAL : HOUSING_NO_WATER;
+  const hasAqueduct = rc.districts.some(
+    (d) => d.type === 'AQUEDUCT' && map.tiles[d.tileIndex].districtComplete,
+  );
+  if (hasAqueduct) {
+    water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
+  }
+  let total = water;
+  for (const id of rc.buildings) total += BUILDINGS[id]?.housing ?? 0;
+  const civ = civOfRival(rival.id);
+  for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
+    if (!tileOwnedByCiv(t, civ) || !t.improvement) continue;
+    total += IMPROVEMENTS[t.improvement as keyof typeof IMPROVEMENTS]?.housing ?? 0;
+  }
+  return total;
+}
+
 export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
@@ -818,9 +858,14 @@ export function rivalPhase(state: GameState): void {
       // zeroing the box, and starvation shrinks the city exactly like the
       // player turn loop. RIVAL_MAX_POP stays as the housing stand-in until
       // C1-B2+ gives rivals real housing.
-      rc.foodBox += food - FOOD_PER_CITIZEN * rc.population;
+      // C1-B5b-iii: REAL housing throttles growth (housingGrowthFactor on
+      // positive surplus) — RIVAL_MAX_POP is retired; farms now supply the
+      // housing that makes growth survivable.
+      const surplus = food - FOOD_PER_CITIZEN * rc.population;
+      const hFactor = housingGrowthFactor(rivalHousing(state, rival, rc) - rc.population);
+      rc.foodBox += surplus > 0 ? surplus * hFactor : surplus;
       const need = growthFoodNeeded(rc.population);
-      if (rc.foodBox >= need && rc.population < RIVAL_MAX_POP) {
+      if (rc.foodBox >= need) {
         rc.population += 1;
         rc.foodBox -= need;
       } else if (rc.foodBox < 0) {

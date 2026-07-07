@@ -601,6 +601,7 @@ class BatchSim:
         )  # [B, T, 6] the removable feature's own yields (stripped at player founding)
         self.feat_stripped = torch.zeros(B, T, dtype=torch.bool, device=device)  # player-founded centers (flips read them stripped)
         self.tile_river = torch.tensor([[bool(t.get("riv", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # C1-B4b-2: Water Mill at rival centers
+        self.tile_wh = torch.tensor([[float(t.get("wh", 2)) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device)  # C1-B5b-iii: water housing at a hypothetical center
         self._feat_adj = torch.tensor(
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
@@ -2538,7 +2539,7 @@ class BatchSim:
         # ties break by GLOBAL tile index (assignWorkedTiles' a.index - b.index),
         # NOT window position — the pre-B1 heuristic kept tilesWithin order.
         key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
-        kk = min(int(self.rules.rivals.get("maxPop", 12)), M)
+        kk = M  # C1-B5b-iii: the pop cap is retired — pops can exceed the old 12
         top_vals, top_idx = key.topk(kk, dim=1)
         take = (torch.arange(kk, device=self.device).unsqueeze(0) < self.rc_pop[:, r, j].unsqueeze(1)) & (top_vals > -1e17)
         f_sel = f.gather(1, top_idx) * take.double()
@@ -3215,11 +3216,31 @@ class BatchSim:
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
                 # need, starvation shrinks (pop floor 1, box reset). maxPop
                 # stays as the housing stand-in until B2+.
+                # C1-B5b-iii: real housing throttles positive surplus
+                # (housingGrowthFactor); RIVAL_MAX_POP is retired.
+                ctr_j = self.rc_center[:, r, j].clamp(min=0)
+                wh_c = self.tile_wh.gather(1, ctr_j.unsqueeze(1)).squeeze(1)
+                fresh_c = wh_c == float(self._h_fresh)
+                if self._aqueduct_idx >= 0:
+                    aq_t = self.rc_dist_tile[:, r, j, self._aqueduct_idx]
+                    has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_t.clamp(min=0).unsqueeze(1)).squeeze(1)
+                else:
+                    has_aq = torch.zeros(B, dtype=torch.bool, device=dev)
+                water_j = torch.where(
+                    has_aq,
+                    torch.where(fresh_c, wh_c + self._aq_fresh_bonus, torch.maximum(wh_c, torch.full_like(wh_c, self._aq_no_fresh_total))),
+                    wh_c,
+                )
+                bh_j = self.rc_bldg[:, r, j].double() @ self.rules.b_housing.to(dev).double()
+                farm_j = ((self.pair_dist[ctr_j] <= 3) & (self.rival_at == r) & (self.improvement == self.FARM)).sum(dim=1).double() * self._farm_housing  # computeHousing counts PILLAGED improvements too
+                housing_j = water_j + bh_j + farm_j
+                head_j = housing_j - self.rc_pop[:, r, j].double()
+                hfac = torch.where(head_j >= 2, torch.ones_like(head_j), torch.where(head_j >= 1, torch.full_like(head_j, 0.5), torch.full_like(head_j, 0.25)))
                 surplus = food - self.rules.food_per_citizen * self.rc_pop[:, r, j].double()
-                self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + surplus, self.rc_growth[:, r, j])
+                self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac, surplus), self.rc_growth[:, r, j])
                 p64 = self.rc_pop[:, r, j].double()
                 need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
-                grow = cact & (self.rc_growth[:, r, j] >= need) & (self.rc_pop[:, r, j] < rr.get("maxPop", 12))
+                grow = cact & (self.rc_growth[:, r, j] >= need)
                 self.rc_pop[:, r, j] = self.rc_pop[:, r, j] + grow.long()
                 self.rc_growth[:, r, j] = torch.where(grow, self.rc_growth[:, r, j] - need, self.rc_growth[:, r, j])
                 starve = cact & ~grow & (self.rc_growth[:, r, j] < 0)

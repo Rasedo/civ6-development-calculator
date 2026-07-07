@@ -614,6 +614,9 @@ for (let s = 0; s < N_SEEDS; s++) {
       rv: t.rivalId ?? -1,
       // C1-B4b-2: Water Mill gates on a river at RIVAL centers too
       riv: hasRiver(t) ? 1 : 0,
+      // C1-B5b-iii: water housing IF a center stood here (fresh 5 /
+      // coastal 3 / dry 2) — rival housing reads it at their centers.
+      wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
       wt: isWater(t) ? 1 : 0,
       // Harbor placement surface (static part of canPlaceDistrict for a coastal
       // district): coastal/lake water adjacent to land, no wonder, no non-bonus
