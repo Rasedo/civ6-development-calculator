@@ -507,9 +507,17 @@ C3's matchmaking is built.
         the parity path since controlled=∅ in gates); (iii) re-add the
         C2b-1 war/peace-AI skips for controlled rivals (correct once the
         net drives units); (iv) env: masks/unit_features/step seat-1
-        routing; (v) V-W1 ACTIVATION for rival seats rides along (the war
-        head exists, gated off). Then re-run the c3a ladder and require
-        the duel metric to discriminate nets before C3b.
+        routing; (v-REVISED) rival-initiated war/peace stays on the
+        SCRIPTED rolls even for controlled rivals: a seat-1-only war head
+        would break net-shape symmetry across seats — the right structure
+        is ONE new war head for BOTH seats when V-W1 activates globally,
+        with V-W2 capture giving wars a payoff. Then re-run the c3a
+        ladder and require the duel metric to discriminate nets before
+        C3b activation. LADDER SO FAR: c3a-1 dense 215.6; c3a-2 relative
+        207.8; c3a-3 (+units head) 211.4 — family-flat on the standard
+        world, seat 0 wins ~90% both orderings throughout; c3a-4 switches
+        to --opponent self because EMA mode never gives seat-1 play any
+        gradient (the structural cause of the persistent seat gap).
   - [ ] C3b. League when plain self-play plateaus or cycles: frozen snapshot
         pool + PFSP matchmaking + exploiters; eval protocol = head-to-head
         vs frozen refs + vs the scripted-policy civ, ranked by **α-Rank**.
