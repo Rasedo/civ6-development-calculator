@@ -11,7 +11,7 @@ import { isWater, isImpassable, hasFreshWater } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
-import { defaultModifiers, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
+import { defaultModifiers, modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -36,7 +36,6 @@ import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
   RIVAL_LEADERS,
   RIVAL_MAX_POP,
-  RIVAL_PROD_DIV,
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
   RIVAL_BORDER_PERIOD,
@@ -622,7 +621,11 @@ function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boole
 function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks): void {
   const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
   const vopts = { unlocks, ownsTile: owns };
-  const ctx = { map: state.map, mods: defaultModifiers() };
+  // C1-B5b-iii: the OWNER's research boosts apply (mine yields; farm-adj
+  // rides along but FEUDALISM sits outside the 100-turn horizon, matching
+  // the player path's latent status). Government/religion/CS blocks stay
+  // player machinery.
+  const ctx = { map: state.map, mods: modifiersFromResearch(rival.research) };
   const nTiles = state.map.tiles.length;
   for (const u of [...state.units]) {
     // unit civId = RAW rival id; tile ownership = unified civ space
@@ -714,10 +717,8 @@ export function rivalCityYields(
   for (const w of worked) {
     for (const k of Object.keys(total) as (keyof Yields)[]) total[k] += w.y[k];
   }
-  // C1-B3b: the research stand-in reads the REAL tree — nTechs/RIVAL_PROD_DIV
-  // (K=12 calibrated so t100 production lands near the old techLevel curve);
-  // it retires entirely at B5 when rival improvements carry production.
-  total.production *= 1 + rival.research.techs.length / RIVAL_PROD_DIV;
+  // C1-B5b-iii: the B3 research→production stand-in is RETIRED — real
+  // mines carry rival production now (owner boosts included via ctx).
   // C1-B4b: COMPLETED districts add floor(adjacency) into their yield
   // column — the rival twin of cityDistrictYields under empty modifiers
   // (adjacencyMult 1, no envoy bonuses, no Work Ethic). Gold/faith land

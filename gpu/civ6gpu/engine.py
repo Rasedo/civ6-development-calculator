@@ -2521,6 +2521,13 @@ class BatchSim:
         p_plane = self._neutral_prod()
         f = f_plane.gather(1, tc).double()
         p = p_plane.gather(1, tc).double()
+        # C1-B5b-iii: the OWNER's mine boosts apply to worked tiles (and via
+        # w[1] to the selection score); the neutral plane stays boost-free
+        # for cross-owner reads.
+        if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
+            boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1).double()
+            mine_here = (self.improvement.gather(1, tc) == self.MINE) & ~self.pillaged.gather(1, tc)
+            p = p + mine_here.double() * boost_r.unsqueeze(1)
         # tileScore('balanced') = Σ yields · focus_base — food/production from
         # the dynamic (defaultModifiers) planes, the other four columns static.
         # All shipped yields are dyadic (asserted via _dyadic_fp over all six
@@ -2574,7 +2581,6 @@ class BatchSim:
                 sci = sci + sc_sel[:, m]
                 cul = cul + cu_sel[:, m]
         # C1-B3b: the research stand-in reads the REAL tree (retires at B5)
-        prod = prod * (1 + self.r_techs[:, r].sum(dim=1).double() / self.rules.rivals.get("research", {}).get("prodDiv", 12))
         # C1-B4b: COMPLETED districts add floor(adjacency) into their yield
         # column (rival cityDistrictYields under empty modifiers; gold/faith
         # columns have no rival consumer yet). Adjacency is recomputed LIVE
