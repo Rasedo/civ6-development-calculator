@@ -224,6 +224,10 @@ def main() -> None:
     ap.add_argument("--resume", default=None)
     ap.add_argument("--seats", type=int, default=1, choices=(1, 2), help="C2d: 2 = seat-swapped self-play over DuelEnv")
     ap.add_argument("--reward", default="dense", choices=("dense", "relative"), help="per-seat reward phase (seats=2)")
+    ap.add_argument("--opponent", default="self", choices=("self", "ema"), help="C3a: who drives seat 1 — the learner itself (naive) or an EMA copy + frozen-snapshot mixture")
+    ap.add_argument("--ema-tau", type=float, default=0.99, help="opponent EMA decay per update")
+    ap.add_argument("--pool-every", type=int, default=10, help="freeze a snapshot into the opponent pool every N updates")
+    ap.add_argument("--pool-frac", type=float, default=0.2, help="fraction of updates whose opponent is a random frozen snapshot (else the EMA)")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -248,6 +252,14 @@ def main() -> None:
     }
     policy = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
     opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
+    # C3a: the opponent — an EMA copy of the learner plus a frozen pool.
+    opponent = None
+    opp_pool: list[dict] = []
+    if args.seats == 2 and args.opponent == "ema":
+        opponent = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
+        opponent.load_state_dict(policy.state_dict())
+        for q in opponent.parameters():
+            q.requires_grad_(False)
     start_update, best = 0, float("-inf")
     if args.resume:
         ck = torch.load(args.resume, map_location=dev)
@@ -293,6 +305,12 @@ def main() -> None:
 
     for update in range(start_update, args.updates):
         t0 = time.time()
+        if opponent is not None and update > start_update:
+            with torch.no_grad():
+                for q, p_ in zip(opponent.parameters(), policy.parameters()):
+                    q.mul_(args.ema_tau).add_(p_, alpha=1.0 - args.ema_tau)
+            if args.pool_every > 0 and update % args.pool_every == 0:
+                opp_pool.append({k: v.detach().clone() for k, v in policy.state_dict().items()})
         if args.anneal_lr:
             frac = 1.0 - update / args.updates
             for g in opt.param_groups:
@@ -303,6 +321,17 @@ def main() -> None:
             obs = torch.cat([pair[:, 0], pair[:, 1]], dim=0)  # [2B, F]
         else:
             obs = env.reset(scramble=None if args.no_scramble else args.seed)
+        # C3a: pick this update's seat-1 driver — EMA (1-pool_frac) or a
+        # random frozen snapshot (pool_frac), per update
+        opp_net = None
+        if opponent is not None:
+            opp_net = opponent
+            if opp_pool and torch.rand(1).item() < args.pool_frac:
+                frozen = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
+                frozen.load_state_dict(opp_pool[int(torch.randint(len(opp_pool), (1,)).item())])
+                for q in frozen.parameters():
+                    q.requires_grad_(False)
+                opp_net = frozen
         with torch.no_grad():
             for t in range(T):
                 if duel is not None:
@@ -312,8 +341,21 @@ def main() -> None:
                 else:
                     ufeat = env.unit_features()
                     masks = env.masks()
-                pout = policy(obs, ufeat)
-                actions, logp, _ = sample_heads(pout, masks)
+                if opp_net is not None:
+                    # learner rows [0:B), opponent rows [B:2B)
+                    Bh = args.batch
+                    pout = policy(obs[:Bh], ufeat[:Bh])
+                    l_masks = {k: v[:Bh] for k, v in masks.items()}
+                    o_masks = {k: v[Bh:] for k, v in masks.items()}
+                    l_actions, logp_l, _ = sample_heads(pout, l_masks)
+                    oout = opp_net(obs[Bh:], ufeat[Bh:])
+                    o_actions, _, _ = sample_heads(oout, o_masks)
+                    actions = {k: torch.cat([l_actions[k], o_actions[k]], dim=0) for k in l_actions}
+                    logp = torch.cat([logp_l, torch.zeros_like(logp_l)], dim=0)
+                    pout = {"value": torch.cat([pout["value"], torch.zeros_like(pout["value"])], dim=0)}
+                else:
+                    pout = policy(obs, ufeat)
+                    actions, logp, _ = sample_heads(pout, masks)
                 buf["obs"][t] = obs
                 buf["ufeat"][t] = ufeat
                 for k in ("production", "tech", "civic", "units", "envoy"):
@@ -342,12 +384,19 @@ def main() -> None:
             ret = adv + buf["value"]
 
         scores = env.sim.empire_score() if duel is None else torch.cat([env.sim.empire_score(), env.sim.rival_score(0)], dim=0)
-        flat = {k: v.reshape(T * B, *v.shape[2:]) for k, v in buf.items()}
-        f_adv, f_ret = adv.reshape(-1), ret.reshape(-1)
+        # C3a: with an external opponent, only the LEARNER's rows train —
+        # opponent rows carry placeholder logp/value and must not update
+        if opp_net is not None:
+            Bh = args.batch
+            flat = {k: v[:, :Bh].reshape(T * Bh, *v.shape[2:]) for k, v in buf.items()}
+            f_adv, f_ret = adv[:, :Bh].reshape(-1), ret[:, :Bh].reshape(-1)
+        else:
+            flat = {k: v.reshape(T * B, *v.shape[2:]) for k, v in buf.items()}
+            f_adv, f_ret = adv.reshape(-1), ret.reshape(-1)
         f_adv = (f_adv - f_adv.mean()) / (f_adv.std() + 1e-8)
 
         pi_losses, v_losses, ents, kls, clipfracs = [], [], [], [], []
-        N = T * B
+        N = T * (args.batch if opp_net is not None else B)
         mb = N // args.minibatches
         for _ in range(args.epochs):
             perm = torch.randperm(N, device=dev)
