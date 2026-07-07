@@ -323,7 +323,20 @@ next buy: GPU-side batched target generation (gumbel_decide already
 vectorizes over the k axis; batch the GAME axis too), thousands of
 states, re-distill CE-only. Conquest is a discovery problem with a
 working teacher — NOT a rules ceiling; the richer-mechanics question
-stays open on its own merits, not as a war-fix. V-H1
+stays open on its own merits, not as a war-fix.
+
+**The fifth attempt (c3a-16-bigd, 2400 states) — THE FIRST ADDITIVE
+TRANSFER**: eval holds the band (216.4) and the probe moves TOWARD the
+teacher for the first time — units 8.1 -> 10.4 (the searcher's
+armies), districts 4.7 -> 5.7, probe score 227.7 ABOVE the parent.
+Distillation now demonstrably transfers behavior; what hasn't
+imprinted is the capture EVENT itself (cities flat 4.6 — captures are
+~1-2 events in 2400 states). The next lever is not more generic tape
+but SIEGE-STATE UPSAMPLING: generate targets from at-war states
+specifically (gen_targets gains a --at-war-only filter, or oversample
+games ending with eliminations), so the rare event carries curriculum
+weight. The M3d loop is functionally closed: teacher finds, tape
+carries, student absorbs — the remaining work is aiming it. V-H1
 note: all assessment tools (eval/duel_eval/behavior_probe/search_eval)
 now pad pre-chop 16-wide unit heads via load_compat.
 
