@@ -550,10 +550,17 @@ def main() -> None:
                     else:  # legacy M1 capital-production targets (ablation only)
                         tdist, tvalid = _masked_dist(tout["production"], targets["m_production"])
                         ce = -(tdist.log_prob(targets["a_production"].unsqueeze(1).clamp(min=0))[:, 0] * tvalid[:, 0].float()).mean()
-                    # value target is RETURN-TO-GO in score units; the head
-                    # predicts it scaled by reward_scale
-                    vreg = 0.5 * (tout["value"] - targets["value"] / args.reward_scale).pow(2).mean()
-                    loss = loss + args.distill_coef * (ce + vreg)
+                    # value target is ABSOLUTE return-to-go in score units —
+                    # meaningful only for a dense-reward value head. In
+                    # relative (zero-sum) mode the head predicts ~0-mean
+                    # relative returns and this term poisons the shared trunk
+                    # (the c3a-12/13 collapse: identical damage at any coef),
+                    # so distillation is CE-only there.
+                    if args.reward == "dense":
+                        vreg = 0.5 * (tout["value"] - targets["value"] / args.reward_scale).pow(2).mean()
+                        loss = loss + args.distill_coef * (ce + vreg)
+                    else:
+                        loss = loss + args.distill_coef * ce
                 if anchor is not None:
                     with torch.no_grad():
                         aout = anchor(flat["obs"][idx], flat["ufeat"][idx])
