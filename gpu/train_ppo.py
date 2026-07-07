@@ -46,7 +46,7 @@ import torch.nn as nn
 from torch.distributions import Categorical
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from civ6gpu import BatchEnv, load_rules, load_fixture, FIXTURES
+from civ6gpu import BatchEnv, DuelEnv, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import P_MAX
 from civ6gpu.env import UNIT_FEATURES
 
@@ -167,6 +167,28 @@ def evaluate_heads(out: dict, masks: dict, actions: dict):
 # --- training -----------------------------------------------------------------
 
 
+def build_duel(batch: int, device: str, horizon: int, reward: str) -> DuelEnv:
+    """C2d: the O=2 self-play env (fixtures round-robin like build_env)."""
+    pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))]
+    fixtures = [pool[i % len(pool)] for i in range(batch)]
+    return DuelEnv(fixtures, load_rules(), device=device, dtype=torch.float32, horizon=horizon, reward=reward)
+
+
+def stack_seat_masks(m0: dict, m1: dict) -> dict:
+    """Seats ride the batch axis: [B, ...] + [B, ...] -> [2B, ...]."""
+    return {k: torch.cat([m0[k], m1[k]], dim=0) for k in m0}
+
+
+def split_actions(actions: dict, B: int) -> tuple[dict, dict]:
+    a0 = {k: v[:B] for k, v in actions.items()}
+    a1 = {k: v[B:] for k, v in actions.items()}
+    # seat 1 acts through the economic heads only
+    return (
+        {"production": a0["production"], "tech": a0["tech"], "civic": a0["civic"], "units": a0["units"], "envoy": a0["envoy"]},
+        {"production": a1["production"], "tech": a1["tech"], "civic": a1["civic"]},
+    )
+
+
 def build_env(batch: int, device: str, horizon: int) -> BatchEnv:
     paths = sorted(FIXTURES.glob("seed*.json"))
     if not paths:
@@ -200,14 +222,21 @@ def main() -> None:
     ap.add_argument("--out", default="gpu/runs/ppo")
     ap.add_argument("--save-every", type=int, default=25)
     ap.add_argument("--resume", default=None)
+    ap.add_argument("--seats", type=int, default=1, choices=(1, 2), help="C2d: 2 = seat-swapped self-play over DuelEnv")
+    ap.add_argument("--reward", default="dense", choices=("dense", "relative"), help="per-seat reward phase (seats=2)")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
     dev = args.device
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    env = build_env(args.batch, dev, args.horizon)
-    B, T = args.batch, args.horizon
+    duel = None
+    if args.seats == 2:
+        duel = build_duel(args.batch, dev, args.horizon, args.reward)
+        env = duel.env  # dims/obs probing go through the seat surface
+    else:
+        env = build_env(args.batch, dev, args.horizon)
+    B, T = args.batch * args.seats, args.horizon  # seats ride the batch axis
 
     m0 = env.masks()
     dims = {
@@ -269,11 +298,20 @@ def main() -> None:
             for g in opt.param_groups:
                 g["lr"] = args.lr * frac
 
-        obs = env.reset(scramble=None if args.no_scramble else args.seed)
+        if duel is not None:
+            pair = duel.reset(scramble=None if args.no_scramble else args.seed)
+            obs = torch.cat([pair[:, 0], pair[:, 1]], dim=0)  # [2B, F]
+        else:
+            obs = env.reset(scramble=None if args.no_scramble else args.seed)
         with torch.no_grad():
             for t in range(T):
-                ufeat = env.unit_features()
-                masks = env.masks()
+                if duel is not None:
+                    ufeat = torch.cat([env.unit_features(seat=0), env.unit_features(seat=1)], dim=0)
+                    m0, m1 = duel.masks()
+                    masks = stack_seat_masks(m0, m1)
+                else:
+                    ufeat = env.unit_features()
+                    masks = env.masks()
                 pout = policy(obs, ufeat)
                 actions, logp, _ = sample_heads(pout, masks)
                 buf["obs"][t] = obs
@@ -283,7 +321,13 @@ def main() -> None:
                     buf[f"a_{k}"][t] = actions[k]
                 buf["logp"][t] = logp
                 buf["value"][t] = pout["value"]
-                obs, reward, _ = env.step(**actions)
+                if duel is not None:
+                    a0, a1 = split_actions(actions, args.batch)
+                    pair, rew2, _ = duel.step(seat0=a0, seat1=a1)
+                    obs = torch.cat([pair[:, 0], pair[:, 1]], dim=0)
+                    reward = torch.cat([rew2[:, 0], rew2[:, 1]], dim=0)
+                else:
+                    obs, reward, _ = env.step(**actions)
                 buf["reward"][t] = reward * args.reward_scale
 
             # GAE; the horizon is a true terminal, so no bootstrap past it
@@ -297,7 +341,7 @@ def main() -> None:
                 adv[t] = last
             ret = adv + buf["value"]
 
-        scores = env.sim.empire_score()
+        scores = env.sim.empire_score() if duel is None else torch.cat([env.sim.empire_score(), env.sim.rival_score(0)], dim=0)
         flat = {k: v.reshape(T * B, *v.shape[2:]) for k, v in buf.items()}
         f_adv, f_ret = adv.reshape(-1), ret.reshape(-1)
         f_adv = (f_adv - f_adv.mean()) / (f_adv.std() + 1e-8)
@@ -368,6 +412,8 @@ def main() -> None:
             "model": policy.state_dict(),
             "optim": opt.state_dict(),
             "update": update + 1,
+                "seats": args.seats,
+                "reward_mode": args.reward,
             "best": max(best, row[2]),
             "obs_size": env.obs_size,
             "dims": dims,

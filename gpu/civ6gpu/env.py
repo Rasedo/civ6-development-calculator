@@ -25,6 +25,8 @@ from __future__ import annotations
 import torch
 
 from .engine import BatchSim, Rules, P_MAX
+
+N_UNIT_ACTS = 16  # keep in sync with the unit head (train_ppo)
 from .rng import hash_keys
 
 _M32 = (1 << 32) - 1
@@ -98,7 +100,7 @@ class BatchEnv:
                 "production": prod,
                 "tech": m["tech"],
                 "civic": m["civic"],
-                "units": torch.zeros(s.B, P_MAX, 13, dtype=torch.bool, device=s.device),
+                "units": torch.zeros(s.B, P_MAX, N_UNIT_ACTS, dtype=torch.bool, device=s.device),
                 "envoy": torch.zeros(s.B, s.S, dtype=torch.bool, device=s.device),
             }
         return {
@@ -286,7 +288,10 @@ class BatchEnv:
         """[B, P, 8] per player-unit-slot features for the units head:
         alive, type, hp, map position, and range/bearing to the nearest
         barbarian camp (zeros when no camp stands — the head then has
-        nothing to hunt)."""
+        nothing to hunt). Seat k>0: zeros — a controlled rival's unit head
+        is masked off until C3-prep, so there is nothing to featurize."""
+        if seat != 0:
+            return torch.zeros(self.sim.B, P_MAX, UNIT_FEATURES, dtype=self.sim.dtype, device=self.sim.device)
         s = self.sim
         d = s.dtype
         B = s.B
