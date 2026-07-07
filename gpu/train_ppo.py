@@ -340,8 +340,17 @@ def main() -> None:
         if "optim" in ck:
             try:
                 opt.load_state_dict(ck["optim"])
+                # a padded head (war/chop vintage) loads structurally but with
+                # NARROWER moment tensors - Adam then explodes at step time;
+                # validate shapes and fall back to fresh state on any mismatch
+                for group in opt.param_groups:
+                    for prm in group["params"]:
+                        st = opt.state.get(prm)
+                        if st and "exp_avg" in st and st["exp_avg"].shape != prm.shape:
+                            raise ValueError("moment shape mismatch")
             except ValueError:
-                print("optimizer state predates the war head - starting Adam fresh")
+                opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
+                print("optimizer state predates the current head layout - starting Adam fresh")
         start_update = ck.get("update", 0)
         best = ck.get("best", best)
         print(f"resumed {args.resume} at update {start_update}")
