@@ -2369,6 +2369,161 @@ class BatchSim:
         self.rv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
 
+    def rival_masks(self, r: int) -> dict[str, torch.Tensor]:
+        """C2b: a controlled rival's decision space, in the PLAYER head
+        layouts so one net serves every seat. production [B, RC,
+        NB+2+NU+nScaffold(+purchase width, all-False)]: col 0..NB-1 queue
+        that building (the B4b-2 gates), NB = settler (capital only, under
+        the picker's own gate), NB+1 = idle, NB+2.. = train that unit
+        (research-gated types + the builder's one-per-civ/jobs gate),
+        then scaffold districts (placeable now, B4a gates). tech [B, NT] /
+        civic [B, NC] = available picks where cur == -1. Purchases and
+        envoys have no rival analog — all-False.
+        NOTE: masks are evaluated on the CURRENT state (call before
+        step()); apply_rival_actions() writes the choices the rival phase
+        will honor."""
+        B, dev = self.B, self.device
+        rdv = self.rules_dev
+        NBn = rdv.b_cost.shape[0]
+        nS = len(self._scaffold)
+        rr = self.rules.rivals
+        alive = self.rc_alive[:, r]  # [B, RC]
+        idle = alive & (self.rc_current[:, r] == -1)
+        # buildings: the B4b-2 gate block, vectorized over cities
+        ones_nb = torch.ones(B, NBn, dtype=torch.bool, device=dev)
+        unl_b = torch.where(
+            rdv.b_unlock.unsqueeze(0) >= 0,
+            self.r_techs[:, r].gather(1, rdv.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            ones_nb,
+        ) & torch.where(
+            rdv.b_unlock_civic.unsqueeze(0) >= 0,
+            self.r_civics[:, r].gather(1, rdv.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            ones_nb,
+        )  # [B, NB]
+        prod_cols = []
+        for j in range(self.RC):
+            have_b = self.rc_bldg[:, r, j]
+            ctile = self.rc_center[:, r, j].clamp(min=0)
+            riv_c = self.tile_river.gather(1, ctile.unsqueeze(1)).squeeze(1)
+            ok_b = unl_b & ~have_b & (~rdv.b_river.view(1, -1) | riv_c.unsqueeze(1))
+            reqd_b = rdv.b_req_district
+            reg_t = self.rc_dist_tile[:, r, j].gather(1, reqd_b.clamp(min=0).unsqueeze(0).expand(B, -1))
+            dcomp = (reg_t >= 0) & self.district_complete.gather(1, reg_t.clamp(min=0))
+            ok_b &= torch.where(reqd_b.unsqueeze(0) >= 0, dcomp, ones_nb)
+            for bi2, reqs in enumerate(self.rules.b_req_buildings):
+                if reqs:
+                    ok_b[:, bi2] &= have_b[:, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=1)
+            # settler: capital slot only, under the picker's own gate
+            n_cities = self.rc_alive[:, r].sum(dim=1)
+            settler_q = (self.rc_current[:, r] == 0).any(dim=1)
+            ok_s = (
+                (torch.ones(B, dtype=torch.bool, device=dev) if j == 0 else torch.zeros(B, dtype=torch.bool, device=dev))
+                & ~settler_q
+                & (n_cities < rr.get("maxCities", 6))
+            ).unsqueeze(1)
+            # units: research-gated types (the picker's ladder exposes all
+            # gated types to the NET — it may train spears where the script
+            # trained horses); builder under one-per-civ + jobs-exist
+            rres = rr.get("research", {})
+            sp_t, ho_t = int(rres.get("spearTech", -1)), int(rres.get("horseTech", -1))
+            ok_u = torch.zeros(B, self.NU, dtype=torch.bool, device=dev)
+            ok_u[:, self._warrior_idx] = True
+            if sp_t >= 0 and self._r_spearman >= 0:
+                ok_u[:, self._r_spearman] = self.r_techs[:, r, sp_t]
+            if ho_t >= 0 and self._r_horseman >= 0:
+                ok_u[:, self._r_horseman] = self.r_techs[:, r, ho_t]
+            if self.improvements_on and self._builder_idx >= 0:
+                has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
+                has_q = (self.rc_current[:, r] == self._builder_idx + 1).any(dim=1)
+                ok_u[:, self._builder_idx] = ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1)
+            # scaffold districts: placeable NOW under the B4 gates
+            ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
+            if self.districts_on and self._scaffold:
+                cap_max = torch.div(self.rc_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
+                spec_cnt = ((self.rc_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
+                for si, (di, utech, plc) in enumerate(self._scaffold):
+                    has_tech = self.r_techs[:, r, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                    not_owned = self.rc_dist_tile[:, r, j, di] < 0
+                    under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
+                    # tile existence probed lazily at apply time (the scan
+                    # is placement-order-dependent); the mask exposes the
+                    # gate-level validity
+                    ok_d[:, si] = has_tech & not_owned & under_cap
+            row = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
+            prod_cols.append(row & idle[:, j].unsqueeze(1))
+        production = torch.stack(prod_cols, dim=1)  # [B, RC, NB+2+NU+nS]
+        tech = self._available_mask(self.r_techs[:, r], self._prereq_t) & (self.r_cur_tech[:, r] == -1).unsqueeze(1)
+        civic = self._available_mask(self.r_civics[:, r], self._prereq_c) & (self.r_cur_civic[:, r] == -1).unsqueeze(1)
+        return {"production": production, "tech": tech, "civic": civic}
+
+    def apply_rival_actions(
+        self,
+        r: int,
+        production: torch.Tensor | None = None,
+        tech: torch.Tensor | None = None,
+        civic: torch.Tensor | None = None,
+    ) -> None:
+        """C2b: write a controlled rival's choices BEFORE step(). Codes use
+        the rival_masks layout; -1 = no action. Queue writes mirror the
+        picker's exact cost/progress semantics (districts run the same
+        placement scan; illegal or unplaceable picks fall to idle)."""
+        B, dev = self.B, self.device
+        rdv = self.rules_dev
+        NBn = rdv.b_cost.shape[0]
+        nS = len(self._scaffold)
+        rr = self.rules.rivals
+        if tech is not None:
+            ok = (tech >= 0) & self.controlled[:, r] & (self.r_cur_tech[:, r] == -1)
+            self.r_cur_tech[:, r] = torch.where(ok, tech.clamp(min=0), self.r_cur_tech[:, r])
+        if civic is not None:
+            ok = (civic >= 0) & self.controlled[:, r] & (self.r_cur_civic[:, r] == -1)
+            self.r_cur_civic[:, r] = torch.where(ok, civic.clamp(min=0), self.r_cur_civic[:, r])
+        if production is None:
+            return
+        for j in range(self.RC):
+            a = production[:, j].to(torch.long)
+            act = (a >= 0) & self.controlled[:, r] & self.rc_alive[:, r, j] & (self.rc_current[:, r, j] == -1)
+            if not bool(act.any()):
+                continue
+            # buildings 0..NB-1
+            is_b = act & (a < NBn)
+            if bool(is_b.any()):
+                bi = a.clamp(min=0, max=NBn - 1)
+                self.rc_current[:, r, j] = torch.where(is_b, 1 + self.NU + nS + bi, self.rc_current[:, r, j])
+                self.rc_cost[:, r, j] = torch.where(is_b, rdv.b_cost.gather(0, bi).double(), self.rc_cost[:, r, j])
+                self.rc_progress[:, r, j] = torch.where(is_b, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+            # settler = NB
+            is_s = act & (a == NBn)
+            if bool(is_s.any()):
+                n_cities = self.rc_alive[:, r].sum(dim=1)
+                settle_cost = js_round(rr.get("settlerBase", 90) + rr.get("settlerStep", 40) * (n_cities.double() - 1).clamp(min=0))
+                self.rc_current[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
+                self.rc_cost[:, r, j] = torch.where(is_s, settle_cost, self.rc_cost[:, r, j])
+                self.rc_progress[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+            # idle = NB+1 (explicit no-op); units NB+2..NB+1+NU
+            is_u = act & (a >= NBn + 2) & (a < NBn + 2 + self.NU)
+            if bool(is_u.any()):
+                ui = (a - (NBn + 2)).clamp(min=0, max=self.NU - 1)
+                self.rc_current[:, r, j] = torch.where(is_u, ui + 1, self.rc_current[:, r, j])
+                self.rc_cost[:, r, j] = torch.where(is_u, self._p_cost.gather(0, ui).double(), self.rc_cost[:, r, j])
+                self.rc_progress[:, r, j] = torch.where(is_u, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+            # scaffold districts: NB+2+NU..
+            is_d = act & (a >= NBn + 2 + self.NU) & (a < NBn + 2 + self.NU + nS)
+            if bool(is_d.any()) and self.districts_on and self._scaffold:
+                dcp = self.rules.district_cost
+                done_rc = self.r_techs[:, r].sum(dim=1) + self.r_civics[:, r].sum(dim=1)
+                total_rc = float(rdv.t_cost.shape[0] + rdv.c_cost.shape[0])
+                d_cost = js_round(dcp.get("base", 54) * (1 + dcp.get("scale", 8) * (done_rc.double() / total_rc)))
+                for si, (di, utech, plc) in enumerate(self._scaffold):
+                    want_d = is_d & (a == NBn + 2 + self.NU + si)
+                    if not bool(want_d.any()):
+                        continue
+                    placed = self._place_district_rival(r, j, di, want_d, plc)
+                    if bool(placed.any()):
+                        self.rc_current[:, r, j] = torch.where(placed, torch.full_like(self.rc_current[:, r, j], 1 + self.NU + si), self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(placed, d_cost, self.rc_cost[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+
     def _rival_job_mask(self, r: int, techs: torch.Tensor | None = None, civics: torch.Tensor | None = None) -> torch.Tensor:
         """[B, T] tiles a rival-r builder could improve NOW: civ-owned,
         unimproved, un-districted, not a center — FARM (baseline; hills gate

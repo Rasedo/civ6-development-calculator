@@ -69,6 +69,34 @@ def main() -> None:
         busy = int((sim.rc_current[0, other] >= 0).sum())
         assert busy > 0, "the scripted rival must keep queueing"
 
+    # 6. C2b-2a: mask-driven random control runs indefinitely and legally —
+    # every sampled action comes from rival_masks and must be honored
+    sim2 = BatchSim([load_fixture(paths[1])], rules, device="cpu", dtype=torch.float64)
+    for _ in range(30):
+        sim2.step()
+    sim2.controlled[0, 0] = True
+    g = torch.Generator().manual_seed(7)
+    for _ in range(40):
+        m = sim2.rival_masks(0)
+        pa = torch.full((1, sim2.RC), -1, dtype=torch.long)
+        for j in range(sim2.RC):
+            row = m["production"][0, j]
+            if row.any():
+                opts = row.nonzero(as_tuple=True)[0]
+                pa[0, j] = opts[torch.randint(len(opts), (1,), generator=g)]
+        ta = torch.full((1,), -1, dtype=torch.long)
+        if m["tech"][0].any():
+            opts = m["tech"][0].nonzero(as_tuple=True)[0]
+            ta[0] = opts[torch.randint(len(opts), (1,), generator=g)]
+        ca = torch.full((1,), -1, dtype=torch.long)
+        if m["civic"][0].any():
+            opts = m["civic"][0].nonzero(as_tuple=True)[0]
+            ca[0] = opts[torch.randint(len(opts), (1,), generator=g)]
+        sim2.apply_rival_actions(0, production=pa, tech=ta, civic=ca)
+        sim2.step()
+    assert bool(sim2.rc_alive[0, 0].any()), "controlled rival must survive random play"
+    assert float(sim2.empire_score()[0]) > 0, "world must keep scoring"
+
     print("C2b CONTROLLED-RIVAL OK")
 
 
