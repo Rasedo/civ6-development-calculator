@@ -52,6 +52,10 @@ def run(name: str, cmd: list[str], threads: int = 8) -> None:
         results.append((name, dt, p.returncode))
         status = "ok" if p.returncode == 0 else f"FAIL rc={p.returncode}"
         print(f"  {name:<14} {dt:6.1f}s  {status}", flush=True)
+        if p.returncode == 0 and name.startswith("eval"):
+            # baselines are results, not just gates — always surface them
+            for ln in p.stdout.strip().splitlines()[-1:]:
+                print(f"    | {ln}", flush=True)
         if p.returncode != 0:
             failed.set()
             tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-15:]

@@ -3126,8 +3126,21 @@ class BatchSim:
 
             # Great-people race (no draws): accrue, claim from the shared pool.
             for cls in range(5):
+                # C1-B4c: real accrual — 1 + (that district's buildings) per
+                # city owning a COMPLETED district of the class (was
+                # cities × gppRate; rivals accrue 0 until their first
+                # Campus/HS/CH completes).
+                d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
+                if d_cls >= 0 and self.districts_on:
+                    reg_c = self.rc_dist_tile[:, r, :, d_cls]  # [B, RC]
+                    comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0))
+                    bmask_c = (self.rules_dev.b_req_district == d_cls).view(1, 1, -1)
+                    nb_of = (self.rc_bldg[:, r] & bmask_c).sum(dim=2)  # [B, RC]
+                    pts = (comp_c.double() * (1.0 + nb_of.double())).sum(dim=1)
+                else:
+                    pts = torch.zeros(B, dtype=torch.float64, device=dev)
                 self.r_gpp[:, r, cls] = torch.where(
-                    active, self.r_gpp[:, r, cls] + n_cities2.double() * rr.get("gppRate", 0.35), self.r_gpp[:, r, cls]
+                    active & (pts > 0), self.r_gpp[:, r, cls] + pts, self.r_gpp[:, r, cls]
                 )
                 has_person = self.gp_earned[:, cls] < self._gp_roster[cls]
                 gcost = self._gp_costs[self.gp_earned[:, cls].clamp(max=self._gp_costs.shape[0] - 1)]

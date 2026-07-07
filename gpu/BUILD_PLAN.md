@@ -320,7 +320,15 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [~] B4. Rival districts: **B4a + B4b-1 + B4b-2 DONE**. B4b-2: rival
+  - [x] B4. Rival districts + buildings COMPLETE. **B4c**: GP accrual is
+        real — 1 + (that district's built buildings) per city owning a
+        COMPLETED GP-class district, replacing cities × RIVAL_GPP_RATE
+        (constant now unused; claim mechanics unchanged: zero-on-claim, no
+        effects, rivals-first). Rivals accrue 0 GPP until their first
+        Campus/HS/CH completes (~t70+), so the player wins the early Great
+        People uncontested; baselines unchanged within CI (108.7/154.9) —
+        the effect is in claim turns, not score means. battery.py now
+        always surfaces eval baselines. Earlier: **B4a + B4b-1 + B4b-2**. B4b-2: rival
         BUILDINGS — picker queues the cheapest available (catalog-order
         ties) under the rival's own tech/civic unlocks, required district
         COMPLETE (single-slot queues can't wait like the player's

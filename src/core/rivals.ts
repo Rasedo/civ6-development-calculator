@@ -23,7 +23,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS } from '../data/units';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
+import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
 import { growthFoodNeeded, CITY_MIN_DIST, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE } from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
@@ -39,7 +39,6 @@ import {
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
   RIVAL_BORDER_PERIOD,
-  RIVAL_GPP_RATE,
   RIVAL_PANTHEON_TURN,
   RIVAL_RELIGION_TURN,
   RIVAL_WAR_MIN_TURNS,
@@ -443,7 +442,17 @@ function tryFoundCity(state: GameState, rival: RivalCiv): void {
 
 function claimGreatPeople(state: GameState, rival: RivalCiv): void {
   for (const cls of GP_CLASSES) {
-    rival.gpp[cls] = (rival.gpp[cls] ?? 0) + rival.cities.length * RIVAL_GPP_RATE;
+    // C1-B4c: real accrual — 1 + (built buildings of that district) per city
+    // owning a COMPLETED district of the class (was cities × RIVAL_GPP_RATE,
+    // so rivals now accrue 0 until their first Campus/HS/CH completes and
+    // the player wins the early Great People uncontested).
+    const gpDist = GP_CLASS_DISTRICT[cls];
+    let pts = 0;
+    for (const rc of rival.cities) {
+      if (!rc.districts.some((d) => d.type === gpDist && state.map.tiles[d.tileIndex].districtComplete)) continue;
+      pts += 1 + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
+    }
+    if (pts > 0) rival.gpp[cls] = (rival.gpp[cls] ?? 0) + pts;
     const earned = state.greatPeople.earned.filter((id) =>
       GREAT_PEOPLE[cls].some((p) => p.id === id),
     ).length;
