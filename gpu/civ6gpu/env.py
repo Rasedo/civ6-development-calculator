@@ -100,7 +100,7 @@ class BatchEnv:
                 "production": prod,
                 "tech": m["tech"],
                 "civic": m["civic"],
-                "units": torch.zeros(s.B, P_MAX, N_UNIT_ACTS, dtype=torch.bool, device=s.device),
+                "units": s.rival_unit_mask(r),  # C3-prep: the rival units head is live
                 "envoy": torch.zeros(s.B, s.S, dtype=torch.bool, device=s.device),
             }
         return {
@@ -128,6 +128,8 @@ class BatchEnv:
             r = self._seat_rival(seat)
             self.sim.controlled[:, r] = True
             self.sim.apply_rival_actions(r, production=production, tech=tech, civic=civic)
+            if units is not None:
+                self.sim._apply_rival_unit_actions(r, units)
             prev = getattr(self, "_last_rival_score", None)
             if prev is None or prev.get("r") != r:
                 prev = {"r": r, "score": self.sim.rival_score(r)}
@@ -206,6 +208,32 @@ class BatchEnv:
             dim=2,
         )  # [B, R, 3]
         return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1)], dim=1)
+
+    def _rival_unit_features(self, r: int) -> torch.Tensor:
+        """[B, P, 8] the player unit-feature layout over the rival's slot
+        map: alive, type, hp, axial position, camp bearing zeros (the
+        scripted hunt heuristic is a player-policy feature)."""
+        s = self.sim
+        d = s.dtype
+        B = s.B
+        smap = s.rival_slot_map(r)
+        present = smap >= 0
+        sc = smap.clamp(min=0)
+        tile = s.v_tile.gather(1, sc).clamp(min=0)
+        out = torch.stack(
+            [
+                present.to(d),
+                s.v_type.gather(1, sc).to(d) / 10.0,
+                s.v_hp.gather(1, sc).to(d) / 100.0,
+                self._ax_q[tile].to(d) / 20.0,
+                self._ax_r[tile].to(d) / 20.0,
+                torch.zeros(B, P_MAX, dtype=d, device=s.device),
+                torch.zeros(B, P_MAX, dtype=d, device=s.device),
+                s.v_charges.gather(1, sc).to(d) / 3.0,
+            ],
+            dim=2,
+        )
+        return out * present.unsqueeze(2).to(d)
 
     def _observe_rival(self, r: int) -> torch.Tensor:
         """The seat-invariant obs layout rendered from rival r's tensors:
@@ -291,7 +319,7 @@ class BatchEnv:
         nothing to hunt). Seat k>0: zeros — a controlled rival's unit head
         is masked off until C3-prep, so there is nothing to featurize."""
         if seat != 0:
-            return torch.zeros(self.sim.B, P_MAX, UNIT_FEATURES, dtype=self.sim.dtype, device=self.sim.device)
+            return self._rival_unit_features(self._seat_rival(seat))
         s = self.sim
         d = s.dtype
         B = s.B

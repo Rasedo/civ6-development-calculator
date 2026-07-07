@@ -1920,6 +1920,109 @@ class BatchSim:
             build_f = build_m = build_l = zc
         return torch.cat([move, attack, hold, build_f, build_m, build_l], dim=2)
 
+    def _apply_rival_unit_actions(self, r: int, actions: torch.Tensor) -> None:
+        """C3-prep: execute a CONTROLLED rival's unit orders in slot order
+        (the rival_unit_mask layout; -1/12 = hold). Orders are re-validated
+        at execution exactly like the player applier; combat draws from the
+        shared stream (off the parity path — controlled is empty in the
+        gates)."""
+        B, dev = self.B, self.device
+        smap = self.rival_slot_map(r)
+        ctl = self.controlled[:, r]
+        for row in range(P_MAX):
+            slot = smap[:, row]
+            present = (slot >= 0) & ctl
+            if not bool(present.any()):
+                continue
+            sc = slot.clamp(min=0)
+            a = actions[:, row].to(torch.long)
+            act = present & (a >= 0) & (a != 12)
+            if not bool(act.any()):
+                continue
+            here = self.v_tile.gather(1, sc.unsqueeze(1)).squeeze(1)
+            is_civ = self._p_charges[self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1)] > 0
+            # --- moves 0-5 ---
+            mv = act & (a < 6)
+            if bool(mv.any()):
+                nb = self.neigh[here.clamp(min=0)]  # [B, 6]
+                tgt = nb.gather(1, a.clamp(min=0, max=5).unsqueeze(1)).squeeze(1)
+                tc = tgt.clamp(min=0)
+                blocked_mil = self._blocked_for(tgt.unsqueeze(1), "rmil", civ=r).squeeze(1)
+                blocked_civ = self._blocked_for(tgt.unsqueeze(1), "rciv", civ=r).squeeze(1)
+                blocked = torch.where(is_civ, blocked_civ, blocked_mil)
+                ok = mv & (tgt >= 0) & self.passable.gather(1, tc.unsqueeze(1)).squeeze(1) & ~blocked
+                if bool(ok.any()):
+                    rows_ = ok.nonzero(as_tuple=True)[0]
+                    civ_rows = rows_[is_civ[rows_]]
+                    mil_rows = rows_[~is_civ[rows_]]
+                    if len(civ_rows):
+                        self.rvciv_at[civ_rows, here[civ_rows]] = -1
+                        self.rvciv_at[civ_rows, tgt[civ_rows]] = sc[civ_rows]
+                    if len(mil_rows):
+                        self.rv_at[mil_rows, here[mil_rows]] = -1
+                        self.rv_at[mil_rows, tgt[mil_rows]] = sc[mil_rows]
+                    self.v_tile[rows_, sc[rows_]] = tgt[rows_]
+            # --- attacks 6-11 (military only; the shared resolution handles
+            # barb/player defenders, lone civilians and city targets) ---
+            atk = act & (a >= 6) & (a < 12) & ~is_civ
+            if bool(atk.any()):
+                nb = self.neigh[here.clamp(min=0)]
+                tgt = nb.gather(1, (a - 6).clamp(min=0, max=5).unsqueeze(1)).squeeze(1)
+                valid_t = atk & (tgt >= 0)
+                if bool(valid_t.any()):
+                    tc = tgt.clamp(min=0)
+                    barb_t = self.barb_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
+                    at_war = self.r_atwar[:, r]
+                    p_unit = (self.pmil_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0) | (self.pciv_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0)
+                    p_city = self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
+                    unit_att = valid_t & (barb_t | (p_unit & at_war))
+                    city_att = valid_t & ~barb_t & ~p_unit & p_city & at_war
+                    for b_ in range(B):
+                        if not bool(valid_t[b_]):
+                            continue
+                        v = int(sc[b_])
+                        one = torch.zeros(B, dtype=torch.bool, device=dev)
+                        one[b_] = True
+                        if bool(unit_att[b_]):
+                            self._hostile_vs_unit(one, tgt, "rival", v)
+                        elif bool(city_att[b_]):
+                            self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "rival", v)
+            # --- builds 13-15 (builders) ---
+            bld = act & (a >= 13) & (a < 16) & is_civ
+            if bool(bld.any()):
+                tc = here.clamp(min=0)
+                imp_for = {13: self.FARM, 14: self.MINE, 15: self.LUMBER}
+                hf = self.r_civics[:, r, self._hillfarms_civic] if self._hillfarms_civic >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+                mining = self.r_techs[:, r, self._mine_unlock_tech] if self._mine_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+                constr = self.r_techs[:, r, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+                base_ok = (
+                    bld
+                    & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
+                    & (self.rival_at.gather(1, tc.unsqueeze(1)).squeeze(1) == r)
+                    & (self.rvcity_at.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.improvement.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.district.gather(1, tc.unsqueeze(1)).squeeze(1) < 0)
+                )
+                farm_ok = base_ok & (a == 13) & (self.farm_flat.gather(1, tc.unsqueeze(1)).squeeze(1) | (self.farm_hill.gather(1, tc.unsqueeze(1)).squeeze(1) & hf))
+                mine_ok2 = base_ok & (a == 14) & self.mine_ok.gather(1, tc.unsqueeze(1)).squeeze(1) & mining & (self.MINE >= 0)
+                lum_ok = base_ok & (a == 15) & self.lumber_ok.gather(1, tc.unsqueeze(1)).squeeze(1) & constr & (self.LUMBER >= 0)
+                did = torch.zeros(B, dtype=torch.bool, device=dev)
+                for code, okm in ((13, farm_ok), (14, mine_ok2), (15, lum_ok)):
+                    if bool(okm.any()):
+                        rows_ = okm.nonzero(as_tuple=True)[0]
+                        self.improvement[rows_, tc[rows_]] = imp_for[code]
+                        self.pillaged[rows_, tc[rows_]] = False
+                        did[rows_] = True
+                if bool(did.any()):
+                    rows_ = did.nonzero(as_tuple=True)[0]
+                    self.v_charges[rows_, sc[rows_]] -= 1
+                    self._eff_version += 1
+                    spent = did & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
+                    if bool(spent.any()):
+                        dr = spent.nonzero(as_tuple=True)[0]
+                        self.v_alive[dr, sc[dr]] = False
+                        self.rvciv_at[dr, here[dr]] = -1
+
     def _scripted_builder(self) -> None:
         """Scripted-policy builder (phase 6a): each player BUILDER with
         charges either builds a FARM on its tile (buildable unimproved farm
@@ -3591,9 +3694,10 @@ class BatchSim:
             self.r_civic_prog[:, r] = torch.where(no_c, torch.minimum(self.r_civic_prog[:, r], torch.zeros_like(self.r_civic_prog[:, r])), self.r_civic_prog[:, r])
 
             # C1-B5b: builder actions (build best-gain improvement or walk) —
-            # under the PRE-advance unlock snapshot, like TS's rivalUnlocks
+            # under the PRE-advance unlock snapshot, like TS's rivalUnlocks.
+            # C3-prep: controlled rivals' builders answer to the units head.
             if self.improvements_on and self._builder_idx >= 0:
-                self._rival_builder_actions(r, active, techs0=r_techs0, civics0=r_civics0)
+                self._rival_builder_actions(r, active & ~self.controlled[:, r], techs0=r_techs0, civics0=r_civics0)
 
             # Great-people race (no draws): accrue, claim from the shared pool.
             for cls in range(5):
@@ -3641,9 +3745,8 @@ class BatchSim:
             v_high = int(self.v_next.max().item())
             for v in range(v_high):
                 # C1-B5b: civilians never act in the war loop (charges mark them)
-                # C2: controlled rivals keep the SCRIPTED unit AI — the units
-                # head for rival seats lands with C3-prep (war verbs)
-                a = atw & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                # C3-prep: the units head drives controlled rivals now
+                a = atw & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_war_act(v, a)
             peace_roll = atw & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))
@@ -3658,8 +3761,8 @@ class BatchSim:
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
             for v in range(v_high):
                 # C1-B5b: builders neither snipe nor patrol
-                # C2: controlled rivals keep the SCRIPTED unit AI (see above)
-                a = pea & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                # C3-prep: the units head drives controlled rivals now
+                a = pea & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_peace_act(v, a, r)
             # War declaration: strength/proximity gates first, the roll last.
