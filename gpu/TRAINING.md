@@ -279,6 +279,16 @@ early-stop on eval). c3a-12 discarded. Next: benchmark gumbelsearch
 WITH c3a-10 on the current world (raise k/depth if needed) — distill
 again only once a real, measured edge exists.
 
+**The teacher benchmark (paired, same six worlds, c3a-10 guiding)**:
+netgreedy 195.2 vs gumbelsearch@k16/d16 **212.1 — a +16.9 real edge**
+(6/6 over scripted vs 5/6). The c3a-12 teacher failure was BUDGET:
+k8/d12 only matches greedy (~200) — no edge to transfer; k16/d16
+leads decisively. The distillation recipe for the third attempt:
+targets generated at the MEASURED budget, --distill-coef 0.1, a SHORT
+rung (~15 updates) with eval immediately after — the anti-forgetting
+protocol. The M3d avenue is alive; the teacher just has to be paid
+for.
+
 **What self-play changed behaviorally** (behavior_probe.py, matched
 worlds, greedy): the ladder traded ARMY for ECONOMY — c3a-1 keeps 10.2
 units, c3a-4/5 keep ~7, with the freed production going into districts
