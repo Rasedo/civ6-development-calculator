@@ -164,6 +164,15 @@ gradient; the EMA opponent drives seat 1 out-of-distribution. c3a-4
 switches to --opponent self (both seats learn, true seat-swapped
 self-play) to build dual-seat competence before EMA/PFSP resume.
 
+c3a-4 (40 self-mode updates) DELIVERS THE DISCRIMINATION SIGNAL: the
+standard eval reaches **219.8 ± 13.1 (family best)** and the duel
+orderings finally split — c3a-4-as-A beats c3a-3 92%/+84.8 while
+c3a-3-as-A manages only 79%/+63.5 against c3a-4's seat-1 defense (~13
+win-rate points of measurable seat-1 skill). The duel metric now
+discriminates; the C3b gate is OPEN and c3a-5 activates PFSP (the
+pool/EMA opponents inherit c3a-4's dual-seat weights, so learner-vs-
+pool pressure is meaningful).
+
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
 46-action head with ranged live → **246.2 ± 12.4** greedy (train mean
