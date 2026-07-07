@@ -146,7 +146,15 @@ seat-swapped PPO over the O=2 DuelEnv (dense phase, EMA opponent +
 80/20 frozen pool, the learner training on its own rows only) reached a
 training-duel mean of 169.8 and **evaluates at 215.6 ± 11.8 on the
 standard scripted world — +43 over the scripted policy (172.7)**.
-The relative-reward phase (c3a-2) continues from this checkpoint.
+The relative-reward phase (c3a-2, 40 updates) evaluates at 207.8 ±
+12.7 (within CI of c3a-1 — the expected margin-vs-score trade). The
+decisive finding is in the head-to-head protocol: **seat 0 wins 88%
+with ~+70 margin in BOTH orderings** — the seat asymmetry (full player
+surface vs economics-only rival control) dominates the duel metric, so
+plain O=2 self-play cannot yet discriminate net strength. C3-prep
+(the rival units head + war verbs) is therefore a PREREQUISITE for
+meaningful self-play pressure and for C3b's league metric — it lands
+before more relative-phase compute.
 
 Every pre-B1 net (tune1/tune2) is stale by construction; **tune3** is
 the first reference net on this world: 50 updates / 20.5M steps on the
