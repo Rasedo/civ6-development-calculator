@@ -29,7 +29,7 @@ import { tileScore, tileYieldsForCenter } from './city';
 import { canPlaceDistrictIn } from './rules';
 import { districtCostIn } from './game';
 import { districtAdjacency } from './yields';
-import { SCAFFOLD_DISTRICTS } from '../data/districts';
+import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
   RIVAL_LEADERS,
   RIVAL_MAX_POP,
@@ -586,6 +586,20 @@ export function rivalCityYields(
   // (K=12 calibrated so t100 production lands near the old techLevel curve);
   // it retires entirely at B5 when rival improvements carry production.
   total.production *= 1 + rival.research.techs.length / RIVAL_PROD_DIV;
+  // C1-B4b: COMPLETED districts add floor(adjacency) into their yield
+  // column — the rival twin of cityDistrictYields under empty modifiers
+  // (adjacencyMult 1, no envoy bonuses, no Work Ethic). Gold/faith land
+  // in columns no rival consumer reads yet (BUILD_PLAN: rival stocks are
+  // a later stage); added after the research multiplier so production
+  // semantics stay worked-tiles-only.
+  for (const d of rc.districts) {
+    if (d.type === 'CITY_CENTER') continue;
+    const dt = state.map.tiles[d.tileIndex];
+    if (!dt.districtComplete) continue;
+    const col = DISTRICTS[d.type].adjacencyYield;
+    if (!col) continue;
+    total[col] += Math.floor(districtAdjacency(state.map, dt, d.type));
+  }
   return total;
 }
 

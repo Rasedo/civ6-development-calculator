@@ -2418,6 +2418,36 @@ class BatchSim:
                 cul = cul + cu_sel[:, m]
         # C1-B3b: the research stand-in reads the REAL tree (retires at B5)
         prod = prod * (1 + self.r_techs[:, r].sum(dim=1).double() / self.rules.rivals.get("research", {}).get("prodDiv", 12))
+        # C1-B4b: COMPLETED districts add floor(adjacency) into their yield
+        # column (rival cityDistrictYields under empty modifiers; gold/faith
+        # columns have no rival consumer yet). Adjacency is recomputed LIVE
+        # per city so a completion earlier in this same phase is seen,
+        # exactly like the TS sequential loop.
+        if self.districts_on:
+            reg = self.rc_dist_tile[:, r, j]  # [B, nD]
+            if bool((reg >= 0).any()):
+                adjc_b4 = self._adj_district_count().to(self.dtype)
+                for di, dd in enumerate(self.districts_cat):
+                    yc = int(dd.get("adjYield", -1))
+                    if yc < 0:
+                        continue
+                    tile_d = reg[:, di]
+                    has = mask & (tile_d >= 0)
+                    if not bool(has.any()):
+                        continue
+                    has = has & self.district_complete.gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    if not bool(has.any()):
+                        continue
+                    adjf = torch.floor(self._district_adj_raw(di, adjc_b4)).gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1).double()
+                    add = torch.where(has, adjf, torch.zeros_like(adjf))
+                    if yc == 3:
+                        sci = sci + add
+                    elif yc == 4:
+                        cul = cul + add
+                    elif yc == 0:
+                        food = food + add
+                    elif yc == 1:
+                        prod = prod + add
         z = torch.zeros_like(food)
         return (
             torch.where(mask, food, z),

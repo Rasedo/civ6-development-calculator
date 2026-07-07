@@ -320,7 +320,16 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
-  - [~] B4. Rival districts: **B4a DONE** (placement + queued completion).
+  - [~] B4. Rival districts: **B4a + B4b-1 DONE**. B4b-1: COMPLETED rival
+        districts add floor(districtAdjacency) into their yield column —
+        the rival cityDistrictYields under empty modifiers (adjacencyMult 1,
+        no envoys, no Work Ethic); gold/faith land in columns without rival
+        consumers yet; GPU recomputes adjacency LIVE per city so same-phase
+        completions are seen like the TS sequential loop. Both gates green
+        first battery. Baselines unchanged within CI (116.0/156.3): rival
+        Campuses complete ~t60-90, so the accrued science barely moves
+        100-turn aggregates — the payoff compounds at longer horizons and
+        with B4b-2 buildings. Earlier: **B4a** (placement + queued completion).
         Step 1 (inert): district_complete [B,T] plane, all 11 consumers
         gated per their exact TS rule, both gates green on UNCHANGED
         fixtures (hash 878b1b03). Step 2: canPlaceDistrictIn (owner-
