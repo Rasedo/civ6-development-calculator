@@ -1,7 +1,14 @@
 """M1 single-agent search self-test.
 
     npm run gpu:export        # (once) writes gpu/fixtures/
-    python gpu/mcts_test.py
+    python gpu/mcts_test.py            # fast: engine-facing invariants (~1 min)
+    python gpu/mcts_test.py --full     # + M2a closed-loop MPC quality benchmarks (~9 min)
+
+Fast mode proves everything the ENGINE is responsible for (snapshot/restore
+bit-exactness, step-after-restore determinism, searches are eval-only and
+deterministic, search >= greedy). --full adds the closed-loop MPC-vs-scripted
+score benchmarks — search-QUALITY properties that only move when mcts.py
+changes, so engine stages don't pay their ~8 minutes.
 
 Two properties, both eval-only (never perturb the parity-checked forward model):
 
@@ -74,7 +81,7 @@ def test_snapshot_restore(rules, paths):
           f"step-after-restore deterministic")
 
 
-def test_search(rules, paths):
+def test_search(rules, paths, full=True):
     n_seeds = n_differ = n_disc = 0
     for path in paths:
         sim = build(rules, path)
@@ -90,10 +97,12 @@ def test_search(rules, paths):
         assert not drift, f"{path.name}: search mutated {drift}"
 
         # determinism: rebuild + research reproduces best + values exactly.
-        sim2 = build(rules, path)
-        advance_to_decision(sim2)
-        best2, vals2 = search_production(sim2, city=0, horizon=HORIZON)
-        assert (best, vals) == (best2, vals2), f"{path.name}: nondeterministic search"
+        # (fast mode: first two seeds only — the rebuild doubles the cost)
+        if full or n_seeds <= 2:
+            sim2 = build(rules, path)
+            advance_to_decision(sim2)
+            best2, vals2 = search_production(sim2, city=0, horizon=HORIZON)
+            assert (best, vals) == (best2, vals2), f"{path.name}: nondeterministic search"
 
         # improves on greedy: same horizon-15 yardstick for both choices.
         snap = sim.snapshot()
@@ -107,14 +116,17 @@ def test_search(rules, paths):
               f"greedy={g_best}({greedy_val:.2f}) {'DIFFER' if best != g_best else 'same'}")
 
     assert n_seeds >= 3, f"too few usable seeds ({n_seeds})"
-    assert n_differ >= 1, "search never improved on greedy"
-    assert n_disc >= 1, "search never discriminated best from median"
+    if full:  # quality signals need the full 12-seed breadth to be reliable
+        assert n_differ >= 1, "search never improved on greedy"
+        assert n_disc >= 1, "search never discriminated best from median"
     print(f"search: {n_seeds} seeds, >=greedy on all, differed on {n_differ}, discriminated on {n_disc}")
 
 
-def test_planning(rules, paths):
+def test_planning(rules, paths, full=True):
     """M2a: closed-loop planning must beat the scripted base policy on final score,
-    stay deterministic, and never mutate the forward model during search."""
+    stay deterministic, and never mutate the forward model during search.
+    Fast mode keeps the single-node eval-only/determinism/loyalty checks and
+    skips the closed-loop score benchmarks (search quality, not engine)."""
     HZ, TURNS = 20, 60
 
     # eval-only + determinism at one mid-game decision, exercising depth 1 and 2.
@@ -122,7 +134,9 @@ def test_planning(rules, paths):
     advance_to_decision(sim)
     pristine = {k: getattr(sim, k).clone() for k in _MUTABLE}
     b1, v1 = plan_production(sim, 0, horizon=HZ, depth=1)
-    b2, _ = plan_production(sim, 0, horizon=HZ, depth=2)  # depth-2 (one call; slower)
+    b2 = b1
+    if full:
+        b2, _ = plan_production(sim, 0, horizon=HZ, depth=2)  # depth-2 (one call; slower)
     drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), pristine[k])]
     assert not drift, f"plan mutated forward model for {drift}"
     sim2 = build(rules, paths[4])
@@ -130,6 +144,18 @@ def test_planning(rules, paths):
     assert plan_production(sim2, 0, horizon=HZ, depth=1) == (b1, v1), "depth-1 nondeterministic"
     print(f"  plan eval-only + deterministic; depth1 pick={b1} depth2 pick={b2} "
           f"({'depth changes the pick' if b1 != b2 else 'same pick at this node'})")
+
+    if not full:
+        # loyalty-shaped leaf still checked in fast mode (engine-facing value path)
+        vf = loyalty_shaped_value(penalty=2.0, thresh=100.0)
+        s = build(rules, paths[4])
+        advance_to_decision(s)
+        assert vf(s) <= _empire_value(s) + 1e-6, "loyalty penalty must not raise the value"
+        pristine = {k: getattr(s, k).clone() for k in _MUTABLE}
+        lb1, _ = plan_production(s, 0, horizon=HZ, depth=1, value_fn=vf)
+        assert not [k for k in _MUTABLE if not torch.equal(getattr(s, k), pristine[k])], "loyalty plan mutated state"
+        print(f"loyalty : shaped leaf <= empire value, plan eval-only (pick={lb1})")
+        return
 
     # closed-loop MPC vs scripted final empire_score (the headline).
     wins = n = 0
@@ -177,13 +203,14 @@ def test_planning(rules, paths):
 
 
 def main():
+    full = "--full" in sys.argv
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run gpu:export` first"
     test_snapshot_restore(rules, paths)
-    test_search(rules, paths[:12])
-    test_planning(rules, paths)
-    print("M1/M2a SEARCH SELF-TEST OK")
+    test_search(rules, paths[:12] if full else paths[:6], full=full)
+    test_planning(rules, paths, full=full)
+    print("M1/M2a SEARCH SELF-TEST OK" + ("" if full else " (fast; --full for MPC benchmarks)"))
 
 
 if __name__ == "__main__":

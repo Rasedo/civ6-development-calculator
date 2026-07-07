@@ -20,6 +20,16 @@ units (V-P), ranged strikes (V-R), and player war/peace plumbed behind
 a gate (V-W1). Phase 5 trains on all of it with a native on-device PPO
 loop, and `gpu/SEARCH.md` is the search arm on the same forward model.
 
+## The battery
+
+`python gpu/battery.py` runs everything an engine stage must pass —
+build, vitest, fixture export, BOTH parity gates, the five self-tests,
+and the two 50-episode baselines — in ~3 min wall (three parallel lanes
+after the serial build/export stage). `--full` adds mcts_test's
+closed-loop MPC quality benchmarks (~9 extra min; only needed when
+search code changes). `--no-eval` skips the baselines for mid-stage
+iteration.
+
 ## The parity contract
 
 This is a *re-derivation*, and re-derivations silently drift — so nothing
