@@ -167,11 +167,24 @@ def evaluate_heads(out: dict, masks: dict, actions: dict):
 # --- training -----------------------------------------------------------------
 
 
-def build_duel(batch: int, device: str, horizon: int, reward: str) -> DuelEnv:
+def _pool(fix_dir):
+    d = fix_dir or FIXTURES
+    return [load_fixture(p) for p in sorted(d.glob("seed*.json"))], load_rules((fix_dir / "rules.json") if fix_dir else None) if fix_dir else load_rules()
+
+
+def build_duel(batch: int, device: str, horizon: int, reward: str, fix_dir=None) -> DuelEnv:
     """C2d: the O=2 self-play env (fixtures round-robin like build_env)."""
-    pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))]
+    pool, rules = _pool(fix_dir)
     fixtures = [pool[i % len(pool)] for i in range(batch)]
-    return DuelEnv(fixtures, load_rules(), device=device, dtype=torch.float32, horizon=horizon, reward=reward)
+    return DuelEnv(fixtures, rules, device=device, dtype=torch.float32, horizon=horizon, reward=reward)
+
+
+def build_melee(batch: int, device: str, horizon: int, reward: str, seats: int, fix_dir=None) -> "MeleeEnv":
+    """C3c: the O-seat FFA env."""
+    from civ6gpu import MeleeEnv
+    pool, rules = _pool(fix_dir)
+    fixtures = [pool[i % len(pool)] for i in range(batch)]
+    return MeleeEnv(fixtures, rules, device=device, dtype=torch.float32, horizon=horizon, reward=reward, seats=seats)
 
 
 def stack_seat_masks(m0: dict, m1: dict) -> dict:
@@ -223,7 +236,10 @@ def main() -> None:
     ap.add_argument("--out", default="gpu/runs/ppo")
     ap.add_argument("--save-every", type=int, default=25)
     ap.add_argument("--resume", default=None)
-    ap.add_argument("--seats", type=int, default=1, choices=(1, 2), help="C2d: 2 = seat-swapped self-play over DuelEnv")
+    ap.add_argument("--seats", type=int, default=1, choices=(1, 2, 3, 4), help="C2d/C3c: 2 = DuelEnv; 3-4 = MeleeEnv FFA (needs --fixtures gpu/fixtures_o4 for seats 4)")
+    ap.add_argument("--fixtures", default=None, help="C3c: alternate fixture pool dir (e.g. gpu/fixtures_o4 for 3-rival FFA worlds)")
+    ap.add_argument("--anchor", default=None, help="C3c piKL: checkpoint whose policy anchors the learner (KL penalty on learner rows)")
+    ap.add_argument("--anchor-kl", type=float, default=0.1, help="piKL coefficient")
     ap.add_argument("--reward", default="dense", choices=("dense", "relative"), help="per-seat reward phase (seats=2)")
     ap.add_argument("--opponent", default="self", choices=("self", "ema", "pfsp"), help="C3a: seat-1 driver — the learner (naive), an EMA copy + uniform frozen mixture, or C3b PFSP (hardest-first pool matchmaking)")
     ap.add_argument("--ema-tau", type=float, default=0.99, help="opponent EMA decay per update")
@@ -237,9 +253,14 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     duel = None
+    melee = None
+    fix_dir = Path(args.fixtures) if args.fixtures else None
     if args.seats == 2:
-        duel = build_duel(args.batch, dev, args.horizon, args.reward)
+        duel = build_duel(args.batch, dev, args.horizon, args.reward, fix_dir)
         env = duel.env  # dims/obs probing go through the seat surface
+    elif args.seats > 2:
+        melee = build_melee(args.batch, dev, args.horizon, args.reward, args.seats, fix_dir)
+        env = melee.env
     else:
         env = build_env(args.batch, dev, args.horizon)
     B, T = args.batch * args.seats, args.horizon  # seats ride the batch axis
@@ -254,6 +275,17 @@ def main() -> None:
     }
     policy = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
     opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
+    # C3c piKL: an anchor policy whose action distribution regularizes the
+    # learner (mixed-motive collapse guard for FFA runs).
+    anchor = None
+    if args.anchor:
+        ck_a = torch.load(args.anchor, map_location=dev)
+        anchor = Policy(env.obs_size, dims, hidden=ck_a.get("hidden", args.hidden)).to(dev)
+        anchor.load_state_dict(ck_a["model"])
+        for q in anchor.parameters():
+            q.requires_grad_(False)
+        print(f"piKL anchor: {args.anchor} (coef {args.anchor_kl})")
+
     # C3a: the opponent — an EMA copy of the learner plus a frozen pool.
     # C3b: the pool is PERSISTENT (out/pool/upd_N.pt survives resumes) and
     # PFSP mode samples it hardest-first by tracked learner win rates.
@@ -331,7 +363,10 @@ def main() -> None:
             for g in opt.param_groups:
                 g["lr"] = args.lr * frac
 
-        if duel is not None:
+        if melee is not None:
+            allobs = melee.reset(scramble=None if args.no_scramble else args.seed)
+            obs = torch.cat([allobs[:, k] for k in range(args.seats)], dim=0)  # [OB, F]
+        elif duel is not None:
             pair = duel.reset(scramble=None if args.no_scramble else args.seed)
             obs = torch.cat([pair[:, 0], pair[:, 1]], dim=0)  # [2B, F]
         else:
@@ -363,7 +398,11 @@ def main() -> None:
                 opp_net = frozen
         with torch.no_grad():
             for t in range(T):
-                if duel is not None:
+                if melee is not None:
+                    ufeat = torch.cat([env.unit_features(seat=k) for k in range(args.seats)], dim=0)
+                    ms = melee.masks()
+                    masks = {k: torch.cat([m[k] for m in ms], dim=0) for k in ms[0]}
+                elif duel is not None:
                     ufeat = torch.cat([env.unit_features(seat=0), env.unit_features(seat=1)], dim=0)
                     m0, m1 = duel.masks()
                     masks = stack_seat_masks(m0, m1)
@@ -400,7 +439,18 @@ def main() -> None:
                     buf[f"a_{k}"][t] = actions[k]
                 buf["logp"][t] = logp
                 buf["value"][t] = pout["value"]
-                if duel is not None:
+                if melee is not None:
+                    Bh = args.batch
+                    seat_acts = []
+                    for k in range(args.seats):
+                        sl = {kk: v[k * Bh : (k + 1) * Bh] for kk, v in actions.items()}
+                        seat_acts.append(
+                            sl if k == 0 else {"production": sl["production"], "tech": sl["tech"], "civic": sl["civic"], "units": sl["units"]}
+                        )
+                    allobs, rewO, _ = melee.step(seat_acts)
+                    obs = torch.cat([allobs[:, k] for k in range(args.seats)], dim=0)
+                    reward = torch.cat([rewO[:, k] for k in range(args.seats)], dim=0)
+                elif duel is not None:
                     a0, a1 = split_actions(actions, args.batch)
                     pair, rew2, _ = duel.step(seat0=a0, seat1=a1)
                     obs = torch.cat([pair[:, 0], pair[:, 1]], dim=0)
@@ -420,7 +470,12 @@ def main() -> None:
                 adv[t] = last
             ret = adv + buf["value"]
 
-        scores = env.sim.empire_score() if duel is None else torch.cat([env.sim.empire_score(), env.sim.rival_score(0)], dim=0)
+        if melee is not None:
+            scores = torch.cat([env.sim.empire_score()] + [env.sim.rival_score(r) for r in range(args.seats - 1)], dim=0)
+        elif duel is not None:
+            scores = torch.cat([env.sim.empire_score(), env.sim.rival_score(0)], dim=0)
+        else:
+            scores = env.sim.empire_score()
         if duel is not None and opp_pick >= 0:
             margins = env.sim.empire_score() - env.sim.rival_score(0)
             pool_meta[opp_pick]["games"] += int(margins.numel())
@@ -456,6 +511,14 @@ def main() -> None:
                 loss_v = 0.5 * (pout["value"] - f_ret[idx]).pow(2).mean()
                 loss_ent = ent.mean()
                 loss = loss_pi + args.vf_coef * loss_v - args.ent_coef * loss_ent
+                if anchor is not None:
+                    with torch.no_grad():
+                        aout = anchor(flat["obs"][idx], flat["ufeat"][idx])
+                    a_logp, _ = evaluate_heads(aout, {k: flat[f"m_{k}"][idx] for k in ("production", "tech", "civic", "units", "envoy")}, {k: flat[f"a_{k}"][idx] for k in ("production", "tech", "civic", "units", "envoy")})
+                    # piKL surrogate: pull the learner's action logp toward the
+                    # anchor's on the sampled actions (logp - a_logp >= 0 when
+                    # the learner overcommits relative to the anchor)
+                    loss = loss + args.anchor_kl * (logp - a_logp).clamp(min=0).mean()
                 opt.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(policy.parameters(), args.max_grad_norm)
