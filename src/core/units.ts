@@ -96,7 +96,10 @@ export function tileFreeForUnit(
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
     if (u.id === unit?.id) continue;
-    if (unitSide(u) !== side) return false; // foreign occupied
+    // C1-B5a: rival CIVS are foreign to each other — side alone can't tell
+    // them apart. Inert for the all-military world (cross-civ military
+    // blocked under either reading); it matters once rival civilians exist.
+    if (unitSide(u) !== side || (side === 'rival' && u.civId !== unit?.civId)) return false; // foreign occupied
     if (unitDomain(u.type) === domain) return false; // same-slot ally
   }
   return true;

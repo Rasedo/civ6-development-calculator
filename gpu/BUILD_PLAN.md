@@ -320,6 +320,17 @@ C3's matchmaking is built.
         Fresh baselines: random 122.8, scripted 192.2 (world got friendlier).
         Gate catches: GPU tie-break + district-nulled yield plane + LUXURY
         AMENITY SHARING (pre-existing gap, now modeled). See status log.
+  - [~] B5. Rival builders/housing/occupancy: **B5a DONE** (inert) —
+        rvciv_at civilian-occupancy plane + v_charges join _MUTABLE;
+        _blocked_for/_first_free_spot grow civ-aware rival probes ('rmil'/
+        'rciv': rival civs are FOREIGN to each other, own-civ cross-domain
+        stacks); TS tileFreeForUnit gains the same civ-aware foreign check
+        (side alone can't distinguish rival civs — identical semantics in
+        the all-military world, so provably inert: fixtures hash 51a10bd5
+        unchanged, both gates green, new occupancy_test pokes all seven
+        probe directions + snapshot coverage + organic-inertness).
+        B5b next (i: extractions; ii: builders end-to-end; iii: real rival
+        modifiers + housing retiring RIVAL_MAX_POP + the prod stand-in).
   - [x] B4. Rival districts + buildings COMPLETE. **B4c**: GP accrual is
         real — 1 + (that district's built buildings) per city owning a
         COMPLETED GP-class district, replacing cities × RIVAL_GPP_RATE

@@ -284,7 +284,7 @@ _MUTABLE = [
     "rival_at", "rvcity_at", "rv_at",
     "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "r_techs", "r_civics",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
-    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp",
+    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "rvciv_at", "v_charges",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
@@ -483,6 +483,10 @@ class BatchSim:
         self.v_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.v_next = torch.zeros(B, dtype=torch.long, device=device)
         self.rv_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # rival-unit slot at tile
+        # C1-B5a: rival CIVILIAN occupancy (slot at tile; civ via v_civ) and
+        # per-slot build charges — inert until B5b spawns the first builder.
+        self.rvciv_at = torch.full((B, T), -1, dtype=torch.long, device=device)
+        self.v_charges = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, 5, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -1634,22 +1638,36 @@ class BatchSim:
         base = self._dmg_base[(diff + 60).clamp(0, 120)]
         return js_round(base * (0.75 + 0.5 * r)).clamp(min=1).to(torch.long)
 
-    def _blocked_for(self, tiles: torch.Tensor, side: str) -> torch.Tensor:
+    def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
         """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
-        foreign unit blocks entirely; an own unit of the same domain blocks.
-        side: 'barb' | 'pmil' | 'pciv'."""
+        foreign unit blocks entirely; an own unit of the same domain blocks;
+        own cross-domain stacks. side: 'barb' | 'pmil' | 'pciv' | 'rmil' |
+        'rciv' ('rmil'/'rciv' are C1-B5a's civ-aware rival probes — pass the
+        probing rival index; rival civs are FOREIGN to each other)."""
         tc = tiles.clamp(min=0)
         barb = self.barb_at.gather(1, tc) >= 0
         pmil = self.pmil_at.gather(1, tc) >= 0
         pciv = self.pciv_at.gather(1, tc) >= 0
-        rv = self.rv_at.gather(1, tc) >= 0
+        rv_slot = self.rv_at.gather(1, tc)
+        rv = rv_slot >= 0
+        rvc_slot = self.rvciv_at.gather(1, tc)
+        rvc = rvc_slot >= 0
         if side == "pmil":
-            return barb | pmil | rv
+            return barb | pmil | rv | rvc
         if side == "pciv":
-            return barb | pciv | rv
-        # 'barb' / 'rival': all their units are military, every other unit is
-        # foreign or same-domain — anything standing there blocks.
-        return barb | pmil | pciv | rv
+            return barb | pciv | rv | rvc
+        if side == "rmil":
+            # foreign anything; own-civ military (same domain); own-civ
+            # civilian stacks (cross-domain)
+            rvc_foreign = rvc & (self.v_civ.gather(1, rvc_slot.clamp(min=0)) != civ)
+            return barb | pmil | pciv | rv | rvc_foreign
+        if side == "rciv":
+            # foreign anything; own-civ civilian (same domain); own-civ
+            # military stacks (cross-domain)
+            rv_foreign = rv & (self.v_civ.gather(1, rv_slot.clamp(min=0)) != civ)
+            return barb | pmil | pciv | rv_foreign | rvc
+        # 'barb': anything standing there blocks.
+        return barb | pmil | pciv | rv | rvc
 
     def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -1663,11 +1681,14 @@ class BatchSim:
         pmil = self.pmil_at.gather(1, okc) >= 0
         pciv = self.pciv_at.gather(1, okc) >= 0
         rv = self.rv_at.gather(1, okc) >= 0
+        rvc = self.rvciv_at.gather(1, okc) >= 0
         if side == "player":
             dom = torch.where(civ_mask.unsqueeze(1), pciv, pmil)
-            blocked = barb | rv | dom
-        else:  # barb or rival: every other unit blocks
-            blocked = barb | pmil | pciv | rv
+            blocked = barb | rv | rvc | dom
+        else:  # barb or rival military: every other unit blocks (C1-B5a:
+            # rival civilians included — own-civ spawn probes stay blanket
+            # like spawnUnit's, which only relaxes for the PLAYER's civ_mask)
+            blocked = barb | pmil | pciv | rv | rvc
         ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~blocked
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
@@ -2330,6 +2351,7 @@ class BatchSim:
         self.v_type[rows, slot] = type_idx[rows] if type_idx.dim() > 0 else type_idx
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
+        self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
 
