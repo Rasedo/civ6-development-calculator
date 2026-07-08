@@ -224,6 +224,16 @@ results to measure NETS rather than SEATS; (3) kingmaking proper
 (cross-seat influence) is only readable after the structural ladder
 flattens.
 
+**The parity dividend (ffa-3-parity: rival chop live, 40 anchored
+updates from ffa-2)**: seat spread 66.3 -> **52.9** (-13.4, a 20%
+flattening); seat 3 wins its FIRST games (0 -> 8.3%), seat 0 loosens
+(58.3 -> 45.8% win), 4-seat mean up (157.1). One verb recovered a
+fifth of the structural ladder — verb parity works and is worth its
+engine rounds. The remaining 52.9 decomposes into the missing rival
+economies (envoys, purchases — gold/influence engine rounds), spawn
+asymmetries in the O4 worlds, and the seat-0 residual; the next
+parity slices are the recorded path.
+
 **The war-head rung (c3a-8-war)** — the six-head trainer resumed from
 c3a-4 with V-W1 live: the net USES the verb (wars seen 0.1 -> 1.0,
 essentially every game) and even hoards gold as peace-exit liquidity
