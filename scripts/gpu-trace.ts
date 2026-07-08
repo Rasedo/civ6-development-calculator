@@ -54,6 +54,8 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.map.tiles.reduce((n, t) => n + (t.droughtTurns > 0 ? 1 : 0), 0),
     state.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0),
     leader, // GV-1
+    state.gameOver ? 1 : 0, // GV-2
+    state.gameOver ? leader : -1, // GV-2 winner
   ];
   for (let s = 0; s < csMax; s++) {
     const cs = state.cityStates[s];

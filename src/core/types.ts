@@ -187,6 +187,8 @@ export interface GovernmentState {
 }
 
 export interface GameState {
+  /** GV-2: true once TURN_LIMIT turns are played (or a victory fires). */
+  gameOver?: boolean;
   map: GameMap;
   cities: City[];
   nextCityId: number;

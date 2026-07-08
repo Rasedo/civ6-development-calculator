@@ -34,6 +34,10 @@ import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURC
 import { applyLumpYield } from './economy';
 import { tileClaimed, civOfRival } from './civs';
 
+/** GV-2: the game is over once this many turns are played (score victory at
+ * the limit; domination can end it earlier). Config for the horizon. */
+export const TURN_LIMIT = 100;
+
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
   return state.research.boosted.includes(id)
@@ -711,6 +715,7 @@ export function endTurn(state: GameState): void {
   }
 
   state.turn += 1;
+  state.gameOver = state.turn > TURN_LIMIT; // GV-2
 }
 
 // ---------------------------------------------------------------------------
@@ -812,6 +817,7 @@ export function deserialize(json: string): GameState {
   state.barbCamps ??= [];
   state.cityHp ??= {};
   state.disasters ??= false;
+  state.gameOver ??= false; // GV-2
   state.fogOfWar ??= false;
   state.explored ??= [];
   state.eventLog ??= [];

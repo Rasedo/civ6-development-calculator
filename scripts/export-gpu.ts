@@ -29,7 +29,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createGame, endTurn, foundCity, queueBuilding, queueSettler } from '../src/core/game';
+import { createGame, endTurn, foundCity, queueBuilding, queueSettler , TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
@@ -312,7 +312,7 @@ const rules = {
   ],
   // Mirrors settlerCost(): 80 + 30 × (cities − 1 + settlers banked + settlers queued).
   // goldPurchaseMult mirrors GOLD_PURCHASE_MULT (V-P1: buy = production cost × 4).
-  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT },
+  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT },
   // One civ-id space (C1-A3, mirrors src/core/civs.ts): the player is civ 0,
   // rival r (array index == rival.id, asserted at export) is civ r+1.
   // City-states and barbarians stay outside the numbering.

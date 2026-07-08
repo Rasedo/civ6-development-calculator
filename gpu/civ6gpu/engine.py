@@ -97,6 +97,7 @@ class Rules:
     settler_per_city: float
     settler_pop_gate: int
     gold_purchase_mult: float  # V-P1: gold price = production cost × this (GOLD_PURCHASE_MULT)
+    turn_limit: int  # GV-2: game over once turn > this
     civs: dict  # C1-A3: {player: 0, rivalBase: 1} — the unified civ-id space (asserted vs engine constants)
     district_cost: dict  # C1-B4: districtCost params {base: 54, scale: 8} — rivals pay it from THEIR research
     score_pop_weight: float
@@ -149,6 +150,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
+        turn_limit=r["scenario"].get("turnLimit", 100),
         civs=r.get("civs", {"player": 0, "rivalBase": 1}),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],
@@ -281,7 +283,7 @@ _MUTABLE = [
     "treasury", "science_total", "culture_total", "techs", "civics",
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
     "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef",
-    "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps",
+    "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
@@ -780,6 +782,7 @@ class BatchSim:
         self.u_tile = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.u_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.next_slot = torch.zeros(B, dtype=torch.long, device=device)  # append-only: keeps unit order
+        self.game_over = torch.zeros(B, dtype=torch.bool, device=device)  # GV-2
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         # Player units (phase 4b): trained via the production head, ordered
@@ -4783,6 +4786,7 @@ class BatchSim:
             self._eff_version += 1  # d_static_adj changed
 
         self.turn += 1
+        self.game_over = torch.full((self.B,), self.turn > self.rules.turn_limit, dtype=torch.bool, device=self.device)  # GV-2
 
     # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 
@@ -4807,6 +4811,8 @@ class BatchSim:
             (self.drought > 0).sum(dim=1).to(self.dtype),
             (self.improvement >= 0).sum(dim=1).to(self.dtype),
             self.leader().to(self.dtype),  # GV-1
+            self.game_over.to(self.dtype),  # GV-2
+            torch.where(self.game_over, self.leader(), torch.full((self.B,), -1, device=self.device)).to(self.dtype),  # GV-2 winner
         ]
         for s in range(self.S):
             cols += [
