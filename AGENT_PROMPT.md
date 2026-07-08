@@ -87,45 +87,49 @@ Every engine change must keep both engines TURN-EXACT:
 
 ## Current state (2026-07-08, branch claude/eloquent-mayer-si4ggq)
 
-Everything designed in BUILD_PLAN §2-4 is SHIPPED and gate-proven:
-the full B-arc (rivals are complete civs: tiles, queues, research,
-districts, buildings, builders, housing), C2 (per-seat egocentric
-surface, one net serves every seat), C3a/b/c (self-play ladder c3a-1..10,
-league machinery, O=4 MeleeEnv + fixtures_o4 + piKL), V-W1+V-W2 both ways
-(either side declares war, fights, and captures cities — the reverse
-transfer reuses the loyalty-flip machinery), and M3d slice 1+2
-(gen_targets.py + train_ppo --distill). Reference numbers live in
-TRAINING.md; the c3a family peaks at ~225 standard eval with c3a-4 as
-the α-Rank champion.
+**THE PROGRAM HAS PIVOTED.** §1-4 (the RL + parity infrastructure) is
+SHIPPED and gate-proven: the full B-arc, C2 per-seat surface, C3a/b/c
+self-play + league + O=4 FFA, V-W1/V-W2 war+capture both ways, M3d
+search-distillation, V-H1 chop, rival-seat verb parity (VP-G1 gold +
+VP-G2 purchases). The RL METHODOLOGY is settled and banked (TRAINING.md
++ /rl-research): self-mode workhorse, α-Rank truth, teacher>student,
+verbs-need-adoption. The war chapter CLOSED by measurement:
+economist-with-minimum-deterrence is this world's optimum (7 rungs);
+c3a-4 (~225 eval, pre-war economist) was the last interim champion.
 
-## Ranked frontiers (work top-down; each has its entry point)
+**Why the pivot** (owner's call): the real goal is the best champion on
+an engine CLOSE ENOUGH TO CIV 6, and every engine change orphans every
+net — so interim champions are disposable. Durable = the parity
+contract, the gate battery, the seat surface, the methodology bank.
+The RL track is PARKED (adoption-smoke rungs only) until the engine is
+done. The roadmap now runs on **BUILD_PLAN §5 — the Civ 6 gap list.**
 
-1. **Conquest via distillation** — the standing empirical problem: three
-   war-capable runs learned deterrence but never discovered multi-turn
-   sieges (cities flat at 4.6). The first distillation attempt (c3a-11)
-   PROVED the teacher rule: targets from the M1 scripted-continuation
-   search REGRESSED the 225-champion to 190 (the student was stronger
-   than the teacher — see TRAINING.md's read). The corrected path:
-   `gen_targets.py --policy` already samples net-driven states; the
-   target CHOICES must now come from NET-GUIDED gumbelsearch (the only
-   searcher that beat the net: 243.7 vs 240.3), emitting full 5-head
-   tuples, generated in at-war states specifically. Success criterion
-   unchanged: `behavior_probe` cities > 4.6.
-2. **The long league campaign** — resume O=2 with mixed self+pool
-   updates (half the games self mode for both-seat gradient, half vs
-   PFSP pool — alternation halves throughput, avoid) and a fresh LR
-   schedule; re-rank with α-Rank; iterate to a genuinely new champion.
-3. **The FFA ladder** — longer anchored O=4 runs (`--seats 4 --fixtures
-   gpu/fixtures_o4 --anchor <o4 ckpt>`), kingmaking telemetry (per-seat
-   win vs score distributions), FFA α-Rank. Watch for mixed-motive
-   collapse; piKL is the leash.
-4. **New verbs with payoffs** (§4 pattern: plumb gated-off → activate →
-   verify the net uses it → measure): candidate next verbs — worker
-   charges purchase, city-state levy head, feature chop (needs live
-   feature tensors — currently static, a known scope boundary).
-5. **Engine breadth only when a verb demands it** (religion, trade
-   routes, more districts) — content without agency has never moved the
-   needle here.
+## Ranked frontiers (BUILD_PLAN §5, work top-down)
+
+The gap to Civ 6, ordered by how much each changes what "champion" MEANS:
+
+1. **G-V Victory & horizon** — IN PROGRESS. The t100 sprint must become
+   a ~300-turn victory race. Slice (i) audit DONE (gpu/horizon_audit.py):
+   found the engine has NO PLAYER SECOND HALF — score peaks ~t200 then
+   declines, player cities contract 3.7→2.2 while rivals scale 8.5→13.5;
+   trees have depth (research starves, not depletes); and a HARD CRASH at
+   ~t150 from the append-only unit pools (U_MAX/P_MAX=96). NEXT: the pool
+   cap (behavior-preserving at horizon-100 → identical fixtures), then a
+   horizon-300 DIAGNOSTIC net (does a competent player sustain, or does
+   the engine structurally cap the late game?), then game-end semantics +
+   domination/score victories.
+2. **G-C Combat depth** — city walls + ranged strikes, siege classes,
+   promotions, ZoC. Re-opens the war-chapter verdict (measured on
+   wall-less 40-defense cities). Makes domination a real axis.
+3. **G-R Religion** — faith is a dead pool today; pantheons/beliefs,
+   religious units/pressure, the religious victory.
+4. **G-T Trade routes**, **G-D full trees**, **G-S scale (300t/8-10
+   cities/bigger maps/pools)**. Cut-lines: STRATEGIC CORE = G-V+G-C+G-R;
+   FULL FIDELITY adds the rest.
+
+Every slice lands via /gate-stage + /port-mechanic; RL shrinks to one
+cheap adoption-smoke per shipped system. The final champion campaign
+runs ONCE, on the finished engine, with the full methodology bank.
 
 ## Skills (invoke them — they ARE the procedures above, operationalized)
 
