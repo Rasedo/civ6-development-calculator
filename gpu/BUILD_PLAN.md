@@ -1099,3 +1099,43 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   Next: A3 — the GPU engine's owner-dimensioned mirror of A1/A2's layout
   (seat-0 slices bit-equal to today's tensors), then B1 (rival tile-working
   on the real citizen/yield path — the first behavior-CHANGING promotion).
+
+
+## 5. The Civ 6 gap — engine completion toward the REAL goal (2026-07-08)
+
+The ultimate goal (owner's words): the best champion — duel or FFA — on an
+engine close enough to Civ 6. Everything in §1-4 built the training/parity
+INFRASTRUCTURE; this section is the remaining GAME. The RL track is PARKED
+(methodology settled and banked in TRAINING.md/ARCHIVE.md; c3a-4 was the
+last interim champion) — one cheap adoption-smoke rung per shipped system,
+nothing more, until the final campaign on the finished engine.
+
+Ordered by how much each system changes what "best champion" MEANS:
+
+- [ ] **G-V Victory & horizon** — the objective itself. Today we optimize
+      score at t100; Civ 6 champions race victories on ~300-turn horizons.
+      Slices: (i) horizon-300 robustness audit (what exhausts: techs, civics,
+      buildable items, growth, loyalty, disasters — measure, then fix the
+      exhaustion cliffs); (ii) game-end semantics (per-game 'done' + winner
+      in both engines, traced); (iii) DOMINATION victory (capture machinery
+      exists — needs capital flags + all-capitals-lost checks);
+      (iv) SCORE victory at the turn limit (exists, formalized). Science/
+      culture/religious victories arrive with their systems below.
+- [ ] **G-C Combat depth** — makes domination a real axis (and plausibly
+      dethrones the economist): city WALLS + ranged city strikes, siege
+      units/classes (support vs melee vs ranged), promotions, healing,
+      zone-of-control. The war chapter's conclusion (armies don't pay)
+      was measured on wall-less 40-defense cities — this system re-opens it.
+- [ ] **G-R Religion** — a full yield economy (faith exists as a dead pool),
+      pantheons/beliefs, religious units, pressure, the religious victory.
+- [ ] **G-T Trade routes** — traders, route yields, roads, plunder.
+- [ ] **G-D Full trees** — the complete district roster (Theater/Entertainment/
+      Aqueduct-as-real/Neighborhood...), full building trees, the full
+      tech/civic trees to the modern era (today's trees end early).
+- [ ] **G-S Scale** — 300 turns everywhere, 8-10 cities, bigger maps,
+      more rivals; batch/memory work on the GPU side.
+
+Sizing honesty: each of G-C/G-R/G-D is a B-arc-sized effort; G-V and G-T are
+half that; G-S is engineering. Cut-line options: STRATEGIC CORE = G-V + G-C
++ G-R (champions mean something Civ-like); FULL FIDELITY adds G-T/G-D/G-S.
+Every slice lands via /gate-stage + /port-mechanic; adoption smokes only.
