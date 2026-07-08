@@ -191,8 +191,14 @@ def load_fixture(path: Path) -> dict:
 
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 4
-U_MAX = 96  # barbarian unit slots per game (append-only; runtime-asserted)
-P_MAX = 96  # player unit slots per game (append-only; runtime-asserted)
+U_MAX = 256  # barbarian/rival unit slots per game (append-only; runtime-asserted).
+             # Raised 96→256 for horizon-300 (G-S cliff #1): barbs high-water
+             # ~160 ever-spawned by t300, rivals ~55. Behavior-preserving at the
+             # horizon-100 gate (barb_hi ~33 there, cap never touched; fixtures
+             # are TS-exported and don't encode this). Append-only is still a
+             # band-aid — true fix = dead-slot reclamation (a future G-S stage,
+             # parity-core risk: unit-order-is-spec).
+P_MAX = 256  # player unit slots per game (append-only; runtime-asserted)
 
 # --- one civ-id space (C1-A3, mirrors src/core/civs.ts) -----------------------
 # The player is civ 0; rival r (fixture array index == TS rival.id, asserted
