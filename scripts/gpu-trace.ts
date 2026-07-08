@@ -59,7 +59,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       continue;
     }
     row.push(
@@ -84,6 +84,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       // C1-B4: COMPLETED rival districts (queued ones pave but don't count).
       rival.cities.reduce((s2, rc) => s2 + rc.districts.filter((d) => d.type !== 'CITY_CENTER' && state.map.tiles[d.tileIndex].districtComplete).length, 0),
       rival.cities.reduce((s2, rc) => s2 + rc.buildings.length, 0),
+      Math.round((rival.treasury ?? 0) * 1000), // VP-G1
     );
   }
   for (let c = 0; c < cMax; c++) {

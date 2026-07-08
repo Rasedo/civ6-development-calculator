@@ -996,6 +996,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       return {
         id: r.id,
         aggression: r.aggression,
+        treasury: 0, // VP-G1: the fixture is a t0 state — rivals start bankless (r.treasury here is the LIVE post-trace object, like the Init-map snapshots avoid)
         cities: rivalCitiesInit.get(r.id) ?? [],
         units: rivalUnitsInit.get(r.id) ?? [],
       };

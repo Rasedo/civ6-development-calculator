@@ -302,6 +302,8 @@ export interface RivalCiv {
   gpp: Partial<Record<GreatPersonClass, number>>;
   pantheonClaimed: boolean;
   religionFounded: boolean;
+  /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
+  treasury?: number;
 }
 
 export interface ReligionState {

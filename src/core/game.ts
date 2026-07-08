@@ -826,6 +826,7 @@ export function deserialize(json: string): GameState {
   for (const r of state.rivals) {
     // C1-B3: older saves lack the rival research trees.
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
+    r.treasury ??= 0; // VP-G1
     for (const rc of r.cities as (RivalCity & { growthBox?: number })[]) {
       rc.civId ??= civOfRival(r.id);
       rc.foodBox ??= rc.growthBox ?? 0;

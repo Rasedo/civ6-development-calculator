@@ -850,8 +850,10 @@ export function rivalPhase(state: GameState): void {
     // pre-turn alive mask the same way).
     let sciSum = 0;
     let culSum = 0;
+    let goldSum = 0;
     for (const rc of [...rival.cities]) {
       const y = rivalCityYields(state, rival, rc);
+      goldSum += y.gold; // VP-G1: rivals bank their gold (no spender yet)
       const food = y.food;
       const production = y.production;
       // C1-B3a: rival science/culture streams — tile+center columns plus
@@ -922,6 +924,7 @@ export function rivalPhase(state: GameState): void {
     }
     if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
     rsr.civicProgress += culSum;
+    rival.treasury = (rival.treasury ?? 0) + goldSum; // VP-G1
     while (rsr.civic && rsr.civicProgress >= CIVICS[rsr.civic].cost) {
       rsr.civicProgress -= CIVICS[rsr.civic].cost;
       rsr.civics.push(rsr.civic);

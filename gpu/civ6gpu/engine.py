@@ -282,7 +282,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "rvciv_at", "v_charges",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
@@ -438,6 +438,10 @@ class BatchSim:
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        self.r_treasury = torch.tensor(
+            [[float((rv.get("treasury") or 0)) for rv in (f.get("rivals") or [])[:r_pad]] + [0.0] * max(r_pad - len(f.get("rivals") or []), 0) for f in fixtures],
+            dtype=torch.float64, device=device,
+        ) if r_pad > 0 else torch.zeros(B, 0, dtype=torch.float64, device=device)  # VP-G1
         self.r_peaceturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # C1-B2: per-city production queues replace the pooled stocks.
         # rc_current: -1 idle, 0 settler, 1+u trains roster unit u.
@@ -1486,7 +1490,7 @@ class BatchSim:
             mask = self.rc_alive[:, r, j]
             if not bool(mask.any()):
                 continue
-            f, pr, sc, cu = self._rival_city_yields(r, j, mask)
+            f, pr, sc, cu, _g = self._rival_city_yields(r, j, mask)
             yt = yt + f * float(w[0]) + pr * float(w[1]) + sc * float(w[3]) + cu * float(w[4])
             bgf = self.rc_bldg[:, r, j].double() @ rd.b_yields.double()  # [B, 6]
             yt = yt + bgf[:, 2] * float(w[2]) + bgf[:, 5] * float(w[5])
@@ -3146,8 +3150,10 @@ class BatchSim:
         # science/culture pass through unclamped like the TS center.
         sc = self.tile_yields[:, :, 3].gather(1, tc).double()
         cu = self.tile_yields[:, :, 4].gather(1, tc).double()
+        go = self.tile_yields[:, :, 2].gather(1, tc).double()  # VP-G1
         sc_sel = sc.gather(1, top_idx) * take.double()
         cu_sel = cu.gather(1, top_idx) * take.double()
+        go_sel = go.gather(1, top_idx) * take.double()  # VP-G1
         # center: real floored yields (tileYieldsForCenter) — food after the
         # fertility/drought tail, production from the neutral plane
         sitec = center.clamp(min=0).unsqueeze(1)
@@ -3161,6 +3167,7 @@ class BatchSim:
         cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double() - fy_c[:, 1] * strip, torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
         c_sc = self.tile_yields[:, :, 3].gather(1, sitec).squeeze(1).double() - fy_c[:, 3] * strip
         c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double() - fy_c[:, 4] * strip
+        c_go = self.tile_yields[:, :, 2].gather(1, sitec).squeeze(1).double() - fy_c[:, 2] * strip  # VP-G1
         if self._dyadic_fp:
             # every term is an exact dyadic, so .sum() is bit-identical to
             # the TS reduce
@@ -3168,10 +3175,12 @@ class BatchSim:
             prod = cp + p_sel.sum(dim=1)
             sci = c_sc + sc_sel.sum(dim=1)
             cul = c_cu + cu_sel.sum(dim=1)
+            gold = c_go + go_sel.sum(dim=1)  # VP-G1
         else:
             food = cf.clone()
             prod = cp.clone()
             sci = c_sc.clone()
+            gold = c_go.clone()  # VP-G1
             cul = c_cu.clone()
             for m in range(kk):  # sequential adds mirror the TS loop's rounding
                 food = food + f_sel[:, m]
@@ -3209,6 +3218,8 @@ class BatchSim:
                         food = food + add
                     elif yc == 1:
                         prod = prod + add
+                    elif yc == 2:
+                        gold = gold + add  # VP-G1: Harbor/Hub adjacency
         # C1-B4b-2: building yields under empty modifiers (the exported
         # catalog has no regional/SHIPYARD scope and worship never queues,
         # so the plain def.yields sum IS cityBuildingYields here).
@@ -3218,6 +3229,7 @@ class BatchSim:
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, 6] (int-valued: dtype roundtrip is exact)
                 food = food + add6[:, 0]
                 prod = prod + add6[:, 1]
+                gold = gold + add6[:, 2]  # VP-G1
                 sci = sci + add6[:, 3]
                 cul = cul + add6[:, 4]
         z = torch.zeros_like(food)
@@ -3226,6 +3238,7 @@ class BatchSim:
             torch.where(mask, prod, z),
             torch.where(mask, sci, z),
             torch.where(mask, cul, z),
+            torch.where(mask, gold, z),
         )
 
     def _expand_rival_border(self, r: int, j: int, due: torch.Tensor) -> None:
@@ -3803,12 +3816,13 @@ class BatchSim:
             prod_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
+            gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)  # VP-G1
             heal = torch.where(self.r_atwar[:, r], 5, 15)
             for j in range(self.RC):
                 cact = active & alive0[:, j]
                 if not bool(cact.any()):
                     continue
-                food, prod, sci, cul = self._rival_city_yields(r, j, cact)
+                food, prod, sci, cul, gold_y = self._rival_city_yields(r, j, cact)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
                 # C1-B3a: tile/center columns plus the citizens' contribution.
                 # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
@@ -3817,6 +3831,7 @@ class BatchSim:
                 # flips completions when a cost lands inside it (seed 9079).
                 sci_sum = torch.where(cact, sci_sum + (sci + self.rules.citizen_science * self.rc_pop[:, r, j].double()), sci_sum)
                 cul_sum = torch.where(cact, cul_sum + (cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double()), cul_sum)
+                gold_sum = torch.where(cact, gold_sum + gold_y, gold_sum)  # VP-G1: plain += y.gold
                 # C1-B1: the real growth accounting — true surplus (can be
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
                 # need, starvation shrinks (pop floor 1, box reset). maxPop
@@ -3908,6 +3923,7 @@ class BatchSim:
             picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
             self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
+            self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] + gold_sum, self.r_treasury[:, r])  # VP-G1
             for _ in range(RESEARCH_LOOPS):
                 curt = self.r_cur_tech[:, r]
                 cost_t = rdv.t_cost.gather(0, curt.clamp(min=0)).double()
@@ -4691,10 +4707,10 @@ class BatchSim:
             self.civics.sum(dim=1).to(self.dtype),
             self.settlers.to(self.dtype),
             self.alive.sum(dim=1).to(self.dtype),
-            torch.round(self.treasury * 1000),
-            torch.round(self.science_total * 1000),
-            torch.round(self.culture_total * 1000),
-            torch.round(self.empire_score() * 1000),
+            js_round(self.treasury * 1000),
+            js_round(self.science_total * 1000),
+            js_round(self.culture_total * 1000),
+            js_round(self.empire_score() * 1000),
             self.rng_state.to(self.dtype),
             self.n_camps.to(self.dtype),
             self.u_alive.sum(dim=1).to(self.dtype),
@@ -4721,10 +4737,10 @@ class BatchSim:
                 torch.where(live & self.r_atwar[:, r], torch.ones_like(zero), zero),
                 torch.where(live, self.r_techs[:, r].sum(dim=1).to(self.dtype), zero),
                 torch.where(live, self.r_civics[:, r].sum(dim=1).to(self.dtype), zero),
-                torch.where(live, torch.round(self.r_tech_prog[:, r] * 1000).to(self.dtype), zero),
-                torch.where(live, torch.round(self.r_civic_prog[:, r] * 1000).to(self.dtype), zero),
-                torch.where(live, torch.round((self.rc_progress[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
-                torch.where(live, torch.round((self.rc_cost[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
+                torch.where(live, js_round(self.r_tech_prog[:, r] * 1000).to(self.dtype), zero),
+                torch.where(live, js_round(self.r_civic_prog[:, r] * 1000).to(self.dtype), zero),
+                torch.where(live, js_round((self.rc_progress[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
+                torch.where(live, js_round((self.rc_cost[:, r] * self.rc_alive[:, r].double()).sum(dim=1) * 1000).to(self.dtype), zero),
                 torch.where(
                     live,
                     (
@@ -4734,6 +4750,7 @@ class BatchSim:
                     zero,
                 ),
                 torch.where(live, self.rc_bldg[:, r].sum(dim=(1, 2)).to(self.dtype), zero),
+                torch.where(live, js_round(self.r_treasury[:, r] * 1000).to(self.dtype), zero),  # VP-G1
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):
@@ -4743,9 +4760,9 @@ class BatchSim:
                 (self.owner == c).sum(dim=1).to(self.dtype),
                 torch.where(live, self.buildings[:, c].sum(dim=1).to(self.dtype) + (1 if c == 0 else 0), zero),  # +PALACE
                 torch.where(live, self.tiles_acquired[:, c].to(self.dtype), zero),
-                torch.where(live, torch.round(self.food_box[:, c] * 1000), zero),
-                torch.where(live, torch.round(self.culture_box[:, c] * 1000), zero),
+                torch.where(live, js_round(self.food_box[:, c] * 1000), zero),
+                torch.where(live, js_round(self.culture_box[:, c] * 1000), zero),
                 torch.where(live, self.city_hp[:, c].to(self.dtype), zero),
-                torch.where(live, torch.round(self.loyalty[:, c] * 1000), zero),
+                torch.where(live, js_round(self.loyalty[:, c] * 1000), zero),
             ]
         return torch.stack(cols, dim=1)
