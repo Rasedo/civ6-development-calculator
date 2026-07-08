@@ -3246,14 +3246,31 @@ class BatchSim:
                 mine_h = (self.mine_ok.gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._mine_unlock_tech]) if self.MINE >= 0 and self._mine_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
                 lum_h = (self.lumber_ok.gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._lumber_unlock_tech]) if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
                 valid = [farm_h, mine_h, lum_h]
+                # C1-B5b-iii parity: TS scores each option as Δ tileScore(tileYields, 'balanced')
+                # = (the yield the improvement adds) · focus_base, and focus_base ([2,2,1,1,1,1])
+                # is NOT the exported BALANCED_WEIGHTS gains (a different set — food 1 vs 2). Compute
+                # it here: FARM adds catalog food + THIS tile's farm-adjacency (>=2 adjacent FARMs,
+                # not whether the tile is already a farm); MINE adds catalog prod + the rival's own
+                # mine boost; LUMBER its flat catalog prod. Ties keep FARM > MINE > LUMBER (opts order).
+                wt = self.rules_dev.focus_base.double()
+                tier_r = self._farmadj_tier(cv0, tk0).double()
+                nbc = self.neigh.clamp(min=0)
+                fimp = self.improvement == self.FARM
+                adj2 = ((fimp[:, nbc] & (self.neigh >= 0).unsqueeze(0)).sum(dim=2) >= 2).double()  # [B,T]
+                adj_h = adj2.gather(1, here.unsqueeze(1)).squeeze(1)  # [B] hypothetical FARM's adjacency
+                mboost = (tk0[:, self._mine_boost_tech].double() * self._mine_boost_amt).sum(dim=1) if self._mine_boost_tech.numel() > 0 else torch.zeros(B, dtype=torch.float64, device=dev)
+                farm_g = (self._farm_food + tier_r * adj_h) * float(wt[0])
+                mine_g = (self._mine_prod + mboost) * float(wt[1])
+                lum_g = torch.full((B,), self._lumber_prod * float(wt[1]), dtype=torch.float64, device=dev)
+                opt_g = [farm_g, mine_g, lum_g]
                 pick = torch.full((B,), -1, dtype=torch.long, device=dev)
                 best_g = torch.full((B,), float("-inf"), dtype=torch.float64, device=dev)
-                for (imp_i, g), v in zip(opts, valid):
+                for (imp_i, _g), v, og in zip(opts, valid, opt_g):
                     if imp_i < 0:
                         continue
-                    better = v & (torch.full((B,), g, dtype=torch.float64, device=dev) > best_g)
+                    better = v & (og > best_g)
                     pick = torch.where(better, torch.full_like(pick, imp_i), pick)
-                    best_g = torch.where(better, torch.full_like(best_g, g), best_g)
+                    best_g = torch.where(better, og, best_g)
                 rows = (build & (pick >= 0)).nonzero(as_tuple=True)[0]
                 if len(rows):
                     self.improvement[rows, here[rows]] = pick[rows]
