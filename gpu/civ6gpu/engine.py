@@ -2574,6 +2574,37 @@ class BatchSim:
                 self.p_tile[rows, p] = tgt[rows]
                 self._clear_camp_at(ok, tgt)  # walkPath clears camps for any player unit
 
+    def _bankrupt_disband(self) -> None:
+        """GV-5: an insolvent treasury disbands ONE player unit per turn — the
+        priciest alive unit (tie -> lowest slot = oldest, matching TS's lowest
+        id; both spawn orders are append-only). Only upkeep>0 units (military)
+        are candidates; no refund. Inert at the gate (play stays gold-positive
+        by t100), so the gates never exercise it — domination_test-style poke +
+        the TS vitest pin the semantics."""
+        insolvent = self.treasury < 0  # [B]
+        if not bool(insolvent.any()):
+            return
+        P = self.p_alive.shape[1]
+        maint = self._p_maint[self.p_type]  # [B, P] upkeep per slot
+        cand = self.p_alive & (maint > 0)
+        slots = torch.arange(P, device=self.device, dtype=maint.dtype).unsqueeze(0)  # [1, P]
+        # maximize (upkeep, -slot): upkeep*(P+1) - slot lets upkeep dominate, tie -> lowest slot
+        score = torch.where(cand, maint * float(P + 1) - slots, torch.full_like(maint, -1e30))
+        victim = score.argmax(dim=1)  # [B]
+        do_kill = insolvent & cand.any(dim=1)
+        if not bool(do_kill.any()):
+            return
+        rows = do_kill.nonzero(as_tuple=True)[0]
+        vslot = victim[rows]
+        vtile = self.p_tile[rows, vslot]
+        vciv = self._p_civ[self.p_type[rows, vslot]]  # clear military vs civilian occupancy
+        mil = ~vciv
+        if bool(mil.any()):
+            self.pmil_at[rows[mil], vtile[mil]] = -1
+        if bool(vciv.any()):
+            self.pciv_at[rows[vciv], vtile[vciv]] = -1
+        self.p_alive[rows, vslot] = False
+
     def _barbarian_phase(self) -> None:
         """Mirrors barbarianPhase turn for turn, draw for draw: camp roll →
         camp placement → per-camp garrison rolls → raider actions (attack
@@ -4688,6 +4719,7 @@ class BatchSim:
         # --- the hostile world (after the city loop, before research) ----------------------
         if self.units_mode:
             self.treasury = self.treasury - (self.p_alive.to(self.dtype) * self._p_maint[self.p_type]).sum(dim=1)
+            self._bankrupt_disband()  # GV-5 (after upkeep, before the barb phase — matches TS)
             self._barbarian_phase()
         if self.disasters:
             self._disaster_phase()

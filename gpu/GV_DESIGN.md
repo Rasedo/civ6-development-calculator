@@ -3,8 +3,12 @@
 Status: IN PROGRESS (2026-07-08). GV-1 (winner indicator) SHIPPED 753a451;
 GV-2 (game-end gameOver+winner) SHIPPED f1d2072+3ccb9fd; TURN_LIMIT=250 set.
 GV-3 (domination) + GV-4 (score victoryType) SHIPPED d0c2d8e (TS) + GPU mirror
-(_domination, victoryType trace col, gpu/domination_test.py poke). REMAINING:
-GV-5 bankruptcy + horizon-300 flip.
+(_domination, victoryType trace col, gpu/domination_test.py poke). GV-5
+(bankruptcy) SHIPPED — Civ6 rule (one unit/turn, priciest, tie->oldest), TS
+game.ts + GPU _bankrupt_disband, tests/bankruptcy.test.ts + gpu/bankruptcy_test.py.
+**GV ARC COMPLETE (slices 1-5).** REMAINING (non-GV): horizon-300 flip (needs
+parity extended past t100) + the 0.6x off-script tail (6/7 bugs fixed; see
+[[engine-pivot]]).
 Also shipped en route: the horizon-300 pool-cap fix (765ab4f) and the GS-1
 game-speed infra + 3 latent-bug fixes incl. farm-adjacency (9feacaa). REMAINING:
 GV-3 domination, GV-4 score victory, GV-5 bankruptcy — plus the deferred 0.6x

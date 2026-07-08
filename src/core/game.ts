@@ -4,14 +4,14 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity } from './types';
+import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { detectBoosts } from './boosts';
-import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits } from './units';
+import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit } from './units';
 import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -734,6 +734,21 @@ export function endTurn(state: GameState): void {
 
   if (state.unitsMode) {
     state.treasury -= unitMaintenance(state);
+    // GV-5 bankruptcy: an insolvent treasury disbands ONE unit per turn (Civ 6
+    // rule) — the priciest player unit, tie -> lowest id (= oldest spawn; a
+    // deterministic order the GPU shares slot-for-slot, both append-only). No
+    // refund; the eased upkeep pulls the treasury back over the next turns.
+    if (state.treasury < 0) {
+      let victim: Unit | undefined;
+      for (const u of state.units) {
+        if (u.owner !== 'player') continue;
+        const m = UNITS[u.type]?.maintenance ?? 0;
+        if (m <= 0) continue;
+        const vm = victim ? UNITS[victim.type]?.maintenance ?? 0 : 0;
+        if (!victim || m > vm || (m === vm && u.id < victim.id)) victim = u;
+      }
+      if (victim) disbandUnit(state, victim.id);
+    }
     barbarianPhase(state);
   }
   if (state.disasters) disasterPhase(state);
