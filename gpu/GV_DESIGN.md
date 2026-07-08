@@ -2,6 +2,9 @@
 
 Status: IN PROGRESS (2026-07-08). GV-1 (winner indicator) SHIPPED 753a451;
 GV-2 (game-end gameOver+winner) SHIPPED f1d2072+3ccb9fd; TURN_LIMIT=250 set.
+GV-3 (domination) + GV-4 (score victoryType) SHIPPED d0c2d8e (TS) + GPU mirror
+(_domination, victoryType trace col, gpu/domination_test.py poke). REMAINING:
+GV-5 bankruptcy + horizon-300 flip.
 Also shipped en route: the horizon-300 pool-cap fix (765ab4f) and the GS-1
 game-speed infra + 3 latent-bug fixes incl. farm-adjacency (9feacaa). REMAINING:
 GV-3 domination, GV-4 score victory, GV-5 bankruptcy — plus the deferred 0.6x

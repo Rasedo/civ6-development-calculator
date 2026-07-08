@@ -21,6 +21,7 @@
  */
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
+import { dominationWinner } from '../src/core/game';
 import { getCityHp } from '../src/core/combat';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
@@ -34,6 +35,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     const rs = rivalEmpireScore(state, rv);
     if (rs > leaderBest) { leaderBest = rs; leader = rv.id + 1; }
   }
+  const dom = dominationWinner(state); // GV-3
   const row = [
     state.turn,
     state.research.techs.length,
@@ -55,7 +57,8 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0),
     leader, // GV-1
     state.gameOver ? 1 : 0, // GV-2
-    state.gameOver ? leader : -1, // GV-2 winner
+    dom >= 0 ? dom : state.gameOver ? leader : -1, // GV-2/GV-3 winner
+    state.victoryType ?? 0, // GV-4/GV-3 victoryType
   ];
   for (let s = 0; s < csMax; s++) {
     const cs = state.cityStates[s];

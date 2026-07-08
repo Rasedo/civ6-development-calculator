@@ -284,6 +284,7 @@ _MUTABLE = [
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
     "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef",
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
+    "victory_type", "winner",
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
@@ -785,6 +786,8 @@ class BatchSim:
         self.u_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.next_slot = torch.zeros(B, dtype=torch.long, device=device)  # append-only: keeps unit order
         self.game_over = torch.zeros(B, dtype=torch.bool, device=device)  # GV-2
+        self.victory_type = torch.zeros(B, dtype=torch.long, device=device)  # GV-4/GV-3
+        self.winner = torch.full((B,), -1, dtype=torch.long, device=device)  # GV-3
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         # Player units (phase 4b): trained via the production head, ordered
@@ -1564,6 +1567,22 @@ class BatchSim:
         acts on it until GV-2."""
         cols = [self.empire_score()] + [self.rival_empire_score(r) for r in range(self.R)]
         return torch.stack(cols, dim=1).argmax(dim=1)
+
+    def _domination(self) -> torch.Tensor:
+        """GV-3: [B] the civ holding EVERY original capital (player site[0] +
+        each rival's rc_center[:,:,0]), else -1. Owner of a capital tile: 0 if a
+        player city is centered there (center_at>=0), else rvcity_at+1 (the
+        rival index -> civ id), else -1 (razed). Mirrors dominationWinner: a solo
+        game (R==0) never dominates; any unowned or split capital -> -1."""
+        B, dev = self.B, self.device
+        if self.R == 0:
+            return torch.full((B,), -1, dtype=torch.long, device=dev)
+        caps = torch.cat([self.site[:, :1], self.rc_center[:, : self.R, 0]], dim=1)  # [B, 1+R]
+        p_owns = self.center_at.gather(1, caps) >= 0
+        rv = self.rvcity_at.gather(1, caps)  # rival index or -1
+        owner = torch.where(p_owns, torch.zeros_like(rv), torch.where(rv >= 0, rv + 1, torch.full_like(rv, -1)))
+        bad = (owner < 0).any(dim=1) | (owner != owner[:, :1]).any(dim=1)
+        return torch.where(bad, torch.full((B,), -1, dtype=torch.long, device=dev), owner[:, 0])
 
     # --- action masks (the macro-action surface) --------------------------------
 
@@ -4825,7 +4844,10 @@ class BatchSim:
             self._eff_version += 1  # d_static_adj changed
 
         self.turn += 1
-        self.game_over = torch.full((self.B,), self.turn > self.rules.turn_limit, dtype=torch.bool, device=self.device)  # GV-2
+        dom = self._domination()  # GV-3
+        self.game_over = (dom >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3
+        self.victory_type = torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))  # GV-4/GV-3
+        self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, self.leader(), torch.full_like(dom, -1)))  # GV-3
 
     # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 
@@ -4851,7 +4873,8 @@ class BatchSim:
             (self.improvement >= 0).sum(dim=1).to(self.dtype),
             self.leader().to(self.dtype),  # GV-1
             self.game_over.to(self.dtype),  # GV-2
-            torch.where(self.game_over, self.leader(), torch.full((self.B,), -1, device=self.device)).to(self.dtype),  # GV-2 winner
+            self.winner.to(self.dtype),  # GV-2/GV-3 winner
+            self.victory_type.to(self.dtype),  # GV-4/GV-3 victoryType
         ]
         for s in range(self.S):
             cols += [
