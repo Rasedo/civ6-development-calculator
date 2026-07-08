@@ -2870,8 +2870,18 @@ class BatchSim:
                     # gate-level validity
                     ok_d[:, si] = has_tech & not_owned & under_cap
             row = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
-            prod_cols.append(row & idle[:, j].unsqueeze(1))
-        production = torch.stack(prod_cols, dim=1)  # [B, RC, NB+2+NU+nS]
+            # VP-G2: the purchase block (buy building / settler / unit at
+            # goldPurchaseMult x cost from the CIV's shared treasury) — NOT
+            # idle-gated, mirroring the player's V-P1 columns. Rival settler
+            # purchase stays False (their settling machinery is scripted).
+            mult = self.rules.gold_purchase_mult
+            afford_b = self.r_treasury[:, r].unsqueeze(1) >= (rdv.b_cost.double() * mult).unsqueeze(0)
+            pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
+            ps = torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            afford_u = self.r_treasury[:, r].unsqueeze(1) >= (self._p_cost.double() * mult).unsqueeze(0)
+            pu = ok_u & afford_u & self.controlled[:, r].unsqueeze(1)
+            prod_cols.append(torch.cat([row & idle[:, j].unsqueeze(1), pb, ps, pu], dim=1))
+        production = torch.stack(prod_cols, dim=1)  # [B, RC, base + NB+1+NU purchase]
         tech = self._available_mask(self.r_techs[:, r], self._prereq_t) & (self.r_cur_tech[:, r] == -1).unsqueeze(1)
         civic = self._available_mask(self.r_civics[:, r], self._prereq_c) & (self.r_cur_civic[:, r] == -1).unsqueeze(1)
         # symmetric war head (seat-invariant [B, 2R] layout): a controlled
@@ -2941,6 +2951,40 @@ class BatchSim:
                 self.rc_current[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
                 self.rc_cost[:, r, j] = torch.where(is_s, settle_cost, self.rc_cost[:, r, j])
                 self.rc_progress[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+            # VP-G2: purchase codes live past the base width — buildings
+            # base..base+NB-1, (settler col skipped), units follow. Purchases
+            # bypass the idle gate and revalidate LIVE (treasury may have
+            # drained earlier in this same slot walk — the V-P1 coupling).
+            base_w = NBn + 2 + self.NU + nS
+            pa = production[:, j].to(torch.long)
+            mult = self.rules.gold_purchase_mult
+            can_p = (pa >= base_w) & self.controlled[:, r] & self.rc_alive[:, r, j]
+            if bool(can_p.any()):
+                pb_i = pa - base_w
+                is_pb = can_p & (pb_i >= 0) & (pb_i < NBn)
+                if bool(is_pb.any()):
+                    bi = pb_i.clamp(min=0, max=NBn - 1)
+                    cost_b = rdv.b_cost.gather(0, bi).double() * mult
+                    ok_now = is_pb & ~self.rc_bldg[torch.arange(self.B, device=self.device), r, j].gather(1, bi.unsqueeze(1)).squeeze(1) & (self.r_treasury[:, r] >= cost_b)
+                    if bool(ok_now.any()):
+                        rows_ = ok_now.nonzero(as_tuple=True)[0]
+                        self.rc_bldg[rows_, r, j, bi[rows_]] = True
+                        self.r_treasury[:, r] = torch.where(ok_now, self.r_treasury[:, r] - cost_b, self.r_treasury[:, r])
+                pu_i = pb_i - (NBn + 1)
+                is_pu = can_p & (pu_i >= 0) & (pu_i < self.NU)
+                if bool(is_pu.any()):
+                    ui = pu_i.clamp(min=0, max=self.NU - 1)
+                    cost_u = self._p_cost.gather(0, ui).double() * mult
+                    ok_now = is_pu & (self.r_treasury[:, r] >= cost_u)
+                    if bool(ok_now.any()):
+                        is_bldr = ok_now & (self._p_charges[ui] > 0)
+                        is_mil = ok_now & ~is_bldr
+                        ctr = self.rc_center[:, r, j].clamp(min=0)
+                        if bool(is_mil.any()):
+                            self._spawn_rival(is_mil, ctr, ui, r)
+                        if bool(is_bldr.any()):
+                            self._spawn_rival_civ(is_bldr, ctr, r)
+                        self.r_treasury[:, r] = torch.where(ok_now, self.r_treasury[:, r] - cost_u, self.r_treasury[:, r])
             # idle = NB+1 (explicit no-op); units NB+2..NB+1+NU
             is_u = act & (a >= NBn + 2) & (a < NBn + 2 + self.NU)
             if bool(is_u.any()):
