@@ -3297,13 +3297,20 @@ class BatchSim:
             & ~districted
         )
         f_plane = self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]
+        # V-H1 parity: a chopped/stripped feature's yields are stale in the static
+        # planes (TS reads tile.feature===null live) — drop them on every worked-tile
+        # column, exactly like the player's _eff_yields (line 1035). The center path
+        # below applies its own strip via fy_c, so it reads the raw plane untouched.
+        fs = self.feat_stripped.to(self.dtype)
+        f_plane = f_plane - self.feat_yields[:, :, 0] * fs
         # the rival applies its OWN farm-adjacency (its Feudalism/Replaceable Parts),
         # exactly like the player — NOT the player's (that stays in _farmadj_food).
         if self.improvements_on:
             tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r])
             if bool((tier_r > 0).any()):
                 f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier_r.unsqueeze(1).to(self.dtype)
-        p_plane = self._neutral_prod()
+        p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
+        ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1)  # strip-adjusted static (cols 2-5)
         f = f_plane.gather(1, tc).double()
         p = p_plane.gather(1, tc).double()
         # C1-B5b-iii: the OWNER's mine boosts apply to worked tiles (and via
@@ -3318,7 +3325,7 @@ class BatchSim:
         # All shipped yields are dyadic (asserted via _dyadic_fp over all six
         # columns), so this sum order is bit-equal to the TS per-key loop.
         w = rd.focus_base.double()
-        s = f * w[0] + p * w[1] + (self.tile_yields[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2).gather(1, tc)
+        s = f * w[0] + p * w[1] + (ty_oth[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2).gather(1, tc)
         M = tiles.shape[1]
         # ties break by GLOBAL tile index (assignWorkedTiles' a.index - b.index),
         # NOT window position — the pre-B1 heuristic kept tilesWithin order.
@@ -3331,10 +3338,10 @@ class BatchSim:
         # C1-B3a: science/culture columns ride the same selection (static
         # planes — no dynamic tail touches them in scope); the center's
         # science/culture pass through unclamped like the TS center.
-        sc = self.tile_yields[:, :, 3].gather(1, tc).double()
-        cu = self.tile_yields[:, :, 4].gather(1, tc).double()
-        go = self.tile_yields[:, :, 2].gather(1, tc).double()  # VP-G1
-        fa = self.tile_yields[:, :, 5].gather(1, tc).double()  # GV-1a
+        sc = ty_oth[:, :, 3].gather(1, tc).double()
+        cu = ty_oth[:, :, 4].gather(1, tc).double()
+        go = ty_oth[:, :, 2].gather(1, tc).double()  # VP-G1
+        fa = ty_oth[:, :, 5].gather(1, tc).double()  # GV-1a
         sc_sel = sc.gather(1, top_idx) * take.double()
         cu_sel = cu.gather(1, top_idx) * take.double()
         go_sel = go.gather(1, top_idx) * take.double()  # VP-G1
