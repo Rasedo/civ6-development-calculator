@@ -423,6 +423,7 @@ class BatchSim:
 
         # --- rival civs (phase 4c) ---------------------------------------------
         rr = rules.rivals
+        n_gp = len(rr.get("gpClassDistrict", [])) or 5  # GP class count (7: Scientist..General; was truncated to 5)
         self.R = int(f0.get("rMax", 0))
         # C1-A3: seats. Civ 0 = the player ([B, C] tensors); civ r+1 = rival
         # index r. O becomes a real tensor axis per-subsystem in the C1-B
@@ -485,7 +486,7 @@ class BatchSim:
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
-        self.r_gpp = torch.zeros(B, r_pad, 5, dtype=torch.float64, device=device)
+        self.r_gpp = torch.zeros(B, r_pad, n_gp, dtype=torch.float64, device=device)
         self.rc_alive = torch.zeros(B, r_pad, rc_pad, dtype=torch.bool, device=device)
         self.rc_center = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -505,7 +506,7 @@ class BatchSim:
         # per-slot build charges — inert until B5b spawns the first builder.
         self.rvciv_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.v_charges = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.gp_earned = torch.zeros(B, 5, dtype=torch.long, device=device)
+        self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -540,9 +541,9 @@ class BatchSim:
         # classes (0-4) matter; the player's reachable ones are Scientist(0),
         # Merchant(2), Prophet(3) — the rest have unplaceable districts.
         gp_cd = rr.get("gpClassDistrict", [])
-        self._gp_class_district = torch.tensor(gp_cd[:5] if gp_cd else [-1] * 5, dtype=torch.long, device=device)  # [5]
+        self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)  # [n_gp] all 7 classes
         gp_fx = rr.get("gpEffects", [])
-        self._gp_effects = torch.tensor(gp_fx[:5] if gp_fx else [[[0, 0, 0, 0]] * 4] * 5, dtype=dtype, device=device)  # [5, maxN, 4]
+        self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 4]
         self._gp_nc = int(self._gp_class_district.numel())
         self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [3, 1.5, 0, -1.5, -3]), dtype=dtype, device=device)
@@ -4138,7 +4139,7 @@ class BatchSim:
                 self._rival_builder_actions(r, active & ~self.controlled[:, r], techs0=r_techs0, civics0=r_civics0)
 
             # Great-people race (no draws): accrue, claim from the shared pool.
-            for cls in range(5):
+            for cls in range(self._gp_nc):  # all GP classes (incl Admiral/General)
                 # C1-B4c: real accrual — 1 + (that district's buildings) per
                 # city owning a COMPLETED district of the class (was
                 # cities × gppRate; rivals accrue 0 until their first
