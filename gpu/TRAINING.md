@@ -234,6 +234,19 @@ economies (envoys, purchases — gold/influence engine rounds), spawn
 asymmetries in the O4 worlds, and the seat-0 residual; the next
 parity slices are the recorded path.
 
+**The economy dividend, first read (ffa-4, VP-G1+G2 live, 50
+updates): NEGATIVE — spread 52.9 -> 65.1.** Two named mechanisms, both
+transients rather than verdicts: (1) fifty updates of purchase
+experience means rival seats MISUSE the verb (4x-cost buys are a trap
+until timed; seats 1-2 means dropped while seat 0 feasted on wasted
+gold — the war-arc lesson again: new verbs are first noise or worse);
+(2) the piKL anchor is ffa-1, a VERB-LESS net — the KL penalty drags
+purchase adoption toward zero for every seat. The corrected
+experiment, recorded: re-anchor on ffa-3 (or drop the anchor), train
+2-3x longer, re-read. Verb parity remains structurally right (the
+chop dividend proved it); the economy's dividend needs its
+curriculum time.
+
 **The war-head rung (c3a-8-war)** — the six-head trainer resumed from
 c3a-4 with V-W1 live: the net USES the verb (wars seen 0.1 -> 1.0,
 essentially every game) and even hoards gold as peace-exit liquidity
