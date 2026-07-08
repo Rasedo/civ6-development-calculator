@@ -602,7 +602,10 @@ function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks
     if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
     if (def.exclusiveWith?.some((x) => have.has(x))) continue;
     if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
-    if (!best || def.cost < best.cost) best = def;
+    // Cheapest wins; ties break by id (ascending) to match the GPU's exported
+    // building order (sorted cost, then id) — NOT catalog/source order, which
+    // silently diverged (e.g. MARKET vs TEMPLE, both cost 120: id 'MARKET' wins).
+    if (!best || def.cost < best.cost || (def.cost === best.cost && def.id < best.id)) best = def;
   }
   if (!best) return false;
   rc.queue.push({ kind: 'building', building: best.id, progress: 0 });
