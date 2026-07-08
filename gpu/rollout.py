@@ -34,6 +34,7 @@ HEAD_PROD, HEAD_TECH, HEAD_CIVIC, HEAD_UNIT, HEAD_ENVOY = 101, 202, 303, 404, 50
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--replicas", type=int, default=3, help="random games per fixture")
+    ap.add_argument("--log", type=int, default=None, help="rng of ONE game -> gpu/fixtures/gpu_statelog.txt")
     ap.add_argument("--turns", type=int, default=100)
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--out", default=str(FIXTURES / "rollout.json"))
@@ -47,6 +48,8 @@ def main() -> None:
         raise SystemExit(1)
     fixtures = [load_fixture(p) for p in paths for _ in range(args.replicas)]
 
+    from statelog import gpu_state_lines
+    _logl = []
     sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
     B, C = sim.B, sim.C
     game_seed = torch.tensor([args.seed * 1_000_003 + i for i in range(B)], dtype=torch.int64)
@@ -100,6 +103,10 @@ def main() -> None:
                 games[b]["actions"].append(entry)
         sim.step(production=pa, tech=ta, civic=ca, units=ua, envoy=ea)
         rows = sim.trace_row()
+        if args.log is not None:
+            for _b in range(B):
+                if games[_b]["rng"] == args.log:
+                    _logl.extend(gpu_state_lines(sim, _b))
         for b in range(B):
             games[b]["trace"].append([float(x) for x in rows[b]])
 
@@ -129,6 +136,9 @@ def main() -> None:
     score = sim.empire_score()
     cities = sim.alive.sum(dim=1)
     print(f"{B} random games × {args.turns} turns → {args.out}")
+    if args.log is not None:
+        open("gpu/fixtures/gpu_statelog.txt", "w", encoding="utf-8", newline="").write(chr(10).join(_logl) + chr(10))
+        print("state log", len(_logl), "lines -> gpu/fixtures/gpu_statelog.txt")
     print(
         f"final: score {score.min():.1f}/{score.mean():.1f}/{score.max():.1f} (min/mean/max), "
         f"cities {int(cities.min())}–{int(cities.max())}, settlers banked {int(sim.settlers.max())} max"

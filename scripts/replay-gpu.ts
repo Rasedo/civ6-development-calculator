@@ -17,7 +17,7 @@
  * flips to a rival.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   createGame,
   endTurn,
@@ -39,6 +39,10 @@ import { neighborTile } from '../src/core/hex';
 import { traceRow, rowTolerance } from './gpu-trace';
 import { UNITS } from '../src/data/units';
 import type { DistrictId } from '../src/core/types';
+import { tsStateLines } from './statelog';
+
+const LOG_RNG = process.env.CIV6_LOG ? Number(process.env.CIV6_LOG) : null;
+const logLines: string[] = [];
 
 const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
@@ -266,6 +270,7 @@ for (const game of roll.games) {
     if (bad) break;
 
     endTurn(state);
+    if (LOG_RNG !== null && game.rng === LOG_RNG) logLines.push(...tsStateLines(state, roll.unitIds));
     for (const c of state.cities) {
       if (!cityIds.includes(c.id)) cityIds.push(c.id);
     }
@@ -291,6 +296,11 @@ for (const game of roll.games) {
     console.log('(stopping after 12 failures)');
     break;
   }
+}
+
+if (LOG_RNG !== null) {
+  writeFileSync('gpu/fixtures/ts_statelog.txt', logLines.join('\n') + '\n');
+  console.log(`state log ${logLines.length} lines -> gpu/fixtures/ts_statelog.txt`);
 }
 
 if (failures === 0) {
