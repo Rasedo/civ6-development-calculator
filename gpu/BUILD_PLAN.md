@@ -1121,7 +1121,13 @@ Ordered by how much each system changes what "best champion" MEANS:
         Score PEAKS ~t200 (207) then DECLINES to 195@t300; d/turn goes
         1.47→0.07→-0.20. Player cities CONTRACT 3.7→2.2 while RIVAL cities
         SCALE 8.5→13.5 — the scripted player is out-expanded and run over.
-        NOT barbs (steady ~6). Trees have DEPTH (23.9/32 techs, 5 still
+        NOT barbs (steady ~6). MECHANISM (gpu/cityloss_probe.py): the loss
+        is LOYALTY, not conquest — 74% of city losses happen AT PEACE
+        (26 peace vs 9 war), i.e. rivals' loyalty pressure scales with
+        their empire and flips the player's border cities. A competent
+        player may need to play TALL (fewer, bigger, high-loyalty cities)
+        — a hypothesis the diagnostic net tests. Trees have DEPTH (23.9/32
+        techs, 5 still
         pickable @t300) — research STARVES as the empire shrinks, doesn't
         deplete. Housing ceilings pop ~17. Gold balloons unspent 243→782
         (scripted has no purchase; a net fixes that).
