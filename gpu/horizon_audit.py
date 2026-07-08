@@ -29,6 +29,7 @@ def main() -> None:
     ap.add_argument("--seeds", type=int, default=12)
     ap.add_argument("--every", type=int, default=50)
     ap.add_argument("--pool", type=int, default=640, help="AUDIT ONLY: bump the append-only unit pools past their 96 cap so the run survives to --turns (the cap itself is G-S cliff #1)")
+    ap.add_argument("--policy", default=None, help="drive the PLAYER with this checkpoint (greedy) instead of the scripted autopilot — the cheap 'competent player' diagnostic: does a strong player sustain the late game or collapse like the autopilot?")
     args = ap.parse_args()
 
     _eng.U_MAX = args.pool  # sized at construction; the committed cap stays 96
@@ -36,7 +37,27 @@ def main() -> None:
 
     rules = load_rules()
     pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))[: args.seeds]]
-    sim = BatchSim(pool, rules, device="cpu", dtype=torch.float64)
+
+    net = env = None
+    if args.policy:
+        from civ6gpu import BatchEnv
+        from train_ppo import Policy, sample_heads, load_compat
+        env = BatchEnv(pool, rules, device="cpu", dtype=torch.float64, horizon=args.turns)
+        sim = env.sim
+        ck = torch.load(args.policy, map_location="cpu")
+        m0 = env.masks()
+        dims = ck.get("dims") or {
+            "C": m0["production"].shape[1], "AP": m0["production"].shape[2],
+            "NT": m0["tech"].shape[1], "NC": m0["civic"].shape[1],
+            "S": m0["envoy"].shape[1], "W": m0.get("war", torch.zeros(1, 0)).shape[1],
+        }
+        net = Policy(env.obs_size, dims, hidden=ck.get("hidden", 256))
+        load_compat(net, ck["model"])
+        net.eval()
+        print(f"PLAYER = {args.policy} (greedy); rivals scripted\n")
+    else:
+        sim = BatchSim(pool, rules, device="cpu", dtype=torch.float64)
+        print("PLAYER = scripted autopilot\n")
     B = sim.B
     NT = int(sim.techs.shape[1])
     NC = int(sim.civics.shape[1])
@@ -74,7 +95,13 @@ def main() -> None:
         prev_score, prev_turn = score, t
 
     for t in range(1, args.turns + 1):
-        sim.step()
+        if net is not None:
+            with torch.no_grad():
+                out = net(env.observe().float(), env.unit_features().float())
+                acts, _, _ = sample_heads(out, env.masks(), greedy=True)
+            env.step(**acts)
+        else:
+            sim.step()
         if t % args.every == 0:
             snap(t)
 

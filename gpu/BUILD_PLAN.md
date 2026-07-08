@@ -1131,11 +1131,24 @@ Ordered by how much each system changes what "best champion" MEANS:
         pickable @t300) — research STARVES as the empire shrinks, doesn't
         deplete. Housing ceilings pop ~17. Gold balloons unspent 243→782
         (scripted has no purchase; a net fixes that).
-      * IMPLICATION: a 300-turn champion race is not "raise the cap + add
-        victories" — we have NO evidence a competent PLAYER can sustain a
-        competitive late game (no net has trained past t100). The cheap
-        high-value diagnostic AFTER the pool fix: train one horizon-300 net,
-        see if a real player scales or the engine structurally caps it.
+      * **DIAGNOSTIC DONE (horizon_audit --policy c3a-10, greedy, OOD past
+        t100): a COMPETENT PLAYER SUSTAINS.** Score plateaus ~285 from
+        t200-300 (vs scripted's decline to 195); pop KEEPS GROWING to 25.4
+        (vs scripted stall ~17); cities hold 3.0 (vs 2.2). The net plays
+        TALL (25 pop / 3 cities — hypothesis confirmed). So "no second
+        half" was AUTOPILOT WEAKNESS, not a structural cap — the horizon
+        extension is VIABLE, and this ANSWERED IT WITHOUT a training run.
+      * BUT two real late-game gaps remain: (a) score goes FLAT past t200
+        (the net maxes its tall cities + tech and has nothing to push
+        higher → this is precisely what VICTORY CONDITIONS + late content
+        provide); (b) treasury runs deeply NEGATIVE (−1491 @t300 — the net
+        over-purchases, no BANKRUPTCY mechanic exists; a G-D/G-V fidelity
+        bug to fix). Loyalty still soft-caps the player at ~3 cities.
+      * REVISED IMPLICATION: G-V is closer to the CHEAP path — add victory
+        conditions + late-game objective, fix bankruptcy — than to "the
+        late game is structurally broken." A horizon-300 TRAINED net (vs
+        this OOD greedy one) is now OPTIONAL/later — it would raise the
+        ~285 floor, not answer a blocking question.
       Remaining G-V slices (re-scoped): (ii) game-end semantics (per-game
       'done' + winner, traced); (iii) DOMINATION victory (capture exists —
       needs capital flags + all-capitals-lost); (iv) SCORE victory at the
