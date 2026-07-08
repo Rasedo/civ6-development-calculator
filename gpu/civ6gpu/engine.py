@@ -1934,7 +1934,7 @@ class BatchSim:
             farmable = self.farm_flat.gather(1, tc) | (self.farm_hill.gather(1, tc) & civ_done)
             build_f = (here_ok & farmable).unsqueeze(2)
             build_m = (here_ok & self.mine_ok.gather(1, tc) & mining).unsqueeze(2)
-            build_l = (here_ok & self.lumber_ok.gather(1, tc) & constr).unsqueeze(2)
+            build_l = (here_ok & self.lumber_ok.gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)  # GS: chopped woods -> no lumber mill
         else:
             zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = zc
@@ -2011,7 +2011,7 @@ class BatchSim:
             farmable = self.farm_flat.gather(1, tc) | (self.farm_hill.gather(1, tc) & hf)
             build_f = (here_ok & farmable).unsqueeze(2)
             build_m = (here_ok & self.mine_ok.gather(1, tc) & mining).unsqueeze(2)
-            build_l = (here_ok & self.lumber_ok.gather(1, tc) & constr).unsqueeze(2)
+            build_l = (here_ok & self.lumber_ok.gather(1, tc) & ~self.feat_stripped.gather(1, tc) & constr).unsqueeze(2)  # GS: chopped woods -> no lumber mill
         else:
             zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = zc
@@ -2156,7 +2156,7 @@ class BatchSim:
                 )
                 farm_ok = base_ok & (a == 13) & (self.farm_flat.gather(1, tc.unsqueeze(1)).squeeze(1) | (self.farm_hill.gather(1, tc.unsqueeze(1)).squeeze(1) & hf))
                 mine_ok2 = base_ok & (a == 14) & self.mine_ok.gather(1, tc.unsqueeze(1)).squeeze(1) & mining & (self.MINE >= 0)
-                lum_ok = base_ok & (a == 15) & self.lumber_ok.gather(1, tc.unsqueeze(1)).squeeze(1) & constr & (self.LUMBER >= 0)
+                lum_ok = base_ok & (a == 15) & self.lumber_ok.gather(1, tc.unsqueeze(1)).squeeze(1) & ~self.feat_stripped.gather(1, tc.unsqueeze(1)).squeeze(1) & constr & (self.LUMBER >= 0)  # GS: chopped woods
                 did = torch.zeros(B, dtype=torch.bool, device=dev)
                 for code, okm in ((13, farm_ok), (14, mine_ok2), (15, lum_ok)):
                     if bool(okm.any()):
