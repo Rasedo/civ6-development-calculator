@@ -11,7 +11,7 @@ import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
-import { defaultModifiers, modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
+import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -749,7 +749,12 @@ export function rivalCityYields(
   // the old flat 3🍞/2⚙ base. The nTechs production multiplier remains
   // the research→production stand-in until C1-B5's real improvements.
   const center = state.map.tiles[rc.centerIndex];
-  const ctx = { map: state.map, mods: defaultModifiers() };
+  // A rival applies its OWN research boosts to its own tiles, exactly like the
+  // player (Civ 6): improvement yields (mine +production), farm-adjacency, hill
+  // farms — all from the rival's own techs/civics. NOT the player's boosts
+  // (that's what defaultModifiers guarded against); modifiersFromResearch is
+  // research-only (no government/religion/CS machinery).
+  const ctx = { map: state.map, mods: modifiersFromResearch(rival.research) };
   const worked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
       (t) =>

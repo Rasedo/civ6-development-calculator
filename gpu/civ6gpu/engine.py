@@ -1337,28 +1337,38 @@ class BatchSim:
             self.player_gp_points = self.player_gp_points - cost * cf
             self.gp_earned[:, :nCls] = earned + can.long()
 
-    def _farmadj_food(self) -> torch.Tensor:
-        """[B, T] the PLAYER'S farm-adjacency food bonus (yields.ts:60):
-        farmAdjTier per non-pillaged FARM with >=2 neighboring FARM tiles.
-        Player-only — rivals use defaultModifiers (farmAdjTier=0), so this
-        stays OUT of the shared _eff_food that _rival_city_yields reads.
-        Gated on the player's Feudalism civic + Replaceable Parts tech."""
-        z = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
-        if not self.improvements_on:
-            return z
-        tier = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if self._farmadj_civic >= 0:
-            tier = tier + self.civics[:, self._farmadj_civic].long()
-        if self._farmadj_tech >= 0:
-            tier = tier + self.techs[:, self._farmadj_tech].long()
-        if not bool((tier > 0).any()):
-            return z
+    def _farmadj_qual(self) -> torch.Tensor:
+        """[B, T] bool: a non-pillaged FARM with >=2 neighboring FARM tiles
+        (yields.ts:60). Tile-based and CIV-INDEPENDENT — the per-civ tier
+        (Feudalism + Replaceable Parts) multiplies it, so the player and each
+        rival reuse this same qualifying set."""
         nb = self.neigh
         nbc = nb.clamp(min=0)
         farm_imp = self.improvement == self.FARM  # pillaged neighbors still count
         adj = farm_imp[:, nbc] & (nb >= 0).unsqueeze(0)  # [B, T, 6]
-        qual = (self.improvement == self.FARM) & ~self.pillaged & (adj.sum(dim=2) >= 2)
-        return qual.to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+        return (self.improvement == self.FARM) & ~self.pillaged & (adj.sum(dim=2) >= 2)
+
+    def _farmadj_tier(self, civics: torch.Tensor, techs: torch.Tensor) -> torch.Tensor:
+        """[B] a civ's farm-adjacency tier from ITS OWN civics/techs (Feudalism
+        +1, Replaceable Parts +1). civics/techs are [B, n] for that civ."""
+        tier = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if self._farmadj_civic >= 0:
+            tier = tier + civics[:, self._farmadj_civic].long()
+        if self._farmadj_tech >= 0:
+            tier = tier + techs[:, self._farmadj_tech].long()
+        return tier
+
+    def _farmadj_food(self) -> torch.Tensor:
+        """[B, T] the PLAYER'S farm-adjacency food bonus = qual * player tier.
+        Each rival adds its OWN via _farmadj_qual*_farmadj_tier in
+        _rival_city_yields (every civ applies its own research boosts, Civ 6)."""
+        z = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+        if not self.improvements_on:
+            return z
+        tier = self._farmadj_tier(self.civics, self.techs)
+        if not bool((tier > 0).any()):
+            return z
+        return self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
 
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
@@ -3287,6 +3297,12 @@ class BatchSim:
             & ~districted
         )
         f_plane = self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]
+        # the rival applies its OWN farm-adjacency (its Feudalism/Replaceable Parts),
+        # exactly like the player — NOT the player's (that stays in _farmadj_food).
+        if self.improvements_on:
+            tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r])
+            if bool((tier_r > 0).any()):
+                f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier_r.unsqueeze(1).to(self.dtype)
         p_plane = self._neutral_prod()
         f = f_plane.gather(1, tc).double()
         p = p_plane.gather(1, tc).double()
