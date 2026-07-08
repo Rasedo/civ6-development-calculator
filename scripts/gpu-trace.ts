@@ -123,9 +123,13 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  // Must match traceRow's column order EXACTLY. HEAD is 22: the 18 base cols
+  // + GV leader/gameOver/winner/victoryType (all integer). Each rival is 14:
+  // the 12 base + treasury/rGScore (both float ×1000, tol 2). A stale tol
+  // silently shifts every later column's tolerance — keep them in lockstep.
+  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2);
   return tol;
 }
