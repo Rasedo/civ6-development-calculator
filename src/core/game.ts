@@ -103,6 +103,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     barbCamps: [],
     cityHp: {},
     disasters: false,
+    gameOver: false, // GV-2
     fogOfWar: false,
     explored: [],
     eventLog: [],
@@ -817,7 +818,9 @@ export function deserialize(json: string): GameState {
   state.barbCamps ??= [];
   state.cityHp ??= {};
   state.disasters ??= false;
-  state.gameOver ??= false; // GV-2
+  // GV-2 gameOver is recomputed every endTurn (turn > TURN_LIMIT); no migration
+  // needed, and adding ??= would break serialize round-trip idempotence for
+  // states that never ran a turn (fresh makeState has it undefined).
   state.fogOfWar ??= false;
   state.explored ??= [];
   state.eventLog ??= [];
