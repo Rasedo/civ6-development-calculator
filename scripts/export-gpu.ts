@@ -764,6 +764,25 @@ for (let s = 0; s < N_SEEDS; s++) {
         !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) && t.feature === 'WOODS'
           ? 1
           : 0,
+      // post-CHOP variants (feature treated as removed): _strip_feature_at
+      // switches farm/mine to these so a chopped WOODS/RAINFOREST tile becomes
+      // farm/mine-able (TS validImprovementsIn gates on the LIVE feature).
+      fa_f_c:
+        !t.district && !t.wonder && !isImpassable(t) &&
+        (t.resource
+          ? RESOURCES[t.resource]?.improvement === 'FARM'
+          : !isWater(t) && (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'FLAT')
+          ? 1 : 0,
+      fa_h_c:
+        !t.resource && !t.district && !t.wonder && !isImpassable(t) && !isWater(t) &&
+        (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation === 'HILLS'
+          ? 1 : 0,
+      mi_c:
+        !t.district && !t.wonder && !isImpassable(t) &&
+        (t.resource
+          ? RESOURCES[t.resource]?.improvement === 'MINE'
+          : !isWater(t) && t.elevation === 'HILLS')
+          ? 1 : 0,
       // disaster statics: floodplain, drought-candidate (flat grass/plains),
       // desert, fertilizable (land, not mountain)
       fp: t.feature === 'FLOODPLAINS' ? 1 : 0,

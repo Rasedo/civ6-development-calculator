@@ -594,6 +594,9 @@ class BatchSim:
         self.farm_hill = torch.tensor([[t.get("fa_h", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.mine_ok = torch.tensor([[t.get("mi", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.lumber_ok = torch.tensor([[t.get("lu", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self._fa_f_c = torch.tensor([[t.get("fa_f_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self._fa_h_c = torch.tensor([[t.get("fa_h_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self._mi_c = torch.tensor([[t.get("mi_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
@@ -2362,6 +2365,18 @@ class BatchSim:
         tile-grab loop — keep the two twins in sync)."""
         self.feat_stripped[rows, tiles] = True
         self.tdef[rows, tiles] = self.hills[rows, tiles].long() * 3  # GS: chopped feature no longer defends (terrainDefense reads live; mirror the founding strip)
+        # TS builderRemoveFeature: chopping WOODS removes a LUMBER_MILL (it requires
+        # woods, Civ 6) — else a stale mill keeps +production on a now-bare tile.
+        if self.LUMBER >= 0:
+            lm = self.improvement[rows, tiles] == self.LUMBER
+            if bool(lm.any()):
+                self.improvement[rows[lm], tiles[lm]] = -1
+            self.lumber_ok[rows, tiles] = False  # no WOODS -> no LUMBER_MILL buildable (TS gates on live tile.feature==='WOODS')
+        # chopping the feature ENABLES farm/mine on the now-bare terrain (TS's
+        # live gate) — switch the static masks to their post-chop variants.
+        self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]
+        self.farm_hill[rows, tiles] = self._fa_h_c[rows, tiles]
+        self.mine_ok[rows, tiles] = self._mi_c[rows, tiles]
         contrib = self._feat_adj[rows, tiles]
         nb = self.neigh[tiles]
         for d in range(6):
