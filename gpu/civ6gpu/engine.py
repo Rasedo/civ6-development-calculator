@@ -2632,9 +2632,11 @@ class BatchSim:
         cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
         city_max_hp = int(cb.get("cityMaxHp", 200))
 
-        # New camp? One draw whenever below the cap (cities always exist);
-        # a second draw picks the spot only if any candidate exists.
-        can_roll = self.n_camps < self.max_camps
+        # New camp? One draw whenever below the cap AND the player still holds a
+        # city — TS short-circuits on `state.cities.length > 0` (combat.ts), so a
+        # collapsed player (0 cities, reachable off-script) skips the roll entirely.
+        # A second draw picks the spot only if any candidate exists.
+        can_roll = self.alive.any(dim=1) & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
         if bool(want.any()):
