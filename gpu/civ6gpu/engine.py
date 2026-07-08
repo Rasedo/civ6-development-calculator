@@ -2342,6 +2342,7 @@ class BatchSim:
         (the founding strip does the same inline, entangled with its
         tile-grab loop — keep the two twins in sync)."""
         self.feat_stripped[rows, tiles] = True
+        self.tdef[rows, tiles] = self.hills[rows, tiles].long() * 3  # GS: chopped feature no longer defends (terrainDefense reads live; mirror the founding strip)
         contrib = self._feat_adj[rows, tiles]
         nb = self.neigh[tiles]
         for d in range(6):

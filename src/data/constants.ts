@@ -33,7 +33,7 @@ export const TILE_PURCHASE_GOLD_PER_CULTURE = 4;
  * research costs scale by this so the whole game accelerates uniformly
  * (~1/0.6 = 1.67x faster), pulling the plateau earlier. Purchases (x4 the
  * production cost) inherit it automatically. */
-export const GAME_SPEED = 1.0;
+export const GAME_SPEED = 0.6;
 
 export const GOLD_PURCHASE_MULT = 4;
 /** Faith price of buying a worship building = production cost × this. */
