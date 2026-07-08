@@ -2616,7 +2616,7 @@ class BatchSim:
         are candidates; no refund. Inert at the gate (play stays gold-positive
         by t100), so the gates never exercise it — domination_test-style poke +
         the TS vitest pin the semantics."""
-        insolvent = self.treasury < 0  # [B]
+        insolvent = js_round(self.treasury * 1000) < 0  # [B] GS: test at milli precision so sub-milli non-dyadic gold drift (0.05-unit sums) can't spuriously trip the < 0 boundary vs TS
         if not bool(insolvent.any()):
             return
         P = self.p_alive.shape[1]

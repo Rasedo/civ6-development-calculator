@@ -738,7 +738,9 @@ export function endTurn(state: GameState): void {
     // rule) — the priciest player unit, tie -> lowest id (= oldest spawn; a
     // deterministic order the GPU shares slot-for-slot, both append-only). No
     // refund; the eased upkeep pulls the treasury back over the next turns.
-    if (state.treasury < 0) {
+    if (Math.round(state.treasury * 1000) < 0) {
+      // GS: test at milli precision — the treasury accumulates non-dyadic 0.05-unit
+      // gold, so a sub-milli float drift must not spuriously trip < 0 vs the GPU.
       let victim: Unit | undefined;
       for (const u of state.units) {
         if (u.owner !== 'player') continue;
