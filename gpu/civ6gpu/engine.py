@@ -4919,6 +4919,12 @@ class BatchSim:
     # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 
     def trace_row(self) -> torch.Tensor:
+        # perf: each civ's empire score is needed by BOTH leader() (GV-1) and
+        # its own trace column — compute once and reuse (was a 2-3x recompute
+        # of rival_empire_score/_rival_city_yields per turn, the trace hotspot).
+        e_score = self.empire_score()
+        r_scores = [self.rival_empire_score(r) for r in range(self.R)]
+        leader_id = torch.stack([e_score] + r_scores, dim=1).argmax(dim=1)
         cols = [
             torch.full((self.B,), float(self.turn), dtype=self.dtype, device=self.device),
             self.techs.sum(dim=1).to(self.dtype),
@@ -4928,7 +4934,7 @@ class BatchSim:
             js_round(self.treasury * 1000),
             js_round(self.science_total * 1000),
             js_round(self.culture_total * 1000),
-            js_round(self.empire_score() * 1000),
+            js_round(e_score * 1000),
             self.rng_state.to(self.dtype),
             self.n_camps.to(self.dtype),
             self.u_alive.sum(dim=1).to(self.dtype),
@@ -4938,7 +4944,7 @@ class BatchSim:
             self.fertility.sum(dim=1).to(self.dtype),
             (self.drought > 0).sum(dim=1).to(self.dtype),
             (self.improvement >= 0).sum(dim=1).to(self.dtype),
-            self.leader().to(self.dtype),  # GV-1
+            leader_id.to(self.dtype),  # GV-1
             self.game_over.to(self.dtype),  # GV-2
             self.winner.to(self.dtype),  # GV-2/GV-3 winner
             self.victory_type.to(self.dtype),  # GV-4/GV-3 victoryType
@@ -4973,7 +4979,7 @@ class BatchSim:
                 ),
                 torch.where(live, self.rc_bldg[:, r].sum(dim=(1, 2)).to(self.dtype), zero),
                 torch.where(live, js_round(self.r_treasury[:, r] * 1000).to(self.dtype), zero),  # VP-G1
-                torch.where(live, js_round(self.rival_empire_score(r) * 1000).to(self.dtype), zero),  # GV-1
+                torch.where(live, js_round(r_scores[r] * 1000).to(self.dtype), zero),  # GV-1
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):
