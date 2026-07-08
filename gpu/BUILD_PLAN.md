@@ -535,6 +535,32 @@ can only watch accumulate. Each verb lands as gated-off plumbing (mask width
 unchanged while off, so existing checkpoints stay loadable), then activates
 behind the off-script gate — the D5 pattern.
 
+### §4b. Rival-seat verb parity (the FFA ladder's structural prerequisite)
+Measured 2026-07: the seat decides O=4 FFAs (spread 66.3); rival chop alone
+recovered a fifth (52.9, 77b8a27). The remaining slices, TS-FIRST per the
+contract:
+
+- [ ] **VP-G1 Rival gold, inert**: TS RivalCiv.treasury (??= 0 migration),
+      accrued in the rival yields phase from the civ's worked gold yields
+      (reuse computeRivalCityYields' tile walk — add the gold column;
+      scripted rivals never SPEND, so behavior is inert-but-visible). Trace
+      column (treasury per civ) so the gates check it from turn one; GPU
+      r_treasury [B,R] mirrors the accrual in _rival_city_yields.
+      Fixture-regenerating (new save field + trace column); baselines
+      unaffected (player-side untouched).
+- [ ] **VP-G2 Rival purchases (controlled seats only)**: rival_masks'
+      production purchase columns (in the player layout, currently
+      False-padded) go real for controlled rivals — priced off r_treasury
+      at goldPurchaseMult, sequential slot walk like V-P1, executed in
+      apply_rival_actions. Scripted rivals keep never-spending (gates
+      untouched by construction); melee_eval re-read = the dividend.
+- [ ] **VP-E1 Rival envoys**: needs rival influence accrual + CS standing
+      per rival — the largest slice; design after VP-G2's dividend read.
+
+Ordering: VP-G1 is a /port-mechanic engine round (~half a session); VP-G2
+rides the C2 surface (mask + applier only). Expected combined dividend: the
+ladder's economy component; spawn asymmetry stays (world-gen, accepted).
+
 - [x] **V-P1** Gold purchases, plumbed + gated OFF: production head grows
       NB+1+NU purchase columns (buy building / settler / unit at
       goldPurchaseMult× cost, mirroring purchaseBuilding/purchaseSettler/
