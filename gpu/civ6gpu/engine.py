@@ -1750,7 +1750,15 @@ class BatchSim:
                 # completed districts of a type (dtype>=0) or any specialty
                 # (dtype<0). Only specialty districts live in self.district (>=0).
                 dtype = row.get("dtype", -1)
-                on = ((self.district >= 0) if dtype < 0 else (self.district == dtype)) & self.district_complete & (self.owner >= 0)  # player eurekas count PLAYER districts
+                if dtype < 0:
+                    # boosts.ts: with no check.type, only districts that COUNT
+                    # TOWARD THE LIMIT qualify (specialty) — aqueducts/neighborhoods
+                    # and other support districts are excluded. A specific dtype
+                    # counts regardless (matching check.type).
+                    dsel = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
+                else:
+                    dsel = self.district == dtype
+                on = dsel & self.district_complete & (self.owner >= 0)  # player eurekas count PLAYER districts
                 pred = on.sum(dim=1) >= row["count"]
             else:
                 continue
