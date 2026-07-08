@@ -1702,6 +1702,8 @@ class BatchSim:
                 pred = (self.alive & self.coastal).any(dim=1)
             elif kind == "cities":
                 pred = self.alive.sum(dim=1) >= row["count"]
+            elif kind == "greatPeople":
+                pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
             elif kind == "tech":
                 pred = self.techs[:, row["t"]]
             elif kind == "nearNaturalWonder":

@@ -209,6 +209,13 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     // districts) wait for D3, when more than one district type can exist.
     const dtype = c.type ? PLACEABLE_DISTRICTS.indexOf(c.type) : -1;
     row = { kind: 'district', dtype, count: c.count };
+  } else if (c.kind === 'greatPeople') {
+    // Great-person eurekas (EDUCATION: a Scientist; HUMANISM: an Artist;
+    // ENLIGHTENMENT: any 3). cls -1 = any class (sum); else the GP_CLASSES
+    // index, which is the GPU's gp_earned column (tracks the first 5 classes).
+    const cls = c.class ? GP_CLASSES.indexOf(c.class) : -1;
+    if (!c.class) row = { kind: 'greatPeople', cls: -1, count: c.count };
+    else if (cls >= 0 && cls < 5) row = { kind: 'greatPeople', cls, count: c.count };
   }
   if (row) boostRows.push({ target, idx, ...row });
 }
