@@ -6,9 +6,10 @@
  * automatically.
  */
 
-import type { GameState, Yields, YieldKey } from './types';
+import type { GameState, Yields, YieldKey, RivalCiv } from './types';
 import { serialize, deserialize, endTurn, queueDistrict, queueBuilding, queueWonder, queueSettler, cancelQueueItem } from './game';
 import { computeCityStats } from './city';
+import { rivalCityYields } from './rivals';
 import { compareCandidates, choiceLabel, scoreSettleSites, type BuildChoice } from './advisor';
 import type { Objective } from './planner';
 
@@ -61,6 +62,21 @@ export function empireScore(state: GameState, objective: Objective): number {
       }
     } else {
       score += stats.total[objective] + city.population; // pop tiebreak keeps expansion honest
+    }
+  }
+  return score;
+}
+
+/** GV-1: the CLEAN balanced empire score for a rival — the exact rival
+ * mirror of empireScore('balanced'), over rivalCityYields (all six yields
+ * incl. worked+building gold/faith). Used for the winner/leader. */
+export function rivalEmpireScore(state: GameState, rival: RivalCiv): number {
+  let score = 0;
+  for (const rc of rival.cities) {
+    score += rc.population * 3;
+    const y = rivalCityYields(state, rival, rc);
+    for (const [k, w] of Object.entries(BALANCED_WEIGHTS)) {
+      score += y[k as YieldKey] * (w ?? 0);
     }
   }
   return score;

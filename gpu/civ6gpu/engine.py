@@ -1496,11 +1496,38 @@ class BatchSim:
             mask = self.rc_alive[:, r, j]
             if not bool(mask.any()):
                 continue
-            f, pr, sc, cu, _g = self._rival_city_yields(r, j, mask)
+            f, pr, sc, cu, _g, _fa = self._rival_city_yields(r, j, mask)
             yt = yt + f * float(w[0]) + pr * float(w[1]) + sc * float(w[3]) + cu * float(w[4])
             bgf = self.rc_bldg[:, r, j].double() @ rd.b_yields.double()  # [B, 6]
             yt = yt + bgf[:, 2] * float(w[2]) + bgf[:, 5] * float(w[5])
         return pop_term + yt.to(self.dtype)
+
+    def rival_empire_score(self, r: int) -> torch.Tensor:
+        """GV-1: the CLEAN balanced empire score for rival r — the exact
+        rival mirror of empire_score('balanced') (Σcity pop*popWeight +
+        Σ_k yields[k]·balanced_weight over ALL SIX yields, worked+building
+        gold/faith via _rival_city_yields). NOT rival_score (the quirky
+        building-only reward helper). Used for the winner/leader."""
+        rd = self.rules_dev
+        w = rd.score_yield_weights
+        B = self.B
+        pop_term = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
+        yt = torch.zeros(B, dtype=torch.float64, device=self.device)
+        for j in range(self.RC):
+            mask = self.rc_alive[:, r, j]
+            if not bool(mask.any()):
+                continue
+            f, pr, sc, cu, go, fa = self._rival_city_yields(r, j, mask)
+            yt = yt + f * float(w[0]) + pr * float(w[1]) + go * float(w[2]) + sc * float(w[3]) + cu * float(w[4]) + fa * float(w[5])
+        return pop_term + yt.to(self.dtype)
+
+    def leader(self) -> torch.Tensor:
+        """GV-1: [B] the current score-leader as a unified civ id — 0 =
+        player, r+1 = rival r (civOfRival). Ties → lowest id (player first,
+        then lowest rival), matching TS's strict-> argmax. INERT: nothing
+        acts on it until GV-2."""
+        cols = [self.empire_score()] + [self.rival_empire_score(r) for r in range(self.R)]
+        return torch.stack(cols, dim=1).argmax(dim=1)
 
     # --- action masks (the macro-action surface) --------------------------------
 
@@ -3201,9 +3228,11 @@ class BatchSim:
         sc = self.tile_yields[:, :, 3].gather(1, tc).double()
         cu = self.tile_yields[:, :, 4].gather(1, tc).double()
         go = self.tile_yields[:, :, 2].gather(1, tc).double()  # VP-G1
+        fa = self.tile_yields[:, :, 5].gather(1, tc).double()  # GV-1a
         sc_sel = sc.gather(1, top_idx) * take.double()
         cu_sel = cu.gather(1, top_idx) * take.double()
         go_sel = go.gather(1, top_idx) * take.double()  # VP-G1
+        fa_sel = fa.gather(1, top_idx) * take.double()  # GV-1a
         # center: real floored yields (tileYieldsForCenter) — food after the
         # fertility/drought tail, production from the neutral plane
         sitec = center.clamp(min=0).unsqueeze(1)
@@ -3218,6 +3247,7 @@ class BatchSim:
         c_sc = self.tile_yields[:, :, 3].gather(1, sitec).squeeze(1).double() - fy_c[:, 3] * strip
         c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double() - fy_c[:, 4] * strip
         c_go = self.tile_yields[:, :, 2].gather(1, sitec).squeeze(1).double() - fy_c[:, 2] * strip  # VP-G1
+        c_fa = self.tile_yields[:, :, 5].gather(1, sitec).squeeze(1).double() - fy_c[:, 5] * strip  # GV-1a
         if self._dyadic_fp:
             # every term is an exact dyadic, so .sum() is bit-identical to
             # the TS reduce
@@ -3226,11 +3256,13 @@ class BatchSim:
             sci = c_sc + sc_sel.sum(dim=1)
             cul = c_cu + cu_sel.sum(dim=1)
             gold = c_go + go_sel.sum(dim=1)  # VP-G1
+            faith = c_fa + fa_sel.sum(dim=1)  # GV-1a
         else:
             food = cf.clone()
             prod = cp.clone()
             sci = c_sc.clone()
             gold = c_go.clone()  # VP-G1
+            faith = c_fa.clone()  # GV-1a
             cul = c_cu.clone()
             for m in range(kk):  # sequential adds mirror the TS loop's rounding
                 food = food + f_sel[:, m]
@@ -3270,6 +3302,8 @@ class BatchSim:
                         prod = prod + add
                     elif yc == 2:
                         gold = gold + add  # VP-G1: Harbor/Hub adjacency
+                    elif yc == 5:
+                        faith = faith + add  # GV-1a: Holy Site adjacency
         # C1-B4b-2: building yields under empty modifiers (the exported
         # catalog has no regional/SHIPYARD scope and worship never queues,
         # so the plain def.yields sum IS cityBuildingYields here).
@@ -3280,6 +3314,7 @@ class BatchSim:
                 food = food + add6[:, 0]
                 prod = prod + add6[:, 1]
                 gold = gold + add6[:, 2]  # VP-G1
+                faith = faith + add6[:, 5]  # GV-1a
                 sci = sci + add6[:, 3]
                 cul = cul + add6[:, 4]
         z = torch.zeros_like(food)
@@ -3289,6 +3324,7 @@ class BatchSim:
             torch.where(mask, sci, z),
             torch.where(mask, cul, z),
             torch.where(mask, gold, z),
+            torch.where(mask, faith, z),
         )
 
     def _expand_rival_border(self, r: int, j: int, due: torch.Tensor) -> None:
@@ -3872,7 +3908,7 @@ class BatchSim:
                 cact = active & alive0[:, j]
                 if not bool(cact.any()):
                     continue
-                food, prod, sci, cul, gold_y = self._rival_city_yields(r, j, cact)
+                food, prod, sci, cul, gold_y, _faith_y = self._rival_city_yields(r, j, cact)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
                 # C1-B3a: tile/center columns plus the citizens' contribution.
                 # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
@@ -4770,6 +4806,7 @@ class BatchSim:
             self.fertility.sum(dim=1).to(self.dtype),
             (self.drought > 0).sum(dim=1).to(self.dtype),
             (self.improvement >= 0).sum(dim=1).to(self.dtype),
+            self.leader().to(self.dtype),  # GV-1
         ]
         for s in range(self.S):
             cols += [
@@ -4801,6 +4838,7 @@ class BatchSim:
                 ),
                 torch.where(live, self.rc_bldg[:, r].sum(dim=(1, 2)).to(self.dtype), zero),
                 torch.where(live, js_round(self.r_treasury[:, r] * 1000).to(self.dtype), zero),  # VP-G1
+                torch.where(live, js_round(self.rival_empire_score(r) * 1000).to(self.dtype), zero),  # GV-1
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

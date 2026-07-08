@@ -20,13 +20,20 @@
  * the number or order of draws fails the very next row.
  */
 
-import { empireScore } from '../src/core/empirePlanner';
+import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { getCityHp } from '../src/core/combat';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import type { GameState } from '../src/core/types';
 
 export function traceRow(state: GameState, cityIds: number[], cMax: number, csMax: number, rMax: number): number[] {
+  // GV-1: current score-leader as a unified civ id (0 player, r+1 rival); ties -> lowest id
+  let leader = 0;
+  let leaderBest = empireScore(state, 'balanced');
+  for (const rv of state.rivals) {
+    const rs = rivalEmpireScore(state, rv);
+    if (rs > leaderBest) { leaderBest = rs; leader = rv.id + 1; }
+  }
   const row = [
     state.turn,
     state.research.techs.length,
@@ -46,6 +53,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.map.tiles.reduce((n, t) => n + t.fertility, 0),
     state.map.tiles.reduce((n, t) => n + (t.droughtTurns > 0 ? 1 : 0), 0),
     state.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0),
+    leader, // GV-1
   ];
   for (let s = 0; s < csMax; s++) {
     const cs = state.cityStates[s];
@@ -59,7 +67,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       continue;
     }
     row.push(
@@ -85,6 +93,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       rival.cities.reduce((s2, rc) => s2 + rc.districts.filter((d) => d.type !== 'CITY_CENTER' && state.map.tiles[d.tileIndex].districtComplete).length, 0),
       rival.cities.reduce((s2, rc) => s2 + rc.buildings.length, 0),
       Math.round((rival.treasury ?? 0) * 1000), // VP-G1
+      Math.round(rivalEmpireScore(state, rival) * 1000), // GV-1
     );
   }
   for (let c = 0; c < cMax; c++) {
