@@ -4,6 +4,8 @@
  * base Civ 6.
  */
 
+import { GAME_SPEED } from './constants';
+
 export interface UnitDef {
   id: string;
   name: string;
@@ -23,7 +25,7 @@ export interface UnitDef {
   description: string;
 }
 
-const U = (def: UnitDef) => def;
+const U = (def: UnitDef): UnitDef => ({ ...def, cost: Math.round(def.cost * GAME_SPEED) });
 
 export const UNITS: Record<string, UnitDef> = Object.fromEntries(
   [

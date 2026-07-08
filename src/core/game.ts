@@ -36,7 +36,7 @@ import { tileClaimed, civOfRival } from './civs';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
-export const TURN_LIMIT = 100;
+export const TURN_LIMIT = 250;
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {

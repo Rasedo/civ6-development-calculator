@@ -6,6 +6,7 @@
  */
 
 import type { DistrictId, Yields } from '../core/types';
+import { GAME_SPEED } from './constants';
 
 export interface BuildingDef {
   id: string;
@@ -32,7 +33,7 @@ export interface BuildingDef {
   worship?: boolean;
 }
 
-const list: BuildingDef[] = [
+const rawList: BuildingDef[] = [
   // --- City Center ---------------------------------------------------------
   { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 1, autoCapital: true },
   { id: 'MONUMENT', name: 'Monument', district: 'CITY_CENTER', cost: 60, yields: { culture: 2 } },
@@ -86,6 +87,8 @@ const list: BuildingDef[] = [
   { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 290, requiresAny: ['ARENA'], amenities: 1, regional: true },
   { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 580, requiresAny: ['ZOO'], amenities: 2, regional: true }, // amenity amount approximate
 ];
+
+const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));
 
 export const BUILDINGS: Record<string, BuildingDef> = Object.fromEntries(list.map((b) => [b.id, b]));
 

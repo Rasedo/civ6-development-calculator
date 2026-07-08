@@ -192,7 +192,7 @@ def load_fixture(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
-RESEARCH_LOOPS = 4
+RESEARCH_LOOPS = 40  # > tree size: complete all ready techs/civics per turn (TS uses an unbounded while); early-exit keeps it free
 U_MAX = 256  # barbarian/rival unit slots per game (append-only; runtime-asserted).
              # Raised 96→256 for horizon-300 (G-S cliff #1): barbs high-water
              # ~160 ever-spawned by t300, rivals ~55. Behavior-preserving at the
@@ -580,6 +580,8 @@ class BatchSim:
         self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
         self._builder_idx = int(imp.get("builderIdx", -1))
         self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
+        self._farmadj_civic = int(imp.get("farmAdjCivic", -1))  # GS: Feudalism farm-adjacency +1 food
+        self._farmadj_tech = int(imp.get("farmAdjTech", -1))    # GS: Replaceable Parts +1 more
         self._mine_unlock_tech = int(imp.get("mineUnlockTech", -1))       # MINING
         self._lumber_unlock_tech = int(imp.get("lumberUnlockTech", -1))   # CONSTRUCTION
         # techs that permanently lift a MINE's yield (Apprenticeship, Industrialization → +1⚙ each)
@@ -915,7 +917,7 @@ class BatchSim:
         return ~done & ~missing
 
     def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor) -> torch.Tensor:
-        return torch.where(boosted, torch.round(cost * (1 - self.rules.boost_fraction)), cost)
+        return torch.where(boosted, js_round(cost * (1 - self.rules.boost_fraction)), cost)  # Math.round is half-up
 
     def _auto_pick(self, cur, done, boosted, cost, prereq):
         """Cheapest-available (effective cost, tie = table order), where cur == -1."""
@@ -1331,6 +1333,29 @@ class BatchSim:
             self.player_gp_points = self.player_gp_points - cost * cf
             self.gp_earned[:, :nCls] = earned + can.long()
 
+    def _farmadj_food(self) -> torch.Tensor:
+        """[B, T] the PLAYER'S farm-adjacency food bonus (yields.ts:60):
+        farmAdjTier per non-pillaged FARM with >=2 neighboring FARM tiles.
+        Player-only — rivals use defaultModifiers (farmAdjTier=0), so this
+        stays OUT of the shared _eff_food that _rival_city_yields reads.
+        Gated on the player's Feudalism civic + Replaceable Parts tech."""
+        z = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+        if not self.improvements_on:
+            return z
+        tier = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if self._farmadj_civic >= 0:
+            tier = tier + self.civics[:, self._farmadj_civic].long()
+        if self._farmadj_tech >= 0:
+            tier = tier + self.techs[:, self._farmadj_tech].long()
+        if not bool((tier > 0).any()):
+            return z
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        farm_imp = self.improvement == self.FARM  # pillaged neighbors still count
+        adj = farm_imp[:, nbc] & (nb >= 0).unsqueeze(0)  # [B, T, 6]
+        qual = (self.improvement == self.FARM) & ~self.pillaged & (adj.sum(dim=2) >= 2)
+        return qual.to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+
     def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
         (total [B, C, 6] alive-masked, housing [B, C], growth_f [B, C]).
@@ -1346,6 +1371,9 @@ class BatchSim:
             tile_score = self._score_cache[1]
         else:
             tile_score = (eff_y * rd.focus_base).sum(dim=2)  # [B, T]
+            # PLAYER farm-adjacency food also scores tiles for selection
+            # (TS assignWorkedTiles uses tileScore WITH the bonus).
+            tile_score = tile_score + self._farmadj_food() * float(rd.focus_base[0])
             self._score_cache = (self._eff_version, tile_score)
         tiles = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), self._off3, self.W, self.H).reshape(B, C, -1)
         M = tiles.shape[2]
@@ -1368,6 +1396,11 @@ class BatchSim:
         top_tile = tc.gather(2, top_idx)  # [B, C, k] global tile ids
         ty = eff_y.unsqueeze(1).expand(B, C, T, 6).gather(2, top_tile.unsqueeze(-1).expand(B, C, k, 6))
         worked_y = (ty * take.unsqueeze(-1).to(self.dtype)).sum(dim=2)  # [B, C, 6]
+        # PLAYER-only farm-adjacency food, summed over the worked FARM tiles.
+        fadj = self._farmadj_food()  # [B, T]
+        fadj_w = (fadj.unsqueeze(1).expand(B, C, T).gather(2, top_tile) * take.to(self.dtype)).sum(dim=2)  # [B, C]
+        worked_y = worked_y.clone()
+        worked_y[:, :, 0] = worked_y[:, :, 0] + fadj_w
 
         bf = self.buildings.to(self.dtype)
         b_y = torch.einsum("bcn,nk->bck", bf, rd.b_yields)
@@ -4659,6 +4692,8 @@ class BatchSim:
             self.techs[rows, self.cur_tech[rows]] = True
             if self.improvements_on and self._mine_boost_tech.numel() > 0 and torch.isin(self.cur_tech[rows], self._mine_boost_tech).any():
                 self._eff_version += 1  # a boost tech just lifted every existing mine's yield
+            if self.improvements_on and self._farmadj_tech >= 0 and bool((self.cur_tech[rows] == self._farmadj_tech).any()):
+                self._eff_version += 1  # GS: Replaceable Parts lifts farm-adjacency food
             self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
             self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
             if tech is None:
@@ -4682,6 +4717,8 @@ class BatchSim:
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.civics[rows, self.cur_civic[rows]] = True
+            if self.improvements_on and self._farmadj_civic >= 0 and bool((self.cur_civic[rows] == self._farmadj_civic).any()):
+                self._eff_version += 1  # GS: Feudalism lifts farm-adjacency food
             self.civic_prog = torch.where(fin, self.civic_prog - eff, self.civic_prog)
             self.cur_civic = torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic)
             if civic is None:

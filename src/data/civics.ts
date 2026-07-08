@@ -5,6 +5,7 @@
  */
 
 import type { Era, ResearchEffect } from './techs';
+import { GAME_SPEED } from './constants';
 
 export interface CivicDef {
   id: string;
@@ -22,7 +23,7 @@ const C = (
   cost: number,
   prereqs: string[],
   effects: ResearchEffect[] = [],
-): CivicDef => ({ id, name, era, cost, prereqs, effects });
+): CivicDef => ({ id, name, era, cost: Math.round(cost * GAME_SPEED), prereqs, effects });
 
 export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
   [

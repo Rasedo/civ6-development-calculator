@@ -450,6 +450,8 @@ const rules = {
     lumberProd: IMPROVEMENTS.LUMBER_MILL.yields.production ?? 1,
     builderIdx: Object.values(UNITS).findIndex((u) => u.id === 'BUILDER'),
     hillFarmsCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'hillFarms')),
+    farmAdjCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'farmAdjacency')),
+    farmAdjTech: techList.findIndex((t) => (t.effects ?? []).some((e) => e.kind === 'farmAdjacency')),
     mineUnlockTech: techList.findIndex((t) =>
       t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE'),
     ),

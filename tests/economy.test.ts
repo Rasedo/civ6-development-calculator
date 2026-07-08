@@ -199,6 +199,10 @@ describe('district projects', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
     addDistrict(state, city, 'CAMPUS', 6, 5);
+    // Grant the cheap Ancient techs so the auto-picked research costs more than
+    // the project's science lump — otherwise (at Online speed) the lump would
+    // complete a tech mid-turn and confound the science-gain assertion.
+    grantTechs(state, 'POTTERY', 'ANIMAL_HUSBANDRY', 'MINING', 'SAILING', 'ARCHERY', 'ASTROLOGY', 'IRRIGATION', 'WRITING', 'MASONRY', 'BRONZE_WORKING', 'WHEEL');
     const r = queueProject(state, city.id, 'RESEARCH_GRANTS');
     expect(r.ok).toBe(true);
     const cost = itemCost(city.queue[0]);

@@ -29,6 +29,12 @@ export function borderGrowthCost(n: number): number {
 export const TILE_PURCHASE_GOLD_PER_CULTURE = 4;
 
 /** Gold price of buying a building/unit = production cost × this (Civ 6). */
+/** Game-speed cost multiplier (GS-1): Online-ish pace. All production AND
+ * research costs scale by this so the whole game accelerates uniformly
+ * (~1/0.6 = 1.67x faster), pulling the plateau earlier. Purchases (x4 the
+ * production cost) inherit it automatically. */
+export const GAME_SPEED = 1.0;
+
 export const GOLD_PURCHASE_MULT = 4;
 /** Faith price of buying a worship building = production cost × this. */
 export const FAITH_PURCHASE_MULT = 2;

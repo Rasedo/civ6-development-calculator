@@ -27,7 +27,7 @@ describe('research progression', () => {
     let guard = 0;
     while (state.research.techs.length === 0 && guard++ < 30) endTurn(state);
     expect(state.research.techs.length).toBe(1);
-    expect(TECHS[state.research.techs[0]].cost).toBe(25); // cheapest tier first
+    expect(TECHS[state.research.techs[0]].cost).toBe(Math.min(...Object.values(TECHS).map((t) => t.cost))); // cheapest tier first
     // a fresh current tech was auto-picked
     expect(state.research.tech).not.toBeNull();
   });

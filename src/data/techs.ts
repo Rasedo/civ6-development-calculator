@@ -5,6 +5,7 @@
  */
 
 import type { DistrictId, ImprovementId, Yields } from '../core/types';
+import { GAME_SPEED } from './constants';
 
 export type Era = 'Ancient' | 'Classical' | 'Medieval' | 'Renaissance' | 'Industrial' | 'Modern';
 
@@ -40,7 +41,7 @@ const T = (
   cost: number,
   prereqs: string[],
   effects: ResearchEffect[] = [],
-): TechDef => ({ id, name, era, cost, prereqs, effects });
+): TechDef => ({ id, name, era, cost: Math.round(cost * GAME_SPEED), prereqs, effects });
 
 export const TECHS: Record<string, TechDef> = Object.fromEntries(
   [
