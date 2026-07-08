@@ -189,6 +189,11 @@ export interface GovernmentState {
 export interface GameState {
   /** GV-2: true once TURN_LIMIT turns are played (or a victory fires). */
   gameOver?: boolean;
+  /** GV-4/GV-3: 0 none, 1 score (TURN_LIMIT), 2 domination (all capitals). */
+  victoryType?: number;
+  /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
+   *  Static once founded — capture never moves the tile, only its owner. */
+  capitalTiles?: number[];
   map: GameMap;
   cities: City[];
   nextCityId: number;

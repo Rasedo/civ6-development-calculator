@@ -50,12 +50,35 @@ growth/combat) and `winner = leader`. Env/trainer already stop at horizon, so
 at TURN_LIMIT==horizon this is inert for training; it matters when we run
 PAST a victory turn. Baselines unaffected at horizon-100. Trace `gameOver`.
 
-### GV-3  Domination victory
+### GV-3  Domination victory  (IN PROGRESS — GV-3a detection)
 A civ wins immediately when it holds ALL capitals (its own + every rival's
-captured). Capture machinery exists (V-W2 both ways). Needs: a `capital` flag
-per city/rc (the FIRST-founded), `capitalsHeld(civ)`, and the all-capitals
-check each turn → sets gameOver+winner early. Parity: capital flag is static
-per city (set at founding), traced. The check is a reduction over ownership.
+captured). Capture machinery exists (V-W2 both ways).
+**LOAD-BEARING FINDING (2026-07-08): capture RESETS isCapital=false**
+(combat.ts:298,344) — so original capitals CANNOT be derived from the isCapital
+flag after capture. GV-3 MUST track the original capital TILES statically.
+Concrete plan (each step gated; TS is spec):
+- `state.capitalTiles: number[]` civ-indexed (0=player, r+1=rival r). Set at
+  founding: game.ts foundCity when `isCapital` (first city) → capitalTiles[0];
+  rivals.ts first rc → capitalTiles[rid+1]. STATIC thereafter (survives capture).
+- `dominationWinner(state)`: for each ct in capitalTiles, ownerOf(ct) = 0 if a
+  player city is centered there, else r+1 if rival r's city is, else -1 (razed).
+  If any -1 or count < 1+rivals → return -1. Else all-equal → that civ, else -1.
+- GPU mirror: `capital_tiles = cat([player city-0 center, rc_center[:,:,0]])`
+  static at init; ownerOf via center_at (player) / rvcity_at (rival civ).
+  `_domination()` = [B] civ or -1, a pure reduction over ALREADY-MATCHED state.
+- Integrate (detection, NO freeze — GV-2 is indicator-only): endTurn after the
+  turn>LIMIT line: `dom=dominationWinner; if(dom>=0){gameOver=true; winner=dom;
+  victoryType=DOMINATION(2)}`. Trace `victoryType` (new col) + winner (exists).
+- GATE-INERT: no one holds all capitals by t100 → dom=-1 both engines → parity
+  trivial. VALIDATE LOGIC with a POKE TEST (manufacture: player captures every
+  rival capital, assert gameOver+winner=0+victoryType=2 in BOTH engines). Write
+  the poke test FIRST (semantics are the real risk, not parity).
+
+### GV-4  Score victory
+At TURN_LIMIT with no earlier victory, winner = leader (GV-1). Mostly falls
+out of GV-1+GV-2; formalize + trace. NOTE: victoryType is REDUNDANT with
+gameOver until GV-3 adds DOMINATION(2) — so GV-4 (SCORE=1) ships WITH GV-3's
+victoryType column, not as a standalone always-0 column.
 
 ### GV-4  Score victory
 At TURN_LIMIT with no earlier victory, winner = leader (GV-1). Mostly falls

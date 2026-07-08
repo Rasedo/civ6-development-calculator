@@ -104,6 +104,8 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     cityHp: {},
     disasters: false,
     gameOver: false, // GV-2
+    victoryType: 0, // GV-4/GV-3
+    capitalTiles: [], // GV-3
     fogOfWar: false,
     explored: [],
     eventLog: [],
@@ -186,7 +188,42 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   revealAround(state, tileIndex, 3);
 
   state.cities.push(city);
+  // GV-3: the player's capital tile (civ 0), static once founded.
+  if (city.isCapital) {
+    if (!state.capitalTiles) state.capitalTiles = [];
+    state.capitalTiles[0] = tileIndex;
+  }
   return { ok: true, city };
+}
+
+/**
+ * GV-3 domination: the civ that holds EVERY original capital (its own plus
+ * every rival's, by capture), else -1. Capitals are loyalty-immune, so a
+ * capital tile only changes hands by capture — `capitalTiles` is static and
+ * we read who currently has a city centered on each. A razed capital (no
+ * city there) makes domination impossible, so we return -1.
+ */
+export function dominationWinner(state: GameState): number {
+  const nRivals = state.rivals?.length ?? 0;
+  if (nRivals === 0) return -1; // nothing to conquer — a solo game never dominates
+  const caps = state.capitalTiles;
+  const expected = 1 + nRivals;
+  if (!caps || caps.filter((t) => t !== undefined).length < expected) return -1;
+  const ownerOf = (ct: number): number => {
+    if (state.cities.some((c) => c.centerIndex === ct)) return 0;
+    for (let r = 0; r < state.rivals.length; r++) {
+      if (state.rivals[r].cities.some((rc) => rc.centerIndex === ct)) return r + 1;
+    }
+    return -1;
+  };
+  let holder = -1;
+  for (const ct of caps) {
+    const o = ownerOf(ct);
+    if (o < 0) return -1; // a capital with no city (razed) — no domination
+    if (holder === -1) holder = o;
+    else if (holder !== o) return -1;
+  }
+  return holder;
 }
 
 export function placeImprovement(
@@ -716,7 +753,12 @@ export function endTurn(state: GameState): void {
   }
 
   state.turn += 1;
-  state.gameOver = state.turn > TURN_LIMIT; // GV-2
+  // GV-3/GV-4: domination ends the game the instant a civ holds every capital;
+  // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
+  // (GV-2 is indicator-only), so at the gate (dom == -1 by t100) this is inert.
+  const dom = dominationWinner(state);
+  state.gameOver = dom >= 0 || state.turn > TURN_LIMIT;
+  state.victoryType = dom >= 0 ? 2 : state.gameOver ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

@@ -132,6 +132,11 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
     if (!tileOwned(t) && !isWater(t)) t.rivalId = rival.id;
   }
   rival.cities.push(city);
+  // GV-3: rival r's capital tile lives at civ index r+1, static once founded.
+  if (city.isCapital) {
+    if (!state.capitalTiles) state.capitalTiles = [];
+    state.capitalTiles[rival.id + 1] = tile.index;
+  }
   return city;
 }
 
