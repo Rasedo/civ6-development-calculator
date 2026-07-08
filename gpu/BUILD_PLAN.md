@@ -1112,15 +1112,28 @@ nothing more, until the final campaign on the finished engine.
 
 Ordered by how much each system changes what "best champion" MEANS:
 
-- [ ] **G-V Victory & horizon** — the objective itself. Today we optimize
-      score at t100; Civ 6 champions race victories on ~300-turn horizons.
-      Slices: (i) horizon-300 robustness audit (what exhausts: techs, civics,
-      buildable items, growth, loyalty, disasters — measure, then fix the
-      exhaustion cliffs); (ii) game-end semantics (per-game 'done' + winner
-      in both engines, traced); (iii) DOMINATION victory (capture machinery
-      exists — needs capital flags + all-capitals-lost checks);
-      (iv) SCORE victory at the turn limit (exists, formalized). Science/
-      culture/religious victories arrive with their systems below.
+- [x] **G-V (i) horizon-300 audit DONE** (gpu/horizon_audit.py, scripted
+      autopilot, 12 seeds → 300 turns). FINDINGS reorder everything below:
+      * **Cliff #1 (G-S, HARD CRASH ~t150): unit pools cap at 96 slots,
+        append-only (dead slots never reclaimed).** U_MAX/P_MAX in engine.py.
+        Barbs + rival units accumulate past the cap. FIRST engine change.
+      * **Cliff #2 (THE deep one): the engine has no player second half.**
+        Score PEAKS ~t200 (207) then DECLINES to 195@t300; d/turn goes
+        1.47→0.07→-0.20. Player cities CONTRACT 3.7→2.2 while RIVAL cities
+        SCALE 8.5→13.5 — the scripted player is out-expanded and run over.
+        NOT barbs (steady ~6). Trees have DEPTH (23.9/32 techs, 5 still
+        pickable @t300) — research STARVES as the empire shrinks, doesn't
+        deplete. Housing ceilings pop ~17. Gold balloons unspent 243→782
+        (scripted has no purchase; a net fixes that).
+      * IMPLICATION: a 300-turn champion race is not "raise the cap + add
+        victories" — we have NO evidence a competent PLAYER can sustain a
+        competitive late game (no net has trained past t100). The cheap
+        high-value diagnostic AFTER the pool fix: train one horizon-300 net,
+        see if a real player scales or the engine structurally caps it.
+      Remaining G-V slices (re-scoped): (ii) game-end semantics (per-game
+      'done' + winner, traced); (iii) DOMINATION victory (capture exists —
+      needs capital flags + all-capitals-lost); (iv) SCORE victory at the
+      limit. Science/culture/religious victories arrive with their systems.
 - [ ] **G-C Combat depth** — makes domination a real axis (and plausibly
       dethrones the economist): city WALLS + ranged city strikes, siege
       units/classes (support vs melee vs ranged), promotions, healing,
