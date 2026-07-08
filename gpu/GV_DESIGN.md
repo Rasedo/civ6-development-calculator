@@ -1,10 +1,15 @@
 # G-V design — victory conditions & the 300-turn horizon
 
-Status: DESIGN (2026-07-08). Diagnosis complete (BUILD_PLAN §5 G-V): a
-competent player sustains a 300-turn game (~285 plateau), the scripted decline
-was autopilot weakness, and the real gaps are (a) no late-game OBJECTIVE
-(score flat past t200) and (b) no bankruptcy (treasury → −1491). This doc
-sequences the fix. Every slice = /gate-stage + /port-mechanic; TS is spec.
+Status: IN PROGRESS (2026-07-08). GV-1 (winner indicator) SHIPPED 753a451;
+GV-2 (game-end gameOver+winner) SHIPPED f1d2072+3ccb9fd; TURN_LIMIT=250 set.
+Also shipped en route: the horizon-300 pool-cap fix (765ab4f) and the GS-1
+game-speed infra + 3 latent-bug fixes incl. farm-adjacency (9feacaa). REMAINING:
+GV-3 domination, GV-4 score victory, GV-5 bankruptcy — plus the deferred 0.6x
+Online-speed ACTIVATION (its off-script latent tail: see [[engine-pivot]]).
+Diagnosis (BUILD_PLAN §5 G-V): a competent player sustains a 300-turn game
+(~285 plateau); the real gaps are (a) no late-game OBJECTIVE (score flat past
+t200) and (b) no bankruptcy (treasury → −1491). Every slice = /gate-stage +
+/port-mechanic; TS is spec.
 
 ## The objective problem
 Today "champion" = empireScore at t100. That is not a Civ 6 victory. G-V makes
