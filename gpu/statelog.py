@@ -51,7 +51,8 @@ def gpu_state_lines(sim, b):
         f"{p}PT = treas:{_milli(sim.treasury[b])} sci:{_milli(sim.science_total[b])} "
         f"cul:{_milli(sim.culture_total[b])} ntech:{int(sim.techs[b].sum())} "
         f"nciv:{int(sim.civics[b].sum())} nset:{int(sim.settlers[b])} ncity:{ncity} nunit:{nunit} "
-        f"umaint:{_milli((sim.p_alive[b] * sim._p_maint[sim.p_type[b]]).sum())}"
+        f"umaint:{_milli((sim.p_alive[b] * sim._p_maint[sim.p_type[b]]).sum())} "
+        f"gp:{','.join(str(int(x)) for x in sim.gp_earned[b].tolist())}"
     )
     for pp in range(sim.p_alive.shape[1]):
         if bool(sim.p_alive[b, pp]):
