@@ -3799,7 +3799,10 @@ class BatchSim:
         tgt = torch.where(has_imp, imp_tgt, city_tgt)
         has_tgt = has_imp | (city_min < 10**9)
         d_here = self.pair_dist[hc, tgt].to(torch.long)
-        step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rival")
+        # 'rmil' (civ-aware), not "rival": the latter isn't a handled side so it fell to the
+        # default "any unit blocks" — an at-war rival MILITARY unit must be able to stack onto
+        # its OWN-civ civilian (Civ 6 cross-domain), matching TS tileFreeForUnit; else it detours.
+        step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rmil", civ=self.v_civ[:, v].unsqueeze(1))
         d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
         skey = torch.where(step_ok, d_nb * 8 + torch.arange(6, device=dev), 10**9)
         best = skey.min(dim=1).values
