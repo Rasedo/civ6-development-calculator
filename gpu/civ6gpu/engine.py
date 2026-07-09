@@ -1735,12 +1735,16 @@ class BatchSim:
         for row in self.rules.boosts:
             kind = row["kind"]
             if kind == "building":
-                pred = self.buildings[:, :, row["b"]].sum(dim=1) >= row["count"]
+                # detectBoosts counts buildings in LIVE cities only (it iterates
+                # state.cities). A razed/lost city leaves a dead slot whose stale
+                # buildings must NOT count — mask by self.alive or a leftover
+                # Market inflates e.g. the GUILDS "build 2 Markets" inspiration.
+                pred = (self.buildings[:, :, row["b"]].bool() & self.alive).sum(dim=1) >= row["count"]
             elif kind == "cityPop":
-                pred = (self.pop >= row["pop"]).any(dim=1)
+                pred = ((self.pop >= row["pop"]) & self.alive).any(dim=1)
             elif kind == "totalPop":
                 if pop_sum is None:
-                    pop_sum = self.pop.sum(dim=1)
+                    pop_sum = (self.pop * self.alive.to(self.pop.dtype)).sum(dim=1)
                 pred = pop_sum >= row["pop"]
             elif kind == "coastalCity":
                 pred = (self.alive & self.coastal).any(dim=1)

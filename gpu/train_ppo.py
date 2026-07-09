@@ -238,7 +238,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--batch", type=int, default=64, help="parallel games (fixtures repeat round-robin)")
     ap.add_argument("--updates", type=int, default=200)
-    ap.add_argument("--horizon", type=int, default=100)
+    ap.add_argument("--horizon", type=int, default=300)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--gamma", type=float, default=0.999)
     ap.add_argument("--gae-lam", type=float, default=0.95)

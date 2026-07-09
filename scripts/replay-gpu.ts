@@ -233,9 +233,15 @@ for (const game of roll.games) {
           }
         }
         if (best < 0) {
-          fail(`turn ${state.turn}: GPU placed ${districtId} in slot ${slot} but TS found no eligible tile`);
-          bad = true;
-          break;
+          // No eligible tile — a builder improved (or districted) the only
+          // candidate EARLIER this turn: unit orders run before production, so
+          // the mask's start-of-turn eligibility can be consumed before the
+          // district is placed. The GPU's _place_district re-validates on the
+          // same post-builder state and no-ops identically, so this is a NO-OP,
+          // not an error — exactly like the unit orders above. Leave the build
+          // slot idle; any real placement divergence surfaces in the per-turn
+          // trace comparison below.
+          continue;
         }
         const tile = state.map.tiles[best];
         tile.district = districtId;

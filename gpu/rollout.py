@@ -35,7 +35,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--replicas", type=int, default=3, help="random games per fixture")
     ap.add_argument("--log", type=int, default=None, help="rng of ONE game -> gpu/fixtures/gpu_statelog.txt")
-    ap.add_argument("--turns", type=int, default=100)
+    ap.add_argument("--turns", type=int, default=300)
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--out", default=str(FIXTURES / "rollout.json"))
     args = ap.parse_args()
