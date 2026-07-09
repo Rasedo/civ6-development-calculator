@@ -7,9 +7,17 @@ Every line is `<turn> <cat> <key> = <value>`; both sides sort before writing so 
 plain line diff aligns by (turn, cat, key). Keys are TILE/CENTER indices and unit
 tiles (stable, engine-agnostic), never array slots.
 """
+import math
 from collections import Counter
 
 _IMP = None
+
+
+def _milli(x):
+    """Integer milli-units, round-half-UP — matches JS Math.round(x*1000). Python's
+    .3f/round() are round-half-to-EVEN, which disagrees with JS toFixed on exactly-
+    dyadic .5-milli values (e.g. 2.0625 -> 2.062 vs 2.063), a pure display artifact."""
+    return int(math.floor(float(x) * 1000 + 0.5))
 
 
 def _imp_name(sim, i):
@@ -39,8 +47,8 @@ def gpu_state_lines(sim, b):
     ncity = int(sim.alive[b].sum())
     nunit = int(sim.p_alive[b].sum())
     L.append(
-        f"{p}PT = treas:{int((sim.treasury[b]*1000).round())} sci:{float(sim.science_total[b]):.3f} "
-        f"cul:{float(sim.culture_total[b]):.3f} ntech:{int(sim.techs[b].sum())} "
+        f"{p}PT = treas:{_milli(sim.treasury[b])} sci:{_milli(sim.science_total[b])} "
+        f"cul:{_milli(sim.culture_total[b])} ntech:{int(sim.techs[b].sum())} "
         f"nciv:{int(sim.civics[b].sum())} nset:{int(sim.settlers[b])} ncity:{ncity} nunit:{nunit}"
     )
     for pp in range(sim.p_alive.shape[1]):
@@ -64,7 +72,7 @@ def gpu_state_lines(sim, b):
         if bool(sim.alive[b, c]):
             L.append(
                 f"{p}PC {int(sim.site[b, c])} = pop{int(sim.pop[b, c])} "
-                f"pr{float(sim.progress[b, c]):.3f} fbox{float(sim.food_box[b, c]):.3f} "
+                f"pr{_milli(sim.progress[b, c])} fbox{_milli(sim.food_box[b, c])} "
                 f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])} nbld{int(sim.buildings[b, c].sum())}"
             )
 
@@ -74,10 +82,10 @@ def gpu_state_lines(sim, b):
             continue
         pop = int((sim.rc_pop[b, r] * sim.rc_alive[b, r].long()).sum())
         L.append(
-            f"{p}RT{r} = ncity{nc} pop{pop} treas{int((sim.r_treasury[b, r]*1000).round())} "
+            f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} "
             f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))}"
         )
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):
-                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{float(sim.rc_progress[b, r, j]):.3f} co{float(sim.rc_cost[b, r, j]):.3f} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))}")
+                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))}")
     return L

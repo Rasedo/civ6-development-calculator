@@ -23,8 +23,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
 
   const pu = state.units.filter((u) => u.owner === 'player');
   L.push(
-    `${p}PT = treas:${Math.round(state.treasury*1000)} sci:${state.scienceTotal.toFixed(3)} ` +
-      `cul:${state.cultureTotal.toFixed(3)} ntech:${state.research.techs.length} ` +
+    `${p}PT = treas:${Math.round(state.treasury*1000)} sci:${Math.round(state.scienceTotal*1000)} ` +
+      `cul:${Math.round(state.cultureTotal*1000)} ntech:${state.research.techs.length} ` +
       `nciv:${state.research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length}`,
   );
   for (const u of pu) L.push(`${p}PU ${u.tileIndex} = t${ti(u.type)} hp${u.hp}`);
@@ -52,8 +52,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
 
   for (const c of state.cities) {
     L.push(
-      `${p}PC ${c.centerIndex} = pop${c.population} pr${(c.queue[0]?.progress ?? 0).toFixed(3)} ` +
-        `fbox${c.foodBox.toFixed(3)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length}`,
+      `${p}PC ${c.centerIndex} = pop${c.population} pr${Math.round((c.queue[0]?.progress ?? 0)*1000)} ` +
+        `fbox${Math.round(c.foodBox*1000)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length}`,
     );
   }
 
@@ -66,7 +66,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0}`,
     );
     for (const rc of rival.cities) {
-      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${(rc.queue[0]?.progress ?? 0).toFixed(3)} co${frontCost(rc).toFixed(3)} k${rc.queue[0]?.kind ?? 'idle'}`);
+      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'}`);
     }
   }
   return L;
