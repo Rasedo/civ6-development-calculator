@@ -5,6 +5,7 @@
  */
 import { getCityHp } from '../src/core/combat';
 import { computeCityStats } from '../src/core/city';
+import { unitMaintenance } from '../src/core/units';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import type { GameState } from '../src/core/types';
@@ -26,7 +27,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   L.push(
     `${p}PT = treas:${Math.round(state.treasury*1000)} sci:${Math.round(state.scienceTotal*1000)} ` +
       `cul:${Math.round(state.cultureTotal*1000)} ntech:${state.research.techs.length} ` +
-      `nciv:${state.research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length}`,
+      `nciv:${state.research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length} ` +
+      `umaint:${Math.round(unitMaintenance(state)*1000)}`,
   );
   for (const u of pu) L.push(`${p}PU ${u.tileIndex} = t${ti(u.type)} hp${u.hp}`);
 
