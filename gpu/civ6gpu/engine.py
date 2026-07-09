@@ -110,6 +110,7 @@ class Rules:
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
     district_scaffold: dict  # D2b: {campusIdx, campusUnlockTech}
+    shipyard_bidx: int  # building-roster index of SHIPYARD (special: prod = Harbor adjacency), -1 if absent
     palace_yields: torch.Tensor  # [6]
     palace_housing: float
     palace_amenities: float
@@ -163,6 +164,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         improvements=r.get("improvements", {}),
         districts=r.get("districts", []),
         district_scaffold=r.get("districtScaffold", {}),
+        shipyard_bidx=int(r.get("shipyardBidx", -1)),
         palace_yields=torch.tensor(r["palace"]["yields"], dtype=torch.float64),
         palace_housing=r["palace"]["housing"],
         palace_amenities=r["palace"]["amenities"],
@@ -678,6 +680,7 @@ class BatchSim:
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
         self._dyn_harbor = torch.tensor([_src_amt(d, 9) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent Harbor
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
+        self._shipyard_bidx = int(rules.shipyard_bidx)
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
         self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
@@ -1466,6 +1469,14 @@ class BatchSim:
                 mask = owned_d & (dt == di)
                 dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
                 total[:, :, yc] = total[:, :, yc] + (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2) + cs_dbonus[:, di].unsqueeze(1) * dcount
+            # SHIPYARD special (yields.ts:171): a city holding a Shipyard adds its completed
+            # Harbor's full districtAdjacency as PRODUCTION — the SAME value that fed the Harbor's
+            # gold above, re-read here as production, pre-amenity-factor like every district yield.
+            if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
+                _hm = (owned_d & (dt == self._harbor_idx)).to(self.dtype)  # [B, C, M] this city's Harbor tiles
+                _hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc))  # [B, T]
+                _hadj_c = (_hadj.gather(1, tcf).reshape(B, C, M) * _hm).sum(dim=2)  # [B, C]
+                total[:, :, 1] = total[:, :, 1] + _hadj_c * self.buildings[:, :, self._shipyard_bidx].to(self.dtype)
             # districtMaintenance: per-type upkeep (0 for City Center / Neighborhood
             # / Aqueduct, else 1); sum over the city's owned completed districts.
             d_maint = (self._d_maint[dt.clamp(min=0)] * (owned_d & (dt >= 0)).to(self.dtype)).sum(dim=2)

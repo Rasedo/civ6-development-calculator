@@ -148,16 +148,12 @@ const civicList = Object.values(CIVICS);
 const techIdx = new Map(techList.map((t, i) => [t.id, i]));
 const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 
-// Buildable set: City Center buildings + the buildings of the districts the
-// scaffold actually places (Campus/Holy Site/Commercial Hub). NOTE: the scaffold
-// also places HARBOR by t~270 (SCAFFOLD_DISTRICTS), so a rival that completes one
-// can't fill it here — it builds a Lighthouse in TS but a far pricier CH/Campus
-// building in the GPU (rng2026006127 t273). The one-line fix (derive this set from
-// SCAFFOLD_DISTRICTS to include HARBOR) is CORRECT but exposes a PLAYER-side Harbor
-// yield/score divergence (col8, 6->13 off-script fails) — the rival path already
-// mirrors TS, the player path does not. Deferred to a dedicated Harbor stage that
-// mirrors the player Harbor yields too; keeping the clean baseline until then.
-const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', 'CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB']);
+// Buildable set: City Center buildings + the buildings of EVERY district the
+// scaffold places — DERIVED from SCAFFOLD_DISTRICTS so the two never drift (the
+// scaffold places HARBOR by ~t270, so its buildings — Lighthouse/Shipyard/Seaport —
+// must be buildable; Aqueduct has no buildings, harmless). Worship buildings still
+// excluded below. (Harbor stage: pairs with the _city_totals player-yield mirror.)
+const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', ...SCAFFOLD_DISTRICTS.map((d) => d.id)]);
 const centerBuildings = Object.values(BUILDINGS)
   .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !b.worship)
   .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
@@ -334,6 +330,9 @@ const rules = {
   districtCost: { base: 54, scale: 8 },
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
+  // SHIPYARD special (yields.ts:171): a city with this building adds its completed Harbor's
+  // districtAdjacency as PRODUCTION. Index into the exported building roster, -1 if absent.
+  shipyardBidx: buildingIdx.get('SHIPYARD') ?? -1,
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
   // 3/6-envoy district tiers are inert without districts, and the CHIEFDOM
