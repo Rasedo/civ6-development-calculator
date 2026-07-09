@@ -70,7 +70,9 @@ function killUnit(state: GameState, unit: Unit): void {
 /** Sack: population and gold loss, improvements around the center pillaged. */
 function sackCity(state: GameState, city: City): void {
   city.population = Math.max(1, Math.floor(city.population * 0.75));
-  state.treasury -= Math.min(100, Math.round(state.treasury * 0.2));
+  // GS: milli-round the treasury before ×0.2 so a sub-milli non-dyadic-gold drift can't tip the
+  // round across a .5 boundary and desync the sack by 1 gold vs the GPU (which mirrors this).
+  state.treasury -= Math.min(100, Math.round((Math.round(state.treasury * 1000) / 1000) * 0.2));
   const center = state.map.tiles[city.centerIndex];
   for (const t of neighbors(state.map, center)) {
     if (t.improvement && !t.pillaged) t.pillaged = true;

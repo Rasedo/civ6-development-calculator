@@ -3869,7 +3869,10 @@ class BatchSim:
             self.pop[sacked_rows, sc] = ((self.pop[sacked_rows, sc] * 3) // 4).clamp(min=1)
             loss = torch.minimum(
                 torch.tensor(100.0, dtype=self.dtype, device=self.device),
-                js_round(self.treasury[sacked_rows] * 0.2).to(self.dtype),
+                # GS: milli-round the treasury first — sub-milli non-dyadic-gold drift (invisible at
+                # the milli trace tolerance) otherwise tips the ×0.2 round across a .5 boundary,
+                # making the sack differ by 1 gold vs TS (which mirrors this same milli-round).
+                js_round(js_round(self.treasury[sacked_rows] * 1000) / 1000 * 0.2).to(self.dtype),
             )
             self.treasury[sacked_rows] -= loss
             self.city_hp[sacked_rows, sc] = round(city_max_hp / 2)
