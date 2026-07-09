@@ -49,8 +49,8 @@ def gpu_state_lines(sim, b):
     for tile, n in sorted(Counter(int(sim.u_tile[b, u]) for u in range(sim.u_alive.shape[1]) if bool(sim.u_alive[b, u])).items()):
         L.append(f"{p}BU {tile} = {n}")
     if hasattr(sim, "v_alive"):
-        for tile, n in sorted(Counter((int(sim.v_civ[b, v]), int(sim.v_tile[b, v])) for v in range(sim.v_alive.shape[1]) if bool(sim.v_alive[b, v])).items()):
-            L.append(f"{p}RU{tile[0]} {tile[1]} = {n}")
+        for k, n in sorted(Counter((int(sim.v_civ[b, v]), int(sim.v_tile[b, v]), int(sim.v_type[b, v])) for v in range(sim.v_alive.shape[1]) if bool(sim.v_alive[b, v])).items()):
+            L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {n}")
 
     imp, pill = sim.improvement[b], sim.pillaged[b]
     # TS carries district='CITY_CENTER' on every city-center tile (center_at /

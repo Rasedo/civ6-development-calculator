@@ -35,12 +35,12 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
 
   const rv = new Map<string, number>();
   for (const u of state.units) if (u.owner === 'rival') {
-    const k = `${u.civId}\t${u.tileIndex}`;
+    const k = `${u.civId}\t${u.tileIndex}\t${ti(u.type)}`;
     rv.set(k, (rv.get(k) ?? 0) + 1);
   }
   for (const [k, n] of [...rv.entries()].sort()) {
-    const [civ, tile] = k.split('\t');
-    L.push(`${p}RU${civ} ${tile} = ${n}`);
+    const [civ, tile, typ] = k.split('\t');
+    L.push(`${p}RU${civ} ${tile} t${typ} = ${n}`);
   }
 
   for (let i = 0; i < state.map.tiles.length; i++) {
