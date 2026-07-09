@@ -19,6 +19,19 @@ def _imp_name(sim, i):
     return _IMP.get(i, f"#{i}") if i >= 0 else "-"
 
 
+def _rc_kind(sim, c):
+    """Decode a rival rc_current code to a TS-matching queue kind."""
+    if c < 0:
+        return "idle"
+    if c == 0:
+        return "settler"
+    if c <= sim.NU:
+        return "unit"
+    if c < 1 + sim.NU + len(sim._scaffold):
+        return "district"
+    return "building"
+
+
 def gpu_state_lines(sim, b):
     T, L = int(sim.turn), []
     p = f"{T} "
@@ -52,7 +65,7 @@ def gpu_state_lines(sim, b):
             L.append(
                 f"{p}PC {int(sim.site[b, c])} = pop{int(sim.pop[b, c])} "
                 f"pr{float(sim.progress[b, c]):.3f} fbox{float(sim.food_box[b, c]):.3f} "
-                f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])}"
+                f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])} nbld{int(sim.buildings[b, c].sum())}"
             )
 
     for r in range(sim.R):
@@ -66,5 +79,5 @@ def gpu_state_lines(sim, b):
         )
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):
-                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{float(sim.rc_progress[b, r, j]):.3f} co{float(sim.rc_cost[b, r, j]):.3f}")
+                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{float(sim.rc_progress[b, r, j]):.3f} co{float(sim.rc_cost[b, r, j]):.3f} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))}")
     return L

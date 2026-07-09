@@ -53,7 +53,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   for (const c of state.cities) {
     L.push(
       `${p}PC ${c.centerIndex} = pop${c.population} pr${(c.queue[0]?.progress ?? 0).toFixed(3)} ` +
-        `fbox${c.foodBox.toFixed(3)} hp${getCityHp(state, c.id)} til${c.tilesAcquired}`,
+        `fbox${c.foodBox.toFixed(3)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length}`,
     );
   }
 
@@ -66,7 +66,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0}`,
     );
     for (const rc of rival.cities) {
-      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${(rc.queue[0]?.progress ?? 0).toFixed(3)} co${frontCost(rc).toFixed(3)}`);
+      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${(rc.queue[0]?.progress ?? 0).toFixed(3)} co${frontCost(rc).toFixed(3)} k${rc.queue[0]?.kind ?? 'idle'}`);
     }
   }
   return L;
