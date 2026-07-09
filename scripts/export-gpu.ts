@@ -149,9 +149,14 @@ const techIdx = new Map(techList.map((t, i) => [t.id, i]));
 const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 
 // Buildable set: City Center buildings + the buildings of the districts the
-// scaffold actually places (Campus/Holy Site/Commercial Hub). Other districts
-// (Theater/Harbor/Industrial Zone/...) aren't placed in scope, and worship
-// buildings need the religion pick — both excluded. (Name kept for churn.)
+// scaffold actually places (Campus/Holy Site/Commercial Hub). NOTE: the scaffold
+// also places HARBOR by t~270 (SCAFFOLD_DISTRICTS), so a rival that completes one
+// can't fill it here — it builds a Lighthouse in TS but a far pricier CH/Campus
+// building in the GPU (rng2026006127 t273). The one-line fix (derive this set from
+// SCAFFOLD_DISTRICTS to include HARBOR) is CORRECT but exposes a PLAYER-side Harbor
+// yield/score divergence (col8, 6->13 off-script fails) — the rival path already
+// mirrors TS, the player path does not. Deferred to a dedicated Harbor stage that
+// mirrors the player Harbor yields too; keeping the clean baseline until then.
 const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', 'CAMPUS', 'HOLY_SITE', 'COMMERCIAL_HUB']);
 const centerBuildings = Object.values(BUILDINGS)
   .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !b.worship)

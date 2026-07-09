@@ -433,7 +433,7 @@ class BatchSim:
         assert int(cv.get("player", PLAYER_CIV)) == PLAYER_CIV and int(cv.get("rivalBase", 1)) == 1, (
             "fixture civ numbering disagrees with engine constants (civs.ts drift?)"
         )
-        self.RC = 10  # rival city slots per civ (settling caps at maxCities; flips can exceed)
+        self.RC = 24  # rival city slots per civ (settling caps at maxCities; loyalty flips can exceed — a strong Harbor-fed rival accumulates many by t300; bumped 10->24, empty slots are rc_alive=False so inert)
         r_pad, rc_pad = max(self.R, 1), self.RC
         self.rival_at = torch.tensor([[t.get("rv", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
