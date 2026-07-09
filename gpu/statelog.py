@@ -43,6 +43,7 @@ def _rc_kind(sim, c):
 def gpu_state_lines(sim, b):
     T, L = int(sim.turn), []
     p = f"{T} "
+    _ct = sim._city_totals()[0]  # [B,C,6] per-city yields (food,prod,gold,sci,cul,faith) — Harbor-stage diag
 
     ncity = int(sim.alive[b].sum())
     nunit = int(sim.p_alive[b].sum())
@@ -73,7 +74,8 @@ def gpu_state_lines(sim, b):
             L.append(
                 f"{p}PC {int(sim.site[b, c])} = pop{int(sim.pop[b, c])} "
                 f"pr{_milli(sim.progress[b, c])} fbox{_milli(sim.food_box[b, c])} "
-                f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])} nbld{int(sim.buildings[b, c].sum())}"
+                f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])} nbld{int(sim.buildings[b, c].sum())} "
+                f"yf{_milli(_ct[b, c, 0])} yp{_milli(_ct[b, c, 1])} yg{_milli(_ct[b, c, 2])}"
             )
 
     for r in range(sim.R):

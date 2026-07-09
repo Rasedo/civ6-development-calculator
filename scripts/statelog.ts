@@ -4,6 +4,7 @@
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
 import { getCityHp } from '../src/core/combat';
+import { computeCityStats } from '../src/core/city';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import type { GameState } from '../src/core/types';
@@ -51,9 +52,11 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   }
 
   for (const c of state.cities) {
+    const yt = computeCityStats(state, c).total;
     L.push(
       `${p}PC ${c.centerIndex} = pop${c.population} pr${Math.round((c.queue[0]?.progress ?? 0)*1000)} ` +
-        `fbox${Math.round(c.foodBox*1000)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length}`,
+        `fbox${Math.round(c.foodBox*1000)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length} ` +
+        `yf${Math.round(yt.food*1000)} yp${Math.round(yt.production*1000)} yg${Math.round(yt.gold*1000)}`,
     );
   }
 
