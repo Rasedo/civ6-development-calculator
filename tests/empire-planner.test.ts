@@ -8,15 +8,15 @@ describe('settlers', () => {
   it('cost rises with empire size; completion adds stock; founding consumes it', () => {
     const state = makeState(makeMap(20, 20));
     const a = foundCity(state, tileAtCoords(state.map, 6, 9).index).city!;
-    expect(settlerCost(state)).toBe(80);
+    expect(settlerCost(state)).toBe(48); // D-15: 80 × GAME_SPEED
 
     // second city needs a settler outside sandbox
     expect(foundCity(state, tileAtCoords(state.map, 12, 9).index).ok).toBe(false);
 
     expect(queueSettler(state, a.id).ok).toBe(true);
-    expect(settlerCost(state)).toBe(110); // queued settler raises the next price
+    expect(settlerCost(state)).toBe(66); // queued settler raises the next price (+18)
     const prod = computeCityStats(state, a).total.production;
-    const turns = Math.ceil(80 / prod);
+    const turns = Math.ceil(48 / prod);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(state.settlers).toBe(1);
 

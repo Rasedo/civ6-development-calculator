@@ -325,14 +325,16 @@ const rules = {
   // goldPurchaseMult mirrors GOLD_PURCHASE_MULT (V-P1: buy = production cost × 4).
   // P4/D-10: builderBase/builderPer/gameSpeed mirror builderCost() —
   // round((50 + 4·n) × GAME_SPEED), n = builders ever trained + queued.
-  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED },
+  // P4/D-15: settler 80/30 speed-scales like unit costs (mirrors settlerCost).
+  scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED },
   // One civ-id space (C1-A3, mirrors src/core/civs.ts): the player is civ 0,
   // rival r (array index == rival.id, asserted at export) is civ r+1.
   // City-states and barbarians stay outside the numbering.
   civs: { player: 0, rivalBase: 1 },
-  // Mirrors districtCost(): round(54 · (1 + 8 · done/total)) — rivals pay it
-  // from THEIR research counts (C1-B4).
-  districtCost: { base: 54, scale: 9 }, // P4/D-8: floor(base*(1+scale*max(tech%, civic%)))
+  // Mirrors districtCostIn() — rivals pay it from THEIR research counts
+  // (C1-B4). P4/D-8: floor(base·(1+scale·max(tech%, civic%)));
+  // P4/D-15: the 54 base speed-scales like every production cost.
+  districtCost: { base: Math.round(54 * GAME_SPEED), scale: 9 },
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   // SHIPYARD special (yields.ts:171): a city with this building adds its completed Harbor's

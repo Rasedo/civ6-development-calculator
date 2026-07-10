@@ -219,8 +219,18 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: the medium/low tail (D-15, D-17, D-22, D-23) and D-8's 25%
+high-value: the medium/low tail (D-17, D-22, D-23) and D-8's 25%
 under-represented discount.
+
+D-15 COMPLETE: GAME_SPEED now scales uniformly — districts (base 54→32,
+TS districtCostIn + exporter districtCost.base + GPU fallback defaults),
+settlers (80/30→48/18, settlerCost + exporter scenario literals), wonders
+(builtWonders W() maps ×speed like buildings/units), projects (the 15 floor
+→9; the body already followed districts). The sweep also fixed a STALE
+controlled-rival district-cost site in the GPU (apply_rival_actions still
+used the pre-D-8 averaged js_round(base·(1+8·done/total)) formula — off the
+parity path since controlled rivals are empty in the gates; now the same
+floor(base·(1+9·max(t%,c%))) as every other site, from that rival's trees).
 
 D-13 COMPLETE (owner-supplied sources): the real cost ladder
 60/65/80/105/135/175/225/265/355/405/525 verified against

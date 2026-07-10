@@ -53,9 +53,10 @@ export function districtCostIn(research: ResearchState): number {
   // P4/D-8: the real Civ 6 curve — floor(54·(1 + 9·max(tech%, civic%)))
   // (the tree you are FURTHER through drives the price, not the average;
   // the 25% under-represented-district discount stays unmodeled — AUDIT).
+  // P4/D-15: the 54 base speed-scales like every other production cost.
   const tPct = research.techs.length / Object.keys(TECHS).length;
   const cPct = research.civics.length / Object.keys(CIVICS).length;
-  return Math.floor(54 * (1 + 9 * Math.max(tPct, cPct)));
+  return Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
 }
 
 export function districtCost(state: GameState): number {
@@ -122,13 +123,17 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
   };
 }
 
-/** Civ 6-ish settler cost, rising with every city, trained settler and queued one. */
+/** Civ 6-ish settler cost, rising with every city, trained settler and queued
+ * one. P4/D-15: the real 80 + 30·n, speed-scaled like unit costs → 48 + 18·n. */
 export function settlerCost(state: GameState): number {
   const queued = state.cities.reduce(
     (n, c) => n + c.queue.filter((q) => q.kind === 'settler').length,
     0,
   );
-  return 80 + 30 * Math.max(0, state.cities.length - 1 + state.settlers + queued);
+  return (
+    Math.round(80 * GAME_SPEED) +
+    Math.round(30 * GAME_SPEED) * Math.max(0, state.cities.length - 1 + state.settlers + queued)
+  );
 }
 
 /** Train a settler in a city (no district requirement). Sandbox founds free anyway. */
@@ -337,9 +342,10 @@ export function queueWonder(
 // Projects & purchases
 // ---------------------------------------------------------------------------
 
-/** Project production cost, scaling with research progress like districts. */
+/** Project production cost, scaling with research progress like districts.
+ * P4/D-15: the floor speed-scales with everything else (15 → 9). */
 export function projectCost(state: GameState): number {
-  return Math.max(15, Math.round(districtCost(state) * 0.5));
+  return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state) * 0.5));
 }
 
 /** Projects this city can run (needs the matching completed district). */

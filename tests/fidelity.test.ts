@@ -44,7 +44,7 @@ describe('district cost scaling', () => {
   it('rises with research and locks at queue time', () => {
     const state = makeState(makeMap(16, 16));
     const base = districtCost(state);
-    expect(base).toBe(54);
+    expect(base).toBe(32); // D-15: round(54 × GAME_SPEED)
 
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
     grantTechs(state, 'WRITING');

@@ -3433,10 +3433,15 @@ class BatchSim:
             # scaffold districts: NB+2+NU..
             is_d = act & (a >= NBn + 2 + self.NU) & (a < NBn + 2 + self.NU + nS)
             if bool(is_d.any()) and self.districts_on and self._scaffold:
+                # P4/D-15 sweep: this CONTROLLED-rival site still carried the
+                # pre-D-8 averaged formula (off the parity path — controlled
+                # is empty in the gates, so no gate could catch it). Now the
+                # same floor(base·(1+9·max(t%, c%))) as every other site,
+                # from THIS rival's trees.
                 dcp = self.rules.district_cost
-                done_rc = self.r_techs[:, r].sum(dim=1) + self.r_civics[:, r].sum(dim=1)
-                total_rc = float(rdv.t_cost.shape[0] + rdv.c_cost.shape[0])
-                d_cost = js_round(dcp.get("base", 54) * (1 + dcp.get("scale", 8) * (done_rc.double() / total_rc)))
+                t_pct_r = self.r_techs[:, r].sum(dim=1).double() / float(rdv.t_cost.shape[0])
+                c_pct_r = self.r_civics[:, r].sum(dim=1).double() / float(rdv.c_cost.shape[0])
+                d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct_r, c_pct_r)))
                 for si, (di, utech, plc) in enumerate(self._scaffold):
                     want_d = is_d & (a == NBn + 2 + self.NU + si)
                     if not bool(want_d.any()):
@@ -4291,7 +4296,7 @@ class BatchSim:
                     # P4/D-8: floor(54·(1 + 9·max(tech%, civic%))) — the real curve
                     t_pct = self.r_techs[:, r].sum(dim=1).double() / float(self.rules_dev.t_cost.shape[0])
                     c_pct = self.r_civics[:, r].sum(dim=1).double() / float(self.rules_dev.c_cost.shape[0])
-                    d_cost = torch.floor(dcp.get("base", 54) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)))
+                    d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)))
                     cap_max = torch.div(self.rc_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
                     spec_cnt = ((self.rc_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
                     for si, (di, utech, plc) in enumerate(self._scaffold):
@@ -4942,7 +4947,7 @@ class BatchSim:
                 # P4/D-8: floor(54·(1 + 9·max(tech%, civic%))) — the real curve
                 t_pct = self.techs.sum(dim=1).double() / float(rd.t_cost.shape[0])
                 c_pct = self.civics.sum(dim=1).double() / float(rd.c_cost.shape[0])
-                d_cost = torch.floor(dcp.get("base", 54) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
+                d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
                 cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
                 dtaken = torch.zeros(B, dtype=torch.bool, device=dev)  # at most one queue per turn
                 for si, (di, utech, plc) in enumerate(self._scaffold):
@@ -5035,7 +5040,7 @@ class BatchSim:
                 # P4/D-8: floor(54·(1 + 9·max(tech%, civic%))) — the real curve
                 t_pct = self.techs.sum(dim=1).double() / float(rd.t_cost.shape[0])
                 c_pct = self.civics.sum(dim=1).double() / float(rd.c_cost.shape[0])
-                d_cost = torch.floor(dcp.get("base", 54) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
+                d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
                 for c in range(C if self._rl_any_city else 1):
                     ac = act[:, c]  # city c's chosen action (-1 where not idle/alive)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
