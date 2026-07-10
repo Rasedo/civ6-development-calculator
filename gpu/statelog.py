@@ -77,13 +77,18 @@ def gpu_state_lines(sim, b):
     for idx in mask.nonzero(as_tuple=True)[0].tolist():
         L.append(f"{p}TI {idx} = i:{_imp_name(sim, int(imp[idx]))} pill:{int(bool(pill[idx]))} dist:{int(bool(has_d[idx]))}")
 
+    dmask = sim.district[b] >= 0
+    for idx in dmask.nonzero(as_tuple=True)[0].tolist():
+        L.append(f"{p}TD {idx} = td{int(sim.tdef[b, idx])} dc{int(bool(sim.district_complete[b, idx]))}")
+
     for c in range(sim.alive.shape[1]):
         if bool(sim.alive[b, c]):
             L.append(
                 f"{p}PC {int(sim.site[b, c])} = pop{int(sim.pop[b, c])} "
                 f"pr{_milli(sim.progress[b, c])} fbox{_milli(sim.food_box[b, c])} "
                 f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])} nbld{int(sim.buildings[b, c].sum())} "
-                f"yf{_milli(_ct[b, c, 0])} yp{_milli(_ct[b, c, 1])} yg{_milli(_ct[b, c, 2])}"
+                f"yf{_milli(_ct[b, c, 0])} yp{_milli(_ct[b, c, 1])} yg{_milli(_ct[b, c, 2])} "
+                f"ys{_milli(_ct[b, c, 3])} yc{_milli(_ct[b, c, 4])} yfa{_milli(_ct[b, c, 5])}"
             )
 
     for r in range(sim.R):

@@ -1114,6 +1114,42 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   baselines in TRAINING.md are historical; all prior nets were already orphaned
   by the 46→52 action-head growth and have been deleted (gpu/runs pruned to
   tune3, the gumbel_test reference). Full audit that found this: gpu/AUDIT.md.
+- P1 RIVAL WATER + V-CS [x] (2026-07-10, 10d2382 + 7d5b125, task #29): rival
+  founding claims the FULL first ring (water incl., mirroring foundCity) and
+  rival border expansion claims water — the Harbor line is structurally
+  rival-reachable (wterr 3→56 over a game). The reshuffled trajectories then
+  exposed a LATENT missing mechanic (seed 9066 t245): the GPU had NO
+  player-vs-city-state combat — V-CS ported attackCityState/captureCityState
+  (cs_hp, defCS 15+pop+6mil, capture → player city at pop×0.75/half HP, +10
+  siege recovery) with the trace hardened to key city-states by ID. Plus C-22:
+  rival Shipyard special production (floor(Harbor adjacency)), both engines.
+  Follow-ups in AUDIT §C-1: offer CS attacks in the RL mask (new verb, needs
+  eval re-baseline), TS captureCityState lacks the city-cap raze rule.
+- P2 PLAYER DISTRICT COST [x] (2026-07-10, task #30): districts are no longer
+  free+instant for the player — the production decision QUEUES them at
+  districtCost(state) (= js_round(54·(1+8·done/total)), the rival formula off
+  player research), through TS queueDistrict everywhere: tile paved INCOMPLETE
+  + feature stripped at queue time, completion via the production loop
+  (q_dtile remembers the target; district codes double as current codes).
+  Scripted autopilots (exporter + GPU) queue the next scaffold district when
+  the capital idles — between the warrior branch and the cheapest-building
+  fallback, at most one per turn. PICK POLICY (both engines): candidate tiles
+  exclude resources — queueDistrict's bonus-resource strip stays unexercised
+  (a res_stripped plane is the enabling work if a future net should place on
+  bonus tiles; noted in AUDIT). Traps paid: (a) the completion spawn call
+  indexes the unit-civ table with the UNMASKED current column — district codes
+  must be clamped out (index-8-of-7 crash caught by the first parity run);
+  (b) _strip_feature_at was NOT idempotent — paving a previously CHOPPED tile
+  double-subtracted the feature's lent adjacency from neighbours (TS
+  feature=null is naturally idempotent; 6 of the 7 gate fails, e.g. an
+  adjacent Holy Site's faith dropped 2→1 GPU-only at seed 9040 t132); the
+  founding-strip twin got the same guard. (c) PRE-EXISTING precedence bug the
+  reshuffle exposed (7th fail, seed 9053 t204): TS meleeAttack lets units ON
+  the tile take the hit first — a lone hostile CIVILIAN dies ROLL-FREE and
+  the attacker advances (even onto an at-war rival CENTER); the GPU had no
+  civilian branch and besieged the CITY through its occupant (2 extra draws +
+  the city's counter killed the attacker). New civk branch mirrors it; siege/
+  cs_hit now yield to hostile civilians.
 
 
 ## 5. The Civ 6 gap — engine completion toward the REAL goal (2026-07-08)

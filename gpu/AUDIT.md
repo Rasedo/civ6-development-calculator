@@ -93,12 +93,15 @@ only the decision policy may differ. Findings (engine = TS / GPU / both):
 
 ### Formula divergences (player path ≠ rival path)
 
-6. **Player districts are free + instant in the GPU/exporter harness** [GPU + exporter] —
-   `engine.py:1262` (instant complete), `:4653-4671` (free, slot stays idle),
-   `scripts/export-gpu.ts:962-988`; rivals pay the full scaled `districtCostIn` over turns
-   (`engine.py:3994-4013`, `rivals.ts:577`). TS core's own `queueDistrict` charges the player —
-   so the harness pair also diverges from the oracle rule (masked from parity because the
-   replay drives the TS side through the same instant path). (task #30)
+6. **Player districts were free + instant in the GPU/exporter harness — FIXED 2026-07-10
+   (task #30).** All player district placement now routes through TS `queueDistrict`
+   semantics in both engines: tile paved incomplete + feature stripped at queue time, the
+   production slot pays `districtCost(state)` (the rival formula off player research),
+   completion via the production loop. Scripted autopilots queue the next scaffold district
+   when the capital idles (warrior branch → district → cheapest building). PICK POLICY kept
+   narrow in both engines: candidate tiles exclude resources, so queueDistrict's
+   bonus-resource strip stays unexercised — a `res_stripped` plane (the chop-twin treatment
+   for resources) is the enabling work if bonus-tile placement should ever be offered.
 7. **Unit healing** [both] — player +10 own territory / +5 elsewhere (`units.ts:291`,
    `engine.py:4716-4718`); rivals+barbs +10 unconditionally (`units.ts:291` `: true` branch,
    `engine.py:4714-4715`). See also fidelity D-2 (the shared model itself diverges from real).
@@ -155,13 +158,22 @@ only the decision policy may differ. Findings (engine = TS / GPU / both):
     287-310`); rival/barb: exactly one 1-tile step or action per turn (`rivals.ts:522-541`,
     `combat.ts:394-448`). GPU is internally symmetric (1 step each) but thereby diverges from
     the TS player rule (masked: the exporter emits single-tile steps).
-22. **Shipyard/regional `special` yields ignored in the rival building sum** [both, latent
-    behind item 1] — `rivals.ts:794-803`, `engine.py:3477-3489` vs `yields.ts:171-176,192-212`.
+22. **Shipyard `special` yields ignored in the rival building sum — FIXED 2026-07-10**
+    (both engines mirror `production += floor(Harbor adjacency)` for rival Shipyards).
+    STILL OPEN: `regional` building yields (`yields.ts:192-212`) remain player-only —
+    latent until IZ/EC districts enter the rival scaffold (see §A BUILD_PLAN deferrals).
 23. **Controlled-rival purchase apply re-checks only ownership+gold** [GPU, minor] —
     `engine.py:3137-3160` vs the player path's full re-validation (`engine.py:4450,4473`).
 24. **Rival ranged-vs-city gate missing** [GPU, latent — no rival ranged roster yet] —
     player mask has `melee_only` (`engine.py:1965-1966`), rival mask lacks it
     (`engine.py:2050-2051`).
+
+25. **[GATE-CAUGHT 2026-07-10, not in the original audit] GPU player-attack precedence
+    missed TS's lone-civilian rule** — TS `meleeAttack` lets units ON the tile take the hit
+    first: a lone hostile civilian dies ROLL-FREE and the attacker advances, even onto an
+    at-war rival city center; the GPU besieged the CITY through its occupant. FIXED with
+    P2 (civk branch; siege/cs_hit yield to hostile civilians). Exposed by trajectory
+    reshuffle at seed 9053 t204.
 
 Also one-directional by construction (track, lower priority): barb camp spawn spacing and
 barb marches consider player assets only (`combat.ts:367-448`); wonders, projects, trade

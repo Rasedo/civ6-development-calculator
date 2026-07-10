@@ -23,6 +23,7 @@ import {
   endTurn,
   foundCity,
   queueBuilding,
+  queueDistrict,
   queueSettler,
   setTechResearch,
   setCivicResearch,
@@ -212,11 +213,12 @@ for (const game of roll.games) {
           break;
         }
       } else if (a >= NB + 2 + NU) {
-        // District placement (D5): the RL production head placed a scaffold
-        // district instantly (free) in THIS city (any city, slot order). Mirror
-        // the exporter's scaffold scan EXACTLY — owned by this city, unimproved,
-        // canPlaceDistrict, best floor(districtAdjacency) tile, ties to lowest
-        // index — and leave the build slot idle, as the GPU's RL block does.
+        // District placement (D5 → P2): the RL production head QUEUES a
+        // scaffold district in THIS city (any city, slot order) — mirror the
+        // scan (owned, unimproved, RESOURCE-FREE — the shared pick policy —
+        // canPlaceDistrict, best floor(districtAdjacency), ties lowest index)
+        // then route through the real queueDistrict: tile paved incomplete +
+        // feature stripped, and the build slot works it off at districtCost.
         const districtId = SCAFFOLD[a - NB - 2 - NU] as DistrictId | undefined;
         if (!districtId) {
           fail(`turn ${state.turn}: district action ${a} in slot ${slot} but no scaffold[${a - NB - 2 - NU}]`);
@@ -226,7 +228,7 @@ for (const game of roll.games) {
         let best = -1;
         let bestAdj = -1;
         for (const tile of state.map.tiles) {
-          if (tile.cityId !== city.id || tile.improvement) continue;
+          if (tile.cityId !== city.id || tile.improvement || tile.resource) continue;
           if (!canPlaceDistrict(state, city, districtId, tile.index).ok) continue;
           const adj = districtAdjacency(state.map, tile, districtId);
           if (adj > bestAdj) {
@@ -245,10 +247,7 @@ for (const game of roll.games) {
           // trace comparison below.
           continue;
         }
-        const tile = state.map.tiles[best];
-        tile.district = districtId;
-        tile.districtComplete = true;
-        city.districts.push({ type: districtId, tileIndex: best });
+        queueDistrict(state, city.id, districtId, best);
       } // a === NB+1: idle — queue nothing
     }
     if (!bad && act?.r !== undefined) {

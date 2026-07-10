@@ -281,7 +281,7 @@ PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 # Names of the mutable state tensors (everything reset() restores).
 _MUTABLE = [
     "alive", "pop", "food_box", "culture_box", "tiles_acquired", "owner", "workable",
-    "buildings", "current", "cur_cost", "progress", "settlers", "settlers_queued",
+    "buildings", "current", "cur_cost", "progress", "q_dtile", "settlers", "settlers_queued",
     "treasury", "science_total", "culture_total", "techs", "civics",
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
     "rng_state", "city_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef",
@@ -756,6 +756,7 @@ class BatchSim:
         self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings)
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
+        self.q_dtile = torch.full((B, C), -1, dtype=torch.long, device=device)  # P2: the queued district's target tile
         self.progress = z(B, C)
         self.prod_bank = z(B, C)  # V-H1: chop production banked while the queue is empty
         self.settlers = torch.zeros(B, dtype=torch.long, device=device)
@@ -1232,21 +1233,24 @@ class BatchSim:
             raw = raw + self._dyn_harbor[di] * self._adj_harbor_count().to(self.dtype)
         return raw
 
-    def _place_district(self, di: int, want: torch.Tensor, c: int, placement: int = 0) -> torch.Tensor:
-        """Place district-type `di` in city slot `c` on its best tile, for batch
+    def _place_district(self, di: int, want: torch.Tensor, c: int, placement: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
+        """QUEUE district-type `di` in city slot `c` on its best tile, for batch
         rows where `want` is set AND an eligible tile exists. Mirrors the exporter's
         best-tile scan: eligible = owned by city c, district-placeable, empty (no
-        district/improvement), within radius 3, not the city-center tile; ranked by
-        floor(static + 0.5·adjacent-completed-districts), ties to lowest tile index.
-        placement=1 (Aqueduct): also require a tile adjacent to the city center AND
-        a water source (aqsrc); no adjacency yield, so ties → lowest index.
+        district/improvement), RESOURCE-FREE (P2 pick policy — queueDistrict's
+        bonus-resource strip stays unexercised, see AUDIT), within radius 3, not
+        the center; ranked by floor(static + 0.5·adjacent-completed-districts),
+        ties to lowest tile index. placement=1 (Aqueduct): adjacent-center + water
+        source; placement=3 (Encampment): NOT adjacent-center. P2: queueDistrict
+        semantics — the tile is paved INCOMPLETE and its feature stripped
+        (tile.feature = null); completion arrives via the production loop.
         Recomputes adjacency each call, so placing city-by-city in slot order
-        reproduces the replay's sequential act.p placement. Returns the [B] placed mask."""
+        reproduces the replay's sequential act.p loop. Returns ([B] placed, [B] tile)."""
         B, T, dev = self.B, self.T, self.device
         site_c = self.site[:, c].clamp(min=0)
         adjc = self._adj_district_count().to(self.dtype)  # [B, T]
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
-        elig = ((self.owner == c) & surface & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3))
+        elig = ((self.owner == c) & surface & (self.district < 0) & (self.improvement < 0) & (self.res_priority == 0) & (self.dist[:, c] <= 3))
         elig[torch.arange(B, device=dev), site_c] = False
         if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any player/rival) — matches TS requires/notAdjacentToCityCenter
@@ -1261,9 +1265,10 @@ class BatchSim:
         if bool(place.any()):
             rows = place.nonzero(as_tuple=True)[0]
             self.district[rows, best[rows]] = di
-            self.district_complete[rows, best[rows]] = True  # instant-complete (queued rival districts arrive with B4)
+            self.district_complete[rows, best[rows]] = False  # P2: queued, not complete
+            self._strip_feature_at(rows, best[rows])  # queueDistrict: tile.feature = null
             self._eff_version += 1
-        return place
+        return place, best
 
     def _place_district_rival(self, r: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
         """C1-B4: the rival twin of _place_district — same rank (best
@@ -1645,9 +1650,9 @@ class BatchSim:
                     site_c = self.site[:, c].clamp(min=0)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
                     under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
-                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
+                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.res_priority == 0) & (self.dist[:, c] <= 3)
                     base[ar, site_c] = False
-                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.improvement < 0) & (self.dist[:, c] <= 3)
+                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.improvement < 0) & (self.res_priority == 0) & (self.dist[:, c] <= 3)
                     cbase[ar, site_c] = False
                     has_land = base.any(dim=1)  # [B]
                     has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
@@ -2425,7 +2430,16 @@ class BatchSim:
         """V-H1 chop: remove the removable feature physically — mark
         feat_stripped and withdraw the adjacency it lent to neighbours
         (the founding strip does the same inline, entangled with its
-        tile-grab loop — keep the two twins in sync)."""
+        tile-grab loop — keep the two twins in sync).
+        IDEMPOTENT (P2): TS `tile.feature = null` on an already-bare tile is
+        a no-op, but the adjacency withdrawal below is CUMULATIVE — stripping
+        an already-stripped tile (queueDistrict paving a chopped tile) would
+        double-subtract the lent adjacency (caught: seed 9040 t132, an
+        adjacent Holy Site's faith dropped 2→1 in the GPU only)."""
+        fresh = ~self.feat_stripped[rows, tiles]
+        if not bool(fresh.any()):
+            return
+        rows, tiles = rows[fresh], tiles[fresh]
         self.feat_stripped[rows, tiles] = True
         self.tdef[rows, tiles] = self.hills[rows, tiles].long() * 3  # GS: chopped feature no longer defends (terrainDefense reads live; mirror the founding strip)
         # TS builderRemoveFeature: chopping WOODS removes a LUMBER_MILL (it requires
@@ -2474,17 +2488,41 @@ class BatchSim:
             v_ok = (vslot >= 0) & self.r_atwar.gather(1, v_civ.unsqueeze(1)).squeeze(1)
             rc_civ_t = self.rvcity_at.gather(1, tc.unsqueeze(1)).squeeze(1)
             rc_ok = (rc_civ_t >= 0) & self.r_atwar.gather(1, rc_civ_t.clamp(min=0).clamp(max=max(self.R - 1, 0)).unsqueeze(1)).squeeze(1)
-            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
+            rvc_slot_t = self.rvciv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+            rvc_civ_t = self.v_civ.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(max=max(self.R - 1, 0))
+            rvc_ok = (rvc_slot_t >= 0) & self.r_atwar.gather(1, rvc_civ_t.unsqueeze(1)).squeeze(1)
+            if self._rl_ranged_active:
+                rngd = self._p_rng_str[self.p_type[:, p]] > 0
+            else:
+                rngd = torch.zeros_like(alive)
+            # TS meleeAttack: units ON the tile take the hit FIRST. A lone
+            # hostile CIVILIAN is simply killed, ROLL-FREE ("Civ 6 captures;
+            # we don't model capture"), then the attacker advances if the
+            # tile frees up — including onto an at-war rival CITY CENTER:
+            # the city is NOT besieged through its occupant. Caught by P2's
+            # reshuffle (seed 9053 t204): a rival builder stood on an at-war
+            # rival center — TS killed it roll-free and advanced, the GPU
+            # besieged the city (2 extra draws + the city's counter).
+            civk = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & rvc_ok & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
+            if bool(civk.any()):
+                kr = civk.nonzero(as_tuple=True)[0]
+                ks = rvc_slot_t[kr]
+                self.v_alive[kr, ks] = False
+                self.rvciv_at[kr, tc[kr]] = -1
+                adv = civk & ~self._blocked_for(tgt.unsqueeze(1), "pmil").squeeze(1)
+                if bool(adv.any()):
+                    vr = adv.nonzero(as_tuple=True)[0]
+                    self.pmil_at[vr, here[vr]] = -1
+                    self.p_tile[vr, p] = tgt[vr]
+                    self.pmil_at[vr, tgt[vr]] = p
+                    self._clear_camp_at(adv, tgt)
+            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
             att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
             # V-R: ranged units strike instead of meleeing (rangedAttack —
             # one roll, no retaliation, no advance). The mask above is
             # unchanged: legality is the same adjacent-hostile condition.
-            if self._rl_ranged_active:
-                rngd = self._p_rng_str[self.p_type[:, p]] > 0
-            else:
-                rngd = torch.zeros_like(att)
             r_att = att & rngd
             att = att & ~rngd
             if bool(att.any()):
@@ -2564,7 +2602,7 @@ class BatchSim:
             cs_sc = cs_s.clamp(min=0)
             cs_hit = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & (bslot < 0) & ~v_ok & (rc_civ_t < 0)
+                & (bslot < 0) & ~v_ok & ~rvc_ok & (rc_civ_t < 0)
                 & (cs_s >= 0)
                 & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
                 & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
@@ -4710,6 +4748,35 @@ class BatchSim:
                 self.progress = torch.where(want_w, torch.zeros_like(self.progress), self.progress)
                 self.warrior_trained = self.warrior_trained | want_w
 
+            # Scripted districts (P2): the CAPITAL queues the next scaffold
+            # district when idle — after the warrior branch, before the
+            # cheapest-building fallback, mirroring the exporter's per-city
+            # chain. First unplaced spec (scaffold order) whose tech is in AND
+            # an eligible tile exists; queueDistrict semantics via
+            # _place_district (paved incomplete + feature strip + cost).
+            if self.districts_on and self._campus_active and self._scaffold:
+                dcp = self.rules.district_cost
+                done_pl = self.techs.sum(dim=1) + self.civics.sum(dim=1)
+                total_pl = float(rd.t_cost.shape[0] + rd.c_cost.shape[0])
+                d_cost = js_round(dcp.get("base", 54) * (1 + dcp.get("scale", 8) * (done_pl.double() / total_pl))).to(self.dtype)
+                cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
+                dtaken = torch.zeros(B, dtype=torch.bool, device=dev)  # at most one queue per turn
+                for si, (di, utech, plc) in enumerate(self._scaffold):
+                    has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                    spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == 0)).sum(dim=1)  # specialty only
+                    under_cap = (plc == 1) | (spec_count < cap_max)  # Aqueduct is non-specialty → no cap
+                    want = (self.current[:, 0] == -1) & ~dtaken & has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & under_cap
+                    if not bool(want.any()):
+                        continue
+                    placed, best = self._place_district(di, want, 0, plc)
+                    if bool(placed.any()):
+                        self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | placed
+                        self.current[:, 0] = torch.where(placed, torch.full_like(self.current[:, 0], self.UNIT_BASE + self.NU + si), self.current[:, 0])
+                        self.cur_cost[:, 0] = torch.where(placed, d_cost, self.cur_cost[:, 0])
+                        self.progress[:, 0] = torch.where(placed, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
+                        self.q_dtile[:, 0] = torch.where(placed, best, self.q_dtile[:, 0])
+                        dtaken = dtaken | placed
+
             # Everyone else: cheapest available City Center building.
             empty = self.alive & (self.current == -1)
             buildable = self._buildable()
@@ -4755,14 +4822,19 @@ class BatchSim:
                 # walk slots sequentially like the replay's act.p loop.
                 self._apply_settlers_and_purchases(act, buildable)
 
-            # RL district placement (D5): ANY city may spend its production
-            # decision to instantly place a scaffold district (off-script; free,
-            # via the scaffold simplification — leaves the build slot idle). The
-            # district codes sit above the unit range at NB+2+NU+si. Cities are
-            # processed in slot order, recomputing adjacency each placement, to
-            # match the replay's sequential act.p loop. Inert until _rl flips on.
+            # RL district placement (D5 → P2): the production decision QUEUES a
+            # scaffold district — the tile is paved + feature-stripped at once
+            # (TS queueDistrict semantics, districtComplete = false) and the
+            # build slot works it off at districtCost(state), exactly like the
+            # rival path. The district codes double as CURRENT codes (above the
+            # unit range at NB+2+NU+si). Cities in slot order, adjacency
+            # recomputed each placement, matching the replay's act.p loop.
             if self.districts_on and self._scaffold and self._rl_district_active:
                 dbase = self.UNIT_BASE + self.NU  # district action base code (NB+2+NU)
+                dcp = self.rules.district_cost
+                done_pl = self.techs.sum(dim=1) + self.civics.sum(dim=1)
+                total_pl = float(rd.t_cost.shape[0] + rd.c_cost.shape[0])
+                d_cost = js_round(dcp.get("base", 54) * (1 + dcp.get("scale", 8) * (done_pl.double() / total_pl))).to(self.dtype)
                 for c in range(C if self._rl_any_city else 1):
                     ac = act[:, c]  # city c's chosen action (-1 where not idle/alive)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
@@ -4773,24 +4845,16 @@ class BatchSim:
                         under_cap = (plc == 1) | (spec_count < cap_c)  # Aqueduct is non-specialty → no cap
                         want = (ac == dbase + si) & has_tech & under_cap & not_owned
                         if bool(want.any()):
-                            self._place_district(di, want, c, plc)
+                            placed, best = self._place_district(di, want, c, plc)
+                            if bool(placed.any()):
+                                self.current[:, c] = torch.where(placed, torch.full_like(self.current[:, c], dbase + si), self.current[:, c])
+                                self.cur_cost[:, c] = torch.where(placed, d_cost, self.cur_cost[:, c])
+                                self.progress[:, c] = torch.where(placed, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
+                                self.q_dtile[:, c] = torch.where(placed, best, self.q_dtile[:, c])
 
-        # --- scripted districts (D3b): place each scaffold district IN ORDER,
-        # once, when its unlock tech is in and the per-pop specialty cap allows
-        # another (maxSpecialtyDistricts = floor((pop-1)/3)+1). Scripted path only
-        # (the RL district action is D5). Mirrors the exporter's scaffold list;
-        # score by the FULL floor(static + 0.5*adjacent completed districts).
-        if production is None and self.districts_on and self._campus_active and self._scaffold:
-            cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
-            for si, (di, utech, plc) in enumerate(self._scaffold):
-                has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == 0)).sum(dim=1)  # specialty only
-                under_cap = (plc == 1) | (spec_count < cap_max)  # Aqueduct is non-specialty → no cap
-                want = has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & under_cap
-                if not bool(want.any()):
-                    continue
-                place = self._place_district(di, want, 0, plc)  # scaffold is capital-only (slot 0)
-                self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | place
+        # (P2: the scripted district placement moved INTO the production chain
+        # above — the capital queues the next scaffold district when idle,
+        # paying districtCost like every other build.)
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------
         if tech is not None:
@@ -4840,13 +4904,22 @@ class BatchSim:
         if made_building.any():
             bi, ci = made_building.nonzero(as_tuple=True)
             self.buildings[bi, ci, self.current[bi, ci]] = True
-        made_unit = done & (self.current >= self.UNIT_BASE)
+        made_unit = done & (self.current >= self.UNIT_BASE) & (self.current < self.UNIT_BASE + self.NU)
         if bool(made_unit.any()):
             # Spawn in city order (the TS city loop completes them that way).
             for c in range(C):
                 m = made_unit[:, c]
                 if bool(m.any()):
-                    self._spawn_player(m, self.site[:, c], (self.current[:, c] - self.UNIT_BASE).clamp(min=0))
+                    # clamp max too: unmasked rows may hold P2 district codes
+                    self._spawn_player(m, self.site[:, c], (self.current[:, c] - self.UNIT_BASE).clamp(min=0, max=self.NU - 1))
+        # P2: a finished district completes its paved tile (queueDistrict's
+        # queue item — the tile was reserved at queue time in q_dtile).
+        made_district = done & (self.current >= self.UNIT_BASE + self.NU)
+        if bool(made_district.any()):
+            db_, dc_ = made_district.nonzero(as_tuple=True)
+            self.district_complete[db_, self.q_dtile[db_, dc_].clamp(min=0)] = True
+            self.q_dtile[db_, dc_] = -1
+            self._eff_version += 1
         self.current = torch.where(done, torch.full_like(self.current, -1), self.current)
         self.progress = torch.where(done, torch.zeros_like(self.progress), self.progress)  # overflow drops (queue empty)
 
@@ -5041,6 +5114,11 @@ class BatchSim:
             # ...and the feature's own yields + any improvement die with the
             # founding (tile.improvement = null; feature = null) — a later
             # loyalty flip reads this center STRIPPED (C1-B3 gate catch).
+            # idempotence (P2 twin-sync): a previously CHOPPED tile has nothing
+            # left to withdraw — TS feature=null is a no-op there, but the
+            # subtraction below is cumulative (same bug class as the
+            # _strip_feature_at double-strip caught at seed 9040 t132).
+            fresh_f = ~self.feat_stripped[rows, s_idx]
             self.feat_stripped[rows, s_idx] = True
             self.improvement[rows, s_idx] = -1
             self.pillaged[rows, s_idx] = False
@@ -5050,7 +5128,7 @@ class BatchSim:
             # founding must subtract the center feature's contribution live (else
             # a fresh city's own district over-counts). Mirrors districtAdjacency
             # recomputing on the live map after foundCity clears the feature.
-            contrib = self._feat_adj[rows, s_idx]  # [R, nD]
+            contrib = self._feat_adj[rows, s_idx] * fresh_f.unsqueeze(1).to(self._feat_adj.dtype)  # [R, nD]
             nb = self.neigh[s_idx]  # [R, 6]
             for d in range(6):
                 n_d = nb[:, d]

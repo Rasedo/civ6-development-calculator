@@ -29,7 +29,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createGame, endTurn, foundCity, queueBuilding, queueSettler , TURN_LIMIT } from '../src/core/game';
+import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
@@ -874,6 +874,33 @@ for (let s = 0; s < N_SEEDS; s++) {
   const warriorTrained = new Set<number>();
   let builderTrained = false;
   const placedDistricts = new Set<number>();
+  // P2: districts cost production now — the capital QUEUES the next scaffold
+  // district when idle (first unplaced spec, scaffold order, whose tech is in
+  // AND a resource-free eligible tile exists; best floor(districtAdjacency),
+  // ties lowest index). Returns true when one was queued. The GPU scripted
+  // chain mirrors this branch exactly (same slot in the priority chain).
+  const queueNextDistrict = (cap: City): boolean => {
+    for (const spec of SCAFFOLD_DISTRICTS) {
+      const di = PLACEABLE_DISTRICTS.indexOf(spec.id);
+      if (placedDistricts.has(di) || !state.research.techs.includes(spec.unlockId)) continue;
+      let best = -1;
+      let bestAdj = -1;
+      for (const tile of state.map.tiles) {
+        if (tile.cityId !== cap.id || tile.improvement || tile.resource) continue;
+        if (!canPlaceDistrict(state, cap, spec.id, tile.index).ok) continue;
+        const adj = districtAdjacency(state.map, tile, spec.id);
+        if (adj > bestAdj) {
+          bestAdj = adj;
+          best = tile.index;
+        }
+      }
+      if (best < 0) continue;
+      queueDistrict(state, cap.id, spec.id, best);
+      placedDistricts.add(di);
+      return true;
+    }
+    return false;
+  };
   const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
     // Envoys: greedily back the neediest met city-state (fewest envoys,
@@ -900,6 +927,8 @@ for (let s = 0; s < N_SEEDS; s++) {
         // the rollout gate's job).
         queueUnit(state, city.id, 'WARRIOR');
         warriorTrained.add(city.id);
+      } else if (SCRIPTED_CAMPUS && city.isCapital && queueNextDistrict(city)) {
+        // P2: queued the next scaffold district (it costs production now).
       } else {
         const next = cheapestBuilding(state, city);
         if (next) queueBuilding(state, city.id, next);
@@ -958,38 +987,8 @@ for (let s = 0; s < N_SEEDS; s++) {
         walkPath(state, u);
       }
     }
-    // Scripted districts (D2b/D3b): place each scaffold district IN ORDER, once,
-    // when its unlock tech is in and the per-pop specialty cap allows another
-    // (canPlaceDistrict enforces the cap). Best floor(districtAdjacency) tile,
-    // ties lowest index; after the builders, before endTurn so this turn's
-    // yields reflect it. The GPU mirrors this list and choice.
-    if (SCRIPTED_CAMPUS) {
-      const cap = state.cities.find((c) => c.isCapital);
-      if (cap) {
-        for (const spec of SCAFFOLD_DISTRICTS) {
-          const di = PLACEABLE_DISTRICTS.indexOf(spec.id);
-          if (placedDistricts.has(di) || !state.research.techs.includes(spec.unlockId)) continue;
-          let best = -1;
-          let bestAdj = -1;
-          for (const tile of map.tiles) {
-            if (tile.cityId !== cap.id || tile.improvement) continue;
-            if (!canPlaceDistrict(state, cap, spec.id, tile.index).ok) continue;
-            const adj = districtAdjacency(map, tile, spec.id);
-            if (adj > bestAdj) {
-              bestAdj = adj;
-              best = tile.index;
-            }
-          }
-          if (best >= 0) {
-            const tile = map.tiles[best];
-            tile.district = spec.id;
-            tile.districtComplete = true;
-            cap.districts.push({ type: spec.id, tileIndex: best });
-            placedDistricts.add(di);
-          }
-        }
-      }
-    }
+    // (P2: scripted districts moved into the per-city production chain above —
+    // the capital queues them at districtCost like every other build.)
     endTurn(state);
     for (const c of state.cities) {
       if (!cityIds.includes(c.id)) cityIds.push(c.id);

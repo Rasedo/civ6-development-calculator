@@ -3,7 +3,7 @@
  * as gpu/statelog.py so gpu/logdiff.py can align them. Keep the two in lockstep:
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
-import { getCityHp } from '../src/core/combat';
+import { getCityHp, terrainDefense } from '../src/core/combat';
 import { isWater } from '../src/core/query';
 import { computeCityStats } from '../src/core/city';
 import { unitMaintenance } from '../src/core/units';
@@ -61,12 +61,20 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     }
   }
 
+  for (let i = 0; i < state.map.tiles.length; i++) {
+    const t = state.map.tiles[i];
+    if (t.district && t.district !== 'CITY_CENTER') {
+      L.push(`${p}TD ${i} = td${terrainDefense(t)} dc${t.districtComplete ? 1 : 0}`);
+    }
+  }
+
   for (const c of state.cities) {
     const yt = computeCityStats(state, c).total;
     L.push(
       `${p}PC ${c.centerIndex} = pop${c.population} pr${Math.round((c.queue[0]?.progress ?? 0)*1000)} ` +
         `fbox${Math.round(c.foodBox*1000)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length} ` +
-        `yf${Math.round(yt.food*1000)} yp${Math.round(yt.production*1000)} yg${Math.round(yt.gold*1000)}`,
+        `yf${Math.round(yt.food*1000)} yp${Math.round(yt.production*1000)} yg${Math.round(yt.gold*1000)} ` +
+        `ys${Math.round(yt.science*1000)} yc${Math.round(yt.culture*1000)} yfa${Math.round(yt.faith*1000)}`,
     );
   }
 
