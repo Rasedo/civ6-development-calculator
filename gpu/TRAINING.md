@@ -572,3 +572,16 @@ net: the full P4 fidelity batch is in (real healing/movement/borders/
 amenities/loyalty/defense/bombardment/costs/maintenance/escalators/
 discount), P5-P8 remain (rival symmetry batch, rival interleave,
 dead-slot reclamation, net-driven export).
+
+
+Post-P5-S1 world (2026-07-10, commit 3b30b8f — rival economy: full
+maintenance chain + bankruptcy, sack gold, conquest plunder; plus three
+latent capture-path fixes):
+
+    random    234.9 ± 24.1 (95% CI)  [min 99.6, max 471.2]
+    scripted  298.3 ± 19.0 (95% CI)  [min 149.1, max 420.0]
+
+Statistically flat vs P4-final (231.7 / 296.3) with mildly friendlier
+tails (min 89→100/115→149) — rival upkeep slows their army growth just
+enough to soften worst-case games. The next reference net trains on
+THIS world.
