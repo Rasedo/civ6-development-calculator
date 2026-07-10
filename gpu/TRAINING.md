@@ -542,3 +542,17 @@ settlers at 48+18n make expansion ~40% cheaper (more cities, more
 score), and the new defense formula makes early cities much harder for
 warrior-band barbarians to crack (min score off the floor: 52 -> 114
 scripted). The next reference net trains on THIS world.
+
+
+Post-D17/D23 world (2026-07-10, commits fc0f095 + bf2c915 — ranged
+bombardment of cities in the action mask; real tile-purchase schedule,
+TS-side only):
+
+    random    232.8 ± 24.0 (95% CI)  [min 88.9, max 429.7]
+    scripted  292.7 ± 21.7 (95% CI)  [min 114.5, max 421.4]
+
+Statistically flat vs post-D15+D22 (231.7 / 292.7) — bombardment is a
+new random-policy verb but floors cities at 1 HP, so it rarely converts
+to captures; notably random's MIN rose 0 -> 89 (fewer total collapses).
+The next reference net trains on THIS world. P4 is now closed except
+the banked D-8 discount design (AUDIT.md).
