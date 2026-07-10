@@ -281,6 +281,17 @@ export function spawnUnit(
   if (civId !== undefined) unit.civId = civId;
   state.units.push(unit);
   if (owner === 'player') revealAround(state, unit.tileIndex);
+  // P4/D-22: track the strongest MELEE unit each civ has ever fielded —
+  // real Civ 6 bases city defense on it (spawnUnit is the chokepoint for
+  // training, purchase, levies and rival production alike).
+  if (def.combat > 0 && !def.ranged) {
+    if (owner === 'player') {
+      state.bestMeleeCS = Math.max(state.bestMeleeCS ?? 0, def.combat);
+    } else if (owner === 'rival') {
+      const rv = state.rivals.find((r) => r.id === civId);
+      if (rv) rv.bestMeleeCS = Math.max(rv.bestMeleeCS ?? 0, def.combat);
+    }
+  }
   return unit;
 }
 

@@ -306,6 +306,7 @@ _MUTABLE = [
     "victory_type", "winner",
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "builders_trained", "r_builders_trained",  # P4/D-10 cost escalators
+    "best_melee", "r_best_melee",  # P4/D-22 city-defense trackers
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
@@ -513,6 +514,9 @@ class BatchSim:
         # cost escalator (builderCost = round((50 + 4·n) · gameSpeed)).
         self.builders_trained = torch.zeros(B, dtype=torch.long, device=device)
         self.r_builders_trained = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # P4/D-22: strongest MELEE unit each civ ever fielded (city defense).
+        self.best_melee = torch.zeros(B, dtype=torch.long, device=device)
+        self.r_best_melee = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.rc_alive = torch.zeros(B, r_pad, rc_pad, dtype=torch.bool, device=device)
         self.rc_center = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -1994,6 +1998,16 @@ class BatchSim:
         if len(cv_rows) > 0:
             self.pciv_at[cv_rows, spot[cv_rows]] = self.p_next[cv_rows]
         self.p_next[rows] += 1
+        # P4/D-22: track the strongest MELEE ever fielded (city defense).
+        # Gated on `can` like TS — a no-spot spawn never lands the unit.
+        # clamp max too: unmasked rows may hold district queue codes.
+        tim = type_idx.clamp(min=0, max=self.NU - 1)
+        melee_cs = torch.where(
+            can & (self._p_rng_str[tim] == 0),
+            self._p_combat[tim],
+            torch.zeros_like(self.best_melee),
+        )
+        self.best_melee = torch.maximum(self.best_melee, melee_cs)
 
     def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
         """A player unit entering a camp tile clears it: +50 gold and the
@@ -2486,9 +2500,12 @@ class BatchSim:
             hit = hit & self.rc_alive[torch.arange(self.B, device=self.device), civ, j]
             slot = torch.where(att & hit, torch.full_like(slot, j), slot)
         bidx = torch.arange(self.B, device=self.device)
-        pop = self.rc_pop[bidx, civ, slot]
-        ntech = self.r_techs[bidx, civ].sum(dim=1)
-        def_cs = 15 + pop + torch.floor(ntech.double() * self.rules.rivals.get("research", {}).get("defPerTech", 3)).long()
+        # P4/D-22 (rivalCityDefense): max(15, THAT civ's strongest melee
+        # ever) + 5 for its own military garrisoning the center.
+        best_r = self.r_best_melee[bidx, civ]
+        gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
+        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.p_type[:, p]]
         d_city = self._damage_roll(att, atk_cs - def_cs)
         d_atk = self._damage_roll(att, def_cs - atk_cs)
@@ -3207,6 +3224,16 @@ class BatchSim:
         self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
+        # P4/D-22: the civ's strongest melee ever (city defense); rival
+        # military is melee unless the roster type carries ranged strength.
+        # clamp max too: unmasked rows may hold district queue codes.
+        ti = (type_idx if type_idx.dim() > 0 else type_idx.expand(self.B)).clamp(min=0, max=self.NU - 1)
+        melee_cs = torch.where(
+            can & (self._p_rng_str[ti] == 0),
+            self._p_combat[ti],
+            torch.zeros_like(self.r_best_melee[:, civ]),
+        )
+        self.r_best_melee[:, civ] = torch.maximum(self.r_best_melee[:, civ], melee_cs)
 
     def rival_masks(self, r: int) -> dict[str, torch.Tensor]:
         """C2b: a controlled rival's decision space, in the PLAYER head
@@ -3997,7 +4024,8 @@ class BatchSim:
 
     def _attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
         """A barbarian battering a rival city (mirrors attackRivalCity):
-        defense 15 + pop + ⌊tech·1.5⌋; sacked at 0 HP, never captured."""
+        P4/D-22 defense (best-melee-ever + garrison); sacked at 0 HP,
+        never captured."""
         if not bool(att.any()):
             return
         ttc = tgt.clamp(min=0)
@@ -4009,9 +4037,12 @@ class BatchSim:
             hit = hit & self.rc_alive[torch.arange(self.B, device=self.device), civ, j]
             slot = torch.where(att & hit, torch.full_like(slot, j), slot)
         bidx = torch.arange(self.B, device=self.device)
-        pop = self.rc_pop[bidx, civ, slot]
-        ntech = self.r_techs[bidx, civ].sum(dim=1)  # [B] — per-game tree size
-        def_cs = 15 + pop + torch.floor(ntech.double() * self.rules.rivals.get("research", {}).get("defPerTech", 3)).long()
+        # P4/D-22 (rivalCityDefense): max(15, civ's strongest melee ever)
+        # + 5 for its own military garrisoning the center.
+        best_r = self.r_best_melee[bidx, civ]
+        gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
+        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._unit_combat[self.u_type[:, u]]
         d_city = self._damage_roll(att, atk_cs - def_cs)
         d_atk = self._damage_roll(att, def_cs - atk_cs)
@@ -4139,15 +4170,12 @@ class BatchSim:
             atk_cs = self._p_combat[self.v_type[:, u]]
         city_max_hp = int(self.rules.combat.get("cityMaxHp", 200))
         sitec = self.site.clamp(min=0)
+        # P4/D-22 (cityDefenseStrength): max(15, strongest melee ever) + 5
+        # when the PLAYER's own military garrisons the center (a hostile
+        # standing there is a besieger, not a garrison). No population term.
         gm = self.pmil_at.gather(1, sitec)
-        gb = self.barb_at.gather(1, sitec)
-        g_cs_p = torch.where(gm >= 0, self._p_combat[self.p_type.gather(1, gm.clamp(min=0))], torch.zeros_like(gm))
-        g_cs_b = torch.where(gb >= 0, self._unit_combat[self.u_type.gather(1, gb.clamp(min=0))], torch.zeros_like(gb))
-        garrison_cs = torch.where(gm >= 0, g_cs_p, g_cs_b)
-        g_cs = garrison_cs.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
-        def_cs = torch.maximum(g_cs, torch.full_like(g_cs, 15)) + torch.div(
-            self.pop.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1), 2, rounding_mode="floor"
-        )
+        gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
+        def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
         d_city = self._damage_roll(att, atk_cs - def_cs)
         d_self = self._damage_roll(att, def_cs - atk_cs)
         rows = att.nonzero(as_tuple=True)[0]

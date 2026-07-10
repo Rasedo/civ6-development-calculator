@@ -100,6 +100,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     tradeRoutes: [],
     settlers: 0,
     buildersTrained: 0, // P4/D-10
+    bestMeleeCS: 0, // P4/D-22
     plannedSettles: [],
     unitsMode,
     units: [],
@@ -898,6 +899,13 @@ export function deserialize(json: string): GameState {
   state.tradeRoutes ??= [];
   state.settlers ??= 0;
   state.buildersTrained ??= 0; // P4/D-10
+  // P4/D-22: older saves seed the tracker from the standing army.
+  state.bestMeleeCS ??= Math.max(
+    0,
+    ...state.units
+      .filter((u) => u.owner === 'player' && !UNITS[u.type]?.ranged)
+      .map((u) => UNITS[u.type]?.combat ?? 0),
+  );
   state.plannedSettles ??= [];
   state.unitsMode ??= false;
   state.units ??= [];

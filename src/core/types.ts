@@ -218,6 +218,9 @@ export interface GameState {
   /** P4/D-10: builders ever trained or purchased — each adds +4 (pre-speed)
    * to the next builder's cost, like real Civ 6. */
   buildersTrained: number;
+  /** P4/D-22: combat strength of the strongest MELEE unit the player has
+   * ever fielded — real Civ 6 bases city defense on it. */
+  bestMeleeCS: number;
   /** Tile indexes queued for automatic founding as settlers complete. */
   plannedSettles: number[];
   /**
@@ -316,6 +319,8 @@ export interface RivalCiv {
   treasury?: number;
   /** P4/D-10: this civ's builders ever trained (its own cost escalator). */
   buildersTrained?: number;
+  /** P4/D-22: this civ's strongest melee unit ever fielded (city defense). */
+  bestMeleeCS?: number;
 }
 
 export interface ReligionState {

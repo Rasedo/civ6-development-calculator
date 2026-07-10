@@ -26,7 +26,6 @@ import {
 } from './units';
 import { revealAround } from './fog';
 import { CITY_WORK_RADIUS } from '../data/constants';
-import { RIVAL_DEF_PER_TECH } from '../data/rivals';
 import { transferCityToRival } from './rivals';
 import type { RuleResult } from './rules';
 import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
@@ -66,10 +65,14 @@ function damageRoll(state: GameState, strengthDiff: number): number {
   return Math.max(1, Math.round(base * (0.8 + 0.4 * nextRandom(state))));
 }
 
+// P4/D-22 (real Civ 6): city defense = the strongest MELEE unit the owner
+// has ever fielded (floor 15), +5 when the owner's own military garrisons
+// the center. No population term; walls stay out of scope.
 export function cityDefenseStrength(state: GameState, city: City): number {
-  const garrison = unitsAt(state, city.centerIndex).find((u) => unitDomain(u.type) === 'military');
-  const garrisonCS = garrison ? UNITS[garrison.type]?.combat ?? 0 : 0;
-  return Math.max(15, garrisonCS) + Math.floor(city.population / 2);
+  const garrison = unitsAt(state, city.centerIndex).find(
+    (u) => u.owner === 'player' && unitDomain(u.type) === 'military',
+  );
+  return Math.max(15, state.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
 export function getCityHp(state: GameState, cityId: number): number {
@@ -251,14 +254,19 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 // Rival cities: siege and capture
 // ---------------------------------------------------------------------------
 
-function rivalCityDefense(rival: RivalCiv, city: RivalCity): number {
-  // C1-B3b: defense reads the real tree (was techLevel × 1.5).
-  return 15 + city.population + Math.floor(rival.research.techs.length * RIVAL_DEF_PER_TECH);
+function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalCity): number {
+  // P4/D-22 (symmetric with cityDefenseStrength): the rival's strongest
+  // melee ever (floor 15) + 5 for its own military garrisoning the center.
+  // Their defense keeps pace through military techs raising bestMeleeCS.
+  const garrison = unitsAt(state, city.centerIndex).find(
+    (u) => u.owner === 'rival' && u.civId === rival.id && unitDomain(u.type) === 'military',
+  );
+  return Math.max(15, rival.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
   const atkCS = UNITS[attacker.type]?.combat ?? 0;
-  const defCS = rivalCityDefense(rival, city);
+  const defCS = rivalCityDefense(state, rival, city);
   city.hp -= damageRoll(state, atkCS - defCS);
   attacker.hp -= damageRoll(state, defCS - atkCS);
   attacker.movesLeft = 0;

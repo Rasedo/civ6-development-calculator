@@ -219,8 +219,18 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: the medium/low tail (D-17, D-22, D-23) and D-8's 25%
-under-represented discount.
+high-value: the medium/low tail (D-17, D-23) and D-8's 25% under-represented
+discount.
+
+D-22 COMPLETE (also closes symmetry C-9): city defense = max(15, strongest
+MELEE unit the owner has EVER fielded) + 5 when the owner's own military
+garrisons the center — no more population/tech-count terms, and the same
+formula for player and rival cities. Trackers: TS state.bestMeleeCS +
+rival.bestMeleeCS (spawnUnit chokepoint — training, purchase, levy, rival
+production; migrate seeds from the standing army), GPU best_melee/
+r_best_melee in _MUTABLE (spawn-site updates gated on the found-spot mask
+like TS). A hostile unit standing on a center no longer counts as the
+"garrison" (it's a besieger). Walls stay out of scope.
 
 D-15 COMPLETE: GAME_SPEED now scales uniformly — districts (base 54→32,
 TS districtCostIn + exporter districtCost.base + GPU fallback defaults),
