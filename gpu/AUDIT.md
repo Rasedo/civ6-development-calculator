@@ -199,14 +199,18 @@ C-7/C-8 too), D-3/D-4 (real entry rule: MP ≥ full step cost incl. river +3, wi
 full-MP one-tile exception — TS-only; both gate paths only ever walk one step from
 full MP, so the GPU one-step model already matches), D-5, D-6, D-7, D-8 (minus the
 25% under-represented discount), D-9, D-10 partial (base 50; +4/builder escalation
-open), D-13 verified subset, D-14, D-24; D-11 decided (R&F/GS canon).** The gate hunts these slices triggered also fixed: the
+open), D-13 verified subset, D-14, D-16 (real border curve 10+(6t)^1.3, both
+engines), D-19 (specialists yield-only — also closed a latent TS↔GPU GPP
+divergence: the GPU never counted them), D-20 (pillage heals only from FOOD
+improvements, both engines, both raider classes), D-24; D-11 decided (R&F/GS
+canon).** The gate hunts these slices triggered also fixed: the
 player-side per-city interleave (the #23 class), strip idempotence + the founding
 twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-strip
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
 high-value: the D-13 remainder (verify values), the D-10 escalation, plus the
-medium/low tail (D-12, D-15..D-23).
+medium/low tail (D-12, D-15, D-17, D-18, D-21, D-22, D-23).
 
 ### High confidence
 

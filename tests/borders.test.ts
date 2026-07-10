@@ -8,8 +8,9 @@ import { hexDistance } from '../src/core/hex';
 describe('cultural border growth', () => {
   it('expansion cost rises with tiles acquired', () => {
     expect(borderGrowthCost(0)).toBe(20);
-    expect(borderGrowthCost(1)).toBe(30);
-    expect(borderGrowthCost(2)).toBe(41); // 20 + 10*2^1.1
+    expect(borderGrowthCost(1)).toBe(35);
+    expect(borderGrowthCost(2)).toBe(52); // 10 + (6·3)^1.3
+    expect(borderGrowthCost(9)).toBe(214); // the real curve's late-game bite
   });
 
   it('culture claims new tiles over time, adjacent and within 5 rings', () => {
@@ -52,7 +53,7 @@ describe('cultural border growth', () => {
     expect(target.cityId).toBe(city.id);
     expect(state.treasury).toBe(1000 - cost);
     expect(city.tilesAcquired).toBe(1);
-    expect(tilePurchaseCost(state, city)).toBe(120); // next tile costs more
+    expect(tilePurchaseCost(state, city)).toBe(140); // next tile costs more (4 × 35)
 
     // far tile: not a candidate
     const far = tileAtCoords(state.map, 16, 9);

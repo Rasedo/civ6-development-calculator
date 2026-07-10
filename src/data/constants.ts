@@ -21,9 +21,11 @@ export const CITY_WORK_RADIUS = 3;
 /** Borders can grow culturally out to this many rings. */
 export const BORDER_MAX_RADIUS = 5;
 
-/** Culture needed for a city's next border expansion (n = tiles acquired so far). */
+/** Culture needed for a city's next border expansion (n = tiles acquired so
+ * far). P4/D-16: the real Civ 6 curve, 10 + (6t)^1.3 with t the 1-based tile
+ * count — first tile still ~20, but later tiles cost properly more. */
 export function borderGrowthCost(n: number): number {
-  return Math.floor(20 + 10 * Math.pow(n, 1.1));
+  return Math.floor(10 + Math.pow(6 * (n + 1), 1.3));
 }
 
 /** Gold price of buying a tile = culture cost × this (before policy discounts). */

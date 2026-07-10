@@ -592,6 +592,12 @@ class BatchSim:
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
+        # P4/D-20: food improvements heal their pillager (combat.ts
+        # PILLAGE_HEAL_IMPROVEMENTS); indexed by improvement code.
+        heal_names = ("FARM", "PASTURE", "CAMP", "PLANTATION", "FISHING_BOATS")
+        self._imp_heals = torch.tensor(
+            [n in heal_names for n in ids] or [False], dtype=torch.bool, device=device
+        )
         self._farm_food = float(imp.get("farmFood", 1))
         self._farm_housing = float(imp.get("farmHousing", 0.5))
         self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
@@ -940,7 +946,8 @@ class BatchSim:
         return torch.floor(15 + 8 * (p - 1) + (p - 1).clamp(min=0) ** 1.5)
 
     def _border_cost(self, n: torch.Tensor) -> torch.Tensor:
-        return torch.floor(20 + 10 * n.to(self.dtype) ** 1.1)
+        # P4/D-16: the real Civ 6 curve — 10 + (6t)^1.3, t = 1-based tile count.
+        return torch.floor(10 + (6 * (n.to(self.dtype) + 1)) ** 1.3)
 
     def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor) -> torch.Tensor:
         """[B, N] researchable now: not done, all prereqs done."""
@@ -2972,8 +2979,9 @@ class BatchSim:
             self.u_acted[:, u] = self.u_acted[:, u] | city_att | unit_att | rvc_att  # P4/D-2
 
             # Pillage: a raider that did not attack, standing on an owned,
-            # improved, unpillaged tile, pillages it (heals 25, holds — no
-            # march this turn), mirroring hostileUnitAct's pillage branch.
+            # improved, unpillaged tile, pillages it (holds — no march this
+            # turn), mirroring hostileUnitAct's pillage branch. P4/D-20: only
+            # FOOD improvements heal the pillager (+25).
             pillage = torch.zeros_like(act)
             if self.improvements_on:
                 h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
@@ -2982,11 +2990,14 @@ class BatchSim:
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
+                    heal_r = self._imp_heals[self.improvement[rows, here[rows]].clamp(min=0)]
                     self.pillaged[rows, here[rows]] = True
                     self.u_acted[rows, u] = True  # P4/D-2
                     self._eff_version += 1  # a farm's yield just dropped
                     hp_cap = self.rules.combat.get("unitHp", 100)
-                    self.u_hp[rows, u] = (self.u_hp[rows, u] + 25).clamp(max=hp_cap)
+                    self.u_hp[rows, u] = torch.where(
+                        heal_r, (self.u_hp[rows, u] + 25).clamp(max=hp_cap), self.u_hp[rows, u]
+                    )
 
             # March target: the nearest unpillaged owned improvement within
             # dist < 13 (ties → lowest tile index), else the nearest alive
@@ -3999,8 +4010,9 @@ class BatchSim:
         self.v_acted[:, v] = self.v_acted[:, v] | city_att | unit_att  # P4/D-2
 
         # Pillage: a war unit that did not attack, standing on an owned
-        # improved unpillaged tile, pillages it (heal 25, hold — no march),
-        # mirroring hostileUnitAct's pillage branch.
+        # improved unpillaged tile, pillages it (hold — no march), mirroring
+        # hostileUnitAct's pillage branch. P4/D-20: only FOOD improvements
+        # heal the pillager (+25).
         hc = here.clamp(min=0)
         pillage = torch.zeros_like(act)
         if self.improvements_on:
@@ -4010,11 +4022,14 @@ class BatchSim:
             pillage = act & ~attack & h_imp & h_unpil & h_owned
             if bool(pillage.any()):
                 rows = pillage.nonzero(as_tuple=True)[0]
+                heal_r = self._imp_heals[self.improvement[rows, hc[rows]].clamp(min=0)]
                 self.pillaged[rows, hc[rows]] = True
                 self.v_acted[rows, v] = True  # P4/D-2
                 self._eff_version += 1
                 hp_cap = self.rules.combat.get("unitHp", 100)
-                self.v_hp[rows, v] = (self.v_hp[rows, v] + 25).clamp(max=hp_cap)
+                self.v_hp[rows, v] = torch.where(
+                    heal_r, (self.v_hp[rows, v] + 25).clamp(max=hp_cap), self.v_hp[rows, v]
+                )
 
         # March target: nearest unpillaged owned improvement within dist < 13
         # (ties -> lowest tile index), else nearest player city — mirrors

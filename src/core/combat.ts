@@ -1,13 +1,13 @@
 /**
  * Combat and barbarians (eyeballed Civ 6). Damage uses the classic
- * 30·e^(0.04·Δstrength)·rand(0.75–1.25) curve, with +3 defense on
+ * 30·e^(0.04·Δstrength)·rand(0.8–1.2) curve, with +3 defense on
  * hills/woods/rainforest/marsh. Barbarian camps spawn in the wilds, garrison
  * themselves, and send raiders that pillage improvements and batter cities;
  * cities at 0 HP are sacked (population/gold loss, nearby pillaging), not
  * captured. All randomness flows through the in-state RNG.
  */
 
-import type { City, CityState, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import type { City, CityState, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { UNITS, UNIT_HP, CITY_MAX_HP } from '../data/units';
@@ -36,6 +36,17 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 export const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
+
+/** P4/D-20: food improvements heal their pillager (real Civ 6); the rest
+ * grant yields the pillager banks — nothing, for barbs and rival raiders.
+ * (Tile.improvement is a plain string, hence Set<string>.) */
+export const PILLAGE_HEAL_IMPROVEMENTS: ReadonlySet<string> = new Set<ImprovementId>([
+  'FARM',
+  'PASTURE',
+  'CAMP',
+  'PLANTATION',
+  'FISHING_BOATS',
+]);
 
 // ---------------------------------------------------------------------------
 // Combat math
@@ -404,11 +415,15 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     return;
   }
 
-  // 2. Pillage the improvement underfoot (heals 25, like Civ 6).
+  // 2. Pillage the improvement underfoot. P4/D-20 (real Civ 6): only FOOD
+  // improvements heal the pillager (+25); the rest are wrecked for yields
+  // the raiders here can't bank — pillaged, no heal.
   const here = tile();
   if (here.improvement && !here.pillaged && here.cityId !== -1) {
     here.pillaged = true;
-    unit.hp = Math.min(UNIT_HP, unit.hp + 25);
+    if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
+      unit.hp = Math.min(UNIT_HP, unit.hp + 25);
+    }
     unit.movesLeft = 0;
     return;
   }

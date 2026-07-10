@@ -789,7 +789,10 @@ export function endTurn(state: GameState): void {
 // Great people
 // ---------------------------------------------------------------------------
 
-/** Points each class gains per turn (districts + their buildings + specialists + beliefs). */
+/** Points each class gains per turn (districts + their buildings + beliefs).
+ * P4/D-19 (real Civ 6): specialists give YIELDS only, no GPP — dropping the
+ * old specialist term also closes a latent TS↔GPU divergence (the GPU never
+ * counted them). */
 export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonClass, number> {
   const out = Object.fromEntries(GP_CLASSES.map((c) => [c, 0])) as Record<GreatPersonClass, number>;
   const gppFlat = getModifiers(state).gppFlat;
@@ -802,7 +805,6 @@ export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonCl
       if (!inst) continue;
       let pts = 1 + (gppFlat[cls] ?? 0);
       pts += city.buildings.filter((b) => BUILDINGS[b]?.district === district).length;
-      pts += city.specialists[String(inst.tileIndex)] ?? 0;
       out[cls] += pts;
     }
   }
