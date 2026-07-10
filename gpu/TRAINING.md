@@ -475,3 +475,19 @@ The random drop (219.6 → 183.9) is the free-district subsidy dying —
 districts now cost the capital 54-450 production each; the scripted
 autopilot loses less (271.9 → 257.8) because its build order absorbs
 the queue time. The next reference net trains on THIS world.
+
+
+Post-P4 world (2026-07-10, commit 3c1193e — the fidelity batch: real
+combat rand 0.8-1.2, city spacing 4, settlers cost pop, the real
+district cost curve, verified maintenance, and the MP-gated four-tier
+HEALING model):
+
+    random    210.1 ± 26.3 (95% CI)  [min 0.0, max 407.6]
+    scripted  279.0 ± 19.5 (95% CI)  [min 76.5, max 408.1]
+
+Both UP from post-P2 (183.9 / 257.8): the healing change hurts sustained
+aggression, which softens barbarian/rival pressure on the PLAYER more
+than it costs the player's own (rare) offensives, and the freed
+maintenance (Monument/Granary/Water Mill/CH/Harbor) feeds the economy.
+Variance also tightened (CI 31 -> 26 random, 29 -> 20 scripted). The
+next reference net trains on THIS world.
