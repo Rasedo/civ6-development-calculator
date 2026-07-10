@@ -30,7 +30,7 @@ import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { BOOST_FRACTION } from '../data/boosts';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
-import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT } from '../data/constants';
+import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
 import { tileClaimed, civOfRival } from './civs';
 
@@ -294,6 +294,11 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   if (!availableBuildings(state, city).some((b) => b.id === buildingId)) {
     return { ok: false, reason: 'Building not available in this city.' };
   }
+  // P4/D-21 (real Civ 6): worship buildings are faith-purchase ONLY — they
+  // never enter the production queue (purchaseBuilding faith-prices them).
+  if (BUILDINGS[buildingId]?.worship) {
+    return { ok: false, reason: 'Worship buildings are purchased with faith, not built.' };
+  }
   if (state.sandbox) {
     city.buildings.push(buildingId);
   } else {
@@ -377,8 +382,11 @@ export function buildingPurchaseCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * GOLD_PURCHASE_MULT;
 }
 
-/** Faith price of a worship building. */
+/** Faith price of a worship building. P4/D-21: real Civ 6 charges a FLAT
+ * 190 faith for worship buildings (speed-scaled like every other cost);
+ * anything else keeps the production×mult schedule. */
 export function buildingFaithCost(buildingId: string): number {
+  if (BUILDINGS[buildingId]?.worship) return Math.round(190 * GAME_SPEED);
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 

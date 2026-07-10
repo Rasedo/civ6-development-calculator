@@ -206,7 +206,10 @@ improvements, both engines, both raider classes), D-24; D-10 COMPLETE (builder
 cost 50 + 4 per builder ever trained/queued, per-civ counters both engines,
 queue-locked + purchase-priced; the "mismatch" its gate run showed was a TRACE
 false positive — gpu-trace/statelog priced unit items statically, fourth of
-that class); D-12 (real amenity
+that class); D-21 (worship buildings are faith-purchase ONLY at a flat
+round(190·speed) = 114 faith — TS-only: the exporter never shipped worship
+buildings to the GPU catalog, so queueBuilding's new rejection aligns TS with
+both real Civ 6 and the GPU's effective behavior); D-12 (real amenity
 bands: Content exactly 0, Displeased −1..−2, Unhappy ≤−3 — Unrest/Revolt stay
 unimplemented features), D-18 (real loyalty values: pressure swing ±20,
 amenity loyalty ±6/±3 — data/export-driven, GPU fallback defaults aligned);
@@ -216,8 +219,10 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: the D-13 remainder (verify values), plus the medium/low tail
-(D-15, D-17, D-21, D-22, D-23) and D-8's 25% under-represented discount.
+high-value: the D-13 remainder (verify values — BLOCKED on a readable source:
+fandom returns 402 to fetchers; verify in-game or via an accessible mirror),
+plus the medium/low tail (D-15, D-17, D-22, D-23) and D-8's 25%
+under-represented discount.
 
 ### High confidence
 
