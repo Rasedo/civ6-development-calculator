@@ -240,6 +240,16 @@ def js_round(x: torch.Tensor) -> torch.Tensor:
     return torch.floor(x + 0.5)
 
 
+def first_argmax(x: torch.Tensor) -> torch.Tensor:
+    """argmax along dim 1 with ties -> LOWEST index. torch.argmax's tie pick
+    is UNSPECIFIED (P4 gate catch: an exact player/rival score tie flipped
+    the GV-1 leader column between engines); TS scans with strict >."""
+    best = x.max(dim=1, keepdim=True).values
+    n = x.shape[1]
+    ar = torch.arange(n, device=x.device).unsqueeze(0).expand_as(x)
+    return torch.where(x == best, ar, torch.full_like(ar, n)).min(dim=1).values
+
+
 _OFFSETS_CACHE: dict[int, torch.Tensor] = {}
 
 
@@ -1547,13 +1557,22 @@ class BatchSim:
         return total, housing, growth_f, tier_idx
 
     def empire_score(self) -> torch.Tensor:
-        """[B] — mirrors empireScore(state, 'balanced'): Σ over cities of
-        population × popWeight + city yields · balanced weights."""
+        """[B] — mirrors empireScore(state, 'balanced') with the TS
+        ASSOCIATION — per city: pop×popWeight, then each yield×weight in
+        key order. Science rides non-dyadic 0.7s, so the sum ORDER is a
+        real ±1 ulp (P4 catch: the GPU's einsum gave the player
+        124.74999999999999 vs TS's exact 124.75, flipping the GV-1 leader
+        while every rounded trace column matched)."""
         total, _, _, _ = self._city_totals()
         rd = self.rules_dev
-        pop_term = self.pop.sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
-        yield_term = torch.einsum("bck,k->b", total, rd.score_yield_weights)
-        return pop_term + yield_term
+        w = rd.score_yield_weights
+        pw = float(self.rules.score_pop_weight)
+        score = torch.zeros(self.B, dtype=self.dtype, device=self.device)
+        for c in range(self.C):
+            score = score + (self.pop[:, c] * self.alive[:, c].long()).to(self.dtype) * pw
+            for k in range(6):
+                score = score + total[:, c, k] * float(w[k])
+        return score
 
     def rival_score(self, r: int) -> torch.Tensor:
         """[B] — the empire_score analog for rival r's seat: pop x
@@ -1586,23 +1605,26 @@ class BatchSim:
         rd = self.rules_dev
         w = rd.score_yield_weights
         B = self.B
-        pop_term = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype) * self.rules.score_pop_weight
+        pw = float(self.rules.score_pop_weight)
+        # TS association (P4): per city — pop×popWeight FIRST, then the six
+        # yields in key order (rivalEmpireScore's per-city loop).
         yt = torch.zeros(B, dtype=torch.float64, device=self.device)
         for j in range(self.RC):
             mask = self.rc_alive[:, r, j]
             if not bool(mask.any()):
                 continue
+            yt = yt + (self.rc_pop[:, r, j] * self.rc_alive[:, r, j].long()).double() * pw
             f, pr, sc, cu, go, fa = self._rival_city_yields(r, j, mask)
             yt = yt + f * float(w[0]) + pr * float(w[1]) + go * float(w[2]) + sc * float(w[3]) + cu * float(w[4]) + fa * float(w[5])
-        return pop_term + yt.to(self.dtype)
+        return yt.to(self.dtype)
 
     def leader(self) -> torch.Tensor:
         """GV-1: [B] the current score-leader as a unified civ id — 0 =
         player, r+1 = rival r (civOfRival). Ties → lowest id (player first,
-        then lowest rival), matching TS's strict-> argmax. INERT: nothing
-        acts on it until GV-2."""
+        then lowest rival), matching TS's strict-> scan — via first_argmax
+        (torch.argmax's tie pick is unspecified)."""
         cols = [self.empire_score()] + [self.rival_empire_score(r) for r in range(self.R)]
-        return torch.stack(cols, dim=1).argmax(dim=1)
+        return first_argmax(torch.stack(cols, dim=1))
 
     def _domination(self) -> torch.Tensor:
         """GV-3: [B] the civ holding EVERY original capital (player site[0] +
@@ -4526,7 +4548,7 @@ class BatchSim:
             wr = (rng + 1 - d_rc).clamp(min=0) * self.rc_pop.reshape(B, -1).to(self.dtype) * rc_live.to(self.dtype)
             press_r = wr.reshape(B, self.R if self.R > 0 else 1, self.RC).sum(dim=2)
             press_r = torch.where(self.r_alive, press_r, torch.full_like(press_r, -1.0))
-            winner = press_r.argmax(dim=1)
+            winner = first_argmax(press_r)  # ties -> lowest rival id (TS strict >)
             rows = fc.nonzero(as_tuple=True)[0]
             for b in rows.tolist():
                 self._transfer_city_to_rival(b, c, int(winner[b]))
@@ -4620,6 +4642,7 @@ class BatchSim:
                 can = is_ps & (self.treasury >= s_cost)
                 self.treasury = torch.where(can, self.treasury - s_cost, self.treasury)
                 self.settlers = self.settlers + can.long()
+                self.pop[:, c] = torch.where(can, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])  # P4/D-6: purchased settlers cost the pop too
                 settlers_live = settlers_live + can.long()
             # --- buy a unit (purchaseUnit: trainable ∧ gold ∧ a free spawn
             # tile at/near the center — no tile means refund, i.e. a no-op)
@@ -4938,6 +4961,7 @@ class BatchSim:
             pop_loyal[:, c] = self.pop[:, c]
             t_c = total[:, c]  # [B, 6] this city's FRESH yields
             popf_c = self.pop[:, c].to(self.dtype)
+            pop_c0 = self.pop[:, c].clone()  # loop-top pop: TS stats.growthNeeded is frozen here (P4/D-6: a settler completion can shrink pop mid-block)
 
             # --- production (col c) -----------------------------------------------
             has_item = self.current[:, c] >= 0
@@ -4948,6 +4972,9 @@ class BatchSim:
             done = has_item & (self.progress[:, c] >= self.cur_cost[:, c])
             made_settler = done & (self.current[:, c] == self.SETTLER)
             self.settlers = self.settlers + made_settler.long()
+            # P4/D-6: a completed Settler costs the city 1 pop (real Civ 6);
+            # the pop-snapshot guard refreshes later cities' totals.
+            self.pop[:, c] = torch.where(made_settler, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])
             made_building = done & (self.current[:, c] < self.NB)
             if bool(made_building.any()):
                 bi = made_building.nonzero(as_tuple=True)[0]
@@ -4974,7 +5001,7 @@ class BatchSim:
             hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
             effective = torch.where(surplus > 0, surplus * hf * growth_f[:, c], surplus)
             self.food_box[:, c] = self.food_box[:, c] + effective
-            need = self._growth_needed(self.pop[:, c])
+            need = self._growth_needed(pop_c0)  # TS stats.growthNeeded: loop-top pop (P4/D-6)
             grow = self.alive[:, c] & (self.food_box[:, c] >= need)
             self.pop[:, c] = self.pop[:, c] + grow.long()
             self.food_box[:, c] = torch.where(grow, self.food_box[:, c] - need, self.food_box[:, c])
@@ -5214,7 +5241,7 @@ class BatchSim:
         # of rival_empire_score/_rival_city_yields per turn, the trace hotspot).
         e_score = self.empire_score()
         r_scores = [self.rival_empire_score(r) for r in range(self.R)]
-        leader_id = torch.stack([e_score] + r_scores, dim=1).argmax(dim=1)
+        leader_id = first_argmax(torch.stack([e_score] + r_scores, dim=1))  # ties -> lowest id (TS strict >)
         cols = [
             torch.full((self.B,), float(self.turn), dtype=self.dtype, device=self.device),
             self.techs.sum(dim=1).to(self.dtype),

@@ -52,7 +52,8 @@ def gpu_state_lines(sim, b):
         f"cul:{_milli(sim.culture_total[b])} ntech:{int(sim.techs[b].sum())} "
         f"nciv:{int(sim.civics[b].sum())} nset:{int(sim.settlers[b])} ncity:{ncity} nunit:{nunit} "
         f"umaint:{_milli((sim.p_alive[b] * sim._p_maint[sim.p_type[b]]).sum())} "
-        f"gp:{','.join(str(int(x)) for x in sim.gp_earned[b].tolist())}"
+        f"gp:{','.join(str(int(x)) for x in sim.gp_earned[b].tolist())} "
+        f"esc:{_milli(sim.empire_score()[b])}"
     )
     for pp in range(sim.p_alive.shape[1]):
         if bool(sim.p_alive[b, pp]):
@@ -99,7 +100,8 @@ def gpu_state_lines(sim, b):
         L.append(
             f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} "
             f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))} "
-            f"terr:{int((sim.rival_at[b] == r).sum())} wterr:{int(((sim.rival_at[b] == r) & sim.water[b]).sum())}"
+            f"terr:{int((sim.rival_at[b] == r).sum())} wterr:{int(((sim.rival_at[b] == r) & sim.water[b]).sum())} "
+            f"rsc:{_milli(sim.rival_empire_score(r)[b])}"
         )
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):

@@ -441,6 +441,8 @@ export function purchaseSettler(state: GameState, cityId: number): RuleResult {
     state.treasury -= cost;
   }
   state.settlers += 1;
+  // P4/D-6: purchased settlers cost the pop too (real Civ 6).
+  city.population = Math.max(1, city.population - 1);
   return { ok: true };
 }
 
@@ -685,6 +687,8 @@ export function endTurn(state: GameState): void {
           state.map.tiles[item.tileIndex].builtWonderComplete = true;
         } else if (item.kind === 'settler') {
           state.settlers += 1;
+          // P4/D-6: real Civ 6 — a completed Settler costs the city 1 pop.
+          city.population = Math.max(1, city.population - 1);
         } else if (item.kind === 'unit') {
           spawnUnit(state, item.unit, city.centerIndex);
         } else if (item.kind === 'project') {

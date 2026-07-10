@@ -5,6 +5,7 @@
  */
 import { getCityHp, terrainDefense } from '../src/core/combat';
 import { rivalCityYields } from '../src/core/rivals';
+import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { isWater } from '../src/core/query';
 import { computeCityStats } from '../src/core/city';
 import { unitMaintenance } from '../src/core/units';
@@ -33,7 +34,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
       `cul:${Math.round(state.cultureTotal*1000)} ntech:${state.research.techs.length} ` +
       `nciv:${state.research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length} ` +
       `umaint:${Math.round(unitMaintenance(state)*1000)} ` +
-      `gp:${GP_CLASSES.map((cls) => greatPeopleEarned(state, cls)).join(',')}`,
+      `gp:${GP_CLASSES.map((cls) => greatPeopleEarned(state, cls)).join(',')} ` +
+      `esc:${Math.round(empireScore(state, 'balanced') * 1000)}`,
   );
   for (const u of pu) L.push(`${p}PU ${u.tileIndex} = t${ti(u.type)} hp${u.hp}`);
 
@@ -87,7 +89,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     L.push(
       `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} ` +
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0} ` +
-        `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length}`,
+        `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length} ` +
+        `rsc:${Math.round(rivalEmpireScore(state, rival) * 1000)}`,
     );
     for (const rc of rival.cities) {
       const ry = rivalCityYields(state, rival, rc);

@@ -20,8 +20,9 @@ export function tradeCapacity(state: GameState): number {
   let cap = 0;
   if (isCivicComplete(state, 'FOREIGN_TRADE')) cap += 1;
   for (const c of state.cities) {
-    if (c.buildings.includes('MARKET')) cap += 1;
-    if (c.buildings.includes('LIGHTHOUSE')) cap += 1;
+    // P4/D-7: real Civ 6 — a city with BOTH a Market and a Lighthouse
+    // still grants only +1 capacity (non-cumulative per city).
+    if (c.buildings.includes('MARKET') || c.buildings.includes('LIGHTHOUSE')) cap += 1;
     for (const w of c.wonders) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
