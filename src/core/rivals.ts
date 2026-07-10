@@ -5,7 +5,7 @@
  * — at-war units raid like barbarians, and cities can be conquered.
  */
 
-import type { City, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
+import type { City, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
@@ -576,14 +576,42 @@ function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity,
     }
     if (best < 0) continue;
     const tile = state.map.tiles[best];
+    // P4/D-8: the rival's own discount, priced BEFORE registering the
+    // placement (symmetric with the player's queueDistrict).
+    const base = districtCostIn(rival.research);
+    const cost = rivalDistrictDiscounted(state, rival, id, unlocks) ? Math.floor(base * 0.6) : base;
     tile.district = id;
     tile.districtComplete = false;
     tile.improvement = null;
     rc.districts.push({ type: id, tileIndex: best });
-    rc.queue.push({ kind: 'district', district: id, tileIndex: best, progress: 0, cost: districtCostIn(rival.research) });
+    rc.queue.push({ kind: 'district', district: id, tileIndex: best, progress: 0, cost });
     return true;
   }
   return false;
+}
+
+/** P4/D-8 (symmetric with districtDiscounted): 40% off while this rival has
+ * PLACED fewer of the type than its per-unlocked-type average of COMPLETED
+ * specialty districts — n < ceil(D/U), D ≥ U, from ITS OWN research. */
+function rivalDistrictDiscounted(
+  state: GameState,
+  rival: RivalCiv,
+  type: DistrictId,
+  unlocks: Unlocks,
+): boolean {
+  if (!DISTRICTS[type]?.countsTowardLimit) return false;
+  const U = [...unlocks.districts].filter((d) => DISTRICTS[d as DistrictId]?.countsTowardLimit).length;
+  if (U === 0) return false;
+  let D = 0;
+  let n = 0;
+  for (const rc of rival.cities) {
+    for (const d of rc.districts) {
+      if (!DISTRICTS[d.type]?.countsTowardLimit) continue;
+      if (state.map.tiles[d.tileIndex].districtComplete) D += 1;
+      if (d.type === type) n += 1;
+    }
+  }
+  return D >= U && n < Math.ceil(D / U);
 }
 
 /**

@@ -59,8 +59,29 @@ export function districtCostIn(research: ResearchState): number {
   return Math.floor(Math.round(54 * GAME_SPEED) * (1 + 9 * Math.max(tPct, cPct)));
 }
 
-export function districtCost(state: GameState): number {
-  return districtCostIn(state.research);
+/** P4/D-8: the GS district discount — 40% off a specialty type while the civ
+ * has PLACED fewer of it than its per-unlocked-type average of COMPLETED
+ * specialty districts: n < ceil(D/U), gated on D ≥ U (civfanatics 27783). */
+export function districtDiscounted(state: GameState, type: DistrictId): boolean {
+  if (!DISTRICTS[type]?.countsTowardLimit) return false;
+  const unlocks = computeUnlocks(state);
+  const U = [...unlocks.districts].filter((d) => DISTRICTS[d as DistrictId]?.countsTowardLimit).length;
+  if (U === 0) return false;
+  let D = 0;
+  let n = 0;
+  for (const c of state.cities) {
+    for (const d of c.districts) {
+      if (!DISTRICTS[d.type]?.countsTowardLimit) continue;
+      if (state.map.tiles[d.tileIndex].districtComplete) D += 1;
+      if (d.type === type) n += 1;
+    }
+  }
+  return D >= U && n < Math.ceil(D / U);
+}
+
+export function districtCost(state: GameState, type?: DistrictId): number {
+  const base = districtCostIn(state.research);
+  return type !== undefined && districtDiscounted(state, type) ? Math.floor(base * 0.6) : base;
 }
 
 export function createGame(
@@ -288,9 +309,12 @@ export function queueDistrict(
   tile.feature = null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
 
+  // P4/D-8: price BEFORE registering the placement (the discount reads the
+  // pre-placement counts — "value C changes the moment you place").
+  const cost = districtCost(state, type);
   city.districts.push({ type, tileIndex });
   if (!state.sandbox) {
-    city.queue.push({ kind: 'district', district: type, tileIndex, progress: 0, cost: districtCost(state) });
+    city.queue.push({ kind: 'district', district: type, tileIndex, progress: 0, cost });
   }
   return { ok: true };
 }

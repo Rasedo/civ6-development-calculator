@@ -499,6 +499,11 @@ const rules = {
     return {
       id,
       idx,
+      // P4/D-8: the unlockDistrict effect's tech/civic index (-1 = none in
+      // the compact tree) — the discount's U counts types with a satisfied
+      // unlock, exactly mirroring computeUnlocks().districts.
+      unlockTech: techList.findIndex((t) => t.effects.some((e) => e.kind === 'unlockDistrict' && e.district === id)),
+      unlockCivic: civicList.findIndex((c) => c.effects.some((e) => e.kind === 'unlockDistrict' && e.district === id)),
       cost: d.cost,
       adjYield: d.adjacencyYield ? YIELD_KEYS.indexOf(d.adjacencyYield) : -1,
       adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),

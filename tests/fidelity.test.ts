@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
-import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, effectiveResearchCost, itemCost } from '../src/core/game';
+import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost } from '../src/core/game';
 import { detectBoosts, toggleBoost, isBoosted } from '../src/core/boosts';
 import { computeCityStats, computeHousing, cityMaintenance } from '../src/core/city';
 import { tileAppeal, appealTier } from '../src/core/appeal';
@@ -57,6 +57,30 @@ describe('district cost scaling', () => {
     grantTechs(state, 'POTTERY', 'MINING', 'SAILING', 'ASTROLOGY');
     expect(districtCost(state)).toBeGreaterThan(early);
     expect(itemCost(city.queue[0])).toBe(locked); // still the price it was queued at
+  });
+
+  it('D-8: under-represented specialty types cost 40% less', () => {
+    const state = makeState(makeMap(16, 16));
+    const city = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
+    grantTechs(state, 'WRITING', 'ASTROLOGY'); // Campus + Holy Site unlocked → U = 2
+
+    // no completed districts yet: D(0) < U(2) → nothing is discounted
+    expect(districtDiscounted(state, 'HOLY_SITE')).toBe(false);
+
+    // two COMPLETED campuses → D = 2 ≥ U, threshold ceil(2/2) = 1
+    for (const [col, row] of [
+      [9, 8],
+      [7, 8],
+    ] as const) {
+      const t = tileAtCoords(state.map, col, row);
+      t.district = 'CAMPUS';
+      t.districtComplete = true;
+      city.districts.push({ type: 'CAMPUS', tileIndex: t.index });
+    }
+    expect(districtDiscounted(state, 'HOLY_SITE')).toBe(true); // placed 0 < 1
+    expect(districtDiscounted(state, 'CAMPUS')).toBe(false); // placed 2 ≥ 1
+    expect(districtCost(state, 'HOLY_SITE')).toBe(Math.floor(districtCost(state) * 0.6));
+    expect(districtCost(state, 'CAMPUS')).toBe(districtCost(state));
   });
 });
 

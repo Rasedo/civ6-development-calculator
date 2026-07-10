@@ -724,6 +724,10 @@ class BatchSim:
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
         self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
         self._aqueduct_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "AQUEDUCT"), -1)
+        # P4/D-8: per-type unlock indices (-1 = no unlockDistrict effect in
+        # the compact tree — NOT unlocked, mirroring computeUnlocks).
+        self._d_unlock_t = torch.tensor([int(d.get("unlockTech", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
+        self._d_unlock_c = torch.tensor([int(d.get("unlockCivic", -1)) for d in self.districts_cat], dtype=torch.long, device=device)
         self._d_maint = torch.tensor([float(d.get("maintenance", 1)) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] gold upkeep per district type
         self._h_fresh = float(rules.housing_fresh)
         self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
@@ -970,6 +974,43 @@ class BatchSim:
         == js_round)."""
         r = self.rules
         return js_round((r.builder_base + r.builder_per * n.to(self.dtype)) * r.game_speed)
+
+    def _unlocked_specialty_count(self, techs2: torch.Tensor, civics2: torch.Tensor) -> torch.Tensor:
+        """P4/D-8: [B] U — specialty district types whose unlockDistrict
+        tech/civic is researched (districtDiscounted's U; -1 = never)."""
+        ut, uc = self._d_unlock_t, self._d_unlock_c
+        unl = ((ut >= 0).unsqueeze(0) & techs2[:, ut.clamp(min=0)]) | (
+            (uc >= 0).unsqueeze(0) & civics2[:, uc.clamp(min=0)]
+        )  # [B, nD]
+        return (unl & self._is_specialty.unsqueeze(0)).sum(dim=1)
+
+    def _player_district_discounted(self, di: int) -> torch.Tensor:
+        """P4/D-8 (districtDiscounted): [B] bool — 40% off type di while the
+        player has PLACED fewer of it than ceil(D/U) with D = COMPLETED
+        specialty districts owned, U = unlocked specialty types, D ≥ U."""
+        if not bool(self._is_specialty[di]):
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        U = self._unlocked_specialty_count(self.techs, self.civics)
+        own = self.owner >= 0
+        spec_t = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
+        D = (own & spec_t & self.district_complete).sum(dim=1)
+        n = (own & (self.district == di)).sum(dim=1)
+        thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")  # ceil(D/U)
+        return (U > 0) & (D >= U) & (n < thresh)
+
+    def _rival_district_discounted(self, r: int, di: int) -> torch.Tensor:
+        """P4/D-8 (rivalDistrictDiscounted): the same rule from THIS rival's
+        own trees and rc_dist_tile registry."""
+        if not bool(self._is_specialty[di]):
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        U = self._unlocked_specialty_count(self.r_techs[:, r], self.r_civics[:, r])
+        placed = self.rc_dist_tile[:, r]  # [B, RC, nD] tile per (city, type)
+        n = (placed[:, :, di] >= 0).sum(dim=1)
+        tiles_f = placed.clamp(min=0).reshape(self.B, -1)
+        comp = (placed >= 0) & self.district_complete.gather(1, tiles_f).reshape(placed.shape)
+        D = (comp & self._is_specialty.view(1, 1, -1)).sum(dim=(1, 2))
+        thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")
+        return (U > 0) & (D >= U) & (n < thresh)
 
     def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor) -> torch.Tensor:
         """[B, N] researchable now: not done, all prereqs done."""
@@ -3518,10 +3559,13 @@ class BatchSim:
                     want_d = is_d & (a == NBn + 2 + self.NU + si)
                     if not bool(want_d.any()):
                         continue
+                    # P4/D-8: discount read BEFORE the placement registers
+                    disc = self._rival_district_discounted(r, di)
+                    d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                     placed = self._place_district_rival(r, j, di, want_d, plc)
                     if bool(placed.any()):
                         self.rc_current[:, r, j] = torch.where(placed, torch.full_like(self.rc_current[:, r, j], 1 + self.NU + si), self.rc_current[:, r, j])
-                        self.rc_cost[:, r, j] = torch.where(placed, d_cost, self.rc_cost[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(placed, d_cost_si, self.rc_cost[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
 
     def _rival_job_mask(self, r: int, techs: torch.Tensor | None = None, civics: torch.Tensor | None = None) -> torch.Tensor:
@@ -4381,10 +4425,13 @@ class BatchSim:
                         want_d = rem & has_tech & not_owned & under_cap
                         if not bool(want_d.any()):
                             continue
+                        # P4/D-8: discount read BEFORE the placement registers
+                        disc = self._rival_district_discounted(r, di)
+                        d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                         placed = self._place_district_rival(r, j, di, want_d, plc)
                         if bool(placed.any()):
                             self.rc_current[:, r, j] = torch.where(placed, torch.full_like(self.rc_current[:, r, j], 1 + self.NU + si), self.rc_current[:, r, j])
-                            self.rc_cost[:, r, j] = torch.where(placed, d_cost, self.rc_cost[:, r, j])
+                            self.rc_cost[:, r, j] = torch.where(placed, d_cost_si, self.rc_cost[:, r, j])
                             self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                             spec_cnt = spec_cnt + (placed & torch.tensor(bool(self._is_specialty[di]), device=dev)).long()
                             rem = rem & ~placed
@@ -5030,11 +5077,14 @@ class BatchSim:
                     want = (self.current[:, 0] == -1) & ~dtaken & has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & under_cap
                     if not bool(want.any()):
                         continue
+                    # P4/D-8: discount read BEFORE the placement registers
+                    disc = self._player_district_discounted(di)
+                    d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                     placed, best = self._place_district(di, want, 0, plc)
                     if bool(placed.any()):
                         self.dscaffold_placed[:, si] = self.dscaffold_placed[:, si] | placed
                         self.current[:, 0] = torch.where(placed, torch.full_like(self.current[:, 0], self.UNIT_BASE + self.NU + si), self.current[:, 0])
-                        self.cur_cost[:, 0] = torch.where(placed, d_cost, self.cur_cost[:, 0])
+                        self.cur_cost[:, 0] = torch.where(placed, d_cost_si, self.cur_cost[:, 0])
                         self.progress[:, 0] = torch.where(placed, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
                         self.q_dtile[:, 0] = torch.where(placed, best, self.q_dtile[:, 0])
                         dtaken = dtaken | placed
@@ -5124,10 +5174,13 @@ class BatchSim:
                         under_cap = (plc == 1) | (spec_count < cap_c)  # Aqueduct is non-specialty → no cap
                         want = (ac == dbase + si) & has_tech & under_cap & not_owned
                         if bool(want.any()):
+                            # P4/D-8: discount read BEFORE the placement registers
+                            disc = self._player_district_discounted(di)
+                            d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                             placed, best = self._place_district(di, want, c, plc)
                             if bool(placed.any()):
                                 self.current[:, c] = torch.where(placed, torch.full_like(self.current[:, c], dbase + si), self.current[:, c])
-                                self.cur_cost[:, c] = torch.where(placed, d_cost, self.cur_cost[:, c])
+                                self.cur_cost[:, c] = torch.where(placed, d_cost_si, self.cur_cost[:, c])
                                 self.progress[:, c] = torch.where(placed, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
                                 self.q_dtile[:, c] = torch.where(placed, best, self.q_dtile[:, c])
 

@@ -219,20 +219,22 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: D-8's under-represented discount (the ONLY open D item).
+**SECTION D IS CLOSED — every tracked fidelity divergence is fixed or
+canon-decided.**
 
-D-8 DISCOUNT DESIGN (verified 2026-07-10, civfanatics resource 27783 +
-thread 625743; NOT yet implemented): under our R&F/GS canon the discount is
-**40%** (not 25% — that was vanilla; GovPlaza's 25% is out of scope). Rule:
-a district TYPE is discounted iff the civ's COMPLETED count of that type
-n < ceil(D/U), gated on D ≥ U, where D = total completed specialty
-districts the civ owns and U = number of specialty district types it has
-UNLOCKED (tech/civic satisfied). Cost = floor(districtCostIn(...) × 0.6),
-locked at queue time like today. Surfaces (lockstep): TS districtCost
-(type-aware now) + queueDistrict, rivals.ts tryQueueRivalDistrict (the
-rival's OWN counts/unlocks — symmetric); GPU: the 4 pricing sites (player
-scripted + RL, rival scripted + controlled) using the scaffold-type unlock
-tensors and per-owner district counts. Baselines re-shift when it lands.
+D-8 DISCOUNT COMPLETE (the final item; civfanatics resource 27783 + thread
+625743): under our R&F/GS canon the discount is **40%** (vanilla's 25% and
+GovPlaza are out of scope). A specialty type is discounted iff the civ has
+PLACED fewer of it than ceil(D/U) with D = its COMPLETED specialty
+districts, U = its UNLOCKED specialty types, gated D ≥ U; cost =
+floor(districtCostIn × 0.6), priced BEFORE the placement registers ("value
+C changes the moment you place") and locked at queue like everything else.
+Surfaces (lockstep): TS districtCost(type)/districtDiscounted +
+queueDistrict, rivalDistrictDiscounted in tryQueueRivalDistrict; exporter
+ships unlockTech/unlockCivic per catalog entry (U counts match
+computeUnlocks by construction — every unlockDistrict effect targets a
+PLACEABLE district); GPU _player/_rival_district_discounted +
+_unlocked_specialty_count over the 4 pricing sites.
 
 D-17 COMPLETE (TS-only — tile purchase has no GPU verb): the real schedule,
 verified via the civfanatics formula thread — ring-based base (50 ring ≤2,
