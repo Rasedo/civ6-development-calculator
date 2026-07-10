@@ -2335,6 +2335,13 @@ class BatchSim:
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
             self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
             self.loyalty[b, c_new] = 100.0
+            # TS captureRivalCity tail (AUDIT C-11): conquest plunders +40
+            # gold, and the war ends if it was the rival's last city. The
+            # raze path (`continue` above) mirrors TS's early return —
+            # no gold, war state untouched.
+            self.treasury[b] += 40.0
+            if not bool(self.rc_alive[b, r].any()):
+                self.r_atwar[b, r] = False
         self._eff_version += 1
 
     def _player_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:

@@ -109,10 +109,13 @@ only the decision policy may differ. Findings (engine = TS / GPU / both):
     pop-only — `r_treasury` untouched, no pillage ring (`combat.ts:256-261`,
     `engine.py:3734-3738`).
 11. **Capture plunder** — player capturing a rival city: TS grants +40 (`combat.ts:354`);
-    **[CONFIRMED] GPU `_capture_rival_city` (`engine.py:2302-2338`) has NO +40 — a latent
+    **[CONFIRMED] GPU `_capture_rival_city` (`engine.py:2302-2338`) had NO +40 — a latent
     TS↔GPU parity bug** (masked only because no off-script game captures a rival city yet).
-    Rival capturing a player city: no plunder either direction (`rivals.ts:368-399`,
-    `engine.py:4376-4405`).
+    **FIXED 2026-07-10**: the GPU now credits +40 AND ends the war on the rival's last city
+    (a second TS-mirror gap found in the same TS block, combat.ts:357-360; the raze path
+    mirrors TS's early return — no gold, war unchanged). war_test poke covers all branches.
+    STILL OPEN (C-11b): rival capturing a player city plunders nothing in either engine
+    (`rivals.ts:368-399`, `engine.py:4376-4405`) — the symmetry half.
 12. **Rival economy skipped** [both] — no building/district/unit maintenance, no bankruptcy
     disband for rivals; they bank gross gold (`rivals.ts:869,940`, `engine.py:4096,4188`) vs
     the player's full upkeep chain (`city.ts:81-102`, `game.ts:736-753`, `engine.py:1505-1508,

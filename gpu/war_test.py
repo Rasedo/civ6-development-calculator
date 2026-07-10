@@ -123,6 +123,51 @@ def test_peace(rules, path):
     print(f"  sue-for-peace OK (cost {cost:.0f} at warTurns {wt}, bit-equal transition)")
 
 
+def test_capture_plunder(rules, path):
+    """AUDIT C-11: capturing a rival city plunders +40 gold and, when it was
+    the rival's LAST city, ends the war — TS captureRivalCity's exact tail.
+    The raze path (player city slots full) gets neither: TS returns early."""
+    sim = build(rules, path)
+    for _ in range(20):
+        sim.step()
+    idx = sim.rc_alive[0].nonzero()
+    assert len(idx), "no rival city by t20 on this seed"
+    r = int(idx[0, 0])
+    sim.r_atwar[0, r] = True
+    caps = 0
+    # capture rival r's cities one by one until eliminated (or player slots full)
+    while bool(sim.rc_alive[0, r].any()) and bool((~sim.alive[0]).any()):
+        jj = int(sim.rc_alive[0, r].nonzero()[0, 0])
+        t0 = float(sim.treasury[0])
+        sim._capture_rival_city(
+            torch.tensor([0]), torch.tensor([r]), torch.tensor([jj]),
+            torch.tensor([int(sim.rc_center[0, r, jj])]),
+        )
+        caps += 1
+        assert float(sim.treasury[0]) == t0 + 40.0, "capture must plunder +40 (TS combat.ts:354)"
+        if bool(sim.rc_alive[0, r].any()):
+            assert bool(sim.r_atwar[0, r]), "war continues while the rival holds cities"
+        else:
+            assert not bool(sim.r_atwar[0, r]), "last city captured -> the war must end"
+    eliminated = not bool(sim.rc_alive[0, r].any())
+    assert caps >= 1, "no captures exercised"
+    assert eliminated, "player slots filled before elimination — last-city branch untested on this seed"
+    # raze path: fake a full empire — every player slot occupied
+    idx2 = sim.rc_alive[0].nonzero()
+    if len(idx2):
+        r2, j2 = int(idx2[0, 0]), int(idx2[0, 1])
+        sim.alive[0, :] = True
+        sim.r_atwar[0, r2] = True
+        t1 = float(sim.treasury[0])
+        sim._capture_rival_city(
+            torch.tensor([0]), torch.tensor([r2]), torch.tensor([j2]),
+            torch.tensor([int(sim.rc_center[0, r2, j2])]),
+        )
+        assert float(sim.treasury[0]) == t1, "raze must not plunder"
+        assert bool(sim.r_atwar[0, r2]), "raze must not end the war (TS early return)"
+    print(f"  capture plunder OK ({caps} captures: +40 each, war ends on the last; raze: neither)")
+
+
 def main() -> None:
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -132,6 +177,7 @@ def main() -> None:
     test_inert_when_off(rules, path)
     test_declare(rules, path)
     test_peace(rules, path)
+    test_capture_plunder(rules, path)
     print("WAR/PEACE PLUMBING OK")
 
 
