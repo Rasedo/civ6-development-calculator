@@ -219,10 +219,21 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: the D-13 remainder (verify values — BLOCKED on a readable source:
-fandom returns 402 to fetchers; verify in-game or via an accessible mirror),
-plus the medium/low tail (D-15, D-17, D-22, D-23) and D-8's 25%
+high-value: the medium/low tail (D-15, D-17, D-22, D-23) and D-8's 25%
 under-represented discount.
+
+D-13 COMPLETE (owner-supplied sources): the real cost ladder
+60/65/80/105/135/175/225/265/355/405/525 verified against
+civfanatics.com/civ6/info/building (25 corrections — notably Stock Exchange
+560→355, Sewer 200→405, Zoo 290→405), and EVERY building now carries the
+verified base-game maintenance from civ6bbg.github.io (corrections vs the
+tier heuristic: Lighthouse/Seaport 0, University/Museum/Armory 2,
+Stadium/Research Lab/Broadcast Center/Power Plant 3). The new data exposed a
+latent GPU bug: TS endTurn computes luxuryAmenities ONCE before its city loop
+(game.ts:667), but the GPU's guard-triggered mid-walk recomputes re-ranked
+luxury grants with mid-walk pops — D-12's tighter bands turned the flicker
+into a Content-vs-Displeased split (rng 2026006142 t160, exact ×0.95/×0.85
+deltas). Fixed: the walk freezes the walk-top lux map (_city_totals(lux=)).
 
 ### High confidence
 

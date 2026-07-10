@@ -1426,10 +1426,19 @@ class BatchSim:
             return z
         return self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
 
-    def _city_totals(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _city_totals(self, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
         (total [B, C, 6] alive-masked, housing [B, C], growth_f [B, C]).
-        Mirrors computeCityStats — used both inside step() and to score."""
+        Mirrors computeCityStats — used both inside step() and to score.
+
+        lux: optional FROZEN luxury-amenity map [B, C]. TS endTurn computes
+        luxuryAmenities(state) ONCE before its city loop (game.ts:667) and
+        feeds that same map to every city's fresh computeCityStats — so the
+        city walk's guard-triggered recomputes must NOT re-rank luxuries
+        with mid-walk pops (D-12's tighter bands turned that flicker into a
+        real tier split: rng 2026006142 t160, city 522 Content-vs-Displeased
+        for one apply). The freshly computed map is stashed on _last_lux for
+        the walk to freeze."""
         r, B, C, T, dev = self.rules, self.B, self.C, self.T, self.device
         rd = self.rules_dev
 
@@ -1544,7 +1553,9 @@ class BatchSim:
 
         amen_have = self.palace_slot_amenities.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_amenities)
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
-        amen_have = amen_have + self._luxury_amenities(amen_have, amen_need)  # C1-B1: improved luxuries
+        lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
+        self._last_lux = lux_add  # the walk freezes this (TS: one luxMap per turn)
+        amen_have = amen_have + lux_add
         balance = amen_have - amen_need
         growth_f, yield_f = self._amenity_factors(balance)
         # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
@@ -5111,6 +5122,7 @@ class BatchSim:
         # gold and TS applied +1 gold × 0.95 amenity while the GPU applied the
         # top-of-turn value.
         total, housing, growth_f, tier_idx = self._city_totals()
+        lux0 = self._last_lux  # frozen for the whole walk (TS luxMap semantics)
         _tot_ver = self._eff_version
         _tot_pop = self.pop.clone()
         y_sum = self._eff_yields().sum(dim=2)
@@ -5127,7 +5139,7 @@ class BatchSim:
         neigh_valid = (self.neigh >= 0).view(1, T, 6)
         for c in range(C):
             if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
-                total, housing, growth_f, tier_idx = self._city_totals()
+                total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
                 y_sum = self._eff_yields().sum(dim=2)
@@ -5192,7 +5204,7 @@ class BatchSim:
             # if THIS city's own completion/growth just changed it (the box
             # add itself stays the loop-top stats value, like TS).
             if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
-                total, housing, growth_f, tier_idx = self._city_totals()
+                total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
                 y_sum = self._eff_yields().sum(dim=2)
