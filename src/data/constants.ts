@@ -76,12 +76,14 @@ export interface AmenityTier {
   yieldFactor: number;
 }
 
-/** Tier from amenity balance (have - needed). Thresholds approximate Civ 6. */
+/** Tier from amenity balance (have - needed). P4/D-12: real Civ 6 bands —
+ * Content is exactly 0, Displeased −1..−2, Unhappy −3 and below (the Unrest/
+ * Revolt tiers below that are unimplemented: no rebel mechanics here). */
 export function amenityTier(balance: number): AmenityTier {
   if (balance >= 3) return { name: 'Ecstatic', growthFactor: 1.2, yieldFactor: 1.1 };
   if (balance >= 1) return { name: 'Happy', growthFactor: 1.1, yieldFactor: 1.05 };
-  if (balance >= -1) return { name: 'Content', growthFactor: 1, yieldFactor: 1 };
-  if (balance >= -4) return { name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.95 };
+  if (balance >= 0) return { name: 'Content', growthFactor: 1, yieldFactor: 1 };
+  if (balance >= -2) return { name: 'Displeased', growthFactor: 0.85, yieldFactor: 0.95 };
   return { name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 };
 }
 

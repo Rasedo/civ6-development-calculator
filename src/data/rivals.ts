@@ -51,13 +51,13 @@ export const RIVAL_PROD_TO_MILITARY = 0.22;
 export const LOYALTY_MAX = 100;
 /** City centers exert population pressure out to this many tiles. */
 export const LOYALTY_RANGE = 9;
-/** Max per-turn swing from population pressure. */
-export const LOYALTY_PRESSURE_SCALE = 10;
-/** Per-turn loyalty by amenity tier name. */
+/** Max per-turn swing from population pressure. P4/D-18: real Civ 6 ±20. */
+export const LOYALTY_PRESSURE_SCALE = 20;
+/** Per-turn loyalty by amenity tier name. P4/D-18: real Civ 6 ±6/±3. */
 export const LOYALTY_AMENITY: Record<string, number> = {
-  Ecstatic: 3,
-  Happy: 1.5,
+  Ecstatic: 6,
+  Happy: 3,
   Content: 0,
-  Displeased: -1.5,
-  Unhappy: -3,
+  Displeased: -3,
+  Unhappy: -6,
 };

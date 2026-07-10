@@ -311,12 +311,13 @@ const rules = {
   centerMinProduction: CITY_CENTER_MIN_PRODUCTION,
   housing: { fresh: HOUSING_FRESH_WATER, coastal: HOUSING_COASTAL, none: HOUSING_NO_WATER, aqFreshBonus: AQUEDUCT_FRESH_BONUS, aqNoFreshTotal: AQUEDUCT_NO_FRESH_TOTAL },
   boostFraction: BOOST_FRACTION,
-  // amenityTier(balance) thresholds, highest first (see data/constants.ts)
+  // amenityTier(balance) thresholds, highest first (see data/constants.ts).
+  // P4/D-12: real Civ 6 bands — Content exactly 0, Displeased -1..-2.
   amenityTiers: [
     { min: 3, growth: 1.2, yield: 1.1 },
     { min: 1, growth: 1.1, yield: 1.05 },
-    { min: -1, growth: 1.0, yield: 1.0 },
-    { min: -4, growth: 0.85, yield: 0.95 },
+    { min: 0, growth: 1.0, yield: 1.0 },
+    { min: -2, growth: 0.85, yield: 0.95 },
     { min: -999, growth: 0.7, yield: 0.9 },
   ],
   // Mirrors settlerCost(): 80 + 30 × (cities − 1 + settlers banked + settlers queued).

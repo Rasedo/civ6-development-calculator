@@ -562,7 +562,7 @@ class BatchSim:
         self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 4]
         self._gp_nc = int(self._gp_class_district.numel())
         self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
-        self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [3, 1.5, 0, -1.5, -3]), dtype=dtype, device=device)
+        self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
@@ -4574,7 +4574,7 @@ class BatchSim:
         if not bool(any_rc.any()):
             return
         rng = int(self.rules.rivals.get("loyaltyRange", 9))
-        scale = float(self.rules.rivals.get("loyaltyScale", 10))
+        scale = float(self.rules.rivals.get("loyaltyScale", 20))
         sitec = self.site.clamp(min=0)
         d_cc = self.pair_dist[sitec.unsqueeze(2), sitec.unsqueeze(1)].to(self.dtype)
         # d_cc[b, c, c'] = dist(site[c], site[c']) — weight by source c'
