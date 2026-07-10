@@ -517,3 +517,14 @@ Post-D10 world (2026-07-10, commit 907a7d0 — builder cost escalation,
 Statistically flat vs post-D12/D18 (177.9 / 241.8) — the escalator only
 bites builder-heavy strategies, which neither baseline policy plays.
 The next reference net trains on THIS world.
+
+
+Post-D13 world (2026-07-10, commit cac4417 — verified building costs +
+maintenance, frozen luxMap in the GPU city walk):
+
+    random    177.0 ± 27.2 (95% CI)  [min 0.0, max 380.0]
+    scripted  243.9 ± 21.1 (95% CI)  [min 59.5, max 373.5]
+
+Flat vs post-D10 (174.4 / 241.9): the ~10% cheaper building ladder
+roughly cancels the new upkeep on science/military buildings. The next
+reference net trains on THIS world.
