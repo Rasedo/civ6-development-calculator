@@ -13,5 +13,8 @@ python/checkpoints/
 python/tb/
 python/*.zip
 gpu/fixtures/
+gpu/fixtures_o4/
+gpu/targets/
 gpu/**/__pycache__/
 gpu/runs/
+.idea/
