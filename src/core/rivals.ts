@@ -41,7 +41,7 @@ import {
   AQUEDUCT_NO_FRESH_TOTAL,
   GAME_SPEED,
 } from '../data/constants';
-import { tileScore, tileYieldsForCenter } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance } from './city';
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
 import { hasRiver, hasFreshWater, isCoastalLand } from './query';
 import { disbandUnit, tileFreeForUnit } from './units';
@@ -590,6 +590,17 @@ function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity,
   return false;
 }
 
+/** P5/S1 (C-12): a rival city's gold upkeep — the player's cityMaintenance
+ * verbatim (completed districts + buildings, shared maintenance tables). */
+function rivalCityMaintenance(state: GameState, rc: RivalCity): number {
+  let total = 0;
+  for (const d of rc.districts) {
+    if (state.map.tiles[d.tileIndex].districtComplete) total += districtMaintenance(d.type);
+  }
+  for (const b of rc.buildings) total += buildingMaintenance(b);
+  return total;
+}
+
 /** P4/D-8 (symmetric with districtDiscounted): 40% off while this rival has
  * PLACED fewer of the type than its per-unlocked-type average of COMPLETED
  * specialty districts — n < ceil(D/U), D ≥ U, from ITS OWN research. */
@@ -915,7 +926,9 @@ export function rivalPhase(state: GameState): void {
     let goldSum = 0;
     for (const rc of [...rival.cities]) {
       const y = rivalCityYields(state, rival, rc);
-      goldSum += y.gold; // VP-G1: rivals bank their gold (no spender yet)
+      // P5/S1 (C-12): rivals pay district+building upkeep like the player's
+      // computeCityStats (completed districts only; same maintenance tables).
+      goldSum += y.gold - rivalCityMaintenance(state, rc);
       const food = y.food;
       const production = y.production;
       // C1-B3a: rival science/culture streams — tile+center columns plus
@@ -989,7 +1002,26 @@ export function rivalPhase(state: GameState): void {
     }
     if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
     rsr.civicProgress += culSum;
-    rival.treasury = (rival.treasury ?? 0) + goldSum; // VP-G1
+    // P5/S1 (C-12): net gold — city upkeep already netted per city; unit
+    // upkeep and the GV-5 bankruptcy rule mirror the player's exactly
+    // (milli-rounded test; disband the priciest-upkeep unit, tie → lowest
+    // id; no refund).
+    rival.treasury = (rival.treasury ?? 0) + goldSum;
+    rival.treasury -= state.units.reduce(
+      (s, u) => s + (u.owner === 'rival' && u.civId === rival.id ? UNITS[u.type]?.maintenance ?? 0 : 0),
+      0,
+    );
+    if (Math.round(rival.treasury * 1000) < 0) {
+      let victim: Unit | undefined;
+      for (const u of state.units) {
+        if (u.owner !== 'rival' || u.civId !== rival.id) continue;
+        const m = UNITS[u.type]?.maintenance ?? 0;
+        if (m <= 0) continue;
+        const vm = victim ? UNITS[victim.type]?.maintenance ?? 0 : 0;
+        if (!victim || m > vm || (m === vm && u.id < victim.id)) victim = u;
+      }
+      if (victim) disbandUnit(state, victim.id);
+    }
     while (rsr.civic && rsr.civicProgress >= CIVICS[rsr.civic].cost) {
       rsr.civicProgress -= CIVICS[rsr.civic].cost;
       rsr.civics.push(rsr.civic);

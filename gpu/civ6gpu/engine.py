@@ -307,6 +307,7 @@ _MUTABLE = [
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "builders_trained", "r_builders_trained",  # P4/D-10 cost escalators
     "best_melee", "r_best_melee",  # P4/D-22 city-defense trackers
+    "district_dead",  # P5/S1: captured districts are paved-but-dead
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
@@ -517,6 +518,10 @@ class BatchSim:
         # P4/D-22: strongest MELEE unit each civ ever fielded (city defense).
         self.best_melee = torch.zeros(B, dtype=torch.long, device=device)
         self.r_best_melee = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # P5/S1 gate-catch: districts on CAPTURED territory are DEAD — TS
+        # keeps the tiles paved but the conquering city's registry holds only
+        # CITY_CENTER (no yields/upkeep/counts; the paving still blocks).
+        self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.rc_alive = torch.zeros(B, r_pad, rc_pad, dtype=torch.bool, device=device)
         self.rc_center = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -991,7 +996,7 @@ class BatchSim:
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         U = self._unlocked_specialty_count(self.techs, self.civics)
-        own = self.owner >= 0
+        own = (self.owner >= 0) & ~self.district_dead  # P5/S1: captured = dead, uncounted
         spec_t = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
         D = (own & spec_t & self.district_complete).sum(dim=1)
         n = (own & (self.district == di)).sum(dim=1)
@@ -1264,7 +1269,7 @@ class BatchSim:
         base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
-            valid = (self.district >= 0) & self.district_complete & (self.owner >= 0)  # [B, T] (buildingCompletable: district DONE)
+            valid = (self.district >= 0) & self.district_complete & (self.owner >= 0) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
             ow_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & valid.unsqueeze(2)  # [B, T, C]
             dt_oh = torch.nn.functional.one_hot(self.district.clamp(min=0), nD).bool()  # [B, T, nD]
             has_dtype = (ow_oh.unsqueeze(3) & dt_oh.unsqueeze(2)).any(dim=1)  # [B, C, nD] city owns a district of type d
@@ -1415,7 +1420,7 @@ class BatchSim:
             d = int(self._gp_class_district[cls])
             if d < 0:
                 continue
-            has_d = (((self.district == d) & self.district_complete).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed district d
+            has_d = (((self.district == d) & self.district_complete & ~self.district_dead).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE district d
             in_d = self._b_req_district == d  # [NB] buildings of district d
             bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
             self.player_gp_points[:, cls] = self.player_gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
@@ -1547,6 +1552,7 @@ class BatchSim:
             owned_d = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
             # yields/maintenance/Aqueduct housing all count COMPLETED districts
             owned_d = owned_d & self.district_complete.gather(1, tcf).reshape(B, C, M)
+            owned_d = owned_d & ~self.district_dead.gather(1, tcf).reshape(B, C, M)  # P5/S1: captured = dead
             adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
             # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
             # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
@@ -1755,7 +1761,7 @@ class BatchSim:
             dcols = torch.zeros(B, C, nS, dtype=torch.bool, device=dev)
             if self._rl_district_active:  # D5b/c: capital (or any city if _rl_any_city) places districts off-script
                 ar = torch.arange(B, device=dev)
-                spec_tile = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]  # [B,T] specialty district tiles
+                spec_tile = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & ~self.district_dead  # [B,T] LIVE specialty district tiles
                 cc = self._adj_center_count()  # [B,T] adjacent CITY_CENTERs (global) — Aqueduct requires, Encampment forbids
                 for c in range(C if self._rl_any_city else 1):
                     site_c = self.site[:, c].clamp(min=0)
@@ -1771,7 +1777,7 @@ class BatchSim:
                     has_enc = (base & (cc == 0)).any(dim=1)  # [B] a land tile NOT adjacent to any center (Encampment)
                     for si, (di, utech, plc) in enumerate(self._scaffold):
                         has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                        not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
+                        not_owned = ~((self.district == di) & (self.owner == c) & ~self.district_dead).any(dim=1)  # one-per-type (LIVE)
                         if plc == 1:  # Aqueduct: non-specialty (no cap), aqueduct-eligible tile
                             dcols[:, c, si] = has_tech & has_aq & not_owned
                         elif plc == 2:  # Harbor: specialty (cap), coastal-water tile
@@ -1901,7 +1907,7 @@ class BatchSim:
                     dsel = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
                 else:
                     dsel = self.district == dtype
-                on = dsel & self.district_complete & (self.owner >= 0)  # player eurekas count PLAYER districts
+                on = dsel & self.district_complete & (self.owner >= 0) & ~self.district_dead  # player eurekas count PLAYER (live) districts
                 pred = on.sum(dim=1) >= row["count"]
             else:
                 continue
@@ -2453,9 +2459,13 @@ class BatchSim:
         for i in range(len(rows)):
             b = int(rows[i]); r = int(civ[i]); j = int(slot[i]); c_t = int(ctr[i])
             pop = max(1, (int(self.rc_pop[b, r, j]) * 3) // 4)
-            # the rival city dies either way
+            # the rival city dies either way — and its registries die with
+            # it (TS removes the City object; a stale rc_dist_tile otherwise
+            # leaks into rNDist and the D-8 counts: seed 9131 t196, 9 vs 7)
             self.rc_alive[b, r, j] = False
             self.rvcity_at[b, c_t] = -1
+            self.rc_dist_tile[b, r, j, :] = -1
+            self.rc_bldg[b, r, j, :] = False
             free = (~self.alive[b]).nonzero(as_tuple=True)[0]
             # territory within radius 3 leaves the rival
             ring = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r)
@@ -2468,6 +2478,12 @@ class BatchSim:
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
             self.owner[b, c_t] = c_new
+            # P5/S1 gate-catch (seed 9131 rng 2026006110 t196): captured
+            # districts are DEAD — TS's new city registers only CITY_CENTER,
+            # so their adjacency yields/upkeep must not follow the territory.
+            dead_ring = ring & (self.district[b] >= 0)
+            dead_ring[c_t] = False  # the center IS the new city's live CITY_CENTER
+            self.district_dead[b] = self.district_dead[b] | dead_ring
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
@@ -2479,6 +2495,7 @@ class BatchSim:
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
             self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
             self.loyalty[b, c_new] = 100.0
+            self._init_center_live(b, c_new, c_t)
             # TS captureRivalCity tail (AUDIT C-11): conquest plunders +40
             # gold, and the war ends if it was the rival's last city. The
             # raze path (`continue` above) mirrors TS's early return —
@@ -2525,7 +2542,25 @@ class BatchSim:
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
             self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
             self.loyalty[b, c_new] = 100.0
+            self._init_center_live(b, c_new, c_t)
         self._eff_version += 1
+
+    def _init_center_live(self, b: int, c_new: int, c_t: int) -> None:
+        """P5/S1 gate-catch (seed 9131 rng 2026006110 t196): a CAPTURED
+        city's center yields must come from the LIVE tile — TS
+        tileYieldsForCenter reads it fresh (raw tile yields, strip-adjusted,
+        min-clamped food/production). Settle sites get precomputed site_cy;
+        captured centers were never fixture sites, so their slots held
+        zeros (or a flipped-away city's stale values)."""
+        strip_c = float(self.feat_stripped[b, c_t])
+        cy = (self.tile_yields[b, c_t].to(self.dtype) - self.feat_yields[b, c_t].to(self.dtype) * strip_c).clone()
+        self.center_raw_food[b, c_new] = float(cy[0])  # pre-clamp (fertility/drought redo the clamp live)
+        cy[0] = max(float(cy[0]), float(self.rules.center_min_food))
+        cy[1] = max(float(cy[1]), float(self.rules.center_min_production))
+        self.center_yields[b, c_new] = cy
+        self.base_maintenance[b, c_new] = 0.0  # City Center 0 upkeep; no Palace, no buildings
+        nb_c = self.neigh[c_t]
+        self.coastal[b, c_new] = bool(self.coastal_water[b, nb_c.clamp(min=0)][nb_c >= 0].any())
 
     def _player_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:
         """V-W2: a PLAYER melee unit besieging a rival city — mirrors
@@ -3229,7 +3264,7 @@ class BatchSim:
             if self._askable.numel() > 0 and self.districts_on:
                 qd = self.cs_quest_district[:, s].clamp(min=0, max=self._askable.numel() - 1)
                 asked_type = self._askable[qd]  # [B]
-                owns_asked = ((self.district == asked_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0)).any(dim=1) & (self.cs_quest_district[:, s] >= 0)  # PLAYER districts only (state.cities)
+                owns_asked = ((self.district == asked_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0) & ~self.district_dead).any(dim=1) & (self.cs_quest_district[:, s] >= 0)  # PLAYER (live) districts only
             else:
                 owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             resolved_dist = act & (self.cs_quest[:, s] == 3) & owns_asked
@@ -3251,7 +3286,7 @@ class BatchSim:
             # askable district (askable idx -> district type via self._askable).
             if self._askable.numel() > 0 and self.districts_on:
                 drawn_type = self._askable[draw1.clamp(min=0, max=self._askable.numel() - 1)]  # [B]
-                already_bd = ((self.district == drawn_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0)).any(dim=1)  # PLAYER districts only
+                already_bd = ((self.district == drawn_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0) & ~self.district_dead).any(dim=1)  # PLAYER (live) districts only
             else:
                 already_bd = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             bd = ~already_bd
@@ -3991,7 +4026,13 @@ class BatchSim:
         if not bool(found.any()):
             return
         rows = found.nonzero(as_tuple=True)[0]
-        slot = self.rc_alive[rows, r].sum(dim=1)
+        # P5/S1 gate-catch (seed 9131 t250): the alive COUNT is not a free
+        # slot once a capture punches a hole mid-pool — it lands ON a live
+        # city and overwrites it. TS appends, so the mirror is last-alive+1
+        # (new cities iterate LAST, matching the array order; holes stay
+        # holes until P7's reclamation).
+        occ_idx = torch.arange(self.RC, device=self.device).view(1, -1)
+        slot = (torch.where(self.rc_alive[rows, r], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
         assert int(slot.max()) < self.RC, "rival city slots exhausted — raise RC"
         s_idx = best_site[rows]
         self.rc_alive[rows, r, slot] = True
@@ -4147,6 +4188,23 @@ class BatchSim:
         if len(sacked) > 0:
             sc, sj = civ[sacked], slot[sacked]
             self.rc_pop[sacked, sc, sj] = ((self.rc_pop[sacked, sc, sj] * 3) // 4).clamp(min=1)
+            # P5/S1 (C-10): the rival sack mirrors sackCity — milli-rounded
+            # 20% gold loss (cap 100) + the pillage ring around the center.
+            loss_r = torch.minimum(
+                torch.tensor(100.0, dtype=torch.float64, device=self.device),
+                js_round(js_round(self.r_treasury[sacked, sc] * 1000) / 1000 * 0.2).double(),
+            )
+            self.r_treasury[sacked, sc] -= loss_r
+            if self.improvements_on:
+                centers_r = self.rc_center[sacked, sc, sj]
+                nb_r = self.neigh[centers_r.clamp(min=0)]  # [K, 6]
+                for d_ in range(6):
+                    n_d = nb_r[:, d_]
+                    on = (n_d >= 0) & (centers_r >= 0)
+                    r2, t2 = sacked[on], n_d[on]
+                    hit = (self.improvement[r2, t2] >= 0) & ~self.pillaged[r2, t2]
+                    self.pillaged[r2[hit], t2[hit]] = True
+                self._eff_version += 1
             self.rc_hp[sacked, sc, sj] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
 
     def _rival_unit_war_act(self, v: int, act: torch.Tensor) -> None:
@@ -4283,6 +4341,9 @@ class BatchSim:
             w_civ = self.v_civ[sacked_rows, u]
             for i in range(len(sacked_rows)):
                 self._transfer_city_to_rival(int(sacked_rows[i]), int(slot[sacked_rows[i]]), int(w_civ[i]))
+            # P5/S1 (C-11b): the conqueror plunders +40 — symmetric with the
+            # player's capture; conquest only, never the loyalty-flip path.
+            self.r_treasury[sacked_rows, w_civ] += 40.0
             sacked_rows = sacked_rows[:0]  # transferred, not sacked
         if len(sacked_rows) > 0:
             sc = slot[sacked_rows]
@@ -4518,7 +4579,14 @@ class BatchSim:
                 # flips completions when a cost lands inside it (seed 9079).
                 sci_sum = torch.where(cact, sci_sum + (sci + self.rules.citizen_science * self.rc_pop[:, r, j].double()), sci_sum)
                 cul_sum = torch.where(cact, cul_sum + (cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double()), cul_sum)
-                gold_sum = torch.where(cact, gold_sum + gold_y, gold_sum)  # VP-G1: plain += y.gold
+                # P5/S1 (C-12): net of the city's upkeep — completed districts
+                # + buildings, the player's tables (TS: y.gold - maintenance
+                # as ONE term inside the +=).
+                dtj = self.rc_dist_tile[:, r, j]  # [B, nD]
+                d_done = (dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0))
+                maint_j = (self._d_maint.unsqueeze(0) * d_done.to(torch.float64)).sum(dim=1)
+                maint_j = maint_j + torch.einsum("bn,n->b", self.rc_bldg[:, r, j].to(torch.float64), self.rules_dev.b_maintenance.double())
+                gold_sum = torch.where(cact, gold_sum + (gold_y - maint_j), gold_sum)  # VP-G1 + C-12
                 # C1-B1: the real growth accounting — true surplus (can be
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
                 # need, starvation shrinks (pop floor 1, box reset). maxPop
@@ -4612,6 +4680,28 @@ class BatchSim:
             self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
             self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] + gold_sum, self.r_treasury[:, r])  # VP-G1
+            # P5/S1 (C-12): unit upkeep + the GV-5 bankruptcy rule, mirroring
+            # the player's exactly (milli-rounded test; disband the
+            # priciest-upkeep unit, tie → lowest slot = spawn order; no
+            # refund). Runs right after the gold lands, before war marches.
+            mine_r = self.v_alive & (self.v_civ == r)
+            upkeep_r = (self._p_maint[self.v_type.clamp(min=0, max=self.NU - 1)] * mine_r.to(self.dtype)).sum(dim=1)
+            self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] - upkeep_r, self.r_treasury[:, r])
+            broke_r = active & (js_round(self.r_treasury[:, r] * 1000) < 0)
+            if bool(broke_r.any()):
+                vm = self._p_maint[self.v_type.clamp(min=0, max=self.NU - 1)]  # [B, U_MAX]
+                slots_ar = torch.arange(self.v_alive.shape[1], device=dev, dtype=self.dtype).view(1, -1)
+                key_v = torch.where(mine_r & (vm > 0), vm * 4096 - slots_ar, torch.full_like(vm, -1.0))
+                best_v, victim = key_v.max(dim=1)
+                kill = broke_r & (best_v > 0)
+                if bool(kill.any()):
+                    kr = kill.nonzero(as_tuple=True)[0]
+                    vs = victim[kr]
+                    vt = self.v_tile[kr, vs]
+                    is_civ_v = self._p_charges[self.v_type[kr, vs]] > 0
+                    self.v_alive[kr, vs] = False
+                    self.rv_at[kr[~is_civ_v], vt[~is_civ_v]] = -1
+                    self.rvciv_at[kr[is_civ_v], vt[is_civ_v]] = -1
             for _ in range(RESEARCH_LOOPS):
                 curt = self.r_cur_tech[:, r]
                 cost_t = rdv.t_cost.gather(0, curt.clamp(min=0)).double()
@@ -4811,8 +4901,11 @@ class BatchSim:
         self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
         self.rival_at[b] = torch.where(owned, torch.full_like(self.rival_at[b], w_), self.rival_at[b])
         self.center_at[b, self.site[b, c]] = -1
-        # ...and joins the winner
-        slot = int(self.rc_alive[b, w_].sum())
+        # ...and joins the winner. P5/S1: last-alive+1, NOT the alive count —
+        # a capture hole would make the count point at a live city (see
+        # _rival_try_found; TS appends, new cities iterate last).
+        alive_w = self.rc_alive[b, w_].nonzero(as_tuple=True)[0]
+        slot = int(alive_w.max()) + 1 if len(alive_w) else 0
         assert slot < self.RC, "rival city slots exhausted — raise RC"
         self.rc_alive[b, w_, slot] = True
         self.rc_center[b, w_, slot] = self.site[b, c]
@@ -5072,7 +5165,7 @@ class BatchSim:
                 dtaken = torch.zeros(B, dtype=torch.bool, device=dev)  # at most one queue per turn
                 for si, (di, utech, plc) in enumerate(self._scaffold):
                     has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                    spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == 0)).sum(dim=1)  # specialty only
+                    spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == 0) & ~self.district_dead).sum(dim=1)  # LIVE specialty only
                     under_cap = (plc == 1) | (spec_count < cap_max)  # Aqueduct is non-specialty → no cap
                     want = (self.current[:, 0] == -1) & ~dtaken & has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & under_cap
                     if not bool(want.any()):
@@ -5169,8 +5262,8 @@ class BatchSim:
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
                     for si, (di, utech, plc) in enumerate(self._scaffold):
                         has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
-                        spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == c)).sum(dim=1)  # specialty only (recomputed)
-                        not_owned = ~((self.district == di) & (self.owner == c)).any(dim=1)  # one-per-type
+                        spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == c) & ~self.district_dead).sum(dim=1)  # LIVE specialty only (recomputed)
+                        not_owned = ~((self.district == di) & (self.owner == c) & ~self.district_dead).any(dim=1)  # one-per-type (LIVE)
                         under_cap = (plc == 1) | (spec_count < cap_c)  # Aqueduct is non-specialty → no cap
                         want = (ac == dbase + si) & has_tech & under_cap & not_owned
                         if bool(want.any()):

@@ -112,6 +112,10 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
       const rival = state.rivals.find((r) => r.id === attacker.civId);
       if (rival) {
         transferCityToRival(state, city, rival, 'conquered');
+        // P5/S1 (C-11b): the conqueror plunders +40, symmetric with the
+        // player's captureRivalCity. Conquest only — loyalty flips (the
+        // other transferCityToRival caller) plunder nothing.
+        rival.treasury = (rival.treasury ?? 0) + 40;
         return;
       }
     }
@@ -299,8 +303,16 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
     if (attacker.owner === 'player') {
       captureRivalCity(state, rival, city);
     } else {
-      // Barbarians sack, they don't govern.
+      // Barbarians sack, they don't govern. P5/S1 (C-10): a rival sack now
+      // mirrors sackCity — gold loss (milli-rounded 20%, cap 100) and the
+      // pillage ring around the center, not just the pop hit.
       city.population = Math.max(1, Math.floor(city.population * 0.75));
+      rival.treasury =
+        (rival.treasury ?? 0) -
+        Math.min(100, Math.round((Math.round((rival.treasury ?? 0) * 1000) / 1000) * 0.2));
+      for (const t of neighbors(state.map, state.map.tiles[city.centerIndex])) {
+        if (t.improvement && !t.pillaged) t.pillaged = true;
+      }
       city.hp = Math.round(200 / 2);
       state.eventLog.push(`Barbarians sacked ${city.name} (${rival.name}).`);
     }

@@ -64,6 +64,46 @@ now actionable, not parked.
 Rivals must be full-fidelity symmetric agents: same formulas, same available actions;
 only the decision policy may differ. Findings (engine = TS / GPU / both):
 
+**P5 STAGE PLAN (banked 2026-07-10; execute in order, one battery per stage).**
+Closed by P4 already: C-7 (D-2 healing), C-9 (D-22 defense), C-24 (D-23 removed
+melee_only — both masks now offer city attacks to any fighter). C-21 movement
+stays parked (masked: exporter emits single-tile steps; an RL-surface question).
+- **S1 — rival economy (C-12 + C-10 + C-11b):** rivals pay building/district/
+  unit maintenance from gross gold + the player's bankruptcy-disband rule;
+  sacking a RIVAL city hits r_treasury −min(100, 20% milli-rounded) + the
+  pillage ring; a rival capturing a player city plunders +40 (the C-11
+  symmetry half). statelog rGold already traces it.
+- **S2 — rival peace cost + settler purchase (C-13):** suing rival pays
+  150+10·warTurns from r_treasury (scripted roll gated on affordability;
+  controlled mask prices it); enable rival settler-purchase column.
+- **S3 — founding cluster (C-14):** rival founding = player founding (pop 1,
+  center strip, uniform spacing, the player's 48+18n settler curve).
+- **S4 — rival border growth (C-15):** consume rc.cultureBox against
+  borderGrowthCost with the player's pick policy + radius 5 (timer dies).
+- **S5 — GP overflow/effects (C-16) + pantheons (C-17):** rival GPP keeps
+  overflow and applies effects; pantheon costs 25 faith (their faith yield
+  gains its consumer; free timed claims die).
+- **S6 — rival loyalty + amenities (C-19 + C-20):** rival cities get loyalty
+  (CAN flip to the player — the reverse transfer) and the amenity tier model.
+- **S7 — camps/pillage/repair/raze (C-3 + C-4 + C-5):** rivals clear camps
+  (+50 r_treasury); hostiles pillage rival tiles + rival builders repair;
+  capture at full cap RAZES in TS (unbounded push) and GPU (hard assert).
+- **S8 — controlled purchase revalidation (C-23):** full re-validation in the
+  GPU controlled-rival purchase apply.
+
+S1 LANDED (see the log below) — and its reshuffle flushed out THREE latent
+capture-path bugs (the first off-script games that capture rival cities):
+(1) captured districts must be DEAD (TS registers only CITY_CENTER — new
+district_dead plane, 9 reader sites filtered); (2) a captured city's center
+yields must come from the LIVE tile (new _init_center_live — settle sites
+get precomputed site_cy, captured centers held zeros; also fixed for CS
+captures + coastal/base_maintenance init); (3) rc slot picks used the alive
+COUNT as the next slot — a capture hole makes that a LIVE city and the next
+founding OVERWRITES it; now last-alive+1 (TS append order; holes wait for
+P7). P7 NOTE: the PLAYER capture path picks the FIRST free slot while TS
+appends — an iteration-order divergence once loyalty-flip holes exist
+(latent; fix with the dead-slot reclamation stage).
+
 ### Structural capability blocks
 
 1. **Rivals can never own coastal water — FIXED 2026-07-10 (10d2382).** Rival founding now
