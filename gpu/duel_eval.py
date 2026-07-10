@@ -48,12 +48,14 @@ def main() -> None:
     ap.add_argument("--a", required=True, help="checkpoint for seat 0")
     ap.add_argument("--b", required=True, help="checkpoint for seat 1, or 'scripted'")
     ap.add_argument("--episodes", type=int, default=24)
-    ap.add_argument("--horizon", type=int, default=100)
+    ap.add_argument("--horizon", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--seed", type=int, default=17)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     dev = args.device
 
+    if args.horizon is None:  # single knob: the game's own length
+        args.horizon = load_rules().turn_limit
     pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))]
     fixtures = [pool[i % len(pool)] for i in range(args.episodes)]
     duel = DuelEnv(fixtures, load_rules(), device=dev, dtype=torch.float32, horizon=args.horizon, reward="dense")

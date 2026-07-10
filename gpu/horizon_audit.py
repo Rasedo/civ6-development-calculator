@@ -25,7 +25,7 @@ from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--turns", type=int, default=300)
+    ap.add_argument("--turns", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--seeds", type=int, default=12)
     ap.add_argument("--every", type=int, default=50)
     ap.add_argument("--pool", type=int, default=640, help="AUDIT ONLY: bump the append-only unit pools past their 96 cap so the run survives to --turns (the cap itself is G-S cliff #1)")
@@ -36,6 +36,8 @@ def main() -> None:
     _eng.P_MAX = args.pool
 
     rules = load_rules()
+    if args.turns is None:  # single knob: the game's own length
+        args.turns = rules.turn_limit
     pool = [load_fixture(p) for p in sorted(FIXTURES.glob("seed*.json"))[: args.seeds]]
 
     net = env = None

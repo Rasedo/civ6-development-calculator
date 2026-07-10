@@ -65,9 +65,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("checkpoints", nargs="+")
     ap.add_argument("--episodes", type=int, default=24)
-    ap.add_argument("--horizon", type=int, default=100)
+    ap.add_argument("--horizon", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
+    if args.horizon is None:  # single knob: the game's own length
+        args.horizon = load_rules().turn_limit
     rows = [(Path(c).parent.name, run(c, args.episodes, args.horizon, args.device)) for c in args.checkpoints]
     keys = list(rows[0][1].keys())
     header = f"{'':<14}" + "".join(f"{name:>12}" for name, _ in rows)

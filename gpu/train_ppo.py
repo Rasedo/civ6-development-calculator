@@ -238,7 +238,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--batch", type=int, default=64, help="parallel games (fixtures repeat round-robin)")
     ap.add_argument("--updates", type=int, default=200)
-    ap.add_argument("--horizon", type=int, default=300)
+    ap.add_argument("--horizon", type=int, default=None, help="episode turns (default: the fixtures' turnLimit — the game length)")
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--gamma", type=float, default=0.999)
     ap.add_argument("--gae-lam", type=float, default=0.95)
@@ -271,6 +271,10 @@ def main() -> None:
     ap.add_argument("--pool-frac", type=float, default=0.2, help="fraction of updates whose opponent is a random frozen snapshot (else the EMA)")
     ap.add_argument("--seat-alternate", action="store_true", help="c3a-6: the learner swaps seats per update (both seats keep gradient under ema/pfsp pool pressure)")
     args = ap.parse_args()
+
+    if args.horizon is None:  # single knob: the fixtures' turnLimit (TS TURN_LIMIT)
+        _rules_path = (Path(args.fixtures) / "rules.json") if args.fixtures else FIXTURES / "rules.json"
+        args.horizon = load_rules(_rules_path).turn_limit
 
     torch.manual_seed(args.seed)
     dev = args.device

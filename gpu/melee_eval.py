@@ -30,11 +30,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", required=True)
     ap.add_argument("--episodes", type=int, default=24)
-    ap.add_argument("--horizon", type=int, default=100)
+    ap.add_argument("--horizon", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--device", default="cpu")
     args = ap.parse_args()
 
     rules = load_rules(O4 / "rules.json")
+    if args.horizon is None:  # single knob: the game's own length
+        args.horizon = rules.turn_limit
     pool = [load_fixture(p) for p in sorted(O4.glob("seed*.json"))]
     fixtures = [pool[i % len(pool)] for i in range(args.episodes)]
     env = MeleeEnv(fixtures, rules, device=args.device, dtype=torch.float32, horizon=args.horizon, reward="dense", seats=4)

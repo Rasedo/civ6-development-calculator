@@ -27,7 +27,7 @@ class MeleeEnv:
         rules: Rules,
         device: str = "cpu",
         dtype=torch.float32,
-        horizon: int = 100,
+        horizon: int | None = None,
         reward: str = "dense",
         seats: int | None = None,
     ):
@@ -36,7 +36,7 @@ class MeleeEnv:
         self.O = (self.sim.R + 1) if seats is None else seats
         assert 2 <= self.O <= self.sim.R + 1, f"seats {self.O} needs {self.O - 1} rivals in the fixtures"
         self.reward_mode = reward
-        self.horizon = horizon
+        self.horizon = self.env.horizon  # None resolved to rules.turn_limit there
 
     @property
     def sim(self):

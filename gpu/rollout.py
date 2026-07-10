@@ -35,13 +35,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--replicas", type=int, default=3, help="random games per fixture")
     ap.add_argument("--log", type=int, default=None, help="rng of ONE game -> gpu/fixtures/gpu_statelog.txt")
-    ap.add_argument("--turns", type=int, default=300)
+    ap.add_argument("--turns", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--out", default=str(FIXTURES / "rollout.json"))
     args = ap.parse_args()
 
     rules_raw = json.loads((FIXTURES / "rules.json").read_text())
     rules = load_rules()
+    if args.turns is None:  # single knob: the game's own length
+        args.turns = rules.turn_limit
     paths = sorted(FIXTURES.glob("seed*.json"))
     if not paths:
         print("no fixtures — run `npm run gpu:export` first")

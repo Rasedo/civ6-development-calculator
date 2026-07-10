@@ -10,7 +10,8 @@
 
 ## Mission
 
-Two mirrored engines simulate a Civ6-like 100-turn development game: the
+Two mirrored engines simulate a Civ6-like development game to the 250-turn
+score victory (TURN_LIMIT, the single horizon knob): the
 TypeScript engine (`src/core`, the spec) and a vectorized PyTorch port
 (`gpu/civ6gpu/engine.py`, the training substrate). On top of them: a
 masked 6-head policy (production / tech / civic / units / envoys / war),
@@ -108,16 +109,13 @@ done. The roadmap now runs on **BUILD_PLAN §5 — the Civ 6 gap list.**
 
 The gap to Civ 6, ordered by how much each changes what "champion" MEANS:
 
-1. **G-V Victory & horizon** — IN PROGRESS. The t100 sprint must become
-   a ~300-turn victory race. Slice (i) audit DONE (gpu/horizon_audit.py):
-   found the engine has NO PLAYER SECOND HALF — score peaks ~t200 then
-   declines, player cities contract 3.7→2.2 while rivals scale 8.5→13.5;
-   trees have depth (research starves, not depletes); and a HARD CRASH at
-   ~t150 from the append-only unit pools (U_MAX/P_MAX=96). NEXT: the pool
-   cap (behavior-preserving at horizon-100 → identical fixtures), then a
-   horizon-300 DIAGNOSTIC net (does a competent player sustain, or does
-   the engine structurally cap the late game?), then game-end semantics +
-   domination/score victories.
+1. **G-V Victory & horizon** — DONE (2026-07-09/10). GV-1..5 shipped
+   (winner indicator, game end, domination, score victory at TURN_LIMIT
+   = 250, bankruptcy), pool caps raised (765ab4f), off-script parity
+   exact to t300, and every horizon default now resolves to the single
+   knob (TS TURN_LIMIT / GPU rules.turn_limit = 250) across train/eval/
+   rollout/envs. Remaining under this banner: net-driven scripted export
+   past t100 (task #26) and dead-slot pool reclamation (task #24).
 2. **G-C Combat depth** — city walls + ranged strikes, siege classes,
    promotions, ZoC. Re-opens the war-chapter verdict (measured on
    wall-less 40-defense cities). Makes domination a real axis.

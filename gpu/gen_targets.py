@@ -34,7 +34,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--episodes", type=int, default=8)
     ap.add_argument("--per-episode", type=int, default=12, help="max searched decisions per episode")
-    ap.add_argument("--horizon", type=int, default=100)
+    ap.add_argument("--horizon", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--search-horizon", type=int, default=20)
     ap.add_argument("--out", default="gpu/targets/m3d-1.pt")
     ap.add_argument("--policy", default=None, help="M3d scaling: drive episodes with this checkpoint (greedy) instead of the scripted policy — targets come from the NET's own state distribution (incl. its wars)")
@@ -47,6 +47,8 @@ def main() -> None:
     args = ap.parse_args()
 
     rules = load_rules()
+    if args.horizon is None:  # single knob: the game's own length
+        args.horizon = rules.turn_limit
     pool = sorted(FIXTURES.glob("seed*.json"))
     rows: list[dict] = []
     net = None

@@ -18,9 +18,11 @@ import {
 } from './rlenv';
 import { scoreCandidate, paramCount, type PolicySpec } from './policy';
 import { sb3Logits, isSb3Policy, type Sb3MlpPolicy } from './sb3';
+import { TURN_LIMIT } from './game';
 
-/** Advisor scoring assumes this game horizon (the training default). */
-export const ADVISOR_HORIZON = 100;
+/** Advisor scoring assumes the full game — TURN_LIMIT, the score-victory turn
+ * (the training default since the horizon knobs were unified, 2026-07-10). */
+export const ADVISOR_HORIZON = TURN_LIMIT;
 
 export interface LoadedPolicy {
   label: string;

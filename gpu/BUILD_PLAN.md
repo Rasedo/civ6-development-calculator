@@ -1099,6 +1099,21 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   Next: A3 — the GPU engine's owner-dimensioned mirror of A1/A2's layout
   (seat-0 slices bit-equal to today's tensors), then B1 (rival tile-working
   on the real citizen/yield path — the first behavior-CHANGING promotion).
+- HORIZON-250 ALIGNMENT [x] (2026-07-10, tasks #27+#28): every horizon default
+  now resolves to the SINGLE knob — TS TURN_LIMIT / GPU rules.turn_limit (the
+  fixtures' scenario.turnLimit) = 250. Owner's call: train/eval to the score
+  victory, not past it (the prior 300 default optimized 50 turns the
+  scoreboard never sees; 100-default eval scored nets 150 turns short).
+  Flipped: BatchEnv/DuelEnv/MeleeEnv (None→turn_limit), rollout --turns,
+  train_ppo --horizon, eval/duel_eval/melee_eval/behavior_probe/gen_targets,
+  horizon_audit, engine turnLimit fallback 100→250, TS CivEnv + ADVISOR_HORIZON
+  (now = TURN_LIMIT). search_eval keeps --turns 100 (SEARCH.md benchmark
+  comparability). Fixtures untouched (exporter already wrote turnLimit 250);
+  off-script gate now runs 250t — a strict prefix of the proven-exact 300t run
+  (the rollout policy is counter-based, stateless per turn). Old horizon-100
+  baselines in TRAINING.md are historical; all prior nets were already orphaned
+  by the 46→52 action-head growth and have been deleted (gpu/runs pruned to
+  tune3, the gumbel_test reference). Full audit that found this: gpu/AUDIT.md.
 
 
 ## 5. The Civ 6 gap — engine completion toward the REAL goal (2026-07-08)

@@ -44,12 +44,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", default="random", help="random | scripted | path/to/ckpt.pt")
     ap.add_argument("--episodes", type=int, default=50)
-    ap.add_argument("--horizon", type=int, default=100)
+    ap.add_argument("--horizon", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--seed", type=int, default=424242)
     ap.add_argument("--sample", action="store_true", help="sample the checkpoint policy instead of argmax")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
 
+    if args.horizon is None:  # single knob: the game's own length
+        args.horizon = load_rules().turn_limit
     env = build_env(args.episodes, args.device, args.horizon)
     B = env.sim.B
     env.reset(scramble=args.seed)

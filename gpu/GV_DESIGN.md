@@ -1,18 +1,15 @@
 # G-V design — victory conditions & the 300-turn horizon
 
-Status: IN PROGRESS (2026-07-08). GV-1 (winner indicator) SHIPPED 753a451;
-GV-2 (game-end gameOver+winner) SHIPPED f1d2072+3ccb9fd; TURN_LIMIT=250 set.
-GV-3 (domination) + GV-4 (score victoryType) SHIPPED d0c2d8e (TS) + GPU mirror
-(_domination, victoryType trace col, gpu/domination_test.py poke). GV-5
-(bankruptcy) SHIPPED — Civ6 rule (one unit/turn, priciest, tie->oldest), TS
-game.ts + GPU _bankrupt_disband, tests/bankruptcy.test.ts + gpu/bankruptcy_test.py.
-**GV ARC COMPLETE (slices 1-5).** REMAINING (non-GV): horizon-300 flip (needs
-parity extended past t100) + the 0.6x off-script tail (6/7 bugs fixed; see
-[[engine-pivot]]).
-Also shipped en route: the horizon-300 pool-cap fix (765ab4f) and the GS-1
-game-speed infra + 3 latent-bug fixes incl. farm-adjacency (9feacaa). REMAINING:
-GV-3 domination, GV-4 score victory, GV-5 bankruptcy — plus the deferred 0.6x
-Online-speed ACTIVATION (its off-script latent tail: see [[engine-pivot]]).
+Status: **DONE — GV ARC COMPLETE (slices 1-5) and the horizon flip SHIPPED.**
+GV-1 (winner indicator) 753a451; GV-2 (game-end gameOver+winner) f1d2072+
+3ccb9fd, TURN_LIMIT=250; GV-3 (domination) + GV-4 (score victoryType) d0c2d8e
+(TS) + GPU mirror (_domination, victoryType trace col, domination_test poke);
+GV-5 (bankruptcy) — Civ6 rule (one unit/turn, priciest, tie->oldest), TS
+game.ts + GPU _bankrupt_disband, with tests. Horizon flip (2026-07-09/10):
+off-script parity exact to t300, then every horizon default unified onto the
+single knob (TS TURN_LIMIT / GPU rules.turn_limit = 250) — see gpu/AUDIT.md §A.
+Also shipped en route: the pool-cap fix (765ab4f) and the GS-1 game-speed
+infra + 3 latent-bug fixes incl. farm-adjacency (9feacaa).
 Diagnosis (BUILD_PLAN §5 G-V): a competent player sustains a 300-turn game
 (~285 plateau); the real gaps are (a) no late-game OBJECTIVE (score flat past
 t200) and (b) no bankruptcy (treasury → −1491). Every slice = /gate-stage +
@@ -112,6 +109,7 @@ mirror. Design:
 GV-1 (winner indicator, needs the TS rival-score) is the keystone — do it
 first and gate it hard; GV-2/3/4 build on it cheaply. GV-5 (bankruptcy) is
 independent and can slot anywhere, but its unit-deletion parity risk means do
-it when fresh, with the poke test written FIRST. The horizon flips to 300 only
-after GV-2 (so a victory can actually end the longer game); the long training
-campaign is the LAST step, on the finished objective.
+it when fresh, with the poke test written FIRST. The horizon flip landed after
+GV-2 as planned and settled on the single knob TURN_LIMIT=250 (train/eval to
+the score victory, not past it); the long training campaign is the LAST step,
+on the finished objective.

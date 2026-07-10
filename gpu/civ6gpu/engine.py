@@ -151,7 +151,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
-        turn_limit=r["scenario"].get("turnLimit", 100),
+        turn_limit=r["scenario"].get("turnLimit", 250),  # TS TURN_LIMIT; the get() is for pre-GV-4 fixtures
         civs=r.get("civs", {"player": 0, "rivalBase": 1}),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],
@@ -603,10 +603,10 @@ class BatchSim:
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
 
-        # --- districts (D1: catalog + inert state tensor) ------------------------
+        # --- districts (D1: catalog + state tensor) -------------------------------
         # The catalog is loaded and a [B, T] district-type-index tensor is
-        # allocated (-1 = none). Nothing places a district yet, so this is a
-        # verified no-op — D2 adds scripted placement + static adjacency yields.
+        # allocated (-1 = none). Writers since D1: the scripted scaffold (D2),
+        # rival queues (D4) and the RL district head (D5) — see _place_district.
         self.districts_cat = list(rules.districts or [])
         self.districts_on = bool(self.districts_cat)
         self.district = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else PLACEABLE_DISTRICTS idx
@@ -3060,7 +3060,9 @@ class BatchSim:
         # symmetric war head (seat-invariant [B, 2R] layout): a controlled
         # rival's only opponent-with-war-rules is THE PLAYER — column 0 =
         # declare (alive, at peace), column R = sue for peace (warTurns >=
-        # min; rivals hold no gold, so peace is free like the scripted roll)
+        # min). Peace is FREE for rivals — a tracked asymmetry (AUDIT C-13):
+        # the player pays 150+10*warTurns, and rivals DO hold gold since
+        # VP-G1 (r_treasury) — the free ride mirrors the scripted roll only.
         Rw = max(self.R, 1)
         war = torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
         war[:, 0] = self.r_alive[:, r] & ~self.r_atwar[:, r]

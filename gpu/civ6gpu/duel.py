@@ -30,13 +30,13 @@ class DuelEnv:
         rules: Rules,
         device: str = "cpu",
         dtype=torch.float32,
-        horizon: int = 100,
+        horizon: int | None = None,
         reward: str = "dense",
     ):
         assert reward in ("dense", "relative")
         self.env = BatchEnv(fixtures, rules, device=device, dtype=dtype, horizon=horizon)
         self.reward_mode = reward
-        self.horizon = horizon
+        self.horizon = self.env.horizon  # None resolved to rules.turn_limit there
         self.war_shaping = 0.0  # V-WS: set by the trainer (--war-shaping)
         self._ws_prev = None
 

@@ -13,6 +13,7 @@ import { YIELD_KEYS, emptyYields, addYields } from './types';
 import {
   createGame,
   endTurn,
+  TURN_LIMIT,
   queueBuilding,
   queueDistrict,
   queueWonder,
@@ -252,7 +253,7 @@ export class CivEnv {
   private policyMoves = 0;
 
   constructor(private opts: EnvOptions) {
-    this.horizon = opts.horizon ?? 100;
+    this.horizon = opts.horizon ?? TURN_LIMIT; // default: the game's own length (score victory)
     this.objective = opts.objective ?? 'balanced';
   }
 

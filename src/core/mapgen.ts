@@ -4,8 +4,8 @@
  * edge-following rivers fed from highlands, lake detection, coast rings,
  * climate-driven features and (optionally) resources.
  *
- * Fully deterministic for a given seed + options. A later stage can bypass
- * this entirely by importing map JSON extracted from the real game.
+ * Fully deterministic for a given seed + options. The UI's import-text path
+ * (panels.ts) can bypass this entirely with map JSON from the real game.
  */
 
 import { fbm } from './noise';

@@ -17,7 +17,7 @@ import { CS_TYPE_COLORS, ENVOY_COST, INFLUENCE_PER_TURN, GOV_INFLUENCE_TIER, LEV
 import { loyaltyDelta } from '../core/rivals';
 import { playerStrength, rivalStrength, rivalProximity } from '../core/rivals';
 import { PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST } from '../data/rivals';
-import type { LoadedPolicy, Recommendation } from '../core/aiAdvisor';
+import { ADVISOR_HORIZON, type LoadedPolicy, type Recommendation } from '../core/aiAdvisor';
 import { FEATURE_VERSION as FEATURE_VERSION_UI } from '../core/rlenv';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
@@ -1413,7 +1413,7 @@ export function renderAiAdvisorPanel(
           '<div class="muted">No open decisions — queues are full and research is set. End a turn or clear a queue to get recommendations.</div>'
         : ''
     }
-    ${policy ? '<div class="hint muted">Rankings assume a horizon-100 game (the training setting). ★ marks the policy\'s pick; Δ is the score gap to it.</div>' : ''}
+    ${policy ? `<div class="hint muted">Rankings assume the full ${ADVISOR_HORIZON}-turn game (the score-victory horizon). ★ marks the policy's pick; Δ is the score gap to it.</div>` : ''}
   `;
 
   container.querySelector('[data-act="ai-load"]')?.addEventListener('click', () => {

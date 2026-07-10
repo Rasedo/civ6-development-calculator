@@ -66,7 +66,12 @@ python gpu/train_ppo.py --resume gpu/runs/overnight/latest.pt --out gpu/runs/ove
 tensorboard --logdir gpu/runs/overnight/tb     # or read gpu/runs/overnight/log.csv
 ```
 
-- `score/mean` — the number that matters. Baselines on the CURRENT
+- `score/mean` — the number that matters. HISTORICAL horizon-100 numbers
+  below: since 2026-07-10 every horizon default resolves to the game
+  length (TURN_LIMIT = 250), so these baselines don't compare to new runs
+  — and every pre-Harbor net was orphaned by the 46→52 action-head growth
+  (gpu/runs pruned to tune3). Fresh 250-turn baselines live at the end of
+  this file. Baselines on the horizon-100
   district engine (50-episode eval, re-run 2026-07): random 115.1 ± 11.8,
   scripted autopilot 162.2 ± 13.0, and the reference net **tune1** at
   **216.9 ± 13.5** greedy (26-action district engine; 12M steps ≈ 80 min

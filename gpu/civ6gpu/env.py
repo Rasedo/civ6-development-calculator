@@ -38,9 +38,12 @@ UNIT_FEATURES = 8
 
 
 class BatchEnv:
-    def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float32, horizon: int = 100):
+    def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float32, horizon: int | None = None):
         self.sim = BatchSim(fixtures, rules, device=device, dtype=dtype)
-        self.horizon = horizon
+        # None -> the game's own length: scenario turnLimit (TS TURN_LIMIT).
+        # Episodes end when the score victory fires; training past it would
+        # optimize turns the scoreboard never sees.
+        self.horizon = int(rules.turn_limit) if horizon is None else horizon
         self._episode = 0
         self._last_score = self.sim.empire_score()
         s = self.sim

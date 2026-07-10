@@ -68,7 +68,8 @@ ulp between runtimes.
 
 Current status: scripted **24 seeds × 100 turns × 6 city slots + 3
 city-states + 2 rival civs + disasters + builders** and off-script **72
-random games × 100 turns** — across rival war declarations, loyalty
+random games × 250 turns (the fixtures' turnLimit — proven exact to 300)**
+— across rival war declarations, loyalty
 flips, ~95 rival settlements, envoy assignments, quests, hundreds of
 fights, a steady drip of floods, droughts, storms and eruptions, and
 builders farming ~3 tiles each (22 of 24 seeds) while barbarians and

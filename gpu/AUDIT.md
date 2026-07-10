@@ -12,7 +12,13 @@ Line numbers are as of commit 1fca921.
 
 ---
 
-## A. Horizon-300 flip is only half-applied  (task #27)
+## A. Horizon flip was only half-applied — RESOLVED (task #27, 2026-07-10)
+
+Owner's decision: the single knob is **TURN_LIMIT = 250** (not 300) — train and
+evaluate to the score victory, not past it. Every default below now resolves to
+TS `TURN_LIMIT` / GPU `rules.turn_limit` (the fixtures' `scenario.turnLimit`);
+`search_eval` keeps `--turns 100` for SEARCH.md benchmark comparability.
+Original finding, for the record:
 
 Flipped to 300: `gpu/train_ppo.py:241`, `gpu/rollout.py:38`, `gpu/horizon_audit.py:28`.
 Still defaulting to 100:
@@ -32,7 +38,7 @@ deferrals (`:60-61` IZ/Theater district code, `:129` ENGINEERING, `:156` Neighbo
 Urbanization, `:41-42`, `:57`, `:698-700`) have hit their stated unblock condition — they are
 now actionable, not parked.
 
-## B. Stale docs / comments  (task #28)
+## B. Stale docs / comments — FIXED (task #28, 2026-07-10)
 
 - `AGENT_PROMPT.md:13` — "100-turn development game" (now 300 train/rollout, TS TURN_LIMIT 250).
 - `AGENT_PROMPT.md:111-120` — G-V arc marked IN PROGRESS; it shipped (GV done, pool cap 765ab4f,
