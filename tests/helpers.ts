@@ -54,6 +54,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     settlers: 0,
     buildersTrained: 0, // P4/D-10
     bestMeleeCS: 0, // P4/D-22
+    tilesPurchased: 0, // P4/D-17
     plannedSettles: [],
     unitsMode: false,
     units: [],

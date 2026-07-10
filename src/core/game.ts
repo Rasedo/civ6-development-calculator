@@ -6,7 +6,7 @@
 
 import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit } from './types';
 import { generateMap } from './mapgen';
-import { tilesWithin } from './hex';
+import { tilesWithin, hexDistance } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
@@ -30,7 +30,7 @@ import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { BOOST_FRACTION } from '../data/boosts';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
-import { CITY_NAMES, borderGrowthCost, TILE_PURCHASE_GOLD_PER_CULTURE, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
+import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
 import { tileClaimed, civOfRival } from './civs';
 
@@ -101,6 +101,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     settlers: 0,
     buildersTrained: 0, // P4/D-10
     bestMeleeCS: 0, // P4/D-22
+    tilesPurchased: 0, // P4/D-17
     plannedSettles: [],
     unitsMode,
     units: [],
@@ -532,11 +533,26 @@ function isEncampmentItem(item: QueueItem): boolean {
 // Tiles, research, government actions
 // ---------------------------------------------------------------------------
 
-/** Gold price for this city's next tile (shared counter with culture growth). */
-export function tilePurchaseCost(state: GameState, city: City): number {
+/** Gold price of a tile. P4/D-17 (real Civ 6): ring-based base (50 for ring
+ * ≤2, 75 for ring 3, +25/ring beyond as a scope extension), speed-scaled,
+ * × (1 + 4·research progress), +5 (scaled) per tile EVER purchased
+ * empire-wide — fully decoupled from the culture-growth counter. Without a
+ * target tile (UI headline price) the ring-2 base is shown. */
+export function tilePurchaseCost(state: GameState, city: City, tileIndex?: number): number {
   const mods = getModifiers(state);
+  const center = state.map.tiles[city.centerIndex];
+  let ring = 2;
+  if (tileIndex !== undefined) {
+    const t = state.map.tiles[tileIndex];
+    ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
+  }
+  const tPct = state.research.techs.length / Object.keys(TECHS).length;
+  const cPct = state.research.civics.length / Object.keys(CIVICS).length;
+  const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
+  const step = Math.round(5 * GAME_SPEED);
   return Math.round(
-    borderGrowthCost(city.tilesAcquired) * TILE_PURCHASE_GOLD_PER_CULTURE * mods.tilePurchaseMult,
+    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (state.tilesPurchased ?? 0)) *
+      mods.tilePurchaseMult,
   );
 }
 
@@ -546,12 +562,16 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number): Ru
   if (!borderCandidates(state, city).includes(tileIndex)) {
     return { ok: false, reason: 'Tile must be unowned and adjacent to this city’s territory (within 5 rings).' };
   }
-  const cost = tilePurchaseCost(state, city);
+  const cost = tilePurchaseCost(state, city, tileIndex);
   if (!state.sandbox) {
     if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     state.treasury -= cost;
   }
-  acquireTile(state, city, tileIndex);
+  // P4/D-17: purchases claim the tile but do NOT advance the culture-growth
+  // counter (real Civ 6 keeps the two schedules separate).
+  state.map.tiles[tileIndex].cityId = city.id;
+  revealAround(state, tileIndex, 1);
+  state.tilesPurchased = (state.tilesPurchased ?? 0) + 1;
   return { ok: true };
 }
 
@@ -906,6 +926,7 @@ export function deserialize(json: string): GameState {
       .filter((u) => u.owner === 'player' && !UNITS[u.type]?.ranged)
       .map((u) => UNITS[u.type]?.combat ?? 0),
   );
+  state.tilesPurchased ??= 0; // P4/D-17
   state.plannedSettles ??= [];
   state.unitsMode ??= false;
   state.units ??= [];

@@ -28,8 +28,8 @@ export function borderGrowthCost(n: number): number {
   return Math.floor(10 + Math.pow(6 * (n + 1), 1.3));
 }
 
-/** Gold price of buying a tile = culture cost × this (before policy discounts). */
-export const TILE_PURCHASE_GOLD_PER_CULTURE = 4;
+// (P4/D-17: the old culture-cost×4 tile pricing died — tilePurchaseCost now
+// carries the real ring/progress/purchased schedule directly.)
 
 /** Gold price of buying a building/unit = production cost × this (Civ 6). */
 /** Game-speed cost multiplier (GS-1): Online-ish pace. All production AND

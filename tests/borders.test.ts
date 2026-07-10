@@ -39,21 +39,22 @@ describe('cultural border growth', () => {
     expect(pickBorderTile(state, city)).toBe(luxTile.index);
   });
 
-  it('buying tiles costs gold and shares the expansion counter', () => {
+  it('buying tiles costs ring-priced gold on its own schedule (D-17)', () => {
     const state = makeState(makeMap(18, 18));
     const city = foundCity(state, tileAtCoords(state.map, 9, 9).index).city!;
     state.treasury = 1000;
 
     const target = tileAtCoords(state.map, 11, 9);
     expect(borderCandidates(state, city)).toContain(target.index);
-    const cost = tilePurchaseCost(state, city);
-    expect(cost).toBe(80); // 20 culture * 4 gold
+    const cost = tilePurchaseCost(state, city, target.index);
+    expect(cost).toBe(30); // ring 2: round(50 × GAME_SPEED), no research yet
 
     expect(buyTile(state, city.id, target.index).ok).toBe(true);
     expect(target.cityId).toBe(city.id);
     expect(state.treasury).toBe(1000 - cost);
-    expect(city.tilesAcquired).toBe(1);
-    expect(tilePurchaseCost(state, city)).toBe(140); // next tile costs more (4 × 35)
+    expect(city.tilesAcquired).toBe(0); // purchases don't advance the culture counter
+    expect(state.tilesPurchased).toBe(1);
+    expect(tilePurchaseCost(state, city)).toBe(33); // +5 (speed-scaled → 3) per purchase
 
     // far tile: not a candidate
     const far = tileAtCoords(state.map, 16, 9);

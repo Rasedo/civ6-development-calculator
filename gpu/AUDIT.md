@@ -219,8 +219,15 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: D-17 tile purchase (needs a verified formula source) and D-8's
-25% under-represented discount.
+high-value: D-8's 25% under-represented discount (the ONLY open D item).
+
+D-17 COMPLETE (TS-only — tile purchase has no GPU verb): the real schedule,
+verified via the civfanatics formula thread — ring-based base (50 ring ≤2,
+75 ring 3, +25/ring as a scope extension for our ring-5 candidates),
+speed-scaled, × (1 + 4·max(tech%, civic%)), + 5 (scaled) per tile EVER
+purchased (state.tilesPurchased, empire-wide). Purchases no longer advance
+the culture-growth counter (the two schedules are decoupled, like real
+Civ 6); TILE_PURCHASE_GOLD_PER_CULTURE died.
 
 D-23 COMPLETE: ranged units bombard cities — rangedAttack falls back through
 the melee chain (rival city at war, then CS center) with ONE roll against

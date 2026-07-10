@@ -221,6 +221,9 @@ export interface GameState {
   /** P4/D-22: combat strength of the strongest MELEE unit the player has
    * ever fielded — real Civ 6 bases city defense on it. */
   bestMeleeCS: number;
+  /** P4/D-17: tiles ever gold-purchased — each adds +5 (pre-speed) to every
+   * future tile purchase, empire-wide (real Civ 6 schedule). */
+  tilesPurchased: number;
   /** Tile indexes queued for automatic founding as settlers complete. */
   plannedSettles: number[];
   /**
