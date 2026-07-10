@@ -287,9 +287,31 @@ export function unitMaintenance(state: GameState): number {
 export function refreshUnits(state: GameState): void {
   for (const unit of state.units) {
     const tile = state.map.tiles[unit.tileIndex];
-    const friendly = unit.owner === 'player' ? tile.cityId !== -1 : true;
-    unit.hp = Math.min(UNIT_HP, unit.hp + (friendly ? 10 : 5));
-    unit.movesLeft = UNITS[unit.type]?.moves ?? 2;
+    const full = UNITS[unit.type]?.moves ?? 2;
+    // P4/D-2 (real Civ 6, unifies AUDIT C-7/C-8): a unit heals only if it
+    // spent NO movement since its last refresh (the heal runs before the
+    // reset below, so any move/attack/build blocks it) — +20 in a friendly
+    // city (barbs: on their camp), +15 in own territory, +10 on neutral
+    // ground, +5 on foreign-owned land.
+    if (unit.movesLeft >= full) {
+      const unowned = tile.cityId === -1 && tile.rivalId === undefined && tile.csId === undefined;
+      let heal: number;
+      if (unit.owner === 'player') {
+        if (tile.cityId !== -1 && tile.district === 'CITY_CENTER') heal = 20;
+        else if (tile.cityId !== -1) heal = 15;
+        else heal = unowned ? 10 : 5;
+      } else if (unit.owner === 'rival') {
+        if (tile.rivalId === unit.civId && tile.district === 'CITY_CENTER') heal = 20;
+        else if (tile.rivalId === unit.civId) heal = 15;
+        else heal = unowned ? 10 : 5;
+      } else {
+        // barbarian: the camp is home
+        if (state.barbCamps.includes(unit.tileIndex)) heal = 20;
+        else heal = unowned ? 10 : 5;
+      }
+      unit.hp = Math.min(UNIT_HP, unit.hp + heal);
+    }
+    unit.movesLeft = full;
     if (unit.path) walkPath(state, unit);
     // Auto-explore: keep chasing the fog until there is none in reach.
     if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {

@@ -94,6 +94,7 @@ def test_peace(rules, path):
     rr = sim.rules.rivals
     need = int(rr.get("peaceMinWarTurns", 8))
     for _ in range(need):
+        sim.treasury[:] = 0.0  # isolate the warTurns gate (a rich-enough world opens the gold gate mid-wait)
         assert not bool(sim.war_mask()[0, sim.R]), "peace column open too soon"
         sim.step()
     assert bool(sim.r_atwar[0, 0]), "war ended prematurely (rival auto-peace?)"

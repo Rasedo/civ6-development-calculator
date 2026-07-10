@@ -58,17 +58,18 @@ def gpu_state_lines(sim, b):
     for pp in range(sim.p_alive.shape[1]):
         if bool(sim.p_alive[b, pp]):
             L.append(f"{p}PU {int(sim.p_tile[b, pp])} = t{int(sim.p_type[b, pp])} hp{int(sim.p_hp[b, pp])}")
-    _bn, _bh = Counter(), Counter()
+    _bn, _bh, _ba = Counter(), Counter(), Counter()
     for u in range(sim.u_alive.shape[1]):
         if bool(sim.u_alive[b, u]):
             t_ = int(sim.u_tile[b, u])
             _bn[t_] += 1
             _bh[t_] += int(sim.u_hp[b, u])
+            _ba[t_] += int(bool(sim.u_acted[b, u]))
     for tile in sorted(_bn):
-        L.append(f"{p}BU {tile} = {_bn[tile]} hp{_bh[tile]}")
+        L.append(f"{p}BU {tile} = {_bn[tile]} hp{_bh[tile]} a{_ba[tile]}")
     if hasattr(sim, "v_alive"):
         for k, n in sorted(Counter((int(sim.v_civ[b, v]), int(sim.v_tile[b, v]), int(sim.v_type[b, v])) for v in range(sim.v_alive.shape[1]) if bool(sim.v_alive[b, v])).items()):
-            L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {n}")
+            L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {n}")  # noqa
 
     imp, pill = sim.improvement[b], sim.pillaged[b]
     # TS carries district='CITY_CENTER' on every city-center tile (center_at /

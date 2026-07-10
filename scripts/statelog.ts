@@ -45,7 +45,10 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     barb.set(u.tileIndex, (barb.get(u.tileIndex) ?? 0) + 1);
     barbHp.set(u.tileIndex, (barbHp.get(u.tileIndex) ?? 0) + u.hp);
   }
-  for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)}`);
+  const barbActed = new Map<number, number>();
+  for (const u of state.units) if (u.owner === 'barbarian')
+    barbActed.set(u.tileIndex, (barbActed.get(u.tileIndex) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));
+  for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)} a${barbActed.get(tile)}`);
 
   const rv = new Map<string, number>();
   for (const u of state.units) if (u.owner === 'rival') {
