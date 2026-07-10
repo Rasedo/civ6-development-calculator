@@ -83,7 +83,7 @@ const rawList: BuildingDef[] = [
   { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 390, requiresAny: ['ARMORY'], yields: { production: 3 }, housing: 1 },
 
   // --- Entertainment Complex ----------------------------------------------------------
-  { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 1 },
+  { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 1, yields: { culture: 1 } }, // P4/D-24: real Arena also gives +1 culture
   { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 290, requiresAny: ['ARENA'], amenities: 1, regional: true },
   { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 580, requiresAny: ['ZOO'], amenities: 2, regional: true }, // amenity amount approximate
 ];

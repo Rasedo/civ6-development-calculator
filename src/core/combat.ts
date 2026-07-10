@@ -49,8 +49,10 @@ export function terrainDefense(tile: Tile): number {
 }
 
 function damageRoll(state: GameState, strengthDiff: number): number {
+  // P4/D-1: the real Civ 6 random factor is 0.8–1.2 (equal-strength hits
+  // land "reliably 24–36"), not the old 0.75–1.25.
   const base = 30 * Math.exp(0.04 * strengthDiff);
-  return Math.max(1, Math.round(base * (0.75 + 0.5 * nextRandom(state))));
+  return Math.max(1, Math.round(base * (0.8 + 0.4 * nextRandom(state))));
 }
 
 export function cityDefenseStrength(state: GameState, city: City): number {

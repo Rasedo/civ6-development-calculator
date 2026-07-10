@@ -101,7 +101,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       cost: 80,
       maintenance: 2,
       moves: 4,
-      combat: 35,
+      combat: 36, // P4/D-9: real Civ 6 Horseman
       requiresTech: 'HORSEBACK_RIDING',
       description: 'Fast shock cavalry (resource requirement not modeled).',
     }),

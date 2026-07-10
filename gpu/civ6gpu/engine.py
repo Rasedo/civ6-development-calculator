@@ -1807,13 +1807,14 @@ class BatchSim:
         return out
 
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor) -> torch.Tensor:
-        """Mirrors damageRoll: 30·e^(0.04·Δ)·rand(0.75–1.25), JS-rounded,
-        min 1. Δ is always an integer here, so the exponential comes from
-        the fixture's JS-computed table (libm exp() can differ by an ulp
+        """Mirrors damageRoll: 30·e^(0.04·Δ)·rand(0.8–1.2) (P4/D-1: the real
+        Civ 6 range — equal-strength hits land 24–36), JS-rounded, min 1.
+        Δ is always an integer here, so the exponential comes from the
+        fixture's JS-computed table (libm exp() can differ by an ulp
         between runtimes and the result rounds to an integer)."""
         r = self._next_random(mask)
         base = self._dmg_base[(diff + 60).clamp(0, 120)]
-        return js_round(base * (0.75 + 0.5 * r)).clamp(min=1).to(torch.long)
+        return js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
 
     def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
         """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
@@ -4886,65 +4887,83 @@ class BatchSim:
             p_heal = torch.where(friendly, heal, 5)
             self.p_hp = torch.where(self.p_alive, (self.p_hp + p_heal).clamp(max=cap), self.p_hp)
 
-        # --- worked tiles + city yields ------------------------------------------
+        # --- worked tiles + city yields: the PER-CITY interleave (P4) -------------
+        # TS endTurn recomputes computeCityStats FRESH for every city inside its
+        # loop, so an EARLIER city's mid-turn mutation — a P2 district/building
+        # completion shifting a later city's adjacency gold, a growth
+        # reshuffling the luxury ranking, a border claim — feeds every LATER
+        # city's APPLIED yields the same turn. Mirror with an invalidation-gated
+        # recompute: totals refresh only when _eff_version moved or a pop
+        # changed since the last compute (completions/claims bump the version;
+        # growth rides the pop snapshot). Caught by the F1 reshuffle (seed 9261
+        # t192): city 332's completing district raised city 203's adjacency
+        # gold and TS applied +1 gold × 0.95 amenity while the GPU applied the
+        # top-of-turn value.
         total, housing, growth_f, tier_idx = self._city_totals()
-        popf = self.pop.to(self.dtype)
-        pop_before = self.pop.clone()  # loyalty mixes pre/post-growth pops
-
-        # --- production ------------------------------------------------------------
-        has_item = self.current >= 0
-        # V-H1: banked chop production pays into the head the moment a build
-        # exists (game.ts consumes productionBank inside the production add).
-        self.progress = torch.where(has_item, self.progress + total[:, :, 1] + self.prod_bank, self.progress)
-        self.prod_bank = torch.where(has_item, torch.zeros_like(self.prod_bank), self.prod_bank)
-        done = has_item & (self.progress >= self.cur_cost)
-        made_settler = done & (self.current == self.SETTLER)
-        self.settlers = self.settlers + made_settler.sum(dim=1)
-        made_building = done & (self.current < self.NB)
-        if made_building.any():
-            bi, ci = made_building.nonzero(as_tuple=True)
-            self.buildings[bi, ci, self.current[bi, ci]] = True
-        made_unit = done & (self.current >= self.UNIT_BASE) & (self.current < self.UNIT_BASE + self.NU)
-        if bool(made_unit.any()):
-            # Spawn in city order (the TS city loop completes them that way).
-            for c in range(C):
-                m = made_unit[:, c]
-                if bool(m.any()):
-                    # clamp max too: unmasked rows may hold P2 district codes
-                    self._spawn_player(m, self.site[:, c], (self.current[:, c] - self.UNIT_BASE).clamp(min=0, max=self.NU - 1))
-        # P2: a finished district completes its paved tile (queueDistrict's
-        # queue item — the tile was reserved at queue time in q_dtile).
-        made_district = done & (self.current >= self.UNIT_BASE + self.NU)
-        if bool(made_district.any()):
-            db_, dc_ = made_district.nonzero(as_tuple=True)
-            self.district_complete[db_, self.q_dtile[db_, dc_].clamp(min=0)] = True
-            self.q_dtile[db_, dc_] = -1
-            self._eff_version += 1
-        self.current = torch.where(done, torch.full_like(self.current, -1), self.current)
-        self.progress = torch.where(done, torch.zeros_like(self.progress), self.progress)  # overflow drops (queue empty)
-
-        # --- growth ------------------------------------------------------------------
-        surplus = total[:, :, 0] - popf * r.food_per_citizen
-        head = housing - popf
-        hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
-        effective = torch.where(surplus > 0, surplus * hf * growth_f, surplus)
-        self.food_box = self.food_box + effective
-        need = self._growth_needed(self.pop)
-        grow = self.alive & (self.food_box >= need)
-        self.pop = self.pop + grow.long()
-        self.food_box = torch.where(grow, self.food_box - need, self.food_box)
-        starve = self.alive & ~grow & (self.food_box < 0)
-        self.pop = torch.where(starve, (self.pop - 1).clamp(min=1), self.pop)
-        self.food_box = torch.where(starve, torch.zeros_like(self.food_box), self.food_box)
-
-        # --- borders --------------------------------------------------------------------
-        # The TS engine expands each city fully, in founding order, within a
-        # turn — later cities see earlier claims. C is tiny, so walk slots.
-        self.culture_box = self.culture_box + total[:, :, 4]
+        tier0 = tier_idx  # loyalty keeps the turn-start tier (pre-interleave behavior)
+        _tot_ver = self._eff_version
+        _tot_pop = self.pop.clone()
         y_sum = self._eff_yields().sum(dim=2)
+        pop_before = self.pop.clone()  # loyalty mixes pre/post-growth pops
+        gold_add = torch.zeros(B, dtype=self.dtype, device=dev)
+        sci_add = torch.zeros(B, dtype=self.dtype, device=dev)
+        cul_add = torch.zeros(B, dtype=self.dtype, device=dev)
         neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
         neigh_valid = (self.neigh >= 0).view(1, T, 6)
         for c in range(C):
+            if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
+                total, housing, growth_f, tier_idx = self._city_totals()
+                _tot_ver = self._eff_version
+                _tot_pop = self.pop.clone()
+                y_sum = self._eff_yields().sum(dim=2)
+            t_c = total[:, c]  # [B, 6] this city's FRESH yields
+            popf_c = self.pop[:, c].to(self.dtype)
+
+            # --- production (col c) -----------------------------------------------
+            has_item = self.current[:, c] >= 0
+            # V-H1: banked chop production pays into the head the moment a build
+            # exists (game.ts consumes productionBank inside the production add).
+            self.progress[:, c] = torch.where(has_item, self.progress[:, c] + t_c[:, 1] + self.prod_bank[:, c], self.progress[:, c])
+            self.prod_bank[:, c] = torch.where(has_item, torch.zeros_like(self.prod_bank[:, c]), self.prod_bank[:, c])
+            done = has_item & (self.progress[:, c] >= self.cur_cost[:, c])
+            made_settler = done & (self.current[:, c] == self.SETTLER)
+            self.settlers = self.settlers + made_settler.long()
+            made_building = done & (self.current[:, c] < self.NB)
+            if bool(made_building.any()):
+                bi = made_building.nonzero(as_tuple=True)[0]
+                self.buildings[bi, c, self.current[bi, c]] = True
+                self._eff_version += 1  # its yields join LATER cities' totals this turn (TS: fresh stats)
+            made_unit = done & (self.current[:, c] >= self.UNIT_BASE) & (self.current[:, c] < self.UNIT_BASE + self.NU)
+            if bool(made_unit.any()):
+                # clamp max too: unmasked rows may hold P2 district codes
+                self._spawn_player(made_unit, self.site[:, c], (self.current[:, c] - self.UNIT_BASE).clamp(min=0, max=self.NU - 1))
+            # P2: a finished district completes its paved tile (queueDistrict's
+            # queue item — the tile was reserved at queue time in q_dtile).
+            made_district = done & (self.current[:, c] >= self.UNIT_BASE + self.NU)
+            if bool(made_district.any()):
+                db_ = made_district.nonzero(as_tuple=True)[0]
+                self.district_complete[db_, self.q_dtile[db_, c].clamp(min=0)] = True
+                self.q_dtile[db_, c] = -1
+                self._eff_version += 1
+            self.current[:, c] = torch.where(done, torch.full_like(self.current[:, c], -1), self.current[:, c])
+            self.progress[:, c] = torch.where(done, torch.zeros_like(self.progress[:, c]), self.progress[:, c])  # overflow drops (queue empty)
+
+            # --- growth (col c; the pop snapshot re-triggers totals for later cities) ---
+            surplus = t_c[:, 0] - popf_c * r.food_per_citizen
+            head = housing[:, c] - popf_c
+            hf = torch.where(head >= 2, 1.0, torch.where(head >= 1, 0.5, 0.25).to(self.dtype)).to(self.dtype)
+            effective = torch.where(surplus > 0, surplus * hf * growth_f[:, c], surplus)
+            self.food_box[:, c] = self.food_box[:, c] + effective
+            need = self._growth_needed(self.pop[:, c])
+            grow = self.alive[:, c] & (self.food_box[:, c] >= need)
+            self.pop[:, c] = self.pop[:, c] + grow.long()
+            self.food_box[:, c] = torch.where(grow, self.food_box[:, c] - need, self.food_box[:, c])
+            starve = self.alive[:, c] & ~grow & (self.food_box[:, c] < 0)
+            self.pop[:, c] = torch.where(starve, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])
+            self.food_box[:, c] = torch.where(starve, torch.zeros_like(self.food_box[:, c]), self.food_box[:, c])
+
+            # --- borders (col c; later cities see earlier claims, as before) --------
+            self.culture_box[:, c] = self.culture_box[:, c] + t_c[:, 4]
             for _ in range(BORDER_LOOPS):
                 cost_b = self._border_cost(self.tiles_acquired[:, c])
                 ready = self.alive[:, c] & (self.culture_box[:, c] >= cost_b)
@@ -4974,13 +4993,17 @@ class BatchSim:
                 if not expand.any():
                     break
 
-        # --- empire accumulators ----------------------------------------------------------
-        self.treasury = self.treasury + total[:, :, 2].sum(dim=1)
-        self.science_total = self.science_total + total[:, :, 3].sum(dim=1)
-        self.culture_total = self.culture_total + total[:, :, 4].sum(dim=1)
+            # --- empire accumulators (col c, FRESH values — TS game.ts:724-729) -----
+            gold_add = gold_add + t_c[:, 2]
+            sci_add = sci_add + t_c[:, 3]
+            cul_add = cul_add + t_c[:, 4]
+
+        self.treasury = self.treasury + gold_add
+        self.science_total = self.science_total + sci_add
+        self.culture_total = self.culture_total + cul_add
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------
-        self._apply_loyalty_and_flips(tier_idx, pop_before)
+        self._apply_loyalty_and_flips(tier0, pop_before)
 
         # --- the hostile world (after the city loop, before research) ----------------------
         if self.units_mode:
@@ -4993,8 +5016,10 @@ class BatchSim:
         self._rival_phase()
 
         # --- research ---------------------------------------------------------------------
-        turn_science = total[:, :, 3].sum(dim=1)
-        turn_culture = total[:, :, 4].sum(dim=1)
+        # P4-interleave: the research streams use the same per-city FRESH sums
+        # TS accumulates in its city loop (turnScience/turnCulture, game.ts:728).
+        turn_science = sci_add
+        turn_culture = cul_add
         if tech is None:
             self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
         self.tech_prog = self.tech_prog + turn_science
