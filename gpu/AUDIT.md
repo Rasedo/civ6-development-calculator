@@ -66,13 +66,17 @@ only the decision policy may differ. Findings (engine = TS / GPU / both):
 
 ### Structural capability blocks
 
-1. **Rivals can never own coastal water** [both] — founding claims skip water
-   (`src/core/rivals.ts:131-133`, border expansion `rivals.ts:410`; GPU `engine.py:3611-3617`,
-   `:3510`) while the player's founding/border growth claim water (`game.ts:184-186`,
-   `city.ts:296-308`, `engine.py:4957-4963`). HARBOR placement needs civ-owned coastal water →
-   the whole Harbor line (Lighthouse/Shipyard/Seaport, Admiral GPP, worked water) is
-   structurally unreachable for rivals except via capturing a player city. This is the ROOT
-   CAUSE of "rivals never build Shipyards", not a queue-policy choice. (task #29)
+1. **Rivals can never own coastal water — FIXED 2026-07-10 (10d2382).** Rival founding now
+   claims the full first ring (water included, mirroring foundCity) and rival border expansion
+   claims water (only impassable + natural wonders excluded), both engines. Rivals hold water
+   from turn 1 (wterr 3 → 56 over a 250t game); the Harbor line is structurally reachable.
+   THE GATE THEN CAUGHT a latent missing mechanic the reshuffle exposed: the GPU had NO
+   player-vs-city-state combat (TS meleeAttack's csTarget fallback) — **V-CS ported** same
+   commit: cs_hp (maxHp 150), defCS = 15+pop(+6 militaristic), capture → player city, +10/turn
+   siege recovery, trace keyed by CS id. NEW follow-ups: (a) the RL unit-attack MASK does not
+   yet OFFER attacks on CS centers — a new verb, do deliberately with an eval re-baseline;
+   (b) TS `captureCityState` has NO city-cap raze rule (unlike `captureRivalCity`, combat.ts:317)
+   — TS-side consistency fix; the GPU skips city creation at a full empire (documented).
 2. **Rival-unreachable catalog** [TS] — outside `SCAFFOLD_DISTRICTS` (`data/districts.ts:250-256`):
    THEATER_SQUARE, INDUSTRIAL_ZONE, ENCAMPMENT, ENTERTAINMENT_COMPLEX, NEIGHBORHOOD and all
    their buildings; worship buildings (no rival worship); PALACE (no unlock path — see item 14).

@@ -797,13 +797,21 @@ export function rivalCityYields(
     total[col] += Math.floor(districtAdjacency(state.map, dt, d.type));
   }
   // C1-B4b-2: building yields under empty modifiers (mult 1, no belief
-  // adds; the exported scope has no regional/SHIPYARD buildings and
-  // worship never queues, so the plain def.yields sum IS
-  // cityBuildingYields here).
+  // adds; worship never queues, so the plain def.yields sum matches
+  // cityBuildingYields). P1/C-22: Harbors are rival-reachable now, so the
+  // SHIPYARD special is live — production += the completed Harbor's
+  // floor(adjacency), the rival twin of yields.ts:171.
   for (const id of rc.buildings) {
     const bd = BUILDINGS[id];
-    if (!bd?.yields) continue;
-    for (const [k, v] of Object.entries(bd.yields)) total[k as keyof Yields] += v ?? 0;
+    if (bd?.yields) {
+      for (const [k, v] of Object.entries(bd.yields)) total[k as keyof Yields] += v ?? 0;
+    }
+    if (bd?.special === 'SHIPYARD') {
+      const harbor = rc.districts.find((d) => d.type === 'HARBOR');
+      if (harbor && state.map.tiles[harbor.tileIndex].districtComplete) {
+        total.production += Math.floor(districtAdjacency(state.map, state.map.tiles[harbor.tileIndex], 'HARBOR'));
+      }
+    }
   }
   return total;
 }

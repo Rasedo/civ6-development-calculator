@@ -3565,9 +3565,8 @@ class BatchSim:
                         gold = gold + add  # VP-G1: Harbor/Hub adjacency
                     elif yc == 5:
                         faith = faith + add  # GV-1a: Holy Site adjacency
-        # C1-B4b-2: building yields under empty modifiers (the exported
-        # catalog has no regional/SHIPYARD scope and worship never queues,
-        # so the plain def.yields sum IS cityBuildingYields here).
+        # C1-B4b-2: building yields under empty modifiers (worship never
+        # queues, so the plain def.yields sum matches cityBuildingYields).
         if self.districts_on:
             selb = self.rc_bldg[:, r, j]
             if bool(selb.any()):
@@ -3578,6 +3577,18 @@ class BatchSim:
                 faith = faith + add6[:, 5]  # GV-1a
                 sci = sci + add6[:, 3]
                 cul = cul + add6[:, 4]
+                # P1/C-22: rivals reach Harbors now, so the SHIPYARD special
+                # is live — production += the completed Harbor's LIVE
+                # floor(adjacency), the rival twin of yields.ts:171 under
+                # empty modifiers (all int-valued: order-exact in f64).
+                if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
+                    hb_tile = self.rc_dist_tile[:, r, j, self._harbor_idx]
+                    has_sy = mask & selb[:, self._shipyard_bidx] & (hb_tile >= 0)
+                    has_sy = has_sy & self.district_complete.gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    if bool(has_sy.any()):
+                        adjc_sy = self._adj_district_count().to(self.dtype)
+                        hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()
+                        prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
         z = torch.zeros_like(food)
         return (
             torch.where(mask, food, z),
