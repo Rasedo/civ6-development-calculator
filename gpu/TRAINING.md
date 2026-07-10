@@ -556,3 +556,19 @@ new random-policy verb but floors cities at 1 HP, so it rarely converts
 to captures; notably random's MIN rose 0 -> 89 (fewer total collapses).
 The next reference net trains on THIS world. P4 is now closed except
 the banked D-8 discount design (AUDIT.md).
+
+
+**P4-FINAL world** (2026-07-10, commit 93efb76 — the D-8 40% district
+discount closes AUDIT section D; every tracked fidelity divergence is
+now fixed or canon-decided):
+
+    random    231.7 ± 24.5 (95% CI)  [min 88.9, max 429.7]
+    scripted  296.3 ± 20.9 (95% CI)  [min 114.5, max 421.4]
+
+Flat vs post-D17/D23 (232.8 / 292.7) — the discount mostly accelerates
+multi-city RIVAL economies (one-city empires never qualify), which the
+baseline policies barely feel. THIS is the reference world for the next
+net: the full P4 fidelity batch is in (real healing/movement/borders/
+amenities/loyalty/defense/bombardment/costs/maintenance/escalators/
+discount), P5-P8 remain (rival symmetry batch, rival interleave,
+dead-slot reclamation, net-driven export).
