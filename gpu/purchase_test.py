@@ -180,6 +180,49 @@ def test_settler_sequencing(rules, path):
     print(f"  settler sequencing OK ({c1:.0f} then {c2:.0f} gold in one turn)")
 
 
+def test_builder_escalation(rules, path):
+    """P4/D-10: two same-turn builder purchases price sequentially off the
+    live escalator (+4 pre-speed apart) and advance builders_trained."""
+    sim = build(rules, path)
+    for _ in range(120):
+        sim.step()
+        if bool(sim.alive[0, 1]):
+            break
+    assert bool(sim.alive[0, 1]), "no second city within 120 scripted turns"
+    if sim._builder_idx < 0:
+        print("  builder escalation SKIPPED (no builder in roster)")
+        return
+    sim._rl_purchase_active = True
+    sim.current[:, :2] = -1
+    sim.progress[:, :2] = 0.0
+    sim.treasury[:] = RICH
+    r = sim.rules
+    bt0 = int(sim.builders_trained[0])
+    bq = int((sim.current[0] == sim.UNIT_BASE + sim._builder_idx).sum())
+    cost = lambda n: round((r.builder_base + r.builder_per * n) * r.game_speed) * r.gold_purchase_mult
+    c1 = cost(bt0 + bq)
+    c2 = cost(bt0 + bq + 1)
+    p = torch.full((1, sim.C), sim.IDLE, dtype=torch.long)
+    p[0, 0] = pbase(sim) + sim.NB + 1 + sim._builder_idx
+    p[0, 1] = pbase(sim) + sim.NB + 1 + sim._builder_idx
+    sim.step(production=p)
+    assert int(sim.builders_trained[0]) == bt0 + 2, "builders_trained did not advance by 2"
+    # baseline turn without purchases, from the same start, to isolate the cost
+    sim2 = build(rules, path)
+    for _ in range(120):
+        sim2.step()
+        if bool(sim2.alive[0, 1]):
+            break
+    sim2._rl_purchase_active = True
+    sim2.current[:, :2] = -1
+    sim2.progress[:, :2] = 0.0
+    sim2.treasury[:] = RICH
+    sim2.step(production=torch.full((1, sim2.C), sim2.IDLE, dtype=torch.long))
+    delta = float(sim2.treasury[0]) - float(sim.treasury[0])
+    assert abs(delta - (c1 + c2)) < 1e-6, f"sequenced builder prices {delta} != {c1}+{c2}"
+    print(f"  builder escalation OK ({c1:.0f} then {c2:.0f} gold in one turn)")
+
+
 def main() -> None:
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -190,6 +233,7 @@ def main() -> None:
     test_width_and_mask_when_on(rules, path)
     test_building_purchase(rules, path)
     test_unit_purchase(rules, path)
+    test_builder_escalation(rules, path)
     test_settler_sequencing(rules, path)
     print("PURCHASE PLUMBING OK")
 

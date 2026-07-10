@@ -116,7 +116,7 @@ export type QueueItem =
   | { kind: 'building'; building: string; progress: number }
   | { kind: 'wonder'; wonder: string; tileIndex: number; progress: number }
   | { kind: 'settler'; progress: number; cost: number }
-  | { kind: 'unit'; unit: string; progress: number }
+  | { kind: 'unit'; unit: string; progress: number; cost?: number }
   | { kind: 'project'; project: string; progress: number; cost: number };
 
 export type GreatPersonClass =
@@ -215,6 +215,9 @@ export interface GameState {
   tradeRoutes: TradeRoute[];
   /** Trained settlers waiting to found a city (first city needs none). */
   settlers: number;
+  /** P4/D-10: builders ever trained or purchased — each adds +4 (pre-speed)
+   * to the next builder's cost, like real Civ 6. */
+  buildersTrained: number;
   /** Tile indexes queued for automatic founding as settlers complete. */
   plannedSettles: number[];
   /**
@@ -311,6 +314,8 @@ export interface RivalCiv {
   religionFounded: boolean;
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   treasury?: number;
+  /** P4/D-10: this civ's builders ever trained (its own cost escalator). */
+  buildersTrained?: number;
 }
 
 export interface ReligionState {

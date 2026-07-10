@@ -96,6 +96,9 @@ class Rules:
     settler_base: float
     settler_per_city: float
     settler_pop_gate: int
+    builder_base: float  # P4/D-10: builderCost = round((base + per·n)·speed)
+    builder_per: float
+    game_speed: float
     gold_purchase_mult: float  # V-P1: gold price = production cost × this (GOLD_PURCHASE_MULT)
     turn_limit: int  # GV-2: game over once turn > this
     civs: dict  # C1-A3: {player: 0, rivalBase: 1} — the unified civ-id space (asserted vs engine constants)
@@ -150,6 +153,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         settler_base=r["scenario"]["settlerBase"],
         settler_per_city=r["scenario"]["settlerPerCity"],
         settler_pop_gate=r["scenario"]["settlerPopGate"],
+        builder_base=r["scenario"].get("builderBase", 50),  # P4/D-10
+        builder_per=r["scenario"].get("builderPer", 4),
+        game_speed=r["scenario"].get("gameSpeed", 0.6),
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         turn_limit=r["scenario"].get("turnLimit", 250),  # TS TURN_LIMIT; the get() is for pre-GV-4 fixtures
         civs=r.get("civs", {"player": 0, "rivalBase": 1}),
@@ -299,6 +305,7 @@ _MUTABLE = [
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner",
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
+    "builders_trained", "r_builders_trained",  # P4/D-10 cost escalators
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
@@ -502,6 +509,10 @@ class BatchSim:
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.r_gpp = torch.zeros(B, r_pad, n_gp, dtype=torch.float64, device=device)
+        # P4/D-10: builders ever trained — the player's and each rival's own
+        # cost escalator (builderCost = round((50 + 4·n) · gameSpeed)).
+        self.builders_trained = torch.zeros(B, dtype=torch.long, device=device)
+        self.r_builders_trained = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.rc_alive = torch.zeros(B, r_pad, rc_pad, dtype=torch.bool, device=device)
         self.rc_center = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -948,6 +959,13 @@ class BatchSim:
     def _border_cost(self, n: torch.Tensor) -> torch.Tensor:
         # P4/D-16: the real Civ 6 curve — 10 + (6t)^1.3, t = 1-based tile count.
         return torch.floor(10 + (6 * (n.to(self.dtype) + 1)) ** 1.3)
+
+    def _builder_cost(self, n: torch.Tensor) -> torch.Tensor:
+        """P4/D-10: builderCost — round((base + per·n) · gameSpeed), n =
+        builders ever trained + queued (units.ts builderCost; Math.round
+        == js_round)."""
+        r = self.rules
+        return js_round((r.builder_base + r.builder_per * n.to(self.dtype)) * r.game_speed)
 
     def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor) -> torch.Tensor:
         """[B, N] researchable now: not done, all prereqs done."""
@@ -1730,7 +1748,14 @@ class BatchSim:
                 u_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                     1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
                 )
-                pu = (u_ok & (tre.unsqueeze(1) >= self._p_cost.unsqueeze(0) * mult)).unsqueeze(1).expand(-1, C, -1)
+                u_cost = self._p_cost.unsqueeze(0).expand(B, -1)
+                if self._builder_idx >= 0:
+                    # P4/D-10: the builder column prices off the live escalator
+                    # (trained + queued), like TS unitPurchaseCost at mask time.
+                    bq = (self.current == self.UNIT_BASE + self._builder_idx).sum(dim=1)
+                    u_cost = u_cost.clone()
+                    u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained + bq)
+                pu = (u_ok & (tre.unsqueeze(1) >= u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
             else:
                 pu = torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
             cols.append(torch.cat([pb, ps, pu], dim=2))
@@ -3261,7 +3286,13 @@ class BatchSim:
             afford_b = self.r_treasury[:, r].unsqueeze(1) >= (rdv.b_cost.double() * mult).unsqueeze(0)
             pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
             ps = torch.zeros(B, 1, dtype=torch.bool, device=dev)
-            afford_u = self.r_treasury[:, r].unsqueeze(1) >= (self._p_cost.double() * mult).unsqueeze(0)
+            u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
+            if self._builder_idx >= 0:
+                # P4/D-10: the builder column prices off THIS rival's escalator
+                rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
+                u_cost_r = u_cost_r.clone()
+                u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
+            afford_u = self.r_treasury[:, r].unsqueeze(1) >= u_cost_r * mult
             pu = ok_u & afford_u & self.controlled[:, r].unsqueeze(1)
             prod_cols.append(torch.cat([row & idle[:, j].unsqueeze(1), pb, ps, pu], dim=1))
         production = torch.stack(prod_cols, dim=1)  # [B, RC, base + NB+1+NU purchase]
@@ -3360,6 +3391,10 @@ class BatchSim:
                 if bool(is_pu.any()):
                     ui = pu_i.clamp(min=0, max=self.NU - 1)
                     cost_u = self._p_cost.gather(0, ui).double() * mult
+                    if self._builder_idx >= 0:
+                        # P4/D-10: bought rival builders price off THEIR escalator
+                        rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
+                        cost_u = torch.where(ui == self._builder_idx, self._builder_cost(rb_n).double() * mult, cost_u)
                     ok_now = is_pu & (self.r_treasury[:, r] >= cost_u)
                     if bool(ok_now.any()):
                         is_bldr = ok_now & (self._p_charges[ui] > 0)
@@ -3369,13 +3404,20 @@ class BatchSim:
                             self._spawn_rival(is_mil, ctr, ui, r)
                         if bool(is_bldr.any()):
                             self._spawn_rival_civ(is_bldr, ctr, r)
+                            self.r_builders_trained[:, r] = self.r_builders_trained[:, r] + is_bldr.long()  # P4/D-10
                         self.r_treasury[:, r] = torch.where(ok_now, self.r_treasury[:, r] - cost_u, self.r_treasury[:, r])
             # idle = NB+1 (explicit no-op); units NB+2..NB+1+NU
             is_u = act & (a >= NBn + 2) & (a < NBn + 2 + self.NU)
             if bool(is_u.any()):
                 ui = (a - (NBn + 2)).clamp(min=0, max=self.NU - 1)
+                cost_q = self._p_cost.gather(0, ui).double()
+                if self._builder_idx >= 0:
+                    # P4/D-10: queued rival builders lock the escalated price
+                    # (earlier j-slots' queues are already in rc_current).
+                    rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
+                    cost_q = torch.where(ui == self._builder_idx, self._builder_cost(rb_n).double(), cost_q)
                 self.rc_current[:, r, j] = torch.where(is_u, ui + 1, self.rc_current[:, r, j])
-                self.rc_cost[:, r, j] = torch.where(is_u, self._p_cost.gather(0, ui).double(), self.rc_cost[:, r, j])
+                self.rc_cost[:, r, j] = torch.where(is_u, cost_q, self.rc_cost[:, r, j])
                 self.rc_progress[:, r, j] = torch.where(is_u, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
             # scaffold districts: NB+2+NU..
             is_d = act & (a >= NBn + 2 + self.NU) & (a < NBn + 2 + self.NU + nS)
@@ -4304,8 +4346,11 @@ class BatchSim:
                     has_q = (self.rc_current[:, r] == self._builder_idx + 1).any(dim=1)
                     want_bd = rem & ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1) & (unit_count < cap)
                     if bool(want_bd.any()):
+                        # P4/D-10: the rival's own escalator (one builder per
+                        # civ at a time, so no queued term — rivals.ts:860).
+                        rb_cost = self._builder_cost(self.r_builders_trained[:, r]).double()
                         self.rc_current[:, r, j] = torch.where(want_bd, torch.full_like(self.rc_current[:, r, j], self._builder_idx + 1), self.rc_current[:, r, j])
-                        self.rc_cost[:, r, j] = torch.where(want_bd, self._p_cost[self._builder_idx].double(), self.rc_cost[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(want_bd, rb_cost, self.rc_cost[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(want_bd, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         unit_count = unit_count + want_bd.long()
                         rem = rem & ~want_bd
@@ -4391,6 +4436,7 @@ class BatchSim:
                         is_bldr = spawn_u & (cur - 1 == self._builder_idx)
                         if bool(is_bldr.any()):
                             self._spawn_rival_civ(is_bldr, self.rc_center[:, r, j], r)
+                            self.r_builders_trained[:, r] = self.r_builders_trained[:, r] + is_bldr.long()  # P4/D-10
                         spawn_u = spawn_u & ~is_bldr
                         if bool(spawn_u.any()):
                             self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r)
@@ -4672,6 +4718,11 @@ class BatchSim:
         queued_live = (self.current == self.SETTLER).sum(dim=1)
         # …and the settler stock, which purchases grow as the walk proceeds
         settlers_live = self.settlers.clone()
+        # P4/D-10: the builder escalator's live count — builders queued in
+        # EARLIER turns plus, as the walk proceeds, this turn's queues and
+        # purchases (TS applies act.p sequentially; both move builderCost).
+        bcode_w = (self.UNIT_BASE + self._builder_idx) if self._builder_idx >= 0 else -999
+        bqueued_live = (self.current == bcode_w).sum(dim=1)
         for c in range(C):
             ac = act[:, c]
             # --- queue a settler (cost from the live counters, queueSettler)
@@ -4685,6 +4736,16 @@ class BatchSim:
                 self.current[:, c] = torch.where(is_s, torch.full_like(self.current[:, c], self.SETTLER), self.current[:, c])
                 queued_live = queued_live + is_s.long()
                 self.settlers_queued = self.settlers_queued + is_s.long()
+            # --- queue a builder (P4/D-10: excluded from the vectorized unit
+            # block in purchase mode; priced off the live escalator here).
+            if self._builder_idx >= 0:
+                is_bq = (ac == bcode_w) & self.alive[:, c] & (self.current[:, c] == -1)
+                if bool(is_bq.any()):
+                    b_cost = self._builder_cost(self.builders_trained + bqueued_live)
+                    self.progress[:, c] = torch.where(is_bq, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
+                    self.cur_cost[:, c] = torch.where(is_bq, b_cost, self.cur_cost[:, c])
+                    self.current[:, c] = torch.where(is_bq, torch.full_like(self.current[:, c], bcode_w), self.current[:, c])
+                    bqueued_live = bqueued_live + is_bq.long()
             pi = ac - pbase
             # --- buy a building (purchaseBuilding: _buildable ∧ gold; instant)
             is_pb = (pi >= 0) & (pi < self.NB)
@@ -4717,11 +4778,18 @@ class BatchSim:
                 p_tech = self._p_tech[utp]
                 tech_ok = (p_tech < 0) | self.techs.gather(1, p_tech.clamp(min=0).unsqueeze(1)).squeeze(1)
                 cost = self._p_cost[utp] * mult
+                if self._builder_idx >= 0:
+                    # P4/D-10: bought builders price off the live escalator…
+                    b_now = self._builder_cost(self.builders_trained + bqueued_live) * mult
+                    cost = torch.where(utp == self._builder_idx, b_now, cost)
                 found, _ = self._first_free_spot(self.site[:, c], "player", self._p_civ[utp])
                 can = is_pu & tech_ok & (self.treasury >= cost) & found
                 if bool(can.any()):
                     self.treasury = torch.where(can, self.treasury - cost, self.treasury)
                     self._spawn_player(can, self.site[:, c], utp)
+                    if self._builder_idx >= 0:
+                        # …and move it for every later slot (TS purchaseUnit).
+                        self.builders_trained = self.builders_trained + (can & (utp == self._builder_idx)).long()
 
     # --- one full turn -----------------------------------------------------------
 
@@ -4822,8 +4890,10 @@ class BatchSim:
                 empty = self.alive & (self.current == -1)
                 want_b = empty[:, 0] & (self.pop[:, 0] >= 2) & ~self.builder_trained
                 bcode = self.UNIT_BASE + self._builder_idx
+                # P4/D-10: escalated price (queued count read BEFORE the write)
+                b_cost = self._builder_cost(self.builders_trained + (self.current == bcode).sum(dim=1))
                 self.current[:, 0] = torch.where(want_b, torch.full_like(self.current[:, 0], bcode), self.current[:, 0])
-                self.cur_cost[:, 0] = torch.where(want_b, self._p_cost[self._builder_idx].expand_as(self.cur_cost[:, 0]), self.cur_cost[:, 0])
+                self.cur_cost[:, 0] = torch.where(want_b, b_cost, self.cur_cost[:, 0])
                 self.progress[:, 0] = torch.where(want_b, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
                 self.builder_trained = self.builder_trained | want_b
 
@@ -4900,9 +4970,25 @@ class BatchSim:
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
             valid_u = is_u & trainable.gather(1, ut)
+            if self._rl_purchase_active and self._builder_idx >= 0:
+                # P4/D-10: with purchases live, builder queues are order-coupled
+                # with builder PURCHASES in the same turn (both move the
+                # escalator) — the sequential walk below handles them instead.
+                valid_u = valid_u & (ut != self._builder_idx)
             self.progress = torch.where(valid_b | valid_u, torch.zeros_like(self.progress), self.progress)
             self.cur_cost = torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost)
             self.cur_cost = torch.where(valid_u, self._p_cost[ut], self.cur_cost)
+            if self._builder_idx >= 0:
+                # P4/D-10 (no-purchase mode): builder queues escalate like the
+                # settler prefix-sum — earlier slots' queues raise later slots'
+                # price (current is pre-decision here, exactly like base_q).
+                is_bu = valid_u & (ut == self._builder_idx)
+                if bool(is_bu.any()):
+                    bcode_q = self.UNIT_BASE + self._builder_idx
+                    base_bq = (self.current == bcode_q).sum(dim=1, keepdim=True)
+                    prefix_b = is_bu.long().cumsum(dim=1) - is_bu.long()
+                    bq_n = self.builders_trained.unsqueeze(1) + base_bq + prefix_b
+                    self.cur_cost = torch.where(is_bu, self._builder_cost(bq_n), self.cur_cost)
             self.current = torch.where(valid_b | valid_u, act, self.current)
             if not self._rl_purchase_active:
                 # The TS engine queues city-by-city in slot order, and each queued
@@ -5072,6 +5158,10 @@ class BatchSim:
             if bool(made_unit.any()):
                 # clamp max too: unmasked rows may hold P2 district codes
                 self._spawn_player(made_unit, self.site[:, c], (self.current[:, c] - self.UNIT_BASE).clamp(min=0, max=self.NU - 1))
+                if self._builder_idx >= 0:
+                    # P4/D-10: a completed builder moves the cost escalator
+                    made_b = made_unit & (self.current[:, c] == self.UNIT_BASE + self._builder_idx)
+                    self.builders_trained = self.builders_trained + made_b.long()
             # P2: a finished district completes its paved tile (queueDistrict's
             # queue item — the tile was reserved at queue time in q_dtile).
             made_district = done & (self.current[:, c] >= self.UNIT_BASE + self.NU)

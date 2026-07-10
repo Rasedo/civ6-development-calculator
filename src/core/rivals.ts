@@ -39,6 +39,7 @@ import {
   HOUSING_NO_WATER,
   AQUEDUCT_FRESH_BONUS,
   AQUEDUCT_NO_FRESH_TOTAL,
+  GAME_SPEED,
 } from '../data/constants';
 import { tileScore, tileYieldsForCenter } from './city';
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
@@ -857,7 +858,14 @@ export function rivalPhase(state: GameState): void {
       } else if (!rivalHasBuilder(state, rival) && rivalHasJob(state, rival, rivalUnlocks) && unitCount < unitCap) {
         // C1-B5b: one builder per civ at a time, only while jobs exist.
         // A builder is a unit — it takes a cap slot like any other.
-        rc.queue.push({ kind: 'unit', unit: 'BUILDER', progress: 0 });
+        // P4/D-10: price escalates on the RIVAL's own counter (one at a
+        // time, so no queued term), locked at queue time like the player's.
+        rc.queue.push({
+          kind: 'unit',
+          unit: 'BUILDER',
+          progress: 0,
+          cost: Math.round((50 + 4 * (rival.buildersTrained ?? 0)) * GAME_SPEED),
+        });
         unitCount += 1;
       } else if (unitCount < unitCap) {
         const type = rival.research.techs.includes('HORSEBACK_RIDING')
@@ -912,7 +920,7 @@ export function rivalPhase(state: GameState): void {
         q.progress += production;
         const cost =
           q.kind === 'unit'
-            ? UNITS[q.unit]?.cost ?? 54
+            ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // P4/D-10: builders lock at queue
             : q.kind === 'building'
               ? BUILDINGS[q.building]?.cost ?? 54
               : q.cost ?? 54;
@@ -921,7 +929,10 @@ export function rivalPhase(state: GameState): void {
           if (q.kind === 'settler') tryFoundCity(state, rival);
           else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
           else if (q.kind === 'building') rc.buildings.push(q.building);
-          else spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
+          else {
+            spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
+            if (q.unit === 'BUILDER') rival.buildersTrained = (rival.buildersTrained ?? 0) + 1; // P4/D-10
+          }
         }
       }
       if ((state.turn + rc.id * 3) % RIVAL_BORDER_PERIOD === 0) {

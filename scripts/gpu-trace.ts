@@ -94,7 +94,9 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
         rival.cities.reduce((s2, rc) => {
           const q = rc.queue[0];
           if (!q) return s2;
-          return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : 0);
+          // P4/D-10: unit items may LOCK a cost (escalated builders) — price
+          // the lock first, exactly like the completion check does.
+          return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? q.cost ?? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : 0);
         }, 0) * 1000,
       ),
       // C1-B4: COMPLETED rival districts (queued ones pave but don't count).

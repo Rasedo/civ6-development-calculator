@@ -10,6 +10,7 @@ import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
 import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
+import { GAME_SPEED } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
@@ -211,6 +212,18 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
 // Training & upkeep
 // ---------------------------------------------------------------------------
 
+/** P4/D-10 (real Civ 6): builder cost escalates — 50 + 4 (pre-speed) per
+ * builder ever trained/purchased or currently in a queue, empire-wide,
+ * rounded after the game-speed scale like every unit cost (data/units U()).
+ * The exporter mirrors the 50/4 literals as scenario.builderBase/builderPer. */
+export function builderCost(state: GameState): number {
+  const queued = state.cities.reduce(
+    (n, c) => n + c.queue.filter((q) => q.kind === 'unit' && q.unit === 'BUILDER').length,
+    0,
+  );
+  return Math.round((50 + 4 * ((state.buildersTrained ?? 0) + queued)) * GAME_SPEED);
+}
+
 /** Unit types a city can train right now. */
 export function trainableUnits(state: GameState): UnitDef[] {
   if (!state.unitsMode) return [];
@@ -229,7 +242,13 @@ export function queueUnit(state: GameState, cityId: number, unitType: string): R
     spawnUnit(state, unitType, city.centerIndex);
     return ok;
   }
-  city.queue.push({ kind: 'unit', unit: unitType, progress: 0 });
+  // P4/D-10: builders lock their escalated price at queue time (the counter
+  // may grow before completion; settlers/districts already work this way).
+  if (unitType === 'BUILDER') {
+    city.queue.push({ kind: 'unit', unit: unitType, progress: 0, cost: builderCost(state) });
+  } else {
+    city.queue.push({ kind: 'unit', unit: unitType, progress: 0 });
+  }
   return ok;
 }
 

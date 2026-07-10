@@ -18,7 +18,7 @@ import type { GameState } from '../src/core/types';
 function frontCost(rc: any): number {
   const q = rc.queue[0];
   if (!q) return 0;
-  if (q.kind === 'unit') return UNITS[q.unit]?.cost ?? 0;
+  if (q.kind === 'unit') return q.cost ?? UNITS[q.unit]?.cost ?? 0; // P4/D-10: builders lock a cost
   if (q.kind === 'building') return BUILDINGS[q.building]?.cost ?? 0;
   return q.cost ?? 0; // settler / district / project carry their own cost
 }

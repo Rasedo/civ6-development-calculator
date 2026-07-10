@@ -11,7 +11,7 @@ import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, ac
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
 import { detectBoosts } from './boosts';
-import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit } from './units';
+import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost } from './units';
 import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
@@ -98,6 +98,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
     tradeRoutes: [],
     settlers: 0,
+    buildersTrained: 0, // P4/D-10
     plannedSettles: [],
     unitsMode,
     units: [],
@@ -381,8 +382,10 @@ export function buildingFaithCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
-export function unitPurchaseCost(unitType: string): number {
-  return (UNITS[unitType]?.cost ?? 0) * GOLD_PURCHASE_MULT;
+export function unitPurchaseCost(state: GameState, unitType: string): number {
+  // P4/D-10: builders price off the live escalator, like the settler pair.
+  const base = unitType === 'BUILDER' ? builderCost(state) : UNITS[unitType]?.cost ?? 0;
+  return base * GOLD_PURCHASE_MULT;
 }
 
 /**
@@ -421,7 +424,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string)
   if (!trainableUnits(state).some((d) => d.id === unitType)) {
     return { ok: false, reason: 'Unit not available (enable units mode / research).' };
   }
-  const cost = unitPurchaseCost(unitType);
+  const cost = unitPurchaseCost(state, unitType);
   if (!state.sandbox) {
     if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     state.treasury -= cost;
@@ -431,6 +434,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string)
     if (!state.sandbox) state.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
+  if (unitType === 'BUILDER') state.buildersTrained += 1; // P4/D-10
   return { ok: true };
 }
 
@@ -471,7 +475,7 @@ export function itemCost(item: QueueItem): number {
   if (item.kind === 'district') return item.cost ?? DISTRICTS[item.district].cost;
   if (item.kind === 'wonder') return BUILT_WONDERS[item.wonder].cost;
   if (item.kind === 'settler') return item.cost;
-  if (item.kind === 'unit') return UNITS[item.unit]?.cost ?? 54;
+  if (item.kind === 'unit') return item.cost ?? UNITS[item.unit]?.cost ?? 54; // P4/D-10: builders lock at queue
   if (item.kind === 'project') return item.cost;
   return BUILDINGS[item.building].cost;
 }
@@ -694,6 +698,7 @@ export function endTurn(state: GameState): void {
           city.population = Math.max(1, city.population - 1);
         } else if (item.kind === 'unit') {
           spawnUnit(state, item.unit, city.centerIndex);
+          if (item.unit === 'BUILDER') state.buildersTrained += 1; // P4/D-10
         } else if (item.kind === 'project') {
           completeProject(state, city, item.project, itemCost(item));
         } else {
@@ -878,6 +883,7 @@ export function deserialize(json: string): GameState {
   state.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null };
   state.tradeRoutes ??= [];
   state.settlers ??= 0;
+  state.buildersTrained ??= 0; // P4/D-10
   state.plannedSettles ??= [];
   state.unitsMode ??= false;
   state.units ??= [];

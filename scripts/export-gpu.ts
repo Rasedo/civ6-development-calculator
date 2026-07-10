@@ -103,6 +103,7 @@ import {
   AQUEDUCT_NO_FRESH_TOTAL,
   GOLD_PURCHASE_MULT,
   LUXURY_AMENITY_CITIES,
+  GAME_SPEED,
 } from '../src/data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
@@ -322,7 +323,9 @@ const rules = {
   ],
   // Mirrors settlerCost(): 80 + 30 × (cities − 1 + settlers banked + settlers queued).
   // goldPurchaseMult mirrors GOLD_PURCHASE_MULT (V-P1: buy = production cost × 4).
-  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT },
+  // P4/D-10: builderBase/builderPer/gameSpeed mirror builderCost() —
+  // round((50 + 4·n) × GAME_SPEED), n = builders ever trained + queued.
+  scenario: { settlerBase: 80, settlerPerCity: 30, settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED },
   // One civ-id space (C1-A3, mirrors src/core/civs.ts): the player is civ 0,
   // rival r (array index == rival.id, asserted at export) is civ r+1.
   // City-states and barbarians stay outside the numbering.

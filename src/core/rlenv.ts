@@ -629,7 +629,7 @@ function purchaseCandidates(state: GameState, city: City): Candidate[] {
         tileFreeForUnit(s, t.index, { type, owner: 'player' }),
       );
     const units = trainableUnits(s)
-      .filter((u) => s.treasury >= unitPurchaseCost(u.id))
+      .filter((u) => s.treasury >= unitPurchaseCost(s, u.id))
       .filter((u) => u.charges !== undefined || u.combat > 0)
       .filter((u) => spawnable(u.id)); // a failed instant-buy would livelock the decision loop
     const builder = units.find((u) => u.charges !== undefined);
@@ -637,7 +637,7 @@ function purchaseCandidates(state: GameState, city: City): Candidate[] {
     for (const u of [builder, strongest].filter(Boolean) as typeof units) {
       out.push(
         makeCandidate(state, { kind: 'purchaseUnit', unit: u.id }, `Buy ${u.name}`, 'purchase', {
-          cost: unitPurchaseCost(u.id) / 4,
+          cost: unitPurchaseCost(s, u.id) / 4,
           city,
         }),
       );

@@ -52,6 +52,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
     tradeRoutes: [],
     settlers: 0,
+    buildersTrained: 0, // P4/D-10
     plannedSettles: [],
     unitsMode: false,
     units: [],

@@ -532,7 +532,7 @@ export function renderCityPanel(
       <button data-act="buy-settler" title="Buy a settler outright" ${state.treasury >= settlerCost(state) * 4 ? '' : 'disabled'}>Buy settler (${settlerCost(state) * 4}g)</button>`}
       ${trainableUnits(state)
         .map((u) => `<button data-act="train-unit" data-id="${u.id}" title="${u.description}">Train ${u.name} (${u.cost}⚙)</button>
-          ${state.sandbox ? '' : `<button data-act="buy-unit" data-id="${u.id}" title="Buy with gold" ${state.treasury >= unitPurchaseCost(u.id) ? '' : 'disabled'}>Buy (${unitPurchaseCost(u.id)}g)</button>`}`)
+          ${state.sandbox ? '' : `<button data-act="buy-unit" data-id="${u.id}" title="Buy with gold" ${state.treasury >= unitPurchaseCost(state, u.id) ? '' : 'disabled'}>Buy (${unitPurchaseCost(state, u.id)}g)</button>`}`)
         .join('')}
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
