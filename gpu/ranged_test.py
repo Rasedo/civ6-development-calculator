@@ -29,27 +29,35 @@ HOLD = 12
 
 
 def find_fight(rules, paths):
-    """Scripted-advance a sim until a player military unit can attack."""
+    """Scripted-advance a sim until a player military unit can attack a
+    UNIT (barb or rival) — the mask also offers at-war rival CITY sieges
+    (V-W2), which this test's defender probe doesn't model."""
     for path in paths:
         sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
         for _ in range(90):
             m = sim.unit_action_mask()[0]  # [P, 16]
             att = m[:, 6:12].any(dim=1)
-            if bool(att.any()):
-                p = int(att.nonzero(as_tuple=True)[0][0])
-                code = 6 + int(m[p, 6:12].nonzero(as_tuple=True)[0][0])
-                return sim, p, code, path.name
+            for p in att.nonzero(as_tuple=True)[0].tolist():
+                for d in m[p, 6:12].nonzero(as_tuple=True)[0].tolist():
+                    tgt = int(sim.neigh[int(sim.p_tile[0, p]), d])
+                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or int(sim.rv_at[0, tgt]) >= 0):
+                        return sim, p, 6 + d, path.name
             sim.step()
     raise AssertionError("no adjacent-hostile situation found in scripted play")
 
 
-def defender_state(sim, tile):
+def defender_state(sim, tile, pre=None):
     b = int(sim.barb_at[0, tile])
     if b >= 0:
         return ("barb", b, int(sim.u_hp[0, b]), bool(sim.u_alive[0, b]))
     v = int(sim.rv_at[0, tile])
-    assert v >= 0, "no hostile at the attack target?"
-    return ("rival", v, int(sim.v_hp[0, v]), bool(sim.v_alive[0, v]))
+    if v >= 0:
+        return ("rival", v, int(sim.v_hp[0, v]), bool(sim.v_alive[0, v]))
+    # the strike killed the defender and the map slot cleared — report it
+    # dead via the pre-attack identity (a wounded defender CAN die to one
+    # ranged hit under the P4 damage range)
+    assert pre is not None, "no hostile at the attack target?"
+    return (pre[0], pre[1], 0, False)
 
 
 def main() -> None:
@@ -85,7 +93,7 @@ def main() -> None:
     # confound the attacker-hp assertions.
     # --- ranged (flag ON): no retaliation, no advance, defender damaged
     sim._apply_unit_actions(ua)
-    kind, slot, hp_d, alive_d = defender_state(sim, tgt)
+    kind, slot, hp_d, alive_d = defender_state(sim, tgt, (pre_kind, pre_slot, pre_hp, True))
     assert int(sim.p_hp[0, p]) == hp0, (
         f"ranged attacker took retaliation ({hp0} -> {int(sim.p_hp[0, p])})"
     )

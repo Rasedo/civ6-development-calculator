@@ -637,6 +637,10 @@ class BatchSim:
             [[t.get("fadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
         )  # [B, T, nD] adjacency a tile's removable feature lends to neighbours (dropped on founding here)
+        self._nfeat_adj = torch.tensor(
+            [[t.get("nfadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
+            dtype=dtype, device=device,
+        )  # [B, T, nD] the NON-removable feature's lent adjacency (GS REEF -> Campus): queueDistrict paves null ANY feature (P2), foundCity only removable
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
@@ -2455,7 +2459,11 @@ class BatchSim:
         self.farm_flat[rows, tiles] = self._fa_f_c[rows, tiles]
         self.farm_hill[rows, tiles] = self._fa_h_c[rows, tiles]
         self.mine_ok[rows, tiles] = self._mi_c[rows, tiles]
-        contrib = self._feat_adj[rows, tiles]
+        # P4: withdraw BOTH feature classes — TS strip sites that reach this
+        # function null ANY feature (P2 queueDistrict paves a REEF too); a
+        # tile has one feature, so exactly one of the two planes is nonzero
+        # (chops can only target removable features — nfadj is 0 there).
+        contrib = self._feat_adj[rows, tiles] + self._nfeat_adj[rows, tiles]
         nb = self.neigh[tiles]
         for d in range(6):
             n_d = nb[:, d]
@@ -3538,12 +3546,17 @@ class BatchSim:
         sitec = center.clamp(min=0).unsqueeze(1)
         r_ = self.rules
         # A PLAYER-founded center (reachable via loyalty flips) was stripped
-        # of its removable feature at founding — subtract the feature's own
-        # yields before the floors (rival-founded centers keep theirs).
+        # of its removable feature at founding — its yields must drop ONCE.
+        # f_plane/p_plane are ALREADY strip-adjusted above (V-H1, lines
+        # ~3500/3507), so cf/cp read them directly; the static cols 2-5 read
+        # the RAW tile_yields and subtract here. (P4 hunt: the old extra
+        # -fy_c*strip on cf/cp DOUBLE-subtracted a flipped center's feature
+        # — rival production 4 vs TS 5 at seed 9001 t197, and most likely
+        # the never-pinned rng2026006095 t294 rival-score residual.)
         strip = self.feat_stripped.gather(1, sitec).squeeze(1).double()
         fy_c = self.feat_yields.gather(1, sitec.unsqueeze(2).expand(-1, 1, 6)).squeeze(1).double()  # [B, 6]
-        cf = torch.maximum(f_plane.gather(1, sitec).squeeze(1).double() - fy_c[:, 0] * strip, torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
-        cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double() - fy_c[:, 1] * strip, torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
+        cf = torch.maximum(f_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
+        cp = torch.maximum(p_plane.gather(1, sitec).squeeze(1).double(), torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
         c_sc = self.tile_yields[:, :, 3].gather(1, sitec).squeeze(1).double() - fy_c[:, 3] * strip
         c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double() - fy_c[:, 4] * strip
         c_go = self.tile_yields[:, :, 2].gather(1, sitec).squeeze(1).double() - fy_c[:, 2] * strip  # VP-G1
@@ -3706,14 +3719,15 @@ class BatchSim:
                 q = q + c3[:, :, m2, 1] * okd[:, :, m2]
                 q = q + c3[:, :, m2, 2] * okd[:, :, m2]
                 q = q + hill[:, :, m2]
-            # tooClose: player cities < 3, city-states < 3, any rival city < 4
+            # tooClose (P4/D-5, CITY_MIN_DIST = 4): player cities < 4,
+            # city-states < 4, any rival city < 5 (the TS +1 rival-rival quirk)
             tc3 = tc.unsqueeze(2)  # [B, M, 1] — pairwise indexing, no [B, M, T]
             d_pl = self.pair_dist[tc3, pl_centers.unsqueeze(1)].to(torch.long)
-            near_pl = ((d_pl < 3) & self.alive.unsqueeze(1)).any(dim=2)
+            near_pl = ((d_pl < 4) & self.alive.unsqueeze(1)).any(dim=2)
             d_cs = self.pair_dist[tc3, self.cs_center.clamp(min=0).unsqueeze(1)].to(torch.long)
-            near_cs = ((d_cs < 3) & self.cs_alive.unsqueeze(1)).any(dim=2)
+            near_cs = ((d_cs < 4) & self.cs_alive.unsqueeze(1)).any(dim=2)
             d_rc = self.pair_dist[tc3, rc_flat.clamp(min=0).unsqueeze(1)].to(torch.long)
-            near_rc = ((d_rc < 4) & rc_live.unsqueeze(1)).any(dim=2)
+            near_rc = ((d_rc < 5) & rc_live.unsqueeze(1)).any(dim=2)
             good = okt & ~near_pl & ~near_cs & ~near_rc & src.unsqueeze(1)
             q = torch.where(good, q, torch.tensor(-torch.inf, dtype=torch.float64, device=dev))
             # strictly-greater beats the running best (first-found keeps ties)
@@ -4900,11 +4914,15 @@ class BatchSim:
         # gold and TS applied +1 gold × 0.95 amenity while the GPU applied the
         # top-of-turn value.
         total, housing, growth_f, tier_idx = self._city_totals()
-        tier0 = tier_idx  # loyalty keeps the turn-start tier (pre-interleave behavior)
         _tot_ver = self._eff_version
         _tot_pop = self.pop.clone()
         y_sum = self._eff_yields().sum(dim=2)
-        pop_before = self.pop.clone()  # loyalty mixes pre/post-growth pops
+        # loyalty mirrors TS's loop-top view: city c's tier and pop are
+        # captured FRESH at its own iteration (post earlier cities' same-turn
+        # mutations, pre its own production/growth) — applyLoyalty runs at the
+        # top of TS's per-city block; the flips still resolve after the loop.
+        tier_fresh = tier_idx.clone()
+        pop_loyal = self.pop.clone()
         gold_add = torch.zeros(B, dtype=self.dtype, device=dev)
         sci_add = torch.zeros(B, dtype=self.dtype, device=dev)
         cul_add = torch.zeros(B, dtype=self.dtype, device=dev)
@@ -4916,6 +4934,8 @@ class BatchSim:
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
                 y_sum = self._eff_yields().sum(dim=2)
+            tier_fresh[:, c] = tier_idx[:, c]
+            pop_loyal[:, c] = self.pop[:, c]
             t_c = total[:, c]  # [B, 6] this city's FRESH yields
             popf_c = self.pop[:, c].to(self.dtype)
 
@@ -4963,6 +4983,14 @@ class BatchSim:
             self.food_box[:, c] = torch.where(starve, torch.zeros_like(self.food_box[:, c]), self.food_box[:, c])
 
             # --- borders (col c; later cities see earlier claims, as before) --------
+            # TS pickBorderTile reads the LIVE map: refresh the yield ranking
+            # if THIS city's own completion/growth just changed it (the box
+            # add itself stays the loop-top stats value, like TS).
+            if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
+                total, housing, growth_f, tier_idx = self._city_totals()
+                _tot_ver = self._eff_version
+                _tot_pop = self.pop.clone()
+                y_sum = self._eff_yields().sum(dim=2)
             self.culture_box[:, c] = self.culture_box[:, c] + t_c[:, 4]
             for _ in range(BORDER_LOOPS):
                 cost_b = self._border_cost(self.tiles_acquired[:, c])
@@ -4988,6 +5016,7 @@ class BatchSim:
                     self.owner[rows, best[rows]] = c
                     self.culture_box[:, c] = torch.where(expand, self.culture_box[:, c] - cost_b, self.culture_box[:, c])
                     self.tiles_acquired[:, c] = self.tiles_acquired[:, c] + expand.long()
+                    self._eff_version += 1  # a claim widens LATER cities' worked candidates (TS: fresh stats)
                 capped = ready & ~has_cand
                 self.culture_box[:, c] = torch.where(capped, torch.minimum(self.culture_box[:, c], cost_b), self.culture_box[:, c])
                 if not expand.any():
@@ -5003,7 +5032,7 @@ class BatchSim:
         self.culture_total = self.culture_total + cul_add
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------
-        self._apply_loyalty_and_flips(tier0, pop_before)
+        self._apply_loyalty_and_flips(tier_fresh, pop_loyal)
 
         # --- the hostile world (after the city loop, before research) ----------------------
         if self.units_mode:
@@ -5096,7 +5125,7 @@ class BatchSim:
             dcity = torch.where(self.alive, self.pair_dist[sc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long), 999)
             rc_flat = self.rc_center.reshape(B, -1).clamp(min=0)
             drc = torch.where(self.rc_alive.reshape(B, -1), self.pair_dist[sc.unsqueeze(1), rc_flat].to(torch.long), 999)
-            ok = free & (dcity.min(dim=1).values >= 3) & (drc.min(dim=1).values >= 3)
+            ok = free & (dcity.min(dim=1).values >= 4) & (drc.min(dim=1).values >= 4)  # P4/D-5: CITY_MIN_DIST = 4
             valid = can & ok
             self.next_site_ptr = self.next_site_ptr + can.long()  # consumed either way
             if not bool(valid.any()):

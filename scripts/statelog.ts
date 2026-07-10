@@ -4,6 +4,7 @@
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
 import { getCityHp, terrainDefense } from '../src/core/combat';
+import { rivalCityYields } from '../src/core/rivals';
 import { isWater } from '../src/core/query';
 import { computeCityStats } from '../src/core/city';
 import { unitMaintenance } from '../src/core/units';
@@ -89,7 +90,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
         `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length}`,
     );
     for (const rc of rival.cities) {
-      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'}`);
+      const ry = rivalCityYields(state, rival, rc);
+      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
     }
   }
   return L;

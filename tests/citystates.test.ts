@@ -65,7 +65,11 @@ describe('city-state placement', () => {
     const ring2 = tilesWithin(state.map, 6, 6, 2).find(
       (t) => hexDistance(t.col, t.row, 6, 6) === 2,
     )!;
-    expect(canFoundCity(state, ring2.index).ok).toBe(false); // min city distance 3
+    expect(canFoundCity(state, ring2.index).ok).toBe(false); // min city distance 4 (P4/D-5)
+    const ring3 = tilesWithin(state.map, 6, 6, 3).find(
+      (t) => hexDistance(t.col, t.row, 6, 6) === 3,
+    )!;
+    expect(canFoundCity(state, ring3.index).ok).toBe(false); // dist 3 blocked too
     const far = tileAtCoords(state.map, 10, 10);
     expect(canFoundCity(state, far.index).ok).toBe(true);
   });
@@ -73,7 +77,7 @@ describe('city-state placement', () => {
   it('border growth never claims city-state territory', () => {
     const state = makeState();
     addCs(state, 8, 5);
-    const city = foundCity(state, tileAtCoords(state.map, 5, 5).index).city!;
+    const city = foundCity(state, tileAtCoords(state.map, 4, 5).index).city!; // dist 4 from the CS (P4/D-5)
     const candidates = borderCandidates(state, city);
     for (const i of candidates) {
       expect(state.map.tiles[i].csId ?? -1).toBe(-1);

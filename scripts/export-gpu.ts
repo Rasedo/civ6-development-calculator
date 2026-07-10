@@ -285,9 +285,9 @@ function staticAdjRaw(map: GameState['map'], tile: Tile, id: DistrictId): number
  * and foundCity clears the feature (game.ts:168). The engine subtracts this from
  * each neighbour's d_static_adj on in-game founding, since the exported adjacency
  * was baked after only the capital founded. 0 for non-removable / no feature. */
-function featureAdjContribution(tile: Tile, id: DistrictId): number {
+function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): number {
   const f = tile.feature;
-  if (!f || !FEATURES[f].removable) return 0;
+  if (!f || FEATURES[f].removable !== removable) return 0;
   const def = DISTRICTS[id];
   if (!def.adjacencyYield) return 0;
   let sum = 0;
@@ -699,6 +699,11 @@ for (let s = 0; s < N_SEEDS; s++) {
       // per placeable district: the adjacency this tile's removable feature lends
       // to a neighbour, dropped when a city founds here (foundCity clears it).
       fadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id)),
+      // P4: the NON-removable feature's lent adjacency (today: the GS REEF's
+      // Campus bonus). queueDistrict nulls ANY feature when it paves the tile
+      // (P2), so the engine must withdraw this too — foundCity does NOT
+      // (it only clears removable features).
+      nfadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id, false)),
       // The removable feature's OWN yields (C1-B3 gate catch): PLAYER founding
       // strips the feature, so a later loyalty-flip must read this center
       // stripped — rival founding does NOT strip, and the t=0 capitals were

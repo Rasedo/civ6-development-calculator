@@ -63,9 +63,10 @@ describe('founding cities', () => {
   it('enforces minimum city distance but not own-territory', () => {
     const state = makeState(makeMap(20, 20));
     const a = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
-    expandBorders(state, a, 3);
+    expandBorders(state, a, 4);
     expect(canFoundCity(state, tileAtCoords(state.map, 10, 8).index).ok).toBe(false); // dist 2
-    expect(canFoundCity(state, tileAtCoords(state.map, 11, 8).index).ok).toBe(true); // dist 3, owned by first city
+    expect(canFoundCity(state, tileAtCoords(state.map, 11, 8).index).ok).toBe(false); // dist 3 — real Civ 6 blocks it (P4/D-5)
+    expect(canFoundCity(state, tileAtCoords(state.map, 12, 8).index).ok).toBe(true); // dist 4, owned by first city
   });
 
   it('never steals already-claimed tiles', () => {
@@ -74,10 +75,10 @@ describe('founding cities', () => {
     const ring1 = tileAtCoords(state.map, 9, 8);
     expect(ring1.cityId).toBe(a.id);
     state.settlers = 1; // later cities need a trained settler
-    const b = foundCity(state, tileAtCoords(state.map, 11, 8).index).city!;
+    const b = foundCity(state, tileAtCoords(state.map, 12, 8).index).city!;
     expect(ring1.cityId).toBe(a.id); // still A's
-    expect(tileAtCoords(state.map, 12, 8).cityId).toBe(b.id);
-    expect(tileAtCoords(state.map, 10, 8).cityId).toBe(b.id); // unowned gap goes to B's first ring
+    expect(tileAtCoords(state.map, 13, 8).cityId).toBe(b.id);
+    expect(tileAtCoords(state.map, 11, 8).cityId).toBe(b.id); // unowned gap goes to B's first ring
   });
 
   it('rejects water, mountains and oases', () => {

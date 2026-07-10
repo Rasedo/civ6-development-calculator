@@ -11,8 +11,9 @@ export const MAP_SIZES = {
 
 export type MapSizeId = keyof typeof MAP_SIZES;
 
-/** Minimum distance between city centers. */
-export const CITY_MIN_DIST = 3;
+/** Minimum distance between city centers.
+ * P4/D-5: real Civ 6 blocks settling within 3 tiles of any center. */
+export const CITY_MIN_DIST = 4;
 
 /** Tiles a city can work / place districts in (rings from the center). */
 export const CITY_WORK_RADIUS = 3;

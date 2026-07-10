@@ -760,7 +760,7 @@ export function rivalCityYields(
   // (that's what defaultModifiers guarded against); modifiersFromResearch is
   // research-only (no government/religion/CS machinery).
   const ctx = { map: state.map, mods: modifiersFromResearch(rival.research) };
-  const worked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
+  const ranked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
       (t) =>
         tileOwnedByCiv(t, civOfRival(rival.id)) &&
@@ -773,8 +773,8 @@ export function rivalCityYields(
       const y = tileYields(ctx, t);
       return { y, index: t.index, score: tileScore(y, 'balanced') };
     })
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .slice(0, rc.population);
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+  const worked = ranked.slice(0, rc.population);
   const centerY = tileYieldsForCenter(ctx, center);
   const total = { ...centerY };
   for (const w of worked) {
