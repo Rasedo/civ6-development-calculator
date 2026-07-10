@@ -463,3 +463,15 @@ random policy's min 0.0 means full player collapse is reachable inside
 the horizon now — the late game is a real differentiator, exactly why
 the flip mattered. Re-baseline after each behavior-changing stage lands
 (the P1-P5 symmetry/fidelity batches WILL move these numbers).
+
+Post-P1+P2 world (2026-07-10, commit 03fd1fe — rivals own water, the
+whole Harbor line + city-state combat live, and the player PAYS for
+districts through the production queue):
+
+    random    183.9 ± 31.1 (95% CI)  [min 0.0, max 444.9]
+    scripted  257.8 ± 29.4 (95% CI)  [min 43.8, max 434.3]
+
+The random drop (219.6 → 183.9) is the free-district subsidy dying —
+districts now cost the capital 54-450 production each; the scripted
+autopilot loses less (271.9 → 257.8) because its build order absorbs
+the queue time. The next reference net trains on THIS world.

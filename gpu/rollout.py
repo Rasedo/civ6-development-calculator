@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -38,7 +40,45 @@ def main() -> None:
     ap.add_argument("--turns", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--out", default=str(FIXTURES / "rollout.json"))
+    ap.add_argument("--shards", type=int, default=None, help="P3: split the games across N processes (byte-identical merge — every game keeps its GLOBAL seed/index)")
+    ap.add_argument("--shard", type=int, default=None, help="internal: this process runs shard k of --shards")
     args = ap.parse_args()
+
+    if args.shards and args.shard is None:
+        # P3 orchestrator: tiny-tensor torch scales across PROCESSES, not
+        # threads (OMP sweep peaks at 4) — N children each roll a contiguous
+        # slice of the game list, keeping GLOBAL indices so every game's
+        # seed (and therefore its trajectory) is identical to the unsharded
+        # run; the merge is byte-identical rollout.json.
+        procs = []
+        for k in range(args.shards):
+            cmd = [sys.executable, __file__, "--shard", str(k), "--shards", str(args.shards),
+                   "--replicas", str(args.replicas), "--seed", str(args.seed),
+                   "--out", args.out + f".shard{k}"]
+            if args.turns is not None:
+                cmd += ["--turns", str(args.turns)]
+            if args.log is not None:
+                cmd += ["--log", str(args.log)]
+            env = os.environ.copy()
+            env.setdefault("OMP_NUM_THREADS", "4")
+            env.setdefault("MKL_NUM_THREADS", "4")
+            procs.append(subprocess.Popen(cmd, env=env))
+        rcs = [p.wait() for p in procs]
+        if any(rcs):
+            raise SystemExit(max(rcs))
+        merged = None
+        for k in range(args.shards):
+            part_path = Path(args.out + f".shard{k}")
+            part = json.loads(part_path.read_text())
+            if merged is None:
+                merged = part
+            else:
+                merged["games"].extend(part["games"])
+            part_path.unlink()
+        Path(args.out).write_text(json.dumps(merged))
+        print(f"{len(merged['games'])} games merged from {args.shards} shards -> {args.out}")
+        print("now verify with: npx vite-node scripts/replay-gpu.ts")
+        return
 
     rules_raw = json.loads((FIXTURES / "rules.json").read_text())
     rules = load_rules()
@@ -49,12 +89,17 @@ def main() -> None:
         print("no fixtures — run `npm run gpu:export` first")
         raise SystemExit(1)
     fixtures = [load_fixture(p) for p in paths for _ in range(args.replicas)]
+    lo = 0
+    if args.shard is not None and args.shards:
+        per = (len(fixtures) + args.shards - 1) // args.shards
+        lo = args.shard * per
+        fixtures = fixtures[lo : lo + per]
 
     from statelog import gpu_state_lines
     _logl = []
     sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
     B, C = sim.B, sim.C
-    game_seed = torch.tensor([args.seed * 1_000_003 + i for i in range(B)], dtype=torch.int64)
+    game_seed = torch.tensor([args.seed * 1_000_003 + lo + i for i in range(B)], dtype=torch.int64)  # GLOBAL index: shard-invariant seeds
     slots = torch.arange(C, dtype=torch.int64).view(1, C)
     from civ6gpu.engine import P_MAX
 
@@ -138,7 +183,7 @@ def main() -> None:
     score = sim.empire_score()
     cities = sim.alive.sum(dim=1)
     print(f"{B} random games × {args.turns} turns → {args.out}")
-    if args.log is not None:
+    if args.log is not None and _logl:  # sharded: only the owning shard writes (others must not clobber)
         open("gpu/fixtures/gpu_statelog.txt", "w", encoding="utf-8", newline="").write(chr(10).join(_logl) + chr(10))
         print("state log", len(_logl), "lines -> gpu/fixtures/gpu_statelog.txt")
     print(
