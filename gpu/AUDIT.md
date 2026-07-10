@@ -219,8 +219,16 @@ twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-st
 (old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
 float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
 civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-high-value: the medium/low tail (D-17, D-23) and D-8's 25% under-represented
-discount.
+high-value: D-17 tile purchase (needs a verified formula source) and D-8's
+25% under-represented discount.
+
+D-23 COMPLETE: ranged units bombard cities — rangedAttack falls back through
+the melee chain (rival city at war, then CS center) with ONE roll against
+the D-22 defense, no retaliation, and the city floors at 1 HP (ranged never
+captures; melee finishes). attackTargets offers cities at the unit's full
+range for the player; the GPU r_sieg/r_cs branches mirror the fallback, and
+the unit mask now offers at-war rival centers to every fighter (CS-center
+mask bits stay the tracked follow-up, same status as melee).
 
 D-22 COMPLETE (also closes symmetry C-9): city defense = max(15, strongest
 MELEE unit the owner has EVER fielded) + 5 when the owner's own military

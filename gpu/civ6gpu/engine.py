@@ -2057,8 +2057,9 @@ class BatchSim:
         alive = self.p_alive.unsqueeze(2)
         move = on_map & passable & ~barb & ~rv_any & ~rvc_civ_n & ~dom & alive
         can_fight = (self._p_combat[self.p_type] > 0).unsqueeze(2)
-        melee_only = (self._p_rng_str[self.p_type] == 0).unsqueeze(2)  # rangedAttack refuses city tiles
-        attack = on_map & (barb | rv_war | (rc_war & melee_only)) & can_fight & alive
+        # P4/D-23: rangedAttack bombards cities too — rc_war is a target for
+        # every fighter now (CS centers stay a tracked mask follow-up).
+        attack = on_map & (barb | rv_war | rc_war) & can_fight & alive
         hold = self.p_alive.unsqueeze(2)
         # 13/14/15: build FARM / MINE / LUMBER_MILL — a builder with charges
         # standing on an owned, unimproved, non-center tile where that
@@ -2721,8 +2722,8 @@ class BatchSim:
             # is not a rival city (TS branch precedence). defCS = 15 + pop
             # (+6 militaristic), CS-damage roll then the counter (that draw
             # order), attacker consumed, NO advance; capture at 0 HP (the
-            # city-state joins the empire). Ranged strikes refuse it —
-            # rangedAttack targets units only.
+            # city-state joins the empire). Ranged bombardment has its own
+            # branches below (P4/D-23): one roll, floor 1 HP, no capture.
             cs_s = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1)
             cs_sc = cs_s.clamp(min=0)
             cs_hit = (
@@ -2754,6 +2755,50 @@ class BatchSim:
                 if bool(cap.any()):
                     self._capture_city_state(cap.nonzero(as_tuple=True)[0], cs_sc)
                 self.p_acted[:, p] = self.p_acted[:, p] | cs_hit  # P4/D-2
+
+            # --- P4/D-23: ranged BOMBARDMENT of cities (rangedAttack's city
+            # fallback) — one roll against the D-22 defense, no retaliation,
+            # HP floors at 1 (ranged never captures; melee finishes).
+            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd
+            if bool(r_sieg.any()):
+                bidx2 = torch.arange(self.B, device=self.device)
+                civ2 = rc_civ_t.clamp(min=0)
+                slot2 = torch.zeros_like(civ2)
+                for j2 in range(self.RC):
+                    hit2 = (self.rc_center[bidx2, civ2, j2] == tc) & self.rc_alive[bidx2, civ2, j2]
+                    slot2 = torch.where(r_sieg & hit2, torch.full_like(slot2, j2), slot2)
+                best_r2 = self.r_best_melee[bidx2, civ2]
+                gslot2 = self.rv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                gar2 = ((gslot2 >= 0) & (self.v_civ[bidx2, gslot2.clamp(min=0)] == civ2)).long()
+                def_cs2 = torch.maximum(best_r2, torch.full_like(best_r2, 15)) + gar2 * 5
+                d_city2 = self._damage_roll(r_sieg, self._p_rng_str[self.p_type[:, p]] - def_cs2)
+                rows2 = r_sieg.nonzero(as_tuple=True)[0]
+                self.rc_hp[rows2, civ2[rows2], slot2[rows2]] = torch.maximum(
+                    self.rc_hp[rows2, civ2[rows2], slot2[rows2]] - d_city2[rows2],
+                    torch.ones_like(d_city2[rows2]),
+                )
+                self.p_acted[:, p] = self.p_acted[:, p] | r_sieg
+            r_cs = (
+                alive & (a >= 6) & (a < 12) & (tgt >= 0)
+                & (bslot < 0) & ~v_ok & ~rvc_ok & (rc_civ_t < 0)
+                & (cs_s >= 0)
+                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
+                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                & (self._p_combat[self.p_type[:, p]] > 0) & rngd
+            )
+            if bool(r_cs.any()):
+                mil_idx2 = int(self.rules.cs.get("militaristicIdx", -1))
+                def_cs3 = (
+                    15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                    + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx2).long() * 6
+                )
+                d_cs3 = self._damage_roll(r_cs, self._p_rng_str[self.p_type[:, p]] - def_cs3)
+                rows3 = r_cs.nonzero(as_tuple=True)[0]
+                self.cs_hp[rows3, cs_sc[rows3]] = torch.maximum(
+                    self.cs_hp[rows3, cs_sc[rows3]] - d_cs3[rows3],
+                    torch.ones_like(d_cs3[rows3]),
+                )
+                self.p_acted[:, p] = self.p_acted[:, p] | r_cs
 
             # --- build FARM/MINE/LUMBER_MILL (13/14/15): a builder on a tile
             # where that improvement is valid. No RNG, re-validated at

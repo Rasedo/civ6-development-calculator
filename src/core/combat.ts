@@ -219,7 +219,29 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
-  if (enemies.length === 0) return no('Nothing to attack there.');
+  if (enemies.length === 0) {
+    // P4/D-23 (real Civ 6): ranged units CAN bombard cities — same fallback
+    // chain as meleeAttack (rival city, then city-state center), one roll,
+    // no retaliation. Ranged fire never captures: the city holds at 1 HP
+    // until melee takes it.
+    if (attacker.owner === 'player') {
+      const rc = rivalCityAt(state, targetIndex);
+      if (rc && rc.rival.atWar) {
+        const defCS = rivalCityDefense(state, rc.rival, rc.city);
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, def.ranged.strength - defCS));
+        attacker.movesLeft = 0;
+        return ok;
+      }
+      const cs = cityStateAt(state, targetIndex);
+      if (cs && cs.centerIndex === targetIndex) {
+        const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, def.ranged.strength - defCS));
+        attacker.movesLeft = 0;
+        return ok;
+      }
+    }
+    return no('Nothing to attack there.');
+  }
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target);
   defender.hp -= damageRoll(state, def.ranged.strength - defCS);
@@ -241,10 +263,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     if (d < 1 || d > range) continue;
     const hasEnemy = unitsAt(state, t.index).some((u) => unitsHostile(state, unit, u));
     const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d === 1;
+    // P4/D-23: the player's ranged units bombard cities at their full range.
+    const cityRange = unit.owner === 'player' ? range : 1;
     const rivalCity =
-      d === 1 &&
+      d <= cityRange &&
       ((unit.owner === 'player' && (rivalCityAt(state, t.index)?.rival.atWar ?? false)) ||
-        (unit.owner === 'barbarian' && rivalCityAt(state, t.index) !== undefined));
+        (unit.owner === 'barbarian' && d === 1 && rivalCityAt(state, t.index) !== undefined));
     if (hasEnemy || playerCity || rivalCity) out.push(t.index);
   }
   return out;
