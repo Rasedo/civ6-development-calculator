@@ -528,3 +528,17 @@ maintenance, frozen luxMap in the GPU city walk):
 Flat vs post-D10 (174.4 / 241.9): the ~10% cheaper building ladder
 roughly cancels the new upkeep on science/military buildings. The next
 reference net trains on THIS world.
+
+
+Post-D15+D22 world (2026-07-10, commits be3dea4 + 403fe74 — uniform
+GAME_SPEED on districts/settlers/wonders/projects, symmetric
+best-melee-ever city defense):
+
+    random    231.7 ± 25.1 (95% CI)  [min 0.0, max 429.7]
+    scripted  292.7 ± 21.7 (95% CI)  [min 114.5, max 421.4]
+
+Both WAY up from post-D13 (177.0 / 243.9): districts at 32 base and
+settlers at 48+18n make expansion ~40% cheaper (more cities, more
+score), and the new defense formula makes early cities much harder for
+warrior-band barbarians to crack (min score off the floor: 52 -> 114
+scripted). The next reference net trains on THIS world.
