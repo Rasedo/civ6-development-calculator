@@ -498,7 +498,7 @@ const rules = {
       adjacency: d.adjacency.map((a) => ({ src: ADJ_SRC.indexOf(a.source), amount: a.amount })),
       housing: d.housing,
       // districtMaintenance: 0 for City Center / Neighborhood / Aqueduct, else 1.
-      maintenance: id === 'CITY_CENTER' || id === 'NEIGHBORHOOD' || id === 'AQUEDUCT' ? 0 : 1,
+      maintenance: ['CITY_CENTER', 'NEIGHBORHOOD', 'AQUEDUCT', 'COMMERCIAL_HUB', 'HARBOR'].includes(id) ? 0 : 1, // P4/D-14: CH+Harbor exempt (real Civ 6)
       countsTowardLimit: d.countsTowardLimit ? 1 : 0,
       allowMultiple: d.allowMultiple ? 1 : 0,
       onCoastalWater: d.placement.onCoastalWater ? 1 : 0,

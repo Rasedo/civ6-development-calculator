@@ -89,7 +89,11 @@ function buildingMaintenance(id: string): number {
 }
 
 function districtMaintenance(type: string): number {
-  return type === 'CITY_CENTER' || type === 'NEIGHBORHOOD' || type === 'AQUEDUCT' ? 0 : 1;
+  // P4/D-14: real Civ 6 also exempts the Commercial Hub and Harbor.
+  return type === 'CITY_CENTER' || type === 'NEIGHBORHOOD' || type === 'AQUEDUCT' ||
+    type === 'COMMERCIAL_HUB' || type === 'HARBOR'
+    ? 0
+    : 1;
 }
 
 export function cityMaintenance(state: GameState, city: City): number {

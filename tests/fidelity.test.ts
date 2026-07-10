@@ -105,9 +105,9 @@ describe('maintenance', () => {
 
     queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 7, 8).index);
     queueBuilding(state, city.id, 'MARKET');
-    expect(cityMaintenance(state, city)).toBe(3); // hub 1, market free
+    expect(cityMaintenance(state, city)).toBe(2); // hub free (P4/D-14, real Civ 6), market free
 
     const stats = computeCityStats(state, city);
-    expect(stats.maintenance).toBe(3);
+    expect(stats.maintenance).toBe(2); // hub exempt (P4/D-14)
   });
 });
