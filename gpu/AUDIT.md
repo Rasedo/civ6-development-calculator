@@ -194,14 +194,19 @@ GP accrual base, domination detection.
 TS core audited (GPU mirrors it). Confidence: H = high, M = medium, L = low.
 "Real" values verified against the Civ 6 wiki / civfanatics where cited in the audit run.
 
-STATUS 2026-07-10: **FIXED — D-1, D-5, D-6, D-7, D-8 (minus the 25% under-represented
-discount), D-9, D-14, D-24; D-11 decided (R&F/GS canon).** The gate hunts these slices
-triggered also fixed: the player-side per-city interleave (the #23 class), strip
-idempotence + the founding twin, non-removable-feature adjacency (nfadj/reef), the
-flipped-center double-strip (old task #21's residual), torch.argmax tie semantics
-(first_argmax), and the empire-score float association. REMAINING high-value: D-2
-healing model (unify with C-7/8), D-3/D-4 movement rules, D-10 builder cost counter,
-D-13 per-building maintenance (verify each value first), plus the medium/low tail.
+STATUS 2026-07-10: **FIXED — D-1, D-2 (the MP-gated four-tier healing model, closing
+C-7/C-8 too), D-3/D-4 (real entry rule: MP ≥ full step cost incl. river +3, with the
+full-MP one-tile exception — TS-only; both gate paths only ever walk one step from
+full MP, so the GPU one-step model already matches), D-5, D-6, D-7, D-8 (minus the
+25% under-represented discount), D-9, D-10 partial (base 50; +4/builder escalation
+open), D-13 verified subset, D-14, D-24; D-11 decided (R&F/GS canon).** The gate hunts these slices triggered also fixed: the
+player-side per-city interleave (the #23 class), strip idempotence + the founding
+twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-strip
+(old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
+float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
+civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
+high-value: the D-13 remainder (verify values), the D-10 escalation, plus the
+medium/low tail (D-12, D-15..D-23).
 
 ### High confidence
 

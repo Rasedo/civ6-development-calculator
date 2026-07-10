@@ -13,6 +13,7 @@ import {
   builderRemoveFeature,
   unitMaintenance,
   tileFreeForUnit,
+  walkPath,
 } from '../src/core/units';
 import { DIR_E } from '../src/core/hex';
 
@@ -77,6 +78,43 @@ describe('movement', () => {
     while (unit.tileIndex !== far.index && guard++ < 10) endTurn(state);
     expect(unit.tileIndex).toBe(far.index);
     expect(unit.path).toBeNull();
+  });
+
+  it('steps need the full MP cost, except one step from full MP (D-3/D-4)', () => {
+    const { state } = unitsState();
+    const start = tileAtCoords(state.map, 8, 10);
+    const mid = tileAtCoords(state.map, 9, 10);
+    const hills = tileAtCoords(state.map, 10, 10);
+    for (const t of [start, mid, hills]) {
+      t.elevation = 'FLAT';
+      t.feature = null;
+    }
+    hills.elevation = 'HILLS';
+
+    const unit = spawnUnit(state, 'BUILDER', start.index)!;
+    unit.tileIndex = start.index; // force exact tile
+    unit.path = [mid.index, hills.index];
+    walkPath(state, unit);
+    // 2 MP: flat costs 1 (1 left); hills costs 2 > 1 and not at full — stop.
+    expect(unit.tileIndex).toBe(mid.index);
+    expect(unit.movesLeft).toBe(1);
+    expect(unit.path).toEqual([hills.index]); // path survives for next turn
+
+    unit.movesLeft = 2; // fresh turn
+    walkPath(state, unit);
+    expect(unit.tileIndex).toBe(hills.index);
+    expect(unit.path).toBeNull();
+
+    // Full-MP exception: a 5-cost step (hills + woods + river) is still one
+    // legal step from full MP, and eats everything.
+    mid.riverMask = 0b111111; // crossing is read off the FROM tile
+    hills.feature = 'WOODS';
+    const back = spawnUnit(state, 'WARRIOR', mid.index)!;
+    back.tileIndex = mid.index;
+    back.path = [hills.index];
+    walkPath(state, back);
+    expect(back.tileIndex).toBe(hills.index);
+    expect(back.movesLeft).toBe(0);
   });
 
   it('one civilian per tile', () => {

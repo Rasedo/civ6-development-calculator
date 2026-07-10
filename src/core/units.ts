@@ -145,7 +145,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
     const curTile = map.tiles[bestIdx];
     for (const n of neighbors(map, curTile)) {
       if (closed.has(n.index) || !unitPassable(n)) continue;
-      // Rivers eat all remaining MP; approximate their path cost as +3.
+      // Rivers cost +3 to cross — the same charge the walker pays.
       const g = cur.g + moveCostInto(n) + (crossesRiver(curTile, n) ? 3 : 0);
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
@@ -157,8 +157,9 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   return null;
 }
 
-/** Walk a unit along its stored path while it has moves (Civ 6 one-step rule). */
+/** Walk a unit along its stored path while its MP cover each step. */
 export function walkPath(state: GameState, unit: Unit): void {
+  const full = UNITS[unit.type]?.moves ?? 2;
   while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
     const nextIndex = unit.path[0];
     const from = state.map.tiles[unit.tileIndex];
@@ -169,10 +170,15 @@ export function walkPath(state: GameState, unit: Unit): void {
       unit.path = null;
       return;
     }
-    const river = crossesRiver(from, to);
+    // P4/D-3+D-4 (real Civ 6): entering costs the tile's full cost, +3 for
+    // a river crossing, and needs that much MP left — except a unit at full
+    // MP may always take one step (paying everything it has). No more
+    // Civ-5-style "enter on fumes", no river-zeroing.
+    const cost = moveCostInto(to) + (crossesRiver(from, to) ? 3 : 0);
+    if (unit.movesLeft < cost && unit.movesLeft < full) return; // path resumes next turn
     unit.tileIndex = nextIndex;
     unit.path.shift();
-    unit.movesLeft = river ? 0 : Math.max(0, unit.movesLeft - moveCostInto(to));
+    unit.movesLeft = Math.max(0, unit.movesLeft - cost);
 
     if (unit.owner === 'player') {
       revealAround(state, nextIndex);
