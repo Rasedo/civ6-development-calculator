@@ -50,9 +50,12 @@ export function effectiveResearchCost(state: GameState, id: string, baseCost: nu
  * research progress). Cost is locked in when the district is queued.
  */
 export function districtCostIn(research: ResearchState): number {
-  const total = Object.keys(TECHS).length + Object.keys(CIVICS).length;
-  const done = research.techs.length + research.civics.length;
-  return Math.round(54 * (1 + 8 * (done / total)));
+  // P4/D-8: the real Civ 6 curve — floor(54·(1 + 9·max(tech%, civic%)))
+  // (the tree you are FURTHER through drives the price, not the average;
+  // the 25% under-represented-district discount stays unmodeled — AUDIT).
+  const tPct = research.techs.length / Object.keys(TECHS).length;
+  const cPct = research.civics.length / Object.keys(CIVICS).length;
+  return Math.floor(54 * (1 + 9 * Math.max(tPct, cPct)));
 }
 
 export function districtCost(state: GameState): number {

@@ -328,7 +328,7 @@ const rules = {
   civs: { player: 0, rivalBase: 1 },
   // Mirrors districtCost(): round(54 · (1 + 8 · done/total)) — rivals pay it
   // from THEIR research counts (C1-B4).
-  districtCost: { base: 54, scale: 8 },
+  districtCost: { base: 54, scale: 9 }, // P4/D-8: floor(base*(1+scale*max(tech%, civic%)))
   // Mirrors empireScore(state, 'balanced'): Σ cities (pop × popWeight + yields · weights).
   score: { popWeight: 3, yieldWeights: YIELD_KEYS.map((k) => BALANCED_WEIGHTS[k] ?? 0) },
   // SHIPYARD special (yields.ts:171): a city with this building adds its completed Harbor's
