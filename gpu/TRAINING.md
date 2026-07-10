@@ -506,3 +506,14 @@ cost ~50% more culture, and doubled loyalty swings strip border cities
 faster once a rival empire outgrows yours. The next reference net
 trains on THIS world (D-10 builder escalation lands next and will
 re-baseline again).
+
+
+Post-D10 world (2026-07-10, commit 907a7d0 — builder cost escalation,
+50 + 4 per builder ever trained, both civs):
+
+    random    174.4 ± 24.8 (95% CI)  [min 0.0, max 365.2]
+    scripted  241.9 ± 20.9 (95% CI)  [min 52.0, max 370.0]
+
+Statistically flat vs post-D12/D18 (177.9 / 241.8) — the escalator only
+bites builder-heavy strategies, which neither baseline policy plays.
+The next reference net trains on THIS world.
