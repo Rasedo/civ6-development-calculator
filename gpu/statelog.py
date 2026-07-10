@@ -57,8 +57,14 @@ def gpu_state_lines(sim, b):
     for pp in range(sim.p_alive.shape[1]):
         if bool(sim.p_alive[b, pp]):
             L.append(f"{p}PU {int(sim.p_tile[b, pp])} = t{int(sim.p_type[b, pp])} hp{int(sim.p_hp[b, pp])}")
-    for tile, n in sorted(Counter(int(sim.u_tile[b, u]) for u in range(sim.u_alive.shape[1]) if bool(sim.u_alive[b, u])).items()):
-        L.append(f"{p}BU {tile} = {n}")
+    _bn, _bh = Counter(), Counter()
+    for u in range(sim.u_alive.shape[1]):
+        if bool(sim.u_alive[b, u]):
+            t_ = int(sim.u_tile[b, u])
+            _bn[t_] += 1
+            _bh[t_] += int(sim.u_hp[b, u])
+    for tile in sorted(_bn):
+        L.append(f"{p}BU {tile} = {_bn[tile]} hp{_bh[tile]}")
     if hasattr(sim, "v_alive"):
         for k, n in sorted(Counter((int(sim.v_civ[b, v]), int(sim.v_tile[b, v]), int(sim.v_type[b, v])) for v in range(sim.v_alive.shape[1]) if bool(sim.v_alive[b, v])).items()):
             L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {n}")
@@ -87,7 +93,8 @@ def gpu_state_lines(sim, b):
         pop = int((sim.rc_pop[b, r] * sim.rc_alive[b, r].long()).sum())
         L.append(
             f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} "
-            f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))}"
+            f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))} "
+            f"terr:{int((sim.rival_at[b] == r).sum())} wterr:{int(((sim.rival_at[b] == r) & sim.water[b]).sum())}"
         )
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):

@@ -446,3 +446,20 @@ live after both nets trained, and tune1 re-evals to the decimal on the
 ranged engine because its policy learned to never attack with (then
 weak, melee-locked) Slingers/Archers. A tune3 trained with ranged live
 is where that verb's value should appear.
+
+## Horizon-250 baselines (2026-07-10, the current reference point)
+
+Every default now resolves to the game length (TURN_LIMIT = 250; commit
+b1e78a2), so all numbers above are horizon-100 HISTORY — and every net
+that produced them was already orphaned by the 46→52 action-head growth
+(gpu/runs pruned to tune3). Fresh 50-episode eval on the post-C-11
+engine (d89f734), BEFORE the rival-water symmetry stage:
+
+    random    219.6 ± 37.6 (95% CI)  [min 0.0, max 457.5]
+    scripted  271.9 ± 30.4 (95% CI)  [min 83.5, max 445.4]
+
+Two reads: (a) 250 turns ≈ doubles the horizon-100 scores; (b) the
+random policy's min 0.0 means full player collapse is reachable inside
+the horizon now — the late game is a real differentiator, exactly why
+the flip mattered. Re-baseline after each behavior-changing stage lands
+(the P1-P5 symmetry/fidelity batches WILL move these numbers).

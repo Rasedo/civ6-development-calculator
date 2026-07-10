@@ -290,7 +290,7 @@ _MUTABLE = [
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty",
-    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district",
+    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
     "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
@@ -414,6 +414,8 @@ class BatchSim:
         self.cs_quest_camp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.cs_quest_issued = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.cs_quest_district = torch.full((B, s_pad), -1, dtype=torch.long, device=device)  # askable idx of a buildDistrict quest (0=CAMPUS)
+        # V-CS: siege hit points (attackCityState) — TS `cs.hp ?? CS_MAX_HP`.
+        self.cs_hp = torch.full((B, s_pad), int(rules.cs.get("maxHp", 150)), dtype=torch.long, device=device)
         self.influence = torch.zeros(B, dtype=dtype, device=device)
         self.envoys_avail = torch.zeros(B, dtype=torch.long, device=device)
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
@@ -2344,6 +2346,45 @@ class BatchSim:
                 self.r_atwar[b, r] = False
         self._eff_version += 1
 
+    def _capture_city_state(self, rows: torch.Tensor, cs_of: torch.Tensor) -> None:
+        """V-CS: captureCityState — the city-state joins the PLAYER's empire.
+        Territory within radius 2 whose csId matches transfers (owner set
+        only where unclaimed — TS `if (t.cityId === -1)`), pop lands at
+        x0.75 (min 1), the new city starts at half HP with zero boxes and
+        zero tilesAcquired. NOTE a TS quirk kept as-is: captureCityState has
+        NO city-cap raze rule (unlike captureRivalCity) and pushes past 6;
+        the fixed GPU slots cannot, so at a full empire only the CS removal
+        happens — unreachable in practice (a 6-city empire grinding a CS to
+        0 HP), tracked in gpu/AUDIT.md C-11b notes."""
+        for i in range(len(rows)):
+            b = int(rows[i]); s = int(cs_of[rows[i]])
+            c_t = int(self.cs_center[b, s])
+            pop = max(1, (int(self.cs_pop[b, s]) * 3) // 4)
+            self.cs_alive[b, s] = False
+            ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
+            self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
+            free = (~self.alive[b]).nonzero(as_tuple=True)[0]
+            if len(free) == 0:
+                continue  # no slot: the CS still dies (see docstring)
+            c_new = int(free[0])
+            self.alive[b, c_new] = True
+            self.site[b, c_new] = c_t
+            self.center_at[b, c_t] = c_new
+            self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
+            self.owner[b, c_t] = c_new
+            self.pop[b, c_new] = pop
+            self.food_box[b, c_new] = 0.0
+            self.culture_box[b, c_new] = 0.0
+            self.tiles_acquired[b, c_new] = 0
+            self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
+            self.current[b, c_new] = -1
+            self.buildings[b, c_new] = False
+            self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
+            self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
+            self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
+            self.loyalty[b, c_new] = 100.0
+        self._eff_version += 1
+
     def _player_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:
         """V-W2: a PLAYER melee unit besieging a rival city — mirrors
         attackRivalCity for attacker.owner === 'player': defender-first
@@ -2511,6 +2552,44 @@ class BatchSim:
                     dead = hp_t[g, ds] <= 0
                     at_map[g[dead], tc[g[dead]]] = -1
                     alive_t[g[dead], ds[dead]] = False
+
+            # --- V-CS: melee vs a CITY-STATE CENTER — meleeAttack's csTarget
+            # fallback: fires only when no hostile unit holds the tile and it
+            # is not a rival city (TS branch precedence). defCS = 15 + pop
+            # (+6 militaristic), CS-damage roll then the counter (that draw
+            # order), attacker consumed, NO advance; capture at 0 HP (the
+            # city-state joins the empire). Ranged strikes refuse it —
+            # rangedAttack targets units only.
+            cs_s = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+            cs_sc = cs_s.clamp(min=0)
+            cs_hit = (
+                alive & (a >= 6) & (a < 12) & (tgt >= 0)
+                & (bslot < 0) & ~v_ok & (rc_civ_t < 0)
+                & (cs_s >= 0)
+                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
+                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
+            )
+            if bool(cs_hit.any()):
+                atk_cs = self._p_combat[self.p_type[:, p]]
+                mil_idx = int(self.rules.cs.get("militaristicIdx", -1))
+                def_cs = (
+                    15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                    + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+                )
+                d_cs = self._damage_roll(cs_hit, atk_cs - def_cs)
+                d_atk = self._damage_roll(cs_hit, def_cs - atk_cs)
+                rows = cs_hit.nonzero(as_tuple=True)[0]
+                self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
+                self.p_hp[:, p] = torch.where(cs_hit, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
+                atk_dead = cs_hit & (self.p_hp[:, p] <= 0)
+                if bool(atk_dead.any()):
+                    ar = atk_dead.nonzero(as_tuple=True)[0]
+                    self.pmil_at[ar, here[ar]] = -1
+                    self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
+                cap = cs_hit & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
+                if bool(cap.any()):
+                    self._capture_city_state(cap.nonzero(as_tuple=True)[0], cs_sc)
 
             # --- build FARM/MINE/LUMBER_MILL (13/14/15): a builder on a tile
             # where that improvement is valid. No RNG, re-validated at
@@ -2945,6 +3024,9 @@ class BatchSim:
 
         if self.turn % 12 == 0:
             self.cs_pop = torch.where(self.cs_alive, (self.cs_pop + 1).clamp(max=10), self.cs_pop)
+        # V-CS: siege recovery — +10/turn toward maxHp (cityStatePhase tail).
+        cs_max = int(self.rules.cs.get("maxHp", 150))
+        self.cs_hp = torch.where(self.cs_alive & (self.cs_hp < cs_max), (self.cs_hp + 10).clamp(max=cs_max), self.cs_hp)
 
     # --- rival civs (phase 4c) ------------------------------------------------------
 
@@ -3507,16 +3589,17 @@ class BatchSim:
         )
 
     def _expand_rival_border(self, r: int, j: int, due: torch.Tensor) -> None:
-        """Mirrors expandRivalBorder: best unowned passable non-wonder tile
-        within 3 adjacent to this civ's land; score = resource·3 − dist·2 −
-        idx/1e6 (unique — scan order is immaterial)."""
+        """Mirrors expandRivalBorder: best unowned non-impassable non-wonder
+        tile (water included — AUDIT C-1, work_ok = !isImpassable exactly
+        like the TS gate) within 3 adjacent to this civ's territory; score =
+        resource·3 − dist·2 − idx/1e6 (unique — scan order is immaterial)."""
         if not bool(due.any()):
             return
         center = self.rc_center[:, r, j]
         tiles = tiles_from_offsets(center, self._off3, self.W, self.H)
         tc = tiles.clamp(min=0)
         unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
-        ok = (tiles >= 0) & unowned & self.passable.gather(1, tc) & ~self.nwonder.gather(1, tc)
+        ok = (tiles >= 0) & unowned & self.work_ok.gather(1, tc) & ~self.nwonder.gather(1, tc)
         nbs = self.neigh[tc.reshape(-1)].reshape(self.B, -1, 6)  # [B, M, 6]
         adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(self.B, -1)).reshape(self.B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
         ok = ok & adj_own
@@ -3618,11 +3701,13 @@ class BatchSim:
             n_d = nb[:, d]
             ndc = n_d.clamp(min=0)
             free = (
+                # the full first ring, water included — mirrors foundCity /
+                # foundRivalCity (AUDIT C-1: a coastal rival must own its
+                # harbor water or the Harbor line is unreachable)
                 (n_d >= 0)
                 & (self.owner[rows, ndc] < 0)
                 & (self.cs_at[rows, ndc] < 0)
                 & (self.rival_at[rows, ndc] < 0)
-                & ~self.water[rows, ndc]
             )
             self.rival_at[rows[free], n_d[free]] = r
 
@@ -5012,10 +5097,11 @@ class BatchSim:
             self.victory_type.to(self.dtype),  # GV-4/GV-3 victoryType
         ]
         for s in range(self.S):
+            cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)
             cols += [
-                self.cs_envoys[:, s].to(self.dtype),
-                self.cs_pop[:, s].to(self.dtype),
-                self.cs_quest[:, s].to(self.dtype),
+                self.cs_envoys[:, s].to(self.dtype) * cs_live,
+                self.cs_pop[:, s].to(self.dtype) * cs_live,
+                self.cs_quest[:, s].to(self.dtype) * cs_live,
             ]
         for r in range(self.R):
             live = self.r_alive[:, r]

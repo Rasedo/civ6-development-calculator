@@ -45,6 +45,7 @@ import {
   CS_TYPE_YIELD,
   CS_TYPE_DISTRICT,
   CS_DISTRICT_BONUS,
+  CS_MAX_HP,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../src/data/religion';
@@ -343,6 +344,9 @@ const rules = {
     capitalBonus: CS_CAPITAL_BONUS,
     questCooldown: QUEST_COOLDOWN,
     questEnvoys: QUEST_ENVOYS,
+    // V-CS: attackCityState/captureCityState (siege hp + the militaristic +6)
+    maxHp: CS_MAX_HP,
+    militaristicIdx: CITY_STATE_TYPES.indexOf('militaristic'),
     // per CS type (by index): which yield column its envoys boost
     typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CS_TYPE_YIELD[t])),
     // per CS type: the district whose count carries the 3-/6-envoy bonus, and

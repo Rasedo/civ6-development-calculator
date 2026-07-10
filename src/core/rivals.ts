@@ -129,7 +129,10 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
   tile.districtComplete = true;
   tile.rivalId = rival.id;
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (!tileOwned(t) && !isWater(t)) t.rivalId = rival.id;
+    // Mirrors foundCity: the full first ring, water included — a coastal
+    // rival must own its harbor water (AUDIT C-1; the water skip made the
+    // whole Harbor line structurally unreachable for rivals).
+    if (!tileOwned(t)) t.rivalId = rival.id;
   }
   rival.cities.push(city);
   // GV-3: rival r's capital tile lives at civ index r+1, static once founded.
@@ -407,7 +410,9 @@ function expandRivalBorder(state: GameState, rival: RivalCiv, city: RivalCity): 
   let best: Tile | null = null;
   let bestScore = -Infinity;
   for (const t of tilesWithin(state.map, center.col, center.row, 3)) {
-    if (tileOwned(t) || isWater(t) || isImpassable(t) || t.wonder) continue;
+    // Water is claimable like the player's border growth (AUDIT C-1) —
+    // only impassable tiles and natural wonders stay out of reach.
+    if (tileOwned(t) || isImpassable(t) || t.wonder) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && tileOwnedByCiv(n, civOfRival(rival.id)),
     );

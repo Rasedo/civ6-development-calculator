@@ -4,6 +4,7 @@
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
 import { getCityHp } from '../src/core/combat';
+import { isWater } from '../src/core/query';
 import { computeCityStats } from '../src/core/city';
 import { unitMaintenance } from '../src/core/units';
 import { greatPeopleEarned } from '../src/core/game';
@@ -36,8 +37,12 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   for (const u of pu) L.push(`${p}PU ${u.tileIndex} = t${ti(u.type)} hp${u.hp}`);
 
   const barb = new Map<number, number>();
-  for (const u of state.units) if (u.owner === 'barbarian') barb.set(u.tileIndex, (barb.get(u.tileIndex) ?? 0) + 1);
-  for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n}`);
+  const barbHp = new Map<number, number>();
+  for (const u of state.units) if (u.owner === 'barbarian') {
+    barb.set(u.tileIndex, (barb.get(u.tileIndex) ?? 0) + 1);
+    barbHp.set(u.tileIndex, (barbHp.get(u.tileIndex) ?? 0) + u.hp);
+  }
+  for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)}`);
 
   const rv = new Map<string, number>();
   for (const u of state.units) if (u.owner === 'rival') {
@@ -69,9 +74,11 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     const rival = state.rivals[r];
     if (rival.cities.length === 0) continue;
     const pop = rival.cities.reduce((a, rc) => a + rc.population, 0);
+    const rt = state.map.tiles.filter((t) => t.rivalId === rival.id);
     L.push(
       `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} ` +
-        `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0}`,
+        `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0} ` +
+        `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length}`,
     );
     for (const rc of rival.cities) {
       L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'}`);

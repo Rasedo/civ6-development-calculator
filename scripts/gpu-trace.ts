@@ -61,7 +61,10 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.victoryType ?? 0, // GV-4/GV-3 victoryType
   ];
   for (let s = 0; s < csMax; s++) {
-    const cs = state.cityStates[s];
+    // Keyed by id (== the GPU's static slot), NOT array position: a captured
+    // city-state leaves the list (V-CS), and positional indexing would shift
+    // every later slot's columns.
+    const cs = state.cityStates.find((c) => c.id === s);
     if (!cs) {
       row.push(0, 0, 0);
       continue;

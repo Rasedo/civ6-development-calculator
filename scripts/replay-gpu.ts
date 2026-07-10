@@ -152,6 +152,8 @@ for (const game of roll.games) {
       } else if (a < 12) {
         // V-R: ranged units strike (one roll, no retaliation) when the GPU
         // engine ran with ranged active — same type-based dispatch rule.
+        // V-CS: meleeAttack's own fallback chain (units → rival city →
+        // city-state center) is the spec; the GPU mirrors it in-engine.
         if (roll.rangedActive && UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, n.index);
         else meleeAttack(state, unit.id, n.index);
       }
