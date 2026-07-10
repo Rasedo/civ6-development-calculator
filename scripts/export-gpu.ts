@@ -543,7 +543,7 @@ const rules = {
     amenities: b.amenities ?? 0,
     // Mirrors city.ts buildingMaintenance (derived, not stored): Commercial Hub
     // buildings (Market/Bank/Stock Exchange) are upkeep-free, like cost-0 ones.
-    maintenance: b.cost === 0 || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1,
+    maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // P4/D-13 mirror
     river: b.special === 'WATER_MILL',
     unlockTech: buildingUnlockTech.get(b.id) ?? -1,
     unlockCivic: buildingUnlockCivic.get(b.id) ?? -1,

@@ -31,14 +31,17 @@ export interface BuildingDef {
   autoCapital?: boolean;
   /** Worship building — only buildable if your religion selected it. */
   worship?: boolean;
+  /** P4/D-13: explicit gold upkeep (real Civ 6) — overrides the cost-tier
+   * heuristic in buildingMaintenance where the wiki value is verified. */
+  maintenance?: number;
 }
 
 const rawList: BuildingDef[] = [
   // --- City Center ---------------------------------------------------------
   { id: 'PALACE', name: 'Palace', district: 'CITY_CENTER', cost: 0, yields: { production: 2, gold: 5, science: 2, culture: 1 }, housing: 1, amenities: 1, autoCapital: true },
-  { id: 'MONUMENT', name: 'Monument', district: 'CITY_CENTER', cost: 60, yields: { culture: 2 } },
-  { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2 },
-  { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL' },
+  { id: 'MONUMENT', name: 'Monument', district: 'CITY_CENTER', cost: 60, yields: { culture: 2 }, maintenance: 0 },
+  { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2, maintenance: 0 },
+  { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL', maintenance: 0 },
   { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 200, housing: 2 },
 
   // --- Campus ----------------------------------------------------------------
@@ -48,7 +51,7 @@ const rawList: BuildingDef[] = [
 
   // --- Holy Site -------------------------------------------------------------
   { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 70, yields: { faith: 2 } },
-  { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 120, requiresAny: ['SHRINE'], yields: { faith: 4 } },
+  { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 120, requiresAny: ['SHRINE'], yields: { faith: 4 }, maintenance: 2 },
   // Worship buildings (one unlocked by founding a religion; player's pick)
   { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, culture: 3 }, worship: true },
   { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true },
@@ -72,7 +75,7 @@ const rawList: BuildingDef[] = [
   { id: 'SEAPORT', name: 'Seaport', district: 'HARBOR', cost: 580, requiresAny: ['SHIPYARD'], yields: { food: 2, gold: 2 } },
 
   // --- Industrial Zone -----------------------------------------------------------
-  { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 2 } },
+  { id: 'WORKSHOP', name: 'Workshop', district: 'INDUSTRIAL_ZONE', cost: 195, yields: { production: 2 }, maintenance: 1 },
   { id: 'FACTORY', name: 'Factory', district: 'INDUSTRIAL_ZONE', cost: 330, requiresAny: ['WORKSHOP'], yields: { production: 3 }, regional: true },
   { id: 'POWER_PLANT', name: 'Power Plant', district: 'INDUSTRIAL_ZONE', cost: 580, requiresAny: ['FACTORY'], yields: { production: 4 }, regional: true },
 

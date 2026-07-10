@@ -33,7 +33,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       id: 'BUILDER',
       name: 'Builder',
       code: 'B',
-      cost: 54,
+      cost: 50, // P4/D-10: real Civ 6 base (the +4-per-builder escalation stays unmodeled - AUDIT)
       maintenance: 0,
       moves: 2,
       combat: 0,

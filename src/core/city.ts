@@ -82,6 +82,10 @@ export interface CityStats {
 function buildingMaintenance(id: string): number {
   const def = BUILDINGS[id];
   if (!def || def.cost === 0) return 0;
+  // P4/D-13: verified real values override the tier heuristic; worship
+  // buildings are maintenance-free in real Civ 6.
+  if (def.maintenance !== undefined) return def.maintenance;
+  if (def.worship) return 0;
   if (def.district === 'COMMERCIAL_HUB') return 0;
   if (def.cost >= 500) return 3;
   if (def.cost >= 190) return 2;
