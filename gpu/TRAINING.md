@@ -491,3 +491,18 @@ than it costs the player's own (rare) offensives, and the freed
 maintenance (Monument/Granary/Water Mill/CH/Harbor) feeds the economy.
 Variance also tightened (CI 31 -> 26 random, 29 -> 20 scripted). The
 next reference net trains on THIS world.
+
+
+Post-D12/D18 world (2026-07-10, commit 40c74d9 — real border curve,
+specialists yield-only, food-only pillage heal, real amenity bands,
+real loyalty values):
+
+    random    177.9 ± 25.5 (95% CI)  [min 0.0, max 363.1]
+    scripted  241.8 ± 20.9 (95% CI)  [min 52.0, max 370.0]
+
+Both DOWN hard from post-P4 (210.1 / 279.0): Content now needs amenity
+balance >= 0 (one tier stricter across the board), late border tiles
+cost ~50% more culture, and doubled loyalty swings strip border cities
+faster once a rival empire outgrows yours. The next reference net
+trains on THIS world (D-10 builder escalation lands next and will
+re-baseline again).
