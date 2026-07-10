@@ -194,6 +194,15 @@ GP accrual base, domination detection.
 TS core audited (GPU mirrors it). Confidence: H = high, M = medium, L = low.
 "Real" values verified against the Civ 6 wiki / civfanatics where cited in the audit run.
 
+STATUS 2026-07-10: **FIXED — D-1, D-5, D-6, D-7, D-8 (minus the 25% under-represented
+discount), D-9, D-14, D-24; D-11 decided (R&F/GS canon).** The gate hunts these slices
+triggered also fixed: the player-side per-city interleave (the #23 class), strip
+idempotence + the founding twin, non-removable-feature adjacency (nfadj/reef), the
+flipped-center double-strip (old task #21's residual), torch.argmax tie semantics
+(first_argmax), and the empire-score float association. REMAINING high-value: D-2
+healing model (unify with C-7/8), D-3/D-4 movement rules, D-10 builder cost counter,
+D-13 per-building maintenance (verify each value first), plus the medium/low tail.
+
 ### High confidence
 
 1. **Combat damage random factor 0.75–1.25** (`combat.ts:51-54`) — real: 0.8–1.2. H
@@ -212,8 +221,9 @@ TS core audited (GPU mirrors it). Confidence: H = high, M = medium, L = low.
    trees; real: `floor(54·(1+9·max(tech%,civic%)))` + 25% under-represented discount. H
 9. **Horseman CS 35** (`data/units.ts:97-107`) — real 36. H
 10. **Builder cost flat 54** (`data/units.ts:33-42`) — real 50 + 4/builder trained. H
-11. **Boost fraction 40%** (`data/boosts.ts:31`) — vanilla is 50%; 40% is R&F/GS. Decide the
-    canon (repo already includes the GS Reef) and document it. H
+11. **Boost fraction 40%** — DECIDED 2026-07-10: the sim's canon is **Rise & Fall /
+    Gathering Storm** (40% boosts; the GS Reef and GS disasters are already modeled).
+    Not a bug; no code change. H
 
 ### Medium confidence
 
