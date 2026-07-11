@@ -190,8 +190,12 @@ export function placeRivals(state: GameState, count?: number): void {
       religionFounded: false,
     };
     foundRivalCity(state, rival, tile);
-    spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id);
+    // P5/S2 gate-catch (a D-22 latent): push BEFORE the starting warrior
+    // spawns so spawnUnit's bestMeleeCS chokepoint can find the rival —
+    // "strongest melee ever FIELDED" includes the starting army (defense
+    // 20 from turn 0; the GPU seeds r_best_melee from the fixture pools).
     state.rivals.push(rival);
+    spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id);
   });
 }
 
@@ -1063,7 +1067,15 @@ export function rivalPhase(state: GameState): void {
         if (unit.movesLeft > 0) hostileUnitAct(state, unit);
       }
       if (rival.warTurns >= RIVAL_WAR_MIN_TURNS && nextRandom(state) < 0.25) {
-        makePeace(state, rival);
+        // P5/S2 (C-13): suing costs the rival what it costs the player —
+        // PEACE_GOLD_COST(warTurns) from ITS treasury; a broke rival fights
+        // on. The roll stays UNCONDITIONAL (draw-count parity with the GPU);
+        // only the outcome gates on affordability.
+        const cost = PEACE_GOLD_COST(rival.warTurns);
+        if (goldAffordable(rival.treasury ?? 0, cost)) {
+          rival.treasury = (rival.treasury ?? 0) - cost;
+          makePeace(state, rival);
+        }
       }
     } else {
       rival.peaceTurns += 1;

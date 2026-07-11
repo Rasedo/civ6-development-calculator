@@ -26,6 +26,11 @@ from pathlib import Path
 
 import torch
 
+# Windows pipes default to the ANSI codepage (cp1251 here) — the '×'/'→' in
+# the summary prints must degrade, not kill a 3-minute run at the finish line.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 from civ6gpu.rng import masked_choice

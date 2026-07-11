@@ -34,6 +34,11 @@ function gates(state: GameState): Unlocks | null {
 
 export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
   const tile = state.map.tiles[tileIndex];
+  // P5/S2: the engine's city capacity is SIX everywhere (fixed GPU slots,
+  // the RL heads, captureRivalCity's raze) — founding honors the same cap.
+  // A refused planned site DROPS (the auto-found loop shifts it) while the
+  // settler stays banked, exactly mirroring the GPU's site consumption.
+  if (state.cities.length >= 6) return no('The empire cannot govern more cities (6 max).');
   if (!isExplored(state, tileIndex)) return no('Unexplored — send a unit to scout it first.');
   if (isWater(tile)) return no('Cities must be founded on land.');
   if (isImpassable(tile)) return no('Impassable terrain.');

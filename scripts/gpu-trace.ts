@@ -14,10 +14,12 @@
  *           foodBox·ms, cultureBox·ms, cityHp, loyalty·ms]
  *
  * City slots are keyed by FOUNDING ORDER via `cityIds` (append new ids as
- * cities appear) — not by position in state.cities, which compacts when a
- * city flips to a rival. A missing id renders as zeros, exactly like a
- * dead GPU slot. rngState stays the strongest signal: any divergence in
- * the number or order of draws fails the very next row.
+ * cities appear; once cMax ids exist, a new id REUSES the first dead
+ * column — mirroring the GPU's first-free-hole slot) — not by position in
+ * state.cities, which compacts when a city flips to a rival. A missing id
+ * renders as zeros, exactly like a dead GPU slot. rngState stays the
+ * strongest signal: any divergence in the number or order of draws fails
+ * the very next row.
  */
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';

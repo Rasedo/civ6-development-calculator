@@ -1007,7 +1007,12 @@ for (let s = 0; s < N_SEEDS; s++) {
     // the capital queues them at districtCost like every other build.)
     endTurn(state);
     for (const c of state.cities) {
-      if (!cityIds.includes(c.id)) cityIds.push(c.id);
+      if (cityIds.includes(c.id)) continue;
+      if (cityIds.length < C_MAX) { cityIds.push(c.id); continue; }
+      // P5/S2: a 7th-plus ever-founded city reuses the first dead column,
+      // mirroring the GPU's first-free-hole slot when founded_n >= C.
+      const hole = cityIds.findIndex((id) => !state.cities.some((x) => x.id === id));
+      if (hole >= 0) cityIds[hole] = c.id;
     }
     for (const id of state.research.boosted) {
       if (knownBoosts.has(id)) continue;

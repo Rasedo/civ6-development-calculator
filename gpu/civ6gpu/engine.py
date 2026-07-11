@@ -882,6 +882,22 @@ class BatchSim:
         self._arangeT = torch.arange(T, device=device)
         self._arangeNB = torch.arange(NB, device=device)
 
+        # P4/D-22 latent, caught by P5-S2's reshuffle (seed 9001 t43): the
+        # FIXTURE-LOADED starting units must seed the best-melee trackers —
+        # TS counts them through spawnUnit at placeRivals (every rival
+        # starts with a WARRIOR → its city defense is 20, not the floor 15;
+        # the 5-point gap drifted rc_hp invisibly until a capture threshold
+        # split on it). Player pools start empty in these worlds; computed
+        # anyway for robustness.
+        vt = self.v_type.clamp(min=0, max=self.NU - 1)
+        melee_v = self.v_alive & (self._p_rng_str[vt] == 0)
+        cs_v = torch.where(melee_v, self._p_combat[vt], torch.zeros_like(self.v_type))
+        for r_ in range(r_pad):
+            self.r_best_melee[:, r_] = torch.where(self.v_civ == r_, cs_v, torch.zeros_like(cs_v)).max(dim=1).values
+        pt_ = self.p_type.clamp(min=0, max=self.NU - 1)
+        melee_p = self.p_alive & (self._p_rng_str[pt_] == 0)
+        self.best_melee = torch.where(melee_p, self._p_combat[pt_], torch.zeros_like(self.p_type)).max(dim=1).values
+
         # Pristine copy of the mutable state, for reset().
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
 
@@ -2481,13 +2497,27 @@ class BatchSim:
             self.rvcity_at[b, c_t] = -1
             self.rc_dist_tile[b, r, j, :] = -1
             self.rc_bldg[b, r, j, :] = False
-            free = (~self.alive[b]).nonzero(as_tuple=True)[0]
             # territory within radius 3 leaves the rival
             ring = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r)
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
-            if len(free) == 0:
-                continue  # razed: no slot (TS mirrors this cap)
-            c_new = int(free[0])
+            # P5/S2 gate-catch (seed 9235 t241): TS APPENDS the captured city
+            # (its trace keeps dead cities' columns and the new city gets a
+            # NEW column), so the slot must be the founding HIGH-WATER mark
+            # (founded_n — last-alive+1 lands in the newest hole when the
+            # most recent city was the one that died). Raze at TS's count
+            # cap; the degenerate hole-reuse fallback only fires when the
+            # column space is exhausted below the cap (untraceable in TS
+            # too — P7 reclaims properly).
+            if int(self.alive[b].sum()) >= 6:
+                continue  # razed (TS: state.cities.length >= 6)
+            c_new = int(self.founded_n[b])
+            if c_new >= self.C:
+                free = (~self.alive[b]).nonzero(as_tuple=True)[0]
+                if len(free) == 0:
+                    continue  # razed: no slot at all
+                c_new = int(free[0])
+            else:
+                self.founded_n[b] += 1
             self.alive[b, c_new] = True
             self.site[b, c_new] = c_t
             self.center_at[b, c_t] = c_new
@@ -2505,6 +2535,12 @@ class BatchSim:
             self.tiles_acquired[b, c_new] = int(self.rc_acquired[b, r, j]) if hasattr(self, "rc_acquired") else 0
             self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
             self.current[b, c_new] = -1
+            # P5/S2 slot hygiene (seed 9235 t241): a reused slot must not
+            # leak a dead city's queue progress/cost (TS starts queue = []).
+            self.progress[b, c_new] = 0.0
+            self.cur_cost[b, c_new] = 0.0
+            self.q_dtile[b, c_new] = -1
+            self.warrior_trained[b, c_new] = False
             self.buildings[b, c_new] = False
             self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
@@ -2537,10 +2573,17 @@ class BatchSim:
             self.cs_alive[b, s] = False
             ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
             self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
-            free = (~self.alive[b]).nonzero(as_tuple=True)[0]
-            if len(free) == 0:
-                continue  # no slot: the CS still dies (see docstring)
-            c_new = int(free[0])
+            # P5/S2: append at the founding HIGH-WATER mark like TS (trace
+            # column order — see _capture_rival_city); NO count cap here
+            # (the documented TS quirk: captureCityState pushes past 6).
+            c_new = int(self.founded_n[b])
+            if c_new >= self.C:
+                free = (~self.alive[b]).nonzero(as_tuple=True)[0]
+                if len(free) == 0:
+                    continue  # no slot: the CS still dies (see docstring)
+                c_new = int(free[0])
+            else:
+                self.founded_n[b] += 1
             self.alive[b, c_new] = True
             self.site[b, c_new] = c_t
             self.center_at[b, c_t] = c_new
@@ -2552,6 +2595,13 @@ class BatchSim:
             self.tiles_acquired[b, c_new] = 0
             self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
             self.current[b, c_new] = -1
+            # P5/S2: full slot hygiene — a reused slot (post-P7, or the
+            # degenerate hole fallback) must not leak the dead city's queue
+            # progress/cost into the fresh city (TS starts queue = []).
+            self.progress[b, c_new] = 0.0
+            self.cur_cost[b, c_new] = 0.0
+            self.q_dtile[b, c_new] = -1
+            self.warrior_trained[b, c_new] = False
             self.buildings[b, c_new] = False
             self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
@@ -2610,7 +2660,11 @@ class BatchSim:
             here_d = self.p_tile[dr, p]
             self.pmil_at[dr, here_d] = -1
             self.p_alive[dr, p] = False
-        cap = att & ~died
+        # P5/S2 gate-catch (seed 9001 t44): TS captureRivalCity fires even
+        # when the attacker DIED to the counter (killUnit precedes the
+        # city-hp check) — a scout can trade itself for the city. The old
+        # `& ~died` denied mutual-death captures.
+        cap = att
         cap_rows = cap.nonzero(as_tuple=True)[0]
         cap_rows = cap_rows[self.rc_hp[cap_rows, civ[cap_rows], slot[cap_rows]] <= 0]
         if len(cap_rows) > 0:
@@ -3231,13 +3285,18 @@ class BatchSim:
                 self.u_acted[rows, u] = True  # P4/D-2
 
         # Cities heal +20 when no hostile stands adjacent (barbarians, or
-        # rival units whose civ is at war).
+        # rival units whose civ is at war — TS unitsHostile counts rival
+        # CIVILIANS too: an at-war builder besieges. P5/S2 hunt, seed 9131
+        # t175: a rival builder on a captured city's ring blocked the TS
+        # heal while the GPU read only the military map).
         nb_c = self.neigh[self.site.clamp(min=0)]  # [B, C, 6]
         nbf = nb_c.clamp(min=0).reshape(B, -1)
         adj_b = (self.barb_at.gather(1, nbf) >= 0).reshape(B, self.C, 6)
         rvn = self.rv_at.gather(1, nbf)
         rv_war = (rvn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
-        besieged = ((adj_b | rv_war.reshape(B, self.C, 6)) & (nb_c >= 0)).any(dim=2)
+        rvcn = self.rvciv_at.gather(1, nbf)
+        rvc_war = (rvcn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rvcn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
+        besieged = ((adj_b | (rv_war | rvc_war).reshape(B, self.C, 6)) & (nb_c >= 0)).any(dim=2)
         healable = self.alive & (self.city_hp < city_max_hp) & ~besieged
         self.city_hp = torch.where(healable, (self.city_hp + cb.get("cityHealPerTurn", 20)).clamp(max=city_max_hp), self.city_hp)
 
@@ -3457,12 +3516,19 @@ class BatchSim:
             row = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
             # VP-G2: the purchase block (buy building / settler / unit at
             # goldPurchaseMult x cost from the CIV's shared treasury) — NOT
-            # idle-gated, mirroring the player's V-P1 columns. Rival settler
-            # purchase stays False (their settling machinery is scripted).
+            # idle-gated, mirroring the player's V-P1 columns. P5/S2 (C-13):
+            # the settler column is LIVE now — priced off the rival's own
+            # curve; the apply founds immediately (their machinery has no
+            # settler bank) and refunds when no valid site exists.
             mult = self.rules.gold_purchase_mult
             afford_b = self._afford(self.r_treasury[:, r].unsqueeze(1), (rdv.b_cost.double() * mult).unsqueeze(0))
             pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
-            ps = torch.zeros(B, 1, dtype=torch.bool, device=dev)
+            s_cost_r = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities.double() - 1).clamp(min=0)
+            ps = (
+                (n_cities < rr.get("maxCities", 6))
+                & self._afford(self.r_treasury[:, r], s_cost_r * mult)
+                & self.controlled[:, r]
+            ).unsqueeze(1) & (torch.ones(B, 1, dtype=torch.bool, device=dev) if j == 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev))
             u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
             if self._builder_idx >= 0:
                 # P4/D-10: the builder column prices off THIS rival's escalator
@@ -3478,13 +3544,18 @@ class BatchSim:
         # symmetric war head (seat-invariant [B, 2R] layout): a controlled
         # rival's only opponent-with-war-rules is THE PLAYER — column 0 =
         # declare (alive, at peace), column R = sue for peace (warTurns >=
-        # min). Peace is FREE for rivals — a tracked asymmetry (AUDIT C-13):
-        # the player pays 150+10*warTurns, and rivals DO hold gold since
-        # VP-G1 (r_treasury) — the free ride mirrors the scripted roll only.
+        # min AND the player's exact gold schedule from r_treasury —
+        # P5/S2 closed the C-13 free ride; the scripted roll pays too).
+        rrw = self.rules.rivals
         Rw = max(self.R, 1)
         war = torch.zeros(B, 2 * Rw, dtype=torch.bool, device=dev)
         war[:, 0] = self.r_alive[:, r] & ~self.r_atwar[:, r]
-        war[:, Rw] = self.r_alive[:, r] & self.r_atwar[:, r] & (self.r_warturns[:, r] >= self.rules.rivals.get("warMinTurns", 14))
+        pcost_m = rrw.get("peaceGold0", 150) + rrw.get("peaceGoldSlope", 10) * self.r_warturns[:, r].to(torch.float64)
+        war[:, Rw] = (
+            self.r_alive[:, r] & self.r_atwar[:, r]
+            & (self.r_warturns[:, r] >= rrw.get("warMinTurns", 14))
+            & self._afford(self.r_treasury[:, r], pcost_m)
+        )
         return {"production": production, "tech": tech, "civic": civic, "war": war}
 
     def apply_rival_actions(
@@ -3517,8 +3588,18 @@ class BatchSim:
             if bool(declare.any()):
                 self.r_atwar[:, r] = self.r_atwar[:, r] | declare
                 self.r_warturns[:, r] = torch.where(declare, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
-            peace = (w == Rw) & self.controlled[:, r] & self.r_atwar[:, r] & (self.r_warturns[:, r] >= self.rules.rivals.get("warMinTurns", 14))
+            # P5/S2 (C-13): the controlled rival's peace is no longer free —
+            # it pays the player's exact schedule from r_treasury (mask
+            # prices it; the apply re-validates affordability).
+            rrp = self.rules.rivals
+            pcost_c = rrp.get("peaceGold0", 150) + rrp.get("peaceGoldSlope", 10) * self.r_warturns[:, r].to(torch.float64)
+            peace = (
+                (w == Rw) & self.controlled[:, r] & self.r_atwar[:, r]
+                & (self.r_warturns[:, r] >= rrp.get("warMinTurns", 14))
+                & self._afford(self.r_treasury[:, r], pcost_c)
+            )
             if bool(peace.any()):
+                self.r_treasury[:, r] = torch.where(peace, self.r_treasury[:, r] - pcost_c, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~peace
                 self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
@@ -3540,7 +3621,10 @@ class BatchSim:
             is_s = act & (a == NBn)
             if bool(is_s.any()):
                 n_cities = self.rc_alive[:, r].sum(dim=1)
-                settle_cost = js_round(rr.get("settlerBase", 90) + rr.get("settlerStep", 40) * (n_cities.double() - 1).clamp(min=0))
+                # P5/S2 key fix: the exporter ships "settlerPer" — the old
+                # "settlerStep" lookup ALWAYS fell to its default (same value
+                # 40, so dormant; now it tracks the export like every knob).
+                settle_cost = js_round(rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities.double() - 1).clamp(min=0))
                 self.rc_current[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
                 self.rc_cost[:, r, j] = torch.where(is_s, settle_cost, self.rc_cost[:, r, j])
                 self.rc_progress[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
@@ -3563,6 +3647,20 @@ class BatchSim:
                         rows_ = ok_now.nonzero(as_tuple=True)[0]
                         self.rc_bldg[rows_, r, j, bi[rows_]] = True
                         self.r_treasury[:, r] = torch.where(ok_now, self.r_treasury[:, r] - cost_b, self.r_treasury[:, r])
+                # P5/S2 (C-13): buy a SETTLER — the rival has no settler bank,
+                # so the purchase founds immediately via the same site scan a
+                # completed settler runs; no valid site = refund (the TS
+                # spawnUnit-refund convention).
+                is_ps2 = can_p & (pb_i == NBn)
+                if bool(is_ps2.any()):
+                    rr2 = self.rules.rivals
+                    n_cities2 = self.rc_alive[:, r].sum(dim=1)
+                    s_cost2 = (rr2.get("settlerBase", 90) + rr2.get("settlerPer", 40) * (n_cities2.double() - 1).clamp(min=0)) * mult
+                    ok_ps = is_ps2 & (n_cities2 < rr2.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], s_cost2)
+                    if bool(ok_ps.any()):
+                        self._rival_try_found(r, ok_ps)
+                        founded2 = ok_ps & (self.rc_alive[:, r].sum(dim=1) > n_cities2)
+                        self.r_treasury[:, r] = torch.where(founded2, self.r_treasury[:, r] - s_cost2, self.r_treasury[:, r])
                 pu_i = pb_i - (NBn + 1)
                 is_pu = can_p & (pu_i >= 0) & (pu_i < self.NU)
                 if bool(is_pu.any()):
@@ -4817,8 +4915,14 @@ class BatchSim:
                     self._rival_unit_war_act(v, a)
             peace_roll = atw & ~self.controlled[:, r] & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))  # C3-sym: controlled rivals leave war via the head
             rp = self._next_random(peace_roll)
-            made_peace = peace_roll & (rp < 0.25)
+            # P5/S2 (C-13): suing costs the rival what it costs the player —
+            # peaceGold0 + slope·warTurns from ITS treasury; a broke rival
+            # fights on. The roll stays UNCONDITIONAL (draw-count parity);
+            # only the outcome gates on milli-rounded affordability.
+            pcost = rr.get("peaceGold0", 150) + rr.get("peaceGoldSlope", 10) * self.r_warturns[:, r].to(torch.float64)
+            made_peace = peace_roll & (rp < 0.25) & self._afford(self.r_treasury[:, r], pcost)
             if bool(made_peace.any()):
+                self.r_treasury[:, r] = torch.where(made_peace, self.r_treasury[:, r] - pcost, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~made_peace
                 self.r_warturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
@@ -5585,10 +5689,11 @@ class BatchSim:
         # --- founding (mirrors the plannedSettles loop at the end of endTurn) ------
         # Consume the planned-site list in order while settlers remain; a
         # site failing canFoundCity is DROPPED without spending the settler.
-        # Slots bind at founding (founded_n is monotonic — a flipped city's
-        # slot is never reused, exactly like trace ids).
+        # Slots bind at founding: append at founded_n while columns remain,
+        # then reuse the first dead column (the trace's cityIds follow the
+        # same rule, so reused columns stay aligned).
         for _ in range(self.KS):
-            can = (self.settlers > 0) & (self.next_site_ptr < self.KS) & (self.founded_n < C)
+            can = (self.settlers > 0) & (self.next_site_ptr < self.KS)
             if not bool(can.any()):
                 break
             ptr = self.next_site_ptr.clamp(max=self.KS - 1)
@@ -5603,13 +5708,21 @@ class BatchSim:
             dcity = torch.where(self.alive, self.pair_dist[sc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long), 999)
             rc_flat = self.rc_center.reshape(B, -1).clamp(min=0)
             drc = torch.where(self.rc_alive.reshape(B, -1), self.pair_dist[sc.unsqueeze(1), rc_flat].to(torch.long), 999)
-            ok = free & (dcity.min(dim=1).values >= 4) & (drc.min(dim=1).values >= 4)  # P4/D-5: CITY_MIN_DIST = 4
+            # P5/S2: the 6-cap moved from `can` into `ok` — TS canFoundCity
+            # now refuses at 6 cities, so the site DROPS (consumed) while
+            # the settler stays banked, on both sides identically. The slot
+            # is founded_n (append; captures bump it too) with a first-free
+            # hole fallback for the post-flip below-cap case.
+            cap_ok = self.alive.sum(dim=1) < 6
+            hole = first_argmax((~self.alive).long())
+            slot_new = torch.where(self.founded_n < C, self.founded_n, hole)
+            ok = free & (dcity.min(dim=1).values >= 4) & (drc.min(dim=1).values >= 4) & cap_ok  # P4/D-5: CITY_MIN_DIST = 4
             valid = can & ok
             self.next_site_ptr = self.next_site_ptr + can.long()  # consumed either way
             if not bool(valid.any()):
                 continue
             rows = valid.nonzero(as_tuple=True)[0]
-            c_new = self.founded_n[rows]
+            c_new = slot_new[rows]
             s_idx = cand_site[rows]
             p_idx = ptr[rows]
             self.site[rows, c_new] = s_idx
@@ -5631,7 +5744,10 @@ class BatchSim:
             self.city_hp[rows, c_new] = self.rules.combat.get("cityMaxHp", 200)
             self.warrior_trained[rows, c_new] = False
             self.settlers[rows] -= 1
-            self.founded_n[rows] += 1
+            # founded_n bumps only for append slots — a hole-fallback founding
+            # reuses a dead column (trace ids reuse it too: TS cityIds keep
+            # dead columns only for cities that DIED; a reused id is new).
+            self.founded_n[rows] += (c_new == self.founded_n[rows]).long()
             # Claim the center (unconditionally, as foundCity does) plus any
             # unowned first-ring tiles; the center becomes a district tile.
             self.owner[rows, s_idx] = c_new

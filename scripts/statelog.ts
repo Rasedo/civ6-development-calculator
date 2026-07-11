@@ -97,7 +97,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     );
     for (const rc of rival.cities) {
       const ry = rivalCityYields(state, rival, rc);
-      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
+      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} hp${rc.hp} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
     }
   }
   return L;

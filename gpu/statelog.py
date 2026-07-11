@@ -107,5 +107,5 @@ def gpu_state_lines(sim, b):
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):
                 _ry = sim._rival_city_yields(r, j, sim.rc_alive[:, r, j])
-                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))} ryf{_milli(_ry[0][b])} ryp{_milli(_ry[1][b])}")
+                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))} hp{int(sim.rc_hp[b, r, j])} ryf{_milli(_ry[0][b])} ryp{_milli(_ry[1][b])}")
     return L

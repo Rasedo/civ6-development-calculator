@@ -73,9 +73,40 @@ stays parked (masked: exporter emits single-tile steps; an RL-surface question).
   sacking a RIVAL city hits r_treasury −min(100, 20% milli-rounded) + the
   pillage ring; a rival capturing a player city plunders +40 (the C-11
   symmetry half). statelog rGold already traces it.
-- **S2 — rival peace cost + settler purchase (C-13):** suing rival pays
-  150+10·warTurns from r_treasury (scripted roll gated on affordability;
-  controlled mask prices it); enable rival settler-purchase column.
+- **S2 — rival peace cost + settler purchase (C-13): LANDED.** A suing
+  rival pays the player's exact 150+10·warTurns schedule from r_treasury:
+  the scripted roll stays UNCONDITIONAL (draw-count parity) with the
+  outcome gated on milli-rounded affordability — a broke rival fights on
+  (S1's bankruptcy disband is its path back to solvency and peace). The
+  controlled war-head's peace column prices the same schedule (mask +
+  apply). The rival settler-purchase column is LIVE (capital column,
+  cap+afford gated; the apply founds immediately via the settler site
+  scan — no bank — and refunds when no site lands). Also fixed the
+  dormant "settlerStep"→"settlerPer" key (always fell to the identical
+  default, now tracks the export).
+  THE S2 RESHUFFLE HUNT (captures are new to off-script games — every
+  reshuffle exposes the next family member) fixed SIX latent bugs:
+  (1) the D-22 best-melee trackers missed fixture-loaded starting units —
+  GPU now init-seeds them from the pools AND TS placeRivals pushed the
+  rival AFTER spawnUnit so its own tracker missed the starting warrior
+  (push/spawn swapped; fixtures re-exported); (2) player captures now slot
+  at the founded_n HIGH-WATER mark with full slot hygiene (progress/
+  cur_cost/q_dtile/warrior_trained cleared, rc registries, district_dead)
+  — last-alive+1 landed in the wrong hole when the newest city was the
+  dead one; (3) the city-heal besiege gate ignored at-war rival CIVILIANS
+  (a builder adjacent to a captured city blocked TS healing but not GPU);
+  (4) mutual-death captures: TS captures a city even when the attacker
+  dies to the counter — GPU's `cap = att & ~died` denied them (now
+  `cap = att`); (5) THE 6-CITY FOUNDING CAP made symmetric: TS
+  canFoundCity now refuses at 6 cities (the planned site DROPS while the
+  settler stays banked — exactly the GPU's consumed-either-way site ptr);
+  GPU founding moved the cap from `can` into `ok` and slots via founded_n
+  append with a first-dead-column fallback, and the trace's cityIds follow
+  the SAME rule (append until cMax, then reuse the first dead column) —
+  this one closed TWO replay failures at once (a 7th-ever-founded city
+  desynced the trace columns); (6) statelog RC lines now carry hp
+  permanently. Also: rollout.py degrades its unicode summary prints
+  instead of dying on cp1251 pipes (PYTHONUTF8 guard).
 - **S3 — founding cluster (C-14):** rival founding = player founding (pop 1,
   center strip, uniform spacing, the player's 48+18n settler curve).
 - **S4 — rival border growth (C-15):** consume rc.cultureBox against
@@ -107,9 +138,9 @@ get precomputed site_cy, captured centers held zeros; also fixed for CS
 captures + coastal/base_maintenance init); (3) rc slot picks used the alive
 COUNT as the next slot — a capture hole makes that a LIVE city and the next
 founding OVERWRITES it; now last-alive+1 (TS append order; holes wait for
-P7). P7 NOTE: the PLAYER capture path picks the FIRST free slot while TS
-appends — an iteration-order divergence once loyalty-flip holes exist
-(latent; fix with the dead-slot reclamation stage).
+P7). (The S1-era P7 note about the player capture slot divergence was
+RESOLVED in S2: player captures and foundings both append at founded_n
+with a first-dead-column fallback mirrored by the trace's cityIds rule.)
 
 ### Structural capability blocks
 
