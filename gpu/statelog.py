@@ -69,6 +69,11 @@ def gpu_state_lines(sim, b):
             _ba[t_] += int(bool(sim.u_acted[b, u]))
     for tile in sorted(_bn):
         L.append(f"{p}BU {tile} = {_bn[tile]} hp{_bh[tile]} a{_ba[tile]}")
+    # barb CAMPS (P5/S6 hunt: camp LOCATIONS were invisible — only the
+    # count is traced, and a draw-picked spot divergence cascades silently)
+    for kk in range(sim.camp_tile.shape[1]):
+        if int(sim.camp_tile[b, kk]) >= 0:
+            L.append(f"{p}CA {int(sim.camp_tile[b, kk])} = 1")
     if hasattr(sim, "v_alive"):
         _rn, _rh, _ra = Counter(), Counter(), Counter()
         for v in range(sim.v_alive.shape[1]):
@@ -126,5 +131,5 @@ def gpu_state_lines(sim, b):
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):
                 _ry = sim._rival_city_yields(r, j, sim.rc_alive[:, r, j])
-                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))} hp{int(sim.rc_hp[b, r, j])} cb{_milli(sim.rc_cbox[b, r, j])} til{int(sim.rc_acquired[b, r, j])} ryf{_milli(_ry[0][b])} ryp{_milli(_ry[1][b])}")
+                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))} hp{int(sim.rc_hp[b, r, j])} loy{_milli(sim.rc_loyalty[b, r, j])} cb{_milli(sim.rc_cbox[b, r, j])} til{int(sim.rc_acquired[b, r, j])} ryf{_milli(_ry[0][b])} ryp{_milli(_ry[1][b])}")
     return L

@@ -316,7 +316,7 @@ _MUTABLE = [
     "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
-    "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_acquired", "rc_hp", "rc_id",
+    "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
@@ -539,6 +539,7 @@ class BatchSim:
         self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_growth = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
         self.rc_cbox = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)  # P5/S4: rc.cultureBox
+        self.rc_loyalty = torch.full((B, r_pad, rc_pad), 100.0, dtype=torch.float64, device=device)  # P5/S6 (C-19)
         self.rc_acquired = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_hp = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_id = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -2511,7 +2512,7 @@ class BatchSim:
                 self.p_tile[rows, p] = dest[rows]
                 self.p_acted[:, p] = self.p_acted[:, p] | move  # P4/D-2
 
-    def _capture_rival_city(self, rows: torch.Tensor, civ: torch.Tensor, slot: torch.Tensor, ctr: torch.Tensor) -> None:
+    def _capture_rival_city(self, rows: torch.Tensor, civ: torch.Tensor, slot: torch.Tensor, ctr: torch.Tensor, plunder: bool = True) -> None:
         """V-W2: captureRivalCity — the rival city transfers to the PLAYER.
         Into a FREE player slot when one exists (TS gains the matching cap:
         beyond C cities the capture razes instead); tiles within the work
@@ -2592,7 +2593,8 @@ class BatchSim:
             # gold, and the war ends if it was the rival's last city. The
             # raze path (`continue` above) mirrors TS's early return —
             # no gold, war state untouched.
-            self.treasury[b] += 40.0
+            if plunder:  # P5/S6: loyalty defections transfer without the +40
+                self.treasury[b] += 40.0
             if not bool(self.rc_alive[b, r].any()):
                 self.r_atwar[b, r] = False
         self._eff_version += 1
@@ -3157,7 +3159,11 @@ class BatchSim:
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
         if bool(want.any()):
             near_city = ((self.dist < 5) & self.alive.unsqueeze(2)).any(dim=1)  # [B, T]
-            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city
+            # P5/S6 gate-catch (seed 9027 t230): campCandidates excludes
+            # t.district LIVE — an ORPHANED pave (razed city's district on an
+            # unowned tile) padded the GPU set and shifted the draw-indexed
+            # camp spot one candidate over. camp_ok is static; paves aren't.
+            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city & (self.district < 0)
             if self.K > 0:
                 camp_d = self.pair_dist[self.camp_tile.clamp(min=0)].to(torch.long)  # [B, K, T]
                 near_camp = ((camp_d < 5) & (self.camp_tile >= 0).unsqueeze(2)).any(dim=1)
@@ -3445,15 +3451,16 @@ class BatchSim:
 
     # --- rival civs (phase 4c) ------------------------------------------------------
 
-    def _spawn_rival(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, civ: int) -> None:
+    def _spawn_rival(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, civ: int) -> torch.Tensor:
         """Rival units are military and share one append-only pool (per-civ
-        order = state.units order filtered by civ, which per-civ loops use)."""
+        order = state.units order filtered by civ, which per-civ loops use).
+        Returns the LANDED mask (P5/S8: purchases refund on no spawn spot)."""
         if not bool(mask.any()):
-            return
+            return torch.zeros_like(mask)
         found, spot = self._first_free_spot(at_tile, "rival", civ=civ)
         can = mask & found
         if not bool(can.any()):
-            return
+            return can
         rows = can.nonzero(as_tuple=True)[0]
         slot = self.v_next[rows]
         assert int(slot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
@@ -3475,6 +3482,7 @@ class BatchSim:
             torch.zeros_like(self.r_best_melee[:, civ]),
         )
         self.r_best_melee[:, civ] = torch.maximum(self.r_best_melee[:, civ], melee_cs)
+        return can
 
     def rival_masks(self, r: int) -> dict[str, torch.Tensor]:
         """C2b: a controlled rival's decision space, in the PLAYER head
@@ -3686,6 +3694,20 @@ class BatchSim:
                     bi = pb_i.clamp(min=0, max=NBn - 1)
                     cost_b = rdv.b_cost.gather(0, bi).double() * mult
                     ok_now = is_pb & ~self.rc_bldg[torch.arange(self.B, device=self.device), r, j].gather(1, bi.unsqueeze(1)).squeeze(1) & self._afford(self.r_treasury[:, r], cost_b)
+                    # P5/S8 (C-23): full re-validation — the district
+                    # prerequisite (completed) and required buildings, the
+                    # TS purchaseBuilding buildingCompletable gates.
+                    reqd_i = rdv.b_req_district.gather(0, bi)
+                    reg_i = self.rc_dist_tile[:, r, j].gather(1, reqd_i.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    d_ok = (reqd_i < 0) | ((reg_i >= 0) & self.district_complete.gather(1, reg_i.clamp(min=0).unsqueeze(1)).squeeze(1))
+                    rb_ok = torch.ones_like(d_ok)
+                    for bi2, reqs in enumerate(self.rules.b_req_buildings):
+                        if reqs:
+                            m2 = bi == bi2
+                            if bool(m2.any()):
+                                have2 = self.rc_bldg[:, r, j][:, torch.tensor(reqs, device=self.device, dtype=torch.long)].any(dim=1)
+                                rb_ok = rb_ok & (~m2 | have2)
+                    ok_now = ok_now & d_ok & rb_ok
                     if bool(ok_now.any()):
                         rows_ = ok_now.nonzero(as_tuple=True)[0]
                         self.rc_bldg[rows_, r, j, bi[rows_]] = True
@@ -3718,12 +3740,17 @@ class BatchSim:
                         is_bldr = ok_now & (self._p_charges[ui] > 0)
                         is_mil = ok_now & ~is_bldr
                         ctr = self.rc_center[:, r, j].clamp(min=0)
+                        # P5/S8 (C-23): deduct only where the spawn LANDED —
+                        # the TS spawnUnit-refund convention (the settler
+                        # branch above already refunds; units now match).
+                        landed = torch.zeros_like(ok_now)
                         if bool(is_mil.any()):
-                            self._spawn_rival(is_mil, ctr, ui, r)
+                            landed = landed | self._spawn_rival(is_mil, ctr, ui, r)
                         if bool(is_bldr.any()):
-                            self._spawn_rival_civ(is_bldr, ctr, r)
-                            self.r_builders_trained[:, r] = self.r_builders_trained[:, r] + is_bldr.long()  # P4/D-10
-                        self.r_treasury[:, r] = torch.where(ok_now, self.r_treasury[:, r] - cost_u, self.r_treasury[:, r])
+                            landed_civ = self._spawn_rival_civ(is_bldr, ctr, r)
+                            landed = landed | landed_civ
+                            self.r_builders_trained[:, r] = self.r_builders_trained[:, r] + landed_civ.long()  # P4/D-10
+                        self.r_treasury[:, r] = torch.where(landed, self.r_treasury[:, r] - cost_u, self.r_treasury[:, r])
             # idle = NB+1 (explicit no-op); units NB+2..NB+1+NU
             is_u = act & (a >= NBn + 2) & (a < NBn + 2 + self.NU)
             if bool(is_u.any()):
@@ -3787,11 +3814,12 @@ class BatchSim:
             & ok
         )
 
-    def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int) -> None:
+    def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int) -> torch.Tensor:
         """C1-B5b: spawn a rival BUILDER — the civilian twin of _spawn_rival
-        (rciv blocking; charges seeded from the roster like the player's)."""
+        (rciv blocking; charges seeded from the roster like the player's).
+        Returns the LANDED mask (P5/S8: purchases refund on no spawn spot)."""
         if not bool(mask.any()):
-            return
+            return torch.zeros_like(mask)
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
         okc = cand7.clamp(min=0)
         ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~self._blocked_for(cand7, "rciv", civ=civ)
@@ -3799,7 +3827,7 @@ class BatchSim:
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         can = mask & (first < 7)
         if not bool(can.any()):
-            return
+            return can
         rows = can.nonzero(as_tuple=True)[0]
         slot = self.v_next[rows]
         assert int(slot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
@@ -3811,6 +3839,7 @@ class BatchSim:
         self.v_charges[rows, slot] = self._p_charges[self._builder_idx]
         self.rvciv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
+        return can
 
     def _rival_builder_actions(self, r: int, active: torch.Tensor, techs0: torch.Tensor | None = None, civics0: torch.Tensor | None = None) -> None:
         """C1-B5b: mirrors rivalBuilderActions — per builder (slot order =
@@ -3905,7 +3934,7 @@ class BatchSim:
                 self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(move, dest, civ=self.v_civ[:, u])  # P5/S7 (C-3): mirrors walkPath's any-unit clear
 
-    def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
         defaultModifiers). Candidates = owned, citizen-workable (water yes,
         impassable no), non-district tiles in the work radius — district/
@@ -4086,6 +4115,17 @@ class BatchSim:
                         adjc_sy = self._adj_district_count().to(self.dtype)
                         hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # P5/S6 (C-20): the amenity tier scales the non-food columns like
+        # computeCityStats (rivalCityYields tail). External callers re-rank
+        # FRESH; the phase loop passes its loop-top frozen factors. The
+        # CALLER's citizen science/culture terms stay unscaled — TS adds
+        # them outside rivalCityYields (a spec quirk, mirrored).
+        yf = amen_yf if amen_yf is not None else self._rival_amenity(r)[2][:, j]
+        prod = prod * yf
+        sci = sci * yf
+        cul = cul * yf
+        gold = gold * yf
+        faith = faith * yf
         z = torch.zeros_like(food)
         return (
             torch.where(mask, food, z),
@@ -4095,6 +4135,80 @@ class BatchSim:
             torch.where(mask, gold, z),
             torch.where(mask, faith, z),
         )
+
+    def _rival_amenity(self, r: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """P5/S6 (C-20): rivalAmenityTiers — each UNIQUE improved luxury on
+        THIS civ's territory grants +1 to its luxAmenityCities neediest
+        cities (need desc, slot asc = rc.id acquisition order); tier from
+        have − needed with have = local building amenities (no Palace, no
+        regional/policy sources — rivals can't build them). Returns
+        (tier_idx, growth_f, yield_f), each [B, RC]."""
+        B, RC = self.B, self.RC
+        rd = self.rules_dev
+        have = torch.einsum("bjn,n->bj", self.rc_bldg[:, r].to(torch.float64), rd.b_amenities.double())
+        need = torch.ceil((self.rc_pop[:, r].double() - 2) / 2).clamp(min=0)
+        out = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
+        alive = self.rc_alive[:, r]
+        if self._n_lux > 0 and self.improvements_on:
+            improved = (self.lux_id >= 0) & (self.rival_at == r) & (self.improvement == self.lux_req)
+            counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
+            counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
+            rounds = (counts > 0).long().sum(dim=1)
+            mx = int(rounds.max().item())
+            slot = torch.arange(RC, device=self.device, dtype=torch.float64).view(1, RC)
+            k = min(self._lux_k, RC)
+            for rnd in range(mx):
+                act = rounds > rnd
+                needr = need - (have + out)
+                key = torch.where(alive, needr * 64 - slot, torch.full_like(needr, -1e9))
+                top_v, top_i = key.topk(k, dim=1)
+                grant = (top_v > -1e8) & act.unsqueeze(1)
+                out.scatter_add_(1, top_i, grant.to(torch.float64))
+        balance = have + out - need
+        growth_f, yield_f = self._amenity_factors(balance)
+        tier_idx = torch.full_like(self.rc_pop[:, r], len(self.rules.amenity_tiers) - 1)
+        for i in reversed(range(len(self.rules.amenity_tiers))):
+            tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
+        return tier_idx, growth_f.double(), yield_f.double()
+
+    def _transfer_rc_to_rc(self, b: int, r_from: int, j: int, r_to: int) -> None:
+        """P5/S6 (C-19): a loyalty flip between rivals — pop ×0.75 floor 1,
+        fresh boxes, CITY_CENTER-only registry, half HP, territory within
+        the work radius re-tags (the transferRivalCityToRival mirror). The
+        loser slot dies with full queue/registry hygiene (the S5 lesson)."""
+        c_t = int(self.rc_center[b, r_from, j])
+        old_pop = int(self.rc_pop[b, r_from, j])
+        old_acq = int(self.rc_acquired[b, r_from, j])
+        self.rc_alive[b, r_from, j] = False
+        self.rc_dist_tile[b, r_from, j, :] = -1
+        self.rc_bldg[b, r_from, j, :] = False
+        self.rc_current[b, r_from, j] = -1
+        self.rc_cost[b, r_from, j] = 0
+        self.rc_progress[b, r_from, j] = 0
+        self.rc_qtile[b, r_from, j] = -1
+        own_t = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r_from)
+        self.rival_at[b] = torch.where(own_t, torch.full_like(self.rival_at[b], r_to), self.rival_at[b])
+        occ = self.rc_alive[b, r_to].nonzero(as_tuple=True)[0]
+        slot = int(occ.max()) + 1 if len(occ) else 0
+        assert slot < self.RC, "rival city slots exhausted - raise RC"
+        self.rc_alive[b, r_to, slot] = True
+        self.rc_center[b, r_to, slot] = c_t
+        self.rc_pop[b, r_to, slot] = max(1, (old_pop * 3) // 4)
+        self.rc_growth[b, r_to, slot] = 0
+        self.rc_cbox[b, r_to, slot] = 0
+        self.rc_loyalty[b, r_to, slot] = 100.0
+        self.rc_acquired[b, r_to, slot] = old_acq
+        self.rc_hp[b, r_to, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
+        self.rc_current[b, r_to, slot] = -1
+        self.rc_progress[b, r_to, slot] = 0
+        self.rc_cost[b, r_to, slot] = 0
+        self.rc_qtile[b, r_to, slot] = -1
+        self.rc_dist_tile[b, r_to, slot, :] = -1
+        self.rc_bldg[b, r_to, slot, :] = False
+        self.rc_id[b, r_to, slot] = int(self.r_next_city_id[b, r_to])
+        self.r_next_city_id[b, r_to] += 1
+        self.rvcity_at[b, c_t] = r_to
+        self._eff_version += 1
 
     def _rival_border_growth(self, r: int, j: int, cact: torch.Tensor, cul_c: torch.Tensor) -> None:
         """P5/S4 (C-15): the player's cultural border growth for rc slot j —
@@ -4244,6 +4358,7 @@ class BatchSim:
         self.rc_pop[rows, r, slot] = 1
         self.rc_growth[rows, r, slot] = 0
         self.rc_cbox[rows, r, slot] = 0  # P5/S4
+        self.rc_loyalty[rows, r, slot] = 100.0  # P5/S6
         self.rc_acquired[rows, r, slot] = 0
         self.rc_hp[rows, r, slot] = rrr.get("cityMaxHp", 200)
         self.rc_current[rows, r, slot] = -1
@@ -4799,12 +4914,46 @@ class BatchSim:
             cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)  # VP-G1
             faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)  # P5/S5 (C-17)
+            # P5/S6: the amenity map freezes at the loop top (the player's
+            # luxMap discipline) — loyalty, growth and yields read it.
+            amen_tidx, amen_gf, amen_yf = self._rival_amenity(r)
+            rc_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
             heal = torch.where(self.r_atwar[:, r], 5, 15)
             for j in range(self.RC):
                 cact = active & alive0[:, j]
                 if not bool(cact.any()):
                     continue
-                food, prod, sci, cul, gold_y, faith_y = self._rival_city_yields(r, j, cact)
+                # P5/S6 (C-19): rival city loyalty at the loop top (the TS
+                # position, before yields/growth) — own = THIS civ, foreign
+                # = the player + every other rival; LIVE pops (earlier slots
+                # in this loop already grew — the natural TS mid-loop mirror);
+                # the capital (slot 0 — transfers can never land there while
+                # any city lives) is immune.
+                if j == 0:
+                    self.rc_loyalty[:, r, 0] = torch.where(cact, torch.full_like(self.rc_loyalty[:, r, 0], 100.0), self.rc_loyalty[:, r, 0])
+                else:
+                    lrng = int(rr.get("loyaltyRange", 9))
+                    lscale = float(rr.get("loyaltyScale", 20))
+                    here_j = self.rc_center[:, r, j].clamp(min=0)
+                    d_own = self.pair_dist[here_j.unsqueeze(1), self.rc_center[:, r].clamp(min=0)].to(torch.float64)
+                    own_p = ((lrng + 1 - d_own).clamp(min=0) * self.rc_pop[:, r].double() * self.rc_alive[:, r].double()).sum(dim=1)
+                    d_pl = self.pair_dist[here_j.unsqueeze(1), self.site.clamp(min=0)].to(torch.float64)
+                    for_p = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1)
+                    others = self.alive.any(dim=1)
+                    for r2 in range(self.R):
+                        if r2 == r:
+                            continue
+                        d_o = self.pair_dist[here_j.unsqueeze(1), self.rc_center[:, r2].clamp(min=0)].to(torch.float64)
+                        for_p = for_p + ((lrng + 1 - d_o).clamp(min=0) * self.rc_pop[:, r2].double() * self.rc_alive[:, r2].double()).sum(dim=1)
+                        others = others | self.rc_alive[:, r2].any(dim=1)
+                    tot_p = own_p + for_p
+                    press = torch.where(tot_p > 0, lscale * (own_p - for_p) / tot_p.clamp(min=1e-9), torch.zeros_like(tot_p))
+                    delta_l = press + self._loyalty_amenity[amen_tidx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
+                    upd_l = cact & others
+                    nxt_l = (self.rc_loyalty[:, r, j] + delta_l).clamp(min=0, max=float(rr.get("loyaltyMax", 100)))
+                    self.rc_loyalty[:, r, j] = torch.where(upd_l, nxt_l, self.rc_loyalty[:, r, j])
+                    rc_flip[:, j] = upd_l & (self.rc_loyalty[:, r, j] <= 0)
+                food, prod, sci, cul, gold_y, faith_y = self._rival_city_yields(r, j, cact, amen_yf=amen_yf[:, j])
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
                 # C1-B3a: tile/center columns plus the citizens' contribution.
                 # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
@@ -4848,7 +4997,7 @@ class BatchSim:
                 head_j = housing_j - self.rc_pop[:, r, j].double()
                 hfac = torch.where(head_j >= 2, torch.ones_like(head_j), torch.where(head_j >= 1, torch.full_like(head_j, 0.5), torch.full_like(head_j, 0.25)))
                 surplus = food - self.rules.food_per_citizen * self.rc_pop[:, r, j].double()
-                self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac, surplus), self.rc_growth[:, r, j])
+                self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j], surplus), self.rc_growth[:, r, j])
                 p64 = self.rc_pop[:, r, j].double()
                 need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
                 grow = cact & (self.rc_growth[:, r, j] >= need)
@@ -4899,6 +5048,38 @@ class BatchSim:
                 self.rc_hp[:, r, j] = torch.where(
                     cact, (self.rc_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.rc_hp[:, r, j]
                 )
+
+            # P5/S6 (C-19): loyalty collapses resolve after the city loop —
+            # to the max-pressure civ (the PLAYER first on ties, then rivals
+            # by id: first_argmax over [player, r0, r1...]); the reverse
+            # transfer reuses the capture machinery WITHOUT plunder.
+            if bool(rc_flip.any()):
+                lrng = int(rr.get("loyaltyRange", 9))
+                for j2 in range(1, self.RC):
+                    fl = rc_flip[:, j2] & self.rc_alive[:, r, j2]
+                    if not bool(fl.any()):
+                        continue
+                    here_j = self.rc_center[:, r, j2].clamp(min=0)
+                    d_pl = self.pair_dist[here_j.unsqueeze(1), self.site.clamp(min=0)].to(torch.float64)
+                    p_pl = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1)
+                    press_all = [p_pl]
+                    for r2 in range(self.R):
+                        if r2 == r:
+                            press_all.append(torch.full_like(p_pl, -1.0))
+                        else:
+                            d_o = self.pair_dist[here_j.unsqueeze(1), self.rc_center[:, r2].clamp(min=0)].to(torch.float64)
+                            press_all.append(((lrng + 1 - d_o).clamp(min=0) * self.rc_pop[:, r2].double() * self.rc_alive[:, r2].double()).sum(dim=1))
+                    winner = first_argmax(torch.stack(press_all, dim=1))  # 0 = the player
+                    for b in fl.nonzero(as_tuple=True)[0].tolist():
+                        w_ = int(winner[b])
+                        if w_ == 0:
+                            self._capture_rival_city(
+                                torch.tensor([b], device=dev), torch.tensor([r], device=dev),
+                                torch.tensor([j2], device=dev), self.rc_center[b, r, j2].view(1),
+                                plunder=False,
+                            )
+                        else:
+                            self._transfer_rc_to_rc(b, r, j2, w_ - 1)
 
             n_cities2 = self.rc_alive[:, r].sum(dim=1)
 
@@ -5208,6 +5389,7 @@ class BatchSim:
         self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
         self.rc_growth[b, w_, slot] = 0
         self.rc_cbox[b, w_, slot] = 0  # P5/S4 (TS transfer: cultureBox 0)
+        self.rc_loyalty[b, w_, slot] = 100.0  # P5/S6
         self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
         self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
         self.rc_id[b, w_, slot] = int(self.r_next_city_id[b, w_])

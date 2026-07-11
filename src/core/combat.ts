@@ -383,8 +383,10 @@ export function captureCityState(state: GameState, cs: CityState): void {
   state.eventLog.push(`${cs.name} conquered — the city-state joins your empire.`);
 }
 
-/** Conquest: the rival city joins your empire (pop hit, no districts kept). */
-export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity): void {
+/** Conquest: the rival city joins your empire (pop hit, no districts kept).
+ * P5/S6: `plunder=false` for loyalty defections — same raze-at-6, territory
+ * and elimination semantics, no +40 and no conquest log line. */
+export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity, plunder = true): void {
   rival.cities = rival.cities.filter((c) => c.id !== city.id);
   const center = state.map.tiles[city.centerIndex];
   // V-W2 slot cap (mirrors the GPU's fixed city slots): a full empire
@@ -426,8 +428,10 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   });
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, city.centerIndex, 3);
-  state.treasury += 40;
-  state.eventLog.push(`${city.name} captured from ${rival.name}!`);
+  if (plunder) {
+    state.treasury += 40;
+    state.eventLog.push(`${city.name} captured from ${rival.name}!`);
+  }
   // Losing a city stings: the war ends if it was their last, else they fight on.
   if (rival.cities.length === 0) {
     rival.atWar = false;

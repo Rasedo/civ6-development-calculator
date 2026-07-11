@@ -7,11 +7,12 @@ P4 93efb76 = old §D fully closed, P5-S1 3b30b8f, S7 e5569a5, S2 ab0c19c,
 S3 9a1b073, S4 b44aff5) and in the session memory. Line numbers cite the
 code at audit time.
 
-**Ladder state:** P1–P4 done. P5 (task #31) nearly done — S5 landing
-(GP overflow/effects, faith pantheons, prophet religion + 3 hunted latents:
-stale rc queue at capture, luxury-tie city_seq, post-walk fresh stats);
-S6 (rival loyalty + amenities) and S8 (controlled purchase revalidation)
-in flight as one combined stage. Then P6 (#23), P7 (#24), P8 (#26).
+**Ladder state:** P1–P5 DONE (task #31 closed 2026-07-11: S1 economy,
+S7 camps/raze, S2 peace+settler purchase, S3 founding, S4 culture
+borders, S5 GP/faith/religion, S6 loyalty+amenities, S8 controlled
+revalidation — ~25 hunted latent parity bugs across the batch).
+Next: P6 (#23), P7 (#24), P8 (#26), then ONE re-baseline pass and the
+champion campaign.
 
 ---
 
@@ -20,17 +21,8 @@ in flight as one combined stage. Then P6 (#23), P7 (#24), P8 (#26).
 Rivals must be full-fidelity symmetric agents — same formulas, same
 available actions; only the decision policy may differ. Confirmed open:
 
-**In flight (S6/S8):**
-- A-1. Rivals lack loyalty (one-directional: player cities defect to
-  rivals, never the reverse) and the amenity tier model (no luxury
-  ranking, no tier yield/growth factors) — rivals.ts:322-376 player-only;
-  rivalCityYields applies no factors. → S6.
-- A-2. GPU controlled-rival purchase apply skips the building district
-  prerequisite (engine.py ~3681) and deducts treasury even when a unit
-  spawn finds no tile (TS refunds; the settler branch next to it refunds
-  correctly — inconsistent). → S8.
-
-**Open, ranked by impact:**
+**Open, ranked by impact** (A-1 loyalty/amenities and A-2 controlled
+revalidation LANDED in the S6+S8 close):
 - A-3. **Rivals get no eureka/inspiration discounts** — player pays 60%
   on boosted research (game.ts:42-46), rivals raw cost (rivals.ts:1082,
   1111; rival.research.boosted never populated; GPU boosted all-False).
@@ -162,6 +154,12 @@ None gate-caught yet, but every reshuffle hunts one of these:
   RC is untraceable in TS terms (documented at the capture sites).
 - C-6. res_stripped plane (bonus-resource tile picks) — enabling work
   parked since P2.
+- C-7. camp_ok is STATIC but TS campCandidates has two LIVE terms: paved
+  districts (fixed in S6 — the orphaned-pave camp shift, seed 9027 t230)
+  and CONSUMED goody huts (TS re-admits the tile once the hut is taken;
+  the GPU never does — latent, opposite direction). Site statics
+  (site_q3) have the same static-vs-live class for paved/chopped ring
+  members.
 
 ## D. Engine optimizations (bit-exact-safe, ranked)
 

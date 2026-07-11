@@ -10,7 +10,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, clearCampFor } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, clearCampFor, captureRivalCity } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
@@ -41,6 +41,10 @@ import {
   AQUEDUCT_NO_FRESH_TOTAL,
   GAME_SPEED,
   borderGrowthCost,
+  amenitiesNeeded,
+  amenityTier,
+  LUXURY_AMENITY_CITIES,
+  type AmenityTier,
 } from '../data/constants';
 import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority } from './city';
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
@@ -848,10 +852,50 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
   return total;
 }
 
+/** P5/S6 (C-20): the player's amenity model per rival civ — each UNIQUE
+ * improved luxury on ITS territory grants +1 amenity to its
+ * LUXURY_AMENITY_CITIES neediest cities (need desc, id asc = acquisition
+ * order — the luxuryAmenities mirror); tier = amenityTier(have − needed)
+ * with have = local building amenities + grants. Regional/policy amenity
+ * sources are player machinery (rivals can't build them; no Palace). */
+export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number, AmenityTier> {
+  const grants = new Map<number, number>();
+  for (const rc of rival.cities) grants.set(rc.id, 0);
+  const luxuries = new Set<string>();
+  for (const t of state.map.tiles) {
+    if (!t.resource || (t.rivalId ?? -1) !== rival.id) continue;
+    const def = RESOURCES[t.resource];
+    if (def.category === 'luxury' && t.improvement === def.improvement) luxuries.add(t.resource);
+  }
+  const baseHave = new Map<number, number>();
+  for (const rc of rival.cities) {
+    let n = 0;
+    for (const id of rc.buildings) {
+      const bd = BUILDINGS[id];
+      if (bd && !bd.regional && bd.amenities) n += bd.amenities;
+    }
+    baseHave.set(rc.id, n);
+  }
+  for (let i = 0; i < luxuries.size; i++) {
+    const ranked = [...rival.cities].sort((a, b) => {
+      const needA = amenitiesNeeded(a.population) - (baseHave.get(a.id)! + grants.get(a.id)!);
+      const needB = amenitiesNeeded(b.population) - (baseHave.get(b.id)! + grants.get(b.id)!);
+      return needB - needA || a.id - b.id;
+    });
+    for (const rc of ranked.slice(0, LUXURY_AMENITY_CITIES)) grants.set(rc.id, grants.get(rc.id)! + 1);
+  }
+  const tiers = new Map<number, AmenityTier>();
+  for (const rc of rival.cities) {
+    tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! - amenitiesNeeded(rc.population)));
+  }
+  return tiers;
+}
+
 export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
   rc: RivalCity,
+  tier?: AmenityTier,
 ): Yields {
   // C1-B1: the REAL citizen path, under defaultModifiers (rivals get no
   // player techs/policies). Candidates mirror workableTiles — owned tiles
@@ -922,7 +966,81 @@ export function rivalCityYields(
       }
     }
   }
+  // P5/S6 (C-20): the amenity tier scales non-food yields, exactly like
+  // computeCityStats. External callers (score/statelog) re-rank FRESH;
+  // the phase loop passes its loop-top frozen map — the player's luxMap
+  // discipline.
+  const t = tier ?? rivalAmenityTiers(state, rival).get(rc.id) ?? amenityTier(0);
+  for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as (keyof Yields)[]) {
+    total[k] *= t.yieldFactor;
+  }
   return total;
+}
+
+/** P5/S6 (C-19): a rival city at 0 loyalty defects to the civ exerting the
+ * most pressure — the PLAYER included (the reverse transfer at last; the
+ * player wins ties, then rivals by id — the GPU's first_argmax order). */
+function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void {
+  const here = state.map.tiles[rc.centerIndex];
+  const pressureOf = (cities: { centerIndex: number; population: number }[]) => {
+    let p = 0;
+    for (const c of cities) {
+      const t = state.map.tiles[c.centerIndex];
+      const d = hexDistance(here.col, here.row, t.col, t.row);
+      if (d <= LOYALTY_RANGE) p += c.population * (LOYALTY_RANGE + 1 - d);
+    }
+    return p;
+  };
+  let winner: RivalCiv | null = null; // null = the player
+  let best = pressureOf(state.cities);
+  for (const other of state.rivals) {
+    if (other.id === rival.id) continue;
+    const p = pressureOf(other.cities);
+    if (p > best) {
+      best = p;
+      winner = other;
+    }
+  }
+  if (winner === null) {
+    // The reverse transfer: the capture machinery minus the conquest
+    // plunder (raze-at-6 and last-city elimination semantics shared).
+    captureRivalCity(state, rival, rc, false);
+    state.eventLog.push(`${rc.name} defected to your empire!`);
+  } else {
+    transferRivalCityToRival(state, rival, winner, rc);
+  }
+}
+
+/** The rc → rc transfer (loyalty flips between rivals): pop ×0.75 floor 1,
+ * fresh boxes, CITY_CENTER-only registry, half HP, territory re-tags —
+ * the transferCityToRival shape on the rival side. */
+function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
+  from.cities = from.cities.filter((c) => c.id !== rc.id);
+  const center = state.map.tiles[rc.centerIndex];
+  for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
+    if (tileOwnedByCiv(t, civOfRival(from.id))) t.rivalId = to.id;
+  }
+  to.cities.push({
+    id: to.nextCityId++,
+    name: rc.name,
+    civId: civOfRival(to.id),
+    centerIndex: rc.centerIndex,
+    population: Math.max(1, Math.floor(rc.population * 0.75)),
+    foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: rc.tilesAcquired,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: rc.centerIndex }],
+    wonders: [],
+    specialists: {},
+    hp: Math.round(RIVAL_CITY_MAX_HP / 2),
+    foundedTurn: state.turn,
+  });
+  state.eventLog.push(`${rc.name} defected from ${from.name} to ${to.name}!`);
 }
 
 export function rivalPhase(state: GameState): void {
@@ -994,8 +1112,48 @@ export function rivalPhase(state: GameState): void {
     let culSum = 0;
     let goldSum = 0;
     let faithSum = 0;
+    // P5/S6 (C-20): the amenity map freezes at the loop top (the player's
+    // luxMap discipline) — loyalty, growth and yields all read this turn's
+    // tiers; defections resolve after the loop (the player pattern).
+    const amenTiers = rivalAmenityTiers(state, rival);
+    const rcDefectors: RivalCity[] = [];
     for (const rc of [...rival.cities]) {
-      const y = rivalCityYields(state, rival, rc);
+      const tier = amenTiers.get(rc.id) ?? amenityTier(0);
+      // P5/S6 (C-19): rival city loyalty at the loop top (the player's
+      // applyLoyalty position) — own = THIS civ's cities, foreign = the
+      // player's + every other rival's; capitals are immune; live pops
+      // (earlier cities in this loop already grew — the player's mix).
+      if (rc.isCapital) {
+        rc.loyalty = LOYALTY_MAX;
+      } else if (state.cities.length > 0 || state.rivals.some((o) => o.id !== rival.id && o.cities.length > 0)) {
+        const here = state.map.tiles[rc.centerIndex];
+        let own = 0;
+        let foreign = 0;
+        for (const c2 of rival.cities) {
+          const t2 = state.map.tiles[c2.centerIndex];
+          const d = hexDistance(here.col, here.row, t2.col, t2.row);
+          if (d <= LOYALTY_RANGE) own += c2.population * (LOYALTY_RANGE + 1 - d);
+        }
+        for (const c2 of state.cities) {
+          const t2 = state.map.tiles[c2.centerIndex];
+          const d = hexDistance(here.col, here.row, t2.col, t2.row);
+          if (d <= LOYALTY_RANGE) foreign += c2.population * (LOYALTY_RANGE + 1 - d);
+        }
+        for (const other of state.rivals) {
+          if (other.id === rival.id) continue;
+          for (const c2 of other.cities) {
+            const t2 = state.map.tiles[c2.centerIndex];
+            const d = hexDistance(here.col, here.row, t2.col, t2.row);
+            if (d <= LOYALTY_RANGE) foreign += c2.population * (LOYALTY_RANGE + 1 - d);
+          }
+        }
+        const pressure =
+          own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
+        const next = (rc.loyalty ?? LOYALTY_MAX) + pressure + (LOYALTY_AMENITY[tier.name] ?? 0);
+        rc.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
+        if (rc.loyalty <= 0) rcDefectors.push(rc);
+      }
+      const y = rivalCityYields(state, rival, rc, tier);
       // P5/S1 (C-12): rivals pay district+building upkeep like the player's
       // computeCityStats (completed districts only; same maintenance tables).
       goldSum += y.gold - rivalCityMaintenance(state, rc);
@@ -1017,7 +1175,10 @@ export function rivalPhase(state: GameState): void {
       // housing that makes growth survivable.
       const surplus = food - FOOD_PER_CITIZEN * rc.population;
       const hFactor = housingGrowthFactor(rivalHousing(state, rival, rc) - rc.population);
-      rc.foodBox += surplus > 0 ? surplus * hFactor : surplus;
+      // P5/S6 (C-20): the tier's growth factor rides the housing factor,
+      // exactly like computeCityStats' effective surplus (no empire/policy
+      // mults — those are player machinery).
+      rc.foodBox += surplus > 0 ? surplus * hFactor * tier.growthFactor : surplus;
       const need = growthFoodNeeded(rc.population);
       if (rc.foodBox >= need) {
         rc.population += 1;
@@ -1066,6 +1227,10 @@ export function rivalPhase(state: GameState): void {
       }
       rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
     }
+
+    // P5/S6 (C-19): loyalty collapses resolve after the city loop (they
+    // mutate the list) — to the max-pressure civ; the PLAYER can win one.
+    for (const rc of rcDefectors) defectRivalCity(state, rival, rc);
 
     // C1-B3a: REAL research — cheapest-first auto-pick at RAW cost (no
     // eurekas for rivals until B6; ties keep the tech-table order via the

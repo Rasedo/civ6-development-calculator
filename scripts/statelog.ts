@@ -57,6 +57,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   for (const u of state.units) if (u.owner === 'barbarian')
     barbActed.set(u.tileIndex, (barbActed.get(u.tileIndex) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));
   for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)} a${barbActed.get(tile)}`);
+  // barb CAMPS (P5/S6 hunt: locations were invisible — the count-only trace)
+  for (const c of state.barbCamps) L.push(`${p}CA ${c} = 1`);
 
   const rv = new Map<string, number>();
   const rvHp = new Map<string, number>();
@@ -111,7 +113,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     );
     for (const rc of rival.cities) {
       const ry = rivalCityYields(state, rival, rc);
-      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} hp${rc.hp} cb${Math.round(rc.cultureBox*1000)} til${rc.tilesAcquired} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
+      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} hp${rc.hp} loy${Math.round((rc.loyalty ?? 100)*1000)} cb${Math.round(rc.cultureBox*1000)} til${rc.tilesAcquired} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
     }
   }
   return L;
