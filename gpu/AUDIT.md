@@ -234,39 +234,40 @@ None gate-caught yet, but every reshuffle hunts one of these:
 
 ## F. Hunt tooling (current, for reference)
 
-**BACKLOG (owner idea, 2026-07-11): snapshot-resume gate.** `rollout.py
---snapshot-at <T>` dumps the WHOLE 72-game batch state (GPU _MUTABLE +
-per-game TS serialize()) at the last non-divergent turn; `--resume-from`
-re-simulates T..250 in ~seconds per iteration instead of ~190s. Rules:
-full-batch snapshots only (BLAS association is batch-shape-dependent);
-the resume check clears THE HUNTED divergence but can false-green fixes
-with pre-T silent effects — the pre-commit bar stays the FULL BATTERY
-(whose gpu-gate lane IS the full gate; never chain a standalone gate
-then the battery on the same code — the gate is the battery's critical
-path, so that near-doubles the cost for zero information). Highest
-value on late-turn failures (t200+ ≈ 20× faster iterations).
-
-**BACKLOG (owner idea, 2026-07-12): always-on statelogs — TWO-TIER.**
-Today a gate failure costs a ~4-6 min re-simulation of all 72 games
-JUST to produce the statelog pair (the single biggest P5 hunt overhead,
-~10 reruns). Naive always-on is a trap on the TS side: tsStateLines
-RECOMPUTES derived state every turn (fresh computeCityStats ×6 + its
-empireScore twin, rivalCityYields ×RC + rivalEmpireScore — each with
-full-map luxury/amenity re-rankings since D-13/S6) ≈ 5-15ms/turn/game
-→ +2-4 min on the replay lane EVERY run for all 72 games; buffering
-doesn't help (lines can't be produced retroactively — the cost is the
-computation, not the write), and reusing endTurn's internal stats would
-log frozen-map values, blinding the log to the fresh-vs-frozen class
-that caught seed 9183. THE DESIGN: tier 1 = the DIRECT-READ fields only
-(pop/hp/acted/loy/cb/co/pr/tsum/CA/positions/counts — traceRow-cheap,
-they pinned ~80% of P5's hunts), always-on for all games on both sides
-(GPU side vectorized — one .tolist() per tensor per turn), transient
-gitignored dir, overwritten per run; tier 2 = the derived yield/score
-fields via the existing --log rerun, only when tier 1 localizes but
-can't explain (~1 hunt in 5). Failure→diff ≈ 0 for most hunts at
-near-zero always-on cost. Logging is pure reads — no parity risk.
-Composes with the snapshot-resume gate: this removes the DIAGNOSIS
-rerun, that removes the VERIFICATION rerun.
+**BACKLOG (owner design, 2026-07-11/12): RAW CHECKPOINTS — one
+mechanism for diagnosis AND verification.** Today a gate failure costs
+a ~4-6 min re-simulation of all 72 games just to produce the statelog
+pair (the biggest P5 hunt overhead, ~10 reruns), and fix-verification
+re-simulates from t0. The design (supersedes the earlier separate
+snapshot-resume + two-tier-statelog notes):
+- Every normal gate run dumps RAW state checkpoints every K turns
+  (K≈25) for ALL games into a transient gitignored dir, overwritten per
+  run: TS = serialize(state) per game (~1-3ms each — every-turn would
+  cost +40-60s/run, K=25 makes it ~2s); GPU = the _MUTABLE tensor set
+  (the MCTS snapshot machinery; ~15-20MB/turn full-batch → ~200MB/run
+  at K=25). Disk throughput is a non-issue; the costs are stringify CPU
+  and tensor volume, both ÷K.
+- RAW state has NO frozen-vs-fresh ambiguity (that only afflicts logged
+  DERIVED values — the luxury-map choice lives in the computation, not
+  the data). A JIT diff tool loads both engines' checkpoints at turn t
+  and runs the EXISTING tsStateLines/gpu_state_lines on the loaded
+  states — any current or future field, computed on demand with
+  whichever semantics the investigation needs; new diagnostics = new
+  readers over old dumps, not engine changes + reruns.
+- Determinism + the saved action log make every turn reachable: binary-
+  search checkpoints for the first divergent one (~8 loads), replay
+  forward ≤K turns single-game computing full lines JIT. Diagnosis ≈
+  under a minute, zero full re-simulation.
+- The same checkpoints ARE the resume points for fix-verification:
+  resume the full batch from the last-common checkpoint (full-batch
+  only — BLAS association is batch-shape-dependent; resume checks clear
+  the hunted divergence but can false-green fixes with pre-checkpoint
+  effects — the pre-commit bar stays the FULL BATTERY, whose gpu-gate
+  lane IS the gate; never chain a standalone gate then the battery on
+  the same code).
+- What checkpoints canNOT replace: intra-turn EVENTS (the CB combat-
+  roll log stays — draws aren't reconstructible from end-of-turn
+  state) and mid-turn transients (rare targeted probes, as today).
 
 Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
 `CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
