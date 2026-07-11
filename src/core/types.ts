@@ -320,6 +320,10 @@ export interface RivalCiv {
   religionFounded: boolean;
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   treasury?: number;
+  /** P5/S5 (C-17): banked faith — the pantheon's consumer. */
+  faith?: number;
+  /** P5/S5 (C-16): PROPHET-class great people this civ claimed (religion gate). */
+  prophets?: number;
   /** P4/D-10: this civ's builders ever trained (its own cost escalator). */
   buildersTrained?: number;
   /** P4/D-22: this civ's strongest melee unit ever fielded (city defense). */

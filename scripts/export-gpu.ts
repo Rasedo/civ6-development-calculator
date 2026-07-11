@@ -48,14 +48,12 @@ import {
   CS_MAX_HP,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEON_FAITH_COST } from '../src/data/religion';
 import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
   RIVAL_GPP_RATE,
-  RIVAL_PANTHEON_TURN,
-  RIVAL_RELIGION_TURN,
   RIVAL_WAR_MIN_TURNS,
   RIVAL_CITY_MAX_HP,
   RIVAL_WORK_RADIUS,
@@ -371,8 +369,10 @@ const rules = {
     settlerPer: Math.round(30 * GAME_SPEED),
     // (P5/S4: borderPeriod died — rival borders grow on culture.)
     gppRate: RIVAL_GPP_RATE,
-    pantheonTurn: RIVAL_PANTHEON_TURN,
-    religionTurn: RIVAL_RELIGION_TURN,
+    // P5/S5: the timed claims died — the pantheon costs faith, religion
+    // gates on pantheon + Holy Site + an earned PROPHET-class person.
+    pantheonFaithCost: PANTHEON_FAITH_COST,
+    prophetCls: GP_CLASSES.indexOf('PROPHET'),
     warMinTurns: RIVAL_WAR_MIN_TURNS,
     // Player diplomacy (V-W1): sueForPeace gates on warTurns >= peaceMinWarTurns
     // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
@@ -413,7 +413,9 @@ const rules = {
     // rivalPhase first, then the player), so only classDistrict + effects are new.
     gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
     gpEffects: GP_CLASSES.map((c) =>
-      GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0]),
+      // P5/S5: col 4 = faith (Prophets) — the rival pantheon's funding; the
+      // player's GPU faith stays unmodeled (no consumer — worship is TS-only).
+      GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0, p.effect.faith ?? 0]),
     ),
     pantheonPool: Object.keys(PANTHEONS).length,
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,

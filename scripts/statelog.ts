@@ -103,9 +103,10 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     const pop = rival.cities.reduce((a, rc) => a + rc.population, 0);
     const rt = state.map.tiles.filter((t) => t.rivalId === rival.id);
     L.push(
-      `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} ` +
+      `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} fai${Math.round((rival.faith ?? 0)*1000)} ` +
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0} ` +
         `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length} ` +
+        `tsum:${rt.reduce((s, t) => s + t.index, 0)} ` +
         `rsc:${Math.round(rivalEmpireScore(state, rival) * 1000)}`,
     );
     for (const rc of rival.cities) {

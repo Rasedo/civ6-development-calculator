@@ -35,10 +35,9 @@ export const RIVAL_SETTLER_COST = (cities: number) =>
 // the player's, rc.cultureBox vs borderGrowthCost.)
 /** Great-person points per class per turn per city. */
 export const RIVAL_GPP_RATE = 0.35;
-/** Turn a rival claims its pantheon (staggered by rival id). */
-export const RIVAL_PANTHEON_TURN = 18;
-/** Turn a rival founds a religion, claiming beliefs (staggered). */
-export const RIVAL_RELIGION_TURN = 45;
+// (P5/S5: RIVAL_PANTHEON_TURN / RIVAL_RELIGION_TURN died — the pantheon
+// costs PANTHEON_FAITH_COST from the rival's own faith, and religion needs
+// the player's gates: pantheon + completed Holy Site + an earned Prophet.)
 /** Auto-peace becomes possible after this many war turns. */
 export const RIVAL_WAR_MIN_TURNS = 14;
 /** The player may sue for peace after this many war turns. */

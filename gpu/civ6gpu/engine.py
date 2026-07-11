@@ -315,7 +315,7 @@ _MUTABLE = [
     "rival_at", "rvcity_at", "rv_at",
     "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
-    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "rvciv_at", "v_charges",
+    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
@@ -519,6 +519,8 @@ class BatchSim:
         self.rc_bldg = torch.zeros(B, r_pad, rc_pad, max(len(rules.b_cost), 1), dtype=torch.bool, device=device)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
+        self.r_faith = torch.zeros(B, r_pad, dtype=torch.float64, device=device)  # P5/S5 (C-17): the pantheon's funding
+        self.r_prophets = torch.zeros(B, r_pad, dtype=torch.long, device=device)  # P5/S5 (C-16): religion gate
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.r_gpp = torch.zeros(B, r_pad, n_gp, dtype=torch.float64, device=device)
         # P4/D-10: builders ever trained — the player's and each rival's own
@@ -590,7 +592,8 @@ class BatchSim:
         gp_cd = rr.get("gpClassDistrict", [])
         self._gp_class_district = torch.tensor(gp_cd if gp_cd else [-1] * n_gp, dtype=torch.long, device=device)  # [n_gp] all 7 classes
         gp_fx = rr.get("gpEffects", [])
-        self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 4]
+        self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 5] (P5/S5: col 4 = faith)
+        self._prophet_cls = int(rr.get("prophetCls", 3))  # P5/S5: PROPHET's class index
         self._gp_nc = int(self._gp_class_district.numel())
         self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
@@ -962,9 +965,12 @@ class BatchSim:
         improved luxury inside player borders — tile.improvement equals the
         resource's OWN improvement; pillage does NOT suspend it, faithfully —
         grants +1 amenity to the luxAmenityCities NEEDIEST cities. Grants
-        feed back into the ranking (need desc, ties city id == slot asc), and
-        rounds are homogeneous, so only the per-game COUNT of active luxuries
-        matters."""
+        feed back into the ranking (need desc, ties CITY ID asc — the
+        ACQUISITION order, city_seq: P5/S5 gate-catch seed 9183 t164, an
+        equal-need tie between a hole-reused low column and an older high
+        column flipped the grant and both cities' amenity tiers), and
+        rounds are homogeneous, so only the per-game COUNT of active
+        luxuries matters."""
         B, C = self.B, self.C
         out = torch.zeros(B, C, dtype=self.dtype, device=self.device)
         if self._n_lux == 0 or not self.improvements_on:
@@ -976,12 +982,12 @@ class BatchSim:
         mx = int(rounds.max().item())
         if mx == 0:
             return out
-        slot = torch.arange(C, device=self.device, dtype=self.dtype).view(1, C)
+        seq = self.city_seq.to(self.dtype)  # TS tie: a.id − b.id (acquisition order)
         k = min(self._lux_k, C)
         for rnd in range(mx):
             act = rounds > rnd
             need = amen_need - (amen_have + out)
-            key = torch.where(self.alive, need * 64 - slot, torch.full_like(need, -1e9))
+            key = torch.where(self.alive, need * 64 - seq, torch.full_like(need, -1e9))
             top_v, top_i = key.topk(k, dim=1)
             grant = (top_v > -1e8) & act.unsqueeze(1)
             out.scatter_add_(1, top_i, grant.to(self.dtype))
@@ -2522,6 +2528,14 @@ class BatchSim:
             self.rvcity_at[b, c_t] = -1
             self.rc_dist_tile[b, r, j, :] = -1
             self.rc_bldg[b, r, j, :] = False
+            # P5/S5 gate-catch (seed 9157 t111): the dead city's QUEUE dies
+            # with it — a stale rc_current builder code made has_q see a
+            # phantom queued builder civ-wide (TS removes the City object,
+            # queue and all), flipping the next pick builder→horseman.
+            self.rc_current[b, r, j] = -1
+            self.rc_cost[b, r, j] = 0
+            self.rc_progress[b, r, j] = 0
+            self.rc_qtile[b, r, j] = -1
             # territory within radius 3 leaves the rival
             ring = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r)
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
@@ -3527,7 +3541,7 @@ class BatchSim:
                 ok_u[:, self._r_horseman] = self.r_techs[:, r, ho_t]
             if self.improvements_on and self._builder_idx >= 0:
                 has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
-                has_q = (self.rc_current[:, r] == self._builder_idx + 1).any(dim=1)
+                has_q = ((self.rc_current[:, r] == self._builder_idx + 1) & self.rc_alive[:, r]).any(dim=1)  # P5/S5: alive-masked
                 ok_u[:, self._builder_idx] = ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1)
             # scaffold districts: placeable NOW under the B4 gates
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
@@ -4121,7 +4135,11 @@ class BatchSim:
                 boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
                 p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
             y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * fs.unsqueeze(-1)).sum(dim=2)
-            y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc)
+            # P5/S5 gate-catch (seed 9027 t239): tileYields returns ZERO for a
+            # paved tile (yields.ts:37 — an orphaned district from a razed
+            # city can be an unowned candidate, hills base 3 leaked into the
+            # key and out-bid TS's real pick one row over).
+            y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * (self.district.gather(1, tc) < 0).to(torch.float64)
             # the player's exact key: dist asc, res priority desc, milli-
             # rounded yield sum desc, global tile index asc (5601-5610 twin)
             d = self.pair_dist[center.unsqueeze(1), tc].to(self.dtype)
@@ -4248,7 +4266,10 @@ class BatchSim:
         fresh_f = ~self.feat_stripped[rows, s_idx]
         self.feat_stripped[rows, s_idx] = True
         self.improvement[rows, s_idx] = -1
-        self.pillaged[rows, s_idx] = False
+        # P5/S5 gate-catch (seed 9027 t169): foundRivalCity does NOT clear
+        # tile.pillaged — a pillaged farm's flag survives the founding (the
+        # improvement dies, the flag stays; TI lines log it and later
+        # readers see it). Do not mirror the old player-block over-clear.
         contrib = self._feat_adj[rows, s_idx] * fresh_f.unsqueeze(1).to(self._feat_adj.dtype)  # [R, nD]
         nb = self.neigh[s_idx]
         for d in range(6):
@@ -4750,7 +4771,9 @@ class BatchSim:
                 # A builder is a unit — it takes a cap slot like any other.
                 if self.improvements_on and self._builder_idx >= 0 and bool(rem.any()):
                     has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
-                    has_q = (self.rc_current[:, r] == self._builder_idx + 1).any(dim=1)
+                    # alive-masked (P5/S5): dead slots' queues are cleared at
+                    # capture, but never trust a hole
+                    has_q = ((self.rc_current[:, r] == self._builder_idx + 1) & self.rc_alive[:, r]).any(dim=1)
                     want_bd = rem & ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1) & (unit_count < cap)
                     if bool(want_bd.any()):
                         # P4/D-10: the rival's own escalator (one builder per
@@ -4775,12 +4798,13 @@ class BatchSim:
             sci_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             cul_sum = torch.zeros(B, dtype=torch.float64, device=dev)
             gold_sum = torch.zeros(B, dtype=torch.float64, device=dev)  # VP-G1
+            faith_sum = torch.zeros(B, dtype=torch.float64, device=dev)  # P5/S5 (C-17)
             heal = torch.where(self.r_atwar[:, r], 5, 15)
             for j in range(self.RC):
                 cact = active & alive0[:, j]
                 if not bool(cact.any()):
                     continue
-                food, prod, sci, cul, gold_y, _faith_y = self._rival_city_yields(r, j, cact)
+                food, prod, sci, cul, gold_y, faith_y = self._rival_city_yields(r, j, cact)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
                 # C1-B3a: tile/center columns plus the citizens' contribution.
                 # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
@@ -4798,6 +4822,7 @@ class BatchSim:
                 maint_j = (self._d_maint.unsqueeze(0) * d_done.to(torch.float64)).sum(dim=1)
                 maint_j = maint_j + torch.einsum("bn,n->b", self.rc_bldg[:, r, j].to(torch.float64), self.rules_dev.b_maintenance.double())
                 gold_sum = torch.where(cact, gold_sum + (gold_y - maint_j), gold_sum)  # VP-G1 + C-12
+                faith_sum = torch.where(cact, faith_sum + faith_y, faith_sum)  # P5/S5 (C-17)
                 # C1-B1: the real growth accounting — true surplus (can be
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
                 # need, starvation shrinks (pop floor 1, box reset). maxPop
@@ -4890,6 +4915,7 @@ class BatchSim:
             self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
             self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] + gold_sum, self.r_treasury[:, r])  # VP-G1
+            self.r_faith[:, r] = torch.where(active, self.r_faith[:, r] + faith_sum, self.r_faith[:, r])  # P5/S5 (C-17)
             # P5/S1 (C-12): unit upkeep + the GV-5 bankruptcy rule, mirroring
             # the player's exactly (milli-rounded test; disband the
             # priciest-upkeep unit, tie → lowest slot = spawn order; no
@@ -4968,20 +4994,58 @@ class BatchSim:
                 self.r_gpp[:, r, cls] = torch.where(
                     active & (pts > 0), self.r_gpp[:, r, cls] + pts, self.r_gpp[:, r, cls]
                 )
-                has_person = self.gp_earned[:, cls] < self._gp_roster[cls]
-                gcost = self._gp_costs[self.gp_earned[:, cls].clamp(max=self._gp_costs.shape[0] - 1)]
-                hit = active & has_person & (self.r_gpp[:, r, cls] >= gcost)
-                self.r_gpp[:, r, cls] = torch.where(hit, torch.zeros_like(self.r_gpp[:, r, cls]), self.r_gpp[:, r, cls])
-                self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+                # P5/S5 (C-16): the player's while-loop — overflow KEPT
+                # (gpp −= cost, not zeroed) and the person's effect lands
+                # in the RIVAL's own streams (tech/civic progress,
+                # treasury, faith, the capital's build head), mirroring
+                # _advance_player_great_people. PROPHETs gate the religion.
+                maxN = self._gp_effects.shape[1]
+                for _ in range(maxN):
+                    earned_c = self.gp_earned[:, cls]
+                    has_person = earned_c < self._gp_roster[cls]
+                    gcost = self._gp_costs[earned_c.clamp(max=self._gp_costs.shape[0] - 1)]
+                    hit = active & has_person & (self.r_gpp[:, r, cls] >= gcost)
+                    if not bool(hit.any()):
+                        break
+                    hf = hit.to(torch.float64)
+                    eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]  # [B, 5]
+                    self.r_tech_prog[:, r] = self.r_tech_prog[:, r] + eff[:, 0].double() * hf
+                    self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + eff[:, 1].double() * hf
+                    self.r_treasury[:, r] = self.r_treasury[:, r] + eff[:, 2].double() * hf
+                    prod_fx = eff[:, 3].double() * hf
+                    if bool((prod_fx != 0).any()):
+                        # the capital's build head (TS: cities.find(isCapital),
+                        # queue non-empty — rc slot 0 IS the founded capital
+                        # and settle/transfer slots never reuse it)
+                        has_build = self.rc_alive[:, r, 0] & (self.rc_current[:, r, 0] >= 0)
+                        self.rc_progress[:, r, 0] = self.rc_progress[:, r, 0] + torch.where(has_build, prod_fx, torch.zeros_like(prod_fx))
+                    if self._gp_effects.shape[2] > 4:
+                        self.r_faith[:, r] = self.r_faith[:, r] + eff[:, 4].double() * hf
+                    if cls == self._prophet_cls:
+                        self.r_prophets[:, r] = self.r_prophets[:, r] + hit.long()
+                    self.r_gpp[:, r, cls] = torch.where(hit, self.r_gpp[:, r, cls] - gcost, self.r_gpp[:, r, cls])
+                    self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
 
             # Pantheon / religion claims: the picks' identities are inert in
             # covered scope, but the draws (and pool sizes) are not.
-            pdue = active & ~self.r_pantheon_done[:, r] & (self.turn >= rr.get("pantheonTurn", 18) + r * 8)
+            # P5/S5 (C-17): the pantheon costs pantheonFaithCost from the
+            # rival's own faith (deducted only when a pick lands, like TS);
+            # religion needs the player's canFoundReligion gates — pantheon,
+            # a completed Holy Site, an earned Prophet. The timers died.
+            pfc = float(rr.get("pantheonFaithCost", 25))
+            pdue = active & ~self.r_pantheon_done[:, r] & (self.r_faith[:, r] >= pfc)
             popen = pdue & (self.pantheon_claimed_n < rr.get("pantheonPool", 8))
             self._next_random(popen)
+            self.r_faith[:, r] = torch.where(popen, self.r_faith[:, r] - pfc, self.r_faith[:, r])
             self.pantheon_claimed_n = self.pantheon_claimed_n + popen.long()
             self.r_pantheon_done[:, r] = self.r_pantheon_done[:, r] | popen
-            rdue = active & ~self.r_religion_done[:, r] & (self.turn >= rr.get("religionTurn", 45) + r * 12)
+            d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
+            if d_hs >= 0 and self.districts_on:
+                reg_hs = self.rc_dist_tile[:, r, :, d_hs]  # [B, RC]
+                has_hs = ((reg_hs >= 0) & self.district_complete.gather(1, reg_hs.clamp(min=0))).any(dim=1)
+            else:
+                has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
+            rdue = active & ~self.r_religion_done[:, r] & self.r_pantheon_done[:, r] & (self.r_prophets[:, r] > 0) & has_hs
             ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
             self._next_random(ropen)
             self._next_random(ropen)
@@ -5583,7 +5647,7 @@ class BatchSim:
         lux0 = self._last_lux  # frozen for the whole walk (TS luxMap semantics)
         _tot_ver = self._eff_version
         _tot_pop = self.pop.clone()
-        y_sum = self._eff_yields().sum(dim=2)
+        y_sum = self._eff_yields().sum(dim=2) * (self.district < 0).to(self.dtype)  # P5/S5: paved tiles yield 0 (tileYields, yields.ts:37)
         # loyalty mirrors TS's loop-top view: city c's tier and pop are
         # captured FRESH at its own iteration (post earlier cities' same-turn
         # mutations, pre its own production/growth) — applyLoyalty runs at the
@@ -5600,7 +5664,7 @@ class BatchSim:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
-                y_sum = self._eff_yields().sum(dim=2)
+                y_sum = self._eff_yields().sum(dim=2) * (self.district < 0).to(self.dtype)  # P5/S5: paved tiles yield 0 (tileYields, yields.ts:37)
             tier_fresh[:, c] = tier_idx[:, c]
             pop_loyal[:, c] = self.pop[:, c]
             t_c = total[:, c]  # [B, 6] this city's FRESH yields
@@ -5665,7 +5729,7 @@ class BatchSim:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
-                y_sum = self._eff_yields().sum(dim=2)
+                y_sum = self._eff_yields().sum(dim=2) * (self.district < 0).to(self.dtype)  # P5/S5: paved tiles yield 0 (tileYields, yields.ts:37)
             self.culture_box[:, c] = self.culture_box[:, c] + t_c[:, 4]
             for _ in range(BORDER_LOOPS):
                 cost_b = self._border_cost(self.tiles_acquired[:, c])
@@ -5708,6 +5772,14 @@ class BatchSim:
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------
         self._apply_loyalty_and_flips(tier_fresh, pop_loyal)
+        # P5/S5 gate-catch (seed 9183 t164, +75 milli esc): every POST-WALK
+        # consumer (trace_row/empire_score/statelog) must see FRESH stats —
+        # TS computeCityStats re-ranks luxuryAmenities LIVE at trace time,
+        # so a mid-walk pop change (a settler completing) can move a luxury
+        # grant and flip two cities' amenity tiers vs the walk's FROZEN map.
+        # The walk's accumulators keep the frozen-map yields (TS does too);
+        # only the cached totals must not leak past the walk.
+        self._eff_version += 1
 
         # --- the hostile world (after the city loop, before research) ----------------------
         if self.units_mode:
@@ -5850,9 +5922,9 @@ class BatchSim:
             self.center_at[rows, s_idx] = c_new
             # foundCity strips the removable feature — exactly the woods/
             # rainforest/marsh that carry +3 defense — so the center tile's
-            # terrain defense drops to its hills component. (Rival and
-            # city-state founding do NOT strip; the capital's statics were
-            # exported post-founding, already stripped.)
+            # terrain defense drops to its hills component. (Rival founding
+            # strips too since P5/S3 — its own twin in _rival_try_found;
+            # city-state founding still does NOT strip.)
             self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
             # ...and the feature's own yields + any improvement die with the
             # founding (tile.improvement = null; feature = null) — a later
@@ -5861,10 +5933,11 @@ class BatchSim:
             # left to withdraw — TS feature=null is a no-op there, but the
             # subtraction below is cumulative (same bug class as the
             # _strip_feature_at double-strip caught at seed 9040 t132).
+            # P5/S5: tile.pillaged is NOT cleared — foundCity never touches
+            # it (a pillaged improvement's flag outlives the improvement).
             fresh_f = ~self.feat_stripped[rows, s_idx]
             self.feat_stripped[rows, s_idx] = True
             self.improvement[rows, s_idx] = -1
-            self.pillaged[rows, s_idx] = False
             self._eff_version += 1
             # ...and drops the district adjacency that feature lent to neighbours:
             # d_static_adj was baked post-capital-founding, so a NON-capital

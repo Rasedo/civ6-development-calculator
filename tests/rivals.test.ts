@@ -127,14 +127,24 @@ describe('races', () => {
   });
 
   it('rival pantheons leave the pool', () => {
+    // P5/S5 (C-17): the pantheon costs the rival 25 of its OWN faith —
+    // the old free timed claim is gone.
     const state = makeState();
-    addRival(state, 6, 6, { pantheonClaimed: false });
-    state.turn = 30;
+    const rival = addRival(state, 6, 6, { pantheonClaimed: false, faith: 25 });
     rivalPhase(state);
     expect(state.claimedPantheons.length).toBe(1);
+    expect(rival.faith ?? 0).toBeLessThan(25); // the claim spent it
     const taken = state.claimedPantheons[0];
     state.faithTotal = 100;
     expect(choosePantheon(state, taken).ok).toBe(false);
+  });
+
+  it('a broke rival claims no pantheon', () => {
+    const state = makeState();
+    addRival(state, 6, 6, { pantheonClaimed: false, faith: 0 });
+    state.turn = 30;
+    rivalPhase(state);
+    expect(state.claimedPantheons.length).toBe(0);
   });
 });
 

@@ -10,6 +10,8 @@ tiles (stable, engine-agnostic), never array slots.
 import math
 from collections import Counter
 
+import torch
+
 _IMP = None
 
 
@@ -115,9 +117,10 @@ def gpu_state_lines(sim, b):
             continue
         pop = int((sim.rc_pop[b, r] * sim.rc_alive[b, r].long()).sum())
         L.append(
-            f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} "
+            f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} fai{_milli(sim.r_faith[b, r])} "
             f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))} "
             f"terr:{int((sim.rival_at[b] == r).sum())} wterr:{int(((sim.rival_at[b] == r) & sim.water[b]).sum())} "
+            f"tsum:{int(((sim.rival_at[b] == r) * torch.arange(sim.T, device=sim.device)).sum())} "
             f"rsc:{_milli(sim.rival_empire_score(r)[b])}"
         )
         for j in range(sim.rc_alive.shape[2]):

@@ -25,7 +25,7 @@ import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -53,8 +53,6 @@ import {
   RIVAL_LEADERS,
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
-  RIVAL_PANTHEON_TURN,
-  RIVAL_RELIGION_TURN,
   RIVAL_WAR_MIN_TURNS,
   PEACE_MIN_WAR_TURNS,
   PEACE_GOLD_COST,
@@ -508,38 +506,67 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
     // so rivals now accrue 0 until their first Campus/HS/CH completes and
     // the player wins the early Great People uncontested).
     const gpDist = GP_CLASS_DISTRICT[cls];
-    let pts = 0;
+    let accrue = 0;
     for (const rc of rival.cities) {
       if (!rc.districts.some((d) => d.type === gpDist && state.map.tiles[d.tileIndex].districtComplete)) continue;
-      pts += 1 + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
+      accrue += 1 + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
     }
-    if (pts > 0) rival.gpp[cls] = (rival.gpp[cls] ?? 0) + pts;
-    const earned = state.greatPeople.earned.filter((id) =>
+    if (accrue > 0) rival.gpp[cls] = (rival.gpp[cls] ?? 0) + accrue;
+    // P5/S5 (C-16): the player's advanceGreatPeople loop — overflow KEPT
+    // (pts −= cost, not zeroed) and the person's effect lands in the
+    // RIVAL's own streams (research progress, treasury, faith, capital
+    // production), exactly like applyGreatPersonEffect.
+    let pts = rival.gpp[cls] ?? 0;
+    let earned = state.greatPeople.earned.filter((id) =>
       GREAT_PEOPLE[cls].some((p) => p.id === id),
     ).length;
-    const person = GREAT_PEOPLE[cls][earned];
-    if (!person) continue;
-    if ((rival.gpp[cls] ?? 0) >= gpCost(earned)) {
-      rival.gpp[cls] = 0;
+    while (earned < GREAT_PEOPLE[cls].length && pts >= gpCost(earned)) {
+      pts -= gpCost(earned);
+      const person = GREAT_PEOPLE[cls][earned];
+      const fx = person.effect;
+      if (fx.science) rival.research.techProgress += fx.science;
+      if (fx.culture) rival.research.civicProgress += fx.culture;
+      if (fx.faith) rival.faith = (rival.faith ?? 0) + fx.faith;
+      if (fx.gold) rival.treasury = (rival.treasury ?? 0) + fx.gold;
+      if (fx.productionToCapital) {
+        const cap = rival.cities.find((c) => c.isCapital);
+        if (cap && cap.queue.length > 0) cap.queue[0].progress += fx.productionToCapital;
+      }
+      if (cls === 'PROPHET') rival.prophets = (rival.prophets ?? 0) + 1;
       state.greatPeople.earned.push(person.id); // gone from the shared pool
       state.eventLog.push(`${rival.name} claimed ${person.name}.`);
+      earned++;
     }
+    if ((rival.gpp[cls] ?? 0) !== pts) rival.gpp[cls] = pts;
   }
 }
 
 function claimBeliefs(state: GameState, rival: RivalCiv): void {
-  if (!rival.pantheonClaimed && state.turn >= RIVAL_PANTHEON_TURN + rival.id * 8) {
+  // P5/S5 (C-17): the pantheon costs the player's PANTHEON_FAITH_COST from
+  // the rival's own faith stream — the free timed claim died. The pick
+  // stays a policy draw from the open pool.
+  if (!rival.pantheonClaimed && (rival.faith ?? 0) >= PANTHEON_FAITH_COST) {
     const open = Object.keys(PANTHEONS).filter(
       (id) => id !== state.religion.pantheon && !state.claimedPantheons.includes(id),
     );
     if (open.length > 0) {
+      rival.faith = (rival.faith ?? 0) - PANTHEON_FAITH_COST;
       const pick = open[Math.floor(nextRandom(state) * open.length)];
       state.claimedPantheons.push(pick);
       rival.pantheonClaimed = true;
       state.eventLog.push(`${rival.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
     }
   }
-  if (!rival.religionFounded && state.turn >= RIVAL_RELIGION_TURN + rival.id * 12) {
+  // P5/S5 (C-17): religion needs the player's canFoundReligion gates —
+  // a pantheon, a completed Holy Site, an earned Prophet (timer died).
+  if (
+    !rival.religionFounded &&
+    rival.pantheonClaimed &&
+    (rival.prophets ?? 0) > 0 &&
+    rival.cities.some((rc) =>
+      rc.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
+    )
+  ) {
     const followers = Object.keys(FOLLOWER_BELIEFS).filter(
       (id) => id !== state.religion.follower && !state.claimedBeliefs.includes(id),
     );
@@ -966,11 +993,13 @@ export function rivalPhase(state: GameState): void {
     let sciSum = 0;
     let culSum = 0;
     let goldSum = 0;
+    let faithSum = 0;
     for (const rc of [...rival.cities]) {
       const y = rivalCityYields(state, rival, rc);
       // P5/S1 (C-12): rivals pay district+building upkeep like the player's
       // computeCityStats (completed districts only; same maintenance tables).
       goldSum += y.gold - rivalCityMaintenance(state, rc);
+      faithSum += y.faith; // P5/S5 (C-17): the faith yield gains its consumer
       const food = y.food;
       const production = y.production;
       // C1-B3a: rival science/culture streams — tile+center columns plus
@@ -1063,6 +1092,7 @@ export function rivalPhase(state: GameState): void {
     // (milli-rounded test; disband the priciest-upkeep unit, tie → lowest
     // id; no refund).
     rival.treasury = (rival.treasury ?? 0) + goldSum;
+    rival.faith = (rival.faith ?? 0) + faithSum; // P5/S5 (C-17)
     rival.treasury -= state.units.reduce(
       (s, u) => s + (u.owner === 'rival' && u.civId === rival.id ? UNITS[u.type]?.maintenance ?? 0 : 0),
       0,
