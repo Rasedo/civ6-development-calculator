@@ -246,20 +246,27 @@ then the battery on the same code — the gate is the battery's critical
 path, so that near-doubles the cost for zero information). Highest
 value on late-turn failures (t200+ ≈ 20× faster iterations).
 
-**BACKLOG (owner idea, 2026-07-12): always-on statelogs.** Today a gate
-failure costs a ~4-6 min re-simulation of all 72 games JUST to produce
-the statelog pair (the single biggest P5 hunt overhead, ~10 reruns).
-Instead: (a) the GPU rollout always emits per-game statelogs into a
-transient gitignored dir (VECTORIZED emission — one .tolist() per
-tensor per turn, the action-log trick — else the per-entity scalar
-reads add minutes to every run), overwritten per run; (b) the TS replay
-buffers tsStateLines per game in memory and flushes ONLY failing games
-(lines up to the failure turn are all logdiff needs — the first
-divergence never comes later). Failure→diff latency drops to ~0; if
-(b)'s always-computed stats calls measure too heavy, ship (a) alone and
-keep the TS log on-demand (still ~2× per hunt). Logging is pure reads —
-no parity risk. Composes with the snapshot-resume gate: this removes
-the DIAGNOSIS rerun, that removes the VERIFICATION rerun.
+**BACKLOG (owner idea, 2026-07-12): always-on statelogs — TWO-TIER.**
+Today a gate failure costs a ~4-6 min re-simulation of all 72 games
+JUST to produce the statelog pair (the single biggest P5 hunt overhead,
+~10 reruns). Naive always-on is a trap on the TS side: tsStateLines
+RECOMPUTES derived state every turn (fresh computeCityStats ×6 + its
+empireScore twin, rivalCityYields ×RC + rivalEmpireScore — each with
+full-map luxury/amenity re-rankings since D-13/S6) ≈ 5-15ms/turn/game
+→ +2-4 min on the replay lane EVERY run for all 72 games; buffering
+doesn't help (lines can't be produced retroactively — the cost is the
+computation, not the write), and reusing endTurn's internal stats would
+log frozen-map values, blinding the log to the fresh-vs-frozen class
+that caught seed 9183. THE DESIGN: tier 1 = the DIRECT-READ fields only
+(pop/hp/acted/loy/cb/co/pr/tsum/CA/positions/counts — traceRow-cheap,
+they pinned ~80% of P5's hunts), always-on for all games on both sides
+(GPU side vectorized — one .tolist() per tensor per turn), transient
+gitignored dir, overwritten per run; tier 2 = the derived yield/score
+fields via the existing --log rerun, only when tier 1 localizes but
+can't explain (~1 hunt in 5). Failure→diff ≈ 0 for most hunts at
+near-zero always-on cost. Logging is pure reads — no parity risk.
+Composes with the snapshot-resume gate: this removes the DIAGNOSIS
+rerun, that removes the VERIFICATION rerun.
 
 Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
 `CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
