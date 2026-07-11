@@ -980,6 +980,16 @@ class BatchSim:
         r = self.rules
         return js_round((r.builder_base + r.builder_per * n.to(self.dtype)) * r.game_speed)
 
+    def _afford(self, tre: torch.Tensor, cost) -> torch.Tensor:
+        """GS: milli-rounded gold-threshold compare (mirrors TS
+        goldAffordable) — the treasuries accumulate non-dyadic 0.05-unit
+        gold whose sub-milli drift differs between the engines, so a raw
+        `treasury >= cost` splits at invisible knife-edges (P5-S7 hunt:
+        seed 9261 t228 — a 72.000-milli treasury vs a 72-gold scout)."""
+        if not torch.is_tensor(cost):
+            cost = torch.tensor(float(cost), dtype=tre.dtype, device=tre.device)
+        return js_round(tre * 1000) >= js_round(cost * 1000)
+
     def _unlocked_specialty_count(self, techs2: torch.Tensor, civics2: torch.Tensor) -> torch.Tensor:
         """P4/D-8: [B] U — specialty district types whose unlockDistrict
         tech/civic is researched (districtDiscounted's U; -1 = never)."""
@@ -1799,13 +1809,13 @@ class BatchSim:
             # tile there — TS refunds when spawnUnit finds none).
             mult = self.rules.gold_purchase_mult
             tre = self.treasury
-            pb = cols[0] & (tre.view(B, 1, 1) >= self.rules_dev.b_cost.view(1, 1, -1) * mult)
+            pb = cols[0] & self._afford(tre.view(B, 1, 1), self.rules_dev.b_cost.view(1, 1, -1) * mult)
             n_cities = self.alive.sum(dim=1, keepdim=True)
             queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
             s_cost = self.rules.settler_base + self.rules.settler_per_city * (
                 n_cities - 1 + self.settlers.unsqueeze(1) + queued_s
             ).clamp(min=0).to(self.dtype)
-            ps = (tre.unsqueeze(1) >= s_cost * mult).unsqueeze(2).expand(B, C, 1)
+            ps = self._afford(tre.unsqueeze(1), s_cost * mult).unsqueeze(2).expand(B, C, 1)
             if self.units_mode:
                 u_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                     1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
@@ -1817,7 +1827,7 @@ class BatchSim:
                     bq = (self.current == self.UNIT_BASE + self._builder_idx).sum(dim=1)
                     u_cost = u_cost.clone()
                     u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained + bq)
-                pu = (u_ok & (tre.unsqueeze(1) >= u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
+                pu = (u_ok & self._afford(tre.unsqueeze(1), u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
             else:
                 pu = torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
             cols.append(torch.cat([pb, ps, pu], dim=2))
@@ -1852,7 +1862,7 @@ class BatchSim:
             self.r_alive
             & self.r_atwar
             & (self.r_warturns >= rr.get("peaceMinWarTurns", 8))
-            & (self.treasury.unsqueeze(1) >= cost)
+            & self._afford(self.treasury.unsqueeze(1), cost)
         )
         return torch.cat([declare, peace], dim=1)
 
@@ -2056,9 +2066,10 @@ class BatchSim:
         )
         self.best_melee = torch.maximum(self.best_melee, melee_cs)
 
-    def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
-        """A player unit entering a camp tile clears it: +50 gold and the
-        camp list splices left (order matters for later garrison loops)."""
+    def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, civ: torch.Tensor | None = None) -> None:
+        """A non-barbarian unit entering a camp tile clears it: +50 gold to
+        ITS civ (P5/S7 C-3 — rivals bank it too; pass civ=[B] rival ids) and
+        the camp list splices left (order matters for later garrison loops)."""
         if not bool(mask.any()):
             return
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
@@ -2071,7 +2082,10 @@ class BatchSim:
             row[k:-1] = row[k + 1 :].clone()
             row[-1] = -1
             self.n_camps[b] -= 1
-            self.treasury[b] += reward
+            if civ is None:
+                self.treasury[b] += reward
+            else:
+                self.r_treasury[b, int(civ[b])] += float(reward)
 
     # --- player unit actions (phase 4b) ---------------------------------------
 
@@ -2265,6 +2279,7 @@ class BatchSim:
                         self.rv_at[mil_rows, tgt[mil_rows]] = sc[mil_rows]
                     self.v_tile[rows_, sc[rows_]] = tgt[rows_]
                     self.v_acted[rows_, sc[rows_]] = True  # P4/D-2
+                    self._clear_camp_at(ok, tgt, civ=torch.full((B,), r, dtype=torch.long, device=dev))  # P5/S7 (C-3)
             # --- attacks 6-11 (military only; the shared resolution handles
             # barb/player defenders, lone civilians and city targets) ---
             atk = act & (a >= 6) & (a < 12) & ~is_civ
@@ -3160,7 +3175,10 @@ class BatchSim:
             if self.improvements_on:
                 h_imp = self.improvement.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
                 h_unpil = ~self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
-                h_owned = self.owner.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
+                # P5/S7 (C-4a): barbarians raid RIVAL improvements too.
+                h_owned = (self.owner.gather(1, here.unsqueeze(1)).squeeze(1) >= 0) | (
+                    self.rival_at.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
+                )
                 pillage = act & ~attack & h_imp & h_unpil & h_owned
                 if bool(pillage.any()):
                     rows = pillage.nonzero(as_tuple=True)[0]
@@ -3184,7 +3202,7 @@ class BatchSim:
                 continue
             arangeT = torch.arange(T, device=dev)
             if self.improvements_on:
-                imp_job = (self.improvement >= 0) & ~self.pillaged & (self.owner >= 0)  # [B, T]
+                imp_job = (self.improvement >= 0) & ~self.pillaged & ((self.owner >= 0) | (self.rival_at >= 0))  # [B, T] (C-4a: rival farms tempt barbs too)
                 d_imp = self.pair_dist[here.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
                 ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
                 imp_min, imp_tgt = ikey.min(dim=1)
@@ -3442,7 +3460,7 @@ class BatchSim:
             # idle-gated, mirroring the player's V-P1 columns. Rival settler
             # purchase stays False (their settling machinery is scripted).
             mult = self.rules.gold_purchase_mult
-            afford_b = self.r_treasury[:, r].unsqueeze(1) >= (rdv.b_cost.double() * mult).unsqueeze(0)
+            afford_b = self._afford(self.r_treasury[:, r].unsqueeze(1), (rdv.b_cost.double() * mult).unsqueeze(0))
             pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
             ps = torch.zeros(B, 1, dtype=torch.bool, device=dev)
             u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
@@ -3451,7 +3469,7 @@ class BatchSim:
                 rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
                 u_cost_r = u_cost_r.clone()
                 u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
-            afford_u = self.r_treasury[:, r].unsqueeze(1) >= u_cost_r * mult
+            afford_u = self._afford(self.r_treasury[:, r].unsqueeze(1), u_cost_r * mult)
             pu = ok_u & afford_u & self.controlled[:, r].unsqueeze(1)
             prod_cols.append(torch.cat([row & idle[:, j].unsqueeze(1), pb, ps, pu], dim=1))
         production = torch.stack(prod_cols, dim=1)  # [B, RC, base + NB+1+NU purchase]
@@ -3540,7 +3558,7 @@ class BatchSim:
                 if bool(is_pb.any()):
                     bi = pb_i.clamp(min=0, max=NBn - 1)
                     cost_b = rdv.b_cost.gather(0, bi).double() * mult
-                    ok_now = is_pb & ~self.rc_bldg[torch.arange(self.B, device=self.device), r, j].gather(1, bi.unsqueeze(1)).squeeze(1) & (self.r_treasury[:, r] >= cost_b)
+                    ok_now = is_pb & ~self.rc_bldg[torch.arange(self.B, device=self.device), r, j].gather(1, bi.unsqueeze(1)).squeeze(1) & self._afford(self.r_treasury[:, r], cost_b)
                     if bool(ok_now.any()):
                         rows_ = ok_now.nonzero(as_tuple=True)[0]
                         self.rc_bldg[rows_, r, j, bi[rows_]] = True
@@ -3554,7 +3572,7 @@ class BatchSim:
                         # P4/D-10: bought rival builders price off THEIR escalator
                         rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
                         cost_u = torch.where(ui == self._builder_idx, self._builder_cost(rb_n).double() * mult, cost_u)
-                    ok_now = is_pu & (self.r_treasury[:, r] >= cost_u)
+                    ok_now = is_pu & self._afford(self.r_treasury[:, r], cost_u)
                     if bool(ok_now.any()):
                         is_bldr = ok_now & (self._p_charges[ui] > 0)
                         is_mil = ok_now & ~is_bldr
@@ -3744,6 +3762,7 @@ class BatchSim:
                 self.rvciv_at[rows, dest[rows]] = u
                 self.v_tile[rows, u] = dest[rows]
                 self.v_acted[rows, u] = True  # P4/D-2
+                self._clear_camp_at(move, dest, civ=self.v_civ[:, u])  # P5/S7 (C-3): mirrors walkPath's any-unit clear
 
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
@@ -4132,6 +4151,8 @@ class BatchSim:
                 a_at[vr, here[vr]] = -1
                 a_tile[vr, u] = ttc[vr]
                 a_at[vr, ttc[vr]] = u
+                if atk_kind == "rival":
+                    self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])  # P5/S7 (C-3)
         if bool(civ_att.any()):
             rows = civ_att.nonzero(as_tuple=True)[0]
             ds = dc_[rows]
@@ -4151,6 +4172,8 @@ class BatchSim:
                 a_at[vr, here[vr]] = -1
                 a_tile[vr, u] = ttc[vr]
                 a_at[vr, ttc[vr]] = u
+                if atk_kind == "rival":
+                    self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])  # P5/S7 (C-3)
 
     def _attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
         """A barbarian battering a rival city (mirrors attackRivalCity):
@@ -4305,6 +4328,7 @@ class BatchSim:
             self.rv_at[rows, dest[rows]] = v
             self.v_tile[rows, v] = dest[rows]
             self.v_acted[rows, v] = True  # P4/D-2
+            self._clear_camp_at(move, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
@@ -4340,10 +4364,10 @@ class BatchSim:
         if atk_kind == "rival" and len(sacked_rows) > 0:
             w_civ = self.v_civ[sacked_rows, u]
             for i in range(len(sacked_rows)):
-                self._transfer_city_to_rival(int(sacked_rows[i]), int(slot[sacked_rows[i]]), int(w_civ[i]))
-            # P5/S1 (C-11b): the conqueror plunders +40 — symmetric with the
-            # player's capture; conquest only, never the loyalty-flip path.
-            self.r_treasury[sacked_rows, w_civ] += 40.0
+                # P5/S1 (C-11b): the conqueror plunders +40 on a REAL
+                # transfer — the C-5 raze (city cap) pays nothing, like TS.
+                if self._transfer_city_to_rival(int(sacked_rows[i]), int(slot[sacked_rows[i]]), int(w_civ[i]), conquest=True):
+                    self.r_treasury[int(sacked_rows[i]), int(w_civ[i])] += 40.0
             sacked_rows = sacked_rows[:0]  # transferred, not sacked
         if len(sacked_rows) > 0:
             sc = slot[sacked_rows]
@@ -4418,6 +4442,7 @@ class BatchSim:
             self.rv_at[rows, dest[rows]] = v
             self.v_tile[rows, v] = dest[rows]
             self.v_acted[rows, v] = True  # P4/D-2
+            self._clear_camp_at(move, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
 
     def _rival_phase(self) -> None:
         """Mirrors rivalPhase, rival by rival in id order — queue picks for
@@ -4889,15 +4914,26 @@ class BatchSim:
             for b in rows.tolist():
                 self._transfer_city_to_rival(b, c, int(winner[b]))
 
-    def _transfer_city_to_rival(self, b: int, c: int, w_: int) -> None:
+    def _transfer_city_to_rival(self, b: int, c: int, w_: int, conquest: bool = False) -> bool:
         """The player-city -> rival-city transfer (shared by loyalty flips
-        and V-W2's reverse capture — mirrors transferCityToRival)."""
+        and V-W2's reverse capture — mirrors transferCityToRival). Returns
+        False when a CONQUEST razes at the winner's city cap (P5/S7 C-5,
+        mirroring TS: the city ceases — tiles freed, center unpaved, no
+        plunder); loyalty flips stay uncapped."""
         old_pop = int(self.pop[b, c])
         # the city leaves the empire
         self.alive[b, c] = False
         self.pop[b, c] = 0
         self.current[b, c] = -1
         owned = self.owner[b] == c
+        if conquest and int(self.rc_alive[b, w_].sum()) >= int(self.rules.rivals.get("maxCities", 6)):
+            s_t = int(self.site[b, c])
+            self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
+            self.center_at[b, s_t] = -1
+            self.district[b, s_t] = -1
+            self.district_complete[b, s_t] = False
+            self._eff_version += 1
+            return False
         self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
         self.rival_at[b] = torch.where(owned, torch.full_like(self.rival_at[b], w_), self.rival_at[b])
         self.center_at[b, self.site[b, c]] = -1
@@ -4922,6 +4958,7 @@ class BatchSim:
         self.rc_bldg[b, w_, slot, :] = False  # nor buildings
         self.r_next_city_id[b, w_] += 1
         self.rvcity_at[b, self.site[b, c]] = w_
+        return True
 
     def _apply_settlers_and_purchases(self, act: torch.Tensor, buildable: torch.Tensor) -> None:
         """RL settler queueing + gold purchases, walked in city-slot order (V-P1).
@@ -4981,7 +5018,7 @@ class BatchSim:
             if bool(is_pb.any()):
                 idx = pi.clamp(min=0, max=self.NB - 1)
                 cost = rd.b_cost[idx] * mult
-                can = is_pb & buildable[:, c].gather(1, idx.unsqueeze(1)).squeeze(1) & (self.treasury >= cost)
+                can = is_pb & buildable[:, c].gather(1, idx.unsqueeze(1)).squeeze(1) & self._afford(self.treasury, cost)
                 if bool(can.any()):
                     rows = can.nonzero(as_tuple=True)[0]
                     self.buildings[rows, c, idx[rows]] = True
@@ -4993,7 +5030,7 @@ class BatchSim:
                 s_cost = (
                     r.settler_base + r.settler_per_city * (n_cities - 1 + settlers_live + queued_live).clamp(min=0).to(self.dtype)
                 ) * mult
-                can = is_ps & (self.treasury >= s_cost)
+                can = is_ps & self._afford(self.treasury, s_cost)
                 self.treasury = torch.where(can, self.treasury - s_cost, self.treasury)
                 self.settlers = self.settlers + can.long()
                 self.pop[:, c] = torch.where(can, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])  # P4/D-6: purchased settlers cost the pop too
@@ -5012,7 +5049,7 @@ class BatchSim:
                     b_now = self._builder_cost(self.builders_trained + bqueued_live) * mult
                     cost = torch.where(utp == self._builder_idx, b_now, cost)
                 found, _ = self._first_free_spot(self.site[:, c], "player", self._p_civ[utp])
-                can = is_pu & tech_ok & (self.treasury >= cost) & found
+                can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
                 if bool(can.any()):
                     self.treasury = torch.where(can, self.treasury - cost, self.treasury)
                     self._spawn_player(can, self.site[:, c], utp)

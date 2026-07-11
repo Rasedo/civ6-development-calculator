@@ -422,6 +422,15 @@ export function buildingFaithCost(buildingId: string): number {
   return (BUILDINGS[buildingId]?.cost ?? 0) * FAITH_PURCHASE_MULT;
 }
 
+/** GS: gold/faith thresholds compare at MILLI precision — the treasury
+ * accumulates non-dyadic 0.05-unit gold whose sub-milli drift differs
+ * between the engines (BLAS association), so a raw `treasury < cost` splits
+ * at invisible knife-edges (P5-S7 hunt: seed 9261 t228 — a 72.000-milli
+ * treasury vs a 72-gold scout purchase went opposite ways). */
+export function goldAffordable(treasury: number, cost: number): boolean {
+  return Math.round(treasury * 1000) >= Math.round(cost * 1000);
+}
+
 export function unitPurchaseCost(state: GameState, unitType: string): number {
   // P4/D-10: builders price off the live escalator, like the settler pair.
   const base = unitType === 'BUILDER' ? builderCost(state) : UNITS[unitType]?.cost ?? 0;
@@ -445,11 +454,11 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   if (!state.sandbox) {
     if (worship) {
       const cost = buildingFaithCost(buildingId);
-      if (state.faithTotal < cost) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+      if (!goldAffordable(state.faithTotal, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
       state.faithTotal -= cost;
     } else {
       const cost = buildingPurchaseCost(buildingId);
-      if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+      if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
       state.treasury -= cost;
     }
   }
@@ -466,7 +475,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string)
   }
   const cost = unitPurchaseCost(state, unitType);
   if (!state.sandbox) {
-    if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     state.treasury -= cost;
   }
   const unit = spawnUnit(state, unitType, city.centerIndex);
@@ -484,7 +493,7 @@ export function purchaseSettler(state: GameState, cityId: number): RuleResult {
   if (!city) return { ok: false, reason: 'No such city.' };
   const cost = settlerCost(state) * GOLD_PURCHASE_MULT;
   if (!state.sandbox) {
-    if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     state.treasury -= cost;
   }
   state.settlers += 1;
@@ -588,7 +597,7 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number): Ru
   }
   const cost = tilePurchaseCost(state, city, tileIndex);
   if (!state.sandbox) {
-    if (state.treasury < cost) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     state.treasury -= cost;
   }
   // P4/D-17: purchases claim the tile but do NOT advance the culture-growth

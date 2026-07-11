@@ -10,7 +10,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, clearCampFor } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
@@ -45,7 +45,7 @@ import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenanc
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
 import { hasRiver, hasFreshWater, isCoastalLand } from './query';
 import { disbandUnit, tileFreeForUnit } from './units';
-import { districtCostIn } from './game';
+import { districtCostIn, goldAffordable } from './game';
 import { districtAdjacency } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
@@ -268,7 +268,7 @@ export function sueForPeace(state: GameState, rivalId: number): RuleResult {
   }
   const cost = PEACE_GOLD_COST(rival.warTurns);
   if (!state.sandbox) {
-    if (state.treasury < cost) return no(`Peace costs ${cost} gold right now.`);
+    if (!goldAffordable(state.treasury, cost)) return no(`Peace costs ${cost} gold right now.`);
     state.treasury -= cost;
   }
   makePeace(state, rival);
@@ -293,7 +293,7 @@ export function levyUnits(state: GameState, csId: number): RuleResult {
     return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
   }
   if (!state.sandbox) {
-    if (state.treasury < LEVY_GOLD_COST) return no(`Levy costs ${LEVY_GOLD_COST} gold.`);
+    if (!goldAffordable(state.treasury, LEVY_GOLD_COST)) return no(`Levy costs ${LEVY_GOLD_COST} gold.`);
     state.treasury -= LEVY_GOLD_COST;
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
@@ -369,10 +369,23 @@ export function flipCityToRival(state: GameState, city: City): void {
 
 /** The player-city → rival-city transfer (shared by loyalty flips and
  * V-W2's reverse capture — a rival melee finishing a player city). */
-export function transferCityToRival(state: GameState, city: City, winner: RivalCiv, why: string): void {
+export function transferCityToRival(state: GameState, city: City, winner: RivalCiv, why: string): boolean {
   state.cities = state.cities.filter((c) => c.id !== city.id);
   delete state.cityHp[String(city.id)];
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.from !== city.id && r.to !== city.id);
+  // P5/S7 (C-5): CONQUEST razes at the winner's city cap, mirroring the
+  // player's captureRivalCity raze — the city simply ceases (tiles freed,
+  // center unpaved, no plunder). Loyalty flips stay uncapped.
+  if (why === 'conquered' && winner.cities.length >= RIVAL_MAX_CITIES) {
+    for (const t of state.map.tiles) {
+      if (t.cityId === city.id) t.cityId = -1;
+    }
+    const center = state.map.tiles[city.centerIndex];
+    center.district = null;
+    center.districtComplete = false;
+    state.eventLog.push(`${city.name} razed — ${winner.name} cannot govern more cities.`);
+    return false;
+  }
   for (const t of state.map.tiles) {
     if (t.cityId === city.id) {
       t.cityId = -1;
@@ -400,6 +413,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     foundedTurn: state.turn,
   });
   state.eventLog.push(`${city.name} has defected to ${winner.name}! (${why})`);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +557,7 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
   if (step && hexDistance(step.col, step.row, home.col, home.row) < hexDistance(here.col, here.row, home.col, home.row)) {
     unit.tileIndex = step.index;
     unit.movesLeft = 0;
+    clearCampFor(state, unit, step.index); // P5/S7 (C-3)
   }
 }
 
@@ -748,7 +763,10 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
         dest = n.index;
       }
     }
-    if (dest >= 0) u.tileIndex = dest;
+    if (dest >= 0) {
+      u.tileIndex = dest;
+      clearCampFor(state, u, dest); // P5/S7 (C-3): mirrors walkPath's any-unit clear
+    }
   }
 }
 

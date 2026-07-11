@@ -85,9 +85,16 @@ stays parked (masked: exporter emits single-tile steps; an RL-surface question).
   gains its consumer; free timed claims die).
 - **S6 — rival loyalty + amenities (C-19 + C-20):** rival cities get loyalty
   (CAN flip to the player — the reverse transfer) and the amenity tier model.
-- **S7 — camps/pillage/repair/raze (C-3 + C-4 + C-5):** rivals clear camps
-  (+50 r_treasury); hostiles pillage rival tiles + rival builders repair;
-  capture at full cap RAZES in TS (unbounded push) and GPU (hard assert).
+- **S7 — camps/pillage/raze (C-3 + C-4a + C-5):** rivals clear camps
+  (+50 r_treasury, every entry path: melee advance, march, patrol, builder
+  walk, controlled move — barbs excluded like TS clearCampFor); BARBARIANS
+  pillage/march-to rival improvements (rival raiders keep player-only —
+  they never war other rivals); conquest of a player city RAZES at the
+  winner's 6-city cap in BOTH engines (transferCityToRival returns
+  transferred?; the +40 plunder pays only on a real transfer; loyalty
+  flips stay uncapped with the RC=24 headroom). C-4b (a REPAIR verb for
+  builders + rival repair) is deferred — it grows the RL action space
+  (mask width, net orphaning, eval re-baseline) and deserves its own stage.
 - **S8 — controlled purchase revalidation (C-23):** full re-validation in the
   GPU controlled-rival purchase apply.
 

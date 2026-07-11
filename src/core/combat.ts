@@ -36,6 +36,21 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 export const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
+/** P5/S7 (C-3): any non-barbarian unit entering a camp tile clears it —
+ * +50 to ITS civ's treasury (rivals bank it like the player). */
+export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
+  if (unit.owner === 'barbarian') return;
+  const camp = state.barbCamps.indexOf(tileIndex);
+  if (camp < 0) return;
+  state.barbCamps.splice(camp, 1);
+  if (unit.owner === 'player') {
+    state.treasury += CAMP_CLEAR_REWARD;
+  } else {
+    const rival = state.rivals.find((r) => r.id === unit.civId);
+    if (rival) rival.treasury = (rival.treasury ?? 0) + CAMP_CLEAR_REWARD;
+  }
+}
+
 /** P4/D-20: food improvements heal their pillager (real Civ 6); the rest
  * grant yields the pillager banks — nothing, for barbs and rival raiders.
  * (Tile.improvement is a plain string, hence Set<string>.) */
@@ -111,11 +126,12 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
     if (attacker.owner === 'rival' && attacker.civId !== undefined) {
       const rival = state.rivals.find((r) => r.id === attacker.civId);
       if (rival) {
-        transferCityToRival(state, city, rival, 'conquered');
         // P5/S1 (C-11b): the conqueror plunders +40, symmetric with the
-        // player's captureRivalCity. Conquest only — loyalty flips (the
-        // other transferCityToRival caller) plunder nothing.
-        rival.treasury = (rival.treasury ?? 0) + 40;
+        // player's captureRivalCity — but only on a real transfer; the
+        // C-5 raze (city cap) mirrors TS's raze early-return: no gold.
+        if (transferCityToRival(state, city, rival, 'conquered')) {
+          rival.treasury = (rival.treasury ?? 0) + 40;
+        }
         return;
       }
     }
@@ -201,11 +217,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   // Advance into the tile if it's now free for us.
   if (state.units.includes(attacker) && tileFreeForUnit(state, targetIndex, attacker)) {
     attacker.tileIndex = targetIndex;
-    const camp = state.barbCamps.indexOf(targetIndex);
-    if (attacker.owner === 'player' && camp >= 0) {
-      state.barbCamps.splice(camp, 1);
-      state.treasury += CAMP_CLEAR_REWARD;
-    }
+    clearCampFor(state, attacker, targetIndex); // P5/S7 (C-3): rivals clear too
   }
   return ok;
 }
@@ -461,9 +473,12 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
 
   // 2. Pillage the improvement underfoot. P4/D-20 (real Civ 6): only FOOD
   // improvements heal the pillager (+25); the rest are wrecked for yields
-  // the raiders here can't bank — pillaged, no heal.
+  // the raiders here can't bank — pillaged, no heal. P5/S7 (C-4a):
+  // BARBARIANS raid rival improvements too; rival raiders keep pillaging
+  // the player only (they never war other rivals).
   const here = tile();
-  if (here.improvement && !here.pillaged && here.cityId !== -1) {
+  const hereOwned = here.cityId !== -1 || (unit.owner === 'barbarian' && here.rivalId !== undefined);
+  if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
     if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
       unit.hp = Math.min(UNIT_HP, unit.hp + 25);
@@ -476,7 +491,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
-    if (!t.improvement || t.pillaged || t.cityId === -1) continue;
+    const tOwned = t.cityId !== -1 || (unit.owner === 'barbarian' && t.rivalId !== undefined);
+    if (!t.improvement || t.pillaged || !tOwned) continue;
     const d = hexDistance(here.col, here.row, t.col, t.row);
     if (d < bestDist) {
       bestDist = d;
@@ -505,6 +521,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       hexDistance(here.col, here.row, target.col, target.row)) {
     unit.tileIndex = step.index;
     unit.movesLeft = 0;
+    clearCampFor(state, unit, step.index); // P5/S7 (C-3): rivals clear camps (barb no-op)
   }
 }
 
