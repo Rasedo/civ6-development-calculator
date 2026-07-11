@@ -42,6 +42,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--replicas", type=int, default=3, help="random games per fixture")
     ap.add_argument("--log", type=int, default=None, help="rng of ONE game -> gpu/fixtures/gpu_statelog.txt")
+    ap.add_argument("--ckpt", type=int, default=25, help="dump full-batch raw checkpoints every N turns (0 = off) — §F hunt tooling")
+    ap.add_argument("--resume-t", type=int, default=None, help="resume from the checkpoint at this turn (with --turns = turns to run FROM there); writes no rollout.json")
     ap.add_argument("--turns", type=int, default=None, help="default: the fixtures' turnLimit (TS TURN_LIMIT)")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--out", default=str(FIXTURES / "rollout.json"))
@@ -51,6 +53,11 @@ def main() -> None:
     args = ap.parse_args()
 
     if args.shards and args.shard is None:
+        if args.ckpt and args.resume_t is None:
+            _cd = FIXTURES / "ckpt"
+            _cd.mkdir(exist_ok=True)
+            for _f in _cd.glob("*"):
+                _f.unlink()
         # P3 orchestrator: tiny-tensor torch scales across PROCESSES, not
         # threads (OMP sweep peaks at 4) — N children each roll a contiguous
         # slice of the game list, keeping GLOBAL indices so every game's
@@ -67,6 +74,9 @@ def main() -> None:
                 cmd += ["--turns", str(args.turns)]
             if args.log is not None:
                 cmd += ["--log", str(args.log)]
+            cmd += ["--ckpt", str(args.ckpt)]
+            if args.resume_t is not None:
+                cmd += ["--resume-t", str(args.resume_t), "--turns", str(args.turns)] if args.turns else ["--resume-t", str(args.resume_t)]
             env = os.environ.copy()
             env.setdefault("OMP_NUM_THREADS", "4")
             env.setdefault("MKL_NUM_THREADS", "4")
@@ -101,6 +111,8 @@ def main() -> None:
             th.join()
         if any(rcs):
             raise SystemExit(max(rcs))
+        if args.resume_t is not None:
+            return  # §F resume runs are diagnostic — no shard outputs to merge
         merged = None
         for k in range(args.shards):
             part_path = Path(args.out + f".shard{k}")
@@ -134,12 +146,21 @@ def main() -> None:
     if not paths:
         print("no fixtures — run `npm run gpu:export` first")
         raise SystemExit(1)
-    fixtures = [load_fixture(p) for p in paths for _ in range(args.replicas)]
+    paths_expanded = [p for p in paths for _ in range(args.replicas)]
+    fixtures = [load_fixture(p) for p in paths_expanded]
     lo = 0
     if args.shard is not None and args.shards:
         per = (len(fixtures) + args.shards - 1) // args.shards
         lo = args.shard * per
         fixtures = fixtures[lo : lo + per]
+        paths_expanded = paths_expanded[lo : lo + per]
+    # §F checkpoints: fresh dir per run (the shard PARENT cleared it before
+    # spawning; a shard child must not race the others)
+    ckpt_dir = FIXTURES / "ckpt"
+    if args.ckpt and args.resume_t is None and args.shard is None:
+        ckpt_dir.mkdir(exist_ok=True)
+        for f in ckpt_dir.glob("*"):
+            f.unlink()
 
     from statelog import gpu_state_lines
     _logl = []
@@ -155,6 +176,14 @@ def main() -> None:
         {"seed": f["seed"], "rng": int(game_seed[i]), "sites": [c["site"] for c in f["cities"]], "actions": [], "trace": []}
         for i, f in enumerate(fixtures)
     ]
+
+    if args.resume_t is not None:
+        # §F resume: restore the FULL batch at the checkpoint (batch-shape
+        # preserving — BLAS association) and run --turns more turns. The
+        # counter-based action sampler reproduces the original draws.
+        _meta = torch.load(ckpt_dir / f"gpu_{int(game_seed[0])}_t{args.resume_t}.pt", weights_only=False)
+        assert _meta["rngs"] == [g["rng"] for g in games], "checkpoint batch mismatch — same fixtures/replicas/shards required"
+        sim.restore(_meta["snap"])
 
     HOLD = 12
     if args.log is not None:
@@ -211,6 +240,12 @@ def main() -> None:
             for _b in range(B):
                 if games[_b]["rng"] == args.log:
                     _logl.extend(gpu_state_lines(sim, _b))
+        if args.ckpt and sim.turn % args.ckpt == 0:
+            ckpt_dir.mkdir(exist_ok=True)
+            torch.save(
+                {"snap": sim.snapshot(), "rngs": [g["rng"] for g in games], "paths": [str(p) for p in paths_expanded]},
+                ckpt_dir / f"gpu_{int(game_seed[0])}_t{sim.turn}.pt",
+            )
         for b in range(B):
             games[b]["trace"].append(rows_l[b])
 
@@ -236,7 +271,8 @@ def main() -> None:
         "scaffold": scaffold_ids,
         "games": games,
     }
-    Path(args.out).write_text(json.dumps(out))
+    if args.resume_t is None:
+        Path(args.out).write_text(json.dumps(out))
     score = sim.empire_score()
     cities = sim.alive.sum(dim=1)
     print(f"{B} random games × {args.turns} turns → {args.out}")

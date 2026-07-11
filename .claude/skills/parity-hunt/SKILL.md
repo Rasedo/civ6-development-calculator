@@ -10,10 +10,29 @@ name the single decision (turn, actor, rule) where the engines disagree —
 then fix the engine that is WRONG. TS is the spec — unless TS itself is
 farther from real Civ 6 than the GPU (owner rule): then fix TS.
 
-## Step 1 — the Phase-1 statelog (ALWAYS first)
+## Step 0 — the checkpoint bracket (§F: no re-simulation)
+
+Every gate run dumps RAW state checkpoints every 25 turns for ALL games
+(transient gpu/fixtures/ckpt/, both engines, on by default). So first:
 
 ```
-PYTHONUTF8=1 python gpu/rollout.py --shards 4 --log <rng>
+PYTHONUTF8=1 python gpu/ckptdiff.py --rng <rng>
+```
+It JIT-computes both statelog line-sets from the raw dumps (no
+re-simulation), prints per-checkpoint verdicts and the divergence
+bracket, and emits the EXACT resume commands for step 1 — which then
+re-simulates ~25 turns instead of 250 (GPU `--resume-t <T> --turns <n>
+--ckpt 0`, TS `CIV6_RESUME_T=<T> CIV6_CKPT=0`). Resume is full-batch
+(BLAS association preserved) and bit-faithful: the resumed trajectory IS
+the original. Probes (pure reads) resume the same way — seconds per
+iteration. Turn labels run 2..(turns+1); ckptdiff's printed --turns
+already covers the far edge.
+
+## Step 1 — the Phase-1 statelog (over the bracket, or full when no
+checkpoints exist)
+
+```
+PYTHONUTF8=1 python gpu/rollout.py --shards 4 --log <rng>   # add --resume-t/--turns from ckptdiff
 CIV6_LOG=<rng> npm run gpu:replay
 python gpu/logdiff.py          # prints the FIRST divergent line
 ```
@@ -24,11 +43,15 @@ python gpu/logdiff.py          # prints the FIRST divergent line
   in-step probe label (self.turn / state.turn) is one MORE off. Align by
   values when in doubt, not labels.
 - Current fields: PT (totals, gp, esc), PU/BU/RU (positions, hp, acted),
-  TI/TD (tiles), PC (pop/progress/boxes/loy/yields), RT (rival totals,
-  fai, terr + tsum shape-checksum), RC (queue kind/cost/progress, cb,
-  til, hp, yields), CB (EVERY damage roll: diff, rand·1e6, dmg — from
-  the damageRoll/_damage_roll chokepoints; catches reordered/extra rolls
-  invisible to the rng column).
+  TI/TD (tiles), CA (camp locations), PC (pop/progress/boxes/loy/
+  yields), RT (rival totals, fai, terr + tsum shape-checksum), RC (queue
+  kind/cost/progress, loy, cb, til, hp, yields), CB (EVERY damage roll:
+  k = the TS call-site tag [mel/melc, rng, rngrc, rngcs, rcty/rctyc,
+  csty/cstyc, pcty/pctyc], t = target tile, c = the rng counter BEFORE
+  the draw — absolute stream position, aligns draws even when sequences
+  slip — plus diff, rand·1e6, dmg; from the damageRoll/_damage_roll
+  chokepoints; catches reordered/extra rolls invisible to the rng
+  column).
 - **If the log lacks the field you need, ADD IT PERMANENTLY** (both
   sides, same order, milli-ints for floats). Every field in the list
   above was added mid-hunt and immediately paid for itself. Aggregates

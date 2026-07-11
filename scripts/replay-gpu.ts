@@ -17,7 +17,7 @@
  * flips to a rival.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import {
   createGame,
   endTurn,
@@ -30,6 +30,8 @@ import {
   purchaseBuilding,
   purchaseSettler,
   purchaseUnit,
+  serialize,
+  deserialize,
 } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove, builderRemoveFeature } from '../src/core/units';
 import { meleeAttack, rangedAttack } from '../src/core/combat';
@@ -44,6 +46,13 @@ import { tsStateLines } from './statelog';
 
 const LOG_RNG = process.env.CIV6_LOG ? Number(process.env.CIV6_LOG) : null;
 const logLines: string[] = [];
+// §F checkpoints: dump serialize(state) every CIV6_CKPT turns (default 25,
+// 0 = off) into the transient ckpt dir; CIV6_RESUME_T resumes each game
+// from its checkpoint at that turn (games without one are skipped).
+const CKPT_K = process.env.CIV6_CKPT !== undefined ? Number(process.env.CIV6_CKPT) : 25;
+const RESUME_T = process.env.CIV6_RESUME_T ? Number(process.env.CIV6_RESUME_T) : null;
+const CKPT_DIR = 'gpu/fixtures/ckpt';
+if (CKPT_K > 0) mkdirSync(CKPT_DIR, { recursive: true });
 
 const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
@@ -77,7 +86,7 @@ let worst = 0;
 
 for (const game of roll.games) {
   games += 1;
-  const state = createGame({
+  let state = createGame({
     width: roll.width,
     height: roll.height,
     seed: game.seed,
@@ -97,7 +106,18 @@ for (const game of roll.games) {
   const rMax = roll.rMax ?? 0;
   const tol = rowTolerance(C, csMax, rMax);
   const byTurn = new Map(game.actions.map((a) => [a.t, a]));
-  const cityIds: number[] = state.cities.map((x) => x.id);
+  let cityIds: number[] = state.cities.map((x) => x.id);
+  // §F resume: continue this game from its checkpoint (deserialized state
+  // + the saved cityIds/loop-index); games without one are skipped.
+  let t0 = 0;
+  if (RESUME_T !== null) {
+    const ckf = `${CKPT_DIR}/ts_${game.rng}_t${RESUME_T}.json`;
+    if (!existsSync(ckf)) continue;
+    const wrapped = JSON.parse(readFileSync(ckf, 'utf8'));
+    state = deserialize(wrapped.state);
+    cityIds = wrapped.cityIds;
+    t0 = wrapped.t;
+  }
   // Phase-1 combat log: collect the logged game's damage rolls (drained
   // into CB lines by tsStateLines each turn).
   (globalThis as any).__cbLog = LOG_RNG !== null && game.rng === LOG_RNG ? [] : undefined;
@@ -106,7 +126,7 @@ for (const game of roll.games) {
     failures += 1;
   };
 
-  for (let t = 0; t < game.trace.length; t++) {
+  for (let t = t0; t < game.trace.length; t++) {
     const act = byTurn.get(state.turn);
     let bad = false;
     // Unit orders first (a player moves the army, then ends the turn).
@@ -304,6 +324,12 @@ for (const game of roll.games) {
         bad = true;
         break;
       }
+    }
+    // §F checkpoints: raw state every CIV6_CKPT turns (statelog-labeled by
+    // state.turn, matching the GPU's sim.turn naming) — written before the
+    // bad-break so a diverged turn's TS view is also dumped for ckptdiff.
+    if (CKPT_K > 0 && state.turn % CKPT_K === 0) {
+      writeFileSync(`${CKPT_DIR}/ts_${game.rng}_t${state.turn}.json`, JSON.stringify({ t: t + 1, cityIds, state: serialize(state) }));
     }
     if (bad) break;
   }

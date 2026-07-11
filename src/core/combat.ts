@@ -73,16 +73,19 @@ export function terrainDefense(tile: Tile): number {
   return d;
 }
 
-function damageRoll(state: GameState, strengthDiff: number): number {
+function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
   // P4/D-1: the real Civ 6 random factor is 0.8–1.2 (equal-strength hits
   // land "reliably 24–36"), not the old 0.75–1.25.
   const base = 30 * Math.exp(0.04 * strengthDiff);
+  // Phase-1 combat log (P5/S4 tooling; §F enrichment): every roll of the
+  // CIV6_LOG game — the GPU _damage_roll twin. k = call-site tag, t =
+  // target tile, c = the rng counter BEFORE the draw (absolute stream
+  // position). statelog drains into keyed CB lines.
+  const c0 = state.rngState >>> 0;
   const r = nextRandom(state);
   const dmg = Math.max(1, Math.round(base * (0.8 + 0.4 * r)));
-  // Phase-1 combat log (P5/S4 tooling): every roll of the CIV6_LOG game —
-  // the GPU _damage_roll twin. statelog drains into keyed CB lines.
   const cb = (globalThis as any).__cbLog;
-  if (cb) cb.push(`diff${strengthDiff} r${Math.round(r * 1e6)} dmg${dmg}`);
+  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${strengthDiff} r${Math.round(r * 1e6)} dmg${dmg}`);
   return dmg;
 }
 
@@ -120,8 +123,8 @@ function sackCity(state: GameState, city: City): void {
 function attackCity(state: GameState, attacker: Unit, city: City): void {
   const atkCS = UNITS[attacker.type]?.combat ?? 0;
   const defCS = cityDefenseStrength(state, city);
-  const dmgToCity = damageRoll(state, atkCS - defCS);
-  const dmgToAttacker = damageRoll(state, defCS - atkCS);
+  const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
+  const dmgToAttacker = damageRoll(state, defCS - atkCS, 'pctyc', city.centerIndex);
   state.cityHp[String(city.id)] = getCityHp(state, city.id) - dmgToCity;
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
@@ -208,8 +211,8 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // Civilians are simply killed (Civ 6 captures; we don't model capture).
     killUnit(state, defender);
   } else {
-    defender.hp -= damageRoll(state, atkCS - defCS);
-    attacker.hp -= damageRoll(state, defCS - atkCS);
+    defender.hp -= damageRoll(state, atkCS - defCS, 'mel', targetIndex);
+    attacker.hp -= damageRoll(state, defCS - atkCS, 'melc', targetIndex);
     if (defender.hp <= 0) {
       killUnit(state, defender);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
@@ -250,14 +253,14 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
         const defCS = rivalCityDefense(state, rc.rival, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, def.ranged.strength - defCS));
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, def.ranged.strength - defCS, 'rngrc', targetIndex));
         attacker.movesLeft = 0;
         return ok;
       }
       const cs = cityStateAt(state, targetIndex);
       if (cs && cs.centerIndex === targetIndex) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, def.ranged.strength - defCS));
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, def.ranged.strength - defCS, 'rngcs', targetIndex));
         attacker.movesLeft = 0;
         return ok;
       }
@@ -266,7 +269,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   }
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target);
-  defender.hp -= damageRoll(state, def.ranged.strength - defCS);
+  defender.hp -= damageRoll(state, def.ranged.strength - defCS, 'rng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
   return ok;
@@ -313,8 +316,8 @@ function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalCity): n
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
   const atkCS = UNITS[attacker.type]?.combat ?? 0;
   const defCS = rivalCityDefense(state, rival, city);
-  city.hp -= damageRoll(state, atkCS - defCS);
-  attacker.hp -= damageRoll(state, defCS - atkCS);
+  city.hp -= damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
+  attacker.hp -= damageRoll(state, defCS - atkCS, 'rctyc', city.centerIndex);
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
   if (city.hp <= 0) {
@@ -341,8 +344,8 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
 function attackCityState(state: GameState, attacker: Unit, cs: CityState): void {
   const atkCS = UNITS[attacker.type]?.combat ?? 0;
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-  cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS);
-  attacker.hp -= damageRoll(state, defCS - atkCS);
+  cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
+  attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
   if ((cs.hp ?? 0) <= 0) captureCityState(state, cs);

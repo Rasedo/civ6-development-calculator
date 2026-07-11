@@ -234,12 +234,17 @@ None gate-caught yet, but every reshuffle hunts one of these:
 
 ## F. Hunt tooling (current, for reference)
 
-**BACKLOG (owner design, 2026-07-11/12): RAW CHECKPOINTS — one
-mechanism for diagnosis AND verification.** Today a gate failure costs
-a ~4-6 min re-simulation of all 72 games just to produce the statelog
-pair (the biggest P5 hunt overhead, ~10 reruns), and fix-verification
-re-simulates from t0. The design (supersedes the earlier separate
-snapshot-resume + two-tier-statelog notes):
+**IMPLEMENTED (owner design, 2026-07-12): RAW CHECKPOINTS — one
+mechanism for diagnosis AND verification.** Shipped: rollout `--ckpt`
+(default 25; parent clears the transient dir per run) dumps
+snapshot()+rngs+paths per shard; the replay dumps wrapped
+serialize(state) per game via CIV6_CKPT; `gpu/ckptdiff.py --rng` is the
+JIT bracket finder (validated: 10/10 checkpoint pairs match on a green
+game via the raw-dump readers); `--resume-t`/CIV6_RESUME_T resume both
+engines from any checkpoint (validated bit-faithful: resumed labels
+226-250 matched the original exactly); scripts/ckpt-lines.ts is the TS
+JIT reader. CB lines enriched with k (call-site tag), t (target tile),
+c (pre-draw rng counter). The original rationale:
 - Every normal gate run dumps RAW state checkpoints every K turns
   (K≈25) for ALL games into a transient gitignored dir, overwritten per
   run: TS = serialize(state) per game (~1-3ms each — every-turn would

@@ -1978,23 +1978,30 @@ class BatchSim:
         self.rng_state = torch.where(mask, a, self.rng_state)
         return out
 
-    def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor) -> torch.Tensor:
+    def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None) -> torch.Tensor:
         """Mirrors damageRoll: 30·e^(0.04·Δ)·rand(0.8–1.2) (P4/D-1: the real
         Civ 6 range — equal-strength hits land 24–36), JS-rounded, min 1.
         Δ is always an integer here, so the exponential comes from the
         fixture's JS-computed table (libm exp() can differ by an ulp
         between runtimes and the result rounds to an integer)."""
+        # Phase-1 combat log (P5/S4 tooling; §F enrichment): every roll of
+        # the logged game becomes a keyed CB<seq> line — TS damageRoll is
+        # the twin. k = the TS call-site tag (one tag per TS function, even
+        # when it serves several GPU branches), t = target tile, c = the
+        # rng counter BEFORE the draw (absolute stream position — aligns
+        # draws even when sequences slip). Draw-order parity makes
+        # sequences align; a reordered/extra roll shows as a mismatched CB
+        # line, invisible to the rng column.
+        b = getattr(self, "_log_combat_b", None)
+        log_hit = b is not None and bool(mask[b])
+        c0 = int(self.rng_state[b]) if log_hit else 0
         r = self._next_random(mask)
         base = self._dmg_base[(diff + 60).clamp(0, 120)]
         dmg = js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
-        # Phase-1 combat log (P5/S4 tooling): every roll of the logged game,
-        # keyed CB<seq> per turn by statelog — TS damageRoll is the twin.
-        # Draw-order parity makes sequences align; a reordered/extra roll
-        # shows as a mismatched CB line, invisible to the rng column.
-        b = getattr(self, "_log_combat_b", None)
-        if b is not None and bool(mask[b]):
+        if log_hit:
+            t_ = int(tile[b]) if tile is not None else -1
             self._combat_events.append(
-                f"diff{int(diff[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}"
+                f"k:{k} t:{t_} c:{c0} diff{int(diff[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}"
             )
         return dmg
 
@@ -2694,8 +2701,8 @@ class BatchSim:
         gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.p_type[:, p]]
-        d_city = self._damage_roll(att, atk_cs - def_cs)
-        d_atk = self._damage_roll(att, def_cs - atk_cs)
+        d_city = self._damage_roll(att, atk_cs - def_cs, k="rcty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_cs, k="rctyc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
         self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows]
         self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
@@ -2826,8 +2833,8 @@ class BatchSim:
                 b_cs = self._unit_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1)
-                d_def = self._damage_roll(att, atk_cs - def_cs)
-                d_atk = self._damage_roll(att, def_cs - atk_cs)
+                d_def = self._damage_roll(att, atk_cs - def_cs, k="mel", tile=tgt)
+                d_atk = self._damage_roll(att, def_cs - atk_cs, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
                 def_dead = torch.zeros_like(att)
                 for grp, at_map, hp_t, alive_t, slot_t in (
@@ -2871,7 +2878,7 @@ class BatchSim:
                 b_cs = self._unit_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1)
-                d_def = self._damage_roll(r_att, atk_rs - def_cs)
+                d_def = self._damage_roll(r_att, atk_rs - def_cs, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
                     (is_b, self.barb_at, self.u_hp, self.u_alive, bslot),
@@ -2898,7 +2905,7 @@ class BatchSim:
             if bool(r_civ.any()):
                 atk_rs = self._p_rng_str[self.p_type[:, p]]
                 def_cs = self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1).to(atk_rs.dtype)  # civilian combat 0 + terrain
-                d_def = self._damage_roll(r_civ, atk_rs - def_cs)
+                d_def = self._damage_roll(r_civ, atk_rs - def_cs, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
                 self.v_hp[rows, ks] -= d_def[rows]
@@ -2931,8 +2938,8 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
                 )
-                d_cs = self._damage_roll(cs_hit, atk_cs - def_cs)
-                d_atk = self._damage_roll(cs_hit, def_cs - atk_cs)
+                d_cs = self._damage_roll(cs_hit, atk_cs - def_cs, k="csty", tile=tgt)
+                d_atk = self._damage_roll(cs_hit, def_cs - atk_cs, k="cstyc", tile=tgt)
                 rows = cs_hit.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
                 self.p_hp[:, p] = torch.where(cs_hit, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
@@ -2961,7 +2968,7 @@ class BatchSim:
                 gslot2 = self.rv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                 gar2 = ((gslot2 >= 0) & (self.v_civ[bidx2, gslot2.clamp(min=0)] == civ2)).long()
                 def_cs2 = torch.maximum(best_r2, torch.full_like(best_r2, 15)) + gar2 * 5
-                d_city2 = self._damage_roll(r_sieg, self._p_rng_str[self.p_type[:, p]] - def_cs2)
+                d_city2 = self._damage_roll(r_sieg, self._p_rng_str[self.p_type[:, p]] - def_cs2, k="rngrc", tile=tgt)
                 rows2 = r_sieg.nonzero(as_tuple=True)[0]
                 self.rc_hp[rows2, civ2[rows2], slot2[rows2]] = torch.maximum(
                     self.rc_hp[rows2, civ2[rows2], slot2[rows2]] - d_city2[rows2],
@@ -2982,7 +2989,7 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx2).long() * 6
                 )
-                d_cs3 = self._damage_roll(r_cs, self._p_rng_str[self.p_type[:, p]] - def_cs3)
+                d_cs3 = self._damage_roll(r_cs, self._p_rng_str[self.p_type[:, p]] - def_cs3, k="rngcs", tile=tgt)
                 rows3 = r_cs.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows3, cs_sc[rows3]] = torch.maximum(
                     self.cs_hp[rows3, cs_sc[rows3]] - d_cs3[rows3],
@@ -4439,8 +4446,8 @@ class BatchSim:
             d_cs_b = self._unit_combat[self.u_type.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)]
             d_cs_v = self._p_combat[self.v_type.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)]
             def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1)
-            d_def = self._damage_roll(mil_att, atk_cs_all - def_cs)
-            d_atk = self._damage_roll(mil_att, def_cs - atk_cs_all)
+            d_def = self._damage_roll(mil_att, atk_cs_all - def_cs, k="mel", tile=tgt)
+            d_atk = self._damage_roll(mil_att, def_cs - atk_cs_all, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
             def_dead = torch.zeros_like(mil_att)
             for grp, at_map, hp_t, alive_t in (
@@ -4518,8 +4525,8 @@ class BatchSim:
         gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._unit_combat[self.u_type[:, u]]
-        d_city = self._damage_roll(att, atk_cs - def_cs)
-        d_atk = self._damage_roll(att, def_cs - atk_cs)
+        d_city = self._damage_roll(att, atk_cs - def_cs, k="rcty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_cs, k="rctyc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
         self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows]
         self.u_hp[:, u] = torch.where(att, self.u_hp[:, u] - d_atk, self.u_hp[:, u])
@@ -4668,8 +4675,9 @@ class BatchSim:
         gm = self.pmil_at.gather(1, sitec)
         gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
         def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
-        d_city = self._damage_roll(att, atk_cs - def_cs)
-        d_self = self._damage_roll(att, def_cs - atk_cs)
+        _ct = self.site.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
+        d_city = self._damage_roll(att, atk_cs - def_cs, k="pcty", tile=_ct)
+        d_self = self._damage_roll(att, def_cs - atk_cs, k="pctyc", tile=_ct)
         rows = att.nonzero(as_tuple=True)[0]
         cs = slot[rows]
         self.city_hp[rows, cs] -= d_city[rows]
