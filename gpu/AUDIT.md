@@ -134,22 +134,41 @@ pantheon 25 faith, the 10 base governments.
 
 ## C. Order/slot integrity latents (the P6/P7 family)
 
-None gate-caught yet, but every reshuffle hunts one of these:
-- C-1. **Column-0 capital pin**: GPU pins loyalty/blocks flips by column 0
-  and _domination reads site[:,0]; TS pins isCapital and reads static
-  capitalTiles. Wrong once a captured capital's column 0 is re-occupied
-  by a hole-reuse founding; TS also re-crowns a refound capital after
-  total collapse (capitalTiles[0] updates), GPU doesn't.
-- C-2. **Column-order couplings**: border-claim/worked-tile interactions
-  between ADJACENT cities and the multi-defector flip order follow column
-  order, not city_seq (TS array order). Same class as the three shipped
-  city_seq fixes (loyalty pop-mix, luxury tie, trace cityIds).
-- C-3. **Dead-slot reclamation** (task #24): unit pools (U_MAX 256,
-  append-only high-water) and city columns (6 + holes) — the true fix for
-  C-1/C-2; unit-order-IS-spec makes it parity-core work.
-- C-4. P6 (task #23): rival per-city yield/pick interleaving — the rival
-  side still applies one top-of-phase snapshot where TS recomputes fresh
-  per city (the player half was fixed in P4).
+- C-1. **RESOLVED (P7, 2026-07-12)**: capital identity — is_cap +
+  cap_tile_player mirror TS isCapital/capitalTiles[0] (refound capitals
+  crown + get the Palace + update the domination anchor; captured
+  capitals' reused columns no longer pin/carry phantom Palace terms).
+  The rc side needs no flag: rc settle slots reach slot 0 only on a
+  total-collapse refound, which IS the new capital in TS too (slot 0 ≡
+  rc capital — documented invariant).
+- C-2. **PARTIALLY RESOLVED (P7)**: player loyalty defectors now resolve
+  in acquisition order (city_seq) with LIVE per-defection pressures.
+  REMAINING (accepted residual): the player city WALK iterates columns,
+  TS iterates array order — border-claim/worked-tile couplings between
+  ADJACENT cities diverge only when a hole-reuse city contends with an
+  array-earlier/column-later neighbor in the same turn; a per-batch walk
+  permutation is not vectorizable. The checkpoint tooling makes the
+  eventual concrete case cheap to hunt.
+- C-3. **RESOLVED for units (P7)**: _reclaim_pool — stable compaction of
+  the u/v/p pools at the step top when the high-water nears the cap
+  (CIV6_RECLAIM_AT forces it for validation gates; TS arrays splice, so
+  living relative order is the spec and stable compaction is
+  behavior-invariant by construction; maps remap by value through the
+  inverse permutation). REMAINING: rc city slots (24/rival, holes from
+  captures/flips) still append-only behind an assert — same compaction
+  pattern applies if a long-game world ever trips it.
+- C-4. P6 (task #23): RESOLVED 2026-07-12 — the parked district-order/
+  interleaving bug class is empirically dead: the C1-B2 per-city-queue
+  restructure + P4/P5 interleaving (per-j live yields, _eff_version
+  invalidation, the S5 post-walk bump) closed it. Evidence: the
+  off-script gate exact across all 72 games incl. a beyond-horizon 300t
+  stress run over the historical regime (t239-294; only t239-250 is
+  reachable in the shipping game). The two remaining deliberate
+  snapshots (pre-turn alive mask, phase-top unlock/amenity maps) mirror
+  TS's own. OWNER RULE (2026-07-12): the horizon contract is 250 =
+  TURN_LIMIT — 300t runs are optional stress evidence, never gates
+  (there is no game-over freeze, so they simulate real but unreachable
+  states).
 - C-5. rc slots: the degenerate first-free-hole fallback at founded_n ≥
   RC is untraceable in TS terms (documented at the capture sites).
 - C-6. res_stripped plane (bonus-resource tile picks) — enabling work

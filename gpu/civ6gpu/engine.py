@@ -310,6 +310,7 @@ _MUTABLE = [
     "district_dead",  # P5/S1: captured districts are paved-but-dead
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
+    "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
@@ -413,7 +414,19 @@ class BatchSim:
         # latent, rare, banked for P7's slot reclamation.)
         self.city_seq = torch.zeros(B, C, dtype=torch.long, device=device)  # capital = seq 0
         self.city_seq_next = torch.ones(B, dtype=torch.long, device=device)
+        # P7 (C-1): the capital is an IDENTITY, not column 0 — TS isCapital
+        # + capitalTiles[0] (which UPDATES when a total-collapse refound
+        # crowns a new capital). A captured capital's hole-reused column
+        # must not pin loyalty / carry the Palace / anchor domination.
+        # (The rc side needs no flag: rc settle slots use last-alive+1,
+        # which reaches slot 0 only when ALL cities died — and that
+        # founding IS the new capital in TS too. Slot 0 ≡ rc capital.)
+        self.is_cap = torch.zeros(B, C, dtype=torch.bool, device=device)
+        self.is_cap[:, 0] = True
+        import os as _os
+        self._reclaim_at = int(_os.environ.get("CIV6_RECLAIM_AT", U_MAX - 24))
         self.site[:, 0] = self.site_tile[:, 0]
+        self.cap_tile_player = self.site[:, 0].clone()  # P7 (C-1): capitalTiles[0] — after the capital site lands
         self.center_yields[:, 0] = self.site_cy[:, 0]
         self.center_raw_food[:, 0] = self.site_raw_food[:, 0]
         self.base_maintenance[:, 0] = self.site_maint[:, 0]
@@ -781,14 +794,12 @@ class BatchSim:
         fp2 = self.tile_yields.double() * 2
         self._dyadic_fp = bool((fp2 == fp2.round()).all())
 
-        # The Palace exists only in the capital (slot 0).
-        pal_y = torch.zeros(C, 6, dtype=dtype, device=device)
-        pal_y[0] = rules.palace_yields.to(device=device, dtype=dtype)
-        self.palace_slot_yields = pal_y
-        slot0 = torch.zeros(C, dtype=dtype, device=device)
-        slot0[0] = 1.0
-        self.palace_slot_housing = slot0 * rules.palace_housing
-        self.palace_slot_amenities = slot0 * rules.palace_amenities
+        # P7 (C-1): the Palace follows the capital IDENTITY (is_cap), not
+        # column 0 — a refound capital gains it (TS gives the first city
+        # ['PALACE']), a hole-reused column 0 does not.
+        self._palace_y = rules.palace_yields.to(device=device, dtype=dtype)  # [6]
+        self._palace_housing = float(rules.palace_housing)
+        self._palace_amenities = float(rules.palace_amenities)
 
         # Boost schedules: [turn, kind(0 tech/1 civic), idx] per game.
         self.boost_schedule = [f.get("boostSchedule", []) for f in fixtures]
@@ -1589,7 +1600,7 @@ class BatchSim:
             cf = torch.where(self.drought.gather(1, sitec) > 0, (cf - 1).clamp(min=0), cf)
             center_y = self.center_yields.clone()
             center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
-        total = worked_y + center_y + self.palace_slot_yields.unsqueeze(0) + b_y
+        total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.view(1, 1, 6) + b_y
         if self.districts_on:
             # District adjacency yields (D2b: Campus science only, placed where no
             # dynamic source is live so the value is purely floor(static);
@@ -1650,7 +1661,7 @@ class BatchSim:
             cap_bonus.scatter_add_(1, self._cs_yidx, tier1)
             total[:, 0, :] += cap_bonus
 
-        amen_have = self.palace_slot_amenities.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_amenities)
+        amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + torch.einsum("bcn,n->bc", bf, rd.b_amenities)
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
         self._last_lux = lux_add  # the walk freezes this (TS: one luxMap per turn)
@@ -1679,7 +1690,7 @@ class BatchSim:
                 torch.maximum(self.water_housing, torch.full_like(self.water_housing, self._aq_no_fresh_total)),
             )
             water_h = torch.where(has_aq, aq_h, self.water_housing)
-        housing = water_h + self.palace_slot_housing.view(1, C) + torch.einsum("bcn,n->bc", bf, rd.b_housing)
+        housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + torch.einsum("bcn,n->bc", bf, rd.b_housing)
         if self.improvements_on:
             # +housing per owned FARM tile within the work radius (pillaged or
             # not — computeHousing does not gate on pillaged, unlike yields).
@@ -1774,7 +1785,7 @@ class BatchSim:
         B, dev = self.B, self.device
         if self.R == 0:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
-        caps = torch.cat([self.site[:, :1], self.rc_center[:, : self.R, 0]], dim=1)  # [B, 1+R]
+        caps = torch.cat([self.cap_tile_player.unsqueeze(1), self.rc_center[:, : self.R, 0]], dim=1)  # [B, 1+R] — P7: capitalTiles[0], not column 0's site
         p_owns = self.center_at.gather(1, caps) >= 0
         rv = self.rvcity_at.gather(1, caps)  # rival index or -1
         owner = torch.where(p_owns, torch.zeros_like(rv), torch.where(rv >= 0, rv + 1, torch.full_like(rv, -1)))
@@ -2568,6 +2579,7 @@ class BatchSim:
             self.alive[b, c_new] = True
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
+            self.is_cap[b, c_new] = False  # P7: captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
@@ -2637,6 +2649,7 @@ class BatchSim:
             self.alive[b, c_new] = True
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
+            self.is_cap[b, c_new] = False  # P7: captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
@@ -5341,27 +5354,29 @@ class BatchSim:
         upd = self.alive & any_rc.unsqueeze(1)
         nxt = (self.loyalty + delta).clamp(min=0, max=float(self.rules.rivals.get("loyaltyMax", 100)))
         self.loyalty = torch.where(upd, nxt, self.loyalty)
-        cap_pin = upd[:, 0]
-        self.loyalty[:, 0] = torch.where(cap_pin, torch.full_like(self.loyalty[:, 0], 100.0), self.loyalty[:, 0])
-        flip = upd & (self.loyalty <= 0)
-        flip[:, 0] = False
+        # P7 (C-1): pin/guard by IDENTITY (TS isCapital), not column 0.
+        cap_pin = upd & self.is_cap
+        self.loyalty = torch.where(cap_pin, torch.full_like(self.loyalty, 100.0), self.loyalty)
+        flip = upd & (self.loyalty <= 0) & ~self.is_cap
         if not bool(flip.any()):
             return
         # Winner per flipping city: the rival with the most pressure (ties →
         # lowest id; zero pressure still wins over the -1 sentinel).
-        for c in range(1, C):
-            fc = flip[:, c]
-            if not bool(fc.any()):
-                continue
-            site_c = self.site[:, c].clamp(min=0)
-            d_rc = self.pair_dist[site_c.unsqueeze(1), rc_flat].to(self.dtype)
-            wr = (rng + 1 - d_rc).clamp(min=0) * self.rc_pop.reshape(B, -1).to(self.dtype) * rc_live.to(self.dtype)
-            press_r = wr.reshape(B, self.R if self.R > 0 else 1, self.RC).sum(dim=2)
-            press_r = torch.where(self.r_alive, press_r, torch.full_like(press_r, -1.0))
-            winner = first_argmax(press_r)  # ties -> lowest rival id (TS strict >)
-            rows = fc.nonzero(as_tuple=True)[0]
-            for b in rows.tolist():
-                self._transfer_city_to_rival(b, c, int(winner[b]))
+        # P7 (C-2): defectors resolve in ACQUISITION order (TS collects them
+        # in its array-order loop) with pressures read LIVE per defection —
+        # an earlier transfer moves pops that later defections must see.
+        pairs: list[tuple[int, int, int]] = []
+        for c in range(C):
+            for b in flip[:, c].nonzero(as_tuple=True)[0].tolist():
+                pairs.append((b, int(self.city_seq[b, c]), c))
+        for b, _, c in sorted(pairs):
+            site_c = int(self.site[b, c])
+            d_rc1 = self.pair_dist[site_c, rc_flat[b].clamp(min=0)].to(self.dtype)
+            wr = (rng + 1 - d_rc1).clamp(min=0) * self.rc_pop[b].reshape(-1).to(self.dtype) * rc_live[b].to(self.dtype)
+            press_r = wr.reshape(self.R if self.R > 0 else 1, self.RC).sum(dim=1)
+            press_r = torch.where(self.r_alive[b], press_r, torch.full_like(press_r, -1.0))
+            winner = int(first_argmax(press_r.unsqueeze(0))[0])  # ties -> lowest rival id (TS strict >)
+            self._transfer_city_to_rival(b, c, winner)
 
     def _transfer_city_to_rival(self, b: int, c: int, w_: int, conquest: bool = False) -> bool:
         """The player-city -> rival-city transfer (shared by loyalty flips
@@ -5372,6 +5387,7 @@ class BatchSim:
         old_pop = int(self.pop[b, c])
         # the city leaves the empire
         self.alive[b, c] = False
+        self.is_cap[b, c] = False  # P7 hygiene: identity dies with the city (a refound sets it fresh)
         self.pop[b, c] = 0
         self.current[b, c] = -1
         owned = self.owner[b] == c
@@ -5509,6 +5525,34 @@ class BatchSim:
                         self.builders_trained = self.builders_trained + (can & (utp == self._builder_idx)).long()
 
     # --- one full turn -----------------------------------------------------------
+
+    def _reclaim_pool(self, prefix: str) -> None:
+        """P7 (C-3, the G-S cliff): stable compaction of a unit pool when
+        its high-water nears the cap. TS arrays SPLICE dead units, so the
+        LIVING's relative order IS the spec — a stable compaction preserves
+        it exactly (slot loops visit the same units in the same order;
+        draws unchanged). Tile->slot maps remap by VALUE through the
+        inverse permutation — no semantic rebuild. CIV6_RECLAIM_AT lowers
+        the trigger for forced-compaction validation gates."""
+        if prefix == "u":
+            fields, counter, maps = ["u_acted", "u_type", "u_tile", "u_hp"], "next_slot", ["barb_at"]
+        elif prefix == "v":
+            fields, counter, maps = ["v_acted", "v_civ", "v_type", "v_tile", "v_hp", "v_charges"], "v_next", ["rv_at", "rvciv_at"]
+        else:
+            fields, counter, maps = ["p_acted", "p_type", "p_tile", "p_hp", "p_charges"], "p_next", ["pmil_at", "pciv_at"]
+        alive = getattr(self, f"{prefix}_alive")
+        B, U = alive.shape
+        perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept
+        inv = torch.empty_like(perm)
+        inv.scatter_(1, perm, torch.arange(U, device=alive.device).unsqueeze(0).expand(B, -1))
+        for name in fields:
+            setattr(self, name, getattr(self, name).gather(1, perm))
+        new_alive = alive.gather(1, perm)
+        setattr(self, f"{prefix}_alive", new_alive)
+        getattr(self, counter).copy_(new_alive.sum(dim=1))
+        for m in maps:
+            at = getattr(self, m)
+            setattr(self, m, torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
 
     def step(
         self,
@@ -6078,6 +6122,7 @@ class BatchSim:
                 continue
             rows = valid.nonzero(as_tuple=True)[0]
             c_new = slot_new[rows]
+            new_cap = self.alive[rows].sum(dim=1) == 0  # P7: a total-collapse refound IS the new capital (TS isCapital + capitalTiles[0] update)
             s_idx = cand_site[rows]
             p_idx = ptr[rows]
             self.site[rows, c_new] = s_idx
@@ -6105,6 +6150,8 @@ class BatchSim:
             self.founded_n[rows] += (c_new == self.founded_n[rows]).long()
             self.city_seq[rows, c_new] = self.city_seq_next[rows]
             self.city_seq_next[rows] += 1
+            self.is_cap[rows, c_new] = new_cap
+            self.cap_tile_player[rows] = torch.where(new_cap, s_idx, self.cap_tile_player[rows])
             # Claim the center (unconditionally, as foundCity does) plus any
             # unowned first-ring tiles; the center becomes a district tile.
             self.owner[rows, s_idx] = c_new
@@ -6151,6 +6198,23 @@ class BatchSim:
                 )
                 self.owner[rows[free_nb], n_d[free_nb]] = c_new[free_nb]
             self._eff_version += 1  # d_static_adj changed
+
+        # --- P7 (C-3): dead-slot reclamation — at the step END, never the
+        # top: callers sample slot-keyed unit actions from the PRE-step
+        # masks, so the layout must hold from unit_action_mask() through
+        # this step's applies (compacting at the top re-pointed in-flight
+        # orders at the wrong units — the forced-compaction gate caught
+        # it). Stable compaction is otherwise behavior-invariant (TS
+        # arrays splice; living relative order is the spec); fires when a
+        # pool's high-water nears its cap (or constantly under
+        # CIV6_RECLAIM_AT).
+        if self.units_mode:
+            if int(self.next_slot.max()) >= self._reclaim_at:
+                self._reclaim_pool("u")
+            if int(self.v_next.max()) >= self._reclaim_at:
+                self._reclaim_pool("v")
+            if int(self.p_next.max()) >= self._reclaim_at:
+                self._reclaim_pool("p")
 
         self.turn += 1
         dom = self._domination()  # GV-3
