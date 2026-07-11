@@ -107,8 +107,32 @@ stays parked (masked: exporter emits single-tile steps; an RL-surface question).
   desynced the trace columns); (6) statelog RC lines now carry hp
   permanently. Also: rollout.py degrades its unicode summary prints
   instead of dying on cp1251 pipes (PYTHONUTF8 guard).
-- **S3 — founding cluster (C-14):** rival founding = player founding (pop 1,
-  center strip, uniform spacing, the player's 48+18n settler curve).
+- **S3 — founding cluster (C-14): LANDED.** Rival founding = player founding:
+  pop 1 (the capital's old pop-3 head start died — a t0 world change, all
+  fixtures re-exported), the foundCity center strip (improvement + removable
+  feature die: yields, +3 defense, lent district adjacency — GPU
+  _rival_try_found gained the player founding twin incl. the idempotence
+  guard), uniform CITY_MIN_DIST=4 spacing (the +1 rival-vs-rival pad
+  dropped, both engines), and the player's speed-scaled settler curve
+  48+18·max(0,c−1) (data/rivals.ts derives from GAME_SPEED; exporter
+  settlerBase/settlerPer 90/40→48/18; GPU fallback defaults aligned).
+  THE RESHUFFLE HUNT caught a deep S2 consequence: TS iterates
+  state.cities in ARRAY order (acquisition order), which stops matching
+  GPU COLUMN order once a hole-reuse founding lands a new city in a low
+  column — the loyalty own-pressure "earlier cities already grew" mix
+  used column order and dropped an array-earlier city's same-turn growth
+  (seed 9066 t184: own 53 vs 58; all four gate failures, one root). FIX:
+  city_seq/city_seq_next rank columns by acquisition (set at founding +
+  both captures); the loyalty earlier-mask compares seq. Statelog PC
+  lines now carry loy permanently. REMAINING LATENTS BANKED FOR P7
+  (order/slot family, none gate-caught yet): (a) the GPU pins loyalty
+  and blocks flips by COLUMN 0 and _domination reads site[:,0], but TS
+  pins isCapital / reads static capitalTiles — wrong once a captured
+  capital's column 0 is re-occupied by a hole-reuse founding (and TS
+  re-crowns a refound capital after total collapse, updating
+  capitalTiles[0]); (b) border-claim/worked-tile order coupling between
+  ADJACENT cities and the multi-defector flip order still follow column
+  order, not city_seq.
 - **S4 — rival border growth (C-15):** consume rc.cultureBox against
   borderGrowthCost with the player's pick policy + radius 5 (timer dies).
 - **S5 — GP overflow/effects (C-16) + pantheons (C-17):** rival GPP keeps

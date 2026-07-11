@@ -78,7 +78,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     const yt = computeCityStats(state, c).total;
     L.push(
       `${p}PC ${c.centerIndex} = pop${c.population} pr${Math.round((c.queue[0]?.progress ?? 0)*1000)} ` +
-        `fbox${Math.round(c.foodBox*1000)} hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length} ` +
+        `fbox${Math.round(c.foodBox*1000)} loy${Math.round((c.loyalty ?? 100)*1000)} ` +
+        `hp${getCityHp(state, c.id)} til${c.tilesAcquired} nbld${c.buildings.filter((bb) => bb !== 'PALACE').length} ` +
         `yf${Math.round(yt.food*1000)} yp${Math.round(yt.production*1000)} yg${Math.round(yt.gold*1000)} ` +
         `ys${Math.round(yt.science*1000)} yc${Math.round(yt.culture*1000)} yfa${Math.round(yt.faith*1000)}`,
     );

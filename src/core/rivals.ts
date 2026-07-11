@@ -111,7 +111,9 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
     name: nextCityName(rival),
     civId: civOfRival(rival.id),
     centerIndex: tile.index,
-    population: rival.cities.length === 0 ? 3 : 1,
+    // P5/S3 (C-14): pop 1 like foundCity — the capital's old pop-3 head
+    // start was an asymmetric pacing crutch.
+    population: 1,
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
@@ -128,6 +130,11 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
+  // P5/S3 (C-14): founding strips like foundCity — the improvement and the
+  // removable feature die with the center (yields, +3 defense, lent
+  // district adjacency all read the live map).
+  tile.improvement = null;
+  if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
   tile.rivalId = rival.id;
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
     // Mirrors foundCity: the full first ring, water included — a coastal
@@ -472,8 +479,10 @@ function tryFoundCity(state: GameState, rival: RivalCiv): void {
         state.rivals.some((r) =>
           r.cities.some(
             (c) =>
+              // P5/S3 (C-14): uniform spacing — the old +1 rival-vs-rival
+              // pad was asymmetric with canFoundCity's flat CITY_MIN_DIST.
               hexDistance(state.map.tiles[c.centerIndex].col, state.map.tiles[c.centerIndex].row, t.col, t.row) <
-              CITY_MIN_DIST + 1,
+              CITY_MIN_DIST,
           ),
         );
       if (tooClose) continue;

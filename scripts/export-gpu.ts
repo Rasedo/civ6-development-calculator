@@ -368,8 +368,8 @@ const rules = {
   rivals: {
     maxPop: RIVAL_MAX_POP,
     maxCities: RIVAL_MAX_CITIES,
-    settlerBase: 90, // RIVAL_SETTLER_COST(c) = 90 + 40·max(0, c − 1)
-    settlerPer: 40,
+    settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: RIVAL_SETTLER_COST(c) = the player's 48 + 18·max(0, c − 1)
+    settlerPer: Math.round(30 * GAME_SPEED),
     borderPeriod: RIVAL_BORDER_PERIOD,
     gppRate: RIVAL_GPP_RATE,
     pantheonTurn: RIVAL_PANTHEON_TURN,

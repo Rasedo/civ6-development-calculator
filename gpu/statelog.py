@@ -88,6 +88,7 @@ def gpu_state_lines(sim, b):
             L.append(
                 f"{p}PC {int(sim.site[b, c])} = pop{int(sim.pop[b, c])} "
                 f"pr{_milli(sim.progress[b, c])} fbox{_milli(sim.food_box[b, c])} "
+                f"loy{_milli(sim.loyalty[b, c])} "
                 f"hp{int(sim.city_hp[b, c])} til{int(sim.tiles_acquired[b, c])} nbld{int(sim.buildings[b, c].sum())} "
                 f"yf{_milli(_ct[b, c, 0])} yp{_milli(_ct[b, c, 1])} yg{_milli(_ct[b, c, 2])} "
                 f"ys{_milli(_ct[b, c, 3])} yc{_milli(_ct[b, c, 4])} yfa{_milli(_ct[b, c, 5])}"

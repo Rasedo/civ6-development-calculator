@@ -309,7 +309,7 @@ _MUTABLE = [
     "best_melee", "r_best_melee",  # P4/D-22 city-defense trackers
     "district_dead",  # P5/S1: captured districts are paved-but-dead
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
-    "next_site_ptr", "founded_n", "loyalty",
+    "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
@@ -403,6 +403,16 @@ class BatchSim:
         self.dist = torch.full((B, C, T), 127, dtype=torch.int16, device=device)
         self.next_site_ptr = torch.ones(B, dtype=torch.long, device=device)  # site 0 = the capital, consumed
         self.founded_n = torch.ones(B, dtype=torch.long, device=device)  # monotonic: flips never free a slot
+        # P5/S3 gate-catch (seed 9066 t184): TS iterates state.cities in
+        # ARRAY order (acquisition order), which stops matching column order
+        # once an S2 hole-reuse founding lands a NEW city in a LOW column.
+        # city_seq[b, c] ranks column c by acquisition; every order-coupled
+        # mirror of the TS city loop (loyalty's grown/not-grown pop mix)
+        # must compare seq, not column index. (Border-claim/worked-tile
+        # order coupling between ADJACENT cities remains column-ordered —
+        # latent, rare, banked for P7's slot reclamation.)
+        self.city_seq = torch.zeros(B, C, dtype=torch.long, device=device)  # capital = seq 0
+        self.city_seq_next = torch.ones(B, dtype=torch.long, device=device)
         self.site[:, 0] = self.site_tile[:, 0]
         self.center_yields[:, 0] = self.site_cy[:, 0]
         self.center_raw_food[:, 0] = self.site_raw_food[:, 0]
@@ -2519,6 +2529,8 @@ class BatchSim:
             else:
                 self.founded_n[b] += 1
             self.alive[b, c_new] = True
+            self.city_seq[b, c_new] = int(self.city_seq_next[b])
+            self.city_seq_next[b] += 1
             self.site[b, c_new] = c_t
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
@@ -2585,6 +2597,8 @@ class BatchSim:
             else:
                 self.founded_n[b] += 1
             self.alive[b, c_new] = True
+            self.city_seq[b, c_new] = int(self.city_seq_next[b])
+            self.city_seq_next[b] += 1
             self.site[b, c_new] = c_t
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
@@ -3523,7 +3537,7 @@ class BatchSim:
             mult = self.rules.gold_purchase_mult
             afford_b = self._afford(self.r_treasury[:, r].unsqueeze(1), (rdv.b_cost.double() * mult).unsqueeze(0))
             pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
-            s_cost_r = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities.double() - 1).clamp(min=0)
+            s_cost_r = rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities.double() - 1).clamp(min=0)
             ps = (
                 (n_cities < rr.get("maxCities", 6))
                 & self._afford(self.r_treasury[:, r], s_cost_r * mult)
@@ -3624,7 +3638,7 @@ class BatchSim:
                 # P5/S2 key fix: the exporter ships "settlerPer" — the old
                 # "settlerStep" lookup ALWAYS fell to its default (same value
                 # 40, so dormant; now it tracks the export like every knob).
-                settle_cost = js_round(rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities.double() - 1).clamp(min=0))
+                settle_cost = js_round(rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities.double() - 1).clamp(min=0))
                 self.rc_current[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
                 self.rc_cost[:, r, j] = torch.where(is_s, settle_cost, self.rc_cost[:, r, j])
                 self.rc_progress[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
@@ -3655,7 +3669,7 @@ class BatchSim:
                 if bool(is_ps2.any()):
                     rr2 = self.rules.rivals
                     n_cities2 = self.rc_alive[:, r].sum(dim=1)
-                    s_cost2 = (rr2.get("settlerBase", 90) + rr2.get("settlerPer", 40) * (n_cities2.double() - 1).clamp(min=0)) * mult
+                    s_cost2 = (rr2.get("settlerBase", 48) + rr2.get("settlerPer", 18) * (n_cities2.double() - 1).clamp(min=0)) * mult
                     ok_ps = is_ps2 & (n_cities2 < rr2.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], s_cost2)
                     if bool(ok_ps.any()):
                         self._rival_try_found(r, ok_ps)
@@ -4121,15 +4135,15 @@ class BatchSim:
                 q = q + c3[:, :, m2, 1] * okd[:, :, m2]
                 q = q + c3[:, :, m2, 2] * okd[:, :, m2]
                 q = q + hill[:, :, m2]
-            # tooClose (P4/D-5, CITY_MIN_DIST = 4): player cities < 4,
-            # city-states < 4, any rival city < 5 (the TS +1 rival-rival quirk)
+            # tooClose (P4/D-5, CITY_MIN_DIST = 4): uniform 4 everywhere —
+            # P5/S3 (C-14) dropped the old +1 rival-vs-rival pad.
             tc3 = tc.unsqueeze(2)  # [B, M, 1] — pairwise indexing, no [B, M, T]
             d_pl = self.pair_dist[tc3, pl_centers.unsqueeze(1)].to(torch.long)
             near_pl = ((d_pl < 4) & self.alive.unsqueeze(1)).any(dim=2)
             d_cs = self.pair_dist[tc3, self.cs_center.clamp(min=0).unsqueeze(1)].to(torch.long)
             near_cs = ((d_cs < 4) & self.cs_alive.unsqueeze(1)).any(dim=2)
             d_rc = self.pair_dist[tc3, rc_flat.clamp(min=0).unsqueeze(1)].to(torch.long)
-            near_rc = ((d_rc < 5) & rc_live.unsqueeze(1)).any(dim=2)
+            near_rc = ((d_rc < 4) & rc_live.unsqueeze(1)).any(dim=2)
             good = okt & ~near_pl & ~near_cs & ~near_rc & src.unsqueeze(1)
             q = torch.where(good, q, torch.tensor(-torch.inf, dtype=torch.float64, device=dev))
             # strictly-greater beats the running best (first-found keeps ties)
@@ -4168,20 +4182,37 @@ class BatchSim:
         self.r_next_city_id[rows, r] += 1
         self.rvcity_at[rows, s_idx] = r
         self.rival_at[rows, s_idx] = r
+        # P5/S3 (C-14): rival founding strips like foundCity — the removable
+        # feature dies (tdef drops to the hills component, feature yields
+        # vanish via feat_stripped, the lent district adjacency withdraws)
+        # and the improvement dies with it. Idempotence guard mirrors the
+        # player founding twin: a previously CHOPPED tile has nothing left
+        # to withdraw. t0 capitals bake the strip into the exported statics.
+        self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
+        fresh_f = ~self.feat_stripped[rows, s_idx]
+        self.feat_stripped[rows, s_idx] = True
+        self.improvement[rows, s_idx] = -1
+        self.pillaged[rows, s_idx] = False
+        contrib = self._feat_adj[rows, s_idx] * fresh_f.unsqueeze(1).to(self._feat_adj.dtype)  # [R, nD]
         nb = self.neigh[s_idx]
         for d in range(6):
             n_d = nb[:, d]
             ndc = n_d.clamp(min=0)
+            on_map = n_d >= 0
+            if bool(on_map.any()):
+                om = on_map.nonzero(as_tuple=True)[0]
+                self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
             free = (
                 # the full first ring, water included — mirrors foundCity /
                 # foundRivalCity (AUDIT C-1: a coastal rival must own its
                 # harbor water or the Harbor line is unreachable)
-                (n_d >= 0)
+                on_map
                 & (self.owner[rows, ndc] < 0)
                 & (self.cs_at[rows, ndc] < 0)
                 & (self.rival_at[rows, ndc] < 0)
             )
             self.rival_at[rows[free], n_d[free]] = r
+        self._eff_version += 1  # feat_stripped / d_static_adj changed
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """Shared melee resolution for a hostile attacker (barb slot u of
@@ -4578,7 +4609,7 @@ class BatchSim:
                 torch.tensor(self._r_horseman, device=dev),
                 torch.where(has_s, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
             )
-            settle_cost = rr.get("settlerBase", 90) + rr.get("settlerPer", 40) * (n_cities - 1).clamp(min=0).double()
+            settle_cost = rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities - 1).clamp(min=0).double()
             scripted_r = ~self.controlled[:, r]  # C2b: the picker only drives scripted rivals
             for j in range(self.RC):
                 idle = active & scripted_r & alive0[:, j] & (self.rc_current[:, r, j] == -1)
@@ -4980,8 +5011,13 @@ class BatchSim:
         d_cc = self.pair_dist[sitec.unsqueeze(2), sitec.unsqueeze(1)].to(self.dtype)
         # d_cc[b, c, c'] = dist(site[c], site[c']) — weight by source c'
         w = (rng + 1 - d_cc).clamp(min=0)
-        arange_c = torch.arange(C, device=dev)
-        earlier = (arange_c.view(1, C) < arange_c.view(C, 1)).unsqueeze(0)  # [1, c, c'] → c' < c
+        # P5/S3 gate-catch (seed 9066 t184, own 53 vs 58): "earlier in the
+        # loop" is TS ARRAY order (acquisition order, city_seq), NOT column
+        # order — an S2 hole-reuse founding puts the NEWEST city in a LOW
+        # column, and every array-earlier/column-later city's same-turn
+        # growth went missing from its own-pressure sum.
+        seq = self.city_seq
+        earlier = seq.unsqueeze(1) < seq.unsqueeze(2)  # [B, c, c'] → seq[c'] < seq[c]
         pop_mix = torch.where(earlier, self.pop.unsqueeze(1).to(self.dtype), pop_before.unsqueeze(1).to(self.dtype))
         own = (w * pop_mix * self.alive.unsqueeze(1).to(self.dtype)).sum(dim=2)
         # foreign pressure from rival cities
@@ -5748,6 +5784,8 @@ class BatchSim:
             # reuses a dead column (trace ids reuse it too: TS cityIds keep
             # dead columns only for cities that DIED; a reused id is new).
             self.founded_n[rows] += (c_new == self.founded_n[rows]).long()
+            self.city_seq[rows, c_new] = self.city_seq_next[rows]
+            self.city_seq_next[rows] += 1
             # Claim the center (unconditionally, as foundCity does) plus any
             # unowned first-ring tiles; the center becomes a district tile.
             self.owner[rows, s_idx] = c_new

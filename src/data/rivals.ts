@@ -4,6 +4,8 @@
  * underneath.
  */
 
+import { GAME_SPEED } from './constants';
+
 export const RIVAL_LEADERS: { name: string; color: string; cityNames: string[] }[] = [
   { name: 'Rome', color: '#8e3db8', cityNames: ['Roma', 'Ostia', 'Ravenna', 'Neapolis', 'Capua', 'Verona'] },
   { name: 'Egypt', color: '#3db88e', cityNames: ['Thebes', 'Memphis', 'Giza', 'Elephantine', 'Sais', 'Tanis'] },
@@ -24,7 +26,11 @@ export const RIVAL_MAX_CITIES = 6;
 export const RIVAL_PROD_RATE = 0.5;
 /** Military stock gained per pop per turn. */
 export const RIVAL_MIL_RATE = 0.35;
-export const RIVAL_SETTLER_COST = (cities: number) => 90 + 40 * Math.max(0, cities - 1);
+/** P5/S3 (C-14): the player's exact settler curve — 48 + 18·(cities−1) at
+ * Online speed. Rivals never bank settlers and single-queue them, so the
+ * player's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
+export const RIVAL_SETTLER_COST = (cities: number) =>
+  Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
 /** Rival cities expand borders every N turns (staggered by city id). */
 export const RIVAL_BORDER_PERIOD = 9;
 /** Great-person points per class per turn per city. */
