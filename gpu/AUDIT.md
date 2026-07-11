@@ -265,9 +265,18 @@ snapshot-resume + two-tier-statelog notes):
   effects — the pre-commit bar stays the FULL BATTERY, whose gpu-gate
   lane IS the gate; never chain a standalone gate then the battery on
   the same code).
-- What checkpoints canNOT replace: intra-turn EVENTS (the CB combat-
-  roll log stays — draws aren't reconstructible from end-of-turn
-  state) and mid-turn transients (rare targeted probes, as today).
+- What checkpoint INSPECTION cannot give: intra-turn EVENTS (the draw
+  stream between two snapshots is not invertible — many event orders
+  produce the same end state; the always-on CB combat-roll log stays)
+  and MID-TURN TRANSIENTS (intermediate values of a turn's computation
+  — the loyalty pop-mix, the frozen luxury map, spawn-time occupancy —
+  are never state at a turn boundary). BUT determinism recovers both
+  via INSTRUMENTED REPLAY: resume from the nearest checkpoint with an
+  event flag or a pure-read probe and the identical turn re-executes,
+  narrating its interior — probe iterations drop from a ~4-6 min full
+  rerun to seconds, and probes are bit-faithful (pure reads replay the
+  exact original trajectory — no false-green caveat, unlike fixes).
+  Net: fewer permanent niche log fields; recover rare views on demand.
 
 Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
 `CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
