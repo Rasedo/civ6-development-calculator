@@ -1,490 +1,257 @@
-# Engine audit — 2026-07-10
+# Engine audit v2 — 2026-07-11
 
-Full-project audit run after the horizon-300 flip (1fca921): (A) horizon-flip completeness,
-(B) doc/comment staleness, (C) player–rival symmetry, (D) real-Civ-6 fidelity of implemented
-mechanics. Scope rule for (D): only IMPLEMENTED behaviour counts — missing features are not
-divergences. Standing direction: where the sim diverges from real Civ 6, real Civ 6 wins
-(see memory `source-of-truth`); where player and rival paths diverge, symmetry wins.
+Second full audit (4 parallel read-only sweeps: asymmetry, fidelity, docs,
+perf), replacing the 2026-07-10 audit. Solved items are dropped — the
+landing log lives in git history (P1 10d2382, P2 03fd1fe, P3 8d115b6,
+P4 93efb76 = old §D fully closed, P5-S1 3b30b8f, S7 e5569a5, S2 ab0c19c,
+S3 9a1b073, S4 b44aff5) and in the session memory. Line numbers cite the
+code at audit time.
 
-Status tags: **[CONFIRMED]** = re-verified by hand this session; everything else is
-audit-reported with file:line citations (verify the exact lines when picking the item up).
-Line numbers are as of commit 1fca921.
+**Ladder state:** P1–P4 done. P5 (task #31) nearly done — S5 landing
+(GP overflow/effects, faith pantheons, prophet religion + 3 hunted latents:
+stale rc queue at capture, luxury-tie city_seq, post-walk fresh stats);
+S6 (rival loyalty + amenities) and S8 (controlled purchase revalidation)
+in flight as one combined stage. Then P6 (#23), P7 (#24), P8 (#26).
 
 ---
 
-## A. Horizon flip was only half-applied — RESOLVED (task #27, 2026-07-10)
+## A. Player–rival asymmetry (the symmetry contract's open gaps)
 
-Owner's decision: the single knob is **TURN_LIMIT = 250** (not 300) — train and
-evaluate to the score victory, not past it. Every default below now resolves to
-TS `TURN_LIMIT` / GPU `rules.turn_limit` (the fixtures' `scenario.turnLimit`);
-`search_eval` keeps `--turns 100` for SEARCH.md benchmark comparability.
-Original finding, for the record:
+Rivals must be full-fidelity symmetric agents — same formulas, same
+available actions; only the decision policy may differ. Confirmed open:
 
-Flipped to 300: `gpu/train_ppo.py:241`, `gpu/rollout.py:38`, `gpu/horizon_audit.py:28`.
-Still defaulting to 100:
+**In flight (S6/S8):**
+- A-1. Rivals lack loyalty (one-directional: player cities defect to
+  rivals, never the reverse) and the amenity tier model (no luxury
+  ranking, no tier yield/growth factors) — rivals.ts:322-376 player-only;
+  rivalCityYields applies no factors. → S6.
+- A-2. GPU controlled-rival purchase apply skips the building district
+  prerequisite (engine.py ~3681) and deducts treasury even when a unit
+  spawn finds no tile (TS refunds; the settler branch next to it refunds
+  correctly — inconsistent). → S8.
 
-- `gpu/eval.py:47`, `gpu/duel_eval.py:51`, `gpu/melee_eval.py:33`, `gpu/behavior_probe.py:68`,
-  `gpu/gen_targets.py:37`
-- `gpu/civ6gpu/env.py:41` (BatchEnv default)
-- `gpu/civ6gpu/engine.py:154` (`turnLimit` fallback)
-- TS: `src/core/rlenv.ts:255` (`horizon ?? 100`), `src/core/aiAdvisor.ts:23` (`ADVISOR_HORIZON`)
+**Open, ranked by impact:**
+- A-3. **Rivals get no eureka/inspiration discounts** — player pays 60%
+  on boosted research (game.ts:42-46), rivals raw cost (rivals.ts:1082,
+  1111; rival.research.boosted never populated; GPU boosted all-False).
+  Up to a 40% research-speed gap. Blocks symmetric play.
+- A-4. **Rivals never build wonders** (queueWonder player-only,
+  game.ts:342-365) — no wonder yields/effects for rivals.
+- A-5. **Rivals cannot spend gold like the player** — no building/unit/
+  settler purchases outside the controlled head, no tile purchase
+  (buyTile player-only, game.ts:592). Treasury only funds maintenance,
+  peace and the S2 settler column.
+- A-6. **Rival unit roster restricted** — WARRIOR→SPEARMAN→HORSEMAN ladder
+  (rivals.ts:979-984) + builder/settler; never SCOUT/SLINGER/ARCHER →
+  rivals field no ranged units at all. Blocks symmetric war.
+- A-7. **Rival religion/pantheon confers no yields** — beliefs are claimed
+  (denial only); their yield/housing/amenity effects never apply to rival
+  cities (getModifiers is player-only; rivals use modifiersFromResearch).
+  Same for government/policy machinery (none for rivals).
+- A-8. **C-21 movement**: every rival mover takes exactly one step then
+  movesLeft=0 (builder walk rivals.ts:816-819, patrol :603-606, hostile
+  march combat.ts:526-531); the player walks real MP paths. A rival
+  HORSEMAN (4 MP) moves like a 1-MP unit.
+- A-9. **Rival-unreachable catalog**: districts outside SCAFFOLD_DISTRICTS
+  (THEATER_SQUARE, INDUSTRIAL_ZONE, ENCAMPMENT, ENTERTAINMENT_COMPLEX,
+  NEIGHBORHOOD + their buildings), worship buildings, PALACE (rival
+  capitals永 lack its yields/housing/amenity — game.ts:203 vs
+  rivals.ts:124). Downstream: rivals can never accrue ENGINEER/GENERAL
+  (and Theater-class) great people — those districts are unreachable.
+- A-10. **Rival city HP regen ignores sieges** — +15/+5 unconditionally
+  (rivals.ts:1067) while the player's +20 only heals with no hostile
+  adjacent (combat.ts:589-596).
+- A-11. Rivals have no trade routes (trade.ts player-keyed).
+- A-12. Rivals don't interact with city-states (no envoys/influence/levy;
+  can't even attack CS — combat.ts:171-177 gates csTarget to the player).
+- A-13. Rival builders: FARM/MINE/LUMBER only — no resource improvements
+  (PASTURE/CAMP/PLANTATION/FISHING_BOATS/QUARRY), no chop/harvest, and
+  no REPAIR (C-4b: the player's builderRepair exists, units.ts:411-419 —
+  the rival half is the open part; repair also grows the RL action space,
+  so it stays its own stage).
+- A-14. Rivals never run projects (queueProject player-only).
+- A-15. Barbarian camp spawn spacing only respects PLAYER cities
+  (combat.ts:449-451) and requires a live player city (:544) — rivals get
+  less barb protection.
+- A-16. captureCityState has no city-cap raze (combat.ts:352-384) while
+  captureRivalCity razes at 6 — the player can exceed 6 cities via CS
+  conquest only. Minor quirk; also the GPU documents a skip-at-full-pool
+  divergence for exactly this path.
+- A-17. Rival border-growth adjacency is CIV-level (no per-rc tile
+  registry) vs the player's per-city adjacency — documented S4 delta,
+  P7 material (needs per-rc tile ownership).
+- A-18. RL surface: the unit-attack mask does not offer CS-center attacks
+  (the V-CS verb exists engine-side) — do deliberately with a re-baseline.
 
-Net effect: nets train at 300 but every eval/duel/melee harness scores at 100.
-Also reconcile the three horizon knobs: training/rollout episode length (300),
-TS score-victory `TURN_LIMIT = 250` (`src/core/game.ts:39`), GPU turnLimit fallback (100).
+## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 
-Related: `gpu/BUILD_PLAN.md`'s "unreachable in 100 turns → revisit with a longer horizon"
-deferrals (`:60-61` IZ/Theater district code, `:129` ENGINEERING, `:156` Neighborhood/
-Urbanization, `:41-42`, `:57`, `:698-700`) have hit their stated unblock condition — they are
-now actionable, not parked.
+Verified correct (do not re-flag): eureka 40%, 1-district-per-3-pop,
+growth curve 15+8(n−1)+(n−1)^1.5, amenities-needed ceil((pop−2)/2),
+pantheon 25 faith, the 10 base governments.
 
-## B. Stale docs / comments — FIXED (task #28, 2026-07-10)
+**Combat/military:**
+- B-1. City walls/ramparts missing entirely (no outer-defense HP layer,
+  no Walls buildings) — sieges trivialized, nothing to build for defense.
+- B-2. Cities never ranged-strike attackers (only melee retaliation).
+- B-3. No zone of control.
+- B-4. No unit XP/promotions/veterancy.
+- B-5. No fortify action/bonus.
+- B-6. No embarkation, no naval units — water is a wall.
+- B-7. No flanking/support bonuses.
+- B-8. Great Generals/Admirals modeled as economy lumps, not combat auras.
+- B-9. No strategic-resource requirements/stockpiles for units.
+- B-10. Military roster ends at Horseman — no Swordsman/Knight/siege/
+  gunpowder line; their unlock techs are absent from the tree.
 
-- `AGENT_PROMPT.md:13` — "100-turn development game" (now 300 train/rollout, TS TURN_LIMIT 250).
-- `AGENT_PROMPT.md:111-120` — G-V arc marked IN PROGRESS; it shipped (GV done, pool cap 765ab4f,
-  flip 1fca921).
-- `gpu/GV_DESIGN.md:3,9,14-15,115-117` — says the horizon-300 flip is still pending / "only
-  after GV-2"; `:14-15` "REMAINING: GV-3/4/5" contradicts `:5-8` which mark them SHIPPED.
-- `gpu/README.md:69-71` — off-script gate described as "72 random games × 100 turns"; it now
-  runs 300 (rollout default).
-- `gpu/TRAINING.md:73,77` — recommends `--horizon 100` "matches the eval protocol"; reads as
-  current guidance but no longer matches the trainer default (nor eval once #27 lands).
-- `src/ui/panels.ts:1416` — "horizon-100 game (the training setting)": training is 300 now;
-  the TS advisor itself is still genuinely horizon-100 (`ADVISOR_HORIZON`) — reword.
-- `gpu/civ6gpu/engine.py:609` — "Nothing places a district yet … verified no-op — D2 adds
-  scripted placement": D2–D5 shipped; framing predates them.
-- `gpu/civ6gpu/engine.py:3063` — "rivals hold no gold": stale since VP-G1/G2 (`r_treasury`
-  exists and controlled rivals spend).
-- `src/core/mapgen.ts:7` — "a later stage can bypass this by importing map JSON": the import
-  path already exists (`panels.ts` import-text). Minor.
-- Root `CLAUDE.md` is an empty untracked file — fill or delete.
+**Progression breadth:**
+- B-11. Tech tree ~32 of ~68 (stops at Modern, no Atomic/Information).
+- B-12. Civics ~31 of ~50.
+- B-13. Policy cards ~20 of ~50+; diplomatic slots exist but no
+  diplomatic cards (idle by design comment).
+- B-14. CITIZEN_SCIENCE = 0.7/pop (real Civ 6 commonly cited 0.5) —
+  verify intent; culture 0.3 matches.
 
-## C. Player–rival symmetry findings  (tasks #29–#31)
+**Economy/districts/religion:**
+- B-15. No war weariness.
+- B-16. District adjacency magnitudes deviate (IZ +1/mine vs real +0.5,
+  Harbor +2/CC vs real +1; Campus/HS/CH close).
+- B-17. Encampment has zero adjacency/specialists (economically inert).
+- B-18. Religion: no Enhancer belief slot; no spread/pressure, no
+  religious units/combat — religion is a private yield engine.
+- B-19. GP costs: flat 60·2^n per class per civ (real: era ladder +
+  global race for specific individuals). The shared-pool race here is
+  first-to-threshold on a common earned-counter — close but not the
+  per-person snipe.
+- B-20. GP effects are instant lumps only (no tile activation, Great
+  Works, charges).
 
-Rivals must be full-fidelity symmetric agents: same formulas, same available actions;
-only the decision policy may differ. Findings (engine = TS / GPU / both):
+**Meta:**
+- B-21. City-states: no per-CS unique suzerain bonuses; 3/6-envoy bonuses
+  keyed to districts, not buildings.
+- B-22. Diplomacy: no casus belli/grievances/alliances/World Congress.
+- B-23. Trade simplified: no Trader unit/roads/route duration/
+  international routes.
+- B-24. No governors (R&F core), no era score/Ages (Dark/Golden).
+- B-25. Victories: only Domination + turn-limit Score; no Science/
+  Culture (no tourism at all)/Religious/Diplomatic.
+- B-26. Map: no cliffs; barbarians don't scale by era or use the real
+  scout-then-raid mechanic; no ranged/naval barbs.
+- B-27. Catalog sizes: 13 world wonders, 7 natural wonders, ~40 buildings
+  (no Walls/Dam/Canal/Government Plaza), 10 pantheons (~24 real),
+  6 follower + 4 founder beliefs.
 
-**P5 STAGE PLAN (banked 2026-07-10; execute in order, one battery per stage).**
-Closed by P4 already: C-7 (D-2 healing), C-9 (D-22 defense), C-24 (D-23 removed
-melee_only — both masks now offer city attacks to any fighter). C-21 movement
-stays parked (masked: exporter emits single-tile steps; an RL-surface question).
-- **S1 — rival economy (C-12 + C-10 + C-11b):** rivals pay building/district/
-  unit maintenance from gross gold + the player's bankruptcy-disband rule;
-  sacking a RIVAL city hits r_treasury −min(100, 20% milli-rounded) + the
-  pillage ring; a rival capturing a player city plunders +40 (the C-11
-  symmetry half). statelog rGold already traces it.
-- **S2 — rival peace cost + settler purchase (C-13): LANDED.** A suing
-  rival pays the player's exact 150+10·warTurns schedule from r_treasury:
-  the scripted roll stays UNCONDITIONAL (draw-count parity) with the
-  outcome gated on milli-rounded affordability — a broke rival fights on
-  (S1's bankruptcy disband is its path back to solvency and peace). The
-  controlled war-head's peace column prices the same schedule (mask +
-  apply). The rival settler-purchase column is LIVE (capital column,
-  cap+afford gated; the apply founds immediately via the settler site
-  scan — no bank — and refunds when no site lands). Also fixed the
-  dormant "settlerStep"→"settlerPer" key (always fell to the identical
-  default, now tracks the export).
-  THE S2 RESHUFFLE HUNT (captures are new to off-script games — every
-  reshuffle exposes the next family member) fixed SIX latent bugs:
-  (1) the D-22 best-melee trackers missed fixture-loaded starting units —
-  GPU now init-seeds them from the pools AND TS placeRivals pushed the
-  rival AFTER spawnUnit so its own tracker missed the starting warrior
-  (push/spawn swapped; fixtures re-exported); (2) player captures now slot
-  at the founded_n HIGH-WATER mark with full slot hygiene (progress/
-  cur_cost/q_dtile/warrior_trained cleared, rc registries, district_dead)
-  — last-alive+1 landed in the wrong hole when the newest city was the
-  dead one; (3) the city-heal besiege gate ignored at-war rival CIVILIANS
-  (a builder adjacent to a captured city blocked TS healing but not GPU);
-  (4) mutual-death captures: TS captures a city even when the attacker
-  dies to the counter — GPU's `cap = att & ~died` denied them (now
-  `cap = att`); (5) THE 6-CITY FOUNDING CAP made symmetric: TS
-  canFoundCity now refuses at 6 cities (the planned site DROPS while the
-  settler stays banked — exactly the GPU's consumed-either-way site ptr);
-  GPU founding moved the cap from `can` into `ok` and slots via founded_n
-  append with a first-dead-column fallback, and the trace's cityIds follow
-  the SAME rule (append until cMax, then reuse the first dead column) —
-  this one closed TWO replay failures at once (a 7th-ever-founded city
-  desynced the trace columns); (6) statelog RC lines now carry hp
-  permanently. Also: rollout.py degrades its unicode summary prints
-  instead of dying on cp1251 pipes (PYTHONUTF8 guard).
-- **S3 — founding cluster (C-14): LANDED.** Rival founding = player founding:
-  pop 1 (the capital's old pop-3 head start died — a t0 world change, all
-  fixtures re-exported), the foundCity center strip (improvement + removable
-  feature die: yields, +3 defense, lent district adjacency — GPU
-  _rival_try_found gained the player founding twin incl. the idempotence
-  guard), uniform CITY_MIN_DIST=4 spacing (the +1 rival-vs-rival pad
-  dropped, both engines), and the player's speed-scaled settler curve
-  48+18·max(0,c−1) (data/rivals.ts derives from GAME_SPEED; exporter
-  settlerBase/settlerPer 90/40→48/18; GPU fallback defaults aligned).
-  THE RESHUFFLE HUNT caught a deep S2 consequence: TS iterates
-  state.cities in ARRAY order (acquisition order), which stops matching
-  GPU COLUMN order once a hole-reuse founding lands a new city in a low
-  column — the loyalty own-pressure "earlier cities already grew" mix
-  used column order and dropped an array-earlier city's same-turn growth
-  (seed 9066 t184: own 53 vs 58; all four gate failures, one root). FIX:
-  city_seq/city_seq_next rank columns by acquisition (set at founding +
-  both captures); the loyalty earlier-mask compares seq. Statelog PC
-  lines now carry loy permanently. REMAINING LATENTS BANKED FOR P7
-  (order/slot family, none gate-caught yet): (a) the GPU pins loyalty
-  and blocks flips by COLUMN 0 and _domination reads site[:,0], but TS
-  pins isCapital / reads static capitalTiles — wrong once a captured
-  capital's column 0 is re-occupied by a hole-reuse founding (and TS
-  re-crowns a refound capital after total collapse, updating
-  capitalTiles[0]); (b) border-claim/worked-tile order coupling between
-  ADJACENT cities and the multi-defector flip order still follow column
-  order, not city_seq.
-- **S4 — rival border growth (C-15): LANDED.** rc.cultureBox fills from
-  the city's own culture (the civicProgress term, pre-growth pop — the
-  SAME value feeds both, like the player's turnCulture/cultureBox double
-  use) and consumes against the player's borderGrowthCost curve with the
-  player's exact pick key (dist asc, resource priority desc, milli-rounded
-  yield-sum desc, index asc; radius 5; fully unowned tiles — water,
-  impassables and natural wonders all claimable like borderCandidates),
-  while-loop with escalating cost + box cap on no-candidate. The yield sum
-  uses the rival's OWN planes (strip-adjusted + its farm-adj/mine boosts —
-  the rivalCityYields ctx). Every-9-turns timer + RIVAL_BORDER_PERIOD/
-  borderPeriod died. ONE documented delta: adjacency is CIV-level (rival
-  territory has no per-rc tile registry — P7 material) where the player's
-  is per-city. New rc_cbox tensor (transfer/found/capture hygiene). THE
-  HUNT (one failure, seed 9066 t60) exposed a PRE-EXISTING heal asymmetry:
-  TS rivalBuilderActions never spent movesLeft on its build/walk, so a
-  MARCHING rival builder healed +20 every turn — the GPU (v_acted) and
-  real Civ 6 both block that; TS now zeroes movesLeft on both actions.
-  HUNT TOOLING MADE PERMANENT (owner ask): statelog RU lines carry hp+a
-  (acted) like BU lines; RC lines carry cb (cultureBox) + til; and the
-  NEW Phase-1 COMBAT LOG — every damage roll of the logged game emits a
-  keyed CB<seq> line (strength diff, rand·1e6, damage) from the single
-  damageRoll/_damage_roll chokepoint, drained by both statelogs — the
-  reordered/extra-roll class the rng column can't see, aligned by
-  logdiff automatically.
-- **S5 — GP overflow/effects (C-16) + pantheons (C-17):** rival GPP keeps
-  overflow and applies effects; pantheon costs 25 faith (their faith yield
-  gains its consumer; free timed claims die).
-- **S6 — rival loyalty + amenities (C-19 + C-20):** rival cities get loyalty
-  (CAN flip to the player — the reverse transfer) and the amenity tier model.
-- **S7 — camps/pillage/raze (C-3 + C-4a + C-5):** rivals clear camps
-  (+50 r_treasury, every entry path: melee advance, march, patrol, builder
-  walk, controlled move — barbs excluded like TS clearCampFor); BARBARIANS
-  pillage/march-to rival improvements (rival raiders keep player-only —
-  they never war other rivals); conquest of a player city RAZES at the
-  winner's 6-city cap in BOTH engines (transferCityToRival returns
-  transferred?; the +40 plunder pays only on a real transfer; loyalty
-  flips stay uncapped with the RC=24 headroom). C-4b (a REPAIR verb for
-  builders + rival repair) is deferred — it grows the RL action space
-  (mask width, net orphaning, eval re-baseline) and deserves its own stage.
-- **S8 — controlled purchase revalidation (C-23):** full re-validation in the
-  GPU controlled-rival purchase apply.
+## C. Order/slot integrity latents (the P6/P7 family)
 
-S1 LANDED (see the log below) — and its reshuffle flushed out THREE latent
-capture-path bugs (the first off-script games that capture rival cities):
-(1) captured districts must be DEAD (TS registers only CITY_CENTER — new
-district_dead plane, 9 reader sites filtered); (2) a captured city's center
-yields must come from the LIVE tile (new _init_center_live — settle sites
-get precomputed site_cy, captured centers held zeros; also fixed for CS
-captures + coastal/base_maintenance init); (3) rc slot picks used the alive
-COUNT as the next slot — a capture hole makes that a LIVE city and the next
-founding OVERWRITES it; now last-alive+1 (TS append order; holes wait for
-P7). (The S1-era P7 note about the player capture slot divergence was
-RESOLVED in S2: player captures and foundings both append at founded_n
-with a first-dead-column fallback mirrored by the trace's cityIds rule.)
+None gate-caught yet, but every reshuffle hunts one of these:
+- C-1. **Column-0 capital pin**: GPU pins loyalty/blocks flips by column 0
+  and _domination reads site[:,0]; TS pins isCapital and reads static
+  capitalTiles. Wrong once a captured capital's column 0 is re-occupied
+  by a hole-reuse founding; TS also re-crowns a refound capital after
+  total collapse (capitalTiles[0] updates), GPU doesn't.
+- C-2. **Column-order couplings**: border-claim/worked-tile interactions
+  between ADJACENT cities and the multi-defector flip order follow column
+  order, not city_seq (TS array order). Same class as the three shipped
+  city_seq fixes (loyalty pop-mix, luxury tie, trace cityIds).
+- C-3. **Dead-slot reclamation** (task #24): unit pools (U_MAX 256,
+  append-only high-water) and city columns (6 + holes) — the true fix for
+  C-1/C-2; unit-order-IS-spec makes it parity-core work.
+- C-4. P6 (task #23): rival per-city yield/pick interleaving — the rival
+  side still applies one top-of-phase snapshot where TS recomputes fresh
+  per city (the player half was fixed in P4).
+- C-5. rc slots: the degenerate first-free-hole fallback at founded_n ≥
+  RC is untraceable in TS terms (documented at the capture sites).
+- C-6. res_stripped plane (bonus-resource tile picks) — enabling work
+  parked since P2.
 
-### Structural capability blocks
+## D. Engine optimizations (bit-exact-safe, ranked)
 
-1. **Rivals can never own coastal water — FIXED 2026-07-10 (10d2382).** Rival founding now
-   claims the full first ring (water included, mirroring foundCity) and rival border expansion
-   claims water (only impassable + natural wonders excluded), both engines. Rivals hold water
-   from turn 1 (wterr 3 → 56 over a 250t game); the Harbor line is structurally reachable.
-   THE GATE THEN CAUGHT a latent missing mechanic the reshuffle exposed: the GPU had NO
-   player-vs-city-state combat (TS meleeAttack's csTarget fallback) — **V-CS ported** same
-   commit: cs_hp (maxHp 150), defCS = 15+pop(+6 militaristic), capture → player city, +10/turn
-   siege recovery, trace keyed by CS id. NEW follow-ups: (a) the RL unit-attack MASK does not
-   yet OFFER attacks on CS centers — a new verb, do deliberately with an eval re-baseline;
-   (b) TS `captureCityState` has NO city-cap raze rule (unlike `captureRivalCity`, combat.ts:317)
-   — TS-side consistency fix; the GPU skips city creation at a full empire (documented).
-2. **Rival-unreachable catalog** [TS] — outside `SCAFFOLD_DISTRICTS` (`data/districts.ts:250-256`):
-   THEATER_SQUARE, INDUSTRIAL_ZONE, ENCAMPMENT, ENTERTAINMENT_COMPLEX, NEIGHBORHOOD and all
-   their buildings; worship buildings (no rival worship); PALACE (no unlock path — see item 14).
-   Ties into the BUILD_PLAN horizon-100 deferrals now unblocked (§A).
-3. **Rivals can't clear barb camps** [both] — player gets +50 gold + removal
-   (`combat.ts:183-188`, `units.ts:180-186`, `engine.py:2481,2625`); rival kills leave the camp.
-4. **Pillage/repair one-directional** [both] — hostiles pillage only player tiles
-   (`combat.ts:407`, `engine.py:3785`); rival improvements are pillage-immune except disasters,
-   and nothing can repair a pillaged rival tile (GPU also lacks a player repair action; TS has
-   `units.ts:353-361`).
-5. **Capture slot overflow** [both] — player at full city cap razes instead
-   (`combat.ts:317-325`, `engine.py:2319-2320`); rival side: TS pushes unbounded
-   (`rivals.ts:378`), GPU hard-asserts on full slots (`engine.py:4390`) — crashable.
+- D-1. **leader() computed and discarded every non-terminal turn**
+  (engine.py ~5950: torch.where evaluates both branches → ~48 rival-score
+  ops + a _city_totals thrown away per step). Gate on
+  `bool(self.game_over.any())`. Zero parity risk; the single biggest win
+  (~15-30% of score-heavy steps).
+- D-2. **_rival_city_yields plane rebuilds**: the [B,T,6] ty_oth +
+  f/p planes are global-or-per-r but rebuilt per (r,j) call (~144×/turn
+  incl. trace + leader). Cache globals on _eff_version, hoist per-r
+  planes once per phase; _rival_border_growth shares them. 20-40% of
+  scoring/rival-phase time. Association-preserving; gate-check.
+- D-3. **Adjacency counts uncached**: _adj_center_count/_adj_harbor_count
+  recomputed per district type per _city_totals; version-key like
+  _eff_yields (all mutation sites verified to bump _eff_version). ~5-10%.
+- D-4. **Per-slot .any() storms**: precompute live-slot lists
+  (v_alive.any(0).nonzero()) per loop instead of per-slot host syncs
+  (256-slot loops × hundreds of syncs/step). Zero parity risk (draws only
+  fire where masks are true). ~5-15% late-game.
+- D-5. _farmadj_qual cached on _eff_version (~50-100 identical
+  rebuilds/turn); _farmadj_food computed twice per _city_totals.
+- D-6. _rival_border_growth: hoist the plane build above the while-loop
+  (claims never invalidate them).
+- D-7. Buffer reuse: _bidx/_arangeT instead of per-loop torch.arange,
+  hoist scalar torch.tensor(inf/min-food) constants. 1-3%, zero risk.
+- D-8. _buildable one_hot [B,T,C]/[B,T,nD] allocations — cache or
+  scatter-count. Small-moderate.
 
-### Formula divergences (player path ≠ rival path)
+## E. Docs staleness (sweep 2026-07-11)
 
-6. **Player districts were free + instant in the GPU/exporter harness — FIXED 2026-07-10
-   (task #30).** All player district placement now routes through TS `queueDistrict`
-   semantics in both engines: tile paved incomplete + feature stripped at queue time, the
-   production slot pays `districtCost(state)` (the rival formula off player research),
-   completion via the production loop. Scripted autopilots queue the next scaffold district
-   when the capital idles (warrior branch → district → cheapest building). PICK POLICY kept
-   narrow in both engines: candidate tiles exclude resources, so queueDistrict's
-   bonus-resource strip stays unexercised — a `res_stripped` plane (the chop-twin treatment
-   for resources) is the enabling work if bonus-tile placement should ever be offered.
-7. **Unit healing** [both] — player +10 own territory / +5 elsewhere (`units.ts:291`,
-   `engine.py:4716-4718`); rivals+barbs +10 unconditionally (`units.ts:291` `: true` branch,
-   `engine.py:4714-4715`). See also fidelity D-2 (the shared model itself diverges from real).
-8. **City healing** [both] — player +20 gated on no hostile adjacent (`combat.ts:505-513`,
-   `engine.py:2834-2843`); rival +15 peace / +5 war, never siege-gated (`rivals.ts:917`,
-   `engine.py:4082,4170-4172`).
-9. **City defense strength** [both] — player `max(15, garrisonCS) + floor(pop/2)`
-   (`combat.ts:56-60`); rival `15 + pop + floor(3·nTechs)` (`combat.ts:241-244`,
-   `engine.py:2357,3722`) — garrison ignored for rivals.
-10. **Sack** [both] — sacking a player city costs pop ×0.75 + treasury −min(100, 20%) +
-    adjacent pillage (`combat.ts:71-81`, `engine.py:3871-3894`); sacking a rival city is
-    pop-only — `r_treasury` untouched, no pillage ring (`combat.ts:256-261`,
-    `engine.py:3734-3738`).
-11. **Capture plunder** — player capturing a rival city: TS grants +40 (`combat.ts:354`);
-    **[CONFIRMED] GPU `_capture_rival_city` (`engine.py:2302-2338`) had NO +40 — a latent
-    TS↔GPU parity bug** (masked only because no off-script game captures a rival city yet).
-    **FIXED 2026-07-10**: the GPU now credits +40 AND ends the war on the rival's last city
-    (a second TS-mirror gap found in the same TS block, combat.ts:357-360; the raze path
-    mirrors TS's early return — no gold, war unchanged). war_test poke covers all branches.
-    STILL OPEN (C-11b): rival capturing a player city plunders nothing in either engine
-    (`rivals.ts:368-399`, `engine.py:4376-4405`) — the symmetry half.
-12. **Rival economy skipped** [both] — no building/district/unit maintenance, no bankruptcy
-    disband for rivals; they bank gross gold (`rivals.ts:869,940`, `engine.py:4096,4188`) vs
-    the player's full upkeep chain (`city.ts:81-102`, `game.ts:736-753`, `engine.py:1505-1508,
-    4809-4810`).
-13. **Rival peace is free; player peace costs 150+10·warTurns** [GPU controlled-rival head] —
-    `engine.py:3063-3067` (stale "rivals hold no gold" comment) vs `rivals.ts:258-272`,
-    `engine.py:1719-1725`. Rival settler-purchase is also hard-False (`engine.py:3053`) while
-    building/unit purchase exists (VP-G2).
-14. **Founding cluster** [both] — rival capital pop 3 + no Palace ever vs player pop 1 +
-    PALACE; rival center feature not stripped (`rivals.ts:107-141`, `engine.py:4933-4934`);
-    settler curve 90+40·(n−1) (`data/rivals.ts:27`) vs player 80+30·n; rival-rival spacing
-    `CITY_MIN_DIST+1` vs 3 elsewhere (`rivals.ts:448-454`, `engine.py:3567-3574`).
-15. **Border growth** [both] — player: culture box vs `borderGrowthCost`, radius 5,
-    res/yield priority + tile purchase (`city.ts:296-343`, `game.ts:709-721`,
-    `engine.py:4762-4797`); rival: free 9-turn timer, radius 3, `res·3 − 2·dist` score,
-    `rc.cultureBox` accrued but never consumed (`rivals.ts:405-426,914`,
-    `engine.py:3500-3523,4168`).
-16. **Great people** [both] — player keeps overflow (`points -= cost`) and gets GP effects
-    (`game.ts:810-841`, `engine.py:1334-1344`); rival GPP zeroed on claim, claimed GP has no
-    effect (`rivals.ts:484-489`, `engine.py:4242-4249`).
-17. **Pantheon/religion** [both] — player: 25 faith + Holy Site/Prophet gates
-    (`game.ts:941-992`); rival: free timed claims (turn 18+8r / 45+12r), rival faith yield has
-    no consumer (`rivals.ts:492-519`, `engine.py:4253-4264`).
-18. **Eurekas player-only** [both] — `rivals.ts:920-947` ("no eurekas for rivals until B6"),
-    `engine.py:4176-4219`. Known/planned (B6) — listed for completeness.
-19. **Loyalty one-directional** [both] — player cities take pressure and can flip to rivals
-    (`rivals.ts:309-364`, `engine.py:4321+`); rival cities have no loyalty state, can never
-    flip to the player.
-20. **Amenities skipped for rivals** [both] — no rival amenity model at all; `rivalHousing`
-    is water+buildings+improvements only (`rivals.ts:716-735`) vs the player's full amenity
-    tier scaling (`city.ts:440-504`, `engine.py:1495-1504`).
-21. **TS unit movement** [TS] — player: full-MP A* multi-turn paths (`units.ts:113-202,
-    287-310`); rival/barb: exactly one 1-tile step or action per turn (`rivals.ts:522-541`,
-    `combat.ts:394-448`). GPU is internally symmetric (1 step each) but thereby diverges from
-    the TS player rule (masked: the exporter emits single-tile steps).
-22. **Shipyard `special` yields ignored in the rival building sum — FIXED 2026-07-10**
-    (both engines mirror `production += floor(Harbor adjacency)` for rival Shipyards).
-    STILL OPEN: `regional` building yields (`yields.ts:192-212`) remain player-only —
-    latent until IZ/EC districts enter the rival scaffold (see §A BUILD_PLAN deferrals).
-23. **Controlled-rival purchase apply re-checks only ownership+gold** [GPU, minor] —
-    `engine.py:3137-3160` vs the player path's full re-validation (`engine.py:4450,4473`).
-24. **Rival ranged-vs-city gate missing** [GPU, latent — no rival ranged roster yet] —
-    player mask has `melee_only` (`engine.py:1965-1966`), rival mask lacks it
-    (`engine.py:2050-2051`).
+**Code comments contradicted by shipped work:**
+- E-1. districts.ts:4 "cost is flat… stage 1 doesn't track" — costs scale
+  with research now (districtCost, game.ts:59).
+- E-2. districts.ts:187 ENCAMPMENT "no combat in stage 1" — combat is live.
+- E-3. rivals.ts:2-4 header "abstract economy underneath" — rivals run
+  real queues/research/maintenance/housing/border-culture now.
+- E-4. rivals.ts:1013-1014 "RIVAL_MAX_POP stays as the housing stand-in"
+  — contradicted 2 lines later (retired).
+- E-5. rivals.ts:1073-1074 + engine.py:496,3913,4898 "techLevel still
+  drives every consumer until B3b" — techLevel is deleted.
+- E-6. engine.py:704 "prodStock edge — see BUILD_PLAN" — pooled stocks
+  replaced by per-city queues long ago.
+- E-7. data/rivals.ts: RIVAL_GPP_RATE (consumed nowhere, stale role
+  comment, still exported) and RIVAL_MAX_POP (dead, still exported) —
+  delete both + their exporter lines.
 
-25. **[GATE-CAUGHT 2026-07-10, not in the original audit] GPU player-attack precedence
-    missed TS's lone-civilian rule** — TS `meleeAttack` lets units ON the tile take the hit
-    first: a lone hostile civilian dies ROLL-FREE and the attacker advances, even onto an
-    at-war rival city center; the GPU besieged the CITY through its occupant. FIXED with
-    P2 (civk branch; siege/cs_hit yield to hostile civilians). Exposed by trajectory
-    reshuffle at seed 9053 t204.
+**READMEs/plans:**
+- E-8. README.md:157 settlers "80 + 30/each" — now 48 + 18/each.
+- E-9. README.md:352 rivals "abstract economy (no real queues/research)"
+  — false now.
+- E-10. README.md:357,413 + BUILD_PLAN:204,240,248 + SEARCH.md:172,177
+  link gpu/C1_DECISION.md / RESEARCH_RL.md — consolidated into ARCHIVE.md;
+  broken references.
+- E-11. README.md:276-284,330,391-397 + gpu/README.md:226-241 — horizon-
+  100 era benchmark tables and orphaned-net numbers presented as current.
+- E-12. gpu/README.md:250,258,18-20,386 — "conquest waits for C1-B7",
+  "war/peace gated OFF" — capture + war shipped both ways.
+- E-13. BUILD_PLAN.md:579 V-W2 checkbox unchecked but shipped; :1088
+  borderPeriod reference (died in S4); :1130 old districtCost formula;
+  :60,129,156 "unreachable in 100 turns" rationale (horizon is 250);
+  B-arc future-tense blocks; status log stops at P2.
+- E-14. GV_DESIGN.md:1,51,54 — "300-turn horizon"/"default keep 100" —
+  settled at 250.
+- E-15. python/README.md:33 + scripts/evaluate.ts,train.ts,rl-bridge.ts
+  hard-code horizon 100 (parked track, but off the single-knob rule).
+- E-16. AGENT_PROMPT.md "Current state (2026-07-08)" + ranked frontiers
+  predate the P-ladder entirely (owner asked for a refresh — in flight).
+- E-17. TRAINING.md — correctly labeled HISTORICAL where old; only gap:
+  no baselines past P5-S1 (deliberate: one pass before P8 per owner).
+- E-18. ARCHIVE.md — verbatim historical by design; harmless.
 
-Also one-directional by construction (track, lower priority): barb camp spawn spacing and
-barb marches consider player assets only (`combat.ts:367-448`); wonders, projects, trade
-routes, envoys/suzerain/levy, specialists, tile/settler purchase, chop lumps (TS), goody
-huts, fog are player-only mechanic families in TS.
+## F. Hunt tooling (current, for reference)
 
-Checked and symmetric (no action): melee combat rolls/terrain defense/victor-survives, shared
-RNG stream, growth curve/starvation/housing factors, citizen yields, tile yields incl. natural
-wonders/disasters, farm/mine research boosts, district adjacency + placement gates + cost
-curve, specialty-district pop cap, building gates + cost tie-break, research banking/autopick,
-work radius, worked-tile scoring, center min yields, Aqueduct housing, stacking rules
-(rmil/pmil = one rule parameterized by owner — NOT a bug), spawn ring, builder improvement
-validity, chop grant scaling (GPU), city HP 200, capture pop ×0.75, Water Mill river gate,
-GP accrual base, domination detection.
+**BACKLOG (owner idea, 2026-07-11): snapshot-resume gate.** `rollout.py
+--snapshot-at <T>` dumps the WHOLE 72-game batch state (GPU _MUTABLE +
+per-game TS serialize()) at the last non-divergent turn; `--resume-from`
+re-simulates T..250 in ~seconds per iteration instead of ~190s. Rules:
+full-batch snapshots only (BLAS association is batch-shape-dependent);
+the resume check clears THE HUNTED divergence but can false-green fixes
+with pre-T silent effects — one full gate + battery before commit stays
+mandatory. Highest value on late-turn failures (t200+ ≈ 20× faster
+iterations).
 
-## D. Real-Civ-6 fidelity divergences (implemented features only)  (task #32)
-
-TS core audited (GPU mirrors it). Confidence: H = high, M = medium, L = low.
-"Real" values verified against the Civ 6 wiki / civfanatics where cited in the audit run.
-
-STATUS 2026-07-10: **FIXED — D-1, D-2 (the MP-gated four-tier healing model, closing
-C-7/C-8 too), D-3/D-4 (real entry rule: MP ≥ full step cost incl. river +3, with the
-full-MP one-tile exception — TS-only; both gate paths only ever walk one step from
-full MP, so the GPU one-step model already matches), D-5, D-6, D-7, D-8 (minus the
-25% under-represented discount), D-9, D-10 partial (base 50; +4/builder escalation
-open), D-13 verified subset, D-14, D-16 (real border curve 10+(6t)^1.3, both
-engines), D-19 (specialists yield-only — also closed a latent TS↔GPU GPP
-divergence: the GPU never counted them), D-20 (pillage heals only from FOOD
-improvements, both engines, both raider classes), D-24; D-10 COMPLETE (builder
-cost 50 + 4 per builder ever trained/queued, per-civ counters both engines,
-queue-locked + purchase-priced; the "mismatch" its gate run showed was a TRACE
-false positive — gpu-trace/statelog priced unit items statically, fourth of
-that class); D-21 (worship buildings are faith-purchase ONLY at a flat
-round(190·speed) = 114 faith — TS-only: the exporter never shipped worship
-buildings to the GPU catalog, so queueBuilding's new rejection aligns TS with
-both real Civ 6 and the GPU's effective behavior); D-12 (real amenity
-bands: Content exactly 0, Displeased −1..−2, Unhappy ≤−3 — Unrest/Revolt stay
-unimplemented features), D-18 (real loyalty values: pressure swing ±20,
-amenity loyalty ±6/±3 — data/export-driven, GPU fallback defaults aligned);
-D-11 decided (R&F/GS canon).** The gate hunts these slices triggered also fixed: the
-player-side per-city interleave (the #23 class), strip idempotence + the founding
-twin, non-removable-feature adjacency (nfadj/reef), the flipped-center double-strip
-(old task #21's residual), torch.argmax tie semantics (first_argmax), the empire-score
-float association, and the third dormant-TS-fallback: ranged attacks ROLL against lone
-civilians (melee-vs-CS and melee-vs-civilian were the first two). REMAINING
-**SECTION D IS CLOSED — every tracked fidelity divergence is fixed or
-canon-decided.**
-
-D-8 DISCOUNT COMPLETE (the final item; civfanatics resource 27783 + thread
-625743): under our R&F/GS canon the discount is **40%** (vanilla's 25% and
-GovPlaza are out of scope). A specialty type is discounted iff the civ has
-PLACED fewer of it than ceil(D/U) with D = its COMPLETED specialty
-districts, U = its UNLOCKED specialty types, gated D ≥ U; cost =
-floor(districtCostIn × 0.6), priced BEFORE the placement registers ("value
-C changes the moment you place") and locked at queue like everything else.
-Surfaces (lockstep): TS districtCost(type)/districtDiscounted +
-queueDistrict, rivalDistrictDiscounted in tryQueueRivalDistrict; exporter
-ships unlockTech/unlockCivic per catalog entry (U counts match
-computeUnlocks by construction — every unlockDistrict effect targets a
-PLACEABLE district); GPU _player/_rival_district_discounted +
-_unlocked_specialty_count over the 4 pricing sites.
-
-D-17 COMPLETE (TS-only — tile purchase has no GPU verb): the real schedule,
-verified via the civfanatics formula thread — ring-based base (50 ring ≤2,
-75 ring 3, +25/ring as a scope extension for our ring-5 candidates),
-speed-scaled, × (1 + 4·max(tech%, civic%)), + 5 (scaled) per tile EVER
-purchased (state.tilesPurchased, empire-wide). Purchases no longer advance
-the culture-growth counter (the two schedules are decoupled, like real
-Civ 6); TILE_PURCHASE_GOLD_PER_CULTURE died.
-
-D-23 COMPLETE: ranged units bombard cities — rangedAttack falls back through
-the melee chain (rival city at war, then CS center) with ONE roll against
-the D-22 defense, no retaliation, and the city floors at 1 HP (ranged never
-captures; melee finishes). attackTargets offers cities at the unit's full
-range for the player; the GPU r_sieg/r_cs branches mirror the fallback, and
-the unit mask now offers at-war rival centers to every fighter (CS-center
-mask bits stay the tracked follow-up, same status as melee).
-
-D-22 COMPLETE (also closes symmetry C-9): city defense = max(15, strongest
-MELEE unit the owner has EVER fielded) + 5 when the owner's own military
-garrisons the center — no more population/tech-count terms, and the same
-formula for player and rival cities. Trackers: TS state.bestMeleeCS +
-rival.bestMeleeCS (spawnUnit chokepoint — training, purchase, levy, rival
-production; migrate seeds from the standing army), GPU best_melee/
-r_best_melee in _MUTABLE (spawn-site updates gated on the found-spot mask
-like TS). A hostile unit standing on a center no longer counts as the
-"garrison" (it's a besieger). Walls stay out of scope.
-
-D-15 COMPLETE: GAME_SPEED now scales uniformly — districts (base 54→32,
-TS districtCostIn + exporter districtCost.base + GPU fallback defaults),
-settlers (80/30→48/18, settlerCost + exporter scenario literals), wonders
-(builtWonders W() maps ×speed like buildings/units), projects (the 15 floor
-→9; the body already followed districts). The sweep also fixed a STALE
-controlled-rival district-cost site in the GPU (apply_rival_actions still
-used the pre-D-8 averaged js_round(base·(1+8·done/total)) formula — off the
-parity path since controlled rivals are empty in the gates; now the same
-floor(base·(1+9·max(t%,c%))) as every other site, from that rival's trees).
-
-D-13 COMPLETE (owner-supplied sources): the real cost ladder
-60/65/80/105/135/175/225/265/355/405/525 verified against
-civfanatics.com/civ6/info/building (25 corrections — notably Stock Exchange
-560→355, Sewer 200→405, Zoo 290→405), and EVERY building now carries the
-verified base-game maintenance from civ6bbg.github.io (corrections vs the
-tier heuristic: Lighthouse/Seaport 0, University/Museum/Armory 2,
-Stadium/Research Lab/Broadcast Center/Power Plant 3). The new data exposed a
-latent GPU bug: TS endTurn computes luxuryAmenities ONCE before its city loop
-(game.ts:667), but the GPU's guard-triggered mid-walk recomputes re-ranked
-luxury grants with mid-walk pops — D-12's tighter bands turned the flicker
-into a Content-vs-Displeased split (rng 2026006142 t160, exact ×0.95/×0.85
-deltas). Fixed: the walk freezes the walk-top lux map (_city_totals(lux=)).
-
-### High confidence
-
-1. **Combat damage random factor 0.75–1.25** (`combat.ts:51-54`) — real: 0.8–1.2. H
-2. **Healing model** (`units.ts:287-293`) — heals every turn even after moving/attacking; no
-   city (+20) or neutral (+10) tiers. Real: only if no MP spent; +20 city / +15 friendly /
-   +10 neutral / +5 enemy. H (also symmetry C-7)
-3. **Movement uses the Civ-5 partial-MP rule** (`units.ts:161-175`) — enters while
-   `movesLeft > 0`. Real Civ 6: need MP ≥ full tile cost (full-MP 1-tile exception). H
-4. **River crossing zeroes remaining MP** (`units.ts:172-175`) — real: +3 MP cost. H
-5. **CITY_MIN_DIST = 3** (`data/constants.ts:15`) — real blocks settling within 3 tiles
-   (min center distance 4). H
-6. **Settler completion doesn't cost 1 pop** (`game.ts:686-687`). H
-7. **Trade capacity: Market+Lighthouse stack in one city** (`trade.ts:22-25`) — real: +1 max
-   per city from that pair. H
-8. **District cost scaling** (`game.ts:52-56`) — `round(54·(1+8·done/total))` averaging both
-   trees; real: `floor(54·(1+9·max(tech%,civic%)))` + 25% under-represented discount. H
-9. **Horseman CS 35** (`data/units.ts:97-107`) — real 36. H
-10. **Builder cost flat 54** (`data/units.ts:33-42`) — real 50 + 4/builder trained. H
-11. **Boost fraction 40%** — DECIDED 2026-07-10: the sim's canon is **Rise & Fall /
-    Gathering Storm** (40% boosts; the GS Reef and GS disasters are already modeled).
-    Not a bug; no code change. H
-
-### Medium confidence
-
-12. **Amenity tier thresholds one tier lenient; no Unrest/Revolt** (`constants.ts:76-83`) —
-    real: Content = 0 only, Displeased −1..−2, Unhappy −3..−4, Unrest −5..−6 (rebels),
-    Revolt ≤−7. Multipliers per tier match. M
-13. **Building maintenance tiering off** (`city.ts:81-89`) — real: Monument/Granary/Water
-    Mill 0 (code 1), Temple 2 (code 1), Workshop 1 (code 2), worship 0 (code 2). M
-14. **District maintenance charges Commercial Hub & Harbor** (`city.ts:91-93`) — real exempts
-    those two. M
-15. **GAME_SPEED 0.6 non-uniform** — scales units/buildings/techs/civics but not wonders
-    (`builtWonders.ts`), districts (`game.ts:52`), settlers (`game.ts:127`), projects →
-    those cost ~1.67× more relative to real ratios. M
-16. **Border growth cost** (`constants.ts:24-26`) — `floor(20+10·n^1.1)`; real
-    `10+(6·n)^1.3` — too fast late (n=10: 146 vs ~214). M
-17. **Tile gold purchase = 4× border culture cost** (`constants.ts:29`, `game.ts:512-517`) —
-    real: own ring-distance + research schedule (~50/75 base), not coupled to the culture
-    counter. M
-18. **Loyalty happiness ±3/±1.5 and pressure cap ±10** (`data/rivals.ts:56-63`,
-    `rivals.ts:309-328`) — real: ±6/±3 and swing to ±20; era weighting absent. M
-19. **Specialists generate GPP** (`game.ts:796-799`) — real: yields only. M
-20. **Pillage heals +25 for ANY improvement** (`combat.ts:405-412`) — real: heal from
-    food-type improvements only; others grant yields. M
-21. **Worship buildings production-buildable** (`rules.ts:259-261`, `game.ts:287-299`) —
-    real: faith-purchase only (fixed 190). M
-22. **City defense ignores best-unit-ever rule** (`combat.ts:56-60`) — real bases CS on the
-    strongest melee unit ever built + garrison flat bonus + walls. M (also symmetry C-9)
-23. **Ranged units can't attack cities** (`combat.ts:194-213`) — real allows it (with wall
-    rules). M
-24. **Arena missing +1 culture** (`data/buildings.ts:86`). M
-
-### Low confidence / minor
-
-25. Appeal "Average" band 0..1 vs real −1..1 (`appeal.ts:31-37`). L
-26. Insulae/Medina count ALL non-center districts vs real specialty-only (`city.ts:199-205`);
-    `policies.ts:27` comment contradicts the implementation. L
-27. Veterancy covers Encampment only; real also Harbor (`data/policies.ts:69`). L
-28. Astrology eureka condition: "own tile adjacent to natural wonder" vs real "discover a
-    natural wonder" (`data/boosts.ts:38`). L
-29. Melee mutual-kill: attacker HP floored to 1 (`combat.ts:171-173`) — real resolution
-    uncertain. L
-30. Tech-cost outliers inside the compact tree (header admits eyeballing, civics are exact):
-    Banking 390/Medieval (real 490/Renaissance), Mass Production & Astronomy 580 (real 490),
-    Industrialization 930 (real 700), Sanitation Industrial (real Modern). L
-
-Verified faithful (no action): growth curve, housing growth factors, amenities-needed
-formula + tier multipliers, food 2/pop, citizen 0.7s/0.3c, center min yields, housing
-(water/Aqueduct), luxury distribution, district pop cap, work radius, purchase ×4, district
-adjacency + placement, specialist yields, unit/city HP, city heal amount, unit roster
-(except D-9/10), tile/improvement yields, terrain defense, regional range 6, pantheon 25,
-checked beliefs, government slots, trade range 15, camp reward 50, pillage amount, loyalty
-pressure shape, capital loyalty immunity, barb fog spawning.
-
-Acknowledged simplifications (comment-marked design choices, NOT tracked as bugs): compact
-tech/civic trees, GAME_SPEED 0.6, condensed auto-claim great people, eyeballed
-policy/religion/wonder/city-state/appeal/disaster values, chop lump formula, domestic trade
-yield approximation, civilian capture→kill, barb sack-instead-of-stall, scripted rival
-diplomacy, no walls, bankruptcy disband approximation.
+Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
+`CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
+divergent line. Fields grown this cycle: PC loy; RC cb/til/hp; RU hp+a
+(acted); RT fai + tsum (territory-shape checksum); CB lines = every
+damage roll (diff, rand·1e6, dmg) from the damageRoll/_damage_roll
+chokepoints — catches reordered/extra rolls the rng column can't see.
+Probe at the exact batch shape of the failing run (BLAS association is
+batch-shape-dependent). PYTHONUTF8=1 on piped Windows runs. Never edit
+engine/TS sources while a gate/battery pipeline is in flight.

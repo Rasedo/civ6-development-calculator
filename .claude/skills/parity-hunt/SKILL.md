@@ -7,53 +7,81 @@ description: Diagnose a TS/GPU parity-gate failure down to the exact divergent d
 
 A gate failure is a real semantic difference. The hunt ends when you can
 name the single decision (turn, actor, rule) where the engines disagree —
-then fix the engine that is WRONG relative to TS-as-spec.
+then fix the engine that is WRONG. TS is the spec — unless TS itself is
+farther from real Civ 6 than the GPU (owner rule): then fix TS.
 
-## Read the failure first
+## Step 1 — the Phase-1 statelog (ALWAYS first)
 
-- `parity_test` prints (column, TS, GPU) at the first bad turn per seed.
-  Column names live in `gpu/parity_test.py` (head + per-CS + per-rival +
-  per-city blocks). `rng` diverging FIRST = a draw-count difference — an
-  action happened in one engine only (fights are 2 draws; lone-civilian
-  kills are roll-free; war/peace rolls are conditional).
-- The replay gate (`REPLAY_DEBUG=1 npm run gpu:replay`) prints ALL
-  differing columns; "no player unit at tile X (civ f)" means positions
-  drifted earlier — f is the CIVILIAN FLAG, not a civ id.
-- Sums can match while distributions diverge (popSum hid a per-city split
-  once). Aggregate columns are not proof of alignment.
+```
+PYTHONUTF8=1 python gpu/rollout.py --shards 4 --log <rng>
+CIV6_LOG=<rng> npm run gpu:replay
+python gpu/logdiff.py          # prints the FIRST divergent line
+```
+- Run at the SAME shard/batch shape as the failing gate — BLAS float
+  association is batch-shape-dependent; B=1 probes follow different
+  trajectories.
+- Statelog line N = state after the step labeled N−1 in the trace; the
+  in-step probe label (self.turn / state.turn) is one MORE off. Align by
+  values when in doubt, not labels.
+- Current fields: PT (totals, gp, esc), PU/BU/RU (positions, hp, acted),
+  TI/TD (tiles), PC (pop/progress/boxes/loy/yields), RT (rival totals,
+  fai, terr + tsum shape-checksum), RC (queue kind/cost/progress, cb,
+  til, hp, yields), CB (EVERY damage roll: diff, rand·1e6, dmg — from
+  the damageRoll/_damage_roll chokepoints; catches reordered/extra rolls
+  invisible to the rng column).
+- **If the log lacks the field you need, ADD IT PERMANENTLY** (both
+  sides, same order, milli-ints for floats). Every field in the list
+  above was added mid-hunt and immediately paid for itself. Aggregates
+  hide splits — tsum exists because terr counts matched while shapes
+  diverged.
 
-## Paired probes (the core tool)
+## Step 2 — targeted temp probes (when the log localizes but can't explain)
 
-- **TS side**: a guarded print inside the phase under suspicion, run
-  through the REAL harness — `RIVAL_DEBUG=<seed> npx vite-node
-  scripts/export-gpu.ts 24 100 5` for scripted worlds, or a
-  `(globalThis).__rdbg` flag set per-game in `scripts/replay-gpu.ts` for
-  off-script games (guard by game RNG, not seed — three games share each
-  seed and interleave).
-- **GPU side**: a B=1 sim stepped scripted, or replay-fed with the logged
-  actions from `gpu/fixtures/rollout.json` (resolve units by tile +
-  charges-flag; do NOT reseed — the rollout never reseeds the world rng).
-- **Alignment discipline** (three false positives came from this):
-  compare END-OF-TURN states only. TS phase-internal prints show
-  pre-growth / mid-phase values and `state.turn` increments early; when
-  in doubt print at the end of `endTurn` and after `sim.step()`.
-- Strip every probe before committing (`grep -rn RIVAL_DEBUG src scripts`).
+- Gate GPU prints on a rollout-set batch attr (`sim._log_combat_b`
+  pattern); gate TS prints on a `globalThis` flag set per-game in
+  replay-gpu.ts (guard by game RNG — three games share each seed).
+- Print the DECISION INPUTS (masks, keys, tie-breaks, strengths), not
+  just outcomes. One probe generation should name the branch.
+- Strip every temp probe before committing (`grep -rn 'TEMP\|_dbg' src
+  scripts gpu`). If a probe class recurs twice, promote it into the
+  statelog instead.
 
-## Escalation ladder
+## Known divergence classes (check these FIRST — all were paid for)
 
-1. Bit-level accumulator diff per turn (print `.toPrecision(20)` vs
-   python `repr`) → find the FIRST differing turn, then decompose that
-   turn's sum term by term. Association and dtype are the usual culprits.
-2. Position diff: dump all unit tiles per turn on both sides
-   (end-of-turn), find the first split, then dump that turn's decision
-   inputs (blocking planes, target keys, tie-breaks) at each candidate.
-3. B=1 vs B=24: if a seed diverges only in the batch, hunt a
-   batch-collapsed reduction (a `.sum()` missing `dim=1` did this).
-4. When the engines agree and the TRACE disagrees, the trace/tolerance
-   harness itself is stale (a queue-kind it can't price, a widened block)
-   — fix the harness, note it as a false positive.
+1. **city_seq / array-vs-column order**: TS iterates and tie-breaks by
+   array/id order (acquisition order); GPU columns stop matching it once
+   a hole-reuse founding lands a new city in a low column. Any
+   order-coupled mirror or id-ascending tie-break must compare
+   `city_seq`. Three shipped instances: loyalty pop-mix, luxury-grant
+   ties, trace cityIds.
+2. **Slot hygiene**: a dead pooled entity's queue/registries leak into
+   civ-wide readers (has_q phantom builder; reused-slot progress). Clear
+   on kill AND alive-mask readers.
+3. **Post-walk freshness**: TS trace/score-time stats recompute LIVE
+   (fresh luxury ranking with post-walk pops); GPU caches must be
+   invalidated after the city walk.
+4. **Draw-count vs draw-value**: same count + different values is
+   invisible to the rng column — that's what CB lines catch. Unconditional
+   rolls with gated OUTCOMES keep draw parity (the peace-roll pattern).
+5. Association/dtype: non-dyadic quanta (0.05 gold, 0.7 science, ×0.95
+   amenity) round differently across sum orders; milli-round at shared
+   thresholds (`goldAffordable`/`_afford`), replicate TS association in
+   scores.
+6. Acted/heal gating: any executed action must block the D-2 heal on
+   BOTH sides (TS movesLeft spend = GPU acted flag); rejected orders
+   must NOT set flags.
+7. Stale trace/tolerance harness: when both engines agree and the trace
+   disagrees, fix the harness (4 instances: static queue pricing, etc.).
 
-## Verify the fix
+## Verify
 
-Full battery, and say in the commit what the divergence WAS (turn, seed,
-rule) — the stage log is the program's memory.
+**Re-run ONLY the failing gate after each fix** (`PYTHONUTF8=1 python
+gpu/rollout.py --shards 4 --pipeline-replay`, ~3 min) and iterate there —
+a hunt usually takes several fix→gate cycles and the battery would double
+each one. The FULL battery runs ONCE at the end, before the commit: it
+re-exports fixtures (mandatory if TS/data changed — the stale-fixture
+trap) and covers the scripted gate + vitest + self-tests the off-script
+gate doesn't. Then say in the commit what the divergence WAS (turn,
+seed, rule) — the stage log is the program's memory. Expect the NEXT
+stage's reshuffle to expose a new latent: hunts are part of every
+stage's budget.

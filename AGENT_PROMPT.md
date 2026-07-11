@@ -52,14 +52,40 @@ Every engine change must keep both engines TURN-EXACT:
   battery = you verified nothing; this happened).
 - Anchors for text patches must be verified against the file (`grep -n`)
   — write-at-end patch scripts that assert mid-way leave NOTHING applied.
-- **Debug with paired probes, end-of-turn aligned**: a `RIVAL_DEBUG`
-  guarded print run through the exporter/replay on the TS side, a B=1
-  replay-fed sim on the GPU side; diff per-turn state; beware phase-point
-  and turn-label misalignment (three false positives came from that) and
-  multi-game interleaving (guard by game rng, not just seed).
+- **Hunt with the Phase-1 statelog FIRST** (supersedes ad-hoc paired
+  probes): `rollout.py --shards 4 --log <rng>` + `CIV6_LOG=<rng> npm run
+  gpu:replay` + `python gpu/logdiff.py` → the first divergent line. When
+  a hunt needs a field the log lacks, ADD IT PERMANENTLY on both sides
+  (this cycle grew: PC loy, RC cb/til/hp, RU hp+a, RT fai+tsum, and the
+  CB combat log — every damage roll's diff/rand/dmg from the single
+  damageRoll/_damage_roll chokepoint, catching reordered/extra rolls the
+  rng column can't see). Escalate to targeted temp probes only when the
+  log localizes but can't explain; strip temp probes same-session.
+  Probe at the EXACT batch shape of the failing run (BLAS float
+  association is batch-shape-dependent — B=1 probes follow different
+  trajectories).
+- **The city_seq class** (three shipped instances: loyalty pop-mix,
+  luxury-grant ties, trace cityIds): TS iterates/ties by ARRAY order =
+  acquisition order; GPU columns stop matching it once a hole-reuse
+  founding lands a new city in a low column. EVERY order-coupled mirror
+  or id-ascending tie-break must compare `city_seq`, never the column
+  index. Assume any new rank/tie site has this bug until checked.
+- **Slot hygiene**: a dead slot's QUEUE and registries die with the city
+  (two shipped catches: rc_current builder code leaking into has_q;
+  progress/cost leaking into reused player slots). When killing any
+  pooled entity, clear every field a later reader could see — or
+  alive-mask the reader.
+- **Post-walk freshness**: TS trace/score-time stats recompute LIVE
+  (fresh luxuryAmenities ranking with post-walk pops); the GPU walk's
+  frozen-map totals must not leak past the walk (_eff_version bump after
+  the city block).
+- **Never edit engine/TS sources while a gate/battery/eval pipeline is
+  in flight** — children import mid-pipeline and run half-edited code
+  (two incidents). Docs/scratchpad writes are safe; source reads are safe.
 - Positions/hp of units are NOT traced — silent divergence there is
-  possible; the fix is a position-diff probe, and the cause is usually a
-  blocking/stacking asymmetry. TS `tileFreeForUnit` is the stacking spec.
+  possible; RU/BU/PU statelog lines now carry hp+acted, and tsum catches
+  same-count territory-shape splits. TS `tileFreeForUnit` is the
+  stacking spec.
 - Two id spaces coexist: tiles use the unified civ space
   (`civOfRival(r) = r+1`), rival UNITS carry the RAW rival id. Never mix.
 - The eval lane covers CUDA device placement that CPU-only parity cannot;
@@ -86,48 +112,40 @@ Every engine change must keep both engines TURN-EXACT:
 - `behavior_probe.py` after every training milestone — strategy deltas
   (units/districts/treasury/wars) tell you more than the score.
 
-## Current state (2026-07-08, branch claude/eloquent-mayer-si4ggq)
+## Current state (2026-07-11, branch claude/eloquent-mayer-si4ggq)
 
-**THE PROGRAM HAS PIVOTED.** §1-4 (the RL + parity infrastructure) is
-SHIPPED and gate-proven: the full B-arc, C2 per-seat surface, C3a/b/c
-self-play + league + O=4 FFA, V-W1/V-W2 war+capture both ways, M3d
-search-distillation, V-H1 chop, rival-seat verb parity (VP-G1 gold +
-VP-G2 purchases). The RL METHODOLOGY is settled and banked (TRAINING.md
-+ /rl-research): self-mode workhorse, α-Rank truth, teacher>student,
-verbs-need-adoption. The war chapter CLOSED by measurement:
-economist-with-minimum-deterrence is this world's optimum (7 rungs);
-c3a-4 (~225 eval, pre-war economist) was the last interim champion.
+**THE PROGRAM HAS PIVOTED** (owner's call): the real goal is the best
+champion on an engine CLOSE ENOUGH TO CIV 6, and every engine change
+orphans every net — so interim champions are disposable. Durable = the
+parity contract, the gate battery, the seat surface, the methodology
+bank (TRAINING.md + /rl-research; the war chapter closed by measurement:
+economist-with-minimum-deterrence). The RL track is PARKED until the
+engine is done.
 
-**Why the pivot** (owner's call): the real goal is the best champion on
-an engine CLOSE ENOUGH TO CIV 6, and every engine change orphans every
-net — so interim champions are disposable. Durable = the parity
-contract, the gate battery, the seat surface, the methodology bank.
-The RL track is PARKED (adoption-smoke rungs only) until the engine is
-done. The roadmap now runs on **BUILD_PLAN §5 — the Civ 6 gap list.**
+**The engine runs on the P-ladder** (tasks #23-#31; audit findings in
+`gpu/AUDIT.md` v2, 2026-07-11 — the SINGLE current gap list):
+- **P1-P4 DONE**: rival water/Harbor line, player district costs,
+  battery 316s→~200s, the full Civ-6 fidelity batch (old audit §D
+  closed: healing/movement/border curve/amenity bands/loyalty values/
+  cost escalators/verified costs/speed uniformity/city defense/ranged
+  bombardment/tile purchase/GS district discount).
+- **P5 (rival symmetry) nearly done**: S1 economy, S7 camps/raze,
+  S2 peace+settler purchase, S3 founding cluster, S4 culture borders,
+  S5 GP effects + faith pantheons + prophet religion; S6 (rival
+  loyalty+amenities) + S8 (controlled purchase revalidation) land as
+  one combined stage. ~20 hunted latent parity bugs so far — every
+  stage's reshuffle exposes the next one; budget hunt time into EVERY
+  stage.
+- **Then**: P6 rival yield interleaving (#23), P7 dead-slot/order
+  reclamation (#24 — the city_seq/capital-pin/column-order family),
+  P8 net-driven scripted export (#26), then ONE re-baseline pass and
+  the champion campaign. NO per-stage eval baselines (owner directive
+  2026-07-10) — one pass before P8.
 
-## Ranked frontiers (BUILD_PLAN §5, work top-down)
-
-The gap to Civ 6, ordered by how much each changes what "champion" MEANS:
-
-1. **G-V Victory & horizon** — DONE (2026-07-09/10). GV-1..5 shipped
-   (winner indicator, game end, domination, score victory at TURN_LIMIT
-   = 250, bankruptcy), pool caps raised (765ab4f), off-script parity
-   exact to t300, and every horizon default now resolves to the single
-   knob (TS TURN_LIMIT / GPU rules.turn_limit = 250) across train/eval/
-   rollout/envs. Remaining under this banner: net-driven scripted export
-   past t100 (task #26) and dead-slot pool reclamation (task #24).
-2. **G-C Combat depth** — city walls + ranged strikes, siege classes,
-   promotions, ZoC. Re-opens the war-chapter verdict (measured on
-   wall-less 40-defense cities). Makes domination a real axis.
-3. **G-R Religion** — faith is a dead pool today; pantheons/beliefs,
-   religious units/pressure, the religious victory.
-4. **G-T Trade routes**, **G-D full trees**, **G-S scale (300t/8-10
-   cities/bigger maps/pools)**. Cut-lines: STRATEGIC CORE = G-V+G-C+G-R;
-   FULL FIDELITY adds the rest.
-
-Every slice lands via /gate-stage + /port-mechanic; RL shrinks to one
-cheap adoption-smoke per shipped system. The final champion campaign
-runs ONCE, on the finished engine, with the full methodology bank.
+AUDIT.md v2 chapters: A asymmetry (eurekas, wonders, purchases, roster,
+religion effects — the post-P5 symmetry queue), B fidelity vs real Civ 6
+(walls/ZoC/XP/naval/victories...), C order/slot latents, D perf
+candidates (leader() gate first), E docs staleness.
 
 ## Skills (invoke them — they ARE the procedures above, operationalized)
 

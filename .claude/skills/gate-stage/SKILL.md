@@ -48,8 +48,29 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
   already exists (`farm_flat`, `mine_ok`, `wh`, `riv`…) before adding one.
 - Two id spaces: tiles use `civOfRival(r) = r+1`; rival UNITS carry the
   raw rival id.
-- Unit positions/hp are untraced — a stage touching movement/stacking
-  needs a position-diff probe (see the parity-hunt skill) even when the
-  gates are green.
+- Unit positions/hp: RU/BU/PU statelog lines carry hp+acted and RT
+  carries tsum (territory shape) — but the TRACE doesn't; a stage
+  touching movement/stacking still deserves a statelog pass (see
+  parity-hunt) even when the gates are green.
 - CPU parity cannot see CUDA device-placement bugs; run the eval lane
   (full battery) before any training-facing commit.
+- **Quiesce sources while pipelines run**: never edit src/core or
+  gpu/civ6gpu while a battery/gate/eval is in flight — children import
+  mid-pipeline and execute half-edited code (two incidents). Docs and
+  scratchpad writes are safe; reads are safe. Clear __pycache__ if a
+  run inexplicably executes stale code.
+- **Budget a hunt into EVERY stage.** Each behavior change reshuffles
+  all 72 off-script trajectories and historically exposes 1-4 latent
+  parity bugs from OLDER code (capture family, order family, heal
+  gating). Green-first-try is the exception. Expected flow: implement →
+  gate → hunt via parity-hunt → fix latents → full battery → commit,
+  with the commit message crediting each hunted catch.
+- New pooled state needs KILL hygiene: when an entity dies, clear every
+  field a civ-wide reader could later see (queues, registries), or
+  alive-mask the readers. New order/tie logic must follow `city_seq`
+  (acquisition order), never column index.
+- Commit messages via `git commit -F <message-file>` (Write the file
+  first) — PowerShell/Bash quoting mangles multi-line -m.
+- `PYTHONUTF8=1` on every piped python run (cp1251 consoles kill
+  unicode prints at the finish line — rollout now degrades gracefully,
+  but children may not).
