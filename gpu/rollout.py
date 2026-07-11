@@ -42,6 +42,7 @@ def main() -> None:
     ap.add_argument("--out", default=str(FIXTURES / "rollout.json"))
     ap.add_argument("--shards", type=int, default=None, help="P3: split the games across N processes (byte-identical merge — every game keeps its GLOBAL seed/index)")
     ap.add_argument("--shard", type=int, default=None, help="internal: this process runs shard k of --shards")
+    ap.add_argument("--pipeline-replay", action="store_true", help="P5 battery: replay each shard's games through the TS oracle AS THAT SHARD LANDS (hides the ~35s serial replay tail); the merge and the gate semantics are unchanged")
     args = ap.parse_args()
 
     if args.shards and args.shard is None:
@@ -50,6 +51,8 @@ def main() -> None:
         # slice of the game list, keeping GLOBAL indices so every game's
         # seed (and therefore its trajectory) is identical to the unsharded
         # run; the merge is byte-identical rollout.json.
+        import threading
+
         procs = []
         for k in range(args.shards):
             cmd = [sys.executable, __file__, "--shard", str(k), "--shards", str(args.shards),
@@ -63,7 +66,34 @@ def main() -> None:
             env.setdefault("OMP_NUM_THREADS", "4")
             env.setdefault("MKL_NUM_THREADS", "4")
             procs.append(subprocess.Popen(cmd, env=env))
+
+        replay_rcs: list[int] = [0] * args.shards
+        replay_out: list[str] = [""] * args.shards
+        threads = []
+        if args.pipeline_replay:
+            npx = "npx.cmd" if os.name == "nt" else "npx"
+
+            def _replay(k: int) -> None:
+                # wait for THIS shard's rollout, then replay its games while
+                # the other shards keep rolling — each shard file is a
+                # complete rollout.json with its slice of games.
+                if procs[k].wait() != 0:
+                    replay_rcs[k] = -1  # rollout itself failed; no replay
+                    return
+                p = subprocess.run(
+                    [npx, "vite-node", "scripts/replay-gpu.ts", args.out + f".shard{k}"],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                )
+                replay_rcs[k] = p.returncode
+                replay_out[k] = p.stdout.strip()
+
+            threads = [threading.Thread(target=_replay, args=(k,)) for k in range(args.shards)]
+            for th in threads:
+                th.start()
+
         rcs = [p.wait() for p in procs]
+        for th in threads:
+            th.join()
         if any(rcs):
             raise SystemExit(max(rcs))
         merged = None
@@ -77,7 +107,18 @@ def main() -> None:
             part_path.unlink()
         Path(args.out).write_text(json.dumps(merged))
         print(f"{len(merged['games'])} games merged from {args.shards} shards -> {args.out}")
-        print("now verify with: npx vite-node scripts/replay-gpu.ts")
+        if args.pipeline_replay:
+            if any(replay_rcs):
+                for k, rc in enumerate(replay_rcs):
+                    if rc:
+                        tail = "\n    | ".join(replay_out[k].splitlines()[-8:])
+                        print(f"shard {k} replay FAILED (rc={rc}):\n    | {tail}")
+                raise SystemExit(1)
+            games_n = len(merged["games"])
+            turns_n = len(merged["games"][0]["trace"]) if merged["games"] else 0
+            print(f"REPLAY PARITY OK — {games_n} games × {turns_n} turns, replayed per-shard while later shards rolled")
+        else:
+            print("now verify with: npx vite-node scripts/replay-gpu.ts")
         return
 
     rules_raw = json.loads((FIXTURES / "rules.json").read_text())
@@ -126,36 +167,43 @@ def main() -> None:
         um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack  # and don't hold back either (builders' 13 unaffected)
         ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)  # [B, P]
         ea = masked_choice(sim.envoy_mask(), game_seed, turn, HEAD_ENVOY)  # [B]
+        # P5 battery perf: one .tolist() per tensor per turn instead of a
+        # per-element tensor-index + int() storm (the python logging loop was
+        # ~20% of the whole rollout in cProfile). Values and JSON output are
+        # byte-identical — tolist() yields the same python ints/floats.
+        pa_l, ta_l, ca_l, ea_l, ua_l = pa.tolist(), ta.tolist(), ca.tolist(), ea.tolist(), ua.tolist()
+        ptile_l = sim.p_tile.tolist()
+        pciv_l = sim._p_civ[sim.p_type].tolist()
         for b in range(B):
             entry: dict = {"t": turn}
-            prods = [[c, int(pa[b, c])] for c in range(C) if pa[b, c] >= 0]
+            prods = [[c, v] for c, v in enumerate(pa_l[b]) if v >= 0]
             if prods:
                 entry["p"] = prods
-            if ta[b] >= 0:
-                entry["r"] = int(ta[b])
-            if ca[b] >= 0:
-                entry["c"] = int(ca[b])
-            if ea[b] >= 0:
-                entry["e"] = int(ea[b])
+            if ta_l[b] >= 0:
+                entry["r"] = ta_l[b]
+            if ca_l[b] >= 0:
+                entry["c"] = ca_l[b]
+            if ea_l[b] >= 0:
+                entry["e"] = ea_l[b]
             # Log each order as [tile, action, civ] (not slot): the replay
             # finds the unit by tile+domain, robust to same-turn spawn/death.
             orders = [
-                [int(sim.p_tile[b, p]), int(ua[b, p]), int(sim._p_civ[sim.p_type[b, p]])]
-                for p in range(P_MAX)
-                if ua[b, p] >= 0 and ua[b, p] != HOLD
+                [ptile_l[b][p], v, int(pciv_l[b][p])]
+                for p, v in enumerate(ua_l[b])
+                if v >= 0 and v != HOLD
             ]
             if orders:
                 entry["u"] = orders
             if len(entry) > 1:
                 games[b]["actions"].append(entry)
         sim.step(production=pa, tech=ta, civic=ca, units=ua, envoy=ea)
-        rows = sim.trace_row()
+        rows_l = sim.trace_row().tolist()
         if args.log is not None:
             for _b in range(B):
                 if games[_b]["rng"] == args.log:
                     _logl.extend(gpu_state_lines(sim, _b))
         for b in range(B):
-            games[b]["trace"].append([float(x) for x in rows[b]])
+            games[b]["trace"].append(rows_l[b])
 
     # Scaffold district ids in placement order — replay maps a district action
     # (a >= NB+2+NU) back to a DistrictId (D5b). Same source as the engine's

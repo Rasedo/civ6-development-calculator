@@ -204,13 +204,24 @@ def test_planning(rules, paths, full=True):
 
 def main():
     full = "--full" in sys.argv
+    # P5 battery split: --part snapshot|search|planning runs ONE test group
+    # so the battery can run the three groups as parallel processes (same
+    # assertions, same seeds — pure process-level parallelism).
+    part = None
+    for i, a in enumerate(sys.argv):
+        if a == "--part" and i + 1 < len(sys.argv):
+            part = sys.argv[i + 1]
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run gpu:export` first"
-    test_snapshot_restore(rules, paths)
-    test_search(rules, paths[:12] if full else paths[:6], full=full)
-    test_planning(rules, paths, full=full)
-    print("M1/M2a SEARCH SELF-TEST OK" + ("" if full else " (fast; --full for MPC benchmarks)"))
+    if part in (None, "snapshot"):
+        test_snapshot_restore(rules, paths)
+    if part in (None, "search"):
+        test_search(rules, paths[:12] if full else paths[:6], full=full)
+    if part in (None, "planning"):
+        test_planning(rules, paths, full=full)
+    label = f" [{part}]" if part else ""
+    print(f"M1/M2a SEARCH SELF-TEST OK{label}" + ("" if full else " (fast; --full for MPC benchmarks)"))
 
 
 if __name__ == "__main__":

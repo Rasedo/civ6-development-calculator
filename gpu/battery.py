@@ -4,19 +4,20 @@
     python gpu/battery.py --full      # + the slow MPC quality benchmarks
     python gpu/battery.py --no-eval   # skip the two 50-episode baselines
 
-Stage 0 (serial, everything depends on it): tsc build, vitest, fixture
-export. Then four lanes run concurrently on the measured bottleneck split:
+Stage 0 (serial, everything depends on it): tsc type gate + fixture
+export (P5: the vite build artifact feeds no gate; vitest runs in a
+lane). Then the lanes run concurrently on the measured bottleneck split:
 
-    parity   : the 24-seed scripted gate (CPU f64)
-    cputests : purchase/war/ranged/gumbel/... self-tests (CPU f64)
-    mcts     : mcts_test alone (~170s — co-critical, so its own lane)
-    gpu      : rollout --shards 3 (P3: 3 processes x OMP 4; tiny-tensor
-               torch scales across processes, the merge is byte-identical)
-               -> replay (off-script gate), then the two eval baselines
+    vitest+parity : the TS suite, then the 24-seed scripted gate
+    cputests      : purchase/war/ranged/gumbel/... self-tests (CPU f64)
+    mcts x3       : snapshot | search | planning as separate processes
+                    (same assertions/seeds — pure process split)
+    gpu           : rollout --shards 4 --pipeline-replay (P3 sharding;
+                    P5: each shard's TS replay runs as the shard lands,
+                    hiding the serial replay tail), then the evals
 
-Wall-clock is stage0 + the slowest lane (~3 min pre-P3, ~2 min after)
-instead of the ~13 min serial sum, with mcts_test's MPC benchmarks (66%
-of the old cost; search-quality, not engine-facing) behind --full.
+Wall-clock is stage0 + the slowest lane, with mcts_test's MPC
+benchmarks (search-quality, not engine-facing) behind --full.
 
 Each step's OMP thread count is capped so three torch processes don't
 oversubscribe the box. Exit code is nonzero if ANY step fails; the table
@@ -79,10 +80,13 @@ def main() -> int:
     py = sys.executable
     t0 = time.time()
 
-    print("stage 0 (serial): build, vitest, export", flush=True)
+    print("stage 0 (serial): tsc, export", flush=True)
     for name, cmd in (
-        ("build", [npm, "run", "build"]),
-        ("vitest", [npm, "test"]),
+        # P5 battery trim: the vite build ARTIFACT feeds no gate (export,
+        # replay and vitest all run from source via vite/vite-node) — the
+        # type check IS the gate, so run tsc alone. vitest moved into the
+        # parity lane (it needs no fixtures).
+        ("tsc", [npx, "tsc", "--noEmit"]),
         ("export", [npm, "run", "gpu:export"]),
     ):
         run(name, cmd, threads=24)
@@ -90,10 +94,13 @@ def main() -> int:
             break
 
     if not failed.is_set():
-        print("lanes (parallel): parity | cpu self-tests | mcts | gpu rollout(sharded)/replay/evals", flush=True)
-        mcts_cmd = [py, "gpu/mcts_test.py"] + (["--full"] if FULL else [])
+        print("lanes (parallel): vitest+parity | cpu self-tests | mcts x3 parts | gpu rollout(sharded, replay pipelined)/evals", flush=True)
+        mcts = [py, "gpu/mcts_test.py"] + (["--full"] if FULL else [])
         lanes = [
-            [("parity", [py, "gpu/parity_test.py"], 6)],
+            [
+                ("vitest", [npm, "test"], 8),
+                ("parity", [py, "gpu/parity_test.py"], 6),
+            ],
             [
                 ("purchase", [py, "gpu/purchase_test.py"], 4),
                 ("war", [py, "gpu/war_test.py"], 4),
@@ -106,15 +113,17 @@ def main() -> int:
                 ("duel", [py, "gpu/duel_test.py"], 4),
                 ("gumbel", [py, "gpu/gumbel_test.py"], 4),
             ],
-            # P3: mcts is its own lane (~170s) — inside the tests lane it made
-            # that lane co-critical with the gpu lane.
-            [("mcts", mcts_cmd, 6)],
+            # P5: mcts split into its three independent groups, run as three
+            # parallel lanes (same assertions/seeds — pure process split).
+            [("mcts-snap", mcts + ["--part", "snapshot"], 4)],
+            [("mcts-search", mcts + ["--part", "search"], 4)],
+            [("mcts-plan", mcts + ["--part", "planning"], 4)],
             [
-                # P3: sharded rollout — 3 processes × OMP 4 (tiny-tensor torch
-                # scales across processes, not threads; the merge is
-                # byte-identical, every game keeps its global seed).
-                ("rollout", [py, "gpu/rollout.py", "--shards", "3"], 4),
-                ("replay", [npm, "run", "gpu:replay"], 8),
+                # P3→P5: sharded rollout (4 procs × OMP 4 — measured best on
+                # this 24-CPU box; 6 shards THRASH: gpu 282s, parity starved);
+                # replay runs AS THE SHARD LANDS (--pipeline-replay), hiding
+                # the ~35s serial replay tail. Merge + gate semantics identical.
+                ("gpu-gate", [py, "gpu/rollout.py", "--shards", "4", "--pipeline-replay"], 4),
             ]
             + (
                 []
