@@ -98,6 +98,9 @@ for (const game of roll.games) {
   const tol = rowTolerance(C, csMax, rMax);
   const byTurn = new Map(game.actions.map((a) => [a.t, a]));
   const cityIds: number[] = state.cities.map((x) => x.id);
+  // Phase-1 combat log: collect the logged game's damage rolls (drained
+  // into CB lines by tsStateLines each turn).
+  (globalThis as any).__cbLog = LOG_RNG !== null && game.rng === LOG_RNG ? [] : undefined;
   const fail = (msg: string) => {
     console.log(`seed ${game.seed} rng ${game.rng}: ${msg}`);
     failures += 1;

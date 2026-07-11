@@ -28,6 +28,14 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   const L: string[] = [];
   const ti = (t: string) => Math.max(-1, unitIds.indexOf(t));
 
+  // Phase-1 combat log: drain the turn's damage rolls (damageRoll buffers
+  // them for the CIV6_LOG game) into keyed CB lines — the gpu/statelog twin.
+  const cb = (globalThis as any).__cbLog as string[] | undefined;
+  if (cb) {
+    cb.forEach((e, i) => L.push(`${p}CB${i} = ${e}`));
+    cb.length = 0;
+  }
+
   const pu = state.units.filter((u) => u.owner === 'player');
   L.push(
     `${p}PT = treas:${Math.round(state.treasury*1000)} sci:${Math.round(state.scienceTotal*1000)} ` +
@@ -51,13 +59,17 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)} a${barbActed.get(tile)}`);
 
   const rv = new Map<string, number>();
+  const rvHp = new Map<string, number>();
+  const rvActed = new Map<string, number>();
   for (const u of state.units) if (u.owner === 'rival') {
     const k = `${u.civId}\t${u.tileIndex}\t${ti(u.type)}`;
     rv.set(k, (rv.get(k) ?? 0) + 1);
+    rvHp.set(k, (rvHp.get(k) ?? 0) + u.hp);
+    rvActed.set(k, (rvActed.get(k) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));
   }
   for (const [k, n] of [...rv.entries()].sort()) {
     const [civ, tile, typ] = k.split('\t');
-    L.push(`${p}RU${civ} ${tile} t${typ} = ${n}`);
+    L.push(`${p}RU${civ} ${tile} t${typ} = ${n} hp${rvHp.get(k)} a${rvActed.get(k)}`);
   }
 
   for (let i = 0; i < state.map.tiles.length; i++) {
@@ -98,7 +110,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     );
     for (const rc of rival.cities) {
       const ry = rivalCityYields(state, rival, rc);
-      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} hp${rc.hp} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
+      L.push(`${p}RC${r} ${rc.centerIndex} = pop${rc.population} pr${Math.round((rc.queue[0]?.progress ?? 0)*1000)} co${Math.round(frontCost(rc)*1000)} k${rc.queue[0]?.kind ?? 'idle'} hp${rc.hp} cb${Math.round(rc.cultureBox*1000)} til${rc.tilesAcquired} ryf${Math.round(ry.food*1000)} ryp${Math.round(ry.production*1000)}`);
     }
   }
   return L;

@@ -31,8 +31,8 @@ export const RIVAL_MIL_RATE = 0.35;
  * player's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
 export const RIVAL_SETTLER_COST = (cities: number) =>
   Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
-/** Rival cities expand borders every N turns (staggered by city id). */
-export const RIVAL_BORDER_PERIOD = 9;
+// (P5/S4: RIVAL_BORDER_PERIOD died — rival borders grow on culture like
+// the player's, rc.cultureBox vs borderGrowthCost.)
 /** Great-person points per class per turn per city. */
 export const RIVAL_GPP_RATE = 0.35;
 /** Turn a rival claims its pantheon (staggered by rival id). */

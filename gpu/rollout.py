@@ -157,6 +157,10 @@ def main() -> None:
     ]
 
     HOLD = 12
+    if args.log is not None:
+        for _b in range(B):
+            if games[_b]["rng"] == args.log:
+                sim._log_combat_b = _b  # Phase-1 combat log (CB lines)
     for _ in range(args.turns):
         turn = sim.turn
         pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)  # [B, C]

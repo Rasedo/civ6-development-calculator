@@ -40,8 +40,9 @@ import {
   AQUEDUCT_FRESH_BONUS,
   AQUEDUCT_NO_FRESH_TOTAL,
   GAME_SPEED,
+  borderGrowthCost,
 } from '../data/constants';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority } from './city';
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
 import { hasRiver, hasFreshWater, isCoastalLand } from './query';
 import { disbandUnit, tileFreeForUnit } from './units';
@@ -52,7 +53,6 @@ import {
   RIVAL_LEADERS,
   RIVAL_MAX_CITIES,
   RIVAL_SETTLER_COST,
-  RIVAL_BORDER_PERIOD,
   RIVAL_PANTHEON_TURN,
   RIVAL_RELIGION_TURN,
   RIVAL_WAR_MIN_TURNS,
@@ -431,29 +431,34 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
 // Per-turn phase
 // ---------------------------------------------------------------------------
 
-function expandRivalBorder(state: GameState, rival: RivalCiv, city: RivalCity): void {
+/** P5/S4 (C-15): the tile this rival city's culture growth claims next —
+ * the player's pickBorderTile policy verbatim (radius 5, fully unowned
+ * tiles, dist asc → resource priority desc → yield sum desc → index asc)
+ * under the rival's OWN research modifiers (the rivalCityYields ctx).
+ * Water, impassables and natural wonders are all claimable, exactly like
+ * borderCandidates. One documented delta: adjacency is CIV-level (rival
+ * territory has no per-city tile registry — P7 material), where the
+ * player's is per-city. */
+function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity): number | null {
   const center = state.map.tiles[city.centerIndex];
-  let best: Tile | null = null;
-  let bestScore = -Infinity;
-  for (const t of tilesWithin(state.map, center.col, center.row, 3)) {
-    // Water is claimable like the player's border growth (AUDIT C-1) —
-    // only impassable tiles and natural wonders stay out of reach.
-    if (tileOwned(t) || isImpassable(t) || t.wonder) continue;
+  const ctx = { map: state.map, mods: modifiersFromResearch(rival.research) };
+  const cands: { dist: number; res: number; ySum: number; i: number }[] = [];
+  for (const t of tilesWithin(state.map, center.col, center.row, 5)) {
+    if (tileOwned(t)) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && tileOwnedByCiv(n, civOfRival(rival.id)),
     );
     if (!adjOwn) continue;
-    const dist = hexDistance(center.col, center.row, t.col, t.row);
-    const score = (t.resource ? 3 : 0) - dist * 2 - t.index / 1e6;
-    if (score > bestScore) {
-      bestScore = score;
-      best = t;
-    }
+    const y = tileYields(ctx, t);
+    cands.push({
+      dist: hexDistance(center.col, center.row, t.col, t.row),
+      res: resourcePriority(t),
+      ySum: y.food + y.production + y.gold + y.science + y.culture + y.faith,
+      i: t.index,
+    });
   }
-  if (best) {
-    best.rivalId = rival.id;
-    city.tilesAcquired += 1;
-  }
+  if (cands.length === 0) return null;
+  return cands.sort((a, b) => a.dist - b.dist || b.res - a.res || b.ySum - a.ySum || a.i - b.i)[0].i;
 }
 
 function tryFoundCity(state: GameState, rival: RivalCiv): void {
@@ -747,6 +752,11 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
       }
       bt.improvement = bestImp;
       bt.pillaged = false;
+      // P5/S4 gate-catch (seed 9066 t44, hunted via the new RU a-flags):
+      // building spends the turn — the D-2 heal gate must see it (real
+      // Civ 6; the GPU sets v_acted here). A working builder healing +20
+      // every turn was the asymmetry.
+      u.movesLeft = 0;
       u.charges = (u.charges ?? 1) - 1;
       if (u.charges <= 0) disbandUnit(state, u.id);
       continue;
@@ -778,6 +788,7 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     }
     if (dest >= 0) {
       u.tileIndex = dest;
+      u.movesLeft = 0; // P5/S4: the walk spends the turn (D-2 heal gate — GPU v_acted twin)
       clearCampFor(state, u, dest); // P5/S7 (C-3): mirrors walkPath's any-unit clear
     }
   }
@@ -965,7 +976,8 @@ export function rivalPhase(state: GameState): void {
       // C1-B3a: rival science/culture streams — tile+center columns plus
       // the citizens' contribution, exactly like the player path.
       sciSum += y.science + CITIZEN_SCIENCE * rc.population;
-      culSum += y.culture + CITIZEN_CULTURE * rc.population;
+      const culC = y.culture + CITIZEN_CULTURE * rc.population;
+      culSum += culC;
       // C1-B1: the real growth accounting — true surplus (can be negative),
       // the unscaled Civ 6 growth curve, grow subtracts the need instead of
       // zeroing the box, and starvation shrinks the city exactly like the
@@ -1007,8 +1019,21 @@ export function rivalPhase(state: GameState): void {
           }
         }
       }
-      if ((state.turn + rc.id * 3) % RIVAL_BORDER_PERIOD === 0) {
-        expandRivalBorder(state, rival, rc);
+      // P5/S4 (C-15): the player's cultural border growth — this city's
+      // culture (the culSum term, pre-growth pop) fills its own box and
+      // consumes against the player's escalating curve; the flat
+      // every-9-turns timer died with it.
+      rc.cultureBox += culC;
+      while (rc.cultureBox >= borderGrowthCost(rc.tilesAcquired)) {
+        const next = pickRivalBorderTile(state, rival, rc);
+        if (next === null) {
+          // Nowhere to grow: cap the box at the current threshold.
+          rc.cultureBox = Math.min(rc.cultureBox, borderGrowthCost(rc.tilesAcquired));
+          break;
+        }
+        rc.cultureBox -= borderGrowthCost(rc.tilesAcquired);
+        state.map.tiles[next].rivalId = rival.id;
+        rc.tilesAcquired += 1;
       }
       rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
     }

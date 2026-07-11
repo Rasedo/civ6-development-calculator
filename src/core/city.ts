@@ -316,7 +316,7 @@ export function borderCandidates(state: GameState, city: City): number[] {
   return out;
 }
 
-function resourcePriority(tile: Tile): number {
+export function resourcePriority(tile: Tile): number {
   if (!tile.resource) return 0;
   const cat = RESOURCES[tile.resource].category;
   return cat === 'luxury' ? 3 : cat === 'strategic' ? 2 : 1;

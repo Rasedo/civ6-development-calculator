@@ -53,7 +53,6 @@ import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
-  RIVAL_BORDER_PERIOD,
   RIVAL_GPP_RATE,
   RIVAL_PANTHEON_TURN,
   RIVAL_RELIGION_TURN,
@@ -370,7 +369,7 @@ const rules = {
     maxCities: RIVAL_MAX_CITIES,
     settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: RIVAL_SETTLER_COST(c) = the player's 48 + 18·max(0, c − 1)
     settlerPer: Math.round(30 * GAME_SPEED),
-    borderPeriod: RIVAL_BORDER_PERIOD,
+    // (P5/S4: borderPeriod died — rival borders grow on culture.)
     gppRate: RIVAL_GPP_RATE,
     pantheonTurn: RIVAL_PANTHEON_TURN,
     religionTurn: RIVAL_RELIGION_TURN,

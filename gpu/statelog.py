@@ -68,8 +68,15 @@ def gpu_state_lines(sim, b):
     for tile in sorted(_bn):
         L.append(f"{p}BU {tile} = {_bn[tile]} hp{_bh[tile]} a{_ba[tile]}")
     if hasattr(sim, "v_alive"):
-        for k, n in sorted(Counter((int(sim.v_civ[b, v]), int(sim.v_tile[b, v]), int(sim.v_type[b, v])) for v in range(sim.v_alive.shape[1]) if bool(sim.v_alive[b, v])).items()):
-            L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {n}")  # noqa
+        _rn, _rh, _ra = Counter(), Counter(), Counter()
+        for v in range(sim.v_alive.shape[1]):
+            if bool(sim.v_alive[b, v]):
+                k = (int(sim.v_civ[b, v]), int(sim.v_tile[b, v]), int(sim.v_type[b, v]))
+                _rn[k] += 1
+                _rh[k] += int(sim.v_hp[b, v])
+                _ra[k] += int(bool(sim.v_acted[b, v]))
+        for k in sorted(_rn):
+            L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {_rn[k]} hp{_rh[k]} a{_ra[k]}")
 
     imp, pill = sim.improvement[b], sim.pillaged[b]
     # TS carries district='CITY_CENTER' on every city-center tile (center_at /
@@ -94,6 +101,14 @@ def gpu_state_lines(sim, b):
                 f"ys{_milli(_ct[b, c, 3])} yc{_milli(_ct[b, c, 4])} yfa{_milli(_ct[b, c, 5])}"
             )
 
+    # Phase-1 combat log: drain the step's damage rolls (engine _damage_roll
+    # buffers them for the logged batch) into keyed CB lines.
+    ev = getattr(sim, "_combat_events", None)
+    if ev:
+        for i, e in enumerate(ev):
+            L.append(f"{p}CB{i} = {e}")
+        ev.clear()
+
     for r in range(sim.R):
         nc = int(sim.rc_alive[b, r].sum())
         if nc == 0:
@@ -108,5 +123,5 @@ def gpu_state_lines(sim, b):
         for j in range(sim.rc_alive.shape[2]):
             if bool(sim.rc_alive[b, r, j]):
                 _ry = sim._rival_city_yields(r, j, sim.rc_alive[:, r, j])
-                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))} hp{int(sim.rc_hp[b, r, j])} ryf{_milli(_ry[0][b])} ryp{_milli(_ry[1][b])}")
+                L.append(f"{p}RC{r} {int(sim.rc_center[b, r, j])} = pop{int(sim.rc_pop[b, r, j])} pr{_milli(sim.rc_progress[b, r, j])} co{_milli(sim.rc_cost[b, r, j])} k{_rc_kind(sim, int(sim.rc_current[b, r, j]))} hp{int(sim.rc_hp[b, r, j])} cb{_milli(sim.rc_cbox[b, r, j])} til{int(sim.rc_acquired[b, r, j])} ryf{_milli(_ry[0][b])} ryp{_milli(_ry[1][b])}")
     return L

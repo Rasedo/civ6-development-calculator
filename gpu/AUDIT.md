@@ -133,8 +133,30 @@ stays parked (masked: exporter emits single-tile steps; an RL-surface question).
   capitalTiles[0]); (b) border-claim/worked-tile order coupling between
   ADJACENT cities and the multi-defector flip order still follow column
   order, not city_seq.
-- **S4 — rival border growth (C-15):** consume rc.cultureBox against
-  borderGrowthCost with the player's pick policy + radius 5 (timer dies).
+- **S4 — rival border growth (C-15): LANDED.** rc.cultureBox fills from
+  the city's own culture (the civicProgress term, pre-growth pop — the
+  SAME value feeds both, like the player's turnCulture/cultureBox double
+  use) and consumes against the player's borderGrowthCost curve with the
+  player's exact pick key (dist asc, resource priority desc, milli-rounded
+  yield-sum desc, index asc; radius 5; fully unowned tiles — water,
+  impassables and natural wonders all claimable like borderCandidates),
+  while-loop with escalating cost + box cap on no-candidate. The yield sum
+  uses the rival's OWN planes (strip-adjusted + its farm-adj/mine boosts —
+  the rivalCityYields ctx). Every-9-turns timer + RIVAL_BORDER_PERIOD/
+  borderPeriod died. ONE documented delta: adjacency is CIV-level (rival
+  territory has no per-rc tile registry — P7 material) where the player's
+  is per-city. New rc_cbox tensor (transfer/found/capture hygiene). THE
+  HUNT (one failure, seed 9066 t60) exposed a PRE-EXISTING heal asymmetry:
+  TS rivalBuilderActions never spent movesLeft on its build/walk, so a
+  MARCHING rival builder healed +20 every turn — the GPU (v_acted) and
+  real Civ 6 both block that; TS now zeroes movesLeft on both actions.
+  HUNT TOOLING MADE PERMANENT (owner ask): statelog RU lines carry hp+a
+  (acted) like BU lines; RC lines carry cb (cultureBox) + til; and the
+  NEW Phase-1 COMBAT LOG — every damage roll of the logged game emits a
+  keyed CB<seq> line (strength diff, rand·1e6, damage) from the single
+  damageRoll/_damage_roll chokepoint, drained by both statelogs — the
+  reordered/extra-roll class the rng column can't see, aligned by
+  logdiff automatically.
 - **S5 — GP overflow/effects (C-16) + pantheons (C-17):** rival GPP keeps
   overflow and applies effects; pantheon costs 25 faith (their faith yield
   gains its consumer; free timed claims die).

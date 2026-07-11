@@ -316,7 +316,7 @@ _MUTABLE = [
     "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "rvciv_at", "v_charges",
-    "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_acquired", "rc_hp", "rc_id",
+    "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_acquired", "rc_hp", "rc_id",
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
@@ -536,6 +536,7 @@ class BatchSim:
         self.rc_center = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_growth = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
+        self.rc_cbox = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)  # P5/S4: rc.cultureBox
         self.rc_acquired = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_hp = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self.rc_id = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -594,6 +595,7 @@ class BatchSim:
         self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
+        self._off5 = tiles_within_offsets(5).to(device)  # P5/S4: rival border growth radius (= player BORDER_MAX_RADIUS)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
         self._off1 = tiles_within_offsets(1).to(device)
@@ -716,6 +718,9 @@ class BatchSim:
         # same rule via rollout.json's rangedActive flag. Off = the old
         # weak-melee behavior, for replaying pre-V-R action logs.
         self._rl_ranged_active = True
+        # Phase-1 combat log hooks (inert unless rollout --log sets the batch)
+        self._log_combat_b: int | None = None
+        self._combat_events: list[str] = []
         self._askable = torch.tensor(sc.get("askable", []), dtype=torch.long, device=device)  # CS-quest askable idx -> district-type idx
         self.d_usable = torch.tensor(
             [[t.get("du", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
@@ -1974,7 +1979,17 @@ class BatchSim:
         between runtimes and the result rounds to an integer)."""
         r = self._next_random(mask)
         base = self._dmg_base[(diff + 60).clamp(0, 120)]
-        return js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
+        dmg = js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
+        # Phase-1 combat log (P5/S4 tooling): every roll of the logged game,
+        # keyed CB<seq> per turn by statelog — TS damageRoll is the twin.
+        # Draw-order parity makes sequences align; a reordered/extra roll
+        # shows as a mismatched CB line, invisible to the rng column.
+        b = getattr(self, "_log_combat_b", None)
+        if b is not None and bool(mask[b]):
+            self._combat_events.append(
+                f"diff{int(diff[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}"
+            )
+        return dmg
 
     def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
         """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
@@ -4067,31 +4082,71 @@ class BatchSim:
             torch.where(mask, faith, z),
         )
 
-    def _expand_rival_border(self, r: int, j: int, due: torch.Tensor) -> None:
-        """Mirrors expandRivalBorder: best unowned non-impassable non-wonder
-        tile (water included — AUDIT C-1, work_ok = !isImpassable exactly
-        like the TS gate) within 3 adjacent to this civ's territory; score =
-        resource·3 − dist·2 − idx/1e6 (unique — scan order is immaterial)."""
-        if not bool(due.any()):
-            return
+    def _rival_border_growth(self, r: int, j: int, cact: torch.Tensor, cul_c: torch.Tensor) -> None:
+        """P5/S4 (C-15): the player's cultural border growth for rc slot j —
+        box += this city's culture, then consume against _border_cost with
+        the player's pick key (dist asc, resource priority desc, yield-sum
+        desc, index asc; radius 5; fully unowned tiles — water, impassables
+        and natural wonders all claimable like borderCandidates). The yield
+        sum uses the RIVAL's planes (strip-adjusted food/prod + its own
+        farm-adjacency and mine boosts — the rivalCityYields ctx). One
+        documented delta shared with TS: adjacency is CIV-level (no per-rc
+        tile registry — P7 material)."""
+        self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
+        B, dev = self.B, self.device
         center = self.rc_center[:, r, j]
-        tiles = tiles_from_offsets(center, self._off3, self.W, self.H)
-        tc = tiles.clamp(min=0)
-        unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
-        ok = (tiles >= 0) & unowned & self.work_ok.gather(1, tc) & ~self.nwonder.gather(1, tc)
-        nbs = self.neigh[tc.reshape(-1)].reshape(self.B, -1, 6)  # [B, M, 6]
-        adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(self.B, -1)).reshape(self.B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
-        ok = ok & adj_own
-        res3 = (self.res_priority.gather(1, tc) > 0).double() * 3
-        d = self.pair_dist[center.unsqueeze(1), tc].double()
-        score = torch.where(ok, res3 - d * 2 - tiles.double() / 1e6, torch.tensor(-torch.inf, dtype=torch.float64, device=self.device))
-        best_s, best_i = score.max(dim=1)
-        claim = due & (best_s > -torch.inf)
-        if bool(claim.any()):
-            rows = claim.nonzero(as_tuple=True)[0]
-            spot = tiles[rows, best_i[rows]]
-            self.rival_at[rows, spot] = r
-            self.rc_acquired[rows, r, j] += 1
+        for _ in range(64):  # the TS while-loop (multiple claims per turn, escalating cost)
+            cost = self._border_cost(self.rc_acquired[:, r, j])
+            ready = cact & (self.rc_cbox[:, r, j] >= cost)
+            if not bool(ready.any()):
+                return
+            tiles = tiles_from_offsets(center, self._off5, self.W, self.H)  # [B, M]
+            tc = tiles.clamp(min=0)
+            unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
+            nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)  # [B, M, 6]
+            adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(B, -1)).reshape(B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
+            ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
+            # the rival ySum plane — the same construction _rival_city_yields
+            # scores worked tiles with (bit-equal to TS tileYields under
+            # modifiersFromResearch: all shipped yields are dyadic).
+            f_plane = self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]
+            fs = self.feat_stripped.to(self.dtype)
+            f_plane = f_plane - self.feat_yields[:, :, 0] * fs
+            if self.improvements_on:
+                tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r])
+                if bool((tier_r > 0).any()):
+                    f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier_r.unsqueeze(1).to(self.dtype)
+            p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
+            if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
+                boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
+                p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
+            y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * fs.unsqueeze(-1)).sum(dim=2)
+            y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc)
+            # the player's exact key: dist asc, res priority desc, milli-
+            # rounded yield sum desc, global tile index asc (5601-5610 twin)
+            d = self.pair_dist[center.unsqueeze(1), tc].to(self.dtype)
+            key = (
+                d * 1e12
+                - self.res_priority.gather(1, tc).to(self.dtype) * 1e9
+                - torch.round(y_sum * 1000) * 1e4
+                + tiles.to(self.dtype)
+            )
+            key = torch.where(ok, key, torch.tensor(float("inf"), dtype=self.dtype, device=dev))
+            best = key.argmin(dim=1)
+            has_cand = ok.any(dim=1)
+            claim = ready & has_cand
+            if bool(claim.any()):
+                rows = claim.nonzero(as_tuple=True)[0]
+                spot = tiles[rows, best[rows]]
+                self.rival_at[rows, spot] = r
+                self.rc_acquired[rows, r, j] += 1
+                self.rc_cbox[rows, r, j] -= cost[rows]
+            capped = ready & ~has_cand
+            if bool(capped.any()):
+                # Nowhere to grow: cap the box at the current threshold.
+                self.rc_cbox[:, r, j] = torch.where(capped, torch.minimum(self.rc_cbox[:, r, j], cost), self.rc_cbox[:, r, j])
+            if not bool(claim.any()):
+                return
 
     def _rival_try_found(self, r: int, want: torch.Tensor) -> None:
         """Mirrors tryFoundCity: scan each own city's 7-ring in city order ×
@@ -4170,6 +4225,7 @@ class BatchSim:
         self.rc_center[rows, r, slot] = s_idx
         self.rc_pop[rows, r, slot] = 1
         self.rc_growth[rows, r, slot] = 0
+        self.rc_cbox[rows, r, slot] = 0  # P5/S4
         self.rc_acquired[rows, r, slot] = 0
         self.rc_hp[rows, r, slot] = rrr.get("cityMaxHp", 200)
         self.rc_current[rows, r, slot] = -1
@@ -4732,7 +4788,8 @@ class BatchSim:
                 # sums FIRST. (cul_sum + cul) + 0.3*pop is one ulp off and
                 # flips completions when a cost lands inside it (seed 9079).
                 sci_sum = torch.where(cact, sci_sum + (sci + self.rules.citizen_science * self.rc_pop[:, r, j].double()), sci_sum)
-                cul_sum = torch.where(cact, cul_sum + (cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double()), cul_sum)
+                cul_c = cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double()  # P5/S4: pre-growth pop, feeds civics AND this city's border box
+                cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
                 # P5/S1 (C-12): net of the city's upkeep — completed districts
                 # + buildings, the player's tables (TS: y.gold - maintenance
                 # as ONE term inside the +=).
@@ -4813,8 +4870,7 @@ class BatchSim:
                             br = done_b.nonzero(as_tuple=True)[0]
                             bi_done = (cur - 1 - self.NU - nS_b4).clamp(min=0)
                             self.rc_bldg[br, r, j, bi_done[br]] = True
-                due = cact & (((self.turn + self.rc_id[:, r, j] * 3) % rr.get("borderPeriod", 9)) == 0)
-                self._expand_rival_border(r, j, due)
+                self._rival_border_growth(r, j, cact, cul_c)  # P5/S4: the timer died
                 self.rc_hp[:, r, j] = torch.where(
                     cact, (self.rc_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.rc_hp[:, r, j]
                 )
@@ -5087,6 +5143,7 @@ class BatchSim:
         self.rc_center[b, w_, slot] = self.site[b, c]
         self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
         self.rc_growth[b, w_, slot] = 0
+        self.rc_cbox[b, w_, slot] = 0  # P5/S4 (TS transfer: cultureBox 0)
         self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
         self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
         self.rc_id[b, w_, slot] = int(self.r_next_city_id[b, w_])
