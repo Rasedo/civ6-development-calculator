@@ -240,9 +240,11 @@ per-game TS serialize()) at the last non-divergent turn; `--resume-from`
 re-simulates T..250 in ~seconds per iteration instead of ~190s. Rules:
 full-batch snapshots only (BLAS association is batch-shape-dependent);
 the resume check clears THE HUNTED divergence but can false-green fixes
-with pre-T silent effects — one full gate + battery before commit stays
-mandatory. Highest value on late-turn failures (t200+ ≈ 20× faster
-iterations).
+with pre-T silent effects — the pre-commit bar stays the FULL BATTERY
+(whose gpu-gate lane IS the full gate; never chain a standalone gate
+then the battery on the same code — the gate is the battery's critical
+path, so that near-doubles the cost for zero information). Highest
+value on late-turn failures (t200+ ≈ 20× faster iterations).
 
 Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
 `CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first

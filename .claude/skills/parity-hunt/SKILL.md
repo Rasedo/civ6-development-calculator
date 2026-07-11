@@ -75,13 +75,21 @@ python gpu/logdiff.py          # prints the FIRST divergent line
 
 ## Verify
 
-**Re-run ONLY the failing gate after each fix** (`PYTHONUTF8=1 python
-gpu/rollout.py --shards 4 --pipeline-replay`, ~3 min) and iterate there —
-a hunt usually takes several fix→gate cycles and the battery would double
-each one. The FULL battery runs ONCE at the end, before the commit: it
-re-exports fixtures (mandatory if TS/data changed — the stale-fixture
-trap) and covers the scripted gate + vitest + self-tests the off-script
-gate doesn't. Then say in the commit what the divergence WAS (turn,
-seed, rule) — the stage log is the program's memory. Expect the NEXT
-stage's reshuffle to expose a new latent: hunts are part of every
-stage's budget.
+Cost model first: the standalone gate (`PYTHONUTF8=1 python
+gpu/rollout.py --shards 4 --pipeline-replay`) is ~190s; the full battery
+walls at ~230s BECAUSE the gpu-gate lane is its critical path — the
+gate is only ~15-20% cheaper than the whole battery. Policy:
+
+- **Iterations you EXPECT to fail**: run the standalone gate. It saves
+  ~40s each and avoids the battery's skip-cascade (a known-broken
+  vitest pin mid-stage fails the cheap lane and SKIPS the gate — a
+  wasted run). Re-export first if TS/data changed (stale-fixture trap;
+  the standalone gate does NOT export).
+- **The check you believe is FINAL**: go straight to the battery — its
+  gpu-gate lane IS the full gate. Never chain a green standalone gate
+  then the battery on the same code state: that near-doubles the cost
+  for zero information.
+
+Then say in the commit what the divergence WAS (turn, seed, rule) — the
+stage log is the program's memory. Expect the NEXT stage's reshuffle to
+expose a new latent: hunts are part of every stage's budget.
