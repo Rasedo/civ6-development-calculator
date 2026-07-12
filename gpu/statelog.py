@@ -39,7 +39,12 @@ def _rc_kind(sim, c):
         return "unit"
     if c < 1 + sim.NU + len(sim._scaffold):
         return "district"
-    return "building"
+    nb = sim.rules_dev.b_cost.shape[0]
+    if c <= sim.NU + len(sim._scaffold) + nb:
+        return "building"
+    if c <= sim.NU + len(sim._scaffold) + nb + len(sim._proj_rows):
+        return "project"  # A-14
+    return "wonder"  # A-4
 
 
 def gpu_state_lines(sim, b):

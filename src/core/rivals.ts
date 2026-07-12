@@ -51,8 +51,9 @@ import {
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
 import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority } from './city';
-import { canPlaceDistrictIn, validImprovementsIn } from './rules';
-import { hasRiver, hasFreshWater, isCoastalLand } from './query';
+import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
+import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
+import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit } from './units';
 import { districtCostIn, goldAffordable } from './game';
 import { districtAdjacency } from './yields';
@@ -737,6 +738,74 @@ function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks
   return true;
 }
 
+/** AUDIT A-4: the CAPITAL raises a world wonder once buildings run dry —
+ * first unlocked wonder in data order, first eligible owned tile (lowest
+ * index), one per world (wonderExists counts in-flight tiles: queueing
+ * paves them, exactly like the player's queueWonder). Placement mirrors
+ * canPlaceWonder's checks from the rival's seat; the tile writes are
+ * queueWonder's verbatim (improvement dies, feature dies except
+ * floodplains, a bonus resource is stripped — the C-6 rule). */
+function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _unlocks: Unlocks): boolean {
+  if (!rc.isCapital) return false;
+  const civ = civOfRival(rival.id);
+  const center = state.map.tiles[rc.centerIndex];
+  for (const def of Object.values(BUILT_WONDERS)) {
+    if (wonderExists(state, def.id)) continue;
+    if (def.requiresTech && !rival.research.techs.includes(def.requiresTech)) continue;
+    if (def.requiresCivic && !rival.research.civics.includes(def.requiresCivic)) continue;
+    const p = def.placement;
+    const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
+      .filter((t) => {
+        if (!tileOwnedByCiv(t, civ) || t.index === rc.centerIndex) return false;
+        if (t.district || t.builtWonder || t.wonder) return false;
+        if (isImpassable(t)) return false;
+        if (t.resource && RESOURCES[t.resource].category !== 'bonus') return false;
+        if (p.onCoastalWater) {
+          if (!isCoastalWater(state.map, t)) return false;
+        } else {
+          if (isWater(t)) return false;
+          if (t.feature === 'FLOODPLAINS' && !p.allowFloodplains) return false;
+          if (t.feature === 'OASIS') return false;
+          if (p.terrains && !p.terrains.includes(t.terrain)) return false;
+          if (p.flatOnly && t.elevation !== 'FLAT') return false;
+          if (p.hillsOnly && t.elevation !== 'HILLS') return false;
+        }
+        if (p.requiresRiver && !hasRiver(t)) return false;
+        const around = neighbors(state.map, t);
+        if (p.adjacentDistrict && !around.some((n) => n.district === p.adjacentDistrict && n.districtComplete)) return false;
+        if (p.adjacentResource && !around.some((n) => n.resource === p.adjacentResource)) return false;
+        return true;
+      })
+      .sort((a, b) => a.index - b.index);
+    const tile = cands[0];
+    if (!tile) continue;
+    tile.builtWonder = def.id;
+    tile.builtWonderComplete = false;
+    tile.improvement = null;
+    tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
+    if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+    rc.wonders.push({ id: def.id, tileIndex: tile.index });
+    rc.queue.push({ kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
+    return true;
+  }
+  return false;
+}
+
+/** A-4: the civ-wide wonder growth multiplier (Hanging Gardens) — the
+ * empireGrowthMult twin over the RIVAL's completed wonders. */
+function rivalGrowthAllMult(state: GameState, rival: RivalCiv): number {
+  let mult = 1;
+  for (const rc of rival.cities) {
+    for (const w of rc.wonders ?? []) {
+      const def = BUILT_WONDERS[w.id];
+      if (def?.effects?.growthAllMult && state.map.tiles[w.tileIndex].builtWonderComplete) {
+        mult *= def.effects.growthAllMult;
+      }
+    }
+  }
+  return mult;
+}
+
 /** C1-B5b: does this rival already have a builder (alive or queued)? One at a time. */
 function rivalHasBuilder(state: GameState, rival: RivalCiv): boolean {
   // NB: rival UNIT civId is the RAW rival id (rivalUnits' convention) —
@@ -969,6 +1038,24 @@ export function rivalCityYields(
   for (const w of worked) {
     for (const k of Object.keys(total) as (keyof Yields)[]) total[k] += w.y[k];
   }
+  // A-4: this city's completed wonders (registry tiles confirmed complete).
+  const rcWonders = (rc.wonders ?? [])
+    .filter((w) => state.map.tiles[w.tileIndex].builtWonderComplete)
+    .map((w) => BUILT_WONDERS[w.id])
+    .filter((d): d is (typeof BUILT_WONDERS)[string] => Boolean(d));
+  // A-4 Petra: +2 food +2 gold +1 production on worked desert non-floodplain
+  // tiles — POST-selection like computeCityStats' petraBonus (the score
+  // ranks without it; the center never qualifies, it carries CITY_CENTER).
+  if (rcWonders.some((d) => d.effects?.petraDesert)) {
+    for (const w of worked) {
+      const t = state.map.tiles[w.index];
+      if (t.terrain === 'DESERT' && t.feature !== 'FLOODPLAINS' && !t.district) {
+        total.food += 2;
+        total.gold += 2;
+        total.production += 1;
+      }
+    }
+  }
   // C1-B5b-iii: the B3 research→production stand-in is RETIRED — real
   // mines carry rival production now (owner boosts included via ctx).
   // C1-B4b: COMPLETED districts add floor(adjacency) into their yield
@@ -1012,6 +1099,14 @@ export function rivalCityYields(
       }
     }
   }
+  // A-4: wonder flat city yields + the belief faithPerWonder (city.ts:435-437
+  // positions — pre-tier, with the buildings).
+  for (const wd of rcWonders) {
+    if (wd.cityYields) {
+      for (const [k, v] of Object.entries(wd.cityYields)) total[k as keyof Yields] += v ?? 0;
+    }
+  }
+  if (ctx.mods.faithPerWonder > 0) total.faith += ctx.mods.faithPerWonder * rcWonders.length;
   // A-7: the founder's capital incomes (perFollowers/perCity land in
   // capitalYields) — added BEFORE the tier scaling, the computeCityStats
   // bonuses position (city.ts:447/475-479).
@@ -1025,6 +1120,15 @@ export function rivalCityYields(
   const t = tier ?? rivalAmenityTiers(state, rival).get(rc.id) ?? amenityTier(0);
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as (keyof Yields)[]) {
     total[k] *= t.yieldFactor;
+  }
+  // A-4: the owning city's wonder yield multipliers (Oxford/Big Ben) —
+  // AFTER the tier scaling, the computeCityStats order (city.ts:483-489).
+  for (const wd of rcWonders) {
+    const mult = wd.effects?.cityYieldMult;
+    if (!mult) continue;
+    for (const k of Object.keys(mult) as (keyof Yields)[]) {
+      total[k] *= mult[k] ?? 1;
+    }
   }
   return total;
 }
@@ -1139,6 +1243,8 @@ export function rivalPhase(state: GameState): void {
         // C1-B4: districts outrank units — the economy compounds.
       } else if (tryQueueRivalBuilding(state, rc, rivalUnlocks)) {
         // C1-B4b-2: then buildings, then the army.
+      } else if (tryQueueRivalWonder(state, rival, rc, rivalUnlocks)) {
+        // A-4: the capital raises a world wonder once buildings run dry.
       } else if (!rivalHasBuilder(state, rival) && rivalHasJob(state, rival, rivalUnlocks) && unitCount < unitCap) {
         // C1-B5b: one builder per civ at a time, only while jobs exist.
         // A builder is a unit — it takes a cap slot like any other.
@@ -1288,9 +1394,12 @@ export function rivalPhase(state: GameState): void {
       // P5/S6 (C-20): the tier's growth factor rides the housing factor,
       // exactly like computeCityStats' effective surplus (no empire/policy
       // mults — those are player machinery).
-      // A-7: the belief growth multiplier rides the chain exactly like
-      // computeCityStats (city.ts:495-501; empireGrowthMult stays player-only).
-      rc.foodBox += surplus > 0 ? surplus * hFactor * tier.growthFactor * getRivalModifiers(state, rival).growthMult : surplus;
+      // A-7/A-4: the belief growth multiplier AND the civ's wonder growth
+      // multiplier (Hanging Gardens — the empireGrowthMult twin) ride the
+      // chain exactly like computeCityStats (city.ts:495-501).
+      rc.foodBox += surplus > 0
+        ? surplus * hFactor * tier.growthFactor * getRivalModifiers(state, rival).growthMult * rivalGrowthAllMult(state, rival)
+        : surplus;
       const need = growthFoodNeeded(rc.population);
       if (rc.foodBox >= need) {
         rc.population += 1;
@@ -1302,19 +1411,22 @@ export function rivalPhase(state: GameState): void {
       // Queue progress + completion (settler founds via the site scan; a
       // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = rc.queue[0];
-      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project')) {
+      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
         q.progress += production;
         const cost =
           q.kind === 'unit'
             ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // P4/D-10: builders lock at queue
             : q.kind === 'building'
               ? BUILDINGS[q.building]?.cost ?? 54
-              : q.cost ?? 54; // settler / district / project carry their own cost
+              : q.kind === 'wonder'
+                ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // A-4: catalog cost (already speed-scaled)
+                : q.cost ?? 54; // settler / district / project carry their own cost
         if (q.progress >= cost) {
           rc.queue.shift();
           if (q.kind === 'settler') tryFoundCity(state, rival);
           else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
           else if (q.kind === 'building') rc.buildings.push(q.building);
+          else if (q.kind === 'wonder') state.map.tiles[q.tileIndex].builtWonderComplete = true; // A-4
           else if (q.kind === 'project') {
             // A-14: the completion lump lands in the RIVAL's own streams
             // (the player's completeProject applies via applyLumpYield to

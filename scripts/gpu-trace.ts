@@ -27,6 +27,7 @@ import { dominationWinner } from '../src/core/game';
 import { getCityHp } from '../src/core/combat';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
+import { BUILT_WONDERS } from '../src/data/builtWonders';
 import type { GameState } from '../src/core/types';
 
 export function traceRow(state: GameState, cityIds: number[], cMax: number, csMax: number, rMax: number): number[] {
@@ -98,7 +99,10 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
           if (!q) return s2;
           // P4/D-10: unit items may LOCK a cost (escalated builders) — price
           // the lock first, exactly like the completion check does.
-          return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? q.cost ?? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : 0);
+          // A-4: wonder items carry NO cost field — price from the catalog
+          // (the D-10 lesson AGAIN: every new queue-cost mechanic must
+          // update BOTH trace harnesses in the same stage).
+          return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? q.cost ?? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : q.kind === 'wonder' ? BUILT_WONDERS[q.wonder]?.cost ?? 0 : 0);
         }, 0) * 1000,
       ),
       // C1-B4: COMPLETED rival districts (queued ones pave but don't count).

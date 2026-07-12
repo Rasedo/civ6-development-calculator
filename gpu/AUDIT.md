@@ -34,12 +34,24 @@ revalidation LANDED in the S6+S8 close):
   cheapest-first pick keys on effective cost like the player's auto-pick.
   New coastal_land (`cl`) plane for rc coastalCity eurekas. Battery green
   first try.
-- A-4. **Rivals never build wonders** (queueWonder player-only,
-  game.ts:342-365) — no wonder yields/effects for rivals.
-- A-5. **Rivals cannot spend gold like the player** — no building/unit/
-  settler purchases outside the controlled head, no tile purchase
-  (buyTile player-only, game.ts:592). Treasury only funds maintenance,
-  peace and the S2 settler column.
+- A-4. **RESOLVED (2026-07-12, task #38)**: rival capitals build world
+  wonders — data-order pick, lowest-index eligible tile, one per world,
+  queue-time paving with the floodplains exception + C-6 bonus strip;
+  effect channels at the player's exact positions (cityYields pre-tier,
+  HG growth product, Petra post-selection, Oxford/Big Ben mults
+  post-tier); anyWonderBuilt eurekas + faithPerWonder activated; -3
+  unlock encoding for out-of-tree requirements. TWO hunt catches: the
+  D-10 trace-harness recurrence (wonder items carry no cost — 11/13
+  "failures" were gpu-trace.ts, not the engines) and a C-6 LATENT
+  (SEA_RESOURCE adjacency must WITHDRAW when a bonus sea resource is
+  paved over — _withdraw_sea_adj at all three strip sites).
+- A-5. **RESOLVED for the building drain (2026-07-12, task #38)**: one
+  scripted purchase per civ per turn — cheapest completable building
+  civ-wide (cost/id/city-order key), instant at goldPurchaseMult, the
+  opening peace cost held as a war chest, queued-in-city duplication
+  guard. REMAINING (policy scope): scripted unit/settler purchases and
+  tile purchase — the controlled head has the machinery; give the
+  scripted rival those spends when a stage needs them.
 - A-6. **Rival unit roster restricted** — WARRIOR→SPEARMAN→HORSEMAN ladder
   (rivals.ts:979-984) + builder/settler; never SCOUT/SLINGER/ARCHER →
   rivals field no ranged units at all. Blocks symmetric war.
@@ -78,7 +90,12 @@ revalidation LANDED in the S6+S8 close):
   no REPAIR (C-4b: the player's builderRepair exists, units.ts:411-419 —
   the rival half is the open part; repair also grows the RL action space,
   so it stays its own stage).
-- A-14. Rivals never run projects (queueProject player-only).
+- A-14. **RESOLVED (2026-07-12, task #38)**: the picker's terminal rung —
+  army capped and nothing queueable → the first project whose district
+  is complete (data order), at the player's cost curve on the RIVAL's
+  research; completion pays round(cost×0.75) into the civ's own stream
+  + round(cost×0.3) GPP. Table-driven: Theater/Encampment projects wire
+  themselves when A-9 lands.
 - A-15. Barbarian camp spawn spacing only respects PLAYER cities
   (combat.ts:449-451) and requires a live player city (:544) — rivals get
   less barb protection.

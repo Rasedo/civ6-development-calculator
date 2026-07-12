@@ -112,6 +112,7 @@ class Rules:
     rivals: dict  # rival-civ pacing, loyalty, GP costs, belief-pool sizes
     beliefs: dict  # A-7: dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
     projects: dict  # A-14: {rows: [{d, y, g}], yieldFraction, gppFraction} in data order
+    wonders: dict  # A-4: {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFid} in data order
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
     district_scaffold: dict  # D2b: {campusIdx, campusUnlockTech}
@@ -171,6 +172,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         rivals=r.get("rivals", {}),
         beliefs=r.get("beliefs", {}),
         projects=r.get("projects", {}),
+        wonders=r.get("wonders", {}),
         improvements=r.get("improvements", {}),
         districts=r.get("districts", []),
         district_scaffold=r.get("districtScaffold", {}),
@@ -327,6 +329,7 @@ _MUTABLE = [
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
     "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # A-7: belief identity
+    "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
 ]
@@ -625,6 +628,7 @@ class BatchSim:
                 "perF": torch.tensor([[0.0] * 7] + [x["perF"] for x in _rows], dtype=torch.float64, device=device),
                 "perC": torch.tensor([[0.0] * 6] + [x["perC"] for x in _rows], dtype=torch.float64, device=device),
                 "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
+                "fpw": torch.tensor([0.0] + [float(x.get("fpw", 0)) for x in _rows], dtype=torch.float64, device=device),  # A-4 activates
             }
         self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
         # A-14: rival projects — rows {d: district idx, y: yield col, g: GP class}
@@ -632,6 +636,24 @@ class BatchSim:
         self._proj_rows = list(_pj.get("rows", []))
         self._proj_yf = float(_pj.get("yieldFraction", 0.75))
         self._proj_gf = float(_pj.get("gppFraction", 0.3))
+        # A-4: rival world wonders — the tile planes (built_wonder id at a
+        # paved tile, its completion flag), the per-rc registry, the static
+        # placement bitmask + rid/des planes, and the effect tables.
+        _wd = rules.wonders or {}
+        self._wond_rows = list(_wd.get("rows", []))
+        self._wond_n = len(self._wond_rows)
+        self._fp_fid = int(_wd.get("fpFid", -1))
+        self.built_wonder = torch.full((B, T), -1, dtype=torch.long, device=device)
+        self.built_wonder_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
+        self.rc_wonder = torch.full((B, r_pad, rc_pad, max(self._wond_n, 1)), -1, dtype=torch.long, device=device)
+        self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self.desert = torch.tensor([[t.get("des", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        if self._wond_n:
+            self._wond_cy = torch.tensor([w["cy"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
+            self._wond_mult = torch.tensor([w["mult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
+            self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            self._wond_petra = torch.tensor([bool(w.get("petra", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)  # [nW]
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for r_ in f.get("rivals", []):
@@ -822,6 +844,7 @@ class BatchSim:
             return float(next((a["amount"] for a in d.get("adjacency", []) if int(a["src"]) == src), 0.0))
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
         self._dyn_harbor = torch.tensor([_src_amt(d, 9) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent Harbor
+        self._dyn_searesource = torch.tensor([_src_amt(d, 10) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent live SEA resource (withdrawn on strip)
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
         self._shipyard_bidx = int(rules.shipyard_bidx)
@@ -1475,6 +1498,23 @@ class BatchSim:
         self._adjh_cache = (self._eff_version, out)
         return out
 
+    def _adj_dtype_complete(self, di: int) -> torch.Tensor:
+        """A-4: [B, T] bool — any adjacent COMPLETED district of type di
+        (wonder adjacentDistrict requirement; no owner filter, like TS
+        canPlaceWonder's neighbor scan)."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        hit = (self.district[:, nbc] == di) & self.district_complete[:, nbc] & (nb >= 0).unsqueeze(0)
+        return hit.any(dim=2)
+
+    def _adj_res_live(self, ri: int) -> torch.Tensor:
+        """A-4: [B, T] bool — any adjacent tile with LIVE resource ri
+        (Stonehenge's stone: a C-6-stripped bonus resource is GONE in TS)."""
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        hit = (self.res_id[:, nbc] == ri) & ~self.res_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
+        return hit.any(dim=2)
+
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         """[B, T] UNFLOORED districtAdjacency for district di: static (d_static_adj)
         + 0.5·adjacent-districts + CITY_CENTER·adjacent-centers + HARBOR_DISTRICT·
@@ -1505,7 +1545,7 @@ class BatchSim:
         site_c = self.site[:, c].clamp(min=0)
         adjc = self._adj_district_count().to(self.dtype)  # [B, T]
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
-        elig = ((self.owner == c) & surface & (self.district < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3))  # C-6: <=1 admits bonus
+        elig = ((self.owner == c) & surface & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3))  # C-6/A-4
         elig[torch.arange(B, device=dev), site_c] = False
         if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any player/rival) — matches TS requires/notAdjacentToCityCenter
@@ -1523,8 +1563,11 @@ class BatchSim:
             self.district_complete[rows, bt] = False  # P2: queued, not complete
             self._strip_feature_at(rows, bt)  # queueDistrict: tile.feature = null
             # C-6: queueDistrict removes a bonus resource (only priority-1
-            # tiles carrying a resource are eligible at all)
+            # tiles carrying a resource are eligible at all); a FRESH sea
+            # strip withdraws its lent SEA_RESOURCE adjacency (live in TS)
+            fresh_rs = (self.res_priority[rows, bt] == 1) & ~self.res_stripped[rows, bt]
             self.res_stripped[rows, bt] = self.res_stripped[rows, bt] | (self.res_priority[rows, bt] == 1)
+            self._withdraw_sea_adj(rows[fresh_rs], bt[fresh_rs])
             self._eff_version += 1
         return place, best
 
@@ -1545,6 +1588,7 @@ class BatchSim:
             (self.rival_at == r)
             & surface
             & (self.district < 0)
+            & (self.built_wonder < 0)  # A-4
             & (self.rvcity_at < 0)  # sibling centers carry district='CITY_CENTER' in TS
             & (self.improvement < 0)
             & (d_center <= 3)
@@ -1566,8 +1610,12 @@ class BatchSim:
             self.rc_dist_tile[rows, r, j, di] = best[rows]
             self.improvement[rows, best[rows]] = -1  # queueDistrict clears it
             # C-6: the rival pave strips a bonus resource too (TS
-            # tryQueueRivalDistrict gained the queueDistrict rule)
-            self.res_stripped[rows, best[rows]] = self.res_stripped[rows, best[rows]] | (self.res_priority[rows, best[rows]] == 1)
+            # tryQueueRivalDistrict gained the queueDistrict rule); fresh
+            # sea strips withdraw their lent SEA_RESOURCE adjacency
+            bt_r = best[rows]
+            fresh_rs = (self.res_priority[rows, bt_r] == 1) & ~self.res_stripped[rows, bt_r]
+            self.res_stripped[rows, bt_r] = self.res_stripped[rows, bt_r] | (self.res_priority[rows, bt_r] == 1)
+            self._withdraw_sea_adj(rows[fresh_rs], bt_r[fresh_rs])
             self._eff_version += 1
         return place
 
@@ -1952,9 +2000,9 @@ class BatchSim:
                     site_c = self.site[:, c].clamp(min=0)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
                     under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
-                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)  # C-6: <=1 admits bonus
+                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)  # C-6/A-4
                     base[ar, site_c] = False
-                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)  # C-6: <=1 admits bonus
+                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)  # C-6/A-4
                     cbase[ar, site_c] = False
                     has_land = base.any(dim=1)  # [B]
                     has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
@@ -2070,6 +2118,8 @@ class BatchSim:
                 pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
             elif kind == "tech":
                 pred = self.techs[:, row["t"]]
+            elif kind == "anyWonderBuilt":
+                pred = self.built_wonder_complete.any(dim=1)  # A-4: reachable now (global scan, both civs)
             elif kind == "nearNaturalWonder":
                 pred = ((self.owner >= 0) & self.wonder_near).any(dim=1)
             elif kind == "improvement":
@@ -2129,6 +2179,8 @@ class BatchSim:
                 pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
             elif kind == "tech":
                 pred = self.r_techs[:, r, row["t"]]
+            elif kind == "anyWonderBuilt":
+                pred = self.built_wonder_complete.any(dim=1)  # A-4: the same global scan
             elif kind == "nearNaturalWonder":
                 pred = ((self.rival_at == r) & self.wonder_near).any(dim=1)
             elif kind == "improvement":
@@ -2727,6 +2779,7 @@ class BatchSim:
             self.rc_is_cap[b, r, j] = False  # P7-FULL: identity dies with the city (capitalTiles keeps the tile)
             self.rvcity_at[b, c_t] = -1
             self.rc_dist_tile[b, r, j, :] = -1
+            self.rc_wonder[b, r, j, :] = -1  # A-4 hygiene
             self.rc_bldg[b, r, j, :] = False
             # P5/S5 gate-catch (seed 9157 t111): the dead city's QUEUE dies
             # with it — a stale rc_current builder code made has_q see a
@@ -2950,6 +3003,30 @@ class BatchSim:
         # tile has one feature, so exactly one of the two planes is nonzero
         # (chops can only target removable features — nfadj is 0 there).
         contrib = self._feat_adj[rows, tiles] + self._nfeat_adj[rows, tiles]
+        nb = self.neigh[tiles]
+        for d in range(6):
+            n_d = nb[:, d]
+            on_map = n_d >= 0
+            if bool(on_map.any()):
+                om = on_map.nonzero(as_tuple=True)[0]
+                self.d_static_adj[rows[om], n_d[om], :] -= contrib[om]
+        self._eff_version += 1
+
+    def _withdraw_sea_adj(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """C-6 latent, the A-4 hunt's second catch (rng 2026006088 t189):
+        SEA_RESOURCE adjacency is baked into d_static_adj, but TS reads the
+        neighbor's resource LIVE (isWater(n) && n.resource !== null) — so
+        paving over a bonus SEA resource must WITHDRAW the adjacency it
+        lent (a Harbor next to the stripped fish kept +1 gold and +1
+        Shipyard production GPU-side only). The _strip_feature_at twin;
+        callers pass only FRESH strips (idempotence — the P4-F2 lesson)."""
+        if not len(rows):
+            return
+        wet = self.water[rows, tiles]
+        if not bool(wet.any()):
+            return
+        rows, tiles = rows[wet], tiles[wet]
+        contrib = self._dyn_searesource.view(1, -1).expand(len(rows), -1)
         nb = self.neigh[tiles]
         for d in range(6):
             n_d = nb[:, d]
@@ -3365,7 +3442,7 @@ class BatchSim:
             # t.district LIVE — an ORPHANED pave (razed city's district on an
             # unowned tile) padded the GPU set and shifted the draw-indexed
             # camp spot one candidate over. camp_ok is static; paves aren't.
-            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city & (self.district < 0)
+            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city & (self.district < 0) & (self.built_wonder < 0)  # A-4: live builtWonder excludes too
             if self.K > 0:
                 camp_d = self.pair_dist[self.camp_tile.clamp(min=0)].to(torch.long)  # [B, K, T]
                 near_camp = ((camp_d < 5) & (self.camp_tile >= 0).unsqueeze(2)).any(dim=1)
@@ -4243,6 +4320,7 @@ class BatchSim:
             (self.center_at.gather(1, tc) >= 0)
             | (self.rvcity_at.gather(1, tc) >= 0)
             | (self.district.gather(1, tc) >= 0)
+            | (self.built_wonder.gather(1, tc) >= 0)  # A-4: wonder tiles are not workable
         )
         valid = (
             (tiles >= 0)
@@ -4355,6 +4433,26 @@ class BatchSim:
                 prod = prod + p_sel[:, m]
                 sci = sci + sc_sel[:, m]
                 cul = cul + cu_sel[:, m]
+        # A-4 Petra: +2 food +2 gold +1 production per WORKED desert
+        # non-floodplain unpaved tile — POST-selection, exactly like
+        # computeCityStats' petraBonus (the score ranks without it; the
+        # center carries CITY_CENTER and never qualifies).
+        if self._wond_n:
+            wreg_p = self.rc_wonder[:, r, j]
+            compw_p = (wreg_p >= 0) & self.built_wonder_complete.gather(1, wreg_p.clamp(min=0))
+            hasP = (compw_p & self._wond_petra.view(1, -1)).any(dim=1)
+            if bool(hasP.any()):
+                sel_tiles = tc.gather(1, top_idx)  # [B, kk] the worked tiles
+                qual = (
+                    self.desert.gather(1, sel_tiles)
+                    & (self.feat_id.gather(1, sel_tiles) != self._fp_fid)
+                    & (self.district.gather(1, sel_tiles) < 0)
+                    & take
+                )
+                nq = (qual & hasP.unsqueeze(1)).sum(dim=1).double()
+                food = food + 2.0 * nq
+                gold = gold + 2.0 * nq
+                prod = prod + nq
         # C1-B3b: the research stand-in reads the REAL tree (retires at B5)
         # C1-B4b: COMPLETED districts add floor(adjacency) into their yield
         # column (rival cityDistrictYields under empty modifiers; gold/faith
@@ -4428,6 +4526,23 @@ class BatchSim:
                         adjc_sy = self._adj_district_count().to(self.dtype)
                         hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # A-4: this city's completed wonders — flat city yields pre-tier
+        # (computeCityStats' buildings position) + the belief faithPerWonder
+        # (city.ts:437), now reachable.
+        compw = None
+        if self._wond_n:
+            wreg = self.rc_wonder[:, r, j]  # [B, nW]
+            compw = (wreg >= 0) & self.built_wonder_complete.gather(1, wreg.clamp(min=0))
+            if bool(compw.any()):
+                wcy = compw.double() @ self._wond_cy  # [B, 6]
+                food = food + wcy[:, 0]
+                prod = prod + wcy[:, 1]
+                gold = gold + wcy[:, 2]
+                sci = sci + wcy[:, 3]
+                cul = cul + wcy[:, 4]
+                faith = faith + wcy[:, 5]
+                if _has_bel:
+                    faith = faith + self._bel_add("fpw", r) * compw.sum(dim=1).double()
         # A-7: the founder's capital incomes (perFollowers on the civ's LIVE
         # total pop + perCity) land on the capital BEFORE the tier scaling —
         # the rivalCityYields capitalYields position.
@@ -4455,6 +4570,22 @@ class BatchSim:
         cul = cul * yf
         gold = gold * yf
         faith = faith * yf
+        # A-4: the owning city's wonder yield multipliers (Oxford/Big Ben)
+        # AFTER the tier scaling — the computeCityStats order; the product
+        # runs in wonder-id order = the TS registry push order (the picker
+        # scans data order one at a time).
+        if compw is not None and bool(compw.any()):
+            wmm = torch.where(
+                compw.unsqueeze(2),
+                self._wond_mult.view(1, -1, 6).expand(compw.shape[0], -1, -1),
+                torch.ones(compw.shape[0], compw.shape[1], 6, dtype=torch.float64, device=self.device),
+            ).prod(dim=1)
+            food = food * wmm[:, 0]
+            prod = prod * wmm[:, 1]
+            gold = gold * wmm[:, 2]
+            sci = sci * wmm[:, 3]
+            cul = cul * wmm[:, 4]
+            faith = faith * wmm[:, 5]
         z = torch.zeros_like(food)
         return (
             torch.where(mask, food, z),
@@ -4526,6 +4657,7 @@ class BatchSim:
         self.rc_alive[b, r_from, j] = False
         self.rc_is_cap[b, r_from, j] = False  # P7-FULL: identity dies with the slot
         self.rc_dist_tile[b, r_from, j, :] = -1
+        self.rc_wonder[b, r_from, j, :] = -1  # A-4 hygiene
         self.rc_bldg[b, r_from, j, :] = False
         self.rc_current[b, r_from, j] = -1
         self.rc_cost[b, r_from, j] = 0
@@ -4550,6 +4682,7 @@ class BatchSim:
         self.rc_cost[b, r_to, slot] = 0
         self.rc_qtile[b, r_to, slot] = -1
         self.rc_dist_tile[b, r_to, slot, :] = -1
+        self.rc_wonder[b, r_to, slot, :] = -1
         self.rc_bldg[b, r_to, slot, :] = False
         self.rc_id[b, r_to, slot] = int(self.r_next_city_id[b, r_to])
         self.r_next_city_id[b, r_to] += 1
@@ -4608,7 +4741,7 @@ class BatchSim:
         # paved tile (yields.ts:37 — an orphaned district from a razed
         # city can be an unowned candidate, hills base 3 leaked into the
         # key and out-bid TS's real pick one row over).
-        y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * (self.district.gather(1, tc) < 0).to(torch.float64)
+        y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * ((self.district.gather(1, tc) < 0) & (self.built_wonder.gather(1, tc) < 0)).to(torch.float64)
         # the player's exact key: dist asc, res priority desc, milli-
         # rounded yield sum desc, global tile index asc (the player-walk
         # twin). C-6: priority reads LIVE (paved bonus resource is GONE).
@@ -4669,7 +4802,7 @@ class BatchSim:
             # AUDIT C-7: siteQuality's candidate gate reads tile.district
             # LIVE (an orphaned pave — razed city — is unowned but refused);
             # settle_ok only bakes the t0 districts.
-            okt = (tiles >= 0) & unowned & self.settle_ok.gather(1, tc) & (self.rvcity_at.gather(1, tc) < 0) & (self.district.gather(1, tc) < 0)
+            okt = (tiles >= 0) & unowned & self.settle_ok.gather(1, tc) & (self.rvcity_at.gather(1, tc) < 0) & (self.district.gather(1, tc) < 0) & (self.built_wonder.gather(1, tc) < 0)
             # quality: fresh8 + Σ ring-2 contributions of passable, unowned members
             ring = tiles_from_offsets(tc.reshape(-1), self._off2, self.W, self.H).reshape(B, -1, self._off2.shape[0])
             rc2 = ring.clamp(min=0)
@@ -4747,6 +4880,7 @@ class BatchSim:
         self.rc_cost[rows, r, slot] = 0
         self.rc_qtile[rows, r, slot] = -1
         self.rc_dist_tile[rows, r, slot, :] = -1
+        self.rc_wonder[rows, r, slot, :] = -1
         self.rc_bldg[rows, r, slot, :] = False
         self.rc_id[rows, r, slot] = self.r_next_city_id[rows, r]
         self.r_next_city_id[rows, r] += 1
@@ -5268,6 +5402,76 @@ class BatchSim:
                         self.rc_cost[:, r, j] = torch.where(want_b, rdv3.b_cost.gather(0, bi).double(), self.rc_cost[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(want_b, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         rem = rem & ~want_b
+                # AUDIT A-4: the CAPITAL raises a world wonder once
+                # buildings run dry — first unlocked wonder in data order,
+                # first eligible owned tile (LOWEST index); one per world
+                # (the built_wonder plane counts in-flight: queueing paves
+                # the tile, exactly like TS queueWonder).
+                if self.districts_on and self._wond_n > 0 and bool((rem & self.rc_is_cap[:, r, j]).any()):
+                    remw = rem & self.rc_is_cap[:, r, j]
+                    d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
+                    base_ok = (
+                        (self.rival_at == r)
+                        & (d_ctr <= 3)
+                        & (self.district < 0)
+                        & (self.built_wonder < 0)
+                        & (self.rvcity_at < 0)
+                        & (self.center_at < 0)
+                        & (self.res_priority <= 1)
+                    )
+                    for wi in range(self._wond_n):
+                        if not bool(remw.any()):
+                            break
+                        wrow = self._wond_rows[wi]
+                        if int(wrow.get("ut", -1)) == -3 or int(wrow.get("uc", -1)) == -3:
+                            continue  # unlock absent from the compact tree — unreachable (TS includes() never matches)
+                        okc = remw
+                        if int(wrow.get("ut", -1)) >= 0:
+                            okc = okc & self.r_techs[:, r, int(wrow["ut"])]
+                        if int(wrow.get("uc", -1)) >= 0:
+                            okc = okc & self.r_civics[:, r, int(wrow["uc"])]
+                        if not bool(okc.any()):
+                            continue
+                        okc = okc & ~(self.built_wonder == wi).any(dim=1)
+                        if not bool(okc.any()):
+                            continue
+                        adjD = int(wrow.get("adjD", -1))
+                        if adjD == -3:
+                            continue  # requires an out-of-catalog district — never placeable
+                        cand_w = base_ok & ((self.wok >> wi) & 1).bool()
+                        if adjD == -2:
+                            cand_w = cand_w & (self._adj_center_count() > 0)
+                        elif adjD >= 0:
+                            cand_w = cand_w & self._adj_dtype_complete(adjD)
+                        if int(wrow.get("adjR", -1)) >= 0:
+                            cand_w = cand_w & self._adj_res_live(int(wrow["adjR"]))
+                        has_w = okc & cand_w.any(dim=1)
+                        if not bool(has_w.any()):
+                            continue
+                        keyw = torch.where(cand_w, self._arangeT_f, self._inf_f)
+                        bw = keyw.argmin(dim=1)
+                        rows_w = has_w.nonzero(as_tuple=True)[0]
+                        bwt = bw[rows_w]
+                        # queueWonder's tile writes: pave, improvement dies,
+                        # feature dies EXCEPT floodplains, bonus resource
+                        # stripped (the C-6 rule)
+                        self.built_wonder[rows_w, bwt] = wi
+                        self.built_wonder_complete[rows_w, bwt] = False
+                        self.improvement[rows_w, bwt] = -1
+                        nofp = self.feat_id[rows_w, bwt] != self._fp_fid
+                        if bool(nofp.any()):
+                            self._strip_feature_at(rows_w[nofp], bwt[nofp])
+                        fresh_rs = (self.res_priority[rows_w, bwt] == 1) & ~self.res_stripped[rows_w, bwt]
+                        self.res_stripped[rows_w, bwt] = self.res_stripped[rows_w, bwt] | (self.res_priority[rows_w, bwt] == 1)
+                        self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
+                        self.rc_wonder[rows_w, r, j, wi] = bwt
+                        code_w = 1 + self.NU + len(self._scaffold) + self.rules_dev.b_cost.shape[0] + len(self._proj_rows) + wi
+                        self.rc_current[:, r, j] = torch.where(has_w, torch.full_like(self.rc_current[:, r, j], code_w), self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(has_w, torch.full_like(self.rc_cost[:, r, j], float(wrow["cost"])), self.rc_cost[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                        self._eff_version += 1  # a pave: features/improvements changed under the caches
+                        remw = remw & ~has_w
+                        rem = rem & ~has_w
                 # C1-B5b: one BUILDER per civ at a time, while a job exists.
                 # A builder is a unit — it takes a cap slot like any other.
                 if self.improvements_on and self._builder_idx >= 0 and bool(rem.any()):
@@ -5481,6 +5685,13 @@ class BatchSim:
                 # A-7: Fertility Rites — the belief growth multiplier rides the
                 # chain like computeCityStats (hf × tier × growthMult).
                 gmul = self._bel_mul("growth", r) if self._r_has_beliefs(r) else 1.0
+                # A-4: Hanging Gardens — the civ-wide completed-wonder growth
+                # product (rivalGrowthAllMult, LIVE per city like TS's call)
+                if self._wond_n:
+                    wregG = self.rc_wonder[:, r]  # [B, RC, nW]
+                    compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
+                    gw = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
+                    gmul = gmul * gw
                 self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j] * gmul, surplus), self.rc_growth[:, r, j])
                 p64 = self.rc_pop[:, r, j].double()
                 need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
@@ -5531,11 +5742,22 @@ class BatchSim:
                             br = done_b.nonzero(as_tuple=True)[0]
                             bi_done = (cur - 1 - self.NU - nS_b4).clamp(min=0)
                             self.rc_bldg[br, r, j, bi_done[br]] = True
+                        # A-4: a finished wonder completes its tile (effects
+                        # read builtWonderComplete live from the registry).
+                        if self._wond_n:
+                            base_w = self.NU + nS_b4 + NBc + len(self._proj_rows)
+                            done_w = done_q & (cur > base_w)
+                            if bool(done_w.any()):
+                                wi_done = (cur - 1 - base_w).clamp(min=0)
+                                wr_ = done_w.nonzero(as_tuple=True)[0]
+                                wt_ = self.rc_wonder[wr_, r, j, wi_done[wr_]]
+                                self.built_wonder_complete[wr_, wt_.clamp(min=0)] = True
+                                self._eff_version += 1
                         # A-14: a finished project pays Math.round(cost×frac)
                         # into the CIV's streams + GPP (the completeProject
                         # twin — rival streams, like GP effects).
                         if self._proj_rows:
-                            done_p = done_q & (cur > self.NU + nS_b4 + NBc)
+                            done_p = done_q & (cur > self.NU + nS_b4 + NBc) & (cur <= self.NU + nS_b4 + NBc + len(self._proj_rows))
                             if bool(done_p.any()):
                                 pi_done = (cur - 1 - self.NU - nS_b4 - NBc).clamp(min=0)
                                 amt_y = js_round(cost_locked * self._proj_yf)
@@ -5967,6 +6189,7 @@ class BatchSim:
         self.rc_cost[b, w_, slot] = 0.0
         self.rc_qtile[b, w_, slot] = -1
         self.rc_dist_tile[b, w_, slot, :] = -1  # flipped districts are NOT adopted (paved-but-dead)
+        self.rc_wonder[b, w_, slot, :] = -1  # A-4: nor wonders (the tile keeps builtWonderComplete, orphaned)
         self.rc_bldg[b, w_, slot, :] = False  # nor buildings
         self.r_next_city_id[b, w_] += 1
         self.rvcity_at[b, self.site[b, c]] = w_
@@ -6124,7 +6347,7 @@ class BatchSim:
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
         for name in self._RC_SLOT_FIELDS:
             setattr(self, name, getattr(self, name).gather(2, perm))
-        for name in ("rc_dist_tile", "rc_bldg"):
+        for name in ("rc_dist_tile", "rc_bldg", "rc_wonder"):
             t = getattr(self, name)
             setattr(self, name, t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
         self._eff_version += 1  # no (r, j)-keyed cache may survive the permutation
@@ -6456,7 +6679,7 @@ class BatchSim:
         lux0 = self._last_lux  # frozen for the whole walk (TS luxMap semantics)
         _tot_ver = self._eff_version
         _tot_pop = self.pop.clone()
-        y_sum = self._eff_yields().sum(dim=2) * (self.district < 0).to(self.dtype)  # P5/S5: paved tiles yield 0 (tileYields, yields.ts:37)
+        y_sum = self._eff_yields().sum(dim=2) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # P5/S5+A-4: paved/wondered tiles yield 0 (tileYields, yields.ts:37)
         # loyalty mirrors TS's loop-top view: city c's tier and pop are
         # captured FRESH at its own iteration (post earlier cities' same-turn
         # mutations, pre its own production/growth) — applyLoyalty runs at the
@@ -6487,7 +6710,7 @@ class BatchSim:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
-                y_sum = self._eff_yields().sum(dim=2) * (self.district < 0).to(self.dtype)  # P5/S5: paved tiles yield 0 (tileYields, yields.ts:37)
+                y_sum = self._eff_yields().sum(dim=2) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # P5/S5+A-4: paved/wondered tiles yield 0 (tileYields, yields.ts:37)
             tier_fresh[bidx, col] = tier_idx[bidx, col]
             pop_loyal[bidx, col] = self.pop[bidx, col]
             t_c = total[bidx, col]  # [B, 6] this city's FRESH yields
@@ -6556,7 +6779,7 @@ class BatchSim:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
                 _tot_pop = self.pop.clone()
-                y_sum = self._eff_yields().sum(dim=2) * (self.district < 0).to(self.dtype)  # P5/S5: paved tiles yield 0 (tileYields, yields.ts:37)
+                y_sum = self._eff_yields().sum(dim=2) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # P5/S5+A-4: paved/wondered tiles yield 0 (tileYields, yields.ts:37)
             self.culture_box[bidx, col] = self.culture_box[bidx, col] + t_c[:, 4]
             dist_c = self.dist[bidx, col]  # [B, T] — static per city, hoisted out of the claim loop
             for _ in range(BORDER_LOOPS):

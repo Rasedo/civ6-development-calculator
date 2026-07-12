@@ -14,6 +14,7 @@ import { GP_CLASSES } from '../src/data/greatPeople';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { RESOURCES } from '../src/data/resources';
+import { BUILT_WONDERS } from '../src/data/builtWonders';
 import type { GameState } from '../src/core/types';
 
 function frontCost(rc: any): number {
@@ -21,6 +22,7 @@ function frontCost(rc: any): number {
   if (!q) return 0;
   if (q.kind === 'unit') return q.cost ?? UNITS[q.unit]?.cost ?? 0; // P4/D-10: builders lock a cost
   if (q.kind === 'building') return BUILDINGS[q.building]?.cost ?? 0;
+  if (q.kind === 'wonder') return BUILT_WONDERS[q.wonder]?.cost ?? 0; // A-4: catalog cost
   return q.cost ?? 0; // settler / district / project carry their own cost
 }
 

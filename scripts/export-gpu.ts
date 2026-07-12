@@ -50,6 +50,7 @@ import {
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEON_FAITH_COST, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
+import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_POP,
@@ -176,6 +177,27 @@ civicList.forEach((c, i) => {
 // AUDIT A-7: the belief-effect row shape (see `beliefs:` in rules below).
 const FEAT_IDS = Object.keys(FEATURES);
 const featIdx = new Map(FEAT_IDS.map((f, i) => [f, i]));
+// AUDIT A-4: resource-id order (the `rid` tile plane + wonder adjR) and
+// the static per-wonder placement test behind the `wok` tile bitmask.
+const RESOURCE_IDS = Object.keys(RESOURCES);
+const BUILT_WONDER_LIST = Object.values(BUILT_WONDERS);
+const wonderStaticOk = (w: (typeof BUILT_WONDER_LIST)[number], t: Tile, m: GameState['map']): boolean => {
+  if (t.wonder) return false;
+  if (isImpassable(t)) return false;
+  const p = w.placement;
+  if (p.onCoastalWater) {
+    if (!isCoastalWater(m, t)) return false;
+  } else {
+    if (isWater(t)) return false;
+    if (t.feature === 'FLOODPLAINS' && !p.allowFloodplains) return false;
+    if (t.feature === 'OASIS') return false;
+    if (p.terrains && !p.terrains.includes(t.terrain)) return false;
+    if (p.flatOnly && t.elevation !== 'FLAT') return false;
+    if (p.hillsOnly && t.elevation !== 'HILLS') return false;
+  }
+  if (p.requiresRiver && !hasRiver(t)) return false;
+  return true;
+};
 const beliefRow = (def: { effects: BeliefEffects }) => ({
   featY: FEAT_IDS.map((f) => YIELD_KEYS.map((k) => def.effects.featureYields?.[f]?.[k] ?? 0)),  // [nFeat, 6]
   bldgY: centerBuildings.map((b) => YIELD_KEYS.map((k) => def.effects.buildingYields?.[b.id]?.[k] ?? 0)),  // [NB, 6]
@@ -192,6 +214,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
     ? [def.effects.perFollowers.per, ...YIELD_KEYS.map((k) => def.effects.perFollowers!.yields[k] ?? 0)]
     : [0, 0, 0, 0, 0, 0, 0],
   perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
+  fpw: def.effects.faithPerWonder ?? 0,  // A-4 activates this (Divine Inspiration)
   // improvements on a resource of a category (God of Craftsmen): rows by
   // category code 0 none / 1 bonus / 2 strategic / 3 luxury — the same
   // codes as the tile `res` priority plane. NOT unreachable: IRON/NITER/
@@ -239,6 +262,11 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     // built, so their eurekas never fire in either engine — left skipped.
     const imp = c.id === 'FARM' ? 0 : c.id === 'MINE' ? 1 : c.id === 'LUMBER_MILL' ? 2 : -1;
     if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
+  } else if (c.kind === 'anyWonderBuilt') {
+    // A-4: rival wonders make this REACHABLE (it was filtered as
+    // structurally-unreachable before) — both civs' detection reads the
+    // same global builtWonderComplete scan.
+    row = { kind: 'anyWonderBuilt' };
   } else if (c.kind === 'district' && !c.distinctTypes) {
     // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
     // MATHEMATICS: 3; per-type ones). distinctTypes conditions (7 different
@@ -469,6 +497,41 @@ const rules = {
     pantheons: Object.values(PANTHEONS).map(beliefRow),
     followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
     founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
+  },
+  // AUDIT A-4: rival wonders (data order). Static placement lives in the
+  // per-tile `wok` bitmask below; LIVE terms (ownership, occupancy,
+  // radius, non-bonus resource, adjacent completed district, adjacent
+  // un-stripped resource, world uniqueness) are the engine's job.
+  // extraWildcardSlot (Forbidden City) is skipped — no rival government;
+  // regionalAmenities (Colosseum) ships but its district is unplaceable
+  // in scope. Costs are already speed-scaled in the data file.
+  wonders: {
+    rows: Object.values(BUILT_WONDERS).map((w) => ({
+      cost: w.cost,
+      // -1 = no requirement; -3 = requires a tech/civic ABSENT from the
+      // compact tree — unreachable, exactly like TS's includes() never
+      // matching (the A-4 hunt's catch: Oracle's MYSTICISM exported -1 and
+      // the GPU read that as unlocked, building wonders TS never could)
+      ut: w.requiresTech ? techIdx.get(w.requiresTech) ?? -3 : -1,
+      uc: w.requiresCivic ? civicIdx.get(w.requiresCivic) ?? -3 : -1,
+      cy: YIELD_KEYS.map((k) => w.cityYields?.[k] ?? 0),
+      growAll: w.effects?.growthAllMult ?? 1,
+      petra: w.effects?.petraDesert ? 1 : 0,
+      mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
+      // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
+      // out-of-catalog (never placeable — Colosseum/Ruhr), else the
+      // PLACEABLE_DISTRICTS index
+      adjD: !w.placement.adjacentDistrict
+        ? -1
+        : w.placement.adjacentDistrict === 'CITY_CENTER'
+          ? -2
+          : PLACEABLE_DISTRICTS.indexOf(w.placement.adjacentDistrict) >= 0
+            ? PLACEABLE_DISTRICTS.indexOf(w.placement.adjacentDistrict)
+            : -3,
+      adjR: w.placement.adjacentResource ? RESOURCE_IDS.indexOf(w.placement.adjacentResource) : -1,
+      regionalAmenities: w.effects?.regionalAmenities ?? 0,
+    })),
+    fpFid: FEAT_IDS.indexOf('FLOODPLAINS'),
   },
   // AUDIT A-14: rival projects (data order; d = PLACEABLE_DISTRICTS idx,
   // y = YIELD_KEYS idx or -1, g = GP_CLASSES idx or -1). Out-of-scaffold
@@ -714,6 +777,14 @@ for (let s = 0; s < N_SEEDS; s++) {
       // feature id (A-7: belief featureYields — Lady of the Reeds tiles);
       // live via feat_stripped (chops/paves null features)
       fid: t.feature ? featIdx.get(t.feature) ?? -1 : -1,
+      // A-4: resource id (Stonehenge's live stone adjacency, strip-aware),
+      // desert flag (Petra) and the static per-wonder placement bitmask
+      // (LIVE terms — ownership, occupancy, radius, non-bonus resource,
+      // adjacent completed district / un-stripped resource, world
+      // uniqueness — are the engine's job)
+      rid: t.resource ? RESOURCE_IDS.indexOf(t.resource) : -1,
+      des: t.terrain === 'DESERT' ? 1 : 0,
+      wok: BUILT_WONDER_LIST.reduce((m2, w, i) => m2 | (wonderStaticOk(w, t, map) ? 1 << i : 0), 0),
       // land units may stand here (mirrors unitPassable)
       pass: unitPassable(t) ? 1 : 0,
       work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)
