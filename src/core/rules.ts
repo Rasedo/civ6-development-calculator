@@ -83,7 +83,10 @@ export function validImprovementsIn(
   opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
 ): ImprovementId[] {
   if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
-  if (tile.district || tile.wonder || isImpassable(tile)) return [];
+  // A-8 gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
+  // in-flight wonder pave refuses improvements exactly like a district pave
+  // (real Civ 6; A-4 covered nine other masks but not this one).
+  if (tile.district || tile.wonder || tile.builtWonder || isImpassable(tile)) return [];
 
   const unlocks = opts.unlocks;
   const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);

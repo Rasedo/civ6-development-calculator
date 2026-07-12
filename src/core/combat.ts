@@ -23,6 +23,8 @@ import {
   disbandUnit,
   unitsHostile,
   rivalCityAt,
+  moveCostInto,
+  crossesRiver,
 } from './units';
 import { revealAround } from './fog';
 import { CITY_WORK_RADIUS } from '../data/constants';
@@ -275,6 +277,42 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   return ok;
 }
 
+/**
+ * AUDIT A-6: a hostile RANGED unit strikes — one roll, no retaliation, no
+ * advance (rangedAttack's shape from the attacker's seat). A PLAYER city
+ * takes the hit first even with a garrison (meleeAttack's city precedence)
+ * and holds at 1 HP — ranged fire never captures; else the units on the
+ * tile (military first; civilians take the roll too, rangedAttack's
+ * convention, not the melee roll-free kill). Any other civ's center tile
+ * is the same no-op quirk as the melee scan: nothing happens, no MP spent.
+ */
+export function hostileRangedStrike(state: GameState, attacker: Unit, targetIndex: number): void {
+  const def = UNITS[attacker.type];
+  if (!def?.ranged) return;
+  const target = state.map.tiles[targetIndex];
+  const hostileToPlayer = attacker.owner !== 'player' && unitsHostile(state, attacker, { owner: 'player' });
+  const enemyCity =
+    target.district === 'CITY_CENTER' && hostileToPlayer
+      ? state.cities.find((c) => c.centerIndex === targetIndex)
+      : undefined;
+  if (enemyCity) {
+    const defCS = cityDefenseStrength(state, enemyCity);
+    state.cityHp[String(enemyCity.id)] = Math.max(
+      1,
+      getCityHp(state, enemyCity.id) - damageRoll(state, def.ranged.strength - defCS, 'vrngc', targetIndex),
+    );
+    attacker.movesLeft = 0;
+    return;
+  }
+  const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
+  if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
+  const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target);
+  defender.hp -= damageRoll(state, def.ranged.strength - defCS, 'vrng', targetIndex);
+  if (defender.hp <= 0) killUnit(state, defender);
+  attacker.movesLeft = 0;
+}
+
 /** Tiles this unit can attack right now (UI helper). */
 export function attackTargets(state: GameState, unit: Unit): number[] {
   const def = UNITS[unit.type];
@@ -287,7 +325,9 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     const d = hexDistance(from.col, from.row, t.col, t.row);
     if (d < 1 || d > range) continue;
     const hasEnemy = unitsAt(state, t.index).some((u) => unitsHostile(state, unit, u));
-    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d === 1;
+    // AUDIT A-6: ranged hostiles bombard city-center tiles at their full
+    // range (the player's D-23 rule from the other seat); melee keeps d===1.
+    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range;
     // P4/D-23: the player's ranged units bombard cities at their full range.
     const cityRange = unit.owner === 'player' ? range : 1;
     const rivalCity =
@@ -478,9 +518,12 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   const tile = () => map.tiles[unit.tileIndex];
 
   // 1. Attack anything hostile in reach (player or, for barbarians, rivals too).
+  // AUDIT A-6: ranged units strike (one roll, no retaliation) instead of
+  // meleeing — attackTargets already scanned at their full range.
   const targets = attackTargets(state, unit);
   if (targets.length > 0) {
-    meleeAttack(state, unit.id, targets[0]);
+    if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, targets[0]);
+    else meleeAttack(state, unit.id, targets[0]);
     return;
   }
 
@@ -512,6 +555,10 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       target = t;
     }
   }
+  // A-8: an improvement is walked ONTO (pillage reads the tile underfoot);
+  // a CITY target stops the march adjacent — enemy centers can't be entered
+  // (real Civ 6), and a unit standing on one could never attack it (d>=1).
+  const marchOnto = target !== null;
   if (!target && state.cities.length > 0) {
     target = state.cities
       .map((c) => map.tiles[c.centerIndex])
@@ -522,19 +569,35 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       )[0];
   }
   if (!target) return;
-  // Step toward the neighbor closest to the target (cheap greedy march).
-  const step = neighbors(map, here)
-    .filter((n) => unitPassable(n) && tileFreeForUnit(state, n.index, unit))
-    .sort(
-      (a, b) =>
-        hexDistance(a.col, a.row, target!.col, target!.row) -
-        hexDistance(b.col, b.row, target!.col, target!.row),
-    )[0];
-  if (step && hexDistance(step.col, step.row, target.col, target.row) <
-      hexDistance(here.col, here.row, target.col, target.row)) {
+  // AUDIT A-8: RIVAL units walk the march on REAL MP — each step re-picks
+  // the passable free neighbor closest to the (fixed) target, moves only if
+  // strictly closer, and pays walkPath's exact charge (tile cost + 3 per
+  // river crossing; a full-MP unit always affords its first step).
+  // Barbarians keep the one-step raid pace — their fidelity is B-26's.
+  const full = UNITS[unit.type]?.moves ?? 2;
+  for (;;) {
+    const at = tile();
+    const step = neighbors(map, at)
+      .filter((n) => unitPassable(n) && tileFreeForUnit(state, n.index, unit))
+      .sort(
+        (a, b) =>
+          hexDistance(a.col, a.row, target!.col, target!.row) -
+          hexDistance(b.col, b.row, target!.col, target!.row),
+      )[0];
+    const stepD = hexDistance(step?.col ?? 0, step?.row ?? 0, target.col, target.row);
+    if (!step || stepD >= hexDistance(at.col, at.row, target.col, target.row) || (!marchOnto && stepD < 1)) {
+      return;
+    }
+    const cost = moveCostInto(step) + (crossesRiver(at, step) ? 3 : 0);
+    if (unit.movesLeft < cost && unit.movesLeft < full) return;
     unit.tileIndex = step.index;
-    unit.movesLeft = 0;
+    unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3): rivals clear camps (barb no-op)
+    if (unit.owner !== 'rival') {
+      unit.movesLeft = 0; // barbarian: the pre-A-8 single step, verbatim
+      return;
+    }
+    if (unit.movesLeft <= 0) return;
   }
 }
 

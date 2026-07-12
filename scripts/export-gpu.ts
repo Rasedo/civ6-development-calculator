@@ -447,6 +447,8 @@ const rules = {
       defPerTech: RIVAL_DEF_PER_TECH,
       spearTech: techIdx.get('BRONZE_WORKING') ?? -1,
       horseTech: techIdx.get('HORSEBACK_RIDING') ?? -1,
+      // AUDIT A-6: the ranged rung — SLINGER is ungated, ARCHER needs this.
+      archerTech: techIdx.get('ARCHERY') ?? -1,
     },
     // C1-B5b: rival builder gates — improvement unlock indices in the tech
     // table (FARM is baseline; hillFarms rides the civic the engine already
@@ -575,6 +577,8 @@ const rules = {
     // V-R: ranged strike stats (Slinger 15/1, Archer 25/2); 0 = melee-only.
     rangedStrength: u.ranged?.strength ?? 0,
     rangedRange: u.ranged?.range ?? 0,
+    // AUDIT A-8: full MP per turn — the rival walkers' budget.
+    moves: u.moves,
   })),
   // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
   // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a
@@ -891,6 +895,11 @@ for (let s = 0; s < N_SEEDS; s++) {
         return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
       }),
       hl: t.elevation === 'HILLS' ? 1 : 0,
+      // AUDIT A-8: river-edge crossing bits for the rival MP walkers. The
+      // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
+      // the same order riverMask bits use — so bit d = crossing toward
+      // neighbor column d, both engines.
+      rm: t.riverMask ?? 0,
       // FARM validity (phase 6a), STATIC part of validImprovements — split
       // by gate. fa_f: flat grass/plains (no feature) or floodplains,
       // ungated. fa_h: hill grass/plains (no feature), needs the hillFarms

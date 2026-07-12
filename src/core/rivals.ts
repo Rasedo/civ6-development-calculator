@@ -9,8 +9,8 @@ import type { City, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yiel
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { spawnUnit, unitsAt } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, clearCampFor, captureRivalCity } from './combat';
+import { spawnUnit, unitsAt, unitsHostile, moveCostInto, crossesRiver } from './units';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers } from './effects';
@@ -600,26 +600,37 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
   }
 }
 
-/** Peacetime patrol: drift back toward the nearest own city. */
+/** Peacetime patrol: drift back toward the nearest own city.
+ * AUDIT A-8: a real-MP walk — home is picked once, then each step re-runs
+ * the tilesWithin scan (any unit blocks, ties in tilesWithin order), moves
+ * only if strictly closer, pays walkPath's charge (tile cost + 3 per river;
+ * a full-MP unit always affords its first step), and stops once within 3. */
 function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
   if (rival.cities.length === 0 || unit.movesLeft <= 0) return;
-  const here = state.map.tiles[unit.tileIndex];
   const homeIdx = rival.cities
     .map((c) => c.centerIndex)
     .sort((a, b) => nearestDistance(state, unit.tileIndex, [a]) - nearestDistance(state, unit.tileIndex, [b]))[0];
   const home = state.map.tiles[homeIdx];
-  if (hexDistance(here.col, here.row, home.col, home.row) <= 3) return;
-  const step = tilesWithin(state.map, here.col, here.row, 1)
-    .filter((t) => t.index !== here.index && !isWater(t) && !isImpassable(t))
-    .filter((t) => unitsAt(state, t.index).length === 0)
-    .sort(
-      (a, b) =>
-        hexDistance(a.col, a.row, home.col, home.row) - hexDistance(b.col, b.row, home.col, home.row),
-    )[0];
-  if (step && hexDistance(step.col, step.row, home.col, home.row) < hexDistance(here.col, here.row, home.col, home.row)) {
+  const full = UNITS[unit.type]?.moves ?? 2;
+  for (;;) {
+    const here = state.map.tiles[unit.tileIndex];
+    if (hexDistance(here.col, here.row, home.col, home.row) <= 3) return;
+    const step = tilesWithin(state.map, here.col, here.row, 1)
+      .filter((t) => t.index !== here.index && !isWater(t) && !isImpassable(t))
+      .filter((t) => unitsAt(state, t.index).length === 0)
+      .sort(
+        (a, b) =>
+          hexDistance(a.col, a.row, home.col, home.row) - hexDistance(b.col, b.row, home.col, home.row),
+      )[0];
+    if (!step || hexDistance(step.col, step.row, home.col, home.row) >= hexDistance(here.col, here.row, home.col, home.row)) {
+      return;
+    }
+    const cost = moveCostInto(step) + (crossesRiver(here, step) ? 3 : 0);
+    if (unit.movesLeft < cost && unit.movesLeft < full) return;
     unit.tileIndex = step.index;
-    unit.movesLeft = 0;
+    unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3)
+    if (unit.movesLeft <= 0) return;
   }
 }
 
@@ -890,22 +901,35 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
       }
     }
     if (best < 0) continue;
+    // AUDIT A-8: the walk toward the (fixed) nearest job runs on REAL MP —
+    // per step: the free neighbor strictly closer (first-found wins ties =
+    // direction order), walkPath's charge (tile cost + 3 per river; a
+    // full-MP unit always affords its first step). Any step still blocks
+    // the D-2 heal (movesLeft < full — the GPU v_acted twin).
     const jt = state.map.tiles[best];
-    const dHere = hexDistance(bt.col, bt.row, jt.col, jt.row);
-    let dest = -1;
-    let destD = dHere;
-    for (const n of neighbors(state.map, bt)) {
-      if (!tileFreeForUnit(state, n.index, u)) continue;
-      const d = hexDistance(n.col, n.row, jt.col, jt.row);
-      if (d < destD) {
-        destD = d;
-        dest = n.index;
+    const fullB = UNITS[u.type]?.moves ?? 2;
+    for (;;) {
+      const at = state.map.tiles[u.tileIndex];
+      const dHere = hexDistance(at.col, at.row, jt.col, jt.row);
+      if (dHere === 0) break;
+      let dest = -1;
+      let destD = dHere;
+      for (const n of neighbors(state.map, at)) {
+        if (!tileFreeForUnit(state, n.index, u)) continue;
+        const d = hexDistance(n.col, n.row, jt.col, jt.row);
+        if (d < destD) {
+          destD = d;
+          dest = n.index;
+        }
       }
-    }
-    if (dest >= 0) {
+      if (dest < 0) break;
+      const dt = state.map.tiles[dest];
+      const cost = moveCostInto(dt) + (crossesRiver(at, dt) ? 3 : 0);
+      if (u.movesLeft < cost && u.movesLeft < fullB) break;
       u.tileIndex = dest;
-      u.movesLeft = 0; // P5/S4: the walk spends the turn (D-2 heal gate — GPU v_acted twin)
+      u.movesLeft = Math.max(0, u.movesLeft - cost);
       clearCampFor(state, u, dest); // P5/S7 (C-3): mirrors walkPath's any-unit clear
+      if (u.movesLeft <= 0) break;
     }
   }
 }
@@ -1228,9 +1252,27 @@ export function rivalPhase(state: GameState): void {
     const unitCap = rival.cities.length * 2 + (rival.atWar ? 3 : 1);
     let unitCount = rivalUnits(state, rival.id).length;
     let settlerQueued = false;
+    // AUDIT A-6: army composition (military only — builders don't count),
+    // live + queued, updated through this pick loop so same-turn picks see
+    // each other — the ranged share targets 1 ranged per 2 melee.
+    let meleeCount = 0;
+    let rangedCount = 0;
+    for (const u of rivalUnits(state, rival.id)) {
+      const d = UNITS[u.type];
+      if (!d || d.combat <= 0) continue;
+      if (d.ranged) rangedCount += 1;
+      else meleeCount += 1;
+    }
     for (const rc of rival.cities) {
       const q = rc.queue[0];
-      if (q?.kind === 'unit') unitCount += 1;
+      if (q?.kind === 'unit') {
+        unitCount += 1;
+        const d = q.unit ? UNITS[q.unit] : undefined;
+        if (d && d.combat > 0) {
+          if (d.ranged) rangedCount += 1;
+          else meleeCount += 1;
+        }
+      }
       if (q?.kind === 'settler') settlerQueued = true;
     }
     const rivalUnlocks = computeUnlocksIn(rival.research);
@@ -1258,13 +1300,22 @@ export function rivalPhase(state: GameState): void {
         });
         unitCount += 1;
       } else if (unitCount < unitCap) {
-        const type = rival.research.techs.includes('HORSEBACK_RIDING')
+        // AUDIT A-6: a mixed roster — train ranged while the army holds
+        // fewer than 1 ranged per 2 melee; best types off the rival's OWN
+        // techs (ARCHER once ARCHERY lands, SLINGER before — it is ungated,
+        // exactly like the player's catalog; the melee ladder unchanged).
+        const meleeType = rival.research.techs.includes('HORSEBACK_RIDING')
           ? 'HORSEMAN'
           : rival.research.techs.includes('BRONZE_WORKING')
             ? 'SPEARMAN'
             : 'WARRIOR';
+        const rangedType = rival.research.techs.includes('ARCHERY') ? 'ARCHER' : 'SLINGER';
+        const wantRanged = rangedCount * 2 < meleeCount;
+        const type = wantRanged ? rangedType : meleeType;
         rc.queue.push({ kind: 'unit', unit: type, progress: 0 });
         unitCount += 1;
+        if (wantRanged) rangedCount += 1;
+        else meleeCount += 1;
       } else {
         // AUDIT A-14: army capped, nothing else queueable — run the first
         // project whose district is COMPLETE (PROJECTS data order),
@@ -1469,7 +1520,15 @@ export function rivalPhase(state: GameState): void {
         state.map.tiles[next].rivalId = rival.id;
         rc.tilesAcquired += 1;
       }
-      rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
+      // AUDIT A-10: a siege pins the HP, exactly like the player's heal —
+      // any adjacent unit hostile to THIS civ (the player's at-war units,
+      // CIVILIANS included per unitsHostile — the P5/S2 player-heal lesson
+      // — or barbarians; other rivals never besiege).
+      const rcCenter = state.map.tiles[rc.centerIndex];
+      const besieged = neighbors(state.map, rcCenter).some((n) =>
+        unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id })),
+      );
+      if (!besieged) rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
     }
 
     // P5/S6 (C-19): loyalty collapses resolve after the city loop (they
@@ -1564,10 +1623,13 @@ export function rivalPhase(state: GameState): void {
       rival.peaceTurns += 1;
       for (const unit of rivalUnits(state, rival.id)) {
         if (UNITS[unit.type]?.charges !== undefined) continue; // C1-B5b: builders don't patrol
-        // Self-defense first: kill adjacent barbarians, then drift home.
+        // Self-defense first: kill barbarians in reach, then drift home.
+        // AUDIT A-6: ranged units snipe at their full range (one roll, no
+        // retaliation) — a melee call would just refuse the distant tile.
         const targets = attackTargets(state, unit);
         if (targets.length > 0) {
-          meleeAttack(state, unit.id, targets[0]);
+          if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, targets[0]);
+          else meleeAttack(state, unit.id, targets[0]);
           continue;
         }
         patrol(state, rival, unit);

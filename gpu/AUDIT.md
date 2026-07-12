@@ -45,6 +45,35 @@ revalidation LANDED in the S6+S8 close):
   "failures" were gpu-trace.ts, not the engines) and a C-6 LATENT
   (SEA_RESOURCE adjacency must WITHDRAW when a bonus sea resource is
   paved over — _withdraw_sea_adj at all three strip sites).
+  **Task #39 addendum (the A-8 hunt's catch, rng 2026006080 t246)**: the
+  9 builtWonder exclusion masks MISSED the improvement-job class —
+  validImprovementsIn never refused an in-flight wonder pave, so both
+  engines' builders happily improved a wonder tile and their GAIN models
+  split (TS live tileYields returns all-zero on paved tiles → every
+  Δ-gain 0 → FARM tie-break; the GPU's catalog constants said MINE).
+  Fixed at the RULES level, real-Civ 6-ward: builtWonder now refuses
+  improvements in validImprovementsIn + six GPU gates (_rival_job_mask,
+  build-here validity via jobm, player/rival RL masks, controlled apply,
+  scripted-builder build+job, player apply). Side-find, mirrored: TS
+  zeroes improvement gains on PILLAGED tiles too (yields.ts:49 — a chop
+  can orphan the flag on a bare tile) — the GPU Δ-gain model now
+  multiplies by the unpillaged indicator.
+  **Forced-compaction catches (same batch)**: (1) rng 2026006080 t220 —
+  the settler-founding slot init was MISSING three of the P5/S2 hygiene
+  clears; a hole-fallback founding into a column whose dead city had
+  buildings inherited them (3 phantom buildings' yields + maintenance;
+  TS founds with buildings: []). buildings/cur_cost/q_dtile now clear
+  exactly like the CS-capture block. (2) rng 2026006084 t193 — the
+  PLAYER border-growth ySum missed FARM-ADJACENCY food (tileYields
+  carries it, yields.ts:60-63; frontier tiles never hold farm clusters
+  until a raze frees EX-RIVAL farmland — the pick then took a bare hill
+  over a clustered farm, a permanently different border). _farmadj_food
+  joins the border y_sum like the walk's scoring; the rival twin
+  (_rcy_food_plane) already carried its own. The hunt also closed a
+  SECOND builtWonder mask gap en route: the player WALK's candidate
+  mask (TS workableTiles excludes builtWonder, city.ts:121 — reachable
+  by capturing a city with an in-flight wonder in radius). The knobs'
+  third and fourth real catches in three runs.
 - A-5. **RESOLVED for the building drain (2026-07-12, task #38)**: one
   scripted purchase per civ per turn — cheapest completable building
   civ-wide (cost/id/city-order key), instant at goldPurchaseMult, the
@@ -52,9 +81,19 @@ revalidation LANDED in the S6+S8 close):
   guard. REMAINING (policy scope): scripted unit/settler purchases and
   tile purchase — the controlled head has the machinery; give the
   scripted rival those spends when a stage needs them.
-- A-6. **Rival unit roster restricted** — WARRIOR→SPEARMAN→HORSEMAN ladder
-  (rivals.ts:979-984) + builder/settler; never SCOUT/SLINGER/ARCHER →
-  rivals field no ranged units at all. Blocks symmetric war.
+- A-6. **RESOLVED (2026-07-12, task #39)**: rivals field a MIXED roster —
+  the pick trains ranged while the army holds fewer than 1 ranged per 2
+  melee (live + queued composition, counts advancing through the pick
+  loop both engines), ARCHER once ARCHERY lands, SLINGER before (ungated,
+  like the catalog); the melee ladder unchanged. Ranged units STRIKE
+  (hostileRangedStrike/_hostile_ranged_strike — one roll, no retaliation,
+  no advance; a player city takes the hit first even through a garrison
+  and HOLDS at 1 HP, ranged never captures; civilians take the roll,
+  rangedAttack's convention) and the war/peace target scans run at the
+  unit's full range in tile order (playerCity at d<=range = the player's
+  D-23 bombard rule from the other seat; other civs' centers stay the
+  no-op quirk). SCOUT stays deliberately out — rivals have no fog to
+  explore. bestMeleeCS already excluded ranged (spawnUnit chokepoint).
 - A-7. **RESOLVED for beliefs (2026-07-12, task #37)**: claimed
   pantheons/beliefs carry IDENTITY now (rival.pantheon/followerBelief/
   founderBelief + GPU r_pantheon/r_follower/r_founder with per-id pool
@@ -69,19 +108,34 @@ revalidation LANDED in the S6+S8 close):
   improvements, A-4 wonders — wire them there). REMAINING (re-scoped):
   government/policy machinery for rivals — build with the policy-breadth
   stage (task #46/B-13).
-- A-8. **C-21 movement**: every rival mover takes exactly one step then
-  movesLeft=0 (builder walk rivals.ts:816-819, patrol :603-606, hostile
-  march combat.ts:526-531); the player walks real MP paths. A rival
-  HORSEMAN (4 MP) moves like a 1-MP unit.
+- A-8. **RESOLVED (2026-07-12, task #39)**: all three rival walkers (war
+  march, patrol, builder walk) run REAL MP — per step: re-pick the free
+  neighbor by the site's existing tie-break keys, move only if strictly
+  closer, pay walkPath's exact charge (enter cost 1+hills+slow-feature =
+  1 + tdef//3 live/strip-adjusted, +3 per river-edge crossing via the
+  new `rm` riverMask plane — the GPU's neigh columns ARE AXIAL_DIRS
+  order, so bit d = crossing toward column d), full-MP units always
+  afford their first step (walkPath D-3/D-4). A CITY march target stops
+  ADJACENT (enemy centers can't be entered — real Civ 6; a unit standing
+  on one could never attack it, the d>=1 scan); improvement targets are
+  walked ONTO (pillage reads the tile underfoot). Any step still blocks
+  the D-2 heal (movesLeft < full = v_acted). BARBARIANS keep the
+  one-step raid pace — their MP fidelity belongs to B-26 (task #44).
+  ONE gate catch + one mirrored latent — the story lives in the A-4
+  entry's task-#39 addendum (the missed builtWonder job mask).
 - A-9. **Rival-unreachable catalog**: districts outside SCAFFOLD_DISTRICTS
   (THEATER_SQUARE, INDUSTRIAL_ZONE, ENCAMPMENT, ENTERTAINMENT_COMPLEX,
   NEIGHBORHOOD + their buildings), worship buildings, PALACE (rival
   capitals永 lack its yields/housing/amenity — game.ts:203 vs
   rivals.ts:124). Downstream: rivals can never accrue ENGINEER/GENERAL
   (and Theater-class) great people — those districts are unreachable.
-- A-10. **Rival city HP regen ignores sieges** — +15/+5 unconditionally
-  (rivals.ts:1067) while the player's +20 only heals with no hostile
-  adjacent (combat.ts:589-596).
+- A-10. **RESOLVED (2026-07-12, task #39)**: the rc heal (+15 peace / +5
+  war, magnitudes unchanged) now gates on the player's exact besieged
+  rule from the rival's seat — any adjacent unit hostile to THIS civ
+  pins the HP (the player's at-war units, CIVILIANS included per
+  unitsHostile — the P5/S2 player-heal lesson — or barbarians; other
+  rivals never besiege), read live at the heal's position in the city
+  loop.
 - A-11. Rivals have no trade routes (trade.ts player-keyed).
 - A-12. Rivals don't interact with city-states (no envoys/influence/levy;
   can't even attack CS — combat.ts:171-177 gates csTarget to the player).
@@ -161,7 +215,9 @@ pantheon 25 faith, the 10 base governments.
 - B-25. Victories: only Domination + turn-limit Score; no Science/
   Culture (no tourism at all)/Religious/Diplomatic.
 - B-26. Map: no cliffs; barbarians don't scale by era or use the real
-  scout-then-raid mechanic; no ranged/naval barbs.
+  scout-then-raid mechanic; no ranged/naval barbs. ALSO (task #39): barb
+  raiders kept the ONE-step march when rival movers gained real MP
+  walks (A-8) — real Civ 6 barbs move full MP; land it here.
 - B-27. Catalog sizes: 13 world wonders, 7 natural wonders, ~40 buildings
   (no Walls/Dam/Canal/Government Plaza), 10 pantheons (~24 real),
   6 follower + 4 founder beliefs.
