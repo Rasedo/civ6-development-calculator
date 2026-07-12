@@ -90,8 +90,9 @@ def gpu_state_lines(sim, b):
     # rvcity_at here), plus specialty districts in self.district — merge for parity.
     has_d = (sim.district[b] >= 0) | (sim.center_at[b] >= 0) | (sim.rvcity_at[b] >= 0)
     mask = (imp >= 0) | pill.bool() | has_d
+    rp = sim.res_priority[b] * (~sim.res_stripped[b]).long()  # C-6: live priority (paved bonus = gone)
     for idx in mask.nonzero(as_tuple=True)[0].tolist():
-        L.append(f"{p}TI {idx} = i:{_imp_name(sim, int(imp[idx]))} pill:{int(bool(pill[idx]))} dist:{int(bool(has_d[idx]))}")
+        L.append(f"{p}TI {idx} = i:{_imp_name(sim, int(imp[idx]))} pill:{int(bool(pill[idx]))} dist:{int(bool(has_d[idx]))} rp:{int(rp[idx])}")
 
     dmask = sim.district[b] >= 0
     for idx in dmask.nonzero(as_tuple=True)[0].tolist():

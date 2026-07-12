@@ -238,10 +238,11 @@ for (const game of roll.games) {
       } else if (a >= NB + 2 + NU) {
         // District placement (D5 → P2): the RL production head QUEUES a
         // scaffold district in THIS city (any city, slot order) — mirror the
-        // scan (owned, unimproved, RESOURCE-FREE — the shared pick policy —
-        // canPlaceDistrict, best floor(districtAdjacency), ties lowest index)
-        // then route through the real queueDistrict: tile paved incomplete +
-        // feature stripped, and the build slot works it off at districtCost.
+        // scan (owned, unimproved — AUDIT C-6: bonus-resource tiles are
+        // pickable, canPlaceDistrict refuses luxury/strategic; best
+        // floor(districtAdjacency), ties lowest index) then route through the
+        // real queueDistrict: tile paved incomplete + feature stripped + any
+        // bonus resource removed, and the build slot works it off at districtCost.
         const districtId = SCAFFOLD[a - NB - 2 - NU] as DistrictId | undefined;
         if (!districtId) {
           fail(`turn ${state.turn}: district action ${a} in slot ${slot} but no scaffold[${a - NB - 2 - NU}]`);
@@ -251,7 +252,7 @@ for (const game of roll.games) {
         let best = -1;
         let bestAdj = -1;
         for (const tile of state.map.tiles) {
-          if (tile.cityId !== city.id || tile.improvement || tile.resource) continue;
+          if (tile.cityId !== city.id || tile.improvement) continue;
           if (!canPlaceDistrict(state, city, districtId, tile.index).ok) continue;
           const adj = districtAdjacency(state.map, tile, districtId);
           if (adj > bestAdj) {

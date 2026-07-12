@@ -13,6 +13,7 @@ import { greatPeopleEarned } from '../src/core/game';
 import { GP_CLASSES } from '../src/data/greatPeople';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
+import { RESOURCES } from '../src/data/resources';
 import type { GameState } from '../src/core/types';
 
 function frontCost(rc: any): number {
@@ -77,7 +78,9 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   for (let i = 0; i < state.map.tiles.length; i++) {
     const t = state.map.tiles[i];
     if (t.improvement || t.pillaged || t.district) {
-      L.push(`${p}TI ${i} = i:${t.improvement ?? '-'} pill:${t.pillaged ? 1 : 0} dist:${t.district ? 1 : 0}`);
+      // C-6: rp = live resource priority (a paved bonus resource is gone)
+      const rp = t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0;
+      L.push(`${p}TI ${i} = i:${t.improvement ?? '-'} pill:${t.pillaged ? 1 : 0} dist:${t.district ? 1 : 0} rp:${rp}`);
     }
   }
 

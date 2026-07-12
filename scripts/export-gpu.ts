@@ -627,6 +627,13 @@ for (let s = 0; s < N_SEEDS; s++) {
     ]),
   );
 
+  // AUDIT C-7: the static camp/settle planes are only correct because no
+  // goody hut can (dis)appear mid-game — enforce the withVillages contract
+  // instead of trusting the flag above.
+  if (map.tiles.some((t) => t.goodyHut)) {
+    throw new Error('GPU export requires a hut-free world (withVillages: false) — the static camp/settle planes assume no goody huts (AUDIT C-7)');
+  }
+
   const tiles = map.tiles.map((t) => {
     // C1-B1: the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
@@ -903,7 +910,10 @@ for (let s = 0; s < N_SEEDS; s++) {
       let best = -1;
       let bestAdj = -1;
       for (const tile of state.map.tiles) {
-        if (tile.cityId !== cap.id || tile.improvement || tile.resource) continue;
+        // AUDIT C-6: bonus-resource tiles are pickable (canPlaceDistrict
+        // refuses luxury/strategic; queueDistrict strips the bonus at pave —
+        // real Civ 6 placement rules).
+        if (tile.cityId !== cap.id || tile.improvement) continue;
         if (!canPlaceDistrict(state, cap, spec.id, tile.index).ok) continue;
         const adj = districtAdjacency(state.map, tile, spec.id);
         if (adj > bestAdj) {

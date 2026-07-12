@@ -135,7 +135,7 @@ pantheon 25 faith, the 10 base governments.
   (no Walls/Dam/Canal/Government Plaza), 10 pantheons (~24 real),
   6 follower + 4 founder beliefs.
 
-## C. Order/slot integrity latents (the P6/P7 family)
+## C. Order/slot integrity latents (the P6/P7 family) — CHAPTER CLOSED 2026-07-12 (C-1..C-7 all resolved)
 
 - C-1. **RESOLVED (P7 2026-07-12, completed by P7-FULL)**: capital
   identity — is_cap + cap_tile_player mirror TS isCapital/capitalTiles[0]
@@ -189,14 +189,29 @@ pantheon 25 faith, the 10 base governments.
   C-2 seq walk included) and the trace cityIds follow the same slot
   rule, so it is traceable after all. The rc-side exhaustion fallback is
   gone entirely: _reclaim_rc compacts before the space can run out.
-- C-6. res_stripped plane (bonus-resource tile picks) — enabling work
-  parked since P2.
-- C-7. camp_ok is STATIC but TS campCandidates has two LIVE terms: paved
-  districts (fixed in S6 — the orphaned-pave camp shift, seed 9027 t230)
-  and CONSUMED goody huts (TS re-admits the tile once the hut is taken;
-  the GPU never does — latent, opposite direction). Site statics
-  (site_q3) have the same static-vs-live class for paved/chopped ring
-  members.
+- C-6. **RESOLVED (2026-07-12, task #35)**: district picks admit
+  BONUS-resource tiles everywhere (exporter autopilot scan, replay scan,
+  GPU player mask + _place_district at res_priority <= 1; the rival
+  paths already admitted them via d_usable/canPlaceDistrictIn), and
+  EVERY pave strips the bonus resource — the real Civ 6 rule
+  (queueDistrict already did; tryQueueRivalDistrict + both GPU
+  _place_district twins gained it; luxury/strategic stay refused). The
+  new res_stripped plane carries the live effects: border-pick resource
+  priority in both engines' keys (an orphaned pave is unowned and
+  claimable) and siteQuality's resource column. TI statelog lines carry
+  rp (LIVE priority) permanently.
+- C-7. **RESOLVED (2026-07-12, task #35)**: the goody-hut term closed by
+  CONTRACT, not code — every GPU-bound world is generated
+  withVillages:false (deliberate: hut claiming is a fog-era mechanic
+  with its own reward rolls) and export-gpu.ts now THROWS if a hut ever
+  appears in an exported world, so the static camp/settle planes' hut
+  assumption is enforced instead of trusted. The site_q3 static-vs-live
+  class is fixed for real: settle CANDIDATES read tile.district live
+  (orphaned paves refused, siteQuality's -1) and ring-member
+  contributions mask the feature column by feat_stripped and the
+  resource column by res_stripped — chops, paves and founding strips
+  all reprice sites live; only the terrain column is truly static.
+  (camp_ok's paved-district live term landed in S6.)
 
 ## D. Engine optimizations (bit-exact-safe, ranked)
 

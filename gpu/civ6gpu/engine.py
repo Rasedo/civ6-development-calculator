@@ -314,7 +314,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_id",
@@ -711,6 +711,10 @@ class BatchSim:
             dtype=dtype, device=device,
         )  # [B, T, 6] the removable feature's own yields (stripped at player founding)
         self.feat_stripped = torch.zeros(B, T, dtype=torch.bool, device=device)  # player-founded centers (flips read them stripped)
+        # AUDIT C-6: a district pave removes a BONUS resource (both engines'
+        # queue paths strip; canPlace refuses luxury/strategic). Live readers:
+        # border-pick resource priority + siteQuality's resource column.
+        self.res_stripped = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.tile_river = torch.tensor([[bool(t.get("riv", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # C1-B4b-2: Water Mill at rival centers
         self.tile_wh = torch.tensor([[float(t.get("wh", 2)) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device)  # C1-B5b-iii: water housing at a hypothetical center
         # V-H1 chop planes: grant key (0 none/1 food/2 prod) + removal-unlock tech
@@ -1405,8 +1409,9 @@ class BatchSim:
         """QUEUE district-type `di` in city slot `c` on its best tile, for batch
         rows where `want` is set AND an eligible tile exists. Mirrors the exporter's
         best-tile scan: eligible = owned by city c, district-placeable, empty (no
-        district/improvement), RESOURCE-FREE (P2 pick policy — queueDistrict's
-        bonus-resource strip stays unexercised, see AUDIT), within radius 3, not
+        district/improvement), no LUXURY/STRATEGIC resource (AUDIT C-6: bonus
+        tiles are pickable and the pave strips the resource, the real Civ 6
+        rule), within radius 3, not
         the center; ranked by floor(static + 0.5·adjacent-completed-districts),
         ties to lowest tile index. placement=1 (Aqueduct): adjacent-center + water
         source; placement=3 (Encampment): NOT adjacent-center. P2: queueDistrict
@@ -1418,7 +1423,7 @@ class BatchSim:
         site_c = self.site[:, c].clamp(min=0)
         adjc = self._adj_district_count().to(self.dtype)  # [B, T]
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
-        elig = ((self.owner == c) & surface & (self.district < 0) & (self.improvement < 0) & (self.res_priority == 0) & (self.dist[:, c] <= 3))
+        elig = ((self.owner == c) & surface & (self.district < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3))  # C-6: <=1 admits bonus
         elig[torch.arange(B, device=dev), site_c] = False
         if placement in (1, 3):  # no-adjacency-yield districts (Aqueduct / Encampment)
             cc = self._adj_center_count()  # [B, T] adjacent CITY_CENTERs (any player/rival) — matches TS requires/notAdjacentToCityCenter
@@ -1432,9 +1437,13 @@ class BatchSim:
         place = want & elig.any(dim=1)
         if bool(place.any()):
             rows = place.nonzero(as_tuple=True)[0]
-            self.district[rows, best[rows]] = di
-            self.district_complete[rows, best[rows]] = False  # P2: queued, not complete
-            self._strip_feature_at(rows, best[rows])  # queueDistrict: tile.feature = null
+            bt = best[rows]
+            self.district[rows, bt] = di
+            self.district_complete[rows, bt] = False  # P2: queued, not complete
+            self._strip_feature_at(rows, bt)  # queueDistrict: tile.feature = null
+            # C-6: queueDistrict removes a bonus resource (only priority-1
+            # tiles carrying a resource are eligible at all)
+            self.res_stripped[rows, bt] = self.res_stripped[rows, bt] | (self.res_priority[rows, bt] == 1)
             self._eff_version += 1
         return place, best
 
@@ -1476,6 +1485,9 @@ class BatchSim:
             self.rc_qtile[rows, r, j] = best[rows]
             self.rc_dist_tile[rows, r, j, di] = best[rows]
             self.improvement[rows, best[rows]] = -1  # queueDistrict clears it
+            # C-6: the rival pave strips a bonus resource too (TS
+            # tryQueueRivalDistrict gained the queueDistrict rule)
+            self.res_stripped[rows, best[rows]] = self.res_stripped[rows, best[rows]] | (self.res_priority[rows, best[rows]] == 1)
             self._eff_version += 1
         return place
 
@@ -1850,9 +1862,9 @@ class BatchSim:
                     site_c = self.site[:, c].clamp(min=0)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
                     under_cap = (spec_tile & (self.owner == c)).sum(dim=1) < cap_c  # only specialty districts count
-                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.res_priority == 0) & (self.dist[:, c] <= 3)
+                    base = (self.owner == c) & self.d_usable & (self.district < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)  # C-6: <=1 admits bonus
                     base[ar, site_c] = False
-                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.improvement < 0) & (self.res_priority == 0) & (self.dist[:, c] <= 3)
+                    cbase = (self.owner == c) & self.coastal_water & (self.district < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3)  # C-6: <=1 admits bonus
                     cbase[ar, site_c] = False
                     has_land = base.any(dim=1)  # [B]
                     has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
@@ -4305,11 +4317,12 @@ class BatchSim:
             # key and out-bid TS's real pick one row over).
             y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * (self.district.gather(1, tc) < 0).to(torch.float64)
             # the player's exact key: dist asc, res priority desc, milli-
-            # rounded yield sum desc, global tile index asc (5601-5610 twin)
+            # rounded yield sum desc, global tile index asc (the player-walk
+            # twin). C-6: priority reads LIVE (paved bonus resource is GONE).
             d = self.pair_dist[center.unsqueeze(1), tc].to(self.dtype)
             key = (
                 d * 1e12
-                - self.res_priority.gather(1, tc).to(self.dtype) * 1e9
+                - (self.res_priority * (~self.res_stripped).long()).gather(1, tc).to(self.dtype) * 1e9
                 - torch.round(y_sum * 1000) * 1e4
                 + tiles.to(self.dtype)
             )
@@ -4352,7 +4365,10 @@ class BatchSim:
             tiles = tiles_from_offsets(center, self._off7, self.W, self.H)  # [B, M]
             tc = tiles.clamp(min=0)
             unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
-            okt = (tiles >= 0) & unowned & self.settle_ok.gather(1, tc) & (self.rvcity_at.gather(1, tc) < 0)
+            # AUDIT C-7: siteQuality's candidate gate reads tile.district
+            # LIVE (an orphaned pave — razed city — is unowned but refused);
+            # settle_ok only bakes the t0 districts.
+            okt = (tiles >= 0) & unowned & self.settle_ok.gather(1, tc) & (self.rvcity_at.gather(1, tc) < 0) & (self.district.gather(1, tc) < 0)
             # quality: fresh8 + Σ ring-2 contributions of passable, unowned members
             ring = tiles_from_offsets(tc.reshape(-1), self._off2, self.W, self.H).reshape(B, -1, self._off2.shape[0])
             rc2 = ring.clamp(min=0)
@@ -4365,6 +4381,14 @@ class BatchSim:
             )
             okd = member_ok.double()
             c3 = self.site_q3.gather(1, rc2.reshape(B, -1).unsqueeze(2).expand(-1, -1, 3)).reshape(B, -1, ring.shape[2], 3)
+            # AUDIT C-7: siteQuality reads MEMBER t.feature/t.resource LIVE —
+            # a chopped/paved member's feature yields vanish (feat_stripped)
+            # and a paved bonus resource is gone (res_stripped, C-6); only
+            # the terrain column is truly static.
+            fs2 = self.feat_stripped.gather(1, rc2.reshape(B, -1)).reshape_as(ring)
+            rs2 = self.res_stripped.gather(1, rc2.reshape(B, -1)).reshape_as(ring)
+            c3[:, :, :, 1] = c3[:, :, :, 1] * (~fs2).double()
+            c3[:, :, :, 2] = c3[:, :, :, 2] * (~rs2).double()
             hill = (self.hills.gather(1, rc2.reshape(B, -1)).reshape_as(ring) & member_ok).double() * 0.5
             q = self.fresh_water.gather(1, tc).double() * 8
             for m2 in range(ring.shape[2]):  # per member, FOUR separate adds — the exact TS sequence
@@ -6071,9 +6095,11 @@ class BatchSim:
                 adj_own = ((owner_nb == col.view(B, 1, 1)) & neigh_valid).any(dim=2)
                 cand_b = (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & (dist_c <= 5) & adj_own
                 # order: dist asc, resource priority desc, yield sum desc, index asc
+                # C-6: priority reads LIVE (a paved bonus resource is GONE in
+                # TS — an orphaned pave is unowned and claimable)
                 key = (
                     dist_c.to(self.dtype) * 1e12
-                    - self.res_priority.to(self.dtype) * 1e9
+                    - (self.res_priority * (~self.res_stripped).long()).to(self.dtype) * 1e9
                     - torch.round(y_sum * 1000) * 1e4
                     + self._arangeT.to(self.dtype)
                 )

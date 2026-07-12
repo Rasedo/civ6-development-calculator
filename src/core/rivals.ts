@@ -647,6 +647,10 @@ function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity,
     tile.district = id;
     tile.districtComplete = false;
     tile.improvement = null;
+    // AUDIT C-6: placement removes a bonus resource, exactly like the
+    // player's queueDistrict (real Civ 6 rule; canPlaceDistrictIn already
+    // refused luxury/strategic).
+    if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
     rc.districts.push({ type: id, tileIndex: best });
     rc.queue.push({ kind: 'district', district: id, tileIndex: best, progress: 0, cost });
     return true;
