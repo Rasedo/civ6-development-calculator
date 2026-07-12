@@ -11,8 +11,11 @@ code at audit time.
 S7 camps/raze, S2 peace+settler purchase, S3 founding, S4 culture
 borders, S5 GP/faith/religion, S6 loyalty+amenities, S8 controlled
 revalidation — ~25 hunted latent parity bugs across the batch).
-Next: P6 (#23), P7 (#24), P8 (#26), then ONE re-baseline pass and the
-champion campaign.
+P6 verified dead + P7 shipped 2026-07-12 (42f7313); P7-FULL (task #34)
+closed the C-2/C-3/C-5 residuals the same day. **P8 (#26) is PARKED by
+owner directive (2026-07-12) until this file has nothing left to fix —
+the open chapters below (A, B, remaining C, D, E) ARE the roadmap**;
+then ONE re-baseline pass and the champion campaign.
 
 ---
 
@@ -134,29 +137,40 @@ pantheon 25 faith, the 10 base governments.
 
 ## C. Order/slot integrity latents (the P6/P7 family)
 
-- C-1. **RESOLVED (P7, 2026-07-12)**: capital identity — is_cap +
-  cap_tile_player mirror TS isCapital/capitalTiles[0] (refound capitals
-  crown + get the Palace + update the domination anchor; captured
-  capitals' reused columns no longer pin/carry phantom Palace terms).
-  The rc side needs no flag: rc settle slots reach slot 0 only on a
-  total-collapse refound, which IS the new capital in TS too (slot 0 ≡
-  rc capital — documented invariant).
-- C-2. **PARTIALLY RESOLVED (P7)**: player loyalty defectors now resolve
-  in acquisition order (city_seq) with LIVE per-defection pressures.
-  REMAINING (accepted residual): the player city WALK iterates columns,
-  TS iterates array order — border-claim/worked-tile couplings between
-  ADJACENT cities diverge only when a hole-reuse city contends with an
-  array-earlier/column-later neighbor in the same turn; a per-batch walk
-  permutation is not vectorizable. The checkpoint tooling makes the
-  eventual concrete case cheap to hunt.
-- C-3. **RESOLVED for units (P7)**: _reclaim_pool — stable compaction of
-  the u/v/p pools at the step top when the high-water nears the cap
-  (CIV6_RECLAIM_AT forces it for validation gates; TS arrays splice, so
-  living relative order is the spec and stable compaction is
-  behavior-invariant by construction; maps remap by value through the
-  inverse permutation). REMAINING: rc city slots (24/rival, holes from
-  captures/flips) still append-only behind an assert — same compaction
-  pattern applies if a long-game world ever trips it.
+- C-1. **RESOLVED (P7 2026-07-12, completed by P7-FULL)**: capital
+  identity — is_cap + cap_tile_player mirror TS isCapital/capitalTiles[0]
+  (refound capitals crown + get the Palace + update the domination
+  anchor; captured capitals' reused columns no longer pin/carry phantom
+  Palace terms). P7-FULL gave the rc side the same explicit identity —
+  rc_is_cap + cap_tile_rival — because _reclaim_rc compaction retired
+  the old "slot 0 ≡ rc capital" invariant (all six slot-0 readers
+  converted: loyalty pin, defection walk, settler-queue gate, controlled
+  settler mask/purchase columns, GP production-to-capital, domination).
+- C-2. **RESOLVED (P7-FULL, 2026-07-12)**: loyalty defectors resolve in
+  acquisition order (P7); the city WALK and empire_score now iterate
+  city_seq rank as well, via per-batch column gathers (X[bidx, col]) —
+  the old "a per-batch walk permutation is not vectorizable" note was
+  wrong. After any hole-reuse founding the GPU now matches TS array
+  order for every cross-city coupling (a completion's fresh totals
+  feeding later cities, border claims consuming shared candidates,
+  spawn-spot contention) AND for the empire gold/science/culture and
+  empireScore float association (the P4 ±1-ulp non-dyadic class). Dead
+  columns sort last and stay the masked no-ops they always were.
+- C-3. **RESOLVED (P7 units, P7-FULL rc — 2026-07-12)**: _reclaim_pool —
+  stable compaction of the u/v/p pools at the step END when the
+  high-water nears the cap (CIV6_RECLAIM_AT forces it for gates; TS
+  arrays splice, so living relative order is the spec; tile→slot maps
+  remap by value through the inverse permutation). rc city slots now
+  compact the same way: _reclaim_rc at the step END, trigger last-alive+1
+  ≥ CIV6_RC_RECLAIM_AT (default RC−8); no slot-keyed tile map exists to
+  remap (rvcity_at/rival_at are civ-keyed), but the capital had to become
+  an IDENTITY first (see C-1). THE FORCED GATE EARNED ITS KEEP AGAIN:
+  the defection walk skipped slot 0 (range(1, RC), the stale slot-0-is-
+  capital assumption) — a compacted-into-slot-0 city hung at loyalty 0
+  while TS resolved its flip (rng 2026006121 t148, the ONLY failure in
+  72 games). Fixed; CIV6_RC_RECLAIM_AT=1 (compaction every step holes
+  exist) then byte-parity green across 72×250t. The three append sites
+  assert only at true 24-living-cities capacity (the U_MAX class).
 - C-4. P6 (task #23): RESOLVED 2026-07-12 — the parked district-order/
   interleaving bug class is empirically dead: the C1-B2 per-city-queue
   restructure + P4/P5 interleaving (per-j live yields, _eff_version
@@ -169,8 +183,12 @@ pantheon 25 faith, the 10 base governments.
   TURN_LIMIT — 300t runs are optional stress evidence, never gates
   (there is no game-over freeze, so they simulate real but unreachable
   states).
-- C-5. rc slots: the degenerate first-free-hole fallback at founded_n ≥
-  RC is untraceable in TS terms (documented at the capture sites).
+- C-5. **RESOLVED (P7-FULL, 2026-07-12)**: the player-column
+  first-free-hole fallback (founded_n ≥ C at the founding/capture sites)
+  is order-safe now — every order-coupled consumer rides city_seq (the
+  C-2 seq walk included) and the trace cityIds follow the same slot
+  rule, so it is traceable after all. The rc-side exhaustion fallback is
+  gone entirely: _reclaim_rc compacts before the space can run out.
 - C-6. res_stripped plane (bonus-resource tile picks) — enabling work
   parked since P2.
 - C-7. camp_ok is STATIC but TS campCandidates has two LIVE terms: paved
@@ -263,7 +281,11 @@ game via the raw-dump readers); `--resume-t`/CIV6_RESUME_T resume both
 engines from any checkpoint (validated bit-faithful: resumed labels
 226-250 matched the original exactly); scripts/ckpt-lines.ts is the TS
 JIT reader. CB lines enriched with k (call-site tag), t (target tile),
-c (pre-draw rng counter). The original rationale:
+c (pre-draw rng counter). Forced-compaction knobs: CIV6_RECLAIM_AT
+(u/v/p unit pools) + CIV6_RC_RECLAIM_AT (rc city slots) — run the
+off-script gate under them to stress the slot-layout invariants (each
+caught a real stale-slot assumption on its first run). The original
+rationale:
 - Every normal gate run dumps RAW state checkpoints every K turns
   (K≈25) for ALL games into a transient gitignored dir, overwritten per
   run: TS = serialize(state) per game (~1-3ms each — every-turn would
