@@ -4,7 +4,8 @@
  * environments; stdout carries protocol lines ONLY.
  *
  * Protocol (one JSON object per line):
- *   → {"cmd":"init","envs":1,"horizon":100,"objective":"balanced","seed":1}
+ *   → {"cmd":"init","envs":1,"horizon":250,"objective":"balanced","seed":1}
+ *     (omitting "horizon" defaults it to the game's TURN_LIMIT)
  *   ← {"ok":true,"obsSize":30,"candSize":29,"maxCands":24,"featureVersion":4}
  *   → {"cmd":"reset"}
  *   ← {"results":[{obs,cands,mask,reward:0,done:false}, …]}         (per env)
@@ -27,6 +28,7 @@ import {
   FEATURE_VERSION,
   type StepResult,
 } from '../src/core/rlenv';
+import { TURN_LIMIT } from '../src/core/game';
 import { empireScore } from '../src/core/empirePlanner';
 import { spatialObservation, SPATIAL_PLANE_COUNT } from '../src/core/spatial';
 import type { Objective } from '../src/core/planner';
@@ -40,7 +42,7 @@ interface EnvSlot {
 }
 
 let slots: EnvSlot[] = [];
-let horizon = 100;
+let horizon = TURN_LIMIT;
 let objective: Objective = 'balanced';
 let baseSeed = 1;
 /** When true, results carry a base64 uint8 map tensor for CNN policies. */
@@ -139,7 +141,7 @@ rl.on('line', (line) => {
   try {
     switch (msg.cmd) {
       case 'init': {
-        horizon = msg.horizon ?? 100;
+        horizon = msg.horizon ?? TURN_LIMIT;
         objective = (msg.objective as Objective) ?? 'balanced';
         baseSeed = msg.seed ?? 1;
         spatial = msg.spatial === true;

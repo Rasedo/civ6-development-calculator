@@ -53,9 +53,7 @@ import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/d
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TERRAINS } from '../src/data/terrains';
 import {
-  RIVAL_MAX_POP,
   RIVAL_MAX_CITIES,
-  RIVAL_GPP_RATE,
   RIVAL_WAR_MIN_TURNS,
   RIVAL_CITY_MAX_HP,
   RIVAL_WORK_RADIUS,
@@ -440,12 +438,10 @@ const rules = {
   // pantheon/belief pools matter only as SIZES: a rival's pick consumes a
   // draw and shrinks the pool, but the identity is inert in covered scope.
   rivals: {
-    maxPop: RIVAL_MAX_POP,
     maxCities: RIVAL_MAX_CITIES,
     settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: RIVAL_SETTLER_COST(c) = the player's 48 + 18·max(0, c − 1)
     settlerPer: Math.round(30 * GAME_SPEED),
     // (P5/S4: borderPeriod died — rival borders grow on culture.)
-    gppRate: RIVAL_GPP_RATE,
     // P5/S5: the timed claims died — the pantheon costs faith, religion
     // gates on pantheon + Holy Site + an earned PROPHET-class person.
     pantheonFaithCost: PANTHEON_FAITH_COST,

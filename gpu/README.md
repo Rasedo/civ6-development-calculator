@@ -16,9 +16,10 @@ scorch them (6). The district economy is live (D1–D6: Campus, Holy
 Site, Commercial Hub, Aqueduct and Harbor place off-script in any city,
 with real adjacency, their building chains and great people), and the
 policy owns real agency verbs: gold purchases of buildings/settlers/
-units (V-P), ranged strikes (V-R), and player war/peace plumbed behind
-a gate (V-W1). Phase 5 trains on all of it with a native on-device PPO
-loop, and `gpu/SEARCH.md` is the search arm on the same forward model.
+units (V-P), ranged strikes (V-R), and player war/peace with city
+capture — rival cities and city-states — live (V-W1/V-W2). Phase 5
+trains on all of it with a native on-device PPO loop, and
+`gpu/SEARCH.md` is the search arm on the same forward model.
 
 ## The battery
 
@@ -221,7 +222,9 @@ fixtures (`npm run gpu:export -- 32`).
 `gpu/eval.py` is the benchmark protocol for this env (N independent
 episodes, fresh worlds, `empireScore` at the horizon). Numbers are
 comparable only WITHIN this table — the GPU env has direct unit control
-and the full hostile world, unlike the TS benchmark scenario:
+and the full hostile world, unlike the TS benchmark scenario.
+Historical (horizon-100 era; the horizon has since settled at 250 —
+current baselines live in `gpu/TRAINING.md`):
 
 | policy (GPU env, 100 turns, 50 episodes, district engine) | score |
 |---|---|
@@ -247,7 +250,7 @@ much experience per handful of updates. Long runs are the point.
 | Tile yields (via exported per-tile tables) | Improvements beyond FARM/MINE/LUMBER_MILL (pasture/camp/plantation, chops/harvests) |
 | Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the covered five (Theater, IZ, Encampment*, Entertainment, Neighborhood) |
 | Growth/starvation, housing (water+buildings+farms+Aqueduct), amenity tiers | Archer range-2 targets; multi-tile A* moves |
-| City Center + district buildings (12; tech/civic unlocks, river gate, prereqs, maintenance) | Conquest: capturing rival cities / city-states (→ C1-B7) |
+| City Center + district buildings (12; tech/civic unlocks, river gate, prereqs, maintenance) | |
 | Districts: Campus/Holy Site/Commercial Hub/Aqueduct/Harbor — RL placement any-city, dynamic adjacency, specialty cap | Militaristic levies, CS trade-route quests |
 | Great people: Scientist/Merchant/Prophet accrual + effects, shared race pool | Policies/governments/religion modifiers |
 | **Gold purchases** (buy building/settler/unit at 4×, slot-order treasury) | Fog of war, trade routes |
@@ -255,7 +258,7 @@ much experience per handful of updates. Long runs are the point.
 | Builders: training, single-step moves, FARM/MINE/LUMBER building, charges | Goody huts (reference maps exported without them) |
 | Tile improvements: dynamic food/production, resource farms, tech-boosted mines | Eureka conditions outside covered state |
 | **Ranged strikes** (Slinger/Archer: one roll, no retaliation, range-1) | Specialists |
-| Player war/peace: plumbed + self-tested, gated OFF until C1-B7 wiring | |
+| Player war/peace: live (declare/peace-for-gold), with capture of rival cities and city-states | |
 | Multi-city: per-city queues, ring-1 claims at founding | |
 | Shared-map border competition (exact per-city ordering) | |
 | Tech/civic research: manual picks, banking, auto-pick | |
@@ -383,9 +386,9 @@ card for the CUDA numbers.
    building chains, great people); gold purchases live in the production
    head (V-P — whose gate caught a latent rival-economy bug: rivals now
    get improvement BASE yields, never the player's tech boosts); ranged
-   strikes live (V-R); player war/peace plumbed behind a gate (V-W1).
-   City capture deliberately waits for C1-B7, where owner-indexed cities
-   make it a civId change.
+   strikes live (V-R); player war/peace live (V-W1), and city capture
+   is live in both engines — rival cities and city-states transfer to
+   the player (V-W2/V-CS).
 9. Single-agent search (M arm) — `gpu/SEARCH.md`: snapshot/restore,
    exhaustive 1-ply, closed-loop MPC, empire-wide search, net-guided
    tuple search. Strong-net verdict: a 1-ply value leaf cannot beat the

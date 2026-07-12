@@ -396,6 +396,23 @@ What landed (engine-only, zero TS changes):
 
 ## E. Docs staleness (sweep 2026-07-11)
 
+**SWEPT 2026-07-12 (task #49): E-1..E-15 ALL RESOLVED** — every item
+below verified against live code first (the 07-11 line numbers had
+drifted), then minimally fixed; E-16 handled separately (owner),
+E-17/E-18 confirmed correct as-is, nothing to do. Notables: E-7's dead
+constants (RIVAL_GPP_RATE/RIVAL_MAX_POP) confirmed consumed nowhere —
+deleted with their exporter lines (rules.json drops maxPop/gppRate);
+E-13d's "unreachable in 100 turns" rationales were RE-VERIFIED
+empirically at 250 (a 3-seed 250t probe: APPRENTICESHIP and ENGINEERING
+now reachable — deferrals re-grounded on AUDIT A-9, not the horizon;
+Urbanization still unreached, Neighborhood note stands); E-15's parked
+RL scripts (evaluate/train/rl-bridge) now default the horizon from
+TURN_LIMIT (single-knob rule; explicit --horizon still wins; runtime-
+verified). Three same-class residuals caught and fixed beyond the
+list: the GPU twin of E-4 (engine.py "maxPop stand-in until B2+") and
+two more "abstract economy" claims (types.ts RivalCiv doc,
+data/rivals.ts header). Original items kept below for reference.
+
 **Code comments contradicted by shipped work:**
 - E-1. districts.ts:4 "cost is flat… stage 1 doesn't track" — costs scale
   with research now (districtCost, game.ts:59).

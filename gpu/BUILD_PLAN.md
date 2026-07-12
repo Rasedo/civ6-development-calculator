@@ -55,10 +55,11 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
               CURRENCY); river static + DISTRICT dyn via the generic loop. Both
               gates green; coverage 4/24 games (needs pop 7 + Currency).
         - [—] **D3b-4** Industrial Zone / Theater / Harbor — DEFERRED (unexercised).
-              Reachability check: capital pop maxes at 9 (median 5), 0/24 games
-              reach the 4th specialty slot (pop≥10) and APPRENTICESHIP (IZ unlock)
-              is never researched in 100 turns. Adding them = vacuous code. Revisit
-              only with a longer horizon or a forced high-pop scenario. The
+              Reachability check (horizon-100 era): capital pop maxed at 9 (median
+              5), 0/24 games reached the 4th specialty slot (pop≥10), APPRENTICESHIP
+              (IZ unlock) unresearched in 100 turns. At the settled 250-turn horizon
+              APPRENTICESHIP IS reachable, so the deferral is no longer
+              horizon-blocked — these districts remain unimplemented (AUDIT A-9). The
               MINE_OR_QUARRY / CITY_CENTER / BUILT_WONDER dynamic sources come with
               them.
 - [x] **D4** District buildings (Library/University/Research Lab, Shrine/Temple,
@@ -126,8 +127,8 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         aqNoFreshTotal=6). Unlock is ENGINEERING (Classical) — NOT MASONRY (the initial
         wiring bug: the scripted tech-includes check passed on MASONRY while
         canPlaceDistrict gates on the ENGINEERING unlock, over-placing). Reachability:
-        ENGINEERING is 0/24 in the scripted policy (never reached in 100 turns) so
-        scripted coverage is vacuous, but off-script random tech play reaches it —
+        ENGINEERING was 0/24 in the horizon-100-era scripted games (it IS reachable
+        at the settled 250-turn horizon), and off-script random tech play reaches it —
         3/72 games place an Aqueduct, so housing/placement/cap/upkeep are all
         non-vacuously verified. Both gates green.
   - [x] **D6b HARBOR** — DONE + green. Coastal specialty district, placed 7×
@@ -153,7 +154,8 @@ largest missing slice of the Civ6 economy. Sub-stages mirror the FARM phase
         requires/notAdjacentToCityCenter must test ALL adjacent CITY_CENTERs (player
         AND rival, via `_adj_center_count()`), not just the placing city's own
         center — also corrected a latent Aqueduct over/under-placement.
-  - [—] **Neighborhood** — needs a late civic (Urbanization) unreached in 100 turns.
+  - [—] **Neighborhood** — needs a late civic (Urbanization, Industrial, cost
+        1060) still unreached even at the 250-turn horizon.
 - **D6 COMPLETE (reachable specials):** Aqueduct (housing) + Harbor (coastal gold)
   are live under both gates. The district action space now covers the economic
   three + housing + coastal — enough for a district-rich retrain.
@@ -201,7 +203,7 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       value head is too noisy to search against. Needs a STRONG net (Q-normalized PUCT /
       chance nodes deferred until then). See the M2b-2 + Phase-B(local) status entries.
 - [ ] **M3** Search-distilled training — the AlphaZero loop, research-informed
-      (`gpu/RESEARCH_RL.md`; our value-leaf failure and raw-score PUCT pathology
+      (`gpu/ARCHIVE.md`; our value-leaf failure and raw-score PUCT pathology
       are both predicted by published work). Sub-stages, each green on its own:
       - [x] **M3a** min-max Q normalization (`minmax_normalize`, degenerate-
             range guard) — shipped with the Gumbel package. Original spec: —
@@ -237,7 +239,7 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
 
 **DECIDED 2026-07-06 (user): Road A — full-fidelity C1.** Promote rivals to
 full symmetric civs in BOTH engines, keeping the two-gate parity contract.
-See `gpu/C1_DECISION.md`. Plan principles: (1) never a big-bang rewrite —
+See `gpu/ARCHIVE.md`. Plan principles: (1) never a big-bang rewrite —
 every stage lands with both gates green; (2) TS stays the oracle at every
 step; (3) behavior-preserving refactors FIRST (fixtures unchanged), then
 one rival subsystem at a time swaps heuristic → real machinery (fixtures
@@ -245,7 +247,7 @@ and baselines legitimately regenerate at each activation); (4) the old
 scripted-rival heuristic is re-expressed as a scripted POLICY driving a
 full civ — it remains the parity anchor and becomes self-play's baseline
 opponent; (5) the verbs arm (war/capture) folds in where symmetric state
-makes it natural. Research-informed additions (`gpu/RESEARCH_RL.md`):
+makes it natural. Research-informed additions (`gpu/ARCHIVE.md`):
 (6) the owner dimension **O is a parameter** — self-play starts at
 **O=2 (duel)**, the theoretically safe regime (2-player-zero-sum-adjacent
 guarantees; half the tensor width; faster league iteration), and scales
@@ -463,9 +465,11 @@ C3's matchmaking is built.
         got HARDER (every city produces continuously). tune3 now stale.
         Detailed designs for B3/B4/B5: gpu/C1_B3-B5_DESIGN.md (agent-drafted,
         reconciled against B2 as built).
-  - [ ] B3. Rival research: real tech/civic trees + eurekas — replaces r_tech.
-  - [ ] B4. Rival districts/buildings with real adjacency (owner-dim D-stages).
-  - [ ] B5. Rival builders + improvements; unit training on the real path.
+  - [x] B3. Rival research: real tech/civic trees — replaced r_tech (detail
+        above; rival eurekas landed later — AUDIT A-3 RESOLVED).
+  - [x] B4. Rival districts/buildings with real adjacency (detail above).
+  - [x] B5. Rival builders + improvements; unit training on the real path
+        (detail above).
   - [ ] B6. Unified GP/pantheon/belief races on the real machinery.
   - [ ] B7. Symmetric conflict: war/peace both ways (V-W1 head activates),
         loyalty flips BOTH ways, and city capture in owner terms (a captured
@@ -576,7 +580,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
       mirroring the TS deal), plumbed + gated OFF: a NEW `war` head
       (`war_mask()` [B,2R], `step(war=…)`), not wired into BatchEnv until
       activation. Self-test `gpu/war_test.py`; both gates green.
-- [ ] **V-W2** City capture: player melee vs rival city centers
+- [x] **V-W2** City capture: player melee vs rival city centers
       (attackCity/captureRivalCity semantics), gated. DESIGN CONSTRAINT
       (recorded at C3-prep): capture INTO the player breaks the static
       player-city-slot assumption (C sites are pre-planned) — the clean
@@ -1085,8 +1089,9 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   full City shape with inert defaults (empty queue/buildings/lockedTiles/
   specialists, focus 'balanced', cultureBox 0, districts = [CITY_CENTER at the
   center] mirroring foundCity, civId = civOfRival). CRITICALLY KEPT: per-rival
-  `nextCityId` counters — rc.id values feed `(turn + rc.id·3) % borderPeriod`
-  (border pacing) and the exported rc ids; renumbering would shift traces. Id
+  `nextCityId` counters — rc.id values feed the exported rc ids (at the
+  time also `(turn + rc.id·3) % borderPeriod` pacing, since retired in
+  P5/S4 — rival borders grow on culture); renumbering would shift traces. Id
   collisions with player ids remain harmless (rival cities never enter
   state.cities / state.cityHp) until B7 unifies the id space deliberately.
   deserialize() migrates OLD saves by filling only MISSING fields in place
@@ -1127,8 +1132,9 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   eval re-baseline), TS captureCityState lacks the city-cap raze rule.
 - P2 PLAYER DISTRICT COST [x] (2026-07-10, task #30): districts are no longer
   free+instant for the player — the production decision QUEUES them at
-  districtCost(state) (= js_round(54·(1+8·done/total)), the rival formula off
-  player research), through TS queueDistrict everywhere: tile paved INCOMPLETE
+  districtCost(state) (today: floor(round(54·speed)·(1+9·max(tech%, civic%))),
+  ×0.6 for an under-represented specialty type — districtCostIn/
+  districtDiscounted in game.ts), through TS queueDistrict everywhere: tile paved INCOMPLETE
   + feature stripped at queue time, completion via the production loop
   (q_dtile remembers the target; district codes double as current codes).
   Scripted autopilots (exporter + GPU) queue the next scaffold district when
@@ -1150,6 +1156,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   civilian branch and besieged the CITY through its occupant (2 extra draws +
   the city's counter killed the attacker). New civk branch mirrors it; siege/
   cs_hit now yield to hostile civilians.
+- LOG FROZEN at P2 — gpu/AUDIT.md and the git log are the live status.
 
 
 ## 5. The Civ 6 gap — engine completion toward the REAL goal (2026-07-08)

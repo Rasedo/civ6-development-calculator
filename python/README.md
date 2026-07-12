@@ -29,8 +29,11 @@ python train_ppo.py --envs 16 --timesteps 2000000
 
 - `--envs` = parallel node simulators; set it to about your core count
   (each is a separate process; the GPU only handles the network).
-- `--timesteps` counts *decisions*, not episodes (~250 decisions/episode at
-  horizon 100, so 2M steps ≈ 8k episodes).
+- `--timesteps` counts *decisions*, not episodes (roughly 2.5 decisions per
+  turn, so ~250 decisions/episode at horizon 100). The engine's full game is
+  TURN_LIMIT = 250 turns — the bridge defaults to it when no horizon is sent —
+  but `train_ppo.py --horizon` still defaults to 100; pass `--horizon 250`
+  for full-length games.
 - `--device cuda` to force GPU, `--load checkpoints/xxx.zip` to resume.
 - Watch curves: `tensorboard --logdir tb` → `civ6/score_mean` is the true
   (unscaled) empire score of recent episodes.

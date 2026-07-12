@@ -1,7 +1,7 @@
 /**
  * Rival civilization flavor + pacing constants (all eyeballed). Rivals are
- * scripted: real cities/units/territory on the map, abstract economy
- * underneath.
+ * scripted: real cities/units/territory on the map, with real production
+ * queues, research, housing and border culture underneath.
  */
 
 import { GAME_SPEED } from './constants';
@@ -15,7 +15,6 @@ export const RIVAL_LEADERS: { name: string; color: string; cityNames: string[] }
 
 /** Rival city pop growth: fraction of the player's growth threshold. */
 export const RIVAL_GROWTH_FACTOR = 0.75;
-export const RIVAL_MAX_POP = 12;
 // C1-B3b: research consumers — production scales ×(1 + nTechs/PROD_DIV),
 // city defense gains DEF_PER_TECH per researched tech (calibrated to land
 // near the old techLevel formulas at turn 100).
@@ -33,8 +32,6 @@ export const RIVAL_SETTLER_COST = (cities: number) =>
   Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
 // (P5/S4: RIVAL_BORDER_PERIOD died — rival borders grow on culture like
 // the player's, rc.cultureBox vs borderGrowthCost.)
-/** Great-person points per class per turn per city. */
-export const RIVAL_GPP_RATE = 0.35;
 // (P5/S5: RIVAL_PANTHEON_TURN / RIVAL_RELIGION_TURN died — the pantheon
 // costs PANTHEON_FAITH_COST from the rival's own faith, and religion needs
 // the player's gates: pantheon + completed Holy Site + an earned Prophet.)

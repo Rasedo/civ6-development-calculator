@@ -169,9 +169,9 @@ the net's value head.
   every τ. Old checkpoints stay benchmarkable via `fit_env_to_checkpoint` (the engine's
   action surface has since widened with purchases).
 - **Next:** M3 (spec'd in `BUILD_PLAN.md` §2 from the literature review in
-  `RESEARCH_RL.md`): min-max Q normalization → Gumbel top-k + Sequential Halving
+  `gpu/ARCHIVE.md`): min-max Q normalization → Gumbel top-k + Sequential Halving
   over sampled tuples → batched candidate evaluation (k tuples as the batch dim)
   → search-derived off-policy value targets with AWPO/importance-corrected policy
   distillation and reanalyze. The multi-agent road is **decided: Road A,
   full-fidelity symmetric rivals**, self-play at O=2 first — ordered stages in
-  `BUILD_PLAN.md` §3, analysis in `C1_DECISION.md`.
+  `BUILD_PLAN.md` §3, analysis in `gpu/ARCHIVE.md`.

@@ -8,7 +8,7 @@
  *   npm run rl:train -- --resume            # continue rl-checkpoint.json
  *
  * Flags (defaults): --gens 200  --pop 24  --sigma 0.15  --lr 0.05
- *   --seeds-per-gen 8  --horizon 100  --arch mlp|bilinear|linear (mlp)
+ *   --seeds-per-gen 8  --horizon (default: the game's TURN_LIMIT)  --arch mlp|bilinear|linear (mlp)
  *   --hidden 24  --objective balanced  --workers <cpus-1>  --eval-every 10
  *   --resume  --dashboard 4650 (0 disables)
  *
@@ -30,6 +30,7 @@ import {
   type EnvOptions,
 } from '../src/core/rlenv';
 import type { Objective } from '../src/core/planner';
+import { TURN_LIMIT } from '../src/core/game';
 import { makePolicy, paramCount, type PolicyArch, type PolicySpec } from '../src/core/policy';
 import { Lcg, makeAdam, adamStep, esGradient, type AdamState } from '../src/core/es';
 
@@ -60,7 +61,7 @@ const POP = Math.max(2, Math.ceil(num('pop', 24) / 2) * 2); // even (antithetic 
 const SIGMA = num('sigma', 0.15);
 const LR = num('lr', 0.05);
 const SEEDS_PER_GEN = num('seeds-per-gen', 8);
-const HORIZON = num('horizon', 100);
+const HORIZON = num('horizon', TURN_LIMIT);
 const ARCH = (args.arch as PolicyArch) || 'mlp';
 const HIDDEN = num('hidden', 24);
 const OBJECTIVE = (args.objective as Objective) || 'balanced';

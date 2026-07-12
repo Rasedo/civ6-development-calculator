@@ -1,8 +1,9 @@
 /**
  * Scripted rival civilizations: real cities, territory and units on the map,
- * abstract economy underneath. They settle, grow, expand borders, race you
- * for great people, pantheons and beliefs, and can declare (or receive) war
- * — at-war units raid like barbarians, and cities can be conquered.
+ * with real production queues, research, maintenance, housing and border
+ * culture underneath. They settle, grow, expand borders, race you for great
+ * people, pantheons and beliefs, and can declare (or receive) war — at-war
+ * units raid like barbarians, and cities can be conquered.
  */
 
 import type { City, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
@@ -1450,8 +1451,7 @@ export function rivalPhase(state: GameState): void {
       // C1-B1: the real growth accounting — true surplus (can be negative),
       // the unscaled Civ 6 growth curve, grow subtracts the need instead of
       // zeroing the box, and starvation shrinks the city exactly like the
-      // player turn loop. RIVAL_MAX_POP stays as the housing stand-in until
-      // C1-B2+ gives rivals real housing.
+      // player turn loop.
       // C1-B5b-iii: REAL housing throttles growth (housingGrowthFactor on
       // positive surplus) — RIVAL_MAX_POP is retired; farms now supply the
       // housing that makes growth survivable.
@@ -1553,8 +1553,7 @@ export function rivalPhase(state: GameState): void {
     // C1-B3a: REAL research — cheapest-first auto-pick at RAW cost (no
     // eurekas for rivals until B6; ties keep the tech-table order via the
     // stable sort, mirroring the player's autoPickResearch), progress
-    // banks and drains exactly like advanceResearch. techLevel still
-    // drives every consumer until B3b swaps them one by one.
+    // banks and drains exactly like advanceResearch.
     const rsr = rival.research;
     // A-3: cheapest-first by EFFECTIVE cost, like the player's auto-pick
     // (boosts discount the pick key; stable sort keeps table-order ties).

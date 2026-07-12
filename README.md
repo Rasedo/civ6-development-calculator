@@ -154,7 +154,7 @@ npm run rl:eval      # evaluate random/greedy/trained (+ --planner) on held-out 
   - *Empire planner*: the same search across every city at once — whenever a
     city's queue runs dry the search decides its next build, including
     training a settler aimed at the best settle site (settlers are real
-    production items: first city free, then 80 + 30/each; planned sites
+    production items: first city free, then 48 + 18/each; planned sites
     auto-found the moment a settler completes, and freshly founded cities
     join the plan's decision process).
 - **Live sync**: connect the app to your `Lua.log` (Chromium's File System
@@ -273,11 +273,13 @@ autopilot between decisions.
 
 ### Benchmark
 
-> **Engine v4** numbers. The deeper-opponents update (v5: rival tile
-> economies, barbarian↔rival wars, city-state conquest/levies, loyalty)
-> made the world harder — weights trained on v4 still load in the UI
-> advisor (with a warning) but `rl:eval` flags them stale, and these
-> baselines need re-running on v5 for fair comparisons.
+> **Historical: engine v4, horizon-100 era — superseded.** The game
+> horizon has since been settled at 250 turns (`TURN_LIMIT`), orphaning
+> these nets. The deeper-opponents update (v5: rival tile economies,
+> barbarian↔rival wars, city-state conquest/levies, loyalty) also made
+> the world harder — weights trained on v4 still load in the UI advisor
+> (with a warning) but `rl:eval` flags them stale. Current baselines
+> live in `gpu/TRAINING.md`.
 
 50 paired held-out seeds, horizon 100, everything enabled (units, fog,
 disasters, city-states, rivals). ES run: MLP (1,465 params), pop 32 × 8
@@ -328,7 +330,8 @@ npm run rl:eval -- --seeds 50 --planner
 ```
 
 Throughput is roughly **3–4 episodes/sec per worker** at horizon 100 (44×26
-map, everything enabled). One generation costs `pop × seeds-per-gen`
+map, everything enabled) — the default horizon is now the full 250-turn
+game, so scale expectations down accordingly. One generation costs `pop × seeds-per-gen`
 episodes: pop 32 × 8 seeds ≈ 256 episodes ≈ 10 s on 7 workers, so an 8-hour
 run is ~2,500–3,000 generations. Knobs worth trying: `--arch bilinear` (fewer
 params, faster to converge), `--hidden 32`, `--sigma 0.1`, more
@@ -349,12 +352,13 @@ These are deliberate; the engine is data-driven so most are easy to revisit:
 - Border-growth tile picking approximates Civ 6's priorities; no tile swapping
   between cities.
 - Rivals are *scripted*, not full AIs: real cities/units/territory with a
-  tile-driven but abstract economy (no real queues/research underneath);
+  tile-driven economy that runs real per-city production queues, their own
+  tech/civic research, gold purchases, wonders, projects and builders;
   they don't fight each other; losing one of your cities means a sack or a
   loyalty flip, not a capture. (Barbarians DO raid rivals, city-states CAN
   be conquered, and militaristic suzerains levy troops — see the feature
   list above.) The GPU arm is replacing this wholesale: Road A promotes
-  rivals to full symmetric civs (`gpu/C1_DECISION.md`).
+  rivals to full symmetric civs (`gpu/ARCHIVE.md`).
 - Great-person effects are instant only; the wonder list is a 13-wonder
   subset. Religion has no spread/pressure (your cities always follow) and no
   enhancer beliefs; rival religions only contest the belief pools. Trade
@@ -392,8 +396,10 @@ mirrored draw for draw. Phase 5 trains on it
 natively: `python gpu/train_ppo.py` runs a masked multi-head PPO whose
 inference, env stepping and updates never leave the device, with worlds
 re-seeded every episode; `gpu/eval.py` is the matching benchmark
-protocol (district engine: random 115.1, scripted autopilot 162.2, and
-the tune1 reference net 216.9 after ~80 min on an RTX 4070 SUPER). On
+protocol (historical horizon-100-era numbers, superseded — district
+engine: random 115.1, scripted autopilot 162.2, and the tune1 reference
+net 216.9 after ~80 min on an RTX 4070 SUPER; the horizon is now the
+full 250-turn game and current baselines live in `gpu/TRAINING.md`). On
 top of the forward model sits a single-agent search arm (`gpu/SEARCH.md`):
 snapshot/restore, closed-loop MPC, empire-wide production search and
 net-guided full-tuple search. See `gpu/README.md` for the
@@ -410,7 +416,7 @@ covered/not-covered table and the roadmap.
    the candidate evaluation.
 2. **Decided 2026-07-06: Road A** — promote rivals to full symmetric
    civs in BOTH engines under the parity contract, then per-seat RL and
-   a self-play league (`gpu/C1_DECISION.md`; ordered stages in
+   a self-play league (`gpu/ARCHIVE.md`; ordered stages in
    `gpu/BUILD_PLAN.md` §3). This absorbs the old "opponent depth" ideas:
    rival build queues and districts on the map, loyalty pressure working
    in your favor, symmetric war — and city capture lands there too,

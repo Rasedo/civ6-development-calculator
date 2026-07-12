@@ -1,4 +1,4 @@
-# G-V design — victory conditions & the 300-turn horizon
+# G-V design — victory conditions & the 250-turn horizon
 
 Status: **DONE — GV ARC COMPLETE (slices 1-5) and the horizon flip SHIPPED.**
 GV-1 (winner indicator) 753a451; GV-2 (game-end gameOver+winner) f1d2072+
@@ -48,11 +48,11 @@ Compute, each turn, the current score-leader across all civs; expose as state
   flip `leader` identically in both engines.
 
 ### GV-2  Game-end semantics (ACTIVE) — behavior change
-`state.gameOver` true at turn >= TURN_LIMIT (config, default keep 100 for the
-gate; 300 for the long game). On gameOver the sim FREEZES (no further yields/
+`state.gameOver` true at turn >= TURN_LIMIT (the single knob: TS TURN_LIMIT /
+GPU rules.turn_limit = 250). On gameOver the sim FREEZES (no further yields/
 growth/combat) and `winner = leader`. Env/trainer already stop at horizon, so
 at TURN_LIMIT==horizon this is inert for training; it matters when we run
-PAST a victory turn. Baselines unaffected at horizon-100. Trace `gameOver`.
+PAST a victory turn. Trace `gameOver`.
 
 ### GV-3  Domination victory  (IN PROGRESS — GV-3a detection)
 A civ wins immediately when it holds ALL capitals (its own + every rival's

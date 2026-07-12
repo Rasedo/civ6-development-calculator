@@ -8,7 +8,7 @@
  *   npm run rl:eval -- --seeds 100
  *   npm run rl:eval -- --planner          # adds the (slow) planner baseline
  *
- * Flags: --seeds 50  --horizon 100  --objective balanced
+ * Flags: --seeds 50  --horizon (default: the game's TURN_LIMIT)  --objective balanced
  *        --planner  --planner-seeds 10  --weights rl-weights.json
  */
 
@@ -24,7 +24,7 @@ import {
 } from '../src/core/rlenv';
 import { makePolicy, type PolicySpec } from '../src/core/policy';
 import { Lcg } from '../src/core/es';
-import { endTurn } from '../src/core/game';
+import { endTurn, TURN_LIMIT } from '../src/core/game';
 import { searchEmpirePlan, adoptEmpirePlan, empireScore } from '../src/core/empirePlanner';
 import type { Objective } from '../src/core/planner';
 
@@ -45,7 +45,7 @@ const args = parseArgs(process.argv.slice(2));
 const num = (key: string, dflt: number) => (args[key] !== undefined ? Number(args[key]) : dflt);
 
 const N_SEEDS = num('seeds', 50);
-const HORIZON = num('horizon', 100);
+const HORIZON = num('horizon', TURN_LIMIT);
 const OBJECTIVE = (args.objective as Objective) || 'balanced';
 const RUN_PLANNER = args.planner === true || args.planner === 'true';
 const PLANNER_SEEDS = num('planner-seeds', 10);

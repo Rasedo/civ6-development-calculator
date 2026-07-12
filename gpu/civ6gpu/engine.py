@@ -527,8 +527,8 @@ class BatchSim:
         self.rc_progress = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
         self.rc_cost = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
         # C1-B3a: real per-rival research trees — the SAME tech/civic tables
-        # as the player, cheapest-first at raw cost. techLevel still drives
-        # every consumer until B3b swaps them one by one.
+        # as the player, cheapest-first at raw cost; researched techs feed
+        # the consumers (production divisor, city defense, unit gates).
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         self.r_techs = torch.zeros(B, r_pad, nt_b3, dtype=torch.bool, device=device)
         self.r_civics = torch.zeros(B, r_pad, nc_b3, dtype=torch.bool, device=device)
@@ -842,7 +842,7 @@ class BatchSim:
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
-        self._rl_any_city = True  # D5c: True lets non-capital cities place districts too (needs the rival×disaster prodStock edge fixed — see BUILD_PLAN)
+        self._rl_any_city = True  # D5c: True lets non-capital cities place districts too
         # V-P1/2: gold purchases (buy a building / settler / unit outright at
         # gold_purchase_mult× production cost, mirroring purchaseBuilding/
         # purchaseSettler/purchaseUnit). ACTIVE since V-P2: the production
@@ -6019,8 +6019,7 @@ class BatchSim:
                 faith_sum = torch.where(cact, faith_sum + faith_y, faith_sum)  # P5/S5 (C-17)
                 # C1-B1: the real growth accounting — true surplus (can be
                 # negative), the unscaled Civ 6 curve, grow SUBTRACTS the
-                # need, starvation shrinks (pop floor 1, box reset). maxPop
-                # stays as the housing stand-in until B2+.
+                # need, starvation shrinks (pop floor 1, box reset).
                 # C1-B5b-iii: real housing throttles positive surplus
                 # (housingGrowthFactor); RIVAL_MAX_POP is retired.
                 ctr_j = self.rc_center[:, r, j].clamp(min=0)
@@ -6207,8 +6206,7 @@ class BatchSim:
             # C1-B3a: REAL research — cheapest-first at RAW cost (boosted =
             # all-False through the shared _auto_pick, so ties keep table
             # order exactly like the TS stable sort); progress banks and
-            # drains like the player loop. techLevel still drives every
-            # consumer until B3b.
+            # drains like the player loop.
             rdv = self.rules_dev
             # A-3: the rival's own boosts drive the cheapest-first pick, like
             # the player's (TS pickNext sorts by effectiveResearchCostIn;

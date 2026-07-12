@@ -1,7 +1,8 @@
 /**
  * Districts (base game, common to all civs). Adjacency rules follow base
- * Civ 6. Production cost is flat (the real game scales costs with overall
- * tech/civic progress, which stage 1 doesn't track).
+ * Civ 6. Production cost scales with overall tech/civic progress and locks
+ * in at queue time (districtCost in core/game.ts); the `cost` field below is
+ * only a fallback for queue items without a locked cost.
  */
 
 import type { DistrictId, YieldKey } from '../core/types';
@@ -184,7 +185,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     adjacency: [],
     housing: 0,
     placement: { notAdjacentToCityCenter: true },
-    description: 'Military district (no combat in stage 1; its buildings still matter).',
+    description: 'Military district (its buildings add production and housing).',
   }),
   AQUEDUCT: D({
     id: 'AQUEDUCT',

@@ -299,7 +299,7 @@ export interface RivalCity extends City {
   foundedTurn: number;
 }
 
-/** A scripted rival empire: real map presence, abstract economy. */
+/** A scripted rival empire: real map presence, real per-city economy. */
 export interface RivalCiv {
   id: number;
   name: string;
