@@ -247,7 +247,7 @@ much experience per handful of updates. Long runs are the point.
 
 | Ported & parity-checked | Not yet (runs in TS only) |
 |---|---|
-| Tile yields (via exported per-tile tables) | Improvements beyond FARM/MINE/LUMBER_MILL (pasture/camp/plantation, chops/harvests) |
+| Tile yields (via exported per-tile tables) | Chops/harvests (one-time yields); player build heads stop at FARM/MINE/LUMBER_MILL (the rival economy builds/yields QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL since A-13) |
 | Citizen assignment (focus weights, exact tie-breaks) | Districts beyond the covered five (Theater, IZ, Encampment*, Entertainment, Neighborhood) |
 | Growth/starvation, housing (water+buildings+farms+Aqueduct), amenity tiers | Archer range-2 targets; multi-tile A* moves |
 | City Center + district buildings (12; tech/civic unlocks, river gate, prereqs, maintenance) | |
@@ -379,8 +379,9 @@ card for the CUDA numbers.
    eurekas; housing stays FARM-only. The off-script gate builds ~15 mines
    across 11 games; lumber mills (CONSTRUCTION lands after 3-charge builders
    act) are covered by a deterministic build-action self-test. Still open
-   here: chop/harvest one-time yields, then the resource improvements
-   (pasture/camp/plantation).
+   here: chop/harvest one-time yields, then player build heads for the
+   resource improvements (pasture/camp/plantation) — which the rival
+   economy already builds/yields since A-13.
 8. ✅ Districts D1–D6 + agency verbs (V arm). Campus/Holy Site/Commercial
    Hub/Aqueduct/Harbor place off-script in any city (dynamic adjacency,
    building chains, great people); gold purchases live in the production

@@ -1,8 +1,9 @@
 /**
- * Tile improvements. Stage 1 has no builders/units: improvements are placed
- * instantly and for free (like a builder with infinite charges), and no tech
- * gating is applied. Yields are base Civ 6 values (pre-tech-boost),
- * eyeballed where noted.
+ * Tile improvements (9 total). In units mode a builder places these, spending
+ * one of its finite charges, and only where research allows: validImprovementsIn
+ * (src/core/rules.ts) gates each on unlocks.improvements plus the hillFarms civic
+ * for hill farms. Sandbox mode is the exception — it bypasses all research gating.
+ * Yields are base Civ 6 values (pre-tech-boost), eyeballed where noted.
  */
 
 import type { ImprovementId, Yields } from '../core/types';

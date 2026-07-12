@@ -446,8 +446,15 @@ constraint on every item: bit-exact, gate-equivalence is the bar.
 ## E. Docs staleness
 
 Fresh hunt 2026-07-13, post-#49-sweep (E-1..E-15 closed at 806a4a0) —
-three verified contradictions the day-old sweep missed. E-16
-(AGENT_PROMPT.md refresh) stays with the owner.
+three verified contradictions the day-old sweep missed. **E-19..E-21
+SWEPT 2026-07-13 (task #51)**: improvements.ts header rewritten to
+current reality (9-improvement roster, real charges,
+`validImprovementsIn` gating, sandbox bypass), both gpu/README
+coverage cells corrected (chops/harvests are the only TS-only
+remainder; player build heads stop at FARM/MINE/LUMBER_MILL), and a
+RETRO note re-scopes BUILD_PLAN VP-G1/G2's never-spend premise
+against shipped A-5/A-4/A-14. tsc clean. E-16 (AGENT_PROMPT.md
+refresh) stays with the owner. Original items kept for reference:
 
 - E-19. `src/data/improvements.ts` header docstring claims "Stage 1
   has no builders/units: improvements are placed instantly and for

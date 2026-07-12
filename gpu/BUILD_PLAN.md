@@ -544,6 +544,13 @@ Measured 2026-07: the seat decides O=4 FFAs (spread 66.3); rival chop alone
 recovered a fifth (52.9, 77b8a27). The remaining slices, TS-FIRST per the
 contract:
 
+> RETRO (2026-07, AUDIT chapter A): the "scripted rivals never SPEND"
+> premise below is OBSOLETE. TS rivals now bank and spend gold (A-5: one
+> building purchase/civ/turn in `rivalPhase`), build world wonders (A-4),
+> and run projects (A-14). VP-G1/VP-G2 need re-scoping against that shipped
+> behavior — the accrual + spend already exist on the TS side, so these
+> boxes are now largely a GPU-mirror + controlled-seat-mask task.
+
 - [ ] **VP-G1 Rival gold, inert**: TS RivalCiv.treasury (??= 0 migration),
       accrued in the rival yields phase from the civ's worked gold yields
       (reuse computeRivalCityYields' tile walk — add the gold column;
