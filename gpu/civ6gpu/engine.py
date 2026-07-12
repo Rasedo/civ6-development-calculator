@@ -930,6 +930,21 @@ class BatchSim:
         self._prereq_t = self._prereq_matrix(rules.t_prereqs, NT).to(device)
         self._prereq_c = self._prereq_matrix(rules.c_prereqs, NC).to(device)
         self._arangeT = torch.arange(T, device=device)
+        # D-7: hoisted per-call allocations (index buffers + scalar consts)
+        self._arangeT_f = self._arangeT.to(dtype)
+        self._bidx = torch.arange(B, device=device)
+        self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
+        self._neg_f = torch.tensor(-1e18, dtype=dtype, device=device)
+        # D-2/D-3/D-5/D-8: derived caches, all keyed on _eff_version like
+        # _eff_cache (every dependency's mutation site bumps it — research
+        # completions and building purchases gained unconditional bumps)
+        self._adjd_cache = None
+        self._adjc_cache = None
+        self._adjh_cache = None
+        self._fadjq_cache = None
+        self._fadjf_cache = None
+        self._rcy_cache = None
+        self._bld_cache = None
         self._arangeNB = torch.arange(NB, device=device)
 
         # P4/D-22 latent, caught by P5-S2's reshuffle (seed 9001 t43): the
@@ -961,6 +976,8 @@ class BatchSim:
         self._food_cache = None
         self._score_cache = None
         self._nprod_cache = None
+        self._adjd_cache = self._adjc_cache = self._adjh_cache = None
+        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
 
     def snapshot(self) -> dict:
         """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
@@ -980,6 +997,8 @@ class BatchSim:
         self._food_cache = None
         self._score_cache = None
         self._nprod_cache = None
+        self._adjd_cache = self._adjc_cache = self._adjh_cache = None
+        self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -1332,6 +1351,8 @@ class BatchSim:
         already built, river gate — and for district buildings, the city owns a
         completed district of the required type and has a prerequisite building
         (mirrors availableBuildings)."""
+        if self._bld_cache is not None and self._bld_cache[0] == self._eff_version:  # D-8
+            return self._bld_cache[1]
         rd = self.rules_dev
         B, C, NB, dev = self.B, self.C, self.NB, self.device
         unlocked = torch.where(
@@ -1359,6 +1380,7 @@ class BatchSim:
                 if reqs:
                     prereq_ok[:, :, nb] = self.buildings[:, :, reqs].any(dim=2)
             base = base & district_ok & prereq_ok
+        self._bld_cache = (self._eff_version, base)
         return base
 
     def _adj_district_count(self) -> torch.Tensor:
@@ -1367,31 +1389,43 @@ class BatchSim:
         districts (self.district) and rival city centers (rvcity_at, which set
         tile.district='CITY_CENTER' in the TS engine). No owner filter, mirroring
         matchesAdjacency('DISTRICT')."""
+        if self._adjd_cache is not None and self._adjd_cache[0] == self._eff_version:  # D-3
+            return self._adjd_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)  # [1, T, 6]
         is_d = ((self.center_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc]) | (self.rvcity_at[:, nbc] >= 0)) & on_map
-        return is_d.sum(dim=2)  # [B, T]
+        out = is_d.sum(dim=2)  # [B, T]
+        self._adjd_cache = (self._eff_version, out)
+        return out
 
     def _adj_center_count(self) -> torch.Tensor:
         """[B, T] adjacent CITY_CENTER districts (player centers + rival centers) —
         the CITY_CENTER adjacency source. matchesAdjacency('CITY_CENTER')."""
+        if self._adjc_cache is not None and self._adjc_cache[0] == self._eff_version:  # D-3
+            return self._adjc_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
         is_c = ((self.center_at[:, nbc] >= 0) | (self.rvcity_at[:, nbc] >= 0)) & on_map
-        return is_c.sum(dim=2)
+        out = is_c.sum(dim=2)
+        self._adjc_cache = (self._eff_version, out)
+        return out
 
     def _adj_harbor_count(self) -> torch.Tensor:
         """[B, T] adjacent completed HARBOR districts — the HARBOR_DISTRICT source
         (Commercial Hub +2/harbor). Empty until Harbors are placeable (D6b)."""
         if self._harbor_idx < 0:
             return torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        if self._adjh_cache is not None and self._adjh_cache[0] == self._eff_version:  # D-3
+            return self._adjh_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
         is_h = (self.district[:, nbc] == self._harbor_idx) & self.district_complete[:, nbc] & on_map
-        return is_h.sum(dim=2)
+        out = is_h.sum(dim=2)
+        self._adjh_cache = (self._eff_version, out)
+        return out
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         """[B, T] UNFLOORED districtAdjacency for district di: static (d_static_adj)
@@ -1431,8 +1465,7 @@ class BatchSim:
             adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield → lowest-index tie-break
         else:  # economic (land) or Harbor (coastal) — full districtAdjacency
             adjf = torch.floor(self._district_adj_raw(di, adjc))  # [B, T]
-        arT = torch.arange(T, device=dev, dtype=self.dtype)
-        key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))
+        key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)  # D-7
         best = key.argmax(dim=1)  # [B]
         place = want & elig.any(dim=1)
         if bool(place.any()):
@@ -1475,8 +1508,7 @@ class BatchSim:
             adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)
         else:
             adjf = torch.floor(self._district_adj_raw(di, adjc))
-        arT = torch.arange(T, device=dev, dtype=self.dtype)
-        key = torch.where(elig, adjf * T - arT, torch.full_like(adjf, -1e18))
+        key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)  # D-7
         best = key.argmax(dim=1)
         place = want & elig.any(dim=1)
         if bool(place.any()):
@@ -1535,11 +1567,15 @@ class BatchSim:
         (yields.ts:60). Tile-based and CIV-INDEPENDENT — the per-civ tier
         (Feudalism + Replaceable Parts) multiplies it, so the player and each
         rival reuse this same qualifying set."""
+        if self._fadjq_cache is not None and self._fadjq_cache[0] == self._eff_version:  # D-5
+            return self._fadjq_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         farm_imp = self.improvement == self.FARM  # pillaged neighbors still count
         adj = farm_imp[:, nbc] & (nb >= 0).unsqueeze(0)  # [B, T, 6]
-        return (self.improvement == self.FARM) & ~self.pillaged & (adj.sum(dim=2) >= 2)
+        out = (self.improvement == self.FARM) & ~self.pillaged & (adj.sum(dim=2) >= 2)
+        self._fadjq_cache = (self._eff_version, out)
+        return out
 
     def _farmadj_tier(self, civics: torch.Tensor, techs: torch.Tensor) -> torch.Tensor:
         """[B] a civ's farm-adjacency tier from ITS OWN civics/techs (Feudalism
@@ -1555,13 +1591,19 @@ class BatchSim:
         """[B, T] the PLAYER'S farm-adjacency food bonus = qual * player tier.
         Each rival adds its OWN via _farmadj_qual*_farmadj_tier in
         _rival_city_yields (every civ applies its own research boosts, Civ 6)."""
+        if self._fadjf_cache is not None and self._fadjf_cache[0] == self._eff_version:  # D-5: computed 2×/_city_totals
+            return self._fadjf_cache[1]
         z = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
         if not self.improvements_on:
-            return z
-        tier = self._farmadj_tier(self.civics, self.techs)
-        if not bool((tier > 0).any()):
-            return z
-        return self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+            out = z
+        else:
+            tier = self._farmadj_tier(self.civics, self.techs)
+            if not bool((tier > 0).any()):
+                out = z
+            else:
+                out = self._farmadj_qual().to(self.dtype) * tier.unsqueeze(1).to(self.dtype)
+        self._fadjf_cache = (self._eff_version, out)
+        return out
 
     def _city_totals(self, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
@@ -1750,7 +1792,7 @@ class BatchSim:
         w = rd.score_yield_weights
         pw = float(self.rules.score_pop_weight)
         ord_ = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
-        bidx = torch.arange(self.B, device=self.device)
+        bidx = self._bidx  # D-7
         score = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for s in range(self.C):
             col = ord_[:, s]
@@ -3286,7 +3328,12 @@ class BatchSim:
         # one's damage.
         u_high = int(self.next_slot.max().item())
         arange6 = torch.arange(6, device=dev)
-        for u in range(u_high):
+        # D-4: iterate only slots alive in SOME game — deaths can only shrink
+        # the set mid-loop and nothing spawns barbs here, so the snapshot is a
+        # superset; ascending order (and thus the TS unit order) is unchanged.
+        # Kills the per-dead-slot host sync (~pool-high-water of them a step).
+        u_live = self.u_alive[:, :u_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if u_high else []
+        for u in u_live:
             act = self.u_alive[:, u] & ~guard[:, u]
             if not bool(act.any()):
                 continue
@@ -3994,6 +4041,42 @@ class BatchSim:
                 self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(move, dest, civ=self.v_civ[:, u])  # P5/S7 (C-3): mirrors walkPath's any-unit clear
 
+    def _rcy_globals(self) -> dict:
+        """D-2: the r-independent planes that _rival_city_yields and
+        _rival_border_growth used to rebuild per (r, j) call (~144×/turn
+        with the trace + leader): strip-adjusted food/production, the
+        strip-adjusted static columns, and the balanced-score sum of the
+        four static columns. Keyed on _eff_version like every derived
+        cache; research completions bump it (both civs), so a mid-phase
+        tech/civic completion invalidates the per-r entries before the
+        trace re-reads that civ. Cached tensors are the IDENTICAL values a
+        fresh compute produces (same ops, same order) — float association
+        is untouched."""
+        if self._rcy_cache is not None and self._rcy_cache[0] == self._eff_version:
+            return self._rcy_cache[1]
+        fs = self.feat_stripped.to(self.dtype)
+        f_base = (self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]) - self.feat_yields[:, :, 0] * fs
+        p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
+        ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1)  # strip-adjusted static (cols 2-5)
+        w = self.rules_dev.focus_base.double()
+        oth_score = (ty_oth[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2)  # [B, T]
+        g = {"fs": fs, "f_base": f_base, "p_plane": p_plane, "ty_oth": ty_oth, "oth_score": oth_score, "w": w, "f_r": {}}
+        self._rcy_cache = (self._eff_version, g)
+        return g
+
+    def _rcy_food_plane(self, r: int, g: dict) -> torch.Tensor:
+        """D-2: rival r's food plane — f_base plus ITS OWN farm-adjacency
+        (Feudalism/Replaceable Parts tier × the shared qualifying set)."""
+        if r in g["f_r"]:
+            return g["f_r"][r]
+        f_plane = g["f_base"]
+        if self.improvements_on:
+            tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r])
+            if bool((tier_r > 0).any()):
+                f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier_r.unsqueeze(1).to(self.dtype)
+        g["f_r"][r] = f_plane
+        return f_plane
+
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
         defaultModifiers). Candidates = owned, citizen-workable (water yes,
@@ -4025,21 +4108,14 @@ class BatchSim:
             & (tiles != center.unsqueeze(1))
             & ~districted
         )
-        f_plane = self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]
-        # V-H1 parity: a chopped/stripped feature's yields are stale in the static
-        # planes (TS reads tile.feature===null live) — drop them on every worked-tile
-        # column, exactly like the player's _eff_yields (line 1035). The center path
-        # below applies its own strip via fy_c, so it reads the raw plane untouched.
-        fs = self.feat_stripped.to(self.dtype)
-        f_plane = f_plane - self.feat_yields[:, :, 0] * fs
-        # the rival applies its OWN farm-adjacency (its Feudalism/Replaceable Parts),
-        # exactly like the player — NOT the player's (that stays in _farmadj_food).
-        if self.improvements_on:
-            tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r])
-            if bool((tier_r > 0).any()):
-                f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier_r.unsqueeze(1).to(self.dtype)
-        p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
-        ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1)  # strip-adjusted static (cols 2-5)
+        # D-2: the strip-adjusted planes (V-H1 — TS reads tile.feature===null
+        # live) and the per-r farm-adjacency plane come from the shared
+        # _eff_version-keyed cache; the center path below applies its own
+        # strip via fy_c, so it reads the raw plane untouched.
+        g = self._rcy_globals()
+        f_plane = self._rcy_food_plane(r, g)
+        p_plane = g["p_plane"]
+        ty_oth = g["ty_oth"]
         f = f_plane.gather(1, tc).double()
         p = p_plane.gather(1, tc).double()
         # C1-B5b-iii: the OWNER's mine boosts apply to worked tiles (and via
@@ -4053,8 +4129,8 @@ class BatchSim:
         # the dynamic (defaultModifiers) planes, the other four columns static.
         # All shipped yields are dyadic (asserted via _dyadic_fp over all six
         # columns), so this sum order is bit-equal to the TS per-key loop.
-        w = rd.focus_base.double()
-        s = f * w[0] + p * w[1] + (ty_oth[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2).gather(1, tc)
+        w = g["w"]
+        s = f * w[0] + p * w[1] + g["oth_score"].gather(1, tc)
         M = tiles.shape[1]
         # ties break by GLOBAL tile index (assignWorkedTiles' a.index - b.index),
         # NOT window position — the pre-B1 heuristic kept tilesWithin order.
@@ -4285,48 +4361,51 @@ class BatchSim:
         self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
         B, dev = self.B, self.device
         center = self.rc_center[:, r, j]
+        # lazy like the original: most calls have no border-ready city —
+        # bail before building anything (the loop re-checks per claim).
+        if not bool((cact & (self.rc_cbox[:, r, j] >= self._border_cost(self.rc_acquired[:, r, j]))).any()):
+            return
+        # D-6: claims only mutate OWNERSHIP (rival_at) — the candidate
+        # window, the rival ySum plane and the pick key are loop-invariant,
+        # so build them ONCE (they were rebuilt per claim iteration).
+        # D-2: the strip-adjusted planes come from the shared cache — the
+        # same construction _rival_city_yields scores worked tiles with
+        # (bit-equal to TS tileYields under modifiersFromResearch: all
+        # shipped yields are dyadic).
+        tiles = tiles_from_offsets(center, self._off5, self.W, self.H)  # [B, M]
+        tc = tiles.clamp(min=0)
+        nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)  # [B, M, 6]
+        g = self._rcy_globals()
+        f_plane = self._rcy_food_plane(r, g)
+        p_plane = g["p_plane"]
+        if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
+            boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
+            p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
+        y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)).sum(dim=2)
+        # P5/S5 gate-catch (seed 9027 t239): tileYields returns ZERO for a
+        # paved tile (yields.ts:37 — an orphaned district from a razed
+        # city can be an unowned candidate, hills base 3 leaked into the
+        # key and out-bid TS's real pick one row over).
+        y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * (self.district.gather(1, tc) < 0).to(torch.float64)
+        # the player's exact key: dist asc, res priority desc, milli-
+        # rounded yield sum desc, global tile index asc (the player-walk
+        # twin). C-6: priority reads LIVE (paved bonus resource is GONE).
+        d = self.pair_dist[center.unsqueeze(1), tc].to(self.dtype)
+        key0 = (
+            d * 1e12
+            - (self.res_priority * (~self.res_stripped).long()).gather(1, tc).to(self.dtype) * 1e9
+            - torch.round(y_sum * 1000) * 1e4
+            + tiles.to(self.dtype)
+        )
         for _ in range(64):  # the TS while-loop (multiple claims per turn, escalating cost)
             cost = self._border_cost(self.rc_acquired[:, r, j])
             ready = cact & (self.rc_cbox[:, r, j] >= cost)
             if not bool(ready.any()):
                 return
-            tiles = tiles_from_offsets(center, self._off5, self.W, self.H)  # [B, M]
-            tc = tiles.clamp(min=0)
             unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
-            nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)  # [B, M, 6]
             adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(B, -1)).reshape(B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
-            # the rival ySum plane — the same construction _rival_city_yields
-            # scores worked tiles with (bit-equal to TS tileYields under
-            # modifiersFromResearch: all shipped yields are dyadic).
-            f_plane = self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]
-            fs = self.feat_stripped.to(self.dtype)
-            f_plane = f_plane - self.feat_yields[:, :, 0] * fs
-            if self.improvements_on:
-                tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r])
-                if bool((tier_r > 0).any()):
-                    f_plane = f_plane + self._farmadj_qual().to(self.dtype) * tier_r.unsqueeze(1).to(self.dtype)
-            p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
-            if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
-                boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
-                p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
-            y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * fs.unsqueeze(-1)).sum(dim=2)
-            # P5/S5 gate-catch (seed 9027 t239): tileYields returns ZERO for a
-            # paved tile (yields.ts:37 — an orphaned district from a razed
-            # city can be an unowned candidate, hills base 3 leaked into the
-            # key and out-bid TS's real pick one row over).
-            y_sum = (f_plane.double() + p_plane.double() + y_oth.double()).gather(1, tc) * (self.district.gather(1, tc) < 0).to(torch.float64)
-            # the player's exact key: dist asc, res priority desc, milli-
-            # rounded yield sum desc, global tile index asc (the player-walk
-            # twin). C-6: priority reads LIVE (paved bonus resource is GONE).
-            d = self.pair_dist[center.unsqueeze(1), tc].to(self.dtype)
-            key = (
-                d * 1e12
-                - (self.res_priority * (~self.res_stripped).long()).gather(1, tc).to(self.dtype) * 1e9
-                - torch.round(y_sum * 1000) * 1e4
-                + tiles.to(self.dtype)
-            )
-            key = torch.where(ok, key, torch.tensor(float("inf"), dtype=self.dtype, device=dev))
+            key = torch.where(ok, key0, self._inf_f)
             best = key.argmin(dim=1)
             has_cand = ok.any(dim=1)
             claim = ready & has_cand
@@ -5218,6 +5297,7 @@ class BatchSim:
                     break
                 rows = fin.nonzero(as_tuple=True)[0]
                 self.r_techs[rows, r, curt[rows]] = True
+                self._eff_version += 1  # D-2: the per-r farm-adj/mine planes key on it (the trace re-reads this civ post-completion)
                 self.r_tech_prog[:, r] = torch.where(fin, self.r_tech_prog[:, r] - cost_t, self.r_tech_prog[:, r])
                 self.r_cur_tech[:, r] = torch.where(fin, torch.full_like(curt, -1), self.r_cur_tech[:, r])
                 picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
@@ -5235,6 +5315,7 @@ class BatchSim:
                     break
                 rows = fin.nonzero(as_tuple=True)[0]
                 self.r_civics[rows, r, curc[rows]] = True
+                self._eff_version += 1  # D-2: Feudalism moves this civ's farm-adj plane
                 self.r_civic_prog[:, r] = torch.where(fin, self.r_civic_prog[:, r] - cost_c, self.r_civic_prog[:, r])
                 self.r_cur_civic[:, r] = torch.where(fin, torch.full_like(curc, -1), self.r_cur_civic[:, r])
                 picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
@@ -5332,7 +5413,10 @@ class BatchSim:
             atw = active & self.r_atwar[:, r]
             self.r_warturns[:, r] = self.r_warturns[:, r] + atw.long()
             v_high = int(self.v_next.max().item())
-            for v in range(v_high):
+            # D-4: this civ's live slots once (deaths only shrink mid-loop; no
+            # spawns in either loop) — the war AND peace walks reuse it.
+            v_mine = (self.v_alive[:, :v_high] & (self.v_civ[:, :v_high] == r)).any(dim=0).nonzero(as_tuple=True)[0].tolist() if v_high else []
+            for v in v_mine:
                 # C1-B5b: civilians never act in the war loop (charges mark them)
                 # C3-prep: the units head drives controlled rivals now
                 a = atw & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
@@ -5354,7 +5438,7 @@ class BatchSim:
 
             pea = active & ~atw
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
-            for v in range(v_high):
+            for v in v_mine:  # D-4: the same live-slot snapshot (superset)
                 # C1-B5b: builders neither snipe nor patrol
                 # C3-prep: the units head drives controlled rivals now
                 a = pea & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
@@ -5562,6 +5646,7 @@ class BatchSim:
                 if bool(can.any()):
                     rows = can.nonzero(as_tuple=True)[0]
                     self.buildings[rows, c, idx[rows]] = True
+                    self._eff_version += 1  # D-8: _buildable keys on it (a bought building must vanish from later masks)
                     self.treasury = torch.where(can, self.treasury - cost, self.treasury)
             # --- buy a settler (purchaseSettler: settlers += 1 immediately,
             # which raises every later slot's price)
@@ -6007,7 +6092,7 @@ class BatchSim:
         # Cities can't be founded or die inside the walk, so the order is
         # fixed at the top.
         walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
-        bidx = torch.arange(B, device=dev)
+        bidx = self._bidx  # D-7
         for s_rank in range(C):
             col = walk_ord[:, s_rank]  # [B] — each game's s_rank-th city by acquisition
             if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
@@ -6103,7 +6188,7 @@ class BatchSim:
                     - torch.round(y_sum * 1000) * 1e4
                     + self._arangeT.to(self.dtype)
                 )
-                key = torch.where(cand_b, key, torch.tensor(float("inf"), dtype=self.dtype, device=dev))
+                key = torch.where(cand_b, key, self._inf_f)  # D-7
                 best = key.argmin(dim=1)
                 has_cand = cand_b.any(dim=1)
                 expand = ready & has_cand
@@ -6170,10 +6255,11 @@ class BatchSim:
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.techs[rows, self.cur_tech[rows]] = True
-            if self.improvements_on and self._mine_boost_tech.numel() > 0 and torch.isin(self.cur_tech[rows], self._mine_boost_tech).any():
-                self._eff_version += 1  # a boost tech just lifted every existing mine's yield
-            if self.improvements_on and self._farmadj_tech >= 0 and bool((self.cur_tech[rows] == self._farmadj_tech).any()):
-                self._eff_version += 1  # GS: Replaceable Parts lifts farm-adjacency food
+            # D-batch: ANY tech completion bumps — unlocks feed _buildable and
+            # the mine-boost/Replaceable-Parts techs feed the yield/score
+            # caches (subsumes the old conditional bumps; over-invalidation
+            # only costs a recompute of identical values).
+            self._eff_version += 1
             self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
             self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
             if tech is None:
@@ -6197,8 +6283,9 @@ class BatchSim:
                 break
             rows = fin.nonzero(as_tuple=True)[0]
             self.civics[rows, self.cur_civic[rows]] = True
-            if self.improvements_on and self._farmadj_civic >= 0 and bool((self.cur_civic[rows] == self._farmadj_civic).any()):
-                self._eff_version += 1  # GS: Feudalism lifts farm-adjacency food
+            # D-batch: ANY civic completion bumps (Feudalism farm-adjacency +
+            # civic-gated buildings in _buildable) — subsumes the conditional.
+            self._eff_version += 1
             self.civic_prog = torch.where(fin, self.civic_prog - eff, self.civic_prog)
             self.cur_civic = torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic)
             if civic is None:
@@ -6351,7 +6438,11 @@ class BatchSim:
         dom = self._domination()  # GV-3
         self.game_over = (dom >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3
         self.victory_type = torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))  # GV-4/GV-3
-        self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, self.leader(), torch.full_like(dom, -1)))  # GV-3
+        # D-1: leader() (a full empire+rival score pass) only matters where a
+        # game just ENDED — torch.where evaluated it eagerly every turn and
+        # threw it away. Winner stays -1 for running games either way.
+        lead = self.leader() if bool(self.game_over.any()) else torch.full_like(dom, -1)
+        self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, lead, torch.full_like(dom, -1)))  # GV-3
 
     # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 

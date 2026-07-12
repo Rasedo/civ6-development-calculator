@@ -213,33 +213,38 @@ pantheon 25 faith, the 10 base governments.
   all reprice sites live; only the terrain column is truly static.
   (camp_ok's paved-district live term landed in S6.)
 
-## D. Engine optimizations (bit-exact-safe, ranked)
+## D. Engine optimizations — CHAPTER CLOSED 2026-07-12 (task #36, D-1..D-8 in one stage)
 
-- D-1. **leader() computed and discarded every non-terminal turn**
-  (engine.py ~5950: torch.where evaluates both branches → ~48 rival-score
-  ops + a _city_totals thrown away per step). Gate on
-  `bool(self.game_over.any())`. Zero parity risk; the single biggest win
-  (~15-30% of score-heavy steps).
-- D-2. **_rival_city_yields plane rebuilds**: the [B,T,6] ty_oth +
-  f/p planes are global-or-per-r but rebuilt per (r,j) call (~144×/turn
-  incl. trace + leader). Cache globals on _eff_version, hoist per-r
-  planes once per phase; _rival_border_growth shares them. 20-40% of
-  scoring/rival-phase time. Association-preserving; gate-check.
-- D-3. **Adjacency counts uncached**: _adj_center_count/_adj_harbor_count
-  recomputed per district type per _city_totals; version-key like
-  _eff_yields (all mutation sites verified to bump _eff_version). ~5-10%.
-- D-4. **Per-slot .any() storms**: precompute live-slot lists
-  (v_alive.any(0).nonzero()) per loop instead of per-slot host syncs
-  (256-slot loops × hundreds of syncs/step). Zero parity risk (draws only
-  fire where masks are true). ~5-15% late-game.
-- D-5. _farmadj_qual cached on _eff_version (~50-100 identical
-  rebuilds/turn); _farmadj_food computed twice per _city_totals.
-- D-6. _rival_border_growth: hoist the plane build above the while-loop
-  (claims never invalidate them).
-- D-7. Buffer reuse: _bidx/_arangeT instead of per-loop torch.arange,
-  hoist scalar torch.tensor(inf/min-food) constants. 1-3%, zero risk.
-- D-8. _buildable one_hot [B,T,C]/[B,T,nD] allocations — cache or
-  scatter-count. Small-moderate.
+**Measured (full battery, all 17 lanes green first try — bit-exact):
+wall 233s → 184s (−21%), gpu-gate 225.5 → 176.0s, mcts-search 213.6 →
+172.2s, mcts-plan 90.9 → 71.6s, gumbel 53.7 → 41.9s, parity 63.3 →
+57.4s, serial-equivalent 803 → 655s.** Training/eval throughput gains
+(D-1/D-2 dominate there) are additionally expected but unmeasured — no
+eval runs until the ONE pre-P8 baseline (owner rule).
+
+What landed (engine-only, zero TS changes):
+- D-1. step() computes leader() only when game_over.any() (torch.where
+  evaluated it eagerly every turn and discarded it).
+- D-2. _rcy_globals()/_rcy_food_plane(r): the strip-adjusted f/p/ty_oth
+  planes + the static-column score sum, cached on _eff_version with
+  per-r food planes; _rival_city_yields and _rival_border_growth share
+  them (identical ops and order — bit-identical by construction).
+- D-3. _adj_district/center/harbor_count cached on _eff_version.
+- D-4. Live-slot lists replace the per-dead-slot host syncs in the barb
+  raider loop and the rival war+peace loops (snapshot is a superset:
+  deaths only shrink it, nothing spawns mid-loop; ascending order kept).
+- D-5. _farmadj_qual + _farmadj_food cached (the 2×-per-_city_totals
+  recompute now hits).
+- D-6. _rival_border_growth hoists window/planes/key above the 64-claim
+  loop (claims only mutate ownership) + lazy early-out when nothing is
+  border-ready.
+- D-7. Hoisted _bidx/_arangeT_f/_inf_f/_neg_f buffers (seq walk,
+  empire_score, both place fns, both border keys).
+- D-8. _buildable cached on _eff_version.
+- THE ENABLING INVARIANT: _eff_version now bumps on EVERY player/rival
+  tech+civic completion (subsumes the old mine-boost/farm-adj
+  conditionals) and on purchased buildings — every cache above keys on
+  it; over-invalidation just recomputes identical values.
 
 ## E. Docs staleness (sweep 2026-07-11)
 
