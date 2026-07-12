@@ -26,10 +26,14 @@ available actions; only the decision policy may differ. Confirmed open:
 
 **Open, ranked by impact** (A-1 loyalty/amenities and A-2 controlled
 revalidation LANDED in the S6+S8 close):
-- A-3. **Rivals get no eureka/inspiration discounts** — player pays 60%
-  on boosted research (game.ts:42-46), rivals raw cost (rivals.ts:1082,
-  1111; rival.research.boosted never populated; GPU boosted all-False).
-  Up to a 40% research-speed gap. Blocks symmetric play.
+- A-3. **RESOLVED (2026-07-12, task #37)**: rivals fire eurekas/
+  inspirations from their own seat — detectRivalBoosts/_detect_rival_boosts
+  at the rival block top (same condition rows; rc cities/research/
+  territory, map-global rows shared), boosted completions at the player's
+  60% (effectiveResearchCostIn/_eff_cost, same rounding), AND the
+  cheapest-first pick keys on effective cost like the player's auto-pick.
+  New coastal_land (`cl`) plane for rc coastalCity eurekas. Battery green
+  first try.
 - A-4. **Rivals never build wonders** (queueWonder player-only,
   game.ts:342-365) — no wonder yields/effects for rivals.
 - A-5. **Rivals cannot spend gold like the player** — no building/unit/

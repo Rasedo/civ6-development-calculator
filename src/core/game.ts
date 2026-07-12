@@ -10,7 +10,7 @@ import { tilesWithin, hexDistance } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
-import { detectBoosts } from './boosts';
+import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost } from './units';
 import { barbarianPhase } from './combat';
 import { revealAround } from './fog';
@@ -27,7 +27,6 @@ import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost } from '../data/gre
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
-import { BOOST_FRACTION } from '../data/boosts';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
@@ -40,9 +39,7 @@ export const TURN_LIMIT = 250;
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
-  return state.research.boosted.includes(id)
-    ? Math.round(baseCost * (1 - BOOST_FRACTION))
-    : baseCost;
+  return effectiveResearchCostIn(state.research, id, baseCost); // A-3: shared with the rival loops
 }
 
 /**

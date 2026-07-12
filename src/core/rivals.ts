@@ -12,6 +12,7 @@ import { nextRandom } from './rand';
 import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, clearCampFor, captureRivalCity } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
+import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -1058,6 +1059,12 @@ export function rivalPhase(state: GameState): void {
   for (const rival of state.rivals) {
     if (rival.cities.length === 0) continue; // eliminated
 
+    // AUDIT A-3: eurekas/inspirations fire from the RIVAL's seat too — the
+    // mirror of the player's endTurn-top detectBoosts (same conditions,
+    // this civ's cities/research/territory; the discounts apply in the
+    // research loops below).
+    detectRivalBoosts(state, rival);
+
     // C1-B2: per-city REAL production queues (settler + units at real
     // costs) replace the pooled prodstock/milstock, their pace/split
     // constants and the random home-city draw. Each city queues ONE item —
@@ -1242,14 +1249,24 @@ export function rivalPhase(state: GameState): void {
     // banks and drains exactly like advanceResearch. techLevel still
     // drives every consumer until B3b swaps them one by one.
     const rsr = rival.research;
+    // A-3: cheapest-first by EFFECTIVE cost, like the player's auto-pick
+    // (boosts discount the pick key; stable sort keeps table-order ties).
     const pickNext = () => {
-      if (rsr.tech === null) rsr.tech = availableTechsIn(rsr).sort((a, b) => a.cost - b.cost)[0]?.id ?? null;
-      if (rsr.civic === null) rsr.civic = availableCivicsIn(rsr).sort((a, b) => a.cost - b.cost)[0]?.id ?? null;
+      if (rsr.tech === null)
+        rsr.tech = availableTechsIn(rsr).sort(
+          (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost) - effectiveResearchCostIn(rsr, b.id, b.cost),
+        )[0]?.id ?? null;
+      if (rsr.civic === null)
+        rsr.civic = availableCivicsIn(rsr).sort(
+          (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost) - effectiveResearchCostIn(rsr, b.id, b.cost),
+        )[0]?.id ?? null;
     };
     pickNext();
     rsr.techProgress += sciSum;
-    while (rsr.tech && rsr.techProgress >= TECHS[rsr.tech].cost) {
-      rsr.techProgress -= TECHS[rsr.tech].cost;
+    // A-3: boosted techs complete at the discounted cost, like the player's
+    // advanceResearch (effectiveResearchCostIn — same rounding).
+    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost)) {
+      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost);
       rsr.techs.push(rsr.tech);
       rsr.tech = null;
       pickNext();
@@ -1277,8 +1294,8 @@ export function rivalPhase(state: GameState): void {
       }
       if (victim) disbandUnit(state, victim.id);
     }
-    while (rsr.civic && rsr.civicProgress >= CIVICS[rsr.civic].cost) {
-      rsr.civicProgress -= CIVICS[rsr.civic].cost;
+    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost)) {
+      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost);  // A-3
       rsr.civics.push(rsr.civic);
       rsr.civic = null;
       pickNext();

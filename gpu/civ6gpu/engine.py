@@ -317,6 +317,7 @@ _MUTABLE = [
     "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
+    "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
@@ -357,6 +358,7 @@ class BatchSim:
         self.workable = torch.tensor([[t["workable"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.res_priority = torch.tensor([[t["res"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # A-3: isCoastalLand (rc coastalCity eurekas)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # C1-B1: citizen-workability (= !isImpassable — water IS workable,
         # unlike unit passability). Defaults to `pass` for pre-B1 fixtures.
@@ -518,6 +520,9 @@ class BatchSim:
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
         self.r_techs = torch.zeros(B, r_pad, nt_b3, dtype=torch.bool, device=device)
         self.r_civics = torch.zeros(B, r_pad, nc_b3, dtype=torch.bool, device=device)
+        # AUDIT A-3: rivals fire eurekas/inspirations too (detectRivalBoosts)
+        self.r_tech_boosted = torch.zeros(B, r_pad, nt_b3, dtype=torch.bool, device=device)
+        self.r_civic_boosted = torch.zeros(B, r_pad, nc_b3, dtype=torch.bool, device=device)
         self.r_cur_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.r_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.r_tech_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
@@ -2052,6 +2057,60 @@ class BatchSim:
                 self.tech_boosted[:, row["idx"]] |= pred & ~self.techs[:, row["idx"]]
             else:
                 self.civic_boosted[:, row["idx"]] |= pred & ~self.civics[:, row["idx"]]
+
+    def _detect_rival_boosts(self, r: int, active: torch.Tensor) -> None:
+        """AUDIT A-3: detectRivalBoosts — the same condition rows evaluated
+        from rival r's seat (its cities/research/territory; the map-global
+        rows — improvement counts, the shared GP pool — read the same
+        global state the player's check does, so every civ runs one
+        formula). Runs at the rival's block top, mirroring the player's
+        turn-top call; policy rows aren't exported (unreachable in scope
+        for every civ)."""
+        alive = self.rc_alive[:, r]
+        pop_sum = None
+        for row in self.rules.boosts:
+            kind = row["kind"]
+            if kind == "building":
+                pred = (self.rc_bldg[:, r, :, row["b"]] & alive).sum(dim=1) >= row["count"]
+            elif kind == "cityPop":
+                pred = ((self.rc_pop[:, r] >= row["pop"]) & alive).any(dim=1)
+            elif kind == "totalPop":
+                if pop_sum is None:
+                    pop_sum = (self.rc_pop[:, r] * alive.to(self.rc_pop.dtype)).sum(dim=1)
+                pred = pop_sum >= row["pop"]
+            elif kind == "coastalCity":
+                pred = (alive & self.coastal_land.gather(1, self.rc_center[:, r].clamp(min=0))).any(dim=1)
+            elif kind == "cities":
+                pred = alive.sum(dim=1) >= row["count"]
+            elif kind == "greatPeople":
+                pred = (self.gp_earned.sum(dim=1) if row["cls"] < 0 else self.gp_earned[:, row["cls"]]) >= row["count"]
+            elif kind == "tech":
+                pred = self.r_techs[:, r, row["t"]]
+            elif kind == "nearNaturalWonder":
+                pred = ((self.rival_at == r) & self.wonder_near).any(dim=1)
+            elif kind == "improvement":
+                # global tile scan, exactly like the player's (TS scans
+                # state.map.tiles with no owner filter — one formula per civ)
+                on = self.improvement == row["imp"]
+                if row.get("onResource"):
+                    on = on & (self.res_priority > 0)
+                pred = on.sum(dim=1) >= row["count"]
+            elif kind == "district":
+                dtype = row.get("dtype", -1)
+                dt = self.rc_dist_tile[:, r]  # [B, RC, nD] registry tiles
+                comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(self.B, -1)).reshape_as(dt)
+                on = (dt >= 0) & comp & alive.unsqueeze(2)
+                if dtype < 0:
+                    pred = (on & self._is_specialty.view(1, 1, -1)).sum(dim=(1, 2)) >= row["count"]
+                else:
+                    pred = on[:, :, dtype].sum(dim=1) >= row["count"]
+            else:
+                continue
+            hit = active & pred
+            if row["target"] == "tech":
+                self.r_tech_boosted[:, r, row["idx"]] |= hit & ~self.r_techs[:, r, row["idx"]]
+            else:
+                self.r_civic_boosted[:, r, row["idx"]] |= hit & ~self.r_civics[:, r, row["idx"]]
 
     # --- barbarians (phase 4a) ----------------------------------------------------
 
@@ -4940,6 +4999,9 @@ class BatchSim:
             active = self.r_alive[:, r] & (n_cities > 0)
             if not bool(active.any()):
                 continue
+            # AUDIT A-3: eurekas/inspirations from this rival's seat — the
+            # TS twin runs at the same point (the rival's block top).
+            self._detect_rival_boosts(r, active)
             # C1-B2: queue PICKS for the PRE-TURN city set, in slot order —
             # the capital (rc_is_cap, the rivals.ts:1077 rc.isCapital gate;
             # P7-FULL: compaction can move it off slot 0) prefers the
@@ -5259,8 +5321,11 @@ class BatchSim:
             # drains like the player loop. techLevel still drives every
             # consumer until B3b.
             rdv = self.rules_dev
-            nb_t = torch.zeros(B, rdv.t_cost.shape[0], dtype=torch.bool, device=dev)
-            nb_c = torch.zeros(B, rdv.c_cost.shape[0], dtype=torch.bool, device=dev)
+            # A-3: the rival's own boosts drive the cheapest-first pick, like
+            # the player's (TS pickNext sorts by effectiveResearchCostIn;
+            # stable sort = table-order ties, _auto_pick's index epsilon).
+            nb_t = self.r_tech_boosted[:, r]
+            nb_c = self.r_civic_boosted[:, r]
             auto_r = active & ~self.controlled[:, r]  # C2b: controlled rivals pick via the net
             picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
             self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
@@ -5291,7 +5356,12 @@ class BatchSim:
                     self.rvciv_at[kr[is_civ_v], vt[is_civ_v]] = -1
             for _ in range(RESEARCH_LOOPS):
                 curt = self.r_cur_tech[:, r]
-                cost_t = rdv.t_cost.gather(0, curt.clamp(min=0)).double()
+                # A-3: boosted techs complete at the player's discounted cost
+                # (_eff_cost — identical rounding to effectiveResearchCostIn)
+                cost_t = self._eff_cost(
+                    rdv.t_cost.gather(0, curt.clamp(min=0)),
+                    self.r_tech_boosted[:, r].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
+                ).double()
                 fin = active & (curt >= 0) & (self.r_tech_prog[:, r] >= cost_t)
                 if not bool(fin.any()):
                     break
@@ -5309,7 +5379,10 @@ class BatchSim:
             self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])
             for _ in range(RESEARCH_LOOPS):
                 curc = self.r_cur_civic[:, r]
-                cost_c = rdv.c_cost.gather(0, curc.clamp(min=0)).double()
+                cost_c = self._eff_cost(
+                    rdv.c_cost.gather(0, curc.clamp(min=0)),
+                    self.r_civic_boosted[:, r].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
+                ).double()  # A-3
                 fin = active & (curc >= 0) & (self.r_civic_prog[:, r] >= cost_c)
                 if not bool(fin.any()):
                     break

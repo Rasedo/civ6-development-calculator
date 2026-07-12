@@ -647,6 +647,9 @@ for (let s = 0; s < N_SEEDS; s++) {
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
       // near a natural wonder (for the ASTROLOGY-style eureka)
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
+      // coastal land (A-3: rival coastalCity eurekas — the player's uses
+      // the per-city flag set at founding/capture)
+      cl: isCoastalLand(map, t) ? 1 : 0,
       // land units may stand here (mirrors unitPassable)
       pass: unitPassable(t) ? 1 : 0,
       work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)
