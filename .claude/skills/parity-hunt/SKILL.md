@@ -13,7 +13,18 @@ farther from real Civ 6 than the GPU (owner rule): then fix TS.
 ## Step 0 — the checkpoint bracket (§F: no re-simulation)
 
 Every gate run dumps RAW state checkpoints every 25 turns for ALL games
-(transient gpu/fixtures/ckpt/, both engines, on by default). So first:
+(transient gpu/fixtures/ckpt/, both engines, on by default).
+
+**When the gate failure already NAMES the turn (it usually does), skip
+the search entirely**: the bracket is [floor((turn−1)/25)·25, +25] —
+resume both engines from that earlier checkpoint with --log/CIV6_LOG
+and you have the statelog diff after simulating a handful of turns.
+(Owner catch 2026-07-12: the full `--log` re-simulation of all 72 games
+costs ~5 min and re-derives what the dumps already hold — NEVER start
+there while checkpoints exist. GPU dumps are per SHARD, keyed by the
+shard's first-game rng; your game is batch index rng − first_rng.)
+
+Only when no turn is known (an end-state drift) binary-search first:
 
 ```
 PYTHONUTF8=1 python gpu/ckptdiff.py --rng <rng>
@@ -26,10 +37,12 @@ re-simulates ~25 turns instead of 250 (GPU `--resume-t <T> --turns <n>
 (BLAS association preserved) and bit-faithful: the resumed trajectory IS
 the original. Probes (pure reads) resume the same way — seconds per
 iteration. Turn labels run 2..(turns+1); ckptdiff's printed --turns
-already covers the far edge.
+already covers the far edge. DIAGNOSIS rides checkpoints; FIX
+VERIFICATION never does (pre-checkpoint effects can false-green — the
+full gate/battery stays the bar).
 
-## Step 1 — the Phase-1 statelog (over the bracket, or full when no
-checkpoints exist)
+## Step 1 — the Phase-1 statelog (RESUMED over the bracket; full-run
+--log ONLY when no checkpoints exist)
 
 ```
 PYTHONUTF8=1 python gpu/rollout.py --shards 4 --log <rng>   # add --resume-t/--turns from ckptdiff
