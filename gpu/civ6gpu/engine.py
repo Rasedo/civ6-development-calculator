@@ -111,6 +111,7 @@ class Rules:
     cs: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     rivals: dict  # rival-civ pacing, loyalty, GP costs, belief-pool sizes
     beliefs: dict  # A-7: dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
+    projects: dict  # A-14: {rows: [{d, y, g}], yieldFraction, gppFraction} in data order
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
     district_scaffold: dict  # D2b: {campusIdx, campusUnlockTech}
@@ -169,6 +170,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         cs=r.get("cs", {}),
         rivals=r.get("rivals", {}),
         beliefs=r.get("beliefs", {}),
+        projects=r.get("projects", {}),
         improvements=r.get("improvements", {}),
         districts=r.get("districts", []),
         district_scaffold=r.get("districtScaffold", {}),
@@ -625,6 +627,11 @@ class BatchSim:
                 "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
             }
         self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
+        # A-14: rival projects — rows {d: district idx, y: yield col, g: GP class}
+        _pj = rules.projects or {}
+        self._proj_rows = list(_pj.get("rows", []))
+        self._proj_yf = float(_pj.get("yieldFraction", 0.75))
+        self._proj_gf = float(_pj.get("gppFraction", 0.3))
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for r_ in f.get("rivals", []):
@@ -5284,6 +5291,93 @@ class BatchSim:
                     self.rc_cost[:, r, j] = torch.where(want_u, self._p_cost[ty].double(), self.rc_cost[:, r, j])
                     self.rc_progress[:, r, j] = torch.where(want_u, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                     unit_count = unit_count + want_u.long()
+                # AUDIT A-14: army capped, nothing else queueable — run the
+                # FIRST project whose district is COMPLETE (exported data
+                # order); cost = the player's projectCost curve on the
+                # RIVAL's research (max(round(15·speed), round(dCost·0.5))).
+                if self.districts_on and self._proj_rows:
+                    left_p = rem & ~want_u
+                    if bool(left_p.any()):
+                        dcp2 = self.rules.district_cost
+                        t_pct2 = self.r_techs[:, r].sum(dim=1).double() / float(self.rules_dev.t_cost.shape[0])
+                        c_pct2 = self.r_civics[:, r].sum(dim=1).double() / float(self.rules_dev.c_cost.shape[0])
+                        d_cost2 = torch.floor(dcp2.get("base", 32) * (1 + dcp2.get("scale", 9) * torch.maximum(t_pct2, c_pct2)))
+                        p_floor = float(round(15 * self.rules.game_speed))
+                        p_cost = torch.maximum(torch.full_like(d_cost2, p_floor), js_round(d_cost2 * 0.5))
+                        for pi_, prow in enumerate(self._proj_rows):
+                            if not bool(left_p.any()):
+                                break
+                            d_i = int(prow.get("d", -1))
+                            if d_i < 0 or d_i >= self.rc_dist_tile.shape[3]:
+                                continue
+                            regp = self.rc_dist_tile[:, r, j, d_i]
+                            has_pd = (regp >= 0) & self.district_complete.gather(1, regp.clamp(min=0).unsqueeze(1)).squeeze(1)
+                            want_p = left_p & has_pd
+                            if not bool(want_p.any()):
+                                continue
+                            code_pr = 1 + self.NU + len(self._scaffold) + self.rules_dev.b_cost.shape[0] + pi_
+                            self.rc_current[:, r, j] = torch.where(want_p, torch.full_like(self.rc_current[:, r, j], code_pr), self.rc_current[:, r, j])
+                            self.rc_cost[:, r, j] = torch.where(want_p, p_cost, self.rc_cost[:, r, j])
+                            self.rc_progress[:, r, j] = torch.where(want_p, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                            left_p = left_p & ~want_p
+
+            # AUDIT A-5: ONE gold purchase per civ per turn — the cheapest
+            # completable building anywhere in the civ (cost, then catalog
+            # id, then city slot — the tryQueueRivalBuilding key), bought
+            # INSTANTLY at goldPurchaseMult×, keeping the opening peace
+            # cost as a war chest. A building queued in that same city is
+            # skipped (completion would duplicate it). exclusiveWith stays
+            # TS-only, absent from the GPU catalog like the queue paths.
+            if self.districts_on:
+                rdv6 = self.rules_dev
+                NB6 = rdv6.b_cost.shape[0]
+                ones6 = torch.ones(B, NB6, dtype=torch.bool, device=dev)
+                unl6 = torch.where(
+                    rdv6.b_unlock.unsqueeze(0) >= 0,
+                    self.r_techs[:, r].gather(1, rdv6.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                    ones6,
+                ) & torch.where(
+                    rdv6.b_unlock_civic.unsqueeze(0) >= 0,
+                    self.r_civics[:, r].gather(1, rdv6.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                    ones6,
+                )
+                elig6 = torch.zeros(B, self.RC, NB6, dtype=torch.bool, device=dev)
+                for j6 in self.rc_alive[:, r].any(dim=0).nonzero(as_tuple=True)[0].tolist():  # D-4 style
+                    al6 = active & self.rc_alive[:, r, j6]
+                    if not bool(al6.any()):
+                        continue
+                    have6 = self.rc_bldg[:, r, j6]
+                    ctile6 = self.rc_center[:, r, j6].clamp(min=0)
+                    riv6 = self.tile_river.gather(1, ctile6.unsqueeze(1)).squeeze(1)
+                    ok6 = unl6 & ~have6 & (~rdv6.b_river.view(1, -1) | riv6.unsqueeze(1))
+                    reg6 = self.rc_dist_tile[:, r, j6].gather(1, rdv6.b_req_district.clamp(min=0).unsqueeze(0).expand(B, -1))
+                    dc6 = (reg6 >= 0) & self.district_complete.gather(1, reg6.clamp(min=0))
+                    ok6 = ok6 & torch.where(rdv6.b_req_district.unsqueeze(0) >= 0, dc6, ones6)
+                    for bi6, reqs6 in enumerate(self.rules.b_req_buildings):
+                        if reqs6:
+                            ok6[:, bi6] &= have6[:, torch.tensor(reqs6, device=dev, dtype=torch.long)].any(dim=1)
+                    qb6 = self.rc_current[:, r, j6] - (1 + self.NU + len(self._scaffold))
+                    is_qb = (qb6 >= 0) & (qb6 < NB6)
+                    if bool(is_qb.any()):
+                        rows_q = is_qb.nonzero(as_tuple=True)[0]
+                        ok6[rows_q, qb6[rows_q]] = False
+                    elig6[:, j6] = ok6 & al6.unsqueeze(1)
+                key6 = (rdv6.b_cost.view(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).view(1, 1, -1)) * 32 \
+                    + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).view(1, -1, 1)
+                key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
+                flat6 = key6.reshape(B, -1)
+                best6 = flat6.argmin(dim=1)
+                has6 = active & torch.isfinite(flat6.gather(1, best6.unsqueeze(1)).squeeze(1))
+                if bool(has6.any()):
+                    jj6 = torch.div(best6, NB6, rounding_mode="floor")
+                    bb6 = best6 % NB6
+                    price6 = rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult
+                    reserve6 = float(rr.get("peaceGold0", 150))
+                    can6 = has6 & (js_round(self.r_treasury[:, r] * 1000) >= js_round((price6 + reserve6) * 1000))
+                    if bool(can6.any()):
+                        rows6 = can6.nonzero(as_tuple=True)[0]
+                        self.rc_bldg[rows6, r, jj6[rows6], bb6[rows6]] = True
+                        self.r_treasury[:, r] = torch.where(can6, self.r_treasury[:, r] - price6, self.r_treasury[:, r])
 
             # phase-top unlock snapshot (TS computes rivalUnlocks here)
             r_techs0 = self.r_techs[:, r].clone()
@@ -5405,6 +5499,7 @@ class BatchSim:
                     self.rc_progress[:, r, j] = torch.where(has_q, self.rc_progress[:, r, j] + prod, self.rc_progress[:, r, j])
                     done_q = has_q & (self.rc_progress[:, r, j] >= self.rc_cost[:, r, j])
                     if bool(done_q.any()):
+                        cost_locked = self.rc_cost[:, r, j].clone()  # A-14: the project lump reads the LOCKED cost
                         self.rc_current[:, r, j] = torch.where(done_q, torch.full_like(cur, -1), self.rc_current[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         self.rc_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_cost[:, r, j]), self.rc_cost[:, r, j])
@@ -5429,11 +5524,38 @@ class BatchSim:
                             self.rc_qtile[dr, r, j] = -1
                             self._eff_version += 1
                         # C1-B4b-2: a finished building joins the registry
-                        done_b = done_q & (cur > self.NU + nS_b4)
+                        # (A-14: bounded above — project codes sit past NB)
+                        NBc = self.rules_dev.b_cost.shape[0]
+                        done_b = done_q & (cur > self.NU + nS_b4) & (cur <= self.NU + nS_b4 + NBc)
                         if bool(done_b.any()):
                             br = done_b.nonzero(as_tuple=True)[0]
                             bi_done = (cur - 1 - self.NU - nS_b4).clamp(min=0)
                             self.rc_bldg[br, r, j, bi_done[br]] = True
+                        # A-14: a finished project pays Math.round(cost×frac)
+                        # into the CIV's streams + GPP (the completeProject
+                        # twin — rival streams, like GP effects).
+                        if self._proj_rows:
+                            done_p = done_q & (cur > self.NU + nS_b4 + NBc)
+                            if bool(done_p.any()):
+                                pi_done = (cur - 1 - self.NU - nS_b4 - NBc).clamp(min=0)
+                                amt_y = js_round(cost_locked * self._proj_yf)
+                                amt_g = js_round(cost_locked * self._proj_gf)
+                                for pi_, prow in enumerate(self._proj_rows):
+                                    hitp = done_p & (pi_done == pi_)
+                                    if not bool(hitp.any()):
+                                        continue
+                                    y_i = int(prow.get("y", -1))
+                                    if y_i == 3:
+                                        self.r_tech_prog[:, r] = torch.where(hitp, self.r_tech_prog[:, r] + amt_y, self.r_tech_prog[:, r])
+                                    elif y_i == 4:
+                                        self.r_civic_prog[:, r] = torch.where(hitp, self.r_civic_prog[:, r] + amt_y, self.r_civic_prog[:, r])
+                                    elif y_i == 2:
+                                        self.r_treasury[:, r] = torch.where(hitp, self.r_treasury[:, r] + amt_y, self.r_treasury[:, r])
+                                    elif y_i == 5:
+                                        self.r_faith[:, r] = torch.where(hitp, self.r_faith[:, r] + amt_y, self.r_faith[:, r])
+                                    g_i = int(prow.get("g", -1))
+                                    if 0 <= g_i < self.r_gpp.shape[2]:
+                                        self.r_gpp[:, r, g_i] = torch.where(hitp, self.r_gpp[:, r, g_i] + amt_g, self.r_gpp[:, r, g_i])
                 self._rival_border_growth(r, j, cact, cul_c)  # P5/S4: the timer died
                 self.rc_hp[:, r, j] = torch.where(
                     cact, (self.rc_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.rc_hp[:, r, j]

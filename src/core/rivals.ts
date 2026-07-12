@@ -42,12 +42,14 @@ import {
   AQUEDUCT_FRESH_BONUS,
   AQUEDUCT_NO_FRESH_TOTAL,
   GAME_SPEED,
+  GOLD_PURCHASE_MULT,
   borderGrowthCost,
   amenitiesNeeded,
   amenityTier,
   LUXURY_AMENITY_CITIES,
   type AmenityTier,
 } from '../data/constants';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
 import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority } from './city';
 import { canPlaceDistrictIn, validImprovementsIn } from './rules';
 import { hasRiver, hasFreshWater, isCoastalLand } from './query';
@@ -1157,6 +1159,58 @@ export function rivalPhase(state: GameState): void {
             : 'WARRIOR';
         rc.queue.push({ kind: 'unit', unit: type, progress: 0 });
         unitCount += 1;
+      } else {
+        // AUDIT A-14: army capped, nothing else queueable — run the first
+        // project whose district is COMPLETE (PROJECTS data order),
+        // converting production to a yield lump + GPP like the player's
+        // queueProject. Cost = the player's projectCost curve on the
+        // RIVAL's own research (the D-8 symmetry pattern).
+        const proj = Object.values(PROJECTS).find((p) =>
+          rc.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete),
+        );
+        if (proj) {
+          const cost = Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCostIn(rival.research) * 0.5));
+          rc.queue.push({ kind: 'project', project: proj.id, progress: 0, cost });
+        }
+      }
+    }
+
+    // AUDIT A-5: spend the banked gold — ONE purchase per civ per turn:
+    // the cheapest completable building anywhere in the civ (cost, then
+    // id, then city order — the tryQueueRivalBuilding key), bought
+    // INSTANTLY at the player's goldPurchaseMult price, keeping the
+    // opening peace cost as a war chest. Skips a building queued in that
+    // same city (completion would duplicate it).
+    {
+      let buyCity: RivalCity | null = null;
+      let buyDef: (typeof BUILDINGS)[string] | null = null;
+      for (const rc of rival.cities) {
+        const have = new Set(rc.buildings);
+        const done = new Set(
+          rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
+        );
+        const center = state.map.tiles[rc.centerIndex];
+        for (const def of Object.values(BUILDINGS)) {
+          if (have.has(def.id) || def.worship) continue;
+          if (!done.has(def.district)) continue;
+          if (!rivalUnlocks.buildings.has(def.id)) continue;
+          if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
+          if (def.exclusiveWith?.some((x) => have.has(x))) continue;
+          if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+          if (rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id) continue;
+          if (!buyDef || def.cost < buyDef.cost || (def.cost === buyDef.cost && def.id < buyDef.id)) {
+            buyDef = def;
+            buyCity = rc;
+          }
+        }
+      }
+      if (buyDef && buyCity) {
+        const price = buyDef.cost * GOLD_PURCHASE_MULT;
+        const reserve = PEACE_GOLD_COST(0);
+        if (Math.round((rival.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
+          rival.treasury = (rival.treasury ?? 0) - price;
+          buyCity.buildings.push(buyDef.id);
+        }
       }
     }
 
@@ -1248,20 +1302,36 @@ export function rivalPhase(state: GameState): void {
       // Queue progress + completion (settler founds via the site scan; a
       // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = rc.queue[0];
-      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building')) {
+      if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project')) {
         q.progress += production;
         const cost =
           q.kind === 'unit'
             ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // P4/D-10: builders lock at queue
             : q.kind === 'building'
               ? BUILDINGS[q.building]?.cost ?? 54
-              : q.cost ?? 54;
+              : q.cost ?? 54; // settler / district / project carry their own cost
         if (q.progress >= cost) {
           rc.queue.shift();
           if (q.kind === 'settler') tryFoundCity(state, rival);
           else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
           else if (q.kind === 'building') rc.buildings.push(q.building);
-          else {
+          else if (q.kind === 'project') {
+            // A-14: the completion lump lands in the RIVAL's own streams
+            // (the player's completeProject applies via applyLumpYield to
+            // its civ streams; GP effects already use this rival pattern).
+            const def = PROJECTS[q.project];
+            if (def?.yield) {
+              const amount = Math.round(cost * PROJECT_YIELD_FRACTION);
+              if (def.yield === 'science') rival.research.techProgress += amount;
+              else if (def.yield === 'culture') rival.research.civicProgress += amount;
+              else if (def.yield === 'gold') rival.treasury = (rival.treasury ?? 0) + amount;
+              else if (def.yield === 'faith') rival.faith = (rival.faith ?? 0) + amount;
+            }
+            if (def?.gpClass) {
+              const pts = Math.round(cost * PROJECT_GPP_FRACTION);
+              rival.gpp[def.gpClass] = (rival.gpp[def.gpClass] ?? 0) + pts;
+            }
+          } else {
             spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
             if (q.unit === 'BUILDER') rival.buildersTrained = (rival.buildersTrained ?? 0) + 1; // P4/D-10
           }

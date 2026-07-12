@@ -49,6 +49,7 @@ import {
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEON_FAITH_COST, type BeliefEffects } from '../src/data/religion';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_POP,
@@ -468,6 +469,18 @@ const rules = {
     pantheons: Object.values(PANTHEONS).map(beliefRow),
     followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
     founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
+  },
+  // AUDIT A-14: rival projects (data order; d = PLACEABLE_DISTRICTS idx,
+  // y = YIELD_KEYS idx or -1, g = GP_CLASSES idx or -1). Out-of-scaffold
+  // districts export d=-1 and never fire — table-driven for A-9's future.
+  projects: {
+    rows: Object.values(PROJECTS).map((p) => ({
+      d: PLACEABLE_DISTRICTS.indexOf(p.district),
+      y: p.yield ? YIELD_KEYS.indexOf(p.yield) : -1,
+      g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
+    })),
+    yieldFraction: PROJECT_YIELD_FRACTION,
+    gppFraction: PROJECT_GPP_FRACTION,
   },
   // Barbarian rules (mirrors combat.ts). dmgBase[d+60] = 30·e^(0.04·d) is
   // computed HERE so both engines share the exact same doubles — libm exp()
