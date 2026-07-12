@@ -318,6 +318,12 @@ export interface RivalCiv {
   gpp: Partial<Record<GreatPersonClass, number>>;
   pantheonClaimed: boolean;
   religionFounded: boolean;
+  /** AUDIT A-7: the CLAIMED belief identities — effects apply to this civ
+   * (previously denial-only: picks joined the global pools and were
+   * forgotten). Optional for old saves; unset until claimed/founded. */
+  pantheon?: string | null;
+  followerBelief?: string | null;
+  founderBelief?: string | null;
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   treasury?: number;
   /** P5/S5 (C-17): banked faith — the pantheon's consumer. */

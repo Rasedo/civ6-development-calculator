@@ -43,10 +43,20 @@ revalidation LANDED in the S6+S8 close):
 - A-6. **Rival unit roster restricted** — WARRIOR→SPEARMAN→HORSEMAN ladder
   (rivals.ts:979-984) + builder/settler; never SCOUT/SLINGER/ARCHER →
   rivals field no ranged units at all. Blocks symmetric war.
-- A-7. **Rival religion/pantheon confers no yields** — beliefs are claimed
-  (denial only); their yield/housing/amenity effects never apply to rival
-  cities (getModifiers is player-only; rivals use modifiersFromResearch).
-  Same for government/policy machinery (none for rivals).
+- A-7. **RESOLVED for beliefs (2026-07-12, task #37)**: claimed
+  pantheons/beliefs carry IDENTITY now (rival.pantheon/followerBelief/
+  founderBelief + GPU r_pantheon/r_follower/r_founder with per-id pool
+  masks; the claim draw picks the k-th OPEN id in data order, both
+  engines) and their effects APPLY via getRivalModifiers/_bel_* tables:
+  feature yields, improvement-on-resource (the hunt's catch — strategic
+  MINEs on IRON/NITER/COAL exist today, two −1-production cities at rng
+  2026006082 t127), building yields/housing, Work Ethic, growth/border
+  multipliers, Divine Spark GPP, River Goddess + Zen amenities/housing,
+  founder incomes to the capital. Belief improvementYields + 
+  faithPerWonder stay table-omitted until their targets exist (A-13
+  improvements, A-4 wonders — wire them there). REMAINING (re-scoped):
+  government/policy machinery for rivals — build with the policy-breadth
+  stage (task #46/B-13).
 - A-8. **C-21 movement**: every rival mover takes exactly one step then
   movesLeft=0 (builder walk rivals.ts:816-819, patrol :603-606, hostile
   march combat.ts:526-531); the player walks real MP paths. A rival

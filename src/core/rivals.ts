@@ -13,6 +13,7 @@ import { spawnUnit, unitsAt } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, clearCampFor, captureRivalCity } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
+import { getRivalModifiers } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -444,7 +445,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
  * player's is per-city. */
 function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity): number | null {
   const center = state.map.tiles[city.centerIndex];
-  const ctx = { map: state.map, mods: modifiersFromResearch(rival.research) };
+  const ctx = { map: state.map, mods: getRivalModifiers(state, rival) };  // A-7: belief tile yields rank candidates too
   const cands: { dist: number; res: number; ySum: number; i: number }[] = [];
   for (const t of tilesWithin(state.map, center.col, center.row, 5)) {
     if (tileOwned(t)) continue;
@@ -511,10 +512,13 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
     // so rivals now accrue 0 until their first Campus/HS/CH completes and
     // the player wins the early Great People uncontested).
     const gpDist = GP_CLASS_DISTRICT[cls];
+    // A-7: Divine Spark — the belief's flat GPP joins the per-city term,
+    // exactly like greatPersonPointsPerTurn (game.ts:876).
+    const gppFlat = getRivalModifiers(state, rival).gppFlat[cls] ?? 0;
     let accrue = 0;
     for (const rc of rival.cities) {
       if (!rc.districts.some((d) => d.type === gpDist && state.map.tiles[d.tileIndex].districtComplete)) continue;
-      accrue += 1 + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
+      accrue += 1 + gppFlat + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
     }
     if (accrue > 0) rival.gpp[cls] = (rival.gpp[cls] ?? 0) + accrue;
     // P5/S5 (C-16): the player's advanceGreatPeople loop — overflow KEPT
@@ -559,6 +563,7 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
       const pick = open[Math.floor(nextRandom(state) * open.length)];
       state.claimedPantheons.push(pick);
       rival.pantheonClaimed = true;
+      rival.pantheon = pick; // A-7: identity kept — its effects apply below
       state.eventLog.push(`${rival.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
     }
   }
@@ -579,9 +584,13 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
       (id) => id !== state.religion.founder && !state.claimedBeliefs.includes(id),
     );
     if (followers.length > 0 && founders.length > 0) {
-      state.claimedBeliefs.push(followers[Math.floor(nextRandom(state) * followers.length)]);
-      state.claimedBeliefs.push(founders[Math.floor(nextRandom(state) * founders.length)]);
+      const fPick = followers[Math.floor(nextRandom(state) * followers.length)];
+      const oPick = founders[Math.floor(nextRandom(state) * founders.length)];
+      state.claimedBeliefs.push(fPick);
+      state.claimedBeliefs.push(oPick);
       rival.religionFounded = true;
+      rival.followerBelief = fPick; // A-7: identities kept — effects apply
+      rival.founderBelief = oPick;
       const name = RELIGION_NAMES[(rival.id + 1) % RELIGION_NAMES.length];
       state.eventLog.push(`${rival.name} founded ${name} — two beliefs left the pool.`);
     }
@@ -848,7 +857,14 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
   }
   let total = water;
-  for (const id of rc.buildings) total += BUILDINGS[id]?.housing ?? 0;
+  // A-7: belief building housing (Religious Community) + River Goddess —
+  // the computeHousing beliefs (city.ts:247-250).
+  const m = getRivalModifiers(state, rival);
+  for (const id of rc.buildings) {
+    total += BUILDINGS[id]?.housing ?? 0;
+    total += m.buildingHousingAdd[id] ?? 0;
+  }
+  if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
   const civ = civOfRival(rival.id);
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
     if (!tileOwnedByCiv(t, civ) || !t.improvement) continue;
@@ -889,9 +905,21 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
     });
     for (const rc of ranked.slice(0, LUXURY_AMENITY_CITIES)) grants.set(rc.id, grants.get(rc.id)! + 1);
   }
+  // A-7: River Goddess + Zen Meditation join the tier balance exactly like
+  // computeCityStats' have (city.ts:456-461); the luxury-grant RANKING
+  // stays building-amenities-only, mirroring the player's luxuryAmenities.
+  const m = getRivalModifiers(state, rival);
   const tiers = new Map<number, AmenityTier>();
   for (const rc of rival.cities) {
-    tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! - amenitiesNeeded(rc.population)));
+    let extra = 0;
+    if (m.riverCity && hasRiver(state.map.tiles[rc.centerIndex])) extra += m.riverCity.amenities;
+    if (m.amenitiesIfSpecialty.length > 0) {
+      const specialty = rc.districts.filter(
+        (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
+      ).length;
+      for (const rule of m.amenitiesIfSpecialty) if (specialty >= rule.min) extra += rule.amenities;
+    }
+    tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! + extra - amenitiesNeeded(rc.population)));
   }
   return tiers;
 }
@@ -914,10 +942,11 @@ export function rivalCityYields(
   const center = state.map.tiles[rc.centerIndex];
   // A rival applies its OWN research boosts to its own tiles, exactly like the
   // player (Civ 6): improvement yields (mine +production), farm-adjacency, hill
-  // farms — all from the rival's own techs/civics. NOT the player's boosts
-  // (that's what defaultModifiers guarded against); modifiersFromResearch is
-  // research-only (no government/religion/CS machinery).
-  const ctx = { map: state.map, mods: modifiersFromResearch(rival.research) };
+  // farms — all from the rival's own techs/civics. NOT the player's boosts.
+  // A-7: plus its OWN claimed pantheon/beliefs (getRivalModifiers) — feature/
+  // improvement yields flow through tileYields; building adds, Work Ethic and
+  // the founder's capital incomes apply below. Government/CS stay player-only.
+  const ctx = { map: state.map, mods: getRivalModifiers(state, rival) };
   const ranked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
       (t) =>
@@ -952,7 +981,11 @@ export function rivalCityYields(
     if (!dt.districtComplete) continue;
     const col = DISTRICTS[d.type].adjacencyYield;
     if (!col) continue;
-    total[col] += Math.floor(districtAdjacency(state.map, dt, d.type));
+    const adj = Math.floor(districtAdjacency(state.map, dt, d.type));
+    total[col] += adj;
+    // A-7 Work Ethic: Holy Site adjacency also provides production
+    // (yields.ts:150, the rival's floored-adjacency convention).
+    if (d.type === 'HOLY_SITE' && ctx.mods.workEthic) total.production += adj;
   }
   // C1-B4b-2: building yields under empty modifiers (mult 1, no belief
   // adds; worship never queues, so the plain def.yields sum matches
@@ -964,12 +997,24 @@ export function rivalCityYields(
     if (bd?.yields) {
       for (const [k, v] of Object.entries(bd.yields)) total[k as keyof Yields] += v ?? 0;
     }
+    // A-7: belief building adds (Feed the World, Choral Music — the
+    // cityBuildingYields beliefAdd twin, yields.ts:169).
+    const beliefAdd = ctx.mods.buildingYieldAdd[id];
+    if (beliefAdd) {
+      for (const [k, v] of Object.entries(beliefAdd)) total[k as keyof Yields] += v ?? 0;
+    }
     if (bd?.special === 'SHIPYARD') {
       const harbor = rc.districts.find((d) => d.type === 'HARBOR');
       if (harbor && state.map.tiles[harbor.tileIndex].districtComplete) {
         total.production += Math.floor(districtAdjacency(state.map, state.map.tiles[harbor.tileIndex], 'HARBOR'));
       }
     }
+  }
+  // A-7: the founder's capital incomes (perFollowers/perCity land in
+  // capitalYields) — added BEFORE the tier scaling, the computeCityStats
+  // bonuses position (city.ts:447/475-479).
+  if (rc.isCapital) {
+    for (const [k, v] of Object.entries(ctx.mods.capitalYields)) total[k as keyof Yields] += v ?? 0;
   }
   // P5/S6 (C-20): the amenity tier scales non-food yields, exactly like
   // computeCityStats. External callers (score/statelog) re-rank FRESH;
@@ -1189,7 +1234,9 @@ export function rivalPhase(state: GameState): void {
       // P5/S6 (C-20): the tier's growth factor rides the housing factor,
       // exactly like computeCityStats' effective surplus (no empire/policy
       // mults — those are player machinery).
-      rc.foodBox += surplus > 0 ? surplus * hFactor * tier.growthFactor : surplus;
+      // A-7: the belief growth multiplier rides the chain exactly like
+      // computeCityStats (city.ts:495-501; empireGrowthMult stays player-only).
+      rc.foodBox += surplus > 0 ? surplus * hFactor * tier.growthFactor * getRivalModifiers(state, rival).growthMult : surplus;
       const need = growthFoodNeeded(rc.population);
       if (rc.foodBox >= need) {
         rc.population += 1;
@@ -1225,14 +1272,18 @@ export function rivalPhase(state: GameState): void {
       // consumes against the player's escalating curve; the flat
       // every-9-turns timer died with it.
       rc.cultureBox += culC;
-      while (rc.cultureBox >= borderGrowthCost(rc.tilesAcquired)) {
+      // A-7: Religious Settlements — the belief border-cost multiplier,
+      // the player's Math.round(base * borderCostMult) form (city.ts:507).
+      const rcBorderCost = () =>
+        Math.round(borderGrowthCost(rc.tilesAcquired) * getRivalModifiers(state, rival).borderCostMult);
+      while (rc.cultureBox >= rcBorderCost()) {
         const next = pickRivalBorderTile(state, rival, rc);
         if (next === null) {
           // Nowhere to grow: cap the box at the current threshold.
-          rc.cultureBox = Math.min(rc.cultureBox, borderGrowthCost(rc.tilesAcquired));
+          rc.cultureBox = Math.min(rc.cultureBox, rcBorderCost());
           break;
         }
-        rc.cultureBox -= borderGrowthCost(rc.tilesAcquired);
+        rc.cultureBox -= rcBorderCost();
         state.map.tiles[next].rivalId = rival.id;
         rc.tilesAcquired += 1;
       }

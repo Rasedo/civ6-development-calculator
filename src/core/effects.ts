@@ -3,7 +3,7 @@
  * `Modifiers` object that the yield/housing/amenity code consumes.
  */
 
-import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Yields } from './types';
+import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, RivalCiv, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, type PolicyEffects } from '../data/policies';
@@ -277,6 +277,7 @@ function applyBeliefEffects(
   state: GameState,
   mods: Modifiers,
   belief?: { effects: BeliefEffects },
+  seat?: { followers: number; cities: number },  // A-7: rival seats pass their own counts
 ): void {
   if (!belief) return;
   const fx = belief.effects;
@@ -307,9 +308,10 @@ function applyBeliefEffects(
   if (fx.riverCity) mods.riverCity = fx.riverCity;
   if (fx.faithPerWonder) mods.faithPerWonder += fx.faithPerWonder;
 
-  // Founder incomes land in the capital (followers = your total population).
+  // Founder incomes land in the capital (followers = the seat's total
+  // population — the player's by default, the rival's when a seat is given).
   if (fx.perFollowers) {
-    const followers = state.cities.reduce((s, c) => s + c.population, 0);
+    const followers = seat ? seat.followers : state.cities.reduce((s, c) => s + c.population, 0);
     const times = Math.floor(followers / fx.perFollowers.per);
     if (times > 0) {
       for (const [k, v] of Object.entries(fx.perFollowers.yields)) {
@@ -319,12 +321,30 @@ function applyBeliefEffects(
     }
   }
   if (fx.perCity) {
-    const n = state.cities.length;
+    const n = seat ? seat.cities : state.cities.length;
     for (const [k, v] of Object.entries(fx.perCity)) {
       const key = k as keyof Yields;
       mods.capitalYields[key] = (mods.capitalYields[key] ?? 0) + (v ?? 0) * n;
     }
   }
+}
+
+/** AUDIT A-7: the rival's modifier head — its research boosts plus its OWN
+ * claimed pantheon and (once its religion is founded) its two beliefs.
+ * Government/policy/CS blocks stay player machinery. The follower counts
+ * are the RIVAL's population/cities (the seat), not the player's. */
+export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers {
+  const mods = modifiersFromResearch(rival.research);
+  const seat = {
+    followers: rival.cities.reduce((s, c) => s + c.population, 0),
+    cities: rival.cities.length,
+  };
+  applyBeliefEffects(state, mods, rival.pantheon ? PANTHEONS[rival.pantheon] : undefined, seat);
+  if (rival.religionFounded) {
+    applyBeliefEffects(state, mods, rival.followerBelief ? FOLLOWER_BELIEFS[rival.followerBelief] : undefined, seat);
+    applyBeliefEffects(state, mods, rival.founderBelief ? FOUNDER_BELIEFS[rival.founderBelief] : undefined, seat);
+  }
+  return mods;
 }
 
 /** Convenience bundle used by yield computations. */

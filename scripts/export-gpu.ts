@@ -48,7 +48,7 @@ import {
   CS_MAX_HP,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEON_FAITH_COST } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEON_FAITH_COST, type BeliefEffects } from '../src/data/religion';
 import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_POP,
@@ -170,6 +170,41 @@ civicList.forEach((c, i) => {
   for (const fx of c.effects ?? []) {
     if (fx.kind === 'unlockBuilding') buildingUnlockCivic.set(fx.building, i);
   }
+});
+
+// AUDIT A-7: the belief-effect row shape (see `beliefs:` in rules below).
+const FEAT_IDS = Object.keys(FEATURES);
+const featIdx = new Map(FEAT_IDS.map((f, i) => [f, i]));
+const beliefRow = (def: { effects: BeliefEffects }) => ({
+  featY: FEAT_IDS.map((f) => YIELD_KEYS.map((k) => def.effects.featureYields?.[f]?.[k] ?? 0)),  // [nFeat, 6]
+  bldgY: centerBuildings.map((b) => YIELD_KEYS.map((k) => def.effects.buildingYields?.[b.id]?.[k] ?? 0)),  // [NB, 6]
+  bldgH: centerBuildings.map((b) => def.effects.buildingHousing?.[b.id] ?? 0),  // [NB]
+  border: def.effects.borderCostMult ?? 1,
+  growth: def.effects.growthMult ?? 1,
+  gpp: GP_CLASSES.map((c) => def.effects.gppFlat?.[c] ?? 0),
+  we: def.effects.workEthic ? 1 : 0,
+  river: def.effects.riverCity ? [def.effects.riverCity.amenities, def.effects.riverCity.housing] : [0, 0],
+  zen: def.effects.amenitiesIfSpecialty
+    ? [def.effects.amenitiesIfSpecialty.min, def.effects.amenitiesIfSpecialty.amenities]
+    : [0, 0],
+  perF: def.effects.perFollowers
+    ? [def.effects.perFollowers.per, ...YIELD_KEYS.map((k) => def.effects.perFollowers!.yields[k] ?? 0)]
+    : [0, 0, 0, 0, 0, 0, 0],
+  perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
+  // improvements on a resource of a category (God of Craftsmen): rows by
+  // category code 0 none / 1 bonus / 2 strategic / 3 luxury — the same
+  // codes as the tile `res` priority plane. NOT unreachable: IRON/NITER/
+  // COAL's own improvement is MINE, so strategic mines exist today (the
+  // A-7 hunt's catch — rng 2026006082 t127, two worked strategic mines).
+  impRes: (() => {
+    const rows = [0, 1, 2, 3].map(() => YIELD_KEYS.map(() => 0 as number));
+    const rule = def.effects.improvementOnResource;
+    if (rule) {
+      const cat = rule.category === 'bonus' ? 1 : rule.category === 'strategic' ? 2 : 3;
+      rows[cat] = YIELD_KEYS.map((k) => rule.yields[k] ?? 0);
+    }
+    return rows;
+  })(),
 });
 
 // Boost conditions the covered scope can actually trigger (everything else
@@ -421,6 +456,19 @@ const rules = {
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,
     founderPool: Object.keys(FOUNDER_BELIEFS).length,
   },
+  // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
+  // beliefs now APPLY to rival civs. Row order = the data-file key order;
+  // the claim draw picks the k-th OPEN id in this same order in both
+  // engines. improvementYields/faithPerWonder are OMITTED: their targets
+  // are structurally unreachable in scope (belief improvementYields touch
+  // only PASTURE/CAMP/FISHING_BOATS/QUARRY/PLANTATION — unbuildable until
+  // A-13; wonders — A-4). improvementOnResource IS shipped (impRes): mines
+  // on IRON/NITER/COAL exist today.
+  beliefs: {
+    pantheons: Object.values(PANTHEONS).map(beliefRow),
+    followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
+    founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
+  },
   // Barbarian rules (mirrors combat.ts). dmgBase[d+60] = 30·e^(0.04·d) is
   // computed HERE so both engines share the exact same doubles — libm exp()
   // may differ by an ulp between runtimes, and damage rounds to integers.
@@ -650,6 +698,9 @@ for (let s = 0; s < N_SEEDS; s++) {
       // coastal land (A-3: rival coastalCity eurekas — the player's uses
       // the per-city flag set at founding/capture)
       cl: isCoastalLand(map, t) ? 1 : 0,
+      // feature id (A-7: belief featureYields — Lady of the Reeds tiles);
+      // live via feat_stripped (chops/paves null features)
+      fid: t.feature ? featIdx.get(t.feature) ?? -1 : -1,
       // land units may stand here (mirrors unitPassable)
       pass: unitPassable(t) ? 1 : 0,
       work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)

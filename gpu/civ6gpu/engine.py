@@ -110,6 +110,7 @@ class Rules:
     units: list  # trainable roster [{id, cost, combat, maintenance, civilian, requiresTech}]
     cs: dict  # city-state constants (envoy cost, influence rate, quest pacing, type→yield)
     rivals: dict  # rival-civ pacing, loyalty, GP costs, belief-pool sizes
+    beliefs: dict  # A-7: dense pantheon/follower/founder effect tables (data-file key order = claim-draw order)
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
     district_scaffold: dict  # D2b: {campusIdx, campusUnlockTech}
@@ -167,6 +168,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         units=r.get("units", []),
         cs=r.get("cs", {}),
         rivals=r.get("rivals", {}),
+        beliefs=r.get("beliefs", {}),
         improvements=r.get("improvements", {}),
         districts=r.get("districts", []),
         district_scaffold=r.get("districtScaffold", {}),
@@ -322,6 +324,7 @@ _MUTABLE = [
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
     "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
+    "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # A-7: belief identity
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
 ]
@@ -591,6 +594,38 @@ class BatchSim:
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
+        # A-7: belief IDENTITY — per-id pool masks + per-civ claimed ids (the
+        # counts above stay as gate mirrors; masks and counts move together).
+        # Ids are -1 until claimed; effects gather rows id+1 from tables whose
+        # row 0 is the neutral pad (zeros for adds, ones for multipliers).
+        _bl = rules.beliefs or {}
+        self.pan_claimed = torch.zeros(B, max(len(_bl.get("pantheons", [])), 1), dtype=torch.bool, device=device)
+        self.fol_claimed = torch.zeros(B, max(len(_bl.get("followers", [])), 1), dtype=torch.bool, device=device)
+        self.fou_claimed = torch.zeros(B, max(len(_bl.get("founders", [])), 1), dtype=torch.bool, device=device)
+        self.r_pantheon = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.r_follower = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.r_founder = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self._bel = {}
+        for _pool, _rows in (("pan", _bl.get("pantheons", [])), ("fol", _bl.get("followers", [])), ("fou", _bl.get("founders", []))):
+            _nf = len(_rows[0]["featY"]) if _rows else 1
+            _nb = len(_rows[0]["bldgY"]) if _rows else 1
+            _ng = len(_rows[0]["gpp"]) if _rows else 1
+            self._bel[_pool] = {
+                "featY": torch.tensor([[[0.0] * 6] * _nf] + [x["featY"] for x in _rows], dtype=torch.float64, device=device),
+                "bldgY": torch.tensor([[[0.0] * 6] * _nb] + [x["bldgY"] for x in _rows], dtype=torch.float64, device=device),
+                "bldgH": torch.tensor([[0.0] * _nb] + [x["bldgH"] for x in _rows], dtype=torch.float64, device=device),
+                "border": torch.tensor([1.0] + [x["border"] for x in _rows], dtype=torch.float64, device=device),
+                "growth": torch.tensor([1.0] + [x["growth"] for x in _rows], dtype=torch.float64, device=device),
+                "gpp": torch.tensor([[0] * _ng] + [x["gpp"] for x in _rows], dtype=torch.long, device=device),
+                "we": torch.tensor([0.0] + [float(x["we"]) for x in _rows], dtype=torch.float64, device=device),
+                "river": torch.tensor([[0.0, 0.0]] + [x["river"] for x in _rows], dtype=torch.float64, device=device),
+                "zen": torch.tensor([[0.0, 0.0]] + [x["zen"] for x in _rows], dtype=torch.float64, device=device),
+                "perF": torch.tensor([[0.0] * 7] + [x["perF"] for x in _rows], dtype=torch.float64, device=device),
+                "perC": torch.tensor([[0.0] * 6] + [x["perC"] for x in _rows], dtype=torch.float64, device=device),
+                "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
+            }
+        self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
+        self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for r_ in f.get("rivals", []):
                 rid = r_["id"]
@@ -781,6 +816,7 @@ class BatchSim:
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
         self._dyn_harbor = torch.tensor([_src_amt(d, 9) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent Harbor
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
+        self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
         self._shipyard_bidx = int(rules.shipyard_bidx)
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
@@ -4136,6 +4172,47 @@ class BatchSim:
         g["f_r"][r] = f_plane
         return f_plane
 
+    def _r_has_beliefs(self, r: int) -> bool:
+        """A-7 fast path: most civs/turns carry no claimed beliefs (a founder
+        implies a follower, so pantheon|follower covers all three)."""
+        return self._bel_any and bool(((self.r_pantheon[:, r] >= 0) | (self.r_follower[:, r] >= 0)).any())
+
+    def _bel_add(self, key: str, r: int) -> torch.Tensor:
+        """A-7: rival r's summed ADDITIVE effect rows (pantheon + follower +
+        founder; unclaimed ids land on the zero pad row)."""
+        return (
+            self._bel["pan"][key][self.r_pantheon[:, r] + 1]
+            + self._bel["fol"][key][self.r_follower[:, r] + 1]
+            + self._bel["fou"][key][self.r_founder[:, r] + 1]
+        )
+
+    def _bel_mul(self, key: str, r: int) -> torch.Tensor:
+        """A-7: the MULTIPLICATIVE twin (pad row = 1.0) — border/growth."""
+        return (
+            self._bel["pan"][key][self.r_pantheon[:, r] + 1]
+            * self._bel["fol"][key][self.r_follower[:, r] + 1]
+            * self._bel["fou"][key][self.r_founder[:, r] + 1]
+        )
+
+    def _belief_feat_plane(self, r: int) -> torch.Tensor:
+        """A-7: [B, T, 6] belief TILE adds — featureYields at tiles with a
+        LIVE feature (fid >= 0 and not stripped) plus improvementOnResource
+        at unpillaged improvements on a LIVE resource (category = the res
+        priority code; the A-7 hunt's catch — strategic MINEs exist today).
+        TS adds both inside tileYields, so they ride every consumer:
+        worked-tile picks and yields, scores, the border ySum."""
+        featA = self._bel_add("featY", r)  # [B, nFeat, 6]
+        plane = featA.gather(1, self.feat_id.clamp(min=0).unsqueeze(2).expand(-1, -1, 6))
+        live = ((self.feat_id >= 0) & ~self.feat_stripped).unsqueeze(2).to(plane.dtype)
+        plane = plane * live
+        impA = self._bel_add("impRes", r)  # [B, 4, 6] rows by category code
+        cat = torch.where(
+            (self.improvement >= 0) & ~self.pillaged & ~self.res_stripped,
+            self.res_priority.clamp(max=3),
+            torch.zeros_like(self.res_priority),
+        )  # 0 = no add (pad row)
+        return plane + impA.gather(1, cat.unsqueeze(2).expand(-1, -1, 6))
+
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
         defaultModifiers). Candidates = owned, citizen-workable (water yes,
@@ -4175,6 +4252,17 @@ class BatchSim:
         f_plane = self._rcy_food_plane(r, g)
         p_plane = g["p_plane"]
         ty_oth = g["ty_oth"]
+        oth_sc = g["oth_score"]
+        # A-7: this civ's belief featureYields join every tile column (TS
+        # adds them inside tileYields) — worked picks, scores and yields all
+        # see them; the score adds stay exact (dyadic ints, f64).
+        _has_bel = self._r_has_beliefs(r)
+        if _has_bel:
+            featP = self._belief_feat_plane(r)
+            f_plane = f_plane + featP[:, :, 0]
+            p_plane = p_plane + featP[:, :, 1]
+            ty_oth = ty_oth + featP
+            oth_sc = oth_sc + (featP[:, :, 2:].double() * g["w"][2:].view(1, 1, 4)).sum(dim=2)
         f = f_plane.gather(1, tc).double()
         p = p_plane.gather(1, tc).double()
         # C1-B5b-iii: the OWNER's mine boosts apply to worked tiles (and via
@@ -4189,7 +4277,7 @@ class BatchSim:
         # All shipped yields are dyadic (asserted via _dyadic_fp over all six
         # columns), so this sum order is bit-equal to the TS per-key loop.
         w = g["w"]
-        s = f * w[0] + p * w[1] + g["oth_score"].gather(1, tc)
+        s = f * w[0] + p * w[1] + oth_sc.gather(1, tc)
         M = tiles.shape[1]
         # ties break by GLOBAL tile index (assignWorkedTiles' a.index - b.index),
         # NOT window position — the pre-B1 heuristic kept tilesWithin order.
@@ -4230,6 +4318,15 @@ class BatchSim:
         c_cu = self.tile_yields[:, :, 4].gather(1, sitec).squeeze(1).double() - fy_c[:, 4] * strip
         c_go = self.tile_yields[:, :, 2].gather(1, sitec).squeeze(1).double() - fy_c[:, 2] * strip  # VP-G1
         c_fa = self.tile_yields[:, :, 5].gather(1, sitec).squeeze(1).double() - fy_c[:, 5] * strip  # GV-1a
+        if _has_bel:
+            # A-7: a LIVE-featured center (e.g. an unremovable floodplain)
+            # keeps its belief feature yields — cf/cp read the adjusted
+            # planes already; the raw static cols 2-5 add them here.
+            featC = featP.gather(1, sitec.unsqueeze(2).expand(-1, 1, 6)).squeeze(1).double()  # [B, 6]
+            c_sc = c_sc + featC[:, 3]
+            c_cu = c_cu + featC[:, 4]
+            c_go = c_go + featC[:, 2]
+            c_fa = c_fa + featC[:, 5]
         if self._dyadic_fp:
             # every term is an exact dyadic, so .sum() is bit-identical to
             # the TS reduce
@@ -4274,6 +4371,10 @@ class BatchSim:
                         continue
                     adjf = torch.floor(self._district_adj_raw(di, adjc_b4)).gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1).double()
                     add = torch.where(has, adjf, torch.zeros_like(adjf))
+                    # A-7 Work Ethic: Holy Site adjacency ALSO yields
+                    # production (the rivals.ts floored-adjacency twin)
+                    if di == self._hs_idx and _has_bel:
+                        prod = prod + add * self._bel_add("we", r)
                     if yc == 3:
                         sci = sci + add
                     elif yc == 4:
@@ -4298,6 +4399,16 @@ class BatchSim:
                 faith = faith + add6[:, 5]  # GV-1a
                 sci = sci + add6[:, 3]
                 cul = cul + add6[:, 4]
+                # A-7: belief building adds (Feed the World / Choral Music —
+                # the beliefAdd twin, unscaled, pre-tier like TS)
+                if _has_bel:
+                    badd = torch.einsum("bn,bnk->bk", selb.double(), self._bel_add("bldgY", r))
+                    food = food + badd[:, 0]
+                    prod = prod + badd[:, 1]
+                    gold = gold + badd[:, 2]
+                    sci = sci + badd[:, 3]
+                    cul = cul + badd[:, 4]
+                    faith = faith + badd[:, 5]
                 # P1/C-22: rivals reach Harbors now, so the SHIPYARD special
                 # is live — production += the completed Harbor's LIVE
                 # floor(adjacency), the rival twin of yields.ts:171 under
@@ -4310,6 +4421,22 @@ class BatchSim:
                         adjc_sy = self._adj_district_count().to(self.dtype)
                         hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # A-7: the founder's capital incomes (perFollowers on the civ's LIVE
+        # total pop + perCity) land on the capital BEFORE the tier scaling —
+        # the rivalCityYields capitalYields position.
+        if _has_bel:
+            perF = self._bel_add("perF", r)  # [B, 7] = per, then the 6 yields
+            perC = self._bel_add("perC", r)  # [B, 6]
+            followers = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).double()
+            times = torch.where(perF[:, 0] > 0, torch.floor(followers / perF[:, 0].clamp(min=1)), torch.zeros_like(followers))
+            capY = perF[:, 1:] * times.unsqueeze(1) + perC * self.rc_alive[:, r].sum(dim=1).double().unsqueeze(1)
+            isc = (self.rc_is_cap[:, r, j] & mask).double()
+            food = food + capY[:, 0] * isc
+            prod = prod + capY[:, 1] * isc
+            gold = gold + capY[:, 2] * isc
+            sci = sci + capY[:, 3] * isc
+            cul = cul + capY[:, 4] * isc
+            faith = faith + capY[:, 5] * isc
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
@@ -4359,7 +4486,22 @@ class BatchSim:
                 top_v, top_i = key.topk(k, dim=1)
                 grant = (top_v > -1e8) & act.unsqueeze(1)
                 out.scatter_add_(1, top_i, grant.to(torch.float64))
-        balance = have + out - need
+        if self._r_has_beliefs(r):
+            # A-7: River Goddess (river centers) + Zen Meditation (2+
+            # completed specialty districts) join the TIER balance only —
+            # the luxury-grant RANKING stays building-amenities-based,
+            # mirroring rivalAmenityTiers.
+            ctr = self.rc_center[:, r].clamp(min=0)
+            extra = self._bel_add("river", r)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
+            zen = self._bel_add("zen", r)  # [B, 2] = min, amenities
+            if bool((zen[:, 1] != 0).any()):
+                dt_ = self.rc_dist_tile[:, r]
+                comp_ = (dt_ >= 0) & self.district_complete.gather(1, dt_.clamp(min=0).reshape(B, -1)).reshape_as(dt_)
+                spec_ = (comp_ & self._is_specialty.view(1, 1, -1)).sum(dim=2).double()
+                extra = extra + torch.where(spec_ >= zen[:, 0].unsqueeze(1), zen[:, 1].unsqueeze(1).expand_as(spec_), torch.zeros_like(spec_))
+            balance = have + out + extra - need
+        else:
+            balance = have + out - need
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.rc_pop[:, r], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
@@ -4420,9 +4562,16 @@ class BatchSim:
         self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
         B, dev = self.B, self.device
         center = self.rc_center[:, r, j]
+        # A-7: Religious Settlements — Math.round(base * borderCostMult),
+        # the player's city.ts:507 form (mult 1 without beliefs: js_round of
+        # the integral base curve is exact, so the expression is identical).
+        _bmul = self._bel_mul("border", r) if self._r_has_beliefs(r) else None
+        def _rc_cost():
+            base = self._border_cost(self.rc_acquired[:, r, j])
+            return js_round(base * _bmul) if _bmul is not None else base
         # lazy like the original: most calls have no border-ready city —
         # bail before building anything (the loop re-checks per claim).
-        if not bool((cact & (self.rc_cbox[:, r, j] >= self._border_cost(self.rc_acquired[:, r, j]))).any()):
+        if not bool((cact & (self.rc_cbox[:, r, j] >= _rc_cost())).any()):
             return
         # D-6: claims only mutate OWNERSHIP (rival_at) — the candidate
         # window, the rival ySum plane and the pick key are loop-invariant,
@@ -4441,6 +4590,13 @@ class BatchSim:
             boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
             p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
         y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)).sum(dim=2)
+        if _bmul is not None or self._r_has_beliefs(r):
+            # A-7: belief featureYields ride the pick key too (TS
+            # pickRivalBorderTile's ctx carries getRivalModifiers now)
+            featP = self._belief_feat_plane(r)
+            f_plane = f_plane + featP[:, :, 0]
+            p_plane = p_plane + featP[:, :, 1]
+            y_oth = y_oth + featP[:, :, 2:].sum(dim=2)
         # P5/S5 gate-catch (seed 9027 t239): tileYields returns ZERO for a
         # paved tile (yields.ts:37 — an orphaned district from a razed
         # city can be an unowned candidate, hills base 3 leaked into the
@@ -4457,7 +4613,7 @@ class BatchSim:
             + tiles.to(self.dtype)
         )
         for _ in range(64):  # the TS while-loop (multiple claims per turn, escalating cost)
-            cost = self._border_cost(self.rc_acquired[:, r, j])
+            cost = _rc_cost()  # A-7: belief border multiplier applied
             ready = cact & (self.rc_cbox[:, r, j] >= cost)
             if not bool(ready.any()):
                 return
@@ -5220,10 +5376,18 @@ class BatchSim:
                 bh_j = self.rc_bldg[:, r, j].double() @ self.rules.b_housing.to(dev).double()
                 farm_j = ((self.pair_dist[ctr_j] <= 3) & (self.rival_at == r) & (self.improvement == self.FARM)).sum(dim=1).double() * self._farm_housing  # computeHousing counts PILLAGED improvements too
                 housing_j = water_j + bh_j + farm_j
+                if self._r_has_beliefs(r):
+                    # A-7: Religious Community building housing + River
+                    # Goddess housing (rivalHousing's belief terms)
+                    housing_j = housing_j + torch.einsum("bn,bn->b", self.rc_bldg[:, r, j].double(), self._bel_add("bldgH", r))
+                    housing_j = housing_j + self._bel_add("river", r)[:, 1] * self.tile_river.gather(1, ctr_j.unsqueeze(1)).squeeze(1).double()
                 head_j = housing_j - self.rc_pop[:, r, j].double()
                 hfac = torch.where(head_j >= 2, torch.ones_like(head_j), torch.where(head_j >= 1, torch.full_like(head_j, 0.5), torch.full_like(head_j, 0.25)))
                 surplus = food - self.rules.food_per_citizen * self.rc_pop[:, r, j].double()
-                self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j], surplus), self.rc_growth[:, r, j])
+                # A-7: Fertility Rites — the belief growth multiplier rides the
+                # chain like computeCityStats (hf × tier × growthMult).
+                gmul = self._bel_mul("growth", r) if self._r_has_beliefs(r) else 1.0
+                self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j] * gmul, surplus), self.rc_growth[:, r, j])
                 p64 = self.rc_pop[:, r, j].double()
                 need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
                 grow = cact & (self.rc_growth[:, r, j] >= need)
@@ -5414,7 +5578,14 @@ class BatchSim:
                     comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0))
                     bmask_c = (self.rules_dev.b_req_district == d_cls).view(1, 1, -1)
                     nb_of = (self.rc_bldg[:, r] & bmask_c).sum(dim=2)  # [B, RC]
-                    pts = (comp_c.double() * (1.0 + nb_of.double())).sum(dim=1)
+                    # A-7 Divine Spark: the belief's flat GPP joins the
+                    # per-city term (1 + gppFlat + buildings), the
+                    # greatPersonPointsPerTurn form.
+                    if self._bel_any and cls < self._bel["pan"]["gpp"].shape[1]:
+                        gflat = self._bel_add("gpp", r)[:, cls].double().unsqueeze(1)  # [B, 1]
+                    else:
+                        gflat = torch.zeros(B, 1, dtype=torch.float64, device=dev)
+                    pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
                 else:
                     pts = torch.zeros(B, dtype=torch.float64, device=dev)
                 self.r_gpp[:, r, cls] = torch.where(
@@ -5454,16 +5625,28 @@ class BatchSim:
                     self.r_gpp[:, r, cls] = torch.where(hit, self.r_gpp[:, r, cls] - gcost, self.r_gpp[:, r, cls])
                     self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
 
-            # Pantheon / religion claims: the picks' identities are inert in
-            # covered scope, but the draws (and pool sizes) are not.
-            # P5/S5 (C-17): the pantheon costs pantheonFaithCost from the
-            # rival's own faith (deducted only when a pick lands, like TS);
-            # religion needs the player's canFoundReligion gates — pantheon,
-            # a completed Holy Site, an earned Prophet. The timers died.
+            # Pantheon / religion claims — A-7: the picks' IDENTITIES matter
+            # now (effects apply to this civ). The draw picks the k-th OPEN
+            # id in data order: TS open[floor(rand * open.length)] where the
+            # open list filters the claimed pool (the player's pantheon is
+            # null in scope). P5/S5 (C-17): the pantheon costs
+            # pantheonFaithCost from the rival's own faith (deducted only
+            # when a pick lands); religion needs the player's
+            # canFoundReligion gates — pantheon, completed Holy Site, an
+            # earned Prophet.
             pfc = float(rr.get("pantheonFaithCost", 25))
             pdue = active & ~self.r_pantheon_done[:, r] & (self.r_faith[:, r] >= pfc)
             popen = pdue & (self.pantheon_claimed_n < rr.get("pantheonPool", 8))
-            self._next_random(popen)
+            rp_ = self._next_random(popen)
+            if bool(popen.any()) and self._bel_any:
+                n_open = (~self.pan_claimed).sum(dim=1)
+                k = torch.floor(rp_ * n_open.to(torch.float64)).to(torch.long)
+                cum = (~self.pan_claimed).long().cumsum(dim=1)
+                sel = (~self.pan_claimed) & (cum == (k + 1).unsqueeze(1))
+                pid = sel.long().argmax(dim=1)
+                prow = popen.nonzero(as_tuple=True)[0]
+                self.pan_claimed[prow, pid[prow]] = True
+                self.r_pantheon[prow, r] = pid[prow]
             self.r_faith[:, r] = torch.where(popen, self.r_faith[:, r] - pfc, self.r_faith[:, r])
             self.pantheon_claimed_n = self.pantheon_claimed_n + popen.long()
             self.r_pantheon_done[:, r] = self.r_pantheon_done[:, r] | popen
@@ -5475,8 +5658,18 @@ class BatchSim:
                 has_hs = torch.zeros(B, dtype=torch.bool, device=dev)
             rdue = active & ~self.r_religion_done[:, r] & self.r_pantheon_done[:, r] & (self.r_prophets[:, r] > 0) & has_hs
             ropen = rdue & (self.claimed_f_n < rr.get("followerPool", 8)) & (self.claimed_o_n < rr.get("founderPool", 8))
-            self._next_random(ropen)
-            self._next_random(ropen)
+            rf_ = self._next_random(ropen)  # follower first, founder second — the TS draw order
+            ro_ = self._next_random(ropen)
+            if bool(ropen.any()) and self._bel_any:
+                rrow = ropen.nonzero(as_tuple=True)[0]
+                for claimed_m, ids_t, rnd in ((self.fol_claimed, self.r_follower, rf_), (self.fou_claimed, self.r_founder, ro_)):
+                    n_open = (~claimed_m).sum(dim=1)
+                    k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
+                    cum = (~claimed_m).long().cumsum(dim=1)
+                    sel = (~claimed_m) & (cum == (k + 1).unsqueeze(1))
+                    bid = sel.long().argmax(dim=1)
+                    claimed_m[rrow, bid[rrow]] = True
+                    ids_t[rrow, r] = bid[rrow]
             self.claimed_f_n = self.claimed_f_n + ropen.long()
             self.claimed_o_n = self.claimed_o_n + ropen.long()
             self.r_religion_done[:, r] = self.r_religion_done[:, r] | ropen
