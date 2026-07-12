@@ -106,7 +106,11 @@ import {
 } from '../src/data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
-const IMPROVEMENT_IDS = ['FARM', 'MINE', 'LUMBER_MILL'];
+// AUDIT A-13: the roster grew — indices 0-2 stay stable (every existing
+// plane/consumer keys on them); the resource-only improvements append.
+// FISHING_BOATS stays OUT: water-only, and a land builder can never stand
+// on the tile (unreachable in both engines).
+const IMPROVEMENT_IDS = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL'];
 // Canonical luxury catalog order for the per-tile `lux` plane.
 const LUXURY_IDS = Object.values(RESOURCES)
   .filter((r) => r.category === 'luxury')
@@ -215,6 +219,12 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
     : [0, 0, 0, 0, 0, 0, 0],
   perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
   fpw: def.effects.faithPerWonder ?? 0,  // A-4 activates this (Divine Inspiration)
+  // A-13 activates improvementYields (omitted while the targets were
+  // unbuildable): extra yields per improvement instance, [nImp, 6] in
+  // IMPROVEMENT_IDS order. The FISHING_BOATS row (God of the Sea) simply
+  // never exports — out of roster — so that belief stays inert, as in TS
+  // scope (the improvement is unreachable in both engines).
+  impY: IMPROVEMENT_IDS.map((id) => YIELD_KEYS.map((k) => def.effects.improvementYields?.[id]?.[k] ?? 0)),
   // improvements on a resource of a category (God of Craftsmen): rows by
   // category code 0 none / 1 bonus / 2 strategic / 3 luxury — the same
   // codes as the tile `res` priority plane. NOT unreachable: IRON/NITER/
@@ -231,10 +241,10 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   })(),
 });
 
-// Boost conditions the covered scope can actually trigger (everything else
-// — improvements, districts, great people, wonders, policies — is
-// structurally unreachable in this scenario for BOTH engines, so skipping
-// it preserves parity).
+// Boost conditions the covered scope can actually trigger. Still skipped
+// (structurally unreachable for BOTH engines, so parity holds): policy
+// rows, distinctTypes district rows (7 different districts — D3), and
+// FISHING_BOATS improvement rows (out of roster, water-unreachable).
 const boostRows: object[] = [];
 for (const [id, def] of Object.entries(BOOSTS)) {
   if (!def.check) continue;
@@ -255,12 +265,15 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     if (t !== undefined) row = { kind: 'tech', t };
   } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
   else if (c.kind === 'improvement') {
-    // Improvement eurekas for the improvements a builder can actually place
-    // (FARM=0, MINE=1, LUMBER_MILL=2). WHEEL/STEEL want a mine ON a resource,
-    // APPRENTICESHIP three mines, MASS_PRODUCTION a lumber mill, IRRIGATION a
-    // farmed resource. Out-of-scope improvements (quarry/pasture/...) can't be
-    // built, so their eurekas never fire in either engine — left skipped.
-    const imp = c.id === 'FARM' ? 0 : c.id === 'MINE' ? 1 : c.id === 'LUMBER_MILL' ? 2 : -1;
+    // Improvement eurekas for every improvement in the grown roster (A-13
+    // gate-catch, seed 9066 t57 rTechProg1: rival 1's first QUARRY at t48
+    // fired MASONRY's eureka in TS only — the old FARM/MINE/LUMBER
+    // hardcode left quarry/pasture rows unexported, so the GPU's research
+    // stream forked on the boosted cost). MASONRY (quarry) and
+    // HORSEBACK_RIDING (pasture) are live now; CELESTIAL_NAVIGATION
+    // (FISHING_BOATS) stays out — the improvement is out of roster,
+    // water-unreachable in both engines.
+    const imp = IMPROVEMENT_IDS.indexOf(c.id);
     if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
   } else if (c.kind === 'anyWonderBuilt') {
     // A-4: rival wonders make this REACHABLE (it was filtered as
@@ -490,11 +503,11 @@ const rules = {
   // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
   // beliefs now APPLY to rival civs. Row order = the data-file key order;
   // the claim draw picks the k-th OPEN id in this same order in both
-  // engines. improvementYields/faithPerWonder are OMITTED: their targets
-  // are structurally unreachable in scope (belief improvementYields touch
-  // only PASTURE/CAMP/FISHING_BOATS/QUARRY/PLANTATION — unbuildable until
-  // A-13; wonders — A-4). improvementOnResource IS shipped (impRes): mines
-  // on IRON/NITER/COAL exist today.
+  // engines. faithPerWonder shipped by A-4 (fpw); improvementYields shipped
+  // by A-13 (impY) now that PASTURE/CAMP/QUARRY/PLANTATION are buildable —
+  // only the FISHING_BOATS row stays out (water-unreachable in both
+  // engines). improvementOnResource shipped since A-7 (impRes): mines on
+  // IRON/NITER/COAL exist today.
   beliefs: {
     pantheons: Object.values(PANTHEONS).map(beliefRow),
     followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
@@ -591,6 +604,20 @@ const rules = {
   // builderIdx is BUILDER's roster position.
   improvements: {
     ids: IMPROVEMENT_IDS,
+    // AUDIT A-13: the dense per-improvement catalog — base yields (6 cols),
+    // housing, and the unlockImprovement tech index (-1 = baseline: FARM).
+    // The legacy scalar keys below stay (engine defaults ride them).
+    rows: IMPROVEMENT_IDS.map((id) => {
+      const def = IMPROVEMENTS[id as keyof typeof IMPROVEMENTS];
+      return {
+        id,
+        yields: YIELD_KEYS.map((k) => def.yields[k] ?? 0),
+        housing: def.housing,
+        unlock: techList.findIndex((t) =>
+          t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === id),
+        ),
+      };
+    }),
     // C1-B1 gate catch: an improved luxury (its OWN improvement, e.g. a mine
     // on Diamonds) grants +1 amenity to this many neediest cities.
     luxAmenityCities: LUXURY_AMENITY_CITIES,
@@ -717,8 +744,18 @@ function cheapestBuilding(state: GameState, city: City): string | null {
   return avail[0]?.id ?? null;
 }
 
+// A-13/A-15: seeds whose scripted game leaves the player with NO cities by
+// t100 (rivals grew strong enough to conquer the capital — the world working
+// as designed, but a dead player poisons the scripted fixture: the policy
+// closure keeps mutating a ghost capital no engine should have to mirror).
+// Each override rerolls JUST that index; off-script rollout games keep
+// covering collapse trajectories, so no coverage is lost. Diagnose a dying
+// seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
+const SEED_OVERRIDES: Record<number, number> = {
+  2: 9028, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
+};
 for (let s = 0; s < N_SEEDS; s++) {
-  const seed = 9001 + s * 13;
+  const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;
   // withVillages: false — goody-hut claiming (a fog-era mechanic with its
   // own reward rolls) is outside the ported scope, so the reference maps
   // must not carry huts a moving unit could trip over.
@@ -781,6 +818,12 @@ for (let s = 0; s < N_SEEDS; s++) {
       // feature id (A-7: belief featureYields — Lady of the Reeds tiles);
       // live via feat_stripped (chops/paves null features)
       fid: t.feature ? featIdx.get(t.feature) ?? -1 : -1,
+      // A-13 off-script gate catch (rng 2026006108 t81): foundCity strips
+      // ONLY a REMOVABLE feature (game.ts:209 / rivals.ts:144) — an OASIS/
+      // FLOODPLAINS center keeps its feature LIVE, and belief featureYields
+      // (Lady of the Reeds) apply to it. The GPU founding paths gate their
+      // feat_stripped/tdef writes on this bit.
+      frm: t.feature && FEATURES[t.feature].removable ? 1 : 0,
       // A-4: resource id (Stonehenge's live stone adjacency, strip-aware),
       // desert flag (Petra) and the static per-wonder placement bitmask
       // (LIVE terms — ownership, occupancy, radius, non-bonus resource,
@@ -900,6 +943,15 @@ for (let s = 0; s < N_SEEDS; s++) {
       // the same order riverMask bits use — so bit d = crossing toward
       // neighbor column d, both engines.
       rm: t.riverMask ?? 0,
+      // AUDIT A-13: the resource's own-improvement roster index — resource
+      // tiles accept exactly this improvement (validImprovements' resource
+      // branch). -1 = no resource; -9 = out of roster (FISHING_BOATS on sea
+      // resources: water tiles a land builder can never reach, both engines).
+      rq: (() => {
+        if (!t.resource) return -1;
+        const i = IMPROVEMENT_IDS.indexOf(RESOURCES[t.resource].improvement);
+        return i >= 0 ? i : -9;
+      })(),
       // FARM validity (phase 6a), STATIC part of validImprovements — split
       // by gate. fa_f: flat grass/plains (no feature) or floodplains,
       // ungated. fa_h: hill grass/plains (no feature), needs the hillFarms
@@ -1163,7 +1215,14 @@ for (let s = 0; s < N_SEEDS; s++) {
     }
     // (P2: scripted districts moved into the per-city production chain above —
     // the capital queues them at districtCost like every other build.)
+    // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's scripted game (the
+    // SEED_OVERRIDES diagnosis knob — see the map above).
+    const evBefore = state.eventLog.length;
     endTurn(state);
+    if (process.env.CIV6_EXPORT_DEBUG === String(seed)) {
+      for (const line of state.eventLog.slice(evBefore)) console.log(`t${state.turn - 1} ${line}`);
+      console.log(`t${state.turn - 1} cities=${state.cities.length} pop=${state.cities.map((c) => c.population).join(',')}`);
+    }
     for (const c of state.cities) {
       if (cityIds.includes(c.id)) continue;
       if (cityIds.length < C_MAX) { cityIds.push(c.id); continue; }
@@ -1180,10 +1239,12 @@ for (let s = 0; s < N_SEEDS; s++) {
     }
     trace.push(traceRow(state, cityIds, C_MAX, CS_MAX, R_MAX));
   }
-  // A collapsed empire is a legitimate outcome — loyalty flips ARE the
-  // hostile world working (the capital itself can never flip).
+  // A collapsed empire is a legitimate outcome for NON-capital cities —
+  // loyalty flips ARE the hostile world working. But rival CONQUEST can
+  // kill the capital too (A-13/A-15 made rivals strong enough); a fully
+  // dead player makes the fixture unusable → add a SEED_OVERRIDES entry.
   if (state.cities.length < 1) {
-    throw new Error(`seed ${seed}: no cities left by turn ${N_TURNS}`);
+    throw new Error(`seed ${seed}: no cities left by turn ${N_TURNS} — add a SEED_OVERRIDES entry (diagnose with CIV6_EXPORT_DEBUG=${seed})`);
   }
 
   const fixture = {

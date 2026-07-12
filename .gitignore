@@ -18,3 +18,4 @@ gpu/targets/
 gpu/**/__pycache__/
 gpu/runs/
 .idea/
+.claude/HANDOFF.md

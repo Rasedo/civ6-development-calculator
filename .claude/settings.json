@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -X utf8 -c \"import pathlib; p = pathlib.Path('.claude/HANDOFF.md'); print('=== POST-COMPACTION HANDOFF (.claude/HANDOFF.md) ===\\n' + p.read_text(encoding='utf-8') if p.exists() else 'No .claude/HANDOFF.md handoff file present.')\""
+          }
+        ]
+      }
+    ]
+  }
+}

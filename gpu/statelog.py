@@ -25,7 +25,12 @@ def _milli(x):
 def _imp_name(sim, i):
     global _IMP
     if _IMP is None:
-        _IMP = {sim.FARM: "FARM", sim.MINE: "MINE", sim.LUMBER: "LUMBER_MILL"}
+        # A-13: data-driven over the exported roster so QUARRY/PASTURE/CAMP/
+        # PLANTATION/OIL_WELL print by name (the TS statelog prints
+        # t.improvement verbatim — logdiff must align).
+        _IMP = dict(enumerate(getattr(sim, "_imp_ids", []) or []))
+        if not _IMP:
+            _IMP = {sim.FARM: "FARM", sim.MINE: "MINE", sim.LUMBER: "LUMBER_MILL"}
     return _IMP.get(i, f"#{i}") if i >= 0 else "-"
 
 

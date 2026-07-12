@@ -396,6 +396,17 @@ export function captureCityState(state: GameState, cs: CityState): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
   const center = state.map.tiles[cs.centerIndex];
+  // AUDIT A-16: the V-W2 slot cap applies here too — a full empire RAZES
+  // the city-state instead of annexing it (captureRivalCity's exact rule;
+  // the player could previously exceed 6 cities via CS conquest only, and
+  // the GPU documented a skip-at-full-pool divergence for this path).
+  if (state.cities.length >= 6) {
+    for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
+      if ((t.csId ?? -1) === cs.id) t.csId = undefined;
+    }
+    state.eventLog.push(`${cs.name} razed — the empire is full.`);
+    return;
+  }
   const id = state.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
     if ((t.csId ?? -1) === cs.id) {
@@ -496,6 +507,14 @@ function campCandidates(state: GameState): Tile[] {
     for (const c of state.cities) {
       const ct = state.map.tiles[c.centerIndex];
       if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
+    }
+    // AUDIT A-15: camp spacing respects RIVAL cities too (real Civ 6 —
+    // camps rise away from every civilization, not just the player).
+    for (const rv of state.rivals) {
+      for (const rc of rv.cities) {
+        const ct = state.map.tiles[rc.centerIndex];
+        if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
+      }
     }
     for (const campIdx of state.barbCamps) {
       const camp = state.map.tiles[campIdx];
@@ -610,8 +629,11 @@ export function barbarianPhase(state: GameState): void {
   }
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
-  // New camp?
-  if (state.cities.length > 0 && state.barbCamps.length < maxCamps && nextRandom(state) < 0.08) {
+  // New camp? AUDIT A-15: ANY live civilization sustains the barb world —
+  // rivals count, not just the player (the roll-gate short-circuit is part
+  // of the draw-count contract; both engines change together).
+  const anyCivCity = state.cities.length > 0 || state.rivals.some((r) => r.cities.length > 0);
+  if (anyCivCity && state.barbCamps.length < maxCamps && nextRandom(state) < 0.08) {
     const candidates = campCandidates(state);
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];

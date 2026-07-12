@@ -825,17 +825,18 @@ function rivalHasBuilder(state: GameState, rival: RivalCiv): boolean {
   return rival.cities.some((rc) => rc.queue[0]?.kind === 'unit' && rc.queue[0].unit === 'BUILDER');
 }
 
-/** C1-B5b: any owned, unimproved tile a rival builder could work right now? */
+/** C1-B5b: any owned LAND tile a rival builder could work right now?
+ * AUDIT A-13: every improvement validImprovementsIn offers under the rival's
+ * own unlocks counts (resource improvements included), plus pillaged tiles
+ * (repair jobs) — mirrors the GPU job mask exactly. Water improvements are
+ * unreachable (a land builder can never stand on the tile). */
 function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boolean {
   const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
-  // Design scope: rival builders place FARM/MINE/LUMBER_MILL only (resource
-  // improvements like PASTURE/CAMP are a later stage) — mirrors the GPU's
-  // farm/mine/lumber job masks exactly.
   return state.map.tiles.some(
     (t) =>
       owns(t) &&
-      !t.improvement &&
-      validImprovementsIn(t, { unlocks, ownsTile: owns }).some((i) => i === 'FARM' || i === 'MINE' || i === 'LUMBER_MILL'),
+      !isWater(t) &&
+      (t.pillaged || (!t.improvement && validImprovementsIn(t, { unlocks, ownsTile: owns }).length > 0)),
   );
 }
 
@@ -843,7 +844,8 @@ function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boole
  * C1-B5b: rival builder actions — on a valid owned unimproved tile, build the
  * option with the best Δ tileScore under defaultModifiers (owner boosts land
  * in B5b-iii); Δ per improvement is its flat catalog yields, so ties resolve
- * by validImprovementsIn's FARM > MINE > LUMBER_MILL order via strict `>`.
+ * by validImprovementsIn's return order via strict `>` (a resource tile
+ * offers exactly its resource's improvement — A-13).
  * Otherwise single-step toward the nearest job (dist·(T+1)+index key, then
  * the tileFreeForUnit neighbor closest to it, ties to direction order,
  * moving only if strictly closer) — the exporter's player builder walk with
@@ -862,9 +864,20 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // unit civId = RAW rival id; tile ownership = unified civ space
     if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
     const bt = state.map.tiles[u.tileIndex];
-    const options = (!bt.improvement ? validImprovementsIn(bt, vopts) : []).filter(
-      (i) => i === 'FARM' || i === 'MINE' || i === 'LUMBER_MILL',
-    );
+    // AUDIT A-13: REPAIR first — standing on an owned pillaged tile clears
+    // the flag with builderRepair's exact semantics (no charge, the turn is
+    // spent). Barbarian raids on rival farmland finally get answered.
+    if (bt.pillaged && owns(bt)) {
+      bt.pillaged = false;
+      u.movesLeft = 0;
+      continue;
+    }
+    // AUDIT A-13: the FARM/MINE/LUMBER_MILL filter is GONE — rival builders
+    // place every improvement validImprovementsIn offers under their own
+    // unlocks (QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL; resource tiles offer
+    // exactly the resource's improvement). Water improvements are
+    // unreachable — a land builder can never stand on the tile.
+    const options = !bt.improvement ? validImprovementsIn(bt, vopts) : [];
     if (options.length > 0) {
       let bestImp = options[0];
       let bestGain = -Infinity;
@@ -888,12 +901,14 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
       if (u.charges <= 0) disbandUnit(state, u.id);
       continue;
     }
-    // walk toward the nearest job
+    // walk toward the nearest job — A-13: a job is any owned LAND tile that
+    // is unimproved-and-buildable (any improvement) OR pillaged (repair).
     let best = -1;
     let bestKey = Infinity;
     for (const t of state.map.tiles) {
-      if (!owns(t) || t.improvement) continue;
-      if (!validImprovementsIn(t, vopts).some((i) => i === 'FARM' || i === 'MINE' || i === 'LUMBER_MILL')) continue;
+      if (!owns(t) || isWater(t)) continue;
+      const isJob = t.pillaged || (!t.improvement && validImprovementsIn(t, vopts).length > 0);
+      if (!isJob) continue;
       const key = hexDistance(bt.col, bt.row, t.col, t.row) * (nTiles + 1) + t.index;
       if (key < bestKey) {
         bestKey = key;

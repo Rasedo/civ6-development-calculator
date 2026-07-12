@@ -82,6 +82,7 @@ const NU = roll.unitIds.length;
 const SCAFFOLD = roll.scaffold ?? [];
 let failures = 0;
 let games = 0;
+let skipped = 0; // resume mode: games without a checkpoint
 let worst = 0;
 
 for (const game of roll.games) {
@@ -112,7 +113,11 @@ for (const game of roll.games) {
   let t0 = 0;
   if (RESUME_T !== null) {
     const ckf = `${CKPT_DIR}/ts_${game.rng}_t${RESUME_T}.json`;
-    if (!existsSync(ckf)) continue;
+    if (!existsSync(ckf)) {
+      games -= 1;
+      skipped += 1;
+      continue;
+    }
     const wrapped = JSON.parse(readFileSync(ckf, 'utf8'));
     state = deserialize(wrapped.state);
     cityIds = wrapped.cityIds;
@@ -345,6 +350,13 @@ if (LOG_RNG !== null) {
   console.log(`state log ${logLines.length} lines -> gpu/fixtures/ts_statelog.txt`);
 }
 
+if (skipped > 0) console.log(`resume: ${skipped} game(s) skipped (no ts_<rng>_t${RESUME_T} checkpoint)`);
+if (games === 0) {
+  // A-13 hunt trap: RESUME_T with a cleared ckpt dir skipped EVERY game and
+  // printed a vacuous PARITY OK — a zero-game run is never a pass.
+  console.log('REPLAY VACUOUS — 0 games replayed');
+  process.exit(1);
+}
 if (failures === 0) {
   console.log(
     `REPLAY PARITY OK — ${games} random games × ${roll.games[0]?.trace.length ?? 0} turns replayed through the TS engine: ` +

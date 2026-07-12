@@ -619,6 +619,7 @@ class BatchSim:
             _nf = len(_rows[0]["featY"]) if _rows else 1
             _nb = len(_rows[0]["bldgY"]) if _rows else 1
             _ng = len(_rows[0]["gpp"]) if _rows else 1
+            _ni = len(_rows[0]["impY"]) if _rows and "impY" in _rows[0] else 1  # A-13
             self._bel[_pool] = {
                 "featY": torch.tensor([[[0.0] * 6] * _nf] + [x["featY"] for x in _rows], dtype=torch.float64, device=device),
                 "bldgY": torch.tensor([[[0.0] * 6] * _nb] + [x["bldgY"] for x in _rows], dtype=torch.float64, device=device),
@@ -633,6 +634,13 @@ class BatchSim:
                 "perC": torch.tensor([[0.0] * 6] + [x["perC"] for x in _rows], dtype=torch.float64, device=device),
                 "impRes": torch.tensor([[[0.0] * 6] * 4] + [x.get("impRes", [[0.0] * 6] * 4) for x in _rows], dtype=torch.float64, device=device),
                 "fpw": torch.tensor([0.0] + [float(x.get("fpw", 0)) for x in _rows], dtype=torch.float64, device=device),  # A-4 activates
+                # A-13 activates improvementYields ([nBel+1, nImp, 6], row 0
+                # = the unclaimed pad): PASTURE/CAMP/QUARRY/PLANTATION are
+                # buildable now (the FISHING_BOATS row never exports).
+                "impY": torch.tensor(
+                    [[[0.0] * 6] * _ni] + [x.get("impY", [[0.0] * 6] * _ni) for x in _rows],
+                    dtype=torch.float64, device=device,
+                ),
             }
         self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
         # A-14: rival projects — rows {d: district idx, y: yield col, g: GP class}
@@ -659,6 +667,11 @@ class BatchSim:
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_petra = torch.tensor([bool(w.get("petra", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)  # [nW]
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # A-13 off-script gate catch (rng 2026006108 t81): foundCity strips
+        # ONLY a REMOVABLE feature — an OASIS/FLOODPLAINS center keeps its
+        # feature LIVE (belief featureYields still apply there). Founding
+        # paths gate their feat_stripped/tdef writes on this bit.
+        self.feat_removable = torch.tensor([[bool(t.get("frm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         for b, f in enumerate(fixtures):
             for r_ in f.get("rivals", []):
                 rid = r_["id"]
@@ -730,6 +743,7 @@ class BatchSim:
         imp = rules.improvements or {}
         ids = imp.get("ids", [])
         self.improvements_on = bool(ids)
+        self._imp_ids = list(ids)  # A-13: roster names (statelog TI lines)
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
@@ -753,6 +767,23 @@ class BatchSim:
         mbt = imp.get("mineBoostTechs", [])  # [[techIdx, prodAmount], ...]
         self._mine_boost_tech = torch.tensor([x[0] for x in mbt], dtype=torch.long, device=device)
         self._mine_boost_amt = torch.tensor([float(x[1]) for x in mbt], dtype=dtype, device=device)
+        # AUDIT A-13: the dense per-improvement catalog (base yields [nI, 6],
+        # housing [nI], unlockImprovement tech idx [nI]; -1 = baseline FARM)
+        # and the per-tile resource-improvement plane rq: resource tiles
+        # accept exactly this roster index (-1 no resource, -9 out of roster
+        # = FISHING_BOATS on sea resources, unreachable in both engines).
+        irows = imp.get("rows", [])
+        nI = max(len(ids), 1)
+        self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
+        self._imp_housing = torch.zeros(nI, dtype=dtype, device=device)
+        self._imp_unlock = torch.full((nI,), -1, dtype=torch.long, device=device)
+        for i, row in enumerate(irows):
+            self._imp_yields[i] = torch.tensor(row["yields"], dtype=dtype)
+            self._imp_housing[i] = float(row["housing"])
+            self._imp_unlock[i] = int(row["unlock"])
+        self.res_imp = torch.tensor(
+            [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
+        )
         self.farm_flat = torch.tensor([[t.get("fa_f", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.farm_hill = torch.tensor([[t.get("fa_h", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.mine_ok = torch.tensor([[t.get("mi", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -1264,6 +1295,13 @@ class BatchSim:
             out = out + ((self.improvement == self.MINE) & live).to(self.dtype) * mine_prod
         if self.LUMBER >= 0:
             out = out + ((self.improvement == self.LUMBER) & live).to(self.dtype) * self._lumber_prod
+        # AUDIT A-13: the grown roster (QUARRY/PASTURE/CAMP/PLANTATION/
+        # OIL_WELL, idx >= 3) adds its catalog production via the dense
+        # table — FARM/MINE/LUMBER keep their bespoke terms above so the
+        # old paths stay bit-identical.
+        new_imp = self.improvement >= 3
+        if bool(new_imp.any()):
+            out = out + (new_imp & live).to(self.dtype) * self._imp_yields[self.improvement.clamp(min=0), 1]
         return out
 
     def _neutral_prod(self) -> torch.Tensor:
@@ -1285,6 +1323,12 @@ class BatchSim:
             out = out + ((self.improvement == self.MINE) & live).to(self.dtype) * self._mine_prod
         if self.LUMBER >= 0:
             out = out + ((self.improvement == self.LUMBER) & live).to(self.dtype) * self._lumber_prod
+        # AUDIT A-13: the grown roster's catalog production — context-free
+        # (IMPROVEMENTS[imp].yields applies under defaultModifiers too; only
+        # the player's mine-boost ctx.mods stay out of the neutral plane).
+        new_imp = self.improvement >= 3
+        if bool(new_imp.any()):
+            out = out + (new_imp & live).to(self.dtype) * self._imp_yields[self.improvement.clamp(min=0), 1]
         self._nprod_cache = (self._eff_version, out)
         return out
 
@@ -1306,6 +1350,12 @@ class BatchSim:
         ty[:, :, 0] = self._eff_food()
         if self.improvements_on:
             ty[:, :, 1] = self._eff_prod()
+            # AUDIT A-13: gold+ columns — CAMP/PLANTATION add catalog gold.
+            # Generic over the whole roster (cols 2-5 are zero for the rest),
+            # pillage-suspended like every improvement yield.
+            live_imp = (self.improvement >= 0) & ~self.pillaged
+            if bool(live_imp.any()):
+                ty[:, :, 2:] = ty[:, :, 2:] + self._imp_yields[self.improvement.clamp(min=0), 2:] * live_imp.unsqueeze(-1).to(ty.dtype)
         # V-H1: a chopped (or founding-stripped) tile loses its feature's own
         # yields on every column — TS reads tile.feature === null live. The
         # center path is untouched (it reads the neutral planes and applies
@@ -1873,15 +1923,14 @@ class BatchSim:
             water_h = torch.where(has_aq, aq_h, self.water_housing)
         housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + torch.einsum("bcn,n->bc", bf, rd.b_housing)
         if self.improvements_on:
-            # +housing per owned FARM tile within the work radius (pillaged or
-            # not — computeHousing does not gate on pillaged, unlike yields).
-            # Only FARM carries housing (0.5); MINE/LUMBER_MILL housing is 0 in
-            # TS (IMPROVEMENTS.MINE/LUMBER_MILL.housing === 0), so a mine or
-            # lumber mill must NOT be credited farm housing.
+            # +catalog housing per owned improvement within the work radius
+            # (pillaged or not — computeHousing does not gate on pillaged,
+            # unlike yields). A-13: table-gathered — FARM/PASTURE/CAMP/
+            # PLANTATION carry 0.5, MINE/LUMBER/QUARRY/OIL_WELL carry 0.
             imp_win = self.improvement.gather(1, tcf).reshape(B, C, M)
             owned_c = self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids
-            imp_owned = (tiles >= 0) & owned_c & (imp_win == self.FARM)
-            housing = housing + imp_owned.to(self.dtype).sum(dim=2) * self._farm_housing
+            imp_owned = (tiles >= 0) & owned_c & (imp_win >= 0)
+            housing = housing + (self._imp_housing[imp_win.clamp(min=0)] * imp_owned.to(self.dtype)).sum(dim=2)
 
         # Dead slots contribute nothing (their static center yields are preloaded).
         total = total * self.alive.unsqueeze(2).to(self.dtype)
@@ -2877,11 +2926,11 @@ class BatchSim:
         Territory within radius 2 whose csId matches transfers (owner set
         only where unclaimed — TS `if (t.cityId === -1)`), pop lands at
         x0.75 (min 1), the new city starts at half HP with zero boxes and
-        zero tilesAcquired. NOTE a TS quirk kept as-is: captureCityState has
-        NO city-cap raze rule (unlike captureRivalCity) and pushes past 6;
-        the fixed GPU slots cannot, so at a full empire only the CS removal
-        happens — unreachable in practice (a 6-city empire grinding a CS to
-        0 HP), tracked in gpu/AUDIT.md C-11b notes."""
+        zero tilesAcquired. AUDIT A-16: the V-W2 slot cap applies here too —
+        a FULL empire (>= 6 live cities) RAZES the city-state instead of
+        annexing it (captureRivalCity's exact rule, now shared by TS; the
+        old TS quirk pushed past 6 while the fixed GPU slots could not —
+        that documented skip-at-full-pool divergence is gone)."""
         for i in range(len(rows)):
             b = int(rows[i]); s = int(cs_of[rows[i]])
             c_t = int(self.cs_center[b, s])
@@ -2889,9 +2938,13 @@ class BatchSim:
             self.cs_alive[b, s] = False
             ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
             self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
+            # AUDIT A-16: raze at TS's count (state.cities.length >= 6) —
+            # the CS dies and its ring frees, but NO city is founded (TS
+            # early-returns before nextCityId++).
+            if int(self.alive[b].sum()) >= 6:
+                continue
             # P5/S2: append at the founding HIGH-WATER mark like TS (trace
-            # column order — see _capture_rival_city); NO count cap here
-            # (the documented TS quirk: captureCityState pushes past 6).
+            # column order — see _capture_rival_city).
             c_new = int(self.founded_n[b])
             if c_new >= self.C:
                 free = (~self.alive[b]).nonzero(as_tuple=True)[0]
@@ -3449,11 +3502,14 @@ class BatchSim:
         cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
         city_max_hp = int(cb.get("cityMaxHp", 200))
 
-        # New camp? One draw whenever below the cap AND the player still holds a
-        # city — TS short-circuits on `state.cities.length > 0` (combat.ts), so a
-        # collapsed player (0 cities, reachable off-script) skips the roll entirely.
+        # New camp? One draw whenever below the cap AND any CIVILIZATION
+        # still holds a city — A-15: the TS gate is anyCivCity now (player
+        # OR rival cities; real Civ 6 barbs don't die with the player), so
+        # only a fully citiless world skips the roll. The short-circuit is
+        # part of the draw-count contract, both engines changed together.
         # A second draw picks the spot only if any candidate exists.
-        can_roll = self.alive.any(dim=1) & (self.n_camps < self.max_camps)
+        any_city = self.alive.any(dim=1) | self.rc_alive.reshape(B, -1).any(dim=1)
+        can_roll = any_city & (self.n_camps < self.max_camps)
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
         if bool(want.any()):
@@ -3462,7 +3518,12 @@ class BatchSim:
             # t.district LIVE — an ORPHANED pave (razed city's district on an
             # unowned tile) padded the GPU set and shifted the draw-indexed
             # camp spot one candidate over. camp_ok is static; paves aren't.
-            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city & (self.district < 0) & (self.built_wonder < 0)  # A-4: live builtWonder excludes too
+            # AUDIT A-15: camps rise away from EVERY civilization — live
+            # RIVAL city centers repel candidates too (real Civ 6; the TS
+            # campCandidates twin loop).
+            rcc = self.rc_center.reshape(B, -1)
+            near_rc = ((self.pair_dist[rcc.clamp(min=0)] < 5) & self.rc_alive.reshape(B, -1).unsqueeze(2)).any(dim=1)
+            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city & ~near_rc & (self.district < 0) & (self.built_wonder < 0)  # A-4: live builtWonder excludes too
             if self.K > 0:
                 camp_d = self.pair_dist[self.camp_tile.clamp(min=0)].to(torch.long)  # [B, K, T]
                 near_camp = ((camp_d < 5) & (self.camp_tile >= 0).unsqueeze(2)).any(dim=1)
@@ -4102,10 +4163,14 @@ class BatchSim:
                         self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
 
     def _rival_job_mask(self, r: int, techs: torch.Tensor | None = None, civics: torch.Tensor | None = None) -> torch.Tensor:
-        """[B, T] tiles a rival-r builder could improve NOW: civ-owned,
-        unimproved, un-districted, not a center — FARM (baseline; hills gate
-        on the rival's hillFarms civic), MINE/LUMBER on the rival's unlock
-        techs. Mirrors validImprovementsIn under the rival's unlocks."""
+        """[B, T] tiles a rival-r builder could work NOW: civ-owned and
+        either BUILDABLE (unimproved, un-districted, not a center — FARM
+        baseline with the hillFarms civic gate, MINE/LUMBER on the rival's
+        unlock techs, and since A-13 the resource roster QUARRY/PASTURE/
+        CAMP/PLANTATION/OIL_WELL on THEIR unlock techs) or PILLAGED (A-13
+        repair jobs — rivalHasJob's t.pillaged branch consults no validity
+        gates; pillage implies a live improvement implies land, so no water
+        term is needed). Mirrors rivalHasJob under the rival's unlocks."""
         B = self.B
         # TS computes rivalUnlocks ONCE at phase top (pre-research-advance);
         # callers past the advance must pass that snapshot or diverge on the
@@ -4118,14 +4183,21 @@ class BatchSim:
             ok = ok | (self.mine_ok & tk[:, self._mine_unlock_tech].unsqueeze(1))
         if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
             ok = ok | (self.lumber_ok & tk[:, self._lumber_unlock_tech].unsqueeze(1))
+        # A-13: grown-roster resource tiles (rq >= 3; rq 0-2 resource tiles
+        # already ride the fa_f/mi planes with the right gates).
+        new_res = self.res_imp >= 3
+        if bool(new_res.any()):
+            unlocked = tk.gather(1, self._imp_unlock[self.res_imp.clamp(min=0)].clamp(min=0))
+            ok = ok | (new_res & unlocked)
+        owned = self.rival_at == r
         return (
-            (self.rival_at == r)
+            owned
             & (self.improvement < 0)
             & (self.district < 0)
             & (self.built_wonder < 0)  # A-8 gate-catch: an in-flight wonder pave refuses jobs (validImprovementsIn twin)
             & (self.rvcity_at < 0)
             & ok
-        )
+        ) | (owned & self.pillaged)
 
     def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int) -> torch.Tensor:
         """C1-B5b: spawn a rival BUILDER — the civilian twin of _spawn_rival
@@ -4156,10 +4228,13 @@ class BatchSim:
 
     def _rival_builder_actions(self, r: int, active: torch.Tensor, techs0: torch.Tensor | None = None, civics0: torch.Tensor | None = None) -> None:
         """C1-B5b: mirrors rivalBuilderActions — per builder (slot order =
-        units order): build the best-gain valid improvement HERE (gains are
-        constants per option since improvement yields are flat adds; strict >
-        keeps FARM > MINE > LUMBER on ties), else single-step toward the
-        nearest job (dist·(T+1)+idx target key; neighbor strictly closer,
+        units order): REPAIR the owned pillaged tile underfoot first (A-13:
+        builderRepair semantics — no charge, the turn is spent), else build
+        the best-gain valid improvement HERE (gains are constants per option
+        since improvement yields are flat adds; strict > keeps the
+        validImprovementsIn order on ties; a resource tile offers exactly
+        its resource's improvement), else single-step toward the nearest
+        job (dist·(T+1)+idx target key; neighbor strictly closer,
         rciv-blocked, ties to direction order). Zero RNG."""
         B, T, dev = self.B, self.T, self.device
         gains = self.rules.rivals.get("builder", {}).get("gains", [1.0, 1.0, 1.0])
@@ -4173,6 +4248,20 @@ class BatchSim:
                 continue
             here = self.v_tile[:, u].clamp(min=0)
             jobm = self._rival_job_mask(r, techs=techs0, civics=civics0)
+            # A-13: REPAIR first — TS checks bt.pillaged && owns(bt) before
+            # any build/walk; no charge is spent, movesLeft goes 0 (v_acted),
+            # and the yield change bumps the version.
+            own_h = self.rival_at.gather(1, here.unsqueeze(1)).squeeze(1) == r
+            pill_h = self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
+            rep = act & own_h & pill_h
+            if bool(rep.any()):
+                rows = rep.nonzero(as_tuple=True)[0]
+                self.pillaged[rows, here[rows]] = False
+                self.v_acted[rows, u] = True
+                self._eff_version += 1
+                act = act & ~rep
+                if not bool(act.any()):
+                    continue
             here_ok = jobm.gather(1, here.unsqueeze(1)).squeeze(1)
             build = act & here_ok
             if bool(build.any()):
@@ -4215,6 +4304,21 @@ class BatchSim:
                     better = v & (og > best_g)
                     pick = torch.where(better, torch.full_like(pick, imp_i), pick)
                     best_g = torch.where(better, og, best_g)
+                # A-13: a grown-roster resource tile offers exactly its
+                # resource's improvement (validImprovementsIn's resource
+                # branch), gated by the rival's own unlock tech; gain =
+                # catalog yields · focus_base (the Δ-gain ctx is
+                # modifiersFromResearch — no belief terms). Disjoint from
+                # farm/mine/lumber: rq >= 3 tiles carry none of those
+                # planes, so option order can't matter.
+                rq_h = self.res_imp.gather(1, here.unsqueeze(1)).squeeze(1)
+                res_v = rq_h >= 3
+                if bool(res_v.any()):
+                    res_v = res_v & tk0.gather(1, self._imp_unlock[rq_h.clamp(min=0)].clamp(min=0).unsqueeze(1)).squeeze(1)
+                    res_g = (self._imp_yields[rq_h.clamp(min=0)].double() * wt).sum(dim=1) * unpil
+                    better = res_v & (res_g > best_g)
+                    pick = torch.where(better, rq_h, pick)
+                    best_g = torch.where(better, res_g, best_g)
                 rows = (build & (pick >= 0)).nonzero(as_tuple=True)[0]
                 if len(rows):
                     self.improvement[rows, here[rows]] = pick[rows]
@@ -4299,6 +4403,13 @@ class BatchSim:
         f_base = (self._eff_food() if (self.disasters or self.improvements_on) else self.tile_yields[:, :, 0]) - self.feat_yields[:, :, 0] * fs
         p_plane = self._neutral_prod() - self.feat_yields[:, :, 1] * fs
         ty_oth = self.tile_yields - self.feat_yields * fs.unsqueeze(-1)  # strip-adjusted static (cols 2-5)
+        # AUDIT A-13: CAMP/PLANTATION catalog gold joins the static columns
+        # (TS tileYields adds improvement yields in every context; pillage
+        # suspends them). Cols 0/1 stay untouched — food/production ride
+        # f_base/p_plane, adding here would double-count.
+        if self.improvements_on:
+            live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
+            ty_oth[:, :, 2:] = ty_oth[:, :, 2:] + self._imp_yields[self.improvement.clamp(min=0), 2:] * live_imp.unsqueeze(-1)
         w = self.rules_dev.focus_base.double()
         oth_score = (ty_oth[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2)  # [B, T]
         g = {"fs": fs, "f_base": f_base, "p_plane": p_plane, "ty_oth": ty_oth, "oth_score": oth_score, "w": w, "f_r": {}}
@@ -4344,9 +4455,11 @@ class BatchSim:
         """A-7: [B, T, 6] belief TILE adds — featureYields at tiles with a
         LIVE feature (fid >= 0 and not stripped) plus improvementOnResource
         at unpillaged improvements on a LIVE resource (category = the res
-        priority code; the A-7 hunt's catch — strategic MINEs exist today).
-        TS adds both inside tileYields, so they ride every consumer:
-        worked-tile picks and yields, scores, the border ySum."""
+        priority code; the A-7 hunt's catch — strategic MINEs exist today)
+        plus, since A-13, improvementYields at unpillaged improvements
+        (yields.ts:49-53 — God of the Open Sky pastures etc. are buildable
+        now). TS adds all three inside tileYields, so they ride every
+        consumer: worked-tile picks and yields, scores, the border ySum."""
         featA = self._bel_add("featY", r)  # [B, nFeat, 6]
         plane = featA.gather(1, self.feat_id.clamp(min=0).unsqueeze(2).expand(-1, -1, 6))
         live = ((self.feat_id >= 0) & ~self.feat_stripped).unsqueeze(2).to(plane.dtype)
@@ -4357,7 +4470,14 @@ class BatchSim:
             self.res_priority.clamp(max=3),
             torch.zeros_like(self.res_priority),
         )  # 0 = no add (pad row)
-        return plane + impA.gather(1, cat.unsqueeze(2).expand(-1, -1, 6))
+        plane = plane + impA.gather(1, cat.unsqueeze(2).expand(-1, -1, 6))
+        # A-13: belief improvementYields, gathered by the tile's improvement
+        # (unpillaged; no resource condition — TS keys on the improvement
+        # alone). The gather pad (idx 0 = FARM) is masked dead by imp_live.
+        impY = self._bel_add("impY", r)  # [B, nImp, 6]
+        imp_live = ((self.improvement >= 0) & ~self.pillaged).unsqueeze(2).to(plane.dtype)
+        plane = plane + impY.gather(1, self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)) * imp_live
+        return plane
 
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
@@ -4792,6 +4912,12 @@ class BatchSim:
             boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1)
             p_plane = p_plane + ((self.improvement == self.MINE) & ~self.pillaged).to(self.dtype) * boost_r.unsqueeze(1)
         y_oth = (self.tile_yields[:, :, 2:] - self.feat_yields[:, :, 2:] * g["fs"].unsqueeze(-1)).sum(dim=2)
+        # AUDIT A-13: CAMP/PLANTATION catalog gold joins the border ySum
+        # (the task-#39 _farmadj_food twin — TS tileYields carries it, and
+        # orphaned improvements DO reach frontier candidates after a raze).
+        if self.improvements_on:
+            live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
+            y_oth = y_oth + self._imp_yields[self.improvement.clamp(min=0), 2:].sum(dim=2) * live_imp
         if _bmul is not None or self._r_has_beliefs(r):
             # A-7: belief featureYields ride the pick key too (TS
             # pickRivalBorderTile's ctx carries getRivalModifiers now)
@@ -4954,9 +5080,15 @@ class BatchSim:
         # and the improvement dies with it. Idempotence guard mirrors the
         # player founding twin: a previously CHOPPED tile has nothing left
         # to withdraw. t0 capitals bake the strip into the exported statics.
-        self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
-        fresh_f = ~self.feat_stripped[rows, s_idx]
-        self.feat_stripped[rows, s_idx] = True
+        # A-13 gate catch (rng 2026006108 t81): an UNREMOVABLE feature
+        # (oasis/floodplains) survives the founding LIVE (rivals.ts:144) —
+        # Lady of the Reeds kept feeding the TS center +2⚙ while the GPU's
+        # blanket feat_stripped starved _belief_feat_plane; both writes
+        # gate on feat_removable.
+        frm_f = self.feat_removable[rows, s_idx]
+        self.tdef[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tdef[rows, s_idx])
+        fresh_f = ~self.feat_stripped[rows, s_idx] & frm_f
+        self.feat_stripped[rows, s_idx] |= frm_f
         self.improvement[rows, s_idx] = -1
         # P5/S5 gate-catch (seed 9027 t169): foundRivalCity does NOT clear
         # tile.pillaged — a pillaged farm's flag survives the founding (the
@@ -5905,7 +6037,11 @@ class BatchSim:
                     wh_c,
                 )
                 bh_j = self.rc_bldg[:, r, j].double() @ self.rules.b_housing.to(dev).double()
-                farm_j = ((self.pair_dist[ctr_j] <= 3) & (self.rival_at == r) & (self.improvement == self.FARM)).sum(dim=1).double() * self._farm_housing  # computeHousing counts PILLAGED improvements too
+                # A-13: table-gathered improvement housing (rivalHousing reads
+                # the catalog generically); computeHousing counts PILLAGED
+                # improvements too.
+                imp_own_j = (self.pair_dist[ctr_j] <= 3) & (self.rival_at == r) & (self.improvement >= 0)
+                farm_j = (self._imp_housing[self.improvement.clamp(min=0)].double() * imp_own_j.double()).sum(dim=1)
                 housing_j = water_j + bh_j + farm_j
                 if self._r_has_beliefs(r):
                     # A-7: Religious Community building housing + River
@@ -7248,8 +7384,13 @@ class BatchSim:
             # rainforest/marsh that carry +3 defense — so the center tile's
             # terrain defense drops to its hills component. (Rival founding
             # strips too since P5/S3 — its own twin in _rival_try_found;
-            # city-state founding still does NOT strip.)
-            self.tdef[rows, s_idx] = self.hills[rows, s_idx].long() * 3
+            # city-state founding still does NOT strip.) A-13 gate catch:
+            # an UNREMOVABLE feature (oasis/floodplains) survives the
+            # founding LIVE (game.ts:209 gates on removable) — belief
+            # featureYields keep applying to that center, so both writes
+            # gate on feat_removable.
+            frm_f = self.feat_removable[rows, s_idx]
+            self.tdef[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tdef[rows, s_idx])
             # ...and the feature's own yields + any improvement die with the
             # founding (tile.improvement = null; feature = null) — a later
             # loyalty flip reads this center STRIPPED (C1-B3 gate catch).
@@ -7259,8 +7400,8 @@ class BatchSim:
             # _strip_feature_at double-strip caught at seed 9040 t132).
             # P5/S5: tile.pillaged is NOT cleared — foundCity never touches
             # it (a pillaged improvement's flag outlives the improvement).
-            fresh_f = ~self.feat_stripped[rows, s_idx]
-            self.feat_stripped[rows, s_idx] = True
+            fresh_f = ~self.feat_stripped[rows, s_idx] & frm_f
+            self.feat_stripped[rows, s_idx] |= frm_f
             self.improvement[rows, s_idx] = -1
             self._eff_version += 1
             # ...and drops the district adjacency that feature lent to neighbours:

@@ -103,9 +103,10 @@ revalidation LANDED in the S6+S8 close):
   MINEs on IRON/NITER/COAL exist today, two −1-production cities at rng
   2026006082 t127), building yields/housing, Work Ethic, growth/border
   multipliers, Divine Spark GPP, River Goddess + Zen amenities/housing,
-  founder incomes to the capital. Belief improvementYields + 
-  faithPerWonder stay table-omitted until their targets exist (A-13
-  improvements, A-4 wonders — wire them there). REMAINING (re-scoped):
+  founder incomes to the capital. faithPerWonder shipped with A-4 (fpw);
+  improvementYields shipped with A-13 (impY, applied in
+  _belief_feat_plane — only the FISHING_BOATS row stays out, its target
+  is water-unreachable in both engines). REMAINING (re-scoped):
   government/policy machinery for rivals — build with the policy-breadth
   stage (task #46/B-13).
 - A-8. **RESOLVED (2026-07-12, task #39)**: all three rival walkers (war
@@ -139,29 +140,89 @@ revalidation LANDED in the S6+S8 close):
 - A-11. Rivals have no trade routes (trade.ts player-keyed).
 - A-12. Rivals don't interact with city-states (no envoys/influence/levy;
   can't even attack CS — combat.ts:171-177 gates csTarget to the player).
-- A-13. Rival builders: FARM/MINE/LUMBER only — no resource improvements
-  (PASTURE/CAMP/PLANTATION/FISHING_BOATS/QUARRY), no chop/harvest, and
-  no REPAIR (C-4b: the player's builderRepair exists, units.ts:411-419 —
-  the rival half is the open part; repair also grows the RL action space,
-  so it stays its own stage).
+- A-13. **RESOLVED (2026-07-12, task #40)**: the improvement roster grew
+  3→8 — [FARM, MINE, LUMBER_MILL, QUARRY, PASTURE, CAMP, PLANTATION,
+  OIL_WELL], indices 0-2 stable so every existing plane/consumer keeps
+  its meaning. Rivals build ALL of them: a resource tile offers exactly
+  its resource's improvement (validImprovementsIn's branch; the new
+  per-tile `rq` plane + per-improvement unlock/yields/housing tables in
+  rules.json), unlock-gated on the RIVAL's own techs (PASTURE/CAMP←
+  Animal Husbandry, QUARRY←Mining, PLANTATION←Irrigation, OIL_WELL←
+  Steel). Yields ride _eff_prod/_eff_yields/_neutral_prod + the rival
+  ty_oth/y_oth static columns (CAMP/PLANTATION gold) with pillage
+  suppression; housing is table-gathered both sides (PASTURE/CAMP/
+  PLANTATION 0.5, pillaged counted — computeHousing never gates);
+  luxury amenities auto-activate via the re-derived luxreq. Rival
+  REPAIR shipped too: standing on an owned pillaged tile clears it
+  FIRST (builderRepair semantics — no charge, turn spent), and repair
+  jobs (owned & pillaged, NO validity gates — rivalHasJob's exact
+  branch) join the job mask/walk targets/builder-training gate. The A-7
+  belief improvementYields table (impY) is wired in _belief_feat_plane
+  (God of the Open Sky pastures etc.); the rival builder Δ-gain ctx
+  stays modifiersFromResearch (no beliefs), catalog-only for the new
+  imps. OUT OF SCOPE, deliberate: FISHING_BOATS (water tile — a land
+  builder can never stand on it, structurally unreachable in BOTH
+  engines; exported rq=-9, God of the Sea inert); chop/harvest stays
+  policy-symmetric via the controlled heads; PLAYER repair/resource-
+  improvement verbs grow the RL action space → batched into A-18's
+  re-baseline. SCRIPTED-GATE CATCH (seed 9066 t57, rTechProg1 −1000
+  milli constant): rival 1's first-ever QUARRY (t48, tile 786) fired
+  MASONRY's "build a quarry" eureka in TS only — the exporter's
+  improvement-boost row still hardcoded FARM/MINE/LUMBER, so the GPU
+  never saw quarry/pasture eurekas and the rival's research stream
+  forked on the boosted cost (same catch class as the player's techs
+  on seed 9144). Fix: boost rows index the full roster
+  (IMPROVEMENT_IDS.indexOf), 34 → 36 detectable boosts — the GPU
+  detectors were already generic, only the table was short.
+  OFF-SCRIPT GATE CATCH (rng 2026006108 t81 col 44, ×3 same-class):
+  an A-7 LATENT exposed by the trajectory shift — rival 0 claimed Lady
+  of the Reeds and its city center sat on an OASIS. TS foundCity strips
+  ONLY a REMOVABLE feature (game.ts:209/rivals.ts:144), so the oasis
+  stayed LIVE and the pantheon fed the center +2⚙; the GPU's founding
+  paths set feat_stripped unconditionally — benign for yields (the fy
+  plane is removable-only, zeros) but _belief_feat_plane uses
+  ~feat_stripped as LIVENESS, so the center's belief add starved (1.9
+  = 2⚙ × the 0.95 amenity tier, constant from the claim turn). Fix:
+  new per-tile `frm` (removable-feature) bit; both founding paths gate
+  their feat_stripped AND tdef writes on it (TS's terrainDefense also
+  reads the surviving feature). Hunt cost note: the TS decomposition
+  came from a ONE-GAME rollout extract replayed with console probes —
+  see the verify-loop FIFTH boundary (a GPU resume run clobbers
+  rollout.json; replay-gpu.ts now hard-fails zero-game vacuous runs).
 - A-14. **RESOLVED (2026-07-12, task #38)**: the picker's terminal rung —
   army capped and nothing queueable → the first project whose district
   is complete (data order), at the player's cost curve on the RIVAL's
   research; completion pays round(cost×0.75) into the civ's own stream
   + round(cost×0.3) GPP. Table-driven: Theater/Encampment projects wire
   themselves when A-9 lands.
-- A-15. Barbarian camp spawn spacing only respects PLAYER cities
-  (combat.ts:449-451) and requires a live player city (:544) — rivals get
-  less barb protection.
-- A-16. captureCityState has no city-cap raze (combat.ts:352-384) while
-  captureRivalCity razes at 6 — the player can exceed 6 cities via CS
-  conquest only. Minor quirk; also the GPU documents a skip-at-full-pool
-  divergence for exactly this path.
+- A-15. **RESOLVED (2026-07-12, task #40)**: camps rise away from EVERY
+  civilization — live RIVAL city centers repel candidates at the same
+  <5 spacing as player cities/camps, and the spawn-roll gate is
+  anyCivCity (player OR rival cities; real Civ 6 barbs don't die with
+  the player — the short-circuit is part of the draw-count contract,
+  both engines changed together). Fixture fallout: the stronger-rivals
+  trajectory shift killed scripted seed 9027 (Rome+Egypt double war
+  t21, capital conquered t36, last city loyalty-flipped t84 → zero
+  player cities at t100) — the exporter gained a documented
+  SEED_OVERRIDES map (index 2 → 9028) plus a CIV6_EXPORT_DEBUG=<seed>
+  narration knob; a dead player poisons a scripted fixture (the policy
+  closure keeps mutating a ghost capital), while off-script rollouts
+  keep covering collapse trajectories.
+- A-16. **RESOLVED (2026-07-12, task #40)**: captureCityState razes at
+  >= 6 live cities exactly like captureRivalCity (csId ring cleared,
+  event logged, NO city founded — TS early-returns before
+  nextCityId++); the GPU raze `continue`s before the slot logic, which
+  also kills the documented skip-at-full-pool divergence (the old TS
+  pushed past 6 while the fixed GPU slots could not).
 - A-17. Rival border-growth adjacency is CIV-level (no per-rc tile
   registry) vs the player's per-city adjacency — documented S4 delta,
   P7 material (needs per-rc tile ownership).
 - A-18. RL surface: the unit-attack mask does not offer CS-center attacks
   (the V-CS verb exists engine-side) — do deliberately with a re-baseline.
+  Task #40 adds two more re-baseline items: PLAYER builder repair and
+  resource-improvement verbs (rivals have both since A-13; the scripted
+  player policy deliberately keeps farming only — action-space growth
+  belongs with the P8 re-baseline).
 
 ## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 
