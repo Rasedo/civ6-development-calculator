@@ -26,7 +26,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { UNITS } from '../data/units';
+import { UNITS, CITY_HEAL_PER_TURN } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import {
@@ -1543,7 +1543,9 @@ export function rivalPhase(state: GameState): void {
       const besieged = neighbors(state.map, rcCenter).some((n) =>
         unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id })),
       );
-      if (!besieged) rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + (rival.atWar ? 5 : 15));
+      // AUDIT A-20: unbesieged cities heal the flat player rate, war or
+      // not (real Civ 6) — the 15-peace/5-war split was a local invention.
+      if (!besieged) rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
     }
 
     // P5/S6 (C-19): loyalty collapses resolve after the city loop (they

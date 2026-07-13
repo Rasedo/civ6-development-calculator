@@ -123,14 +123,15 @@ untagged halves of tagged items stay Fable/main-session work.
   the player (rivals never besiege, pillage or conquer each other —
   see the "other rivals never besiege" guards in `rivalPhase` and
   `_rival_phase`).
-- A-20 (new). City heal rates are asymmetric: player cities heal a
-  flat +20 when unbesieged, war or not (`barbarianPhase` (combat.ts);
-  `cityHealPerTurn` in `_barbarian_phase` (engine.py)), while rival
-  cities heal +15 at peace / +5 at war (`rivalPhase` (rivals.ts, the
-  A-10 block); `torch.where(r_atwar, 5, 15)` in `_rival_phase`
-  (engine.py)). A-10 shipped only the siege pin — the rates never
-  converged, so an unbesieged player city under war out-heals a rival
-  city 4:1, biasing sieges toward the player.
+- A-20. **RESOLVED (2026-07-13, task #54)**: rival cities heal the
+  player's flat +20 when unbesieged — the 15-peace/5-war split was a
+  local invention; real Civ 6 city HP regen ignores war status. Both
+  engines read one source: new `CITY_HEAL_PER_TURN` (data/units.ts,
+  next to `CITY_MAX_HP`) in `rivalPhase`, and the already-exported
+  `cityHealPerTurn` rules field (the one `_barbarian_phase` reads) in
+  `_rival_phase`. The A-10 besieged pin and the max-HP clamp are
+  untouched. Fixture regen: all 24 seeds survived, no SEED_OVERRIDES
+  needed.
 - A-21 (new). The player has no pillage verb at all: pillaging exists
   only on the hostile side (`hostileUnitAct` step 2 (combat.ts) /
   `_rival_unit_war_act` (engine.py) for at-war rivals, plus

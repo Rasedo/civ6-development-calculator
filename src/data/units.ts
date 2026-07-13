@@ -110,3 +110,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
 
 export const UNIT_HP = 100;
 export const CITY_MAX_HP = 200;
+/** AUDIT A-20: flat per-turn city heal when unbesieged, war or not (real
+ * Civ 6) — the rate `barbarianPhase` applies to player cities (combat.ts)
+ * and `rivalPhase` to rival cities; the GPU reads it as the exported
+ * `cityHealPerTurn` rules field. */
+export const CITY_HEAL_PER_TURN = 20;

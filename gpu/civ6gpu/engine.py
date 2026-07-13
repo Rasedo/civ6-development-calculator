@@ -6318,7 +6318,10 @@ class BatchSim:
             # luxMap discipline) — loyalty, growth and yields read it.
             amen_tidx, amen_gf, amen_yf = self._rival_amenity(r)
             rc_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-            heal = torch.where(self.r_atwar[:, r], 5, 15)
+            # AUDIT A-20: unbesieged cities heal the flat player rate, war
+            # or not (real Civ 6) — the same cityHealPerTurn rules field
+            # _barbarian_phase reads; the 15/5 split was a local invention.
+            heal = int(self.rules.combat.get("cityHealPerTurn", 20))
             # D-11: the Hanging-Gardens growth product reads the CIV-wide
             # wonder registry — identical for every j. Hoist per r; a wonder
             # COMPLETION mid-loop (the only in-loop write to its inputs —
