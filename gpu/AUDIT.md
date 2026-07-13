@@ -24,6 +24,13 @@ available actions; only the decision policy may differ. Verified
 against live code 2026-07-12 (post-#36–#40): all seven inherited items
 remain open; four new gaps found in the sweep.
 
+**[opus-ok: …] tags (2026-07-13)** mark the sub-slices delegable to
+Opus subagents off an exhaustive brief (per the parallel-subagent
+model rule: Fable for engine-core bit-exactness — rival-city core,
+yield/score/RNG paths, combat; Opus for periphery — tables, exporter
+plumbing, mask columns, hunt localization). Untagged items and the
+untagged halves of tagged items stay Fable/main-session work.
+
 - A-5 (remainder). Scripted rivals spend gold on ONE building per civ
   per turn (the A-5 block in `rivalPhase` (rivals.ts); `_rival_phase`
   (engine.py)) but never gold-buy units or settlers, and no rival ever
@@ -44,6 +51,9 @@ remain open; four new gaps found in the sweep.
   (`computeUnlocksIn`) have no rival consumer. No GPU government
   tensors exist for either seat (inert while the scripted player never
   adopts one). Re-scoped to land with the policy-breadth work (#46).
+  [opus-ok: the getRivalModifiers extension + GPU modifier tables +
+  exporter rows, off a settled effects list — the same shape as the
+  A-7 belief tables; the yield-path APPLICATION sites stay Fable.]
 - A-9. Rival-unreachable catalog: `tryQueueRivalDistrict` (rivals.ts) /
   `_place_district_rival`+`rival_masks` (engine.py) iterate only
   `SCAFFOLD_DISTRICTS` (data/districts.ts: CAMPUS, HOLY_SITE,
@@ -57,7 +67,11 @@ remain open; four new gaps found in the sweep.
   c==0). Downstream: `GP_CLASS_DISTRICT` (data/greatPeople.ts) gates
   ENGINEER on INDUSTRIAL_ZONE, GENERAL on ENCAMPMENT, ARTIST on
   THEATER_SQUARE, so `claimGreatPeople` (rivals.ts) can never accrue
-  those three classes.
+  those three classes. [opus-ok: the catalog/exporter side — district
+  and building table rows, GP-class wiring, PALACE grant constant —
+  off a settled breadth list; the rival QUEUE/PICK logic
+  (tryQueueRivalDistrict order, purchase interplay, draw-count) stays
+  Fable.]
 - A-11. Rivals have no trade routes — trade.ts is player-keyed
   throughout (`tradeCapacity` iterates `state.cities`,
   `cityTradeYields`/`routeYields`/`addTradeRoute`/`addCsTradeRoute` all
@@ -94,7 +108,11 @@ remain open; four new gaps found in the sweep.
   (`builderRepair` (units.ts) exists; rivals repair via
   `_rival_builder_actions` since A-13), and no resource-improvement
   verbs (rivals place everything `validImprovementsIn` offers; the
-  scripted player policy farms only).
+  scripted player policy farms only). [opus-ok: the mask-COLUMN
+  plumbing (unit_action_mask rows for CS-attack/repair/improvements/
+  pillage/specialists incl. A-21/A-22) — new verbs are inert under the
+  scripted player policy, so gates can't drift; the APPLY-path wiring
+  and the P8 re-baseline decisions stay Fable/main.]
 - A-19 (new). Rival–rival war is structurally impossible:
   `RivalCiv.atWar` (types.ts) is a single war-with-the-player boolean,
   `unitsHostile` (units.ts) hard-returns false for rival-vs-rival, and
