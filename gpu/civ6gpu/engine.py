@@ -2059,14 +2059,279 @@ class BatchSim:
         # TS association (P4): per city — pop×popWeight FIRST, then the six
         # yields in key order (rivalEmpireScore's per-city loop).
         yt = torch.zeros(B, dtype=torch.float64, device=self.device)
+        if not bool(self.rc_alive[:, r].any()):
+            return yt.to(self.dtype)
+        # D-9: ONE batched pass replaces the RC per-j _rival_city_yields
+        # calls (each a full window gather + ~30 plane gathers + topk); the
+        # per-j ACCUMULATION below keeps the loop's exact j order and op
+        # association (P4: this sum order is a real ±1 ulp). Serves every
+        # consumer — trace_row, leader(), statelog — through this one body.
+        F, PR, SC, CU, GO, FA = self._rival_city_yields_all(r)
         for j in range(self.RC):
             mask = self.rc_alive[:, r, j]
             if not bool(mask.any()):
                 continue
             yt = yt + (self.rc_pop[:, r, j] * self.rc_alive[:, r, j].long()).double() * pw
-            f, pr, sc, cu, go, fa = self._rival_city_yields(r, j, mask)
-            yt = yt + f * float(w[0]) + pr * float(w[1]) + go * float(w[2]) + sc * float(w[3]) + cu * float(w[4]) + fa * float(w[5])
+            yt = yt + F[:, j] * float(w[0]) + PR[:, j] * float(w[1]) + GO[:, j] * float(w[2]) + SC[:, j] * float(w[3]) + CU[:, j] * float(w[4]) + FA[:, j] * float(w[5])
         return yt.to(self.dtype)
+
+    def _rival_city_yields_all(self, r: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """D-9: the batched-j twin of _rival_city_yields for the POST-STEP
+        score/trace path (FRESH amenity factors, state frozen between j's)
+        — one [B, RC, M] window + plane gather + a single topk instead of
+        RC per-j passes. Returns (food, prod, sci, cul, gold, faith), each
+        [B, RC], column j bit-identical to _rival_city_yields(r, j, mask):
+        every op is the per-j op batched along the new dim (gathers and
+        elementwise ops are shape-blind; the citizen sums ride the same
+        _dyadic_fp guard, with the same sequential m-loop when it's off;
+        int-valued matmuls/einsums are exact in f64 for any order; the
+        wonder-multiplier product runs an explicit wonder-id-order loop —
+        the TS registry order). Guards widened from per-j to any-j only
+        gate adds of exact 0.0. _rival_phase keeps the per-j function: its
+        frozen amen_yf and mid-phase sequencing are per-city by spec."""
+        rd = self.rules_dev
+        B, RC = self.B, self.RC
+        alive = self.rc_alive[:, r]  # [B, RC]
+        centers = self.rc_center[:, r]  # [B, RC]
+        g = self._rcy_globals()
+        # D-9 window cache: centers move only on found/capture/transfer/
+        # compaction, and every such site bumps _eff_version (the existing
+        # (r, j)-cache convention — _reclaim_rc's own comment), so the per-r
+        # window rides g's _eff_version lifetime.
+        win = g.setdefault("win_r", {})
+        tiles = win.get(r)
+        if tiles is None:
+            tiles = tiles_from_offsets(centers.reshape(-1), self._off3, self.W, self.H).reshape(B, RC, -1)
+            win[r] = tiles
+        M = tiles.shape[2]
+        tc3 = tiles.clamp(min=0)
+        tc = tc3.reshape(B, RC * M)
+
+        def gat(plane: torch.Tensor) -> torch.Tensor:  # [B, T] -> [B, RC, M]
+            return plane.gather(1, tc).reshape(B, RC, M)
+
+        districted = (
+            (self.center_at.gather(1, tc) >= 0)
+            | (self.rvcity_at.gather(1, tc) >= 0)
+            | (self.district.gather(1, tc) >= 0)
+            | (self.built_wonder.gather(1, tc) >= 0)  # A-4: wonder tiles are not workable
+        ).reshape(B, RC, M)
+        valid = (
+            (tiles >= 0)
+            & (gat(self.rival_at) == r)
+            & gat(self.work_ok)
+            & (tiles != centers.unsqueeze(2))
+            & ~districted
+        )
+        f_plane = self._rcy_food_plane(r, g)
+        p_plane = g["p_plane"]
+        ty_oth = g["ty_oth"]
+        oth_sc = g["oth_score"]
+        _has_bel = self._r_has_beliefs(r)
+        featP = None
+        if _has_bel:
+            featP = self._belief_feat_plane(r)
+            f_plane = f_plane + featP[:, :, 0]
+            p_plane = p_plane + featP[:, :, 1]
+            ty_oth = ty_oth + featP
+            oth_sc = oth_sc + (featP[:, :, 2:].double() * g["w"][2:].view(1, 1, 4)).sum(dim=2)
+        f = gat(f_plane).double()
+        p = gat(p_plane).double()
+        if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
+            boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1).double()
+            mine_here = (gat(self.improvement) == self.MINE) & ~gat(self.pillaged)
+            p = p + mine_here.double() * boost_r.view(B, 1, 1)
+        w = g["w"]
+        s = f * w[0] + p * w[1] + gat(oth_sc)
+        # ties break by GLOBAL tile index like the per-j path; valid keys are
+        # collision-free (distinct tiles -> distinct keys), so the batched
+        # topk picks the identical set in the identical order.
+        key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
+        top_vals, top_idx = key.topk(M, dim=2)
+        take = (torch.arange(M, device=self.device).view(1, 1, M) < self.rc_pop[:, r].unsqueeze(2)) & (top_vals > -1e17)
+        f_sel = f.gather(2, top_idx) * take.double()
+        p_sel = p.gather(2, top_idx) * take.double()
+        sc = gat(ty_oth[:, :, 3]).double()
+        cu = gat(ty_oth[:, :, 4]).double()
+        go = gat(ty_oth[:, :, 2]).double()  # VP-G1
+        fa = gat(ty_oth[:, :, 5]).double()  # GV-1a
+        sc_sel = sc.gather(2, top_idx) * take.double()
+        cu_sel = cu.gather(2, top_idx) * take.double()
+        go_sel = go.gather(2, top_idx) * take.double()  # VP-G1
+        fa_sel = fa.gather(2, top_idx) * take.double()  # GV-1a
+        # center: real floored yields — the per-j block with [B] -> [B, RC]
+        ctr = centers.clamp(min=0)
+        r_ = self.rules
+        strip = self.feat_stripped.gather(1, ctr).double()  # [B, RC]
+        fy_c = self.feat_yields.gather(1, ctr.unsqueeze(2).expand(-1, -1, 6)).double()  # [B, RC, 6]
+        cf = torch.maximum(f_plane.gather(1, ctr).double(), torch.tensor(float(r_.center_min_food), dtype=torch.float64, device=self.device))
+        cp = torch.maximum(p_plane.gather(1, ctr).double(), torch.tensor(float(r_.center_min_production), dtype=torch.float64, device=self.device))
+        c_sc = self.tile_yields[:, :, 3].gather(1, ctr).double() - fy_c[:, :, 3] * strip
+        c_cu = self.tile_yields[:, :, 4].gather(1, ctr).double() - fy_c[:, :, 4] * strip
+        c_go = self.tile_yields[:, :, 2].gather(1, ctr).double() - fy_c[:, :, 2] * strip  # VP-G1
+        c_fa = self.tile_yields[:, :, 5].gather(1, ctr).double() - fy_c[:, :, 5] * strip  # GV-1a
+        if _has_bel:
+            featC = featP.gather(1, ctr.unsqueeze(2).expand(-1, -1, 6)).double()  # [B, RC, 6]
+            c_sc = c_sc + featC[:, :, 3]
+            c_cu = c_cu + featC[:, :, 4]
+            c_go = c_go + featC[:, :, 2]
+            c_fa = c_fa + featC[:, :, 5]
+        if self._dyadic_fp:
+            food = cf + f_sel.sum(dim=2)
+            prod = cp + p_sel.sum(dim=2)
+            sci = c_sc + sc_sel.sum(dim=2)
+            cul = c_cu + cu_sel.sum(dim=2)
+            gold = c_go + go_sel.sum(dim=2)  # VP-G1
+            faith = c_fa + fa_sel.sum(dim=2)  # GV-1a
+        else:
+            food = cf.clone()
+            prod = cp.clone()
+            sci = c_sc.clone()
+            gold = c_go.clone()  # VP-G1 (per-j quirk kept: no worked-tile tail)
+            faith = c_fa.clone()  # GV-1a (per-j quirk kept: no worked-tile tail)
+            cul = c_cu.clone()
+            for m in range(M):  # sequential adds mirror the per-j (TS) loop's rounding
+                food = food + f_sel[:, :, m]
+                prod = prod + p_sel[:, :, m]
+                sci = sci + sc_sel[:, :, m]
+                cul = cul + cu_sel[:, :, m]
+        # A-4 Petra (per-j guard widened to any-j: absent cities add exact 0)
+        compw = None
+        if self._wond_n:
+            wreg = self.rc_wonder[:, r]  # [B, RC, nW]
+            compw = (wreg >= 0) & self.built_wonder_complete.gather(1, wreg.clamp(min=0).reshape(B, -1)).reshape_as(wreg)
+            hasP = (compw & self._wond_petra.view(1, 1, -1)).any(dim=2)  # [B, RC]
+            if bool(hasP.any()):
+                sel_tiles = tc3.gather(2, top_idx)  # [B, RC, M] the worked tiles
+                st = sel_tiles.reshape(B, RC * M)
+                qual = (
+                    self.desert.gather(1, st).reshape(B, RC, M)
+                    & (self.feat_id.gather(1, st).reshape(B, RC, M) != self._fp_fid)
+                    & (self.district.gather(1, st).reshape(B, RC, M) < 0)
+                    & take
+                )
+                nq = (qual & hasP.unsqueeze(2)).sum(dim=2).double()
+                food = food + 2.0 * nq
+                gold = gold + 2.0 * nq
+                prod = prod + nq
+        # C1-B4b: completed-district floored adjacency. State is frozen here
+        # (post-step), so ONE _adj_district_count serves every j — the per-j
+        # calls returned this same tensor each time.
+        if self.districts_on:
+            reg = self.rc_dist_tile[:, r]  # [B, RC, nD]
+            if bool((reg >= 0).any()):
+                adjc_b4 = self._adj_district_count().to(self.dtype)
+                for di, dd in enumerate(self.districts_cat):
+                    yc = int(dd.get("adjYield", -1))
+                    if yc < 0:
+                        continue
+                    tile_d = reg[:, :, di]  # [B, RC]
+                    has = alive & (tile_d >= 0)
+                    if not bool(has.any()):
+                        continue
+                    has = has & self.district_complete.gather(1, tile_d.clamp(min=0))
+                    if not bool(has.any()):
+                        continue
+                    adjf = torch.floor(self._district_adj_raw(di, adjc_b4)).gather(1, tile_d.clamp(min=0)).double()
+                    add = torch.where(has, adjf, torch.zeros_like(adjf))
+                    if di == self._hs_idx and _has_bel:  # A-7 Work Ethic
+                        prod = prod + add * self._bel_add("we", r).unsqueeze(1)
+                    if yc == 3:
+                        sci = sci + add
+                    elif yc == 4:
+                        cul = cul + add
+                    elif yc == 0:
+                        food = food + add
+                    elif yc == 1:
+                        prod = prod + add
+                    elif yc == 2:
+                        gold = gold + add  # VP-G1
+                    elif yc == 5:
+                        faith = faith + add  # GV-1a
+        # C1-B4b-2: building yields (int-valued matmul: exact in any order)
+        if self.districts_on:
+            selb = self.rc_bldg[:, r]  # [B, RC, NB]
+            if bool(selb.any()):
+                add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, RC, 6]
+                food = food + add6[:, :, 0]
+                prod = prod + add6[:, :, 1]
+                gold = gold + add6[:, :, 2]  # VP-G1
+                faith = faith + add6[:, :, 5]  # GV-1a
+                sci = sci + add6[:, :, 3]
+                cul = cul + add6[:, :, 4]
+                if _has_bel:  # A-7 belief building adds (int rows)
+                    badd = torch.einsum("bjn,bnk->bjk", selb.double(), self._bel_add("bldgY", r))
+                    food = food + badd[:, :, 0]
+                    prod = prod + badd[:, :, 1]
+                    gold = gold + badd[:, :, 2]
+                    sci = sci + badd[:, :, 3]
+                    cul = cul + badd[:, :, 4]
+                    faith = faith + badd[:, :, 5]
+                # P1/C-22 SHIPYARD: completed Harbor's LIVE floor(adjacency)
+                if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
+                    hb_tile = self.rc_dist_tile[:, r, :, self._harbor_idx]  # [B, RC]
+                    has_sy = alive & selb[:, :, self._shipyard_bidx] & (hb_tile >= 0)
+                    has_sy = has_sy & self.district_complete.gather(1, hb_tile.clamp(min=0))
+                    if bool(has_sy.any()):
+                        adjc_sy = self._adj_district_count().to(self.dtype)
+                        hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0)).double()
+                        prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # A-4: completed wonders — flat city yields + belief faithPerWonder
+        if compw is not None and bool(compw.any()):
+            wcy = compw.double() @ self._wond_cy  # [B, RC, 6] (int-valued)
+            food = food + wcy[:, :, 0]
+            prod = prod + wcy[:, :, 1]
+            gold = gold + wcy[:, :, 2]
+            sci = sci + wcy[:, :, 3]
+            cul = cul + wcy[:, :, 4]
+            faith = faith + wcy[:, :, 5]
+            if _has_bel:
+                faith = faith + self._bel_add("fpw", r).unsqueeze(1) * compw.sum(dim=2).double()
+        # A-7: founder capital incomes (per-civ values, applied at the capital)
+        if _has_bel:
+            perF = self._bel_add("perF", r)  # [B, 7]
+            perC = self._bel_add("perC", r)  # [B, 6]
+            followers = (self.rc_pop[:, r] * self.rc_alive[:, r].long()).sum(dim=1).double()
+            times = torch.where(perF[:, 0] > 0, torch.floor(followers / perF[:, 0].clamp(min=1)), torch.zeros_like(followers))
+            capY = perF[:, 1:] * times.unsqueeze(1) + perC * self.rc_alive[:, r].sum(dim=1).double().unsqueeze(1)
+            isc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+            food = food + capY[:, 0].unsqueeze(1) * isc
+            prod = prod + capY[:, 1].unsqueeze(1) * isc
+            gold = gold + capY[:, 2].unsqueeze(1) * isc
+            sci = sci + capY[:, 3].unsqueeze(1) * isc
+            cul = cul + capY[:, 4].unsqueeze(1) * isc
+            faith = faith + capY[:, 5].unsqueeze(1) * isc
+        # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
+        # replaces RC identical per-j calls; elementwise scaling is exact.
+        yf = self._rival_amenity(r)[2]  # [B, RC]
+        prod = prod * yf
+        sci = sci * yf
+        cul = cul * yf
+        gold = gold * yf
+        faith = faith * yf
+        # A-4: wonder yield multipliers AFTER the tier scaling — an EXPLICIT
+        # wonder-id-order product (the TS registry order the per-j
+        # .prod(dim=1) realizes on all gated data): shape-independent.
+        if compw is not None and bool(compw.any()):
+            ones6 = torch.ones(1, 1, 6, dtype=torch.float64, device=self.device)
+            wmm = torch.ones(B, RC, 6, dtype=torch.float64, device=self.device)
+            for wi in range(compw.shape[2]):
+                wmm = wmm * torch.where(compw[:, :, wi : wi + 1], self._wond_mult[wi].view(1, 1, 6), ones6)
+            food = food * wmm[:, :, 0]
+            prod = prod * wmm[:, :, 1]
+            gold = gold * wmm[:, :, 2]
+            sci = sci * wmm[:, :, 3]
+            cul = cul * wmm[:, :, 4]
+            faith = faith * wmm[:, :, 5]
+        z = torch.zeros_like(food)
+        return (
+            torch.where(alive, food, z),
+            torch.where(alive, prod, z),
+            torch.where(alive, sci, z),
+            torch.where(alive, cul, z),
+            torch.where(alive, gold, z),
+            torch.where(alive, faith, z),
+        )
 
     def leader(self) -> torch.Tensor:
         """GV-1: [B] the current score-leader as a unified civ id — 0 =

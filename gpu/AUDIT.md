@@ -365,44 +365,21 @@ gaps re-scoped; B-26's one-step barb march re-verified still open
 (A-8 shipped full-MP for rivals only); B-27 figures refreshed by
 direct count. All other inherited items re-verified accurate.
 
-## D. Engine optimizations (open opportunities)
+## D. Engine optimizations — CHAPTER CLOSED 2026-07-13
 
-The 2026-07-12 landed batch (D-1..D-8: leader() gating,
-_rcy/_adj/_farmadj/_buildable caches, live-slot lists, border-growth
-hoists, shared buffers — −21% battery wall) is dropped; items below
-are the remaining open opportunities, ranked by expected impact. Hard
-constraint on every item: bit-exact, gate-equivalence is the bar.
-
-**D-10..D-18 RESOLVED (2026-07-13, task #52)** — the safe-class batch,
-landed by three parallel worktree subagents (engine.py / parity_test.py
-/ rollout.py disjoint), merged, one unified validation. Measured on a
-quiet machine: battery wall 249s → 218s all-green; scripted gate 151s
-→ 63s isolated (−58%; D-11b/D-12 dominated — the per-(r,j) full-map
-pair_dist planes were the true hot spot); parity lane −13-19%
-(D-17), rollout.json BYTE-IDENTICAL + checkpoint tensors equal (D-18).
-Forced-compaction off-script gate green (72×250t) — mandatory here
-because D-14/D-15 changed slot iteration. No gate caught a regression
-(every item first-try). Details per item live in this file's git
-history and commit messages. PROCESS CATCH banked: worktree agents
-spawn on a STALE base (the default remote ref, not local HEAD) — the
-D-17 agent's failing baseline diagnosed it; agents must fast-forward
-to the session HEAD before baselining. Only D-9 (below) remains open
-in this chapter.
-
-- D-9. Trace-side `_rival_city_yields` duplication — batch the per-j
-  calls in `rival_empire_score`. `trace_row` runs every turn
-  (rollout.py + parity_test.py) and calls `rival_empire_score(r)` for
-  all R, each looping `for j in range(self.RC)` into
-  `_rival_city_yields` — R×RC full yield computations (window gather,
-  ~30 plane gathers, topk over M=37) on top of the R×RC the same
-  turn's `_rival_phase` already did. The phase values can't be reused
-  (mid-step vs post-step state), but the trace path can compute all j
-  at once ([B, RC, M] gathers + one topk), keeping the per-j
-  accumulation order into `yt`; per-city column sums are dyadic-exact
-  per the `_dyadic_fp` assertion, and the [B, M] `tiles_from_offsets`
-  window per (r, j) can be cached on a center-version. Risk: **needs
-  gate-equivalence check** (reduction/topk shapes change; the dyadic
-  argument should hold but must be proven on the gate).
+D-1..D-8 (task #36, f739d8c), D-10..D-18 (task #52, 1779904) and D-9
+(task #53) all landed bit-exact; landing logs live in git history.
+D-9, the one needs-gate-equivalence item, closed the chapter:
+`_rival_city_yields_all` batches the trace path's per-j city yields
+into one [B, RC, M] gather set + a single topk, `rival_empire_score`
+keeps the per-j accumulation order (the P4 ±1-ulp class) reading
+column slices, and the window cache rides the existing _eff_version
+key (every rc_center mutation site already bumps it — zero new
+invalidation sites). Proof: a direct bitwise probe (torch.equal, all
+6 columns × every alive (r,j) × 24 seeds × 100 turns) plus green
+scripted, forced-compaction and battery gates. Hard constraint for
+any future item stays: bit-exact, gate-equivalence is the bar; never
+read perf numbers off a contended machine.
 
 ## E. Docs staleness
 
