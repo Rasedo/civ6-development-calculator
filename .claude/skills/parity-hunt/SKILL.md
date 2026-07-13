@@ -10,7 +10,7 @@ name the single decision (turn, actor, rule) where the engines disagree —
 then fix the engine that is WRONG. TS is the spec — unless TS itself is
 farther from real Civ 6 than the GPU (owner rule): then fix TS.
 
-## Step 0 — the checkpoint bracket (§F: no re-simulation)
+## Step 0 — the checkpoint bracket (gpu/HUNTING.md: no re-simulation)
 
 Every gate run dumps RAW state checkpoints every 25 turns for ALL games
 (transient gpu/fixtures/ckpt/, both engines, on by default).

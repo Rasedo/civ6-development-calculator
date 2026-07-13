@@ -173,7 +173,8 @@ core/game.ts), settler 80+30·n with pop −1 (`settlerCost`), city HP
 influence (`ENVOY_COST`), loyalty core: range 9, ±20 pressure, ±3/6
 amenity term (`loyaltyDelta`, `LOYALTY_RANGE`/`LOYALTY_PRESSURE_SCALE`/
 `LOYALTY_AMENITY`), unit costs/maintenance for the modeled roster
-(`UNITS`). Note: every production/research cost is uniformly ×0.6
+(`UNITS`). [opus-ok] tags below follow the same rule as chapter A's.
+Note: every production/research cost is uniformly ×0.6
 (`GAME_SPEED`) — a deliberate Online-speed choice, not counted as a
 gap; likewise GS disasters are modeled minus sea-level rise
 (`disasterPhase`, core/disasters.ts).
@@ -218,7 +219,9 @@ gap; likewise GS disasters are modeled minus sea-level rise
   Swordsman/Knight/siege/gunpowder line; their unlock techs are absent
   by design — `TECHS` header: "Pure-military techs are omitted".
   Late-game combat power is frozen at Classical levels while science
-  runs to Modern.
+  runs to Modern. [opus-ok: the UNITS/TECHS catalog rows + exporter
+  tables off a settled roster list; combat integration and draw-count
+  stay Fable.]
 - B-15. No war weariness: no amenity penalty from prolonged war
   anywhere in the amenity aggregation (`computeCityStats`/`amenityTier`,
   core/city.ts + `declareWar`, core/rivals.ts). Eternal wars are free.
@@ -258,15 +261,20 @@ gap; likewise GS disasters are modeled minus sea-level rise
 **Progression breadth:**
 - B-11. Tech tree is 32 of the real ~68: `TECHS` (data/techs.ts)
   counted 32 entries; `ERAS` stops at Modern (no Atomic/Information/
-  Future).
-- B-12. Civics 31 of the real ~50: `CIVICS` (data/civics.ts) counted 31.
+  Future). [opus-ok: TECHS rows + boost-condition rows + exporter off
+  a settled tree design; unlock/effect wiring stays Fable.]
+- B-12. Civics 31 of the real ~50: `CIVICS` (data/civics.ts) counted
+  31. [opus-ok: same split as B-11 — CIVICS rows are tables.]
 - B-13. Policy cards 19 (recounted) of the real 50+, and no diplomatic
   cards: `POLICIES` counted 19 entries; data/policies.ts header
   documents diplomatic slots sitting idle. `GOVERNMENTS` = all 10 base
-  ones.
+  ones. [opus-ok: POLICIES card rows + exporter; the effect channels
+  (applyPolicyEffects + GPU modifier tables) are the A-7r slice —
+  settle both briefs together in #46.]
 - B-14. `CITIZEN_SCIENCE` = 0.7/pop (data/constants.ts) vs real 0.5 —
   verify intent; `CITIZEN_CULTURE` 0.3 matches real. ~40% extra base
-  science compounds over 250 turns.
+  science compounds over 250 turns. [opus-ok WHOLE item once the owner
+  rules on intent: one constant + fixture regen.]
 - B-27. Catalog sizes (recounted this sweep): world wonders 13
   (`BUILT_WONDERS`, data/builtWonders.ts) vs ~30 in base game; natural
   wonders 7 (`WONDERS`, data/wonders.ts) vs ~12; buildings 34
@@ -276,6 +284,9 @@ gap; likewise GS disasters are modeled minus sea-level rise
   ~25/~11/~8; great people 28 = 7 classes × 4 (`GREAT_PEOPLE`) vs real
   9 classes (no Writer/Musician classes, no per-era rosters); projects
   6 (`PROJECTS`, data/projects.ts); improvements 9 (`IMPROVEMENTS`).
+  [opus-ok: catalog ROWS off settled lists; every EFFECT-channel
+  placement stays Fable — the A-4 lesson: effect positions in the
+  yields pipeline are the hunt magnet.]
 
 **Economy/districts/religion:**
 - B-16. District adjacency magnitudes deviate from GS values:
@@ -285,6 +296,8 @@ gap; likewise GS disasters are modeled minus sea-level rise
   matches vanilla-launch values — the deviation is vs the GS ruleset
   the repo otherwise follows, e.g. the district discount and loyalty.)
   Campus/Holy Site/Theater/Commercial Hub magnitudes verified correct.
+  [opus-ok WHOLE item off owner-settled target values: DISTRICTS
+  constants + the GPU adjacency tables + fixture regen.]
 - B-17 (re-scoped). Encampment is no longer inert: it earns +1 General
   GPP/turn plus +1 per building (`greatPersonPointsPerTurn`,
   core/game.ts; `GP_CLASS_DISTRICT`), and Barracks/Stable/Armory/
@@ -313,7 +326,9 @@ gap; likewise GS disasters are modeled minus sea-level rise
   3/6-envoy bonuses key to districts via `CS_TYPE_DISTRICT`
   (data/cityStates.ts) instead of the real building tiers
   (Library/University etc.). Quests do exist (`questSatisfied`,
-  core/cityStates.ts) but are a small fixed set.
+  core/cityStates.ts) but are a small fixed set. [opus-ok: the CS data
+  rows (building-tier keys, per-CS bonus table); suzerain/quest logic
+  stays Fable.]
 - B-23. Trade simplified: no Trader unit, no roads, no route duration
   or completion (`TradeRoute` in core/types.ts has a `toCs` target and
   nothing else), no international routes to rival civs —
@@ -432,48 +447,7 @@ refresh) stays with the owner. Original items kept for reference:
   "current behavior" section, but the spend premise now directly
   contradicts shipped scripted-rival code.
 
-## F. Hunt tooling (current, for reference)
+## F. Hunt tooling — MOVED (2026-07-13)
 
-**RAW CHECKPOINTS — one mechanism for diagnosis AND verification.**
-Shipped: rollout `--ckpt` (default 25; parent clears the transient dir
-per run) dumps snapshot()+rngs+paths per shard; the replay dumps
-wrapped serialize(state) per game via CIV6_CKPT; `gpu/ckptdiff.py
---rng` is the JIT bracket finder; `--resume-t`/CIV6_RESUME_T resume
-both engines from any checkpoint (validated bit-faithful);
-scripts/ckpt-lines.ts is the TS JIT reader. CB lines carry k
-(call-site tag), t (target tile), c (pre-draw rng counter).
-Forced-compaction knobs: CIV6_RECLAIM_AT (u/v/p unit pools) +
-CIV6_RC_RECLAIM_AT (rc city slots) — run the off-script gate under
-them to stress slot-layout invariants (four real catches to date).
-- RAW state has no frozen-vs-fresh ambiguity; a JIT diff tool loads
-  both engines' checkpoints at turn t and runs the existing
-  tsStateLines/gpu_state_lines on the loaded states — new diagnostics
-  = new readers over old dumps, not engine changes + reruns.
-- Determinism + the saved action log make every turn reachable:
-  binary-search checkpoints for the first divergent one, replay
-  forward ≤K turns single-game computing full lines JIT.
-- The same checkpoints ARE the resume points for fix-verification
-  (full-batch only — BLAS association is batch-shape-dependent; resume
-  checks can false-green fixes with pre-checkpoint effects — the
-  pre-commit bar stays the FULL BATTERY, whose gpu-gate lane IS the
-  gate; never chain a standalone gate then the battery on the same
-  code).
-- What checkpoint INSPECTION cannot give: intra-turn EVENTS (the CB
-  combat-roll log stays) and MID-TURN TRANSIENTS — both recovered via
-  INSTRUMENTED REPLAY: resume from the nearest checkpoint with an
-  event flag or a pure-read probe; probes are bit-faithful (pure reads
-  replay the exact original trajectory — no false-green caveat,
-  unlike fixes).
-- GPU resume needs `--shard K --shards 4` to match batch layout, and
-  a resume run OVERWRITES rollout.json — for TS-side instrumentation
-  of one off-script game, extract a one-game rollout file
-  (`{...roll, games: [g]}`) and full-replay it (seconds, no resume).
-
-Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
-`CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
-divergent line. Fields: PC loy; RC cb/til/hp; RU hp+a (acted); RT fai
-+ tsum (territory checksum); TI carries rp (live resource priority);
-CB lines = every damage roll from the damageRoll/_damage_roll
-chokepoints. Probe at the exact batch shape of the failing run.
-PYTHONUTF8=1 on piped Windows runs. Never edit engine/TS sources while
-a gate/battery pipeline is in flight.
+The hunt-tooling reference is IMPLEMENTED machinery, not an open gap;
+it now lives in gpu/HUNTING.md (same content, maintained there).
