@@ -85,6 +85,32 @@ export function unitsHostile(
   return state.rivals.find((r) => r.id === civId)?.atWar ?? false;
 }
 
+/**
+ * B-3 ZONE OF CONTROL (deliberate simplification): a MILITARY unit hostile
+ * to `mover` standing ADJACENT to `tileIndex` exerts a zone of control —
+ * entering that tile ends the mover's movement this turn. Civilians exert
+ * none; hostility is tested LIVE via unitsHostile; city centers are deferred.
+ */
+export function inEnemyZoc(
+  state: GameState,
+  tileIndex: number,
+  mover: { owner: Unit['owner']; civId?: number },
+): boolean {
+  const tile = state.map.tiles[tileIndex];
+  for (const n of neighbors(state.map, tile)) {
+    for (const u of unitsAt(state, n.index)) {
+      if (unitDomain(u.type) === 'military' && unitsHostile(state, u, mover)) return true;
+    }
+  }
+  return false;
+}
+
+/** B-5 FORTIFY: the defender-strength bonus a unit's fortifyTurns grants
+ * (+3 CS at >=1, +6 at >=2; cap 2). Civilians never fortify (0). */
+export function fortifyBonus(unit: { fortifyTurns?: number }): number {
+  return Math.min(2, unit.fortifyTurns ?? 0) * 3;
+}
+
 /** Stacking: 1 military + 1 civilian per side; other sides block entirely. */
 export function tileFreeForUnit(
   state: GameState,
@@ -191,6 +217,10 @@ export function walkPath(state: GameState, unit: Unit): void {
         state.treasury += 50;
       }
     }
+    // B-3 ZOC: entering a tile adjacent to a hostile MILITARY unit ends
+    // movement (the enter cost is already paid above, then movesLeft:=0).
+    // The path persists — a queued move resumes next turn.
+    if (inEnemyZoc(state, nextIndex, unit)) unit.movesLeft = 0;
   }
   if (unit.path && unit.path.length === 0) unit.path = null;
 }
@@ -278,6 +308,8 @@ export function spawnUnit(
     charges: def.charges ?? null,
     path: null,
   };
+  // B-5 FORTIFY: military units carry a fortify counter (civilians never do).
+  if (def.charges === undefined) unit.fortifyTurns = 0;
   if (civId !== undefined) unit.civId = civId;
   state.units.push(unit);
   if (owner === 'player') revealAround(state, unit.tileIndex);
@@ -346,6 +378,13 @@ export function refreshUnits(state: GameState): void {
         else heal = unowned ? 10 : 5;
       }
       unit.hp = Math.min(UNIT_HP, unit.hp + heal);
+    }
+    // B-5 FORTIFY: reuse the EXACT D-2 heal gate (movesLeft >= full = spent
+    // no MP since the last refresh). A military unit that stayed put digs in
+    // (+1, cap 2); any move/attack (movesLeft < full) resets it. Symmetric
+    // across owners; read movesLeft BEFORE the reset below.
+    if (unitDomain(unit.type) === 'military') {
+      unit.fortifyTurns = unit.movesLeft >= full ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
     }
     unit.movesLeft = full;
     if (unit.path) walkPath(state, unit);

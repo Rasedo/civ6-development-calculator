@@ -10,8 +10,8 @@ import type { City, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yiel
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { spawnUnit, unitsAt, unitsHostile, moveCostInto, crossesRiver } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity } from './combat';
+import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers } from './effects';
@@ -26,7 +26,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { UNITS, CITY_HEAL_PER_TURN } from '../data/units';
+import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import {
@@ -631,6 +631,12 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
     unit.tileIndex = step.index;
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3)
+    // B-3 ZOC: patrol halts adjacent to a hostile MILITARY unit (barbs at
+    // peace; the player too once at war — LIVE unitsHostile per step).
+    if (inEnemyZoc(state, unit.tileIndex, unit)) {
+      unit.movesLeft = 0;
+      return;
+    }
     if (unit.movesLeft <= 0) return;
   }
 }
@@ -945,6 +951,12 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
       u.tileIndex = dest;
       u.movesLeft = Math.max(0, u.movesLeft - cost);
       clearCampFor(state, u, dest); // P5/S7 (C-3): mirrors walkPath's any-unit clear
+      // B-3 ZOC: the builder (a civilian mover) halts adjacent to a hostile
+      // MILITARY unit too — only the EXERTER must be military.
+      if (inEnemyZoc(state, u.tileIndex, u)) {
+        u.movesLeft = 0;
+        break;
+      }
       if (u.movesLeft <= 0) break;
     }
   }
@@ -1383,6 +1395,7 @@ export function rivalPhase(state: GameState): void {
         if (Math.round((rival.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
           rival.treasury = (rival.treasury ?? 0) - price;
           buyCity.buildings.push(buyDef.id);
+          if (buyDef.id === 'ANCIENT_WALLS') buyCity.outerHp = WALLS_HP; // AUDIT B-1
         }
       }
     }
@@ -1491,7 +1504,10 @@ export function rivalPhase(state: GameState): void {
           rc.queue.shift();
           if (q.kind === 'settler') tryFoundCity(state, rival);
           else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
-          else if (q.kind === 'building') rc.buildings.push(q.building);
+          else if (q.kind === 'building') {
+            rc.buildings.push(q.building);
+            if (q.building === 'ANCIENT_WALLS') rc.outerHp = WALLS_HP; // AUDIT B-1
+          }
           else if (q.kind === 'wonder') state.map.tiles[q.tileIndex].builtWonderComplete = true; // A-4
           else if (q.kind === 'project') {
             // A-14: the completion lump lands in the RIVAL's own streams
@@ -1535,17 +1551,55 @@ export function rivalPhase(state: GameState): void {
         state.map.tiles[next].rivalId = rival.id;
         rc.tilesAcquired += 1;
       }
+      // AUDIT B-2: the rival mirror of the player city strike (combat.ts) —
+      // a rival city WITH ANCIENT_WALLS fires once per turn at the nearest
+      // unit hostile to THIS civ (barbarians always; the player's at-war
+      // units, civilians included), lowest tile index breaking ties. One
+      // roll at the rival city's defense strength vs the target's defense
+      // (rivalCityDefense; single roll, no retaliation, never captures).
+      // rc order, immediately before the heal — a kill shifts the shared RNG.
+      const rcCenter = state.map.tiles[rc.centerIndex];
+      if (rc.buildings.includes('ANCIENT_WALLS')) {
+        let bestTile = -1;
+        let bestDist = 99;
+        for (const t of state.map.tiles) {
+          const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
+          if (d < 1 || d > 2) continue;
+          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
+          if (d < bestDist) {
+            bestDist = d;
+            bestTile = t.index;
+          }
+        }
+        if (bestTile >= 0) {
+          const hostiles = unitsAt(state, bestTile).filter((u) =>
+            unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
+          );
+          const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
+          const tt = state.map.tiles[bestTile];
+          const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt);
+          const atkCS = rivalCityDefense(state, rival, rc);
+          defender.hp -= damageRoll(state, atkCS - defCS, 'rcstk', bestTile);
+          if (defender.hp <= 0) disbandUnit(state, defender.id);
+        }
+      }
       // AUDIT A-10: a siege pins the HP, exactly like the player's heal —
       // any adjacent unit hostile to THIS civ (the player's at-war units,
       // CIVILIANS included per unitsHostile — the P5/S2 player-heal lesson
       // — or barbarians; other rivals never besiege).
-      const rcCenter = state.map.tiles[rc.centerIndex];
       const besieged = neighbors(state.map, rcCenter).some((n) =>
         unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id })),
       );
       // AUDIT A-20: unbesieged cities heal the flat player rate, war or
       // not (real Civ 6) — the 15-peace/5-war split was a local invention.
-      if (!besieged) rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
+      // AUDIT B-1: the outer wall pool heals on the same gate/rate (cap
+      // WALLS_HP), full-HP or not — the player's barbarianPhase mirror.
+      if (!besieged) {
+        rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
+        if (rc.buildings.includes('ANCIENT_WALLS')) {
+          rc.outerHp = Math.min(WALLS_HP, (rc.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
+        }
+      }
     }
 
     // P5/S6 (C-19): loyalty collapses resolve after the city loop (they

@@ -46,6 +46,11 @@ const rawList: BuildingDef[] = [
   { id: 'GRANARY', name: 'Granary', district: 'CITY_CENTER', cost: 65, yields: { food: 1 }, housing: 2, maintenance: 0 },
   { id: 'WATER_MILL', name: 'Water Mill', district: 'CITY_CENTER', cost: 80, yields: { food: 1, production: 1 }, special: 'WATER_MILL', maintenance: 0 },
   { id: 'SEWER', name: 'Sewer', district: 'CITY_CENTER', cost: 405, housing: 2, maintenance: 2 },
+  // AUDIT B-1: Ancient Walls — the one defensive tier this stage. A plain
+  // CITY_CENTER building (no yields/housing, 0 upkeep) unlocked by MASONRY;
+  // its game effect (a 100-HP outer-defense pool + the once-per-turn city
+  // ranged strike) lives in combat.ts/rivals.ts, not in the yield pipeline.
+  { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0 },
 
   // --- Campus ----------------------------------------------------------------
   { id: 'LIBRARY', name: 'Library', district: 'CAMPUS', cost: 80, yields: { science: 2 }, maintenance: 1 },

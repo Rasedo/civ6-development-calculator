@@ -30,7 +30,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove, moveCostInto } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense } from '../src/core/combat';
@@ -77,7 +77,7 @@ import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
-import { UNITS, UNIT_HP, CITY_MAX_HP } from '../src/data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
@@ -412,6 +412,10 @@ const rules = {
   // SHIPYARD special (yields.ts:171): a city with this building adds its completed Harbor's
   // districtAdjacency as PRODUCTION. Index into the exported building roster, -1 if absent.
   shipyardBidx: buildingIdx.get('SHIPYARD') ?? -1,
+  // AUDIT B-1: the ANCIENT_WALLS building row — the engine watches its
+  // completion to fill the outer-defense pool, and B-2's city ranged strike
+  // fires only from cities holding it. -1 if absent from the exported set.
+  ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
   // 3/6-envoy district tiers are inert without districts, and the CHIEFDOM
@@ -567,6 +571,7 @@ const rules = {
     garrisonGrowChance: 0.1,
     spearmanAfterTurn: 60,
     cityHealPerTurn: 20,
+    wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
     unitHealPerTurn: 10,
     unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
     campClearReward: 50,
@@ -840,8 +845,15 @@ for (let s = 0; s < N_SEEDS; s++) {
         const ri = IMPROVEMENT_IDS.indexOf(RESOURCES[t.resource].improvement ?? '');
         return ri >= 0 ? ri : -9;
       })(),
-      // defender bonus (mirrors terrainDefense: hills / woods / rainforest / marsh)
+      // defender bonus (mirrors terrainDefense: hills / woods / rainforest +3;
+      // B-28: marsh / floodplains −2). READ-only for defense in the engine.
       tdef: terrainDefense(t),
+      // B-28: movement-slow encoding, DECOUPLED from tdef so marsh's defense
+      // (−2) can differ from its slow-to-enter cost. enter cost = 1 + tmove//3
+      // (= moveCostInto − 1): hills +3, slow feature (woods/rainforest/marsh)
+      // +3; floodplains is NOT slow. tmove//3 is byte-identical to the OLD
+      // tdef//3 for every tile, so movement trajectories are unchanged.
+      tmove: (moveCostInto(t) - 1) * 3,
       // statically camp-eligible (dynamic exclusions — ownership, distance
       // to cities/camps — are the engine's job; mirrors campCandidates)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,

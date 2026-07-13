@@ -10,7 +10,7 @@
 import type { City, CityState, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
-import { UNITS, UNIT_HP, CITY_MAX_HP } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { CS_MAX_HP } from '../data/cityStates';
 import { cityStateAt } from './cityStates';
 import {
@@ -22,6 +22,8 @@ import {
   spawnUnit,
   disbandUnit,
   unitsHostile,
+  inEnemyZoc,
+  fortifyBonus,
   rivalCityAt,
   moveCostInto,
   crossesRiver,
@@ -71,11 +73,15 @@ export const PILLAGE_HEAL_IMPROVEMENTS: ReadonlySet<string> = new Set<Improvemen
 export function terrainDefense(tile: Tile): number {
   let d = 0;
   if (tile.elevation === 'HILLS') d += 3;
-  if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST' || tile.feature === 'MARSH') d += 3;
+  if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST') d += 3;
+  // AUDIT B-28 (real Civ 6): marsh and floodplains EXPOSE the defender (−2) —
+  // they don't shelter like woods/rainforest. Marsh stays SLOW to enter
+  // (moveCostInto, deliberately unchanged); only its DEFENSE value flips here.
+  if (tile.feature === 'MARSH' || tile.feature === 'FLOODPLAINS') d -= 2;
   return d;
 }
 
-function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
+export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
   // P4/D-1: the real Civ 6 random factor is 0.8–1.2 (equal-strength hits
   // land "reliably 24–36"), not the old 0.75–1.25.
   const base = 30 * Math.exp(0.04 * strengthDiff);
@@ -127,7 +133,14 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'pctyc', city.centerIndex);
-  state.cityHp[String(city.id)] = getCityHp(state, city.id) - dmgToCity;
+  // AUDIT B-1: the ANCIENT_WALLS outer pool soaks the hit first — only the
+  // spillover reaches city HP (a deliberate simplification of Civ 6's
+  // percentage wall rules: outer absorbs the whole roll until depleted).
+  // No walls → outerHp absent (0) → the full roll lands, exactly as before.
+  const outer = city.outerHp ?? 0;
+  const absorbed = Math.min(outer, dmgToCity);
+  if (absorbed > 0) city.outerHp = outer - absorbed;
+  state.cityHp[String(city.id)] = getCityHp(state, city.id) - (dmgToCity - absorbed);
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
@@ -206,7 +219,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const defender =
     enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defDef = UNITS[defender.type];
-  const defCS = (defDef?.combat ?? 0) + terrainDefense(target);
+  const defCS = (defDef?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender); // B-5
   const atkCS = def.combat;
 
   if ((defDef?.combat ?? 0) <= 0) {
@@ -270,7 +283,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     return no('Nothing to attack there.');
   }
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target);
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender); // B-5
   defender.hp -= damageRoll(state, def.ranged.strength - defCS, 'rng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
@@ -307,7 +320,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target);
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender); // B-5
   defender.hp -= damageRoll(state, def.ranged.strength - defCS, 'vrng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
@@ -343,7 +356,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 // Rival cities: siege and capture
 // ---------------------------------------------------------------------------
 
-function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalCity): number {
+export function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalCity): number {
   // P4/D-22 (symmetric with cityDefenseStrength): the rival's strongest
   // melee ever (floor 15) + 5 for its own military garrisoning the center.
   // Their defense keeps pace through military techs raising bestMeleeCS.
@@ -356,7 +369,12 @@ function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalCity): n
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
   const atkCS = UNITS[attacker.type]?.combat ?? 0;
   const defCS = rivalCityDefense(state, rival, city);
-  city.hp -= damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
+  // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
+  const dmgToCity = damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
+  const outer = city.outerHp ?? 0;
+  const absorbed = Math.min(outer, dmgToCity);
+  if (absorbed > 0) city.outerHp = outer - absorbed;
+  city.hp -= dmgToCity - absorbed;
   attacker.hp -= damageRoll(state, defCS - atkCS, 'rctyc', city.centerIndex);
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
@@ -588,11 +606,11 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
       )[0];
   }
   if (!target) return;
-  // AUDIT A-8: RIVAL units walk the march on REAL MP — each step re-picks
-  // the passable free neighbor closest to the (fixed) target, moves only if
-  // strictly closer, and pays walkPath's exact charge (tile cost + 3 per
-  // river crossing; a full-MP unit always affords its first step).
-  // Barbarians keep the one-step raid pace — their fidelity is B-26's.
+  // AUDIT A-8 + B-26: RIVAL and BARBARIAN units both walk the march on REAL
+  // MP — each step re-picks the passable free neighbor closest to the (fixed)
+  // target, moves only if strictly closer, and pays walkPath's exact charge
+  // (tile cost + 3 per river crossing; a full-MP unit always affords its first
+  // step). Any step spends MP (movesLeft < full → the D-2 heal is blocked).
   const full = UNITS[unit.type]?.moves ?? 2;
   for (;;) {
     const at = tile();
@@ -612,8 +630,13 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     unit.tileIndex = step.index;
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3): rivals clear camps (barb no-op)
-    if (unit.owner !== 'rival') {
-      unit.movesLeft = 0; // barbarian: the pre-A-8 single step, verbatim
+    // B-3 ZOC: a march step ending adjacent to a hostile MILITARY unit halts
+    // (same per-step rule as walkPath / patrol / builder walk). Gated to
+    // rivals: B-26 gives barbarians the full-MP walk but they do NOT obey ZOC
+    // yet — the GPU barb walk mirrors the pre-ZOC march, so gating here keeps
+    // both engines symmetric. (barbs-obey-ZOC is a deferred refinement.)
+    if (unit.owner === 'rival' && inEnemyZoc(state, unit.tileIndex, unit)) {
+      unit.movesLeft = 0;
       return;
     }
     if (unit.movesLeft <= 0) return;
@@ -677,14 +700,52 @@ export function barbarianPhase(state: GameState): void {
     if (unit.movesLeft > 0) hostileUnitAct(state, unit);
   }
 
-  // City healing when no hostile is adjacent.
+  // AUDIT B-2: a city WITH ANCIENT_WALLS fires once per turn — range 2, at
+  // the nearest unit hostile to the player (barbarians always; at-war rival
+  // units, civilians included — the unitsHostile predicate), ties broken by
+  // lowest tile index (the standard tile-order scan). One roll at the city's
+  // defense strength vs the target's defense, mirroring hostileRangedStrike:
+  // a single roll, no retaliation, civilians take the roll, never captures.
+  // City order — a kill removes the target for later cities and advances the
+  // shared RNG, so this runs immediately BEFORE the heal loop.
+  for (const city of state.cities) {
+    if (!city.buildings.includes('ANCIENT_WALLS')) continue;
+    const center = map.tiles[city.centerIndex];
+    let bestTile = -1;
+    let bestDist = 99;
+    for (const t of map.tiles) {
+      const d = hexDistance(center.col, center.row, t.col, t.row);
+      if (d < 1 || d > 2) continue;
+      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'player' }))) continue;
+      if (d < bestDist) {
+        bestDist = d;
+        bestTile = t.index;
+      }
+    }
+    if (bestTile < 0) continue;
+    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { owner: 'player' }));
+    const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
+    const tt = map.tiles[bestTile];
+    const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt);
+    const atkCS = cityDefenseStrength(state, city);
+    defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
+    if (defender.hp <= 0) killUnit(state, defender);
+  }
+
+  // City healing when no hostile is adjacent. AUDIT B-1: the outer wall pool
+  // heals on the same unbesieged gate and rate, capped at WALLS_HP (real
+  // Civ 6 repairs walls too) — full-HP walled cities still heal their wall,
+  // so the early `continue` on full city HP is gone.
   for (const city of state.cities) {
     const hp = getCityHp(state, city.id);
-    if (hp >= CITY_MAX_HP) continue;
     const center = map.tiles[city.centerIndex];
     const besieged = neighbors(map, center).some((n) =>
       unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'player' })),
     );
-    if (!besieged) state.cityHp[String(city.id)] = Math.min(CITY_MAX_HP, hp + 20);
+    if (besieged) continue;
+    if (hp < CITY_MAX_HP) state.cityHp[String(city.id)] = Math.min(CITY_MAX_HP, hp + CITY_HEAL_PER_TURN);
+    if (city.buildings.includes('ANCIENT_WALLS')) {
+      city.outerHp = Math.min(WALLS_HP, (city.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
+    }
   }
 }

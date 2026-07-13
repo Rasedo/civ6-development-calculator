@@ -72,7 +72,9 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockDistrict', district: 'CAMPUS' },
       { kind: 'unlockBuilding', building: 'LIBRARY' },
     ]),
-    T('MASONRY', 'Masonry', 'Ancient', 80, ['MINING']),
+    T('MASONRY', 'Masonry', 'Ancient', 80, ['MINING'], [
+      { kind: 'unlockBuilding', building: 'ANCIENT_WALLS' }, // AUDIT B-1
+    ]),
     T('BRONZE_WORKING', 'Bronze Working', 'Ancient', 80, ['MINING'], [
       { kind: 'unlockDistrict', district: 'ENCAMPMENT' },
       { kind: 'unlockBuilding', building: 'BARRACKS' },

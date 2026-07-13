@@ -181,26 +181,45 @@ gap; likewise GS disasters are modeled minus sea-level rise
 (`disasterPhase`, core/disasters.ts).
 
 **Combat/military:**
-- B-1. Walls/ramparts missing: no Walls tiers in `BUILDINGS`
-  (data/buildings.ts header: "no wonders, no walls"), city HP is one
-  flat 200 pool (`CITY_MAX_HP`, data/units.ts; `getCityHp`/
-  `cityDefenseStrength`, combat.ts) with no outer-defense layer. Real:
-  Ancient/Medieval/Renaissance Walls add a separate HP bar that melee
-  can't fully bypass. Sieges stay trivial.
-- B-2. Cities never ranged-strike attackers — only the
-  melee-retaliation roll in `attackCity`/`attackRivalCity`/
-  `attackCityState` (combat.ts); the city turn is just the heal loop at
-  the bottom of `barbarianPhase`. Real cities (with walls) fire a
-  ranged shot every turn. Follows from B-1; insertion point is
-  `barbarianPhase`/`endTurn`.
-- B-3. No zone of control: `findPath`/`walkPath`/`moveCostInto`
-  (core/units.ts) ignore enemy adjacency entirely; units slide past
-  defenders freely.
+- B-1. **RESOLVED (2026-07-13, task #42)**: one tier — `ANCIENT_WALLS`
+  (`BUILDINGS`, CITY_CENTER, cost 80, MASONRY unlock via `techs.ts`)
+  grants a 100-HP OUTER pool (`outerHp` on City/RivalCity; GPU
+  `outer_hp`/`rc_outer_hp`, `_MUTABLE` + `_RC_SLOT_FIELDS`) that
+  absorbs attack damage FIRST, spillover to city hp (the three melee
+  twins both engines). Heals with the +20 city heal (`CITY_HEAL_PER_TURN`
+  clamp), wiped on capture/transfer/raze. Walls do NOT raise
+  `cityDefenseStrength` (deliberate 1-tier simplification, commented).
+  City-states deferred (no build queue). Rivals build/buy it
+  data-driven (probe-confirmed).
+- B-2. **RESOLVED (2026-07-13, task #42)**: a city WITH `ANCIENT_WALLS`
+  strikes once/turn — range 2, nearest unit hostile to the city's civ
+  (tile-order tie-break), one `damageRoll` at `cityDefenseStrength`
+  (hostileRangedStrike conventions: single roll, no retaliation,
+  civilians take it, never captures; new `pcstk`/`rcstk` k-tags).
+  Player strike in `barbarianPhase`'s city section, rival in
+  `rivalPhase`, both immediately before the heal, identical draw order
+  both engines (per-rank `walk_ord` / rc slot order on the GPU). No CS
+  strike (no walls).
+- B-3. **RESOLVED for player+rival movement (2026-07-13, task #43)**:
+  `inEnemyZoc` (units.ts) / `_in_enemy_zoc` (engine.py) — entering a
+  tile adjacent to a hostile MILITARY unit halts the mover (movesLeft
+  := 0) after the enter cost, tested live per step; wired into the
+  player `walkPath` and all three A-8 rival walkers (war march /
+  patrol / builder). DEFERRED: barbarians do NOT obey ZOC yet — B-26
+  gave them the full-MP walk but the ZOC check is rival-gated so both
+  engines stay symmetric (the GPU barb walk mirrors the pre-ZOC
+  march). City-center ZOC also deferred.
 - B-4. No unit XP/promotions: `Unit` (core/types.ts) has no
   xp/promotion fields, `UnitDef` (data/units.ts) has no promotion tree.
-- B-5. No fortify action/bonus: the only rest mechanic is
-  heal-if-unmoved in `refreshUnits` (core/units.ts); no +3/+6
-  fortification CS.
+- B-5. **RESOLVED (2026-07-13, task #43)**: `fortifyTurns` (military
+  only, cap 2) accrues on the EXACT acted/moved gate the D-2 heal uses
+  (a unit that spent no MP digs in), reset by any move/attack; +3 CS
+  at >=1, +6 at >=2 added to the DEFENDER's strength at every
+  unit-defense roll site both engines. Symmetric (rival patrollers
+  fortify). Survives TS serialize + GPU snapshot/restore + every
+  `_reclaim_pool` permutation (`p/u/v_fortify` in `_MUTABLE` + the
+  field lists, zeroed on spawn). HOLD already existed — no RL
+  action-space growth.
 - B-6. No embarkation/naval anything: `unitPassable` (core/units.ts) is
   `!isWater && !isImpassable` — water is a wall; `UNITS` has zero naval
   entries. Island starts are unreachable, Harbor cities can't be
@@ -231,13 +250,18 @@ gap; likewise GS disasters are modeled minus sea-level rise
   single step (`barbarianPhase` spawns SPEARMAN after turn 60, else
   WARRIOR) — no scout-then-raid escalation, no ranged/naval barbs,
   camps spawn WARRIOR garrisons directly. CONFIRMED still open: barb
-  raiders keep the one-step march (`hostileUnitAct`, combat.ts — "the
-  pre-A-8 single step, verbatim"; the A-8 full-MP walk shipped for
-  rival units only). Real barbs move full MP.
-- B-28 (new). Marsh defense sign is flipped: `terrainDefense`
-  (combat.ts) grants +3 for MARSH alongside woods/rainforest; real
-  Civ 6 gives the defender −2 in marsh (and floodplains). Marshes
-  should be kill zones, not fortresses.
+  raiders **RESOLVED (2026-07-13, task #44)**: barbs now run the same
+  A-8 real-MP walk as rival movers (`hostileUnitAct` fall-through both
+  engines; GPU `_barbarian_phase` raider block rewritten as the
+  vectorized multi-step loop mirroring `_rival_unit_war_act`; target
+  semantics unchanged). STILL OPEN in B-26: no cliffs, single-step era
+  scaling, no scout-then-raid escalation, no ranged/naval barbs.
+- B-28. **RESOLVED (2026-07-13, task #44)**: `terrainDefense` now gives
+  the defender −2 on MARSH and FLOODPLAINS (was +3). GPU decoupled the
+  dual-purpose `tdef` plane by adding a sibling `tmove` plane (enter
+  cost reads `tmove//3`, defense reads `tdef`) so marsh stays slow to
+  enter while its defense flips — movement cost proven unchanged
+  (0/27,456 tiles). Exporter emits `tmove`.
 - B-29 (new). No wounded-strength penalty and no river-crossing attack
   penalty: `meleeAttack`/`damageRoll` (combat.ts) use full
   `UNITS[type].combat` regardless of HP, and `crossesRiver`
@@ -424,6 +448,20 @@ refresh) stays with the owner. Original items kept for reference:
   runs. These are unchecked forward-plan boxes, not a
   "current behavior" section, but the spend premise now directly
   contradicts shipped scripted-rival code.
+
+## G. Known parity latents (dormant, not currently gate-visible)
+
+- G-1. Rival-builder gain approximation: the GPU `_rival_builder_actions`
+  balanced-gain model and TS's exact `tileScore` delta (rivals.ts) can
+  RANK improvements differently on some tiles (observed: MINE (GPU) vs
+  FARM (TS) on plain hills once farm-hills + late mine boosts unlock).
+  Not triggered by current fixtures/rollout trajectories (off-script
+  250t gate green at the #42-#44 merge), but ANY future trajectory
+  shift can expose it — surfaced during the B-26/B-28 sweep at a
+  single-slice trajectory (seed 9196 t248, rival-0 rivalEmpireScore
+  673.238 vs 667.238). Fix when it goes gate-visible: pick the ranking
+  closer to real Civ 6, converge the two. Tracked in the deferred-fixes
+  memory.
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 

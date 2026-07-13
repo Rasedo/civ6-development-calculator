@@ -115,3 +115,8 @@ export const CITY_MAX_HP = 200;
  * and `rivalPhase` to rival cities; the GPU reads it as the exported
  * `cityHealPerTurn` rules field. */
 export const CITY_HEAL_PER_TURN = 20;
+/** AUDIT B-1: the ANCIENT_WALLS outer-defense pool — full HP a walled city
+ * gets on top of its normal HP. Damage depletes it first (combat.ts); it
+ * heals with the city (CITY_HEAL_PER_TURN, unbesieged). The GPU reads it as
+ * the exported `wallsHp` rules field. */
+export const WALLS_HP = 100;

@@ -17,7 +17,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
-import { UNITS } from '../data/units';
+import { UNITS, WALLS_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -329,6 +329,7 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
   }
   if (state.sandbox) {
     city.buildings.push(buildingId);
+    if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP; // AUDIT B-1
   } else {
     city.queue.push({ kind: 'building', building: buildingId, progress: 0 });
   }
@@ -460,6 +461,7 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
     }
   }
   city.buildings.push(buildingId);
+  if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP; // AUDIT B-1
   return { ok: true };
 }
 
@@ -768,6 +770,8 @@ export function endTurn(state: GameState): void {
           completeProject(state, city, item.project, itemCost(item));
         } else {
           city.buildings.push(item.building);
+          // AUDIT B-1: completing the walls fills the outer-defense pool.
+          if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
         }
         if (city.queue.length > 0) city.queue[0].progress += overflow;
       }
@@ -1003,6 +1007,9 @@ export function deserialize(json: string): GameState {
   for (const u of state.units) {
     u.owner ??= 'player';
     u.hp ??= 100;
+    // B-5 FORTIFY: fill only MILITARY units in place (civilians never carry
+    // the field) so a current-shape save round-trips byte-identically.
+    if (UNITS[u.type]?.charges === undefined) u.fortifyTurns ??= 0;
   }
   for (const t of state.map.tiles) {
     (t as Tile).pillaged ??= false;

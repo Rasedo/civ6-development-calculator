@@ -165,6 +165,13 @@ export interface City {
    * A city at 0 flips to the pressuring rival. Absent = 100.
    */
   loyalty?: number;
+  /**
+   * AUDIT B-1: outer-defense HP from ANCIENT_WALLS (max WALLS_HP = 100).
+   * Set to full when the walls complete; damage depletes it before city HP;
+   * heals with the city. Absent = 0 (no walls). Wiped on capture/transfer
+   * because the new owner's `buildings` start empty. RivalCity inherits it.
+   */
+  outerHp?: number;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */
@@ -279,6 +286,9 @@ export interface Unit {
   hp: number;
   /** Builder charges; null for non-builders. */
   charges: number | null;
+  /** B-5 FORTIFY (military units only): consecutive turns ended without a
+   * move or attack, capped at 2. +3 CS defending at >=1, +6 at >=2. */
+  fortifyTurns?: number;
   /** Remaining multi-turn movement path (tile indexes), or null. */
   path: number[] | null;
   /** Standing order ('explore' keeps picking new frontier targets). */
