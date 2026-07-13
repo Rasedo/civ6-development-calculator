@@ -64,22 +64,31 @@ def main() -> int:
     float_cols = [i for i, a in enumerate(atol.tolist()) if a > 0]
 
     n_turns = len(fixtures[0]["trace"])
+    # D-17: stack every fixture's trace ONCE up front — [B, n_turns, ncols].
+    # Traces are uniform (one export batch: same turn count and column count
+    # per fixture); torch.tensor raises on ragged input, the loud failure we
+    # want if that ever stops holding.
+    want_all = torch.tensor([f["trace"] for f in fixtures], dtype=torch.float64)
     failures = 0
     worst = torch.zeros(len(cols), dtype=torch.float64)
     for t in range(n_turns):
         sim.step()
         got = sim.trace_row()
-        for b, f in enumerate(fixtures):
-            want = torch.tensor(f["trace"][t], dtype=torch.float64)
-            diff = (got[b] - want).abs()
-            worst = torch.maximum(worst, diff)
-            if (diff > atol).any():
-                bad = [(cols[i], float(want[i]), float(got[b][i])) for i in range(len(cols)) if diff[i] > atol[i]]
-                print(f"seed {f['seed']} turn {int(want[0])}: MISMATCH {bad}")
-                failures += 1
-                if failures > 12:
-                    print("(stopping after 12 mismatches)")
-                    return 1
+        diff_all = (got - want_all[:, t]).abs()
+        worst = torch.maximum(worst, diff_all.amax(dim=0))
+        if (diff_all > atol).any():
+            # mismatch somewhere this turn — drop to the per-game diagnostic
+            # report (format is load-bearing: hunts parse these lines)
+            for b, f in enumerate(fixtures):
+                want = want_all[b, t]
+                diff = diff_all[b]
+                if (diff > atol).any():
+                    bad = [(cols[i], float(want[i]), float(got[b][i])) for i in range(len(cols)) if diff[i] > atol[i]]
+                    print(f"seed {f['seed']} turn {int(want[0])}: MISMATCH {bad}")
+                    failures += 1
+                    if failures > 12:
+                        print("(stopping after 12 mismatches)")
+                        return 1
     if failures == 0:
         drift = float(worst[float_cols].max())
         print(

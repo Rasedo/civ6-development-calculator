@@ -190,6 +190,35 @@ def main() -> None:
         for _b in range(B):
             if games[_b]["rng"] == args.log:
                 sim._log_combat_b = _b  # Phase-1 combat log (CB lines)
+    # D-18: hand each checkpoint's torch.save off to a background writer
+    # thread. snapshot()'s clone is taken in the main thread AT the checkpoint
+    # turn (so the payload is decoupled from live engine state); the worker
+    # only serializes. A single FIFO writer preserves dump order; the
+    # end-of-run sentinel + join flushes every checkpoint to disk before the
+    # process reports done, and a writer exception is re-raised there (never
+    # swallowed) for crash-safety.
+    import queue as _queuemod
+    import threading as _threadingmod
+
+    _ckpt_q: _queuemod.Queue = _queuemod.Queue()
+    _ckpt_err: list = []
+    _ckpt_thread = None
+    if args.ckpt:
+        def _ckpt_writer() -> None:
+            while True:
+                item = _ckpt_q.get()
+                try:
+                    if item is None:
+                        return
+                    payload, path = item
+                    torch.save(payload, path)
+                except BaseException as _e:  # surface at join, don't vanish
+                    _ckpt_err.append(_e)
+                finally:
+                    _ckpt_q.task_done()
+
+        _ckpt_thread = _threadingmod.Thread(target=_ckpt_writer, name="ckpt-writer")
+        _ckpt_thread.start()
     for _ in range(args.turns):
         turn = sim.turn
         pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)  # [B, C]
@@ -212,7 +241,22 @@ def main() -> None:
         pa_l, ta_l, ca_l, ea_l, ua_l = pa.tolist(), ta.tolist(), ca.tolist(), ea.tolist(), ua.tolist()
         ptile_l = sim.p_tile.tolist()
         pciv_l = sim._p_civ[sim.p_type].tolist()
+        # D-18: skip quiet (game, turn) rows. This vectorized "any loggable
+        # action this turn" row mask EXACTLY reproduces the old
+        # `len(entry) > 1` gate — a row is logged iff it has a production
+        # (any pa>=0), a tech, a civic, an envoy, or a real unit order
+        # (ua>=0 and !=HOLD). No empty entry was ever appended, so games with
+        # nothing to log never enter the O(C) python dict/list build below.
+        active_l = (
+            (pa >= 0).any(dim=1)
+            | (ta >= 0)
+            | (ca >= 0)
+            | (ea >= 0)
+            | ((ua >= 0) & (ua != HOLD)).any(dim=1)
+        ).tolist()
         for b in range(B):
+            if not active_l[b]:
+                continue
             entry: dict = {"t": turn}
             prods = [[c, v] for c, v in enumerate(pa_l[b]) if v >= 0]
             if prods:
@@ -242,12 +286,18 @@ def main() -> None:
                     _logl.extend(gpu_state_lines(sim, _b))
         if args.ckpt and sim.turn % args.ckpt == 0:
             ckpt_dir.mkdir(exist_ok=True)
-            torch.save(
+            _ckpt_q.put((
                 {"snap": sim.snapshot(), "rngs": [g["rng"] for g in games], "paths": [str(p) for p in paths_expanded]},
                 ckpt_dir / f"gpu_{int(game_seed[0])}_t{sim.turn}.pt",
-            )
+            ))
         for b in range(B):
             games[b]["trace"].append(rows_l[b])
+
+    if _ckpt_thread is not None:  # flush all checkpoints; surface writer errors
+        _ckpt_q.put(None)
+        _ckpt_thread.join()
+        if _ckpt_err:
+            raise _ckpt_err[0]
 
     # Scaffold district ids in placement order — replay maps a district action
     # (a >= NB+2+NU) back to a DistrictId (D5b). Same source as the engine's

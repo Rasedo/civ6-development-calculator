@@ -340,6 +340,22 @@ hoists, shared buffers — −21% battery wall) is dropped; items below
 are the remaining open opportunities, ranked by expected impact. Hard
 constraint on every item: bit-exact, gate-equivalence is the bar.
 
+**D-10..D-18 RESOLVED (2026-07-13, task #52)** — the safe-class batch,
+landed by three parallel worktree subagents (engine.py / parity_test.py
+/ rollout.py disjoint), merged, one unified validation. Measured on a
+quiet machine: battery wall 249s → 218s all-green; scripted gate 151s
+→ 63s isolated (−58%; D-11b/D-12 dominated — the per-(r,j) full-map
+pair_dist planes were the true hot spot); parity lane −13-19%
+(D-17), rollout.json BYTE-IDENTICAL + checkpoint tensors equal (D-18).
+Forced-compaction off-script gate green (72×250t) — mandatory here
+because D-14/D-15 changed slot iteration. No gate caught a regression
+(every item first-try). Details per item live in this file's git
+history and commit messages. PROCESS CATCH banked: worktree agents
+spawn on a STALE base (the default remote ref, not local HEAD) — the
+D-17 agent's failing baseline diagnosed it; agents must fast-forward
+to the session HEAD before baselining. Only D-9 (below) remains open
+in this chapter.
+
 - D-9. Trace-side `_rival_city_yields` duplication — batch the per-j
   calls in `rival_empire_score`. `trace_row` runs every turn
   (rollout.py + parity_test.py) and calls `rival_empire_score(r)` for
@@ -354,94 +370,6 @@ constraint on every item: bit-exact, gate-equivalence is the bar.
   window per (r, j) can be cached on a center-version. Risk: **needs
   gate-equivalence check** (reduction/topk shapes change; the dyadic
   argument should hold but must be proven on the gate).
-- D-10. `_city_totals` sub-term caches + a pop-dirty flag in the
-  step() city walk. The walk (`for s_rank in range(C)` in `step`)
-  re-runs the FULL-batch `_city_totals` whenever `_eff_version` moved
-  or `torch.equal(self.pop, _tot_pop)` fails — with B games some city
-  grows nearly every turn, so several full recomputes/turn, each
-  redoing the `einsum("bcn,nk->bck")` building-yields term,
-  `cs_dbonus` scatter, and the district-adjacency block even when only
-  a pop changed. Cache those sub-terms on their own change counters
-  (buildings/envoys writes already coincide with `_eff_version` bumps;
-  pop-only invalidations reuse them bit-identically), and replace the
-  per-rank `torch.equal` + `pop.clone()` with a dirty flag set at the
-  growth/settler/starve writes. Risk: **safe** (cached tensors are the
-  identical values a recompute produces; comparison logic only).
-- D-11. `_rival_phase` economy-loop per-j hoists: civ-wide wonder
-  growth product and the full-map housing scan. Inside the
-  `for j in range(self.RC)` economy loop, the Hanging-Gardens growth
-  multiplier is computed from `rc_wonder[:, r]` over ALL the civ's
-  cities — the identical [B] value for every j; hoist per r and
-  invalidate on the (rare) mid-loop wonder completion. The A-13
-  improvement-housing term builds `pair_dist[ctr_j] <= 3` — a fresh
-  [B, T] plane per (r, j) per turn; restrict to the radius-3 window
-  (`tiles_from_offsets`, 37 tiles — the ≤3 set exactly), where the
-  integer `_imp_housing` sums stay exact. Risk: **safe** (same values,
-  integer-valued sums).
-- D-12. Loyalty foreign-pressure `for r2 in range(self.R)` — vectorize
-  across civs. The rival loyalty block (inside `_rival_phase`'s j
-  loop) accumulates foreign pressure with a Python loop over the other
-  R−1 civs — O(R²·RC) `pair_dist` gathers per turn, each allocating
-  [B, RC]. Every term is `(lrng+1−d)⁺ × pop × alive` — integer-valued
-  f64, so summing all foreign civs in one stacked op is exact
-  regardless of association; the final `press` division sees
-  bit-identical inputs. Risk: **safe** (integer-valued terms; sums
-  exact).
-- D-13. Border-claim adjacency recomputed dense per claim iteration.
-  In the step() walk's `BORDER_LOOPS` loop, each iteration with any
-  ready city gathers `owner` into [B, T, 6] (`neigh_flat`) and reduces
-  to `adj_own` — full-map work per city per claim, though each claim
-  changes ONE tile's owner. Maintain `adj_own`-per-owner
-  incrementally: on the single-tile owner write, update only that
-  tile's 6 neighbours (same booleans the dense recompute produces);
-  same trick applies to `_rival_border_growth`'s claim loop if any
-  dense re-derive remains there. Risk: **safe** (boolean/index logic,
-  no float math).
-- D-14. D-4 live-slot lists for the PLAYER unit loops.
-  `_apply_unit_actions` and `_scripted_builder` still iterate
-  `for p in range(p_high)` with a per-slot `bool(alive.any())` host
-  check — the exact per-dead-slot sync pattern D-4 removed from the
-  barb raider and rival war/peace loops (`u_live` / `v_mine`
-  snapshots). Nothing spawns player units inside either loop and
-  deaths only shrink the set, so the same any-game-alive superset
-  snapshot preserves slot order. Risk: **safe** (identical iteration
-  set semantics).
-- D-15. `_barbarian_phase` camp-roll candidates built dense for a
-  masked few. When any game passes the 8% camp roll (near-certain
-  each turn at battery B), the candidate mask builds `near_rc` via
-  `pair_dist[rcc]` — [B, R·RC, T] — plus `near_city` [B, C, T] and
-  `camp_d` [B, K, T] for ALL games, though only the `want` rows
-  consume them. All ops are boolean/integer, so row-restricting to
-  `want.nonzero()` (or caching `near_city`/`near_rc` on city-set
-  changes) is exact; no BLAS shapes involved. Risk: **safe**.
-- D-16. `_city_state_phase` per-s full-map district scans. The
-  `for s in range(self.S)` quest loop runs
-  `(self.district == asked_type.unsqueeze(1)) & district_complete & …`
-  twice per city-state — 2·S full [B, T] scans per turn for a value
-  ("player owns a live complete district of askable type d") that is
-  constant across the loop (quest resolution never mutates districts).
-  Hoist one [B, nAskable] ownership table per turn and gather per s.
-  Risk: **safe** (same booleans, hoisted).
-- D-17. parity_test.py per-(turn, fixture) Python comparison. The gate
-  loops `for b, f in enumerate(fixtures)` every turn, constructing
-  `torch.tensor(f["trace"][t])` and diffing per game — B×n_turns
-  tensor constructions plus Python-level column scans, in the lane the
-  battery notes as starvation-sensitive. Pre-stack all fixture traces
-  once into a [B, n_turns, ncols] tensor at load and compare each
-  turn's [B, ncols] slice in one vectorized `(got − want).abs() > atol`
-  (drop to the per-column report only on a hit). Harness-only; engine
-  untouched. Risk: **safe**.
-- D-18. rollout.py per-turn Python assembly + synchronous checkpoint
-  dumps. The per-turn `for b in range(B)` action-log dict build runs
-  O(B·C) Python every turn even for games with no loggable action that
-  turn (the tolist batching landed; the dict/list construction did not
-  — skip games via a pre-computed "any action" row mask from the
-  tolist'd arrays). Separately, the default `--ckpt 25` makes each
-  battery shard `snapshot()` + `torch.save` the full batch every 25
-  turns inside the timed gate; keep the (memory-mandated) checkpoints
-  but hand the saved dict to a background writer thread — the clone in
-  `snapshot()` already decouples it from engine state. Risk: **safe**
-  (logging/IO only; identical bytes written).
 
 ## E. Docs staleness
 

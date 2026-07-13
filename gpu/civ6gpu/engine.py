@@ -1056,6 +1056,10 @@ class BatchSim:
         self._fadjf_cache = None
         self._rcy_cache = None
         self._bld_cache = None
+        # D-10: _city_totals walk-scoped sub-term cache (building einsums,
+        # district adjacency/CS addends, upkeep + housing pieces) — keyed on
+        # _eff_version, READ only by the step() walk's lux-frozen recomputes.
+        self._ct_cache = None
         self._arangeNB = torch.arange(NB, device=device)
 
         # P4/D-22 latent, caught by P5-S2's reshuffle (seed 9001 t43): the
@@ -1089,6 +1093,7 @@ class BatchSim:
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
+        self._ct_cache = None  # D-10
 
     def snapshot(self) -> dict:
         """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
@@ -1110,6 +1115,7 @@ class BatchSim:
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
+        self._ct_cache = None  # D-10
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -1821,8 +1827,22 @@ class BatchSim:
         worked_y = worked_y.clone()
         worked_y[:, :, 0] = worked_y[:, :, 0] + fadj_w
 
-        bf = self.buildings.to(self.dtype)
-        b_y = torch.einsum("bcn,nk->bck", bf, rd.b_yields)
+        # D-10: walk-scoped sub-term cache. The step() walk's guard-triggered
+        # recomputes (lux is not None — the frozen luxMap path) mostly fire on
+        # POP-only changes; every term below that doesn't read pop is then
+        # bit-identical to the last compute. Keyed on _eff_version: every
+        # non-pop mutation inside the walk (completion, claim, purchase...)
+        # bumps it, and out-of-walk consumers (trace/empire_score, lux=None)
+        # never read the cache — they always recompute and refresh the store,
+        # so a hit can only return values a fresh recompute would reproduce.
+        cc = None
+        if lux is not None and self._ct_cache is not None and self._ct_cache[0] == self._eff_version:
+            cc = self._ct_cache[1]
+        if cc is not None:
+            b_y = cc["b_y"]
+        else:
+            bf = self.buildings.to(self.dtype)
+            b_y = torch.einsum("bcn,nk->bck", bf, rd.b_yields)
         center_y = self.center_yields
         if self.disasters:
             # fertility/drought hit the center's RAW food before the min-clamp
@@ -1833,53 +1853,74 @@ class BatchSim:
             center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
         total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.view(1, 1, 6) + b_y
         if self.districts_on:
-            # District adjacency yields (D2b: Campus science only, placed where no
-            # dynamic source is live so the value is purely floor(static);
-            # dynamic sources + other district types are D3). Mirrors
-            # cityDistrictYields: floor(adjacency) into the district's yield
-            # column, summed into the pre-amenity total.
-            dt = self.district.gather(1, tcf).reshape(B, C, M)
-            owned_d = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
-            # yields/maintenance/Aqueduct housing all count COMPLETED districts
-            owned_d = owned_d & self.district_complete.gather(1, tcf).reshape(B, C, M)
-            owned_d = owned_d & ~self.district_dead.gather(1, tcf).reshape(B, C, M)  # P5/S1: captured = dead
-            adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
-            # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
-            # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
-            # completed district of its type. Sum per district idx here; the CS
-            # yield equals that district's adjYield for every CS-associated type
-            # (Campus→science, Holy Site→faith, Commercial Hub→gold, …), so it
-            # lands in the same column as the adjacency below, pre-amenity-factor.
-            nD = len(self.districts_cat)
-            cs_dbonus = torch.zeros(B, nD, dtype=self.dtype, device=dev)
-            if self.S > 0:
-                perD = ((self.cs_envoys >= 3).to(self.dtype) + (self.cs_envoys >= 6).to(self.dtype)) * self._cs_district_bonus
-                perD = perD * self.cs_alive.to(self.dtype)  # [B, S]
-                cs_dbonus.scatter_add_(1, self._cs_didx.clamp(min=0), perD)
-            # For each PLACED district with an adjacencyYield: floor(static +
-            # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
-            # sources (mine/quarry for IZ, city-center for Harbor, built-wonder
-            # for Theater) are added when those types are placed (D3b-4+).
-            for d in self.districts_cat:
-                yc = int(d.get("adjYield", -1))
-                if yc < 0:
-                    continue
-                di = int(d["idx"])
-                adjv = torch.floor(self._district_adj_raw(di, adjc))  # [B, T] full districtAdjacency
-                mask = owned_d & (dt == di)
-                dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
-                total[:, :, yc] = total[:, :, yc] + (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2) + cs_dbonus[:, di].unsqueeze(1) * dcount
-            # SHIPYARD special (yields.ts:171): a city holding a Shipyard adds its completed
-            # Harbor's full districtAdjacency as PRODUCTION — the SAME value that fed the Harbor's
-            # gold above, re-read here as production, pre-amenity-factor like every district yield.
-            if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
-                _hm = (owned_d & (dt == self._harbor_idx)).to(self.dtype)  # [B, C, M] this city's Harbor tiles
-                _hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc))  # [B, T]
-                _hadj_c = (_hadj.gather(1, tcf).reshape(B, C, M) * _hm).sum(dim=2)  # [B, C]
-                total[:, :, 1] = total[:, :, 1] + _hadj_c * self.buildings[:, :, self._shipyard_bidx].to(self.dtype)
-            # districtMaintenance: per-type upkeep (0 for City Center / Neighborhood
-            # / Aqueduct, else 1); sum over the city's owned completed districts.
-            d_maint = (self._d_maint[dt.clamp(min=0)] * (owned_d & (dt >= 0)).to(self.dtype)).sum(dim=2)
+            if cc is not None:
+                # D-10: the whole block is pop-free — replay the cached per-
+                # district addends in catalog order (same adds, same
+                # association as the miss path below).
+                d_addends = cc["d_addends"]
+                ship_add = cc["ship_add"]
+                d_maint = cc["d_maint"]
+                has_aq = cc["has_aq"]
+            else:
+                # District adjacency yields (D2b: Campus science only, placed where no
+                # dynamic source is live so the value is purely floor(static);
+                # dynamic sources + other district types are D3). Mirrors
+                # cityDistrictYields: floor(adjacency) into the district's yield
+                # column, summed into the pre-amenity total.
+                dt = self.district.gather(1, tcf).reshape(B, C, M)
+                owned_d = (tiles >= 0) & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
+                # yields/maintenance/Aqueduct housing all count COMPLETED districts
+                owned_d = owned_d & self.district_complete.gather(1, tcf).reshape(B, C, M)
+                owned_d = owned_d & ~self.district_dead.gather(1, tcf).reshape(B, C, M)  # P5/S1: captured = dead
+                adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
+                # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
+                # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
+                # completed district of its type. Sum per district idx here; the CS
+                # yield equals that district's adjYield for every CS-associated type
+                # (Campus→science, Holy Site→faith, Commercial Hub→gold, …), so it
+                # lands in the same column as the adjacency below, pre-amenity-factor.
+                nD = len(self.districts_cat)
+                cs_dbonus = torch.zeros(B, nD, dtype=self.dtype, device=dev)
+                if self.S > 0:
+                    perD = ((self.cs_envoys >= 3).to(self.dtype) + (self.cs_envoys >= 6).to(self.dtype)) * self._cs_district_bonus
+                    perD = perD * self.cs_alive.to(self.dtype)  # [B, S]
+                    cs_dbonus.scatter_add_(1, self._cs_didx.clamp(min=0), perD)
+                # For each PLACED district with an adjacencyYield: floor(static +
+                # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
+                # sources (mine/quarry for IZ, city-center for Harbor, built-wonder
+                # for Theater) are added when those types are placed (D3b-4+).
+                # D-10: the two addends per district are built as a list and
+                # applied below — total + adjSum + csTerm, the original
+                # left-to-right association, cache hit or miss.
+                d_addends = []
+                for d in self.districts_cat:
+                    yc = int(d.get("adjYield", -1))
+                    if yc < 0:
+                        continue
+                    di = int(d["idx"])
+                    adjv = torch.floor(self._district_adj_raw(di, adjc))  # [B, T] full districtAdjacency
+                    mask = owned_d & (dt == di)
+                    dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
+                    d_addends.append((yc, (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2), cs_dbonus[:, di].unsqueeze(1) * dcount))
+                # SHIPYARD special (yields.ts:171): a city holding a Shipyard adds its completed
+                # Harbor's full districtAdjacency as PRODUCTION — the SAME value that fed the Harbor's
+                # gold above, re-read here as production, pre-amenity-factor like every district yield.
+                ship_add = None
+                if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
+                    _hm = (owned_d & (dt == self._harbor_idx)).to(self.dtype)  # [B, C, M] this city's Harbor tiles
+                    _hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc))  # [B, T]
+                    _hadj_c = (_hadj.gather(1, tcf).reshape(B, C, M) * _hm).sum(dim=2)  # [B, C]
+                    ship_add = _hadj_c * self.buildings[:, :, self._shipyard_bidx].to(self.dtype)
+                # districtMaintenance: per-type upkeep (0 for City Center / Neighborhood
+                # / Aqueduct, else 1); sum over the city's owned completed districts.
+                d_maint = (self._d_maint[dt.clamp(min=0)] * (owned_d & (dt >= 0)).to(self.dtype)).sum(dim=2)
+                # Aqueduct ownership feeds computeHousing below (D-10: hoisted
+                # into the cacheable block — owned_d/dt live only on this path)
+                has_aq = (owned_d & (dt == self._aqueduct_idx)).any(dim=2) if self._aqueduct_idx >= 0 else None
+            for yc_a, adj_add, cs_add in d_addends:
+                total[:, :, yc_a] = total[:, :, yc_a] + adj_add + cs_add
+            if ship_add is not None:
+                total[:, :, 1] = total[:, :, 1] + ship_add
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
@@ -1892,7 +1933,8 @@ class BatchSim:
             cap_bonus.scatter_add_(1, self._cs_yidx, tier1)
             total[:, 0, :] += cap_bonus
 
-        amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + torch.einsum("bcn,n->bc", bf, rd.b_amenities)
+        amen_b = cc["amen_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_amenities)  # D-10
+        amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + amen_b
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
         self._last_lux = lux_add  # the walk freezes this (TS: one luxMap per turn)
@@ -1904,7 +1946,8 @@ class BatchSim:
         for i in reversed(range(len(self.rules.amenity_tiers))):
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
         total[:, :, 1:] *= yield_f.unsqueeze(2)  # non-food × amenity factor
-        maintenance = self.base_maintenance + torch.einsum("bcn,n->bc", bf, rd.b_maintenance)
+        maint_b = cc["maint_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_maintenance)  # D-10
+        maintenance = self.base_maintenance + maint_b
         if self.districts_on:
             maintenance = maintenance + d_maint  # specialty-district upkeep (Campus = 1 gold)
         total[:, :, 2] -= maintenance
@@ -1913,7 +1956,8 @@ class BatchSim:
         if self.districts_on and self._aqueduct_idx >= 0:
             # Aqueduct (computeHousing): a fresh-water city gets +aqFreshBonus;
             # a non-fresh city's water housing is raised to aqNoFreshTotal.
-            has_aq = (owned_d & (dt == self._aqueduct_idx)).any(dim=2)  # [B, C] owns a completed Aqueduct
+            # (has_aq — owns a completed Aqueduct [B, C] — comes from the D-10
+            # cacheable district block above.)
             fresh = self.water_housing == self._h_fresh  # [B, C]
             aq_h = torch.where(
                 fresh,
@@ -1921,16 +1965,34 @@ class BatchSim:
                 torch.maximum(self.water_housing, torch.full_like(self.water_housing, self._aq_no_fresh_total)),
             )
             water_h = torch.where(has_aq, aq_h, self.water_housing)
-        housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + torch.einsum("bcn,n->bc", bf, rd.b_housing)
+        house_b = cc["house_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_housing)  # D-10
+        housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + house_b
         if self.improvements_on:
             # +catalog housing per owned improvement within the work radius
             # (pillaged or not — computeHousing does not gate on pillaged,
             # unlike yields). A-13: table-gathered — FARM/PASTURE/CAMP/
             # PLANTATION carry 0.5, MINE/LUMBER/QUARRY/OIL_WELL carry 0.
-            imp_win = self.improvement.gather(1, tcf).reshape(B, C, M)
-            owned_c = self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids
-            imp_owned = (tiles >= 0) & owned_c & (imp_win >= 0)
-            housing = housing + (self._imp_housing[imp_win.clamp(min=0)] * imp_owned.to(self.dtype)).sum(dim=2)
+            if cc is not None:
+                imp_add = cc["imp_add"]  # D-10: pop-free, improvement/owner writes bump the version
+            else:
+                imp_win = self.improvement.gather(1, tcf).reshape(B, C, M)
+                owned_c = self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids
+                imp_owned = (tiles >= 0) & owned_c & (imp_win >= 0)
+                imp_add = (self._imp_housing[imp_win.clamp(min=0)] * imp_owned.to(self.dtype)).sum(dim=2)
+            housing = housing + imp_add
+
+        # D-10: refresh the store on every miss (lux=None callers always land
+        # here, so a fresh walk always starts from a same-version store).
+        if cc is None:
+            store = {"b_y": b_y, "amen_b": amen_b, "maint_b": maint_b, "house_b": house_b}
+            if self.districts_on:
+                store["d_addends"] = d_addends
+                store["ship_add"] = ship_add
+                store["d_maint"] = d_maint
+                store["has_aq"] = has_aq
+            if self.improvements_on:
+                store["imp_add"] = imp_add
+            self._ct_cache = (self._eff_version, store)
 
         # Dead slots contribute nothing (their static center yields are preloaded).
         total = total * self.alive.unsqueeze(2).to(self.dtype)
@@ -2779,10 +2841,12 @@ class BatchSim:
         arangeT = torch.arange(T, device=dev)
         arange6 = torch.arange(6, device=dev)
         p_high = int(self.p_next.max().item())
-        for p in range(p_high):
+        # D-14 (the D-4 live-slot pattern): `active` is FIXED at the loop top,
+        # so slots outside this snapshot are exactly the ones the old per-slot
+        # any() check skipped — same iteration set, no per-dead-slot sync.
+        p_live = active[:, :p_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if p_high else []
+        for p in p_live:
             act = active[:, p]
-            if not bool(act.any()):
-                continue
             here = self.p_tile[:, p]
             hc = here.clamp(min=0)
             owned_here = self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
@@ -3114,11 +3178,16 @@ class BatchSim:
         the shared RNG, so this order is part of the parity contract."""
         cb = self.rules.combat
         p_high = int(self.p_next.max().item())
-        for p in range(p_high):
+        # D-14 (the D-4 live-slot pattern): slots alive in SOME game at loop
+        # top, ascending. Nothing spawns player units in here and deaths only
+        # shrink the set, so this is a superset of every slot the old
+        # per-slot any() check would run — a slot that dies in ALL games
+        # mid-loop no-ops through the body (every mutation and every
+        # _damage_roll sits under a mask ⊆ alive with its own any() guard).
+        p_live = self.p_alive[:, :p_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if p_high else []
+        for p in p_live:
             a = actions[:, p].to(torch.long)
             alive = self.p_alive[:, p]
-            if not bool(alive.any()):
-                continue
             here = self.p_tile[:, p]
             nb = self.neigh[here.clamp(min=0)]  # [B, 6]
 
@@ -3513,7 +3582,11 @@ class BatchSim:
         r1 = self._next_random(can_roll)
         want = can_roll & (r1 < cb.get("campSpawnChance", 0.08))
         if bool(want.any()):
-            near_city = ((self.dist < 5) & self.alive.unsqueeze(2)).any(dim=1)  # [B, T]
+            # D-15: only the `want` rows consume the candidate planes — build
+            # them on the want sub-batch (boolean/integer ops row-restrict
+            # exactly; the RNG calls keep their full-B masks unchanged).
+            wr = want.nonzero(as_tuple=True)[0]
+            near_city_w = ((self.dist[wr] < 5) & self.alive[wr].unsqueeze(2)).any(dim=1)  # [n, T]
             # P5/S6 gate-catch (seed 9027 t230): campCandidates excludes
             # t.district LIVE — an ORPHANED pave (razed city's district on an
             # unowned tile) padded the GPU set and shifted the draw-indexed
@@ -3521,20 +3594,22 @@ class BatchSim:
             # AUDIT A-15: camps rise away from EVERY civilization — live
             # RIVAL city centers repel candidates too (real Civ 6; the TS
             # campCandidates twin loop).
-            rcc = self.rc_center.reshape(B, -1)
-            near_rc = ((self.pair_dist[rcc.clamp(min=0)] < 5) & self.rc_alive.reshape(B, -1).unsqueeze(2)).any(dim=1)
-            cand = self.camp_ok & (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & ~near_city & ~near_rc & (self.district < 0) & (self.built_wonder < 0)  # A-4: live builtWonder excludes too
+            rcc_w = self.rc_center[wr].reshape(len(wr), -1)
+            near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.rc_alive[wr].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
+            cand_w = self.camp_ok[wr] & (self.owner[wr] == -1) & (self.cs_at[wr] < 0) & (self.rival_at[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # A-4: live builtWonder excludes too
             if self.K > 0:
-                camp_d = self.pair_dist[self.camp_tile.clamp(min=0)].to(torch.long)  # [B, K, T]
-                near_camp = ((camp_d < 5) & (self.camp_tile >= 0).unsqueeze(2)).any(dim=1)
-                cand = cand & ~near_camp
-            has = want & cand.any(dim=1)
+                camp_d_w = self.pair_dist[self.camp_tile[wr].clamp(min=0)].to(torch.long)  # [n, K, T]
+                near_camp_w = ((camp_d_w < 5) & (self.camp_tile[wr] >= 0).unsqueeze(2)).any(dim=1)
+                cand_w = cand_w & ~near_camp_w
+            has = torch.zeros_like(want)
+            has[wr] = cand_w.any(dim=1)  # want[wr] is all-True, so has == want & cand.any
             r2 = self._next_random(has)
             if bool(has.any()):
-                k = torch.floor(r2 * cand.sum(dim=1).to(torch.float64)).to(torch.long)
-                cum = cand.long().cumsum(dim=1)
-                sel = cand & (cum == (k + 1).unsqueeze(1))
-                spot = sel.long().argmax(dim=1)
+                k_w = torch.floor(r2[wr] * cand_w.sum(dim=1).to(torch.float64)).to(torch.long)
+                cum_w = cand_w.long().cumsum(dim=1)
+                sel_w = cand_w & (cum_w == (k_w + 1).unsqueeze(1))
+                spot = torch.zeros(B, dtype=torch.long, device=dev)
+                spot[wr] = sel_w.long().argmax(dim=1)
                 rows = has.nonzero(as_tuple=True)[0]
                 self.camp_tile[rows, self.n_camps[rows]] = spot[rows]
                 self.n_camps[rows] += 1
@@ -3742,6 +3817,15 @@ class BatchSim:
             self.envoys_avail = self.envoys_avail + earn.long()
 
         cooldown = int(r.get("questCooldown", 12))
+        # D-16: "player owns a live complete district of askable type a" is
+        # constant across the s loop (quest resolution never touches the
+        # district planes) — one [B, nAskable] table per turn, gathered per
+        # s below, instead of 2·S full [B, T] scans.
+        if self._askable.numel() > 0 and self.districts_on:
+            own_live = self.district_complete & (self.owner >= 0) & ~self.district_dead  # [B, T]
+            own_tbl = ((self.district.unsqueeze(2) == self._askable.view(1, 1, -1)) & own_live.unsqueeze(2)).any(dim=1)  # [B, nA]
+        else:
+            own_tbl = None
         for s in range(self.S):
             act = self.cs_alive[:, s] & self.cs_met[:, s]
             # Resolve: clear-the-camp, or a buildDistrict quest for a district the
@@ -3752,10 +3836,9 @@ class BatchSim:
             resolved_camp = act & (self.cs_quest[:, s] == 1) & camp_gone
             # a buildDistrict quest resolves when the player owns the asked
             # district type (askable idx recorded in cs_quest_district).
-            if self._askable.numel() > 0 and self.districts_on:
+            if own_tbl is not None:
                 qd = self.cs_quest_district[:, s].clamp(min=0, max=self._askable.numel() - 1)
-                asked_type = self._askable[qd]  # [B]
-                owns_asked = ((self.district == asked_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0) & ~self.district_dead).any(dim=1) & (self.cs_quest_district[:, s] >= 0)  # PLAYER (live) districts only
+                owns_asked = own_tbl.gather(1, qd.unsqueeze(1)).squeeze(1) & (self.cs_quest_district[:, s] >= 0)  # PLAYER (live) districts only (D-16 table)
             else:
                 owns_asked = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             resolved_dist = act & (self.cs_quest[:, s] == 3) & owns_asked
@@ -3775,9 +3858,8 @@ class BatchSim:
             draw1 = torch.floor(r1 * 4.0).to(torch.long)
             # buildDistrict offered unless the player already owns the DRAWN
             # askable district (askable idx -> district type via self._askable).
-            if self._askable.numel() > 0 and self.districts_on:
-                drawn_type = self._askable[draw1.clamp(min=0, max=self._askable.numel() - 1)]  # [B]
-                already_bd = ((self.district == drawn_type.unsqueeze(1)) & self.district_complete & (self.owner >= 0) & ~self.district_dead).any(dim=1)  # PLAYER (live) districts only
+            if own_tbl is not None:
+                already_bd = own_tbl.gather(1, draw1.clamp(min=0, max=self._askable.numel() - 1).unsqueeze(1)).squeeze(1)  # PLAYER (live) districts only (D-16 table)
             else:
                 already_bd = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             bd = ~already_bd
@@ -4940,13 +5022,16 @@ class BatchSim:
             - torch.round(y_sum * 1000) * 1e4
             + tiles.to(self.dtype)
         )
+        unowned = None  # D-13: window planes dense once, then incremental per claim
+        adj_own = None
         for _ in range(64):  # the TS while-loop (multiple claims per turn, escalating cost)
             cost = _rc_cost()  # A-7: belief border multiplier applied
             ready = cact & (self.rc_cbox[:, r, j] >= cost)
             if not bool(ready.any()):
                 return
-            unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
-            adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(B, -1)).reshape(B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
+            if unowned is None:
+                unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
+                adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(B, -1)).reshape(B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
             key = torch.where(ok, key0, self._inf_f)
             best = key.argmin(dim=1)
@@ -4958,6 +5043,14 @@ class BatchSim:
                 self.rival_at[rows, spot] = r
                 self.rc_acquired[rows, r, j] += 1
                 self.rc_cbox[rows, r, j] -= cost[rows]
+                # D-13: only rival_at[spot] changed (-1 → r, per the unowned
+                # gate). The spot leaves the unowned plane; window tiles
+                # ADJACENT to it gain r-adjacency — same booleans the dense
+                # re-derive would produce (owner/cs_at never move in-loop).
+                unowned[rows, best[rows]] = False
+                nb_s = self.neigh[spot]  # [n, 6]
+                adj_hit = ((tiles[rows].unsqueeze(2) == nb_s.unsqueeze(1)) & (nb_s >= 0).unsqueeze(1)).any(dim=2)  # [n, M]
+                adj_own[rows] = adj_own[rows] | adj_hit
             capped = ready & ~has_cand
             if bool(capped.any()):
                 # Nowhere to grow: cap the box at the current threshold.
@@ -5961,6 +6054,18 @@ class BatchSim:
             amen_tidx, amen_gf, amen_yf = self._rival_amenity(r)
             rc_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
             heal = torch.where(self.r_atwar[:, r], 5, 15)
+            # D-11: the Hanging-Gardens growth product reads the CIV-wide
+            # wonder registry — identical for every j. Hoist per r; a wonder
+            # COMPLETION mid-loop (the only in-loop write to its inputs —
+            # a settler founding only rewrites an all--1 free slot, product
+            # term 1.0 either way) drops the cache and the next j recomputes
+            # the same expression on the fresh state, exactly like the old
+            # per-j compute.
+            gw_cache = None
+            if self._wond_n:
+                wregG = self.rc_wonder[:, r]  # [B, RC, nW]
+                compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
+                gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
             for j in range(self.RC):
                 cact = active & alive0[:, j]
                 if not bool(cact.any()):
@@ -5985,12 +6090,16 @@ class BatchSim:
                     d_pl = self.pair_dist[here_j.unsqueeze(1), self.site.clamp(min=0)].to(torch.float64)
                     for_p = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1)
                     others = self.alive.any(dim=1)
-                    for r2 in range(self.R):
-                        if r2 == r:
-                            continue
-                        d_o = self.pair_dist[here_j.unsqueeze(1), self.rc_center[:, r2].clamp(min=0)].to(torch.float64)
-                        for_p = for_p + ((lrng + 1 - d_o).clamp(min=0) * self.rc_pop[:, r2].double() * self.rc_alive[:, r2].double()).sum(dim=1)
-                        others = others | self.rc_alive[:, r2].any(dim=1)
+                    # D-12: all foreign civs in ONE stacked op — every term is
+                    # (lrng+1−d)⁺ × pop × alive, integer-valued f64, so the
+                    # single sum is exact regardless of association.
+                    oth = [r2 for r2 in range(self.R) if r2 != r]
+                    if oth:
+                        ctr_o = self.rc_center[:, oth].reshape(B, -1)
+                        alive_o = self.rc_alive[:, oth].reshape(B, -1)
+                        d_o = self.pair_dist[here_j.unsqueeze(1), ctr_o.clamp(min=0)].to(torch.float64)
+                        for_p = for_p + ((lrng + 1 - d_o).clamp(min=0) * self.rc_pop[:, oth].reshape(B, -1).double() * alive_o.double()).sum(dim=1)
+                        others = others | alive_o.any(dim=1)
                     tot_p = own_p + for_p
                     press = torch.where(tot_p > 0, lscale * (own_p - for_p) / tot_p.clamp(min=1e-9), torch.zeros_like(tot_p))
                     delta_l = press + self._loyalty_amenity[amen_tidx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
@@ -6038,9 +6147,16 @@ class BatchSim:
                 bh_j = self.rc_bldg[:, r, j].double() @ self.rules.b_housing.to(dev).double()
                 # A-13: table-gathered improvement housing (rivalHousing reads
                 # the catalog generically); computeHousing counts PILLAGED
-                # improvements too.
-                imp_own_j = (self.pair_dist[ctr_j] <= 3) & (self.rival_at == r) & (self.improvement >= 0)
-                farm_j = (self._imp_housing[self.improvement.clamp(min=0)].double() * imp_own_j.double()).sum(dim=1)
+                # improvements too. D-11: restricted to the radius-3 window
+                # (tiles_from_offsets' 37 offsets = the ≤3 hex set exactly,
+                # off-map -1) instead of a full [B, T] pair_dist plane per
+                # (r, j); the summands are catalog halves (0.5/0 — exact
+                # dyadics), so the shorter sum is bit-identical.
+                win3 = tiles_from_offsets(ctr_j, self._off3, self.W, self.H)  # [B, 37]
+                w3c = win3.clamp(min=0)
+                imp_w3 = self.improvement.gather(1, w3c)
+                imp_own_j = (win3 >= 0) & (self.rival_at.gather(1, w3c) == r) & (imp_w3 >= 0)
+                farm_j = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own_j.double()).sum(dim=1)
                 housing_j = water_j + bh_j + farm_j
                 if self._r_has_beliefs(r):
                     # A-7: Religious Community building housing + River
@@ -6054,12 +6170,14 @@ class BatchSim:
                 # chain like computeCityStats (hf × tier × growthMult).
                 gmul = self._bel_mul("growth", r) if self._r_has_beliefs(r) else 1.0
                 # A-4: Hanging Gardens — the civ-wide completed-wonder growth
-                # product (rivalGrowthAllMult, LIVE per city like TS's call)
+                # product (rivalGrowthAllMult, LIVE per city like TS's call;
+                # D-11: hoisted per r above, recomputed on completion flag)
                 if self._wond_n:
-                    wregG = self.rc_wonder[:, r]  # [B, RC, nW]
-                    compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
-                    gw = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
-                    gmul = gmul * gw
+                    if gw_cache is None:
+                        wregG = self.rc_wonder[:, r]  # [B, RC, nW]
+                        compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
+                        gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
+                    gmul = gmul * gw_cache
                 self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j] * gmul, surplus), self.rc_growth[:, r, j])
                 p64 = self.rc_pop[:, r, j].double()
                 need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
@@ -6121,6 +6239,7 @@ class BatchSim:
                                 wt_ = self.rc_wonder[wr_, r, j, wi_done[wr_]]
                                 self.built_wonder_complete[wr_, wt_.clamp(min=0)] = True
                                 self._eff_version += 1
+                                gw_cache = None  # D-11: growth product changed under the hoist
                         # A-14: a finished project pays Math.round(cost×frac)
                         # into the CIV's streams + GPP (the completeProject
                         # twin — rival streams, like GP effects).
@@ -7057,7 +7176,12 @@ class BatchSim:
         total, housing, growth_f, tier_idx = self._city_totals()
         lux0 = self._last_lux  # frozen for the whole walk (TS luxMap semantics)
         _tot_ver = self._eff_version
-        _tot_pop = self.pop.clone()
+        # D-10: pop changes ride a dirty FLAG set at the walk's only pop
+        # writes (settler completion, growth, starvation) — replaces the
+        # per-rank torch.equal + pop.clone() snapshot compare. A clamp-at-1
+        # write that leaves pop unchanged forces a spurious recompute of
+        # identical values (bit-exact, rare).
+        _pop_dirty = False
         y_sum = self._eff_yields().sum(dim=2) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # P5/S5+A-4: paved/wondered tiles yield 0 (tileYields, yields.ts:37)
         # loyalty mirrors TS's loop-top view: city c's tier and pop are
         # captured FRESH at its own iteration (post earlier cities' same-turn
@@ -7085,10 +7209,10 @@ class BatchSim:
         bidx = self._bidx  # D-7
         for s_rank in range(C):
             col = walk_ord[:, s_rank]  # [B] — each game's s_rank-th city by acquisition
-            if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
+            if self._eff_version != _tot_ver or _pop_dirty:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
-                _tot_pop = self.pop.clone()
+                _pop_dirty = False
                 # Task-#39 forced-gate catch (rng 2026006084 t193): tileYields
                 # carries FARM-ADJACENCY food (yields.ts:60-63) — the border
                 # ySum missed it because frontier tiles never hold farm
@@ -7154,15 +7278,18 @@ class BatchSim:
             self.pop[bidx, col] = torch.where(starve, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
             fb2 = self.food_box[bidx, col]
             self.food_box[bidx, col] = torch.where(starve, torch.zeros_like(fb2), fb2)
+            # D-10: all three pop-write masks of this rank in one host check
+            if bool((made_settler | grow | starve).any()):
+                _pop_dirty = True
 
             # --- borders (later cities see earlier claims, as before) --------
             # TS pickBorderTile reads the LIVE map: refresh the yield ranking
             # if THIS city's own completion/growth just changed it (the box
             # add itself stays the loop-top stats value, like TS).
-            if self._eff_version != _tot_ver or not torch.equal(self.pop, _tot_pop):
+            if self._eff_version != _tot_ver or _pop_dirty:
                 total, housing, growth_f, tier_idx = self._city_totals(lux=lux0)
                 _tot_ver = self._eff_version
-                _tot_pop = self.pop.clone()
+                _pop_dirty = False
                 # Task-#39 forced-gate catch (rng 2026006084 t193): tileYields
                 # carries FARM-ADJACENCY food (yields.ts:60-63) — the border
                 # ySum missed it because frontier tiles never hold farm
@@ -7171,13 +7298,15 @@ class BatchSim:
                 y_sum = (self._eff_yields().sum(dim=2) + self._farmadj_food()) * ((self.district < 0) & (self.built_wonder < 0)).to(self.dtype)  # P5/S5+A-4: paved/wondered tiles yield 0 (tileYields, yields.ts:37)
             self.culture_box[bidx, col] = self.culture_box[bidx, col] + t_c[:, 4]
             dist_c = self.dist[bidx, col]  # [B, T] — static per city, hoisted out of the claim loop
+            adj_own = None  # D-13: dense on the first ready iteration, then incremental
             for _ in range(BORDER_LOOPS):
                 cost_b = self._border_cost(self.tiles_acquired[bidx, col])
                 ready = self.alive[bidx, col] & (self.culture_box[bidx, col] >= cost_b)
                 if not ready.any():
                     break
-                owner_nb = self.owner.gather(1, neigh_flat).reshape(B, T, 6)
-                adj_own = ((owner_nb == col.view(B, 1, 1)) & neigh_valid).any(dim=2)
+                if adj_own is None:
+                    owner_nb = self.owner.gather(1, neigh_flat).reshape(B, T, 6)
+                    adj_own = ((owner_nb == col.view(B, 1, 1)) & neigh_valid).any(dim=2)
                 cand_b = (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & (dist_c <= 5) & adj_own
                 # order: dist asc, resource priority desc, yield sum desc, index asc
                 # C-6: priority reads LIVE (a paved bonus resource is GONE in
@@ -7195,6 +7324,14 @@ class BatchSim:
                 if expand.any():
                     rows = expand.nonzero(as_tuple=True)[0]
                     self.owner[rows, best[rows]] = col[rows]
+                    # D-13: each claim flips ONE tile (-1 → col, per the
+                    # cand_b owner==-1 gate), so adjacency-to-col only GROWS,
+                    # and only at the claimed tile's ≤6 on-map neighbours —
+                    # the same booleans the dense re-derive would produce.
+                    nb_b = self.neigh[best[rows]]  # [n, 6]
+                    ok_b = nb_b >= 0
+                    rr_b = rows.unsqueeze(1).expand_as(nb_b)
+                    adj_own[rr_b[ok_b], nb_b[ok_b]] = True
                     cb = self.culture_box[bidx, col]
                     self.culture_box[bidx, col] = torch.where(expand, cb - cost_b, cb)
                     self.tiles_acquired[bidx, col] = self.tiles_acquired[bidx, col] + expand.long()
