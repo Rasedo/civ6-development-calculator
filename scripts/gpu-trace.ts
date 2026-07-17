@@ -11,7 +11,7 @@
  *   per rival slot (rMax) — [nCities, popSum, nUnits, atWar, nTechs,
  *           nCivics, techProg·ms, civicProg·ms, ΣqueueProg·ms, ΣqueueCost·ms]
  *   per city slot (cMax) — [pop, ownedTiles, buildings, tilesAcquired,
- *           foodBox·ms, cultureBox·ms, cityHp, loyalty·ms]
+ *           foodBox·ms, cultureBox·ms, cityHp, loyalty·ms, followedReligion]
  *
  * City slots are keyed by FOUNDING ORDER via `cityIds` (append new ids as
  * cities appear; once cMax ids exist, a new id REUSES the first dead
@@ -115,7 +115,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let c = 0; c < cMax; c++) {
     const city = state.cities.find((x) => x.id === cityIds[c]);
     if (!city) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
       continue;
     }
     row.push(
@@ -127,6 +127,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       Math.round(city.cultureBox * 1000),
       getCityHp(state, city.id),
       Math.round((city.loyalty ?? 100) * 1000),
+      city.followedReligion ?? -1, // B-18: the pressure-spread followed-religion id (-1 = none)
     );
   }
   return row;
@@ -141,6 +142,6 @@ export function rowTolerance(cMax: number, csMax: number, rMax: number): number[
   const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
   for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2);
-  for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2);
+  for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
   return tol;
 }

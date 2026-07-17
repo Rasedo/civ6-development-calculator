@@ -25,32 +25,35 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 35 | 5.6 | **16%** |
-| B fidelity | 88 | 36.0 | **41%** |
+| A symmetry | 35 | 7.5 | **21%** |
+| B fidelity | 88 | 37.0 | **42%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (E-16 with owner) | 6 | 5 | 83% |
-| G parity latents | 4 | 3 | 75% |
-| **Overall (incl. closed)** | **178** | **94.6** | **53%** |
-| Open chapters only (A+B+E+G) | 133 | 49.6 | **37%** |
+| G parity latents (EMPTY) | 4 | 4 | 100% |
+| **Overall (incl. closed)** | **178** | **98.5** | **55%** |
+| Open chapters only (A+B+E) | 129 | 49.5 | **38%** |
 
-(2026-07-17 #46r update: A-7r 70%→90% — LIVE with residual channels;
-G-3 resolved-refuted, G-4 resolved-on-catch added.)
+(2026-07-17 #46r: A-7r →90% LIVE; G-3 refuted, G-4 on-catch. Later
+same day A-5r+#47r: A-5r 95% — tile purchase folds into #50; B-18
+35%→60% — spread landed, yields-coupling open; G-2 done → chapter G
+EMPTY.)
 
 Per-item weights (done% in parens where partial):
-- A: A-5r 2, A-7r 4 (90% — LIVE, residual channels/wiring), A-9 4,
-  A-11 4, A-12 4, A-17 4, A-18 3, A-19 4, A-20 2 (done), A-21 2,
-  A-22 2.
+- A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (90% — LIVE, residual
+  wiring), A-9 4, A-11 4, A-12 4, A-17 4, A-18 3, A-19 4, A-20 2
+  (done), A-21 2, A-22 2.
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 (done); B-15 2
   (85% — magnitude waits on #56); B-26 3 (50%); B-4 3, B-6 8, B-7 2,
   B-8 2, B-9 3, B-10 3, B-29 2, B-30 2, B-31 1, B-32 2 (open).
 - B progression: B-11 4 / B-12 3 / B-14 1 (done); B-13 3 (80%);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
-  (35%); B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
+  (60% — spread landed, yields-coupling open); B-20 3 (30%); B-21 2
+  (40%); B-23 3 (open).
 - B meta: B-25 3 (50%); B-22 3, B-24 3, B-33 3 (open).
 - E: E-16 1 (open); the landed E-sweep counted as 5 done.
-- G: G-1 1, G-3 1, G-4 1 (done); G-2 1 (open).
+- G: G-1, G-2, G-3, G-4 — all done (chapter EMPTY).
 
 ---
 
@@ -79,8 +82,15 @@ untagged halves of tagged items stay Fable/main-session work.
   building/settler/unit codes) for controlled rivals — so the gap is
   the scripted policy's verbs (units/settlers) plus tile purchase,
   which has no rival or GPU twin on ANY seat (`buyTile` is
-  TS-player-only). [Round B2 note: slice P deferred this whole item —
-  still open, now the last piece of #46.]
+  TS-player-only). **RESOLVED except tile purchase (2026-07-17,
+  A-5r)**: scripted rivals gold-buy settlers and units — priority
+  BUILDING > SETTLER > UNIT, one purchase/civ/turn, controlled-head
+  VP-G2 semantics, milli-rounded affordability, refunds on failed
+  spawn/found. Unit branch parity-validated (82 in-gate fires);
+  settler branch never fires organically — poke-covered
+  (`gpu/rival_purchase_test.py`), a recorded coverage gap, not a bug.
+  Tile purchase stays open (no GPU verb on any seat — fold into the
+  A-18/#50 verb work).
 - A-7 (remainder — LIVE 2026-07-17, #46r). `GOVERNMENTS_ADOPTION_LIVE
   = true`: both scripted seats adopt governments and slot policies,
   turn-exact at 24×250 (the flip hunt fixed housingAll + wildcard
@@ -376,14 +386,19 @@ gap; likewise GS disasters are modeled minus sea-level rise
   slots (`SPECIALIST_YIELDS` (data/greatPeople.ts) has no ENCAMPMENT
   entry; `citySpecialistSlots` skips it), no district combat role (no
   HP/ranged strike/movement block), no unit-XP function.
-- B-18 (re-scoped 2026-07-17, Round B2). LANDED: Enhancer belief slot
-  (catalog of 7, `enhanceReligion`, exporter pool+table — INERT
-  plumbing, no GPU behavior yet) + belief catalogs to real counts
-  (pantheons 25, follower 9, founder 8; degradations in
-  gpu/ROUND_B2_LOG.md §Q). STILL OPEN: pressure/spread (cities follow
-  the founder's religion wholesale), Missionaries/Apostles,
-  theological combat, rival enhancer claiming + GPU `r_enhancer` race
-  (needs a mirrored 3rd `_next_random` draw), religious victory.
+- B-18 (re-scoped again 2026-07-17, #47r). LANDED since Round B2:
+  belief catalogs (25/9/8/7), Enhancer slot, the rival ENHANCER race
+  (mirrored 3rd `_next_random` draw after the founder draw — 31
+  in-gate claims), and PRESSURE SPREAD both engines (+1 integer
+  pressure/turn within 10 tiles of a founded religion's frozen holy
+  center, `followedReligion` = argmax ties-to-lowest-id, KILL hygiene
+  + `_reclaim_rc` permutation, proven by a new compared trace
+  column — first in-gate flip ~t65). STILL OPEN: the
+  pressure→YIELDS coupling (`followedReligion` is computed and
+  trace-proven but follower-belief yields still apply uniformly
+  per-civ — own gate-stage, exact next steps in ROUND_B2_LOG §T),
+  enhancer EFFECTS (all 7 inert), Missionaries/Apostles, theological
+  combat, religious victory.
 - B-19. **RESOLVED (2026-07-17, Round B2)**: era-anchored GP cost
   ladder `[60,120,200,290,390,500,620,750]` (`gpCost`), global race
   kept; WRITER/MUSICIAN classes added (n_gp=9, both → THEATER_SQUARE,
@@ -515,14 +530,14 @@ refresh) stays with the owner. Original items kept for reference:
   scenario 1 proves gains-are-current (red pre-fix), scenario 2 proves
   validity-is-snapshot (guards the seed-9274 catch against
   over-correction).
-- G-2 (found by Round B2 agent Q, 2026-07-17). The GPU PLAYER
-  GP-advance loop applies gpEffects columns 0-3 but not column 4
-  (faith), while the RIVAL loop applies faith — a player-earned
-  Prophet banks faith in TS but not on the GPU. Dormant: the scripted
-  player never earns a Prophet with a completed Holy Site in 100
-  turns. Fix at the player GP-claim site in engine.py (mirror the
-  rival loop's faith column) — cheap; pair with the #47 follow-up or
-  the #56 horizon extension, whichever lands first.
+- G-2. RESOLVED (2026-07-17, #47r — re-verified before fixing per the
+  G-3 lesson; the asymmetry was real): the GPU player GP loop now
+  banks the faith effect column via a `player_faith` accumulator
+  mirroring the rival loop; poked in `gpu/religion_gp_test.py` (a
+  fresh player Prophet banks exactly 100 faith + snapshot coverage).
+  Noted residual: per-turn player yield-faith (`faithTotal`) remains
+  GPU-unmodeled beyond this bank — dormant, no in-gate consumer; wire
+  with player religion-founding. **Chapter G is EMPTY.**
 - G-4. RESOLVED-ON-CATCH (2026-07-17, #56 hunt, seed 9287 t128→t142
   visible): the GPU's scripted builder walker (`_scripted_builder`)
   ran BEFORE the production-choice section while the exporter's script

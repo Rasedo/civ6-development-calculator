@@ -28,7 +28,7 @@ import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -83,6 +83,19 @@ const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 const RIVAL_SPACING = 10;
+
+/** AUDIT A-5r: the military units a scripted rival may gold-buy — the same
+ * roster the production picker trains (WARRIOR/SLINGER ungated; the rest on
+ * the rival's real techs), in UNITS-table order so strict `>` on combat
+ * breaks ties to the lowest-index type (the GPU argmax mirror). BUILDER/
+ * SCOUT are excluded — never in the rival roster. */
+const RIVAL_BUY_UNITS: { id: string; tech?: string }[] = [
+  { id: 'WARRIOR' },
+  { id: 'SLINGER' },
+  { id: 'ARCHER', tech: 'ARCHERY' },
+  { id: 'SPEARMAN', tech: 'BRONZE_WORKING' },
+  { id: 'HORSEMAN', tech: 'HORSEBACK_RIDING' },
+];
 
 // ---------------------------------------------------------------------------
 // Placement
@@ -601,8 +614,28 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
       rival.religionFounded = true;
       rival.followerBelief = fPick; // A-7: identities kept — effects apply
       rival.founderBelief = oPick;
+      // B-18: freeze the holy tile (the founding civ's capital center) — the
+      // source of this religion's pressure spread. Capital always exists.
+      rival.holyTile = (rival.cities.find((rc) => rc.isCapital) ?? rival.cities[0])?.centerIndex ?? null;
       const name = RELIGION_NAMES[(rival.id + 1) % RELIGION_NAMES.length];
       state.eventLog.push(`${rival.name} founded ${name} — two beliefs left the pool.`);
+    }
+  }
+  // B-18: enhance the founded religion — a SECOND earned Prophet claims an
+  // enhancer belief, denying it from the shared pool (like follower/founder).
+  // The draw sits AFTER the founder draw with the same UNCONDITIONAL shape the
+  // GPU's _next_random(eopen) mirrors — only the outcome gates on pool + state.
+  // Effects are all inert this round; the identity applies via getRivalModifiers.
+  if (rival.religionFounded && !rival.enhancerClaimed && (rival.prophets ?? 0) >= 2) {
+    const enhancers = Object.keys(ENHANCER_BELIEFS).filter(
+      (id) => id !== state.religion.enhancer && !(state.claimedEnhancers ?? []).includes(id),
+    );
+    if (enhancers.length > 0) {
+      const ePick = enhancers[Math.floor(nextRandom(state) * enhancers.length)];
+      (state.claimedEnhancers ??= []).push(ePick);
+      rival.enhancerClaimed = true;
+      rival.enhancerBelief = ePick; // A-7-style: identity kept — effects apply
+      state.eventLog.push(`${rival.name} enhanced its religion (${ENHANCER_BELIEFS[ePick].name} is taken).`);
     }
   }
 }
@@ -1381,13 +1414,17 @@ export function rivalPhase(state: GameState): void {
       }
     }
 
-    // AUDIT A-5: spend the banked gold — ONE purchase per civ per turn:
-    // the cheapest completable building anywhere in the civ (cost, then
-    // id, then city order — the tryQueueRivalBuilding key), bought
-    // INSTANTLY at the player's goldPurchaseMult price, keeping the
-    // opening peace cost as a war chest. Skips a building queued in that
-    // same city (completion would duplicate it).
+    // AUDIT A-5 (+A-5r): spend the banked gold — ONE purchase per civ per
+    // turn, priority BUILDING > SETTLER > UNIT. Building: the cheapest
+    // completable building anywhere in the civ (cost, then id, then city
+    // order — the tryQueueRivalBuilding key), bought INSTANTLY at the
+    // player's goldPurchaseMult price, keeping the opening peace cost as a
+    // war chest. Skips a building queued in that same city (completion would
+    // duplicate it). If no building was bought, the A-5r settler/unit
+    // branches run below (no war-chest reserve, matching the controlled
+    // head's apply_rival_actions purchase spec).
     {
+      let bought = false;
       let buyCity: RivalCity | null = null;
       let buyDef: (typeof BUILDINGS)[string] | null = null;
       for (const rc of rival.cities) {
@@ -1417,6 +1454,53 @@ export function rivalPhase(state: GameState): void {
           rival.treasury = (rival.treasury ?? 0) - price;
           buyCity.buildings.push(buyDef.id);
           if (buyDef.id === 'ANCIENT_WALLS') buyCity.outerHp = WALLS_HP; // AUDIT B-1
+          bought = true;
+        }
+      }
+      // AUDIT A-5r: SETTLER — when no building was bought and the civ is
+      // under its city cap, buy one at the rival settler price × mult. The
+      // rival has no settler bank, so the purchase founds IMMEDIATELY via the
+      // production-settler site scan (tryFoundCity); pay only on a real found
+      // (no site = refund, the spawn-refund convention). The new city joins
+      // this turn's amenity map and city loop (both taken after this block).
+      if (!bought && rival.cities.length < RIVAL_MAX_CITIES) {
+        const price = RIVAL_SETTLER_COST(rival.cities.length) * GOLD_PURCHASE_MULT;
+        if (goldAffordable(rival.treasury ?? 0, price)) {
+          const before = rival.cities.length;
+          tryFoundCity(state, rival);
+          if (rival.cities.length > before) {
+            rival.treasury = (rival.treasury ?? 0) - price;
+            bought = true;
+          }
+        }
+      }
+      // AUDIT A-5r: MILITARY UNIT — when nothing else was bought and the
+      // civ's live+queued military is under the #56 H1 quota (2× cities,
+      // rival-side), buy the STRONGEST affordable trainable military unit
+      // (highest combat, ties to table order) at cost × mult. It spawns via
+      // the shared rival machinery at the capital (else the first city), and
+      // pays only where it LANDED (no free spot = refund, the P5/S8 pattern).
+      if (!bought && meleeCount + rangedCount < rival.cities.length * 2) {
+        let pickId: string | null = null;
+        let pickCombat = -Infinity;
+        for (const cand of RIVAL_BUY_UNITS) {
+          if (cand.tech && !rival.research.techs.includes(cand.tech)) continue;
+          const def = UNITS[cand.id];
+          if (!def) continue;
+          if (!goldAffordable(rival.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
+          if (def.combat > pickCombat) {
+            pickCombat = def.combat;
+            pickId = cand.id;
+          }
+        }
+        if (pickId) {
+          const spawnCity = rival.cities.find((c) => c.isCapital) ?? rival.cities[0];
+          const price = UNITS[pickId].cost * GOLD_PURCHASE_MULT;
+          const u = spawnUnit(state, pickId, spawnCity.centerIndex, 'rival', rival.id);
+          if (u) {
+            rival.treasury = (rival.treasury ?? 0) - price;
+            bought = true;
+          }
         }
       }
     }

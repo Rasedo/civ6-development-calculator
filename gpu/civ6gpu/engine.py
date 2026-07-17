@@ -338,8 +338,10 @@ _MUTABLE = [
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
-    "gp_earned", "player_gp_points", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n",
+    "gp_earned", "player_gp_points", "player_faith", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # A-7: belief identity
+    "enh_claimed", "r_enhancer", "r_enhancer_done",  # B-18: enhancer race
+    "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
@@ -619,6 +621,7 @@ class BatchSim:
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_o_n = torch.zeros(B, dtype=torch.long, device=device)
+        self.claimed_e_n = torch.zeros(B, dtype=torch.long, device=device)  # B-18: enhancer race
         # A-7: belief IDENTITY — per-id pool masks + per-civ claimed ids (the
         # counts above stay as gate mirrors; masks and counts move together).
         # Ids are -1 until claimed; effects gather rows id+1 from tables whose
@@ -627,9 +630,31 @@ class BatchSim:
         self.pan_claimed = torch.zeros(B, max(len(_bl.get("pantheons", [])), 1), dtype=torch.bool, device=device)
         self.fol_claimed = torch.zeros(B, max(len(_bl.get("followers", [])), 1), dtype=torch.bool, device=device)
         self.fou_claimed = torch.zeros(B, max(len(_bl.get("founders", [])), 1), dtype=torch.bool, device=device)
+        # B-18: enhancer pool mask + per-civ claimed identity + a done flag
+        # (mirror of fol_claimed / r_follower / r_religion_done). Effects stay
+        # unwired (all enhancers inert), so no _bel["enh"] table is built — the
+        # identity is kept for when a non-inert enhancer lands.
+        self.enh_claimed = torch.zeros(B, max(len(_bl.get("enhancers", [])), 1), dtype=torch.bool, device=device)
+        self._enh_any = len(_bl.get("enhancers", [])) > 0
         self.r_pantheon = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.r_follower = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
         self.r_founder = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.r_enhancer = torch.full((B, r_pad), -1, dtype=torch.long, device=device)  # B-18
+        self.r_enhancer_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # B-18
+        # B-18 religious pressure spread (INERT: not read by yields/trace yet).
+        # Religions indexed in the unified civ space: 0 = player, i+1 = rival i.
+        # holy_tile[:, g] = religion g's frozen holy tile (its founding capital
+        # center) or -1. Per-city integer pressure accumulators + the followed
+        # religion id (-1 = none), for player cities [B,C] and rival cities
+        # [B,r_pad,rc_pad]. Dead/absent slots are zeroed each turn (KILL hygiene,
+        # mirroring the TS fresh-object reset on founding/flip).
+        self._O = self.O  # 1 + R
+        self._pressure_range = int(rr.get("pressureRange", 10))  # B-18: holy-city spread radius
+        self.holy_tile = torch.full((B, self._O), -1, dtype=torch.long, device=device)
+        self.city_pressure = torch.zeros(B, C, self._O, dtype=torch.long, device=device)
+        self.city_followed = torch.full((B, C), -1, dtype=torch.long, device=device)
+        self.rc_pressure = torch.zeros(B, r_pad, rc_pad, self._O, dtype=torch.long, device=device)
+        self.rc_followed = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
         self._bel = {}
         for _pool, _rows in (("pan", _bl.get("pantheons", [])), ("fol", _bl.get("followers", [])), ("fou", _bl.get("founders", []))):
             _nf = len(_rows[0]["featY"]) if _rows else 1
@@ -728,6 +753,15 @@ class BatchSim:
         self._prophet_cls = int(rr.get("prophetCls", 3))  # P5/S5: PROPHET's class index
         self._gp_nc = int(self._gp_class_district.numel())
         self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
+        # G-2: the player's faith bank. TS applyGreatPersonEffect banks fx.faith
+        # into state.faithTotal (game.ts); the rival GP loop already applies its
+        # gpEffects col-4 into r_faith, but the player GP loop did not — an
+        # earned Prophet banked faith in TS, not on the GPU. This mirrors that.
+        # Not a parity-compared column (player faith has no in-gate consumer —
+        # worship/pantheon founding is TS-only for the player), so it stays a
+        # pure internal accumulator; the per-turn yield-faith side (game.ts:851)
+        # remains unmodeled (the larger B-18 player religion-founding work).
+        self.player_faith = torch.zeros(B, dtype=torch.float64, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off5 = tiles_within_offsets(5).to(device)  # P5/S4: rival border growth radius (= player BORDER_MAX_RADIUS)
@@ -1907,17 +1941,55 @@ class BatchSim:
             can = (earned < self._gp_roster[:nCls].unsqueeze(0)) & (self.player_gp_points >= cost)
             if not bool(can.any()):
                 break
-            eff = self._gp_effects[torch.arange(nCls, device=dev).view(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,4]
+            eff = self._gp_effects[torch.arange(nCls, device=dev).view(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,5] (col 4 = faith)
             cf = can.to(self.dtype)
             self.tech_prog = self.tech_prog + (eff[:, :, 0] * cf).sum(dim=1)  # science → current tech (banks for next turn)
             self.civic_prog = self.civic_prog + (eff[:, :, 1] * cf).sum(dim=1)  # culture → current civic
             self.treasury = self.treasury + (eff[:, :, 2] * cf).sum(dim=1)  # gold → treasury
+            if self._gp_effects.shape[2] > 4:  # G-2: faith → player's faith bank (mirrors the rival loop)
+                self.player_faith = self.player_faith + (eff[:, :, 4].double() * cf.double()).sum(dim=1)
             prod = (eff[:, :, 3] * cf).sum(dim=1)  # production → capital's current build head
             if bool((prod != 0).any()):
                 has_build = self.alive[:, 0] & (self.current[:, 0] >= 0)
                 self.progress[:, 0] = self.progress[:, 0] + torch.where(has_build, prod, torch.zeros_like(prod))
             self.player_gp_points = self.player_gp_points - cost * cf
             self.gp_earned[:, :nCls] = earned + can.long()
+
+    def _spread_religious_pressure(self) -> None:
+        """B-18 (mirror of TS spreadReligiousPressure): each founded religion's
+        HOLY tile (holy_tile[:, g], the founding capital center, frozen) adds +1
+        integer pressure to every LIVE city within range; each city then follows
+        the religion with the most pressure (>0), ties to the lowest id (argmax
+        returns the first max). Religions are the unified civ ids: g=0 player,
+        g=i+1 rival i. Deterministic, zero-RNG. INERT — city_followed/rc_followed
+        are NOT read by yields or the trace yet (coupling deferred, §T).
+
+        KILL hygiene: dead/absent slots are zeroed each turn (torch.where on the
+        alive mask), so a razed-then-reused slot starts fresh — the TS mirror is
+        the fresh City object a founded/flipped city gets. rc_pressure/rc_followed
+        permute with their city in _reclaim_rc, so pressure tracks the CITY, not
+        the slot, through compaction."""
+        RANGE = self._pressure_range
+        B, O = self.B, self._O
+        founded = self.holy_tile >= 0  # [B, O]
+        ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
+        # --- player cities [B, C] ------------------------------------------
+        pc = self.site.clamp(min=0)  # [B, C] center tile (dead slots -> 0, masked out)
+        d_pc = self.pair_dist[pc.unsqueeze(2), ht.unsqueeze(1)].to(torch.long)  # [B, C, O]
+        add_pc = (d_pc <= RANGE) & founded.unsqueeze(1) & self.alive.unsqueeze(2)  # [B, C, O]
+        self.city_pressure = torch.where(self.alive.unsqueeze(2), self.city_pressure + add_pc.long(), torch.zeros_like(self.city_pressure))
+        tot_pc = self.city_pressure.sum(dim=2)
+        best_pc = self.city_pressure.argmax(dim=2)  # ties -> lowest id
+        self.city_followed = torch.where(self.alive & (tot_pc > 0), best_pc, torch.full_like(best_pc, -1))
+        # --- rival cities [B, r_pad, rc_pad] -------------------------------
+        if self.R > 0:
+            rcc = self.rc_center.clamp(min=0)  # [B, R, RC]
+            d_rc = self.pair_dist[rcc.unsqueeze(3), ht.view(B, 1, 1, O)].to(torch.long)  # [B, R, RC, O]
+            add_rc = (d_rc <= RANGE) & founded.view(B, 1, 1, O) & self.rc_alive.unsqueeze(3)
+            self.rc_pressure = torch.where(self.rc_alive.unsqueeze(3), self.rc_pressure + add_rc.long(), torch.zeros_like(self.rc_pressure))
+            tot_rc = self.rc_pressure.sum(dim=3)
+            best_rc = self.rc_pressure.argmax(dim=3)
+            self.rc_followed = torch.where(self.rc_alive & (tot_rc > 0), best_rc, torch.full_like(best_rc, -1))
 
     def _farmadj_qual(self) -> torch.Tensor:
         """[B, T] bool: a non-pillaged FARM with >=2 neighboring FARM tiles
@@ -6705,13 +6777,17 @@ class BatchSim:
                             self.rc_progress[:, r, j] = torch.where(want_p, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                             left_p = left_p & ~want_p
 
-            # AUDIT A-5: ONE gold purchase per civ per turn — the cheapest
-            # completable building anywhere in the civ (cost, then catalog
-            # id, then city slot — the tryQueueRivalBuilding key), bought
-            # INSTANTLY at goldPurchaseMult×, keeping the opening peace
-            # cost as a war chest. A building queued in that same city is
-            # skipped (completion would duplicate it). exclusiveWith stays
-            # TS-only, absent from the GPU catalog like the queue paths.
+            # AUDIT A-5 (+A-5r): ONE gold purchase per civ per turn, priority
+            # BUILDING > SETTLER > UNIT. Building: the cheapest completable
+            # building anywhere in the civ (cost, then catalog id, then city
+            # slot — the tryQueueRivalBuilding key), bought INSTANTLY at
+            # goldPurchaseMult×, keeping the opening peace cost as a war chest.
+            # A building queued in that same city is skipped (completion would
+            # duplicate it). exclusiveWith stays TS-only, absent from the GPU
+            # catalog like the queue paths. `bought_r5` threads the priority:
+            # settler/unit run only where no building was bought (no war-chest
+            # reserve — the controlled-head apply_rival_actions purchase spec).
+            bought_r5 = torch.zeros(B, dtype=torch.bool, device=dev)
             if self.districts_on:
                 rdv6 = self.rules_dev
                 NB6 = rdv6.b_cost.shape[0]
@@ -6766,6 +6842,66 @@ class BatchSim:
                             if len(wm6) > 0:
                                 self.rc_outer_hp[wm6, r, jj6[wm6]] = self._walls_hp
                         self.r_treasury[:, r] = torch.where(can6, self.r_treasury[:, r] - price6, self.r_treasury[:, r])
+                        bought_r5 = bought_r5 | can6
+
+            # AUDIT A-5r: SETTLER — no building bought, under the city cap,
+            # settler price × mult affordable. The rival has no settler bank,
+            # so it founds IMMEDIATELY via the same site scan a completed
+            # settler runs (_rival_try_found); pay only where a city was
+            # actually founded (no site = refund). The newborn joins THIS
+            # turn's amenity map + city loop (alive_c below, the TS
+            # [...rival.cities] snapshot taken after this block).
+            mult_r5 = self.rules.gold_purchase_mult
+            sett_price5 = settle_cost * mult_r5  # settle_cost = settlerBase + settlerPer·(n_cities−1), from the picker
+            want_s5 = active & ~bought_r5 & (n_cities < rr.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], sett_price5)
+            if bool(want_s5.any()):
+                n_before5 = self.rc_alive[:, r].sum(dim=1)
+                self._rival_try_found(r, want_s5)
+                founded5 = want_s5 & (self.rc_alive[:, r].sum(dim=1) > n_before5)
+                self.r_treasury[:, r] = torch.where(founded5, self.r_treasury[:, r] - sett_price5, self.r_treasury[:, r])
+                bought_r5 = bought_r5 | founded5
+            # AUDIT A-5r: MILITARY UNIT — nothing else bought and live+queued
+            # military under the #56 H1 quota (2× cities). Buy the STRONGEST
+            # affordable trainable military unit (highest _p_combat, ties to
+            # lowest unit index = table order), spawned via _spawn_rival at the
+            # capital (else the first alive city); pay only where it LANDED
+            # (no free spot = refund, the P5/S8 pattern).
+            mil_count5 = n_melee + n_ranged
+            want_u5 = active & ~bought_r5 & (mil_count5 < 2 * n_cities)
+            if bool(want_u5.any()):
+                ok_u5 = torch.zeros(B, self.NU, dtype=torch.bool, device=dev)
+                ok_u5[:, self._warrior_idx] = True
+                if sp_t >= 0 and self._r_spearman >= 0:
+                    ok_u5[:, self._r_spearman] = self.r_techs[:, r, sp_t]
+                if ho_t >= 0 and self._r_horseman >= 0:
+                    ok_u5[:, self._r_horseman] = self.r_techs[:, r, ho_t]
+                if self._r_slinger >= 0:
+                    ok_u5[:, self._r_slinger] = True
+                if ar_t >= 0 and self._r_archer >= 0:
+                    ok_u5[:, self._r_archer] = self.r_techs[:, r, ar_t]
+                mil5 = ok_u5 & (self._p_combat.unsqueeze(0) > 0)  # military only (excludes the builder)
+                afford_u5 = self._afford(self.r_treasury[:, r].unsqueeze(1), self._p_cost.double().unsqueeze(0) * mult_r5)
+                cand_u5 = mil5 & afford_u5
+                elig_u5 = want_u5 & cand_u5.any(dim=1)
+                if bool(elig_u5.any()):
+                    # highest combat wins; combat·NU − index breaks ties to the
+                    # lowest index (table order), matching the TS strict-`>` scan
+                    key_u5 = self._p_combat.double().unsqueeze(0) * self.NU - torch.arange(self.NU, device=dev, dtype=torch.float64).unsqueeze(0)
+                    key_u5 = torch.where(cand_u5, key_u5.expand(B, -1), torch.full((B, self.NU), -1e18, dtype=torch.float64, device=dev))
+                    pick_ty5 = key_u5.argmax(dim=1)
+                    cap_is5 = self.rc_is_cap[:, r]
+                    has_cap5 = cap_is5.any(dim=1)
+                    spawn_slot5 = torch.where(has_cap5, cap_is5.long().argmax(dim=1), self.rc_alive[:, r].long().argmax(dim=1))
+                    ctr5 = self.rc_center[:, r].gather(1, spawn_slot5.unsqueeze(1)).squeeze(1).clamp(min=0)
+                    landed_u5 = self._spawn_rival(elig_u5, ctr5, pick_ty5, r)
+                    price_u5 = self._p_cost.gather(0, pick_ty5).double() * mult_r5
+                    self.r_treasury[:, r] = torch.where(landed_u5, self.r_treasury[:, r] - price_u5, self.r_treasury[:, r])
+                    bought_r5 = bought_r5 | landed_u5
+            # A-5r: the city-loop snapshot is taken AFTER the buy block (the TS
+            # [...rival.cities] discipline) — an A-5r settler newborn acts this
+            # turn (amenity + yields), a queue-completion newborn (founded
+            # inside the loop, later) does not.
+            alive_c = self.rc_alive[:, r].clone()
 
             # phase-top unlock snapshot (TS computes rivalUnlocks here)
             r_techs0 = self.r_techs[:, r].clone()
@@ -6796,7 +6932,7 @@ class BatchSim:
                 compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
                 gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
             for j in range(self.RC):
-                cact = active & alive0[:, j]
+                cact = active & alive_c[:, j]  # A-5r: post-buy snapshot (settler newborn acts this turn)
                 if not bool(cact.any()):
                     continue
                 # P5/S6 (C-19): rival city loyalty at the loop top (the TS
@@ -7308,6 +7444,33 @@ class BatchSim:
             self.claimed_f_n = self.claimed_f_n + ropen.long()
             self.claimed_o_n = self.claimed_o_n + ropen.long()
             self.r_religion_done[:, r] = self.r_religion_done[:, r] | ropen
+            # B-18: freeze this religion's holy tile (the rival's capital center)
+            # at founding — the pressure source. r_religion_done latches, so
+            # ropen fires once and the tile never re-writes.
+            self.holy_tile[:, r + 1] = torch.where(ropen, self.cap_tile_rival[:, r], self.holy_tile[:, r + 1])
+
+            # B-18: enhance the founded religion — a SECOND earned Prophet
+            # claims an enhancer belief, denying it from the shared pool
+            # (mirror of the follower/founder claim). TS claimBeliefs adds this
+            # draw AFTER the founder draw, gated on
+            # religionFounded && !enhancerClaimed && prophets>=2 && pool-open.
+            # The draw advances only where eopen (the peace-roll pattern), so it
+            # is RNG-neutral when it never fires. Effects stay unwired (all
+            # enhancers inert) — the identity is kept for when one is wired.
+            edue = active & self.r_religion_done[:, r] & ~self.r_enhancer_done[:, r] & (self.r_prophets[:, r] >= 2)
+            eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))
+            re_ = self._next_random(eopen)  # third belief draw — after follower/founder
+            if bool(eopen.any()) and self._enh_any:
+                erow = eopen.nonzero(as_tuple=True)[0]
+                n_open = (~self.enh_claimed).sum(dim=1)
+                k = torch.floor(re_ * n_open.to(torch.float64)).to(torch.long)
+                cum = (~self.enh_claimed).long().cumsum(dim=1)
+                sel = (~self.enh_claimed) & (cum == (k + 1).unsqueeze(1))
+                eid = sel.long().argmax(dim=1)
+                self.enh_claimed[erow, eid[erow]] = True
+                self.r_enhancer[erow, r] = eid[erow]
+            self.claimed_e_n = self.claimed_e_n + eopen.long()
+            self.r_enhancer_done[:, r] = self.r_enhancer_done[:, r] | eopen
 
             # War or peace (branch on the value at entry; a peace made this
             # turn still ran the war branch, exactly like the TS if/else).
@@ -7622,7 +7785,7 @@ class BatchSim:
     _RC_SLOT_FIELDS = (
         "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty",
         "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id", "rc_is_cap", "rc_current", "rc_progress",
-        "rc_cost", "rc_qtile",
+        "rc_cost", "rc_qtile", "rc_followed",  # B-18: pressure spread (3D per-slot)
     )
 
     def _reclaim_rc(self) -> None:
@@ -7643,7 +7806,7 @@ class BatchSim:
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
         for name in self._RC_SLOT_FIELDS:
             setattr(self, name, getattr(self, name).gather(2, perm))
-        for name in ("rc_dist_tile", "rc_bldg", "rc_wonder"):
+        for name in ("rc_dist_tile", "rc_bldg", "rc_wonder", "rc_pressure"):  # B-18: rc_pressure is 4D [B,R,RC,O]
             t = getattr(self, name)
             setattr(self, name, t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
         self._eff_version += 1  # no (r, j)-keyed cache may survive the permutation
@@ -8431,6 +8594,12 @@ class BatchSim:
             # gate on feat_removable.
             frm_f = self.feat_removable[rows, s_idx]
             self.tdef[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tdef[rows, s_idx])
+            # #47r hunt catch (rng 2026006135 t93): the B-28 tmove mirror was
+            # applied to the chop and rival-founding strips but MISSED here —
+            # a player-founding strip left tmove stale, and when the city
+            # later died the freed tile charged 2 MP on the GPU vs TS's live
+            # 1 MP, desyncing a barb walk (697 vs 698).
+            self.tmove[rows, s_idx] = torch.where(frm_f, self.hills[rows, s_idx].long() * 3, self.tmove[rows, s_idx])
             # ...and the feature's own yields + any improvement die with the
             # founding (tile.improvement = null; feature = null) — a later
             # loyalty flip reads this center STRIPPED (C1-B3 gate catch).
@@ -8488,6 +8657,11 @@ class BatchSim:
             rc_hw = (self.rc_alive.long() * (torch.arange(self.RC, device=dev).view(1, 1, -1) + 1)).amax(dim=2)
             if int(rc_hw.max()) >= self._rc_reclaim_at:
                 self._reclaim_rc()
+
+        # B-18: religious pressure spread — after all foundings/settles/flips and
+        # the rc compaction, mirroring TS endTurn's tail (spreadReligiousPressure
+        # after the plannedSettles loop). INERT: not read by yields/trace yet.
+        self._spread_religious_pressure()
 
         self.turn += 1
         dom = self._domination()  # GV-3
@@ -8577,5 +8751,6 @@ class BatchSim:
                 torch.where(live, js_round(self.culture_box[:, c] * 1000), zero),
                 torch.where(live, self.city_hp[:, c].to(self.dtype), zero),
                 torch.where(live, js_round(self.loyalty[:, c] * 1000), zero),
+                torch.where(live, self.city_followed[:, c].to(self.dtype), zero),  # B-18: followed religion id (-1 none, dead slot 0)
             ]
         return torch.stack(cols, dim=1)

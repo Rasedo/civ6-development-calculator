@@ -450,3 +450,180 @@ tables added to data/cityStates.ts; the suzerain/quest/envoy LOGIC stays as-is
   is in; wiring the live envoy channel + the GPU term from districts to buildings
   is a future round (inert in-gate, needs a mirrored GPU hot-path change). The
   per-CS suzerain bonuses (`CS_SUZERAIN_BONUS`) likewise await a wiring round.
+
+## Slice S (A-5r) — scripted rivals gold-buy settlers & units
+
+Base sha 7ffc9b0 (#46r A-7r LIVE). Extends the A-5 rival gold-buy block
+(`rivalPhase`, src/core/rivals.ts; `_rival_phase`, gpu/civ6gpu/engine.py)
+from BUILDINGS-only to the priority chain **BUILDING > SETTLER > UNIT** — one
+purchase per civ per turn.
+
+### Design decisions / thresholds
+
+- **Priority** threaded by a `bought`/`bought_r5` flag: settler runs only where
+  no building was bought; unit only where neither was. "No building bought"
+  includes the reserve-fail case (building keeps its `PEACE_GOLD_COST(0)`=150
+  war-chest reserve; a rich-enough-for-settler treasury that can't cover
+  building+reserve falls through), so the settler/unit branches are genuinely
+  reachable.
+- **Prices/effects = the controlled-head spec** (`apply_rival_actions` VP-G2
+  buy-settler / buy-unit): production cost × `GOLD_PURCHASE_MULT` (4), **no
+  war-chest reserve** for settler/unit (only the building branch reserves),
+  milli-rounded affordability via the shared `goldAffordable`/`_afford`.
+- **Settler**: gate = `cities < RIVAL_MAX_CITIES` (6) AND affordable at
+  `RIVAL_SETTLER_COST(cities)·4`. The rival has no settler bank, so it founds
+  IMMEDIATELY via the production-settler site scan (`tryFoundCity` /
+  `_rival_try_found`); deduct only where a city was actually founded (no site =
+  refund). The newborn joins THIS turn's amenity map + city loop (the TS
+  `[...rival.cities]` snapshot is taken AFTER the buy block) — mirrored on the
+  GPU by a fresh post-buy `alive_c` snapshot driving the city loop (was `alive0`,
+  which was pre-A5; identical whenever no settler is bought). A queue-completion
+  settler (founded inside the loop) still does NOT act this turn — unchanged.
+- **Unit**: gate = live+queued military `< 2×cities` (the #56 H1 quota,
+  rival-side, reusing the A-6 `meleeCount/rangedCount` = `n_melee/n_ranged`
+  counters). Candidate roster = the picker's trainable military set
+  {WARRIOR, SLINGER, ARCHER, SPEARMAN, HORSEMAN} (WARRIOR/SLINGER ungated, the
+  rest on the rival's real techs), BUILDER/SCOUT excluded. Pick the **strongest
+  affordable** by `combat` (strict `>` = table order on ties; GPU argmax on
+  `combat·NU − index`). Spawns via `spawnUnit`/`_spawn_rival` at the CAPITAL
+  (else the first alive city) with first-free-spot semantics; pay only where it
+  LANDED (no spot = refund, the P5/S8 pattern).
+
+### Validation
+
+- tsc clean; vitest 248/248 green; export regenerated (trajectories reshuffled,
+  e.g. seed 9287 CS envoys 5/5/5→5/5/4); no seed died (no SEED_OVERRIDES churn).
+- Scripted parity gate (24×250): **PARITY OK, 0.0 milli.**
+- Forced-compaction gate (`CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3`): **0.0
+  milli.** (Mandatory — pooled v-slot churn from bought units.)
+- Poke test `gpu/rival_purchase_test.py` (wired into `gpu/battery.py` cputests):
+  priority building>settler>unit + one-per-turn; settler buy founds at 264 gold
+  and blocks the unit branch; settler threshold (no found one milli below price);
+  strongest-affordable ranking (192→HORSEMAN, 156→SPEARMAN, 96→WARRIOR-over-
+  SLINGER); the 2×cities quota gate; refund-on-no-spot keeps exactly the price.
+- In-gate exercise (24 seeds × 250t): the **UNIT branch fired 82×** (gate-
+  validated). The **SETTLER branch fired 0×** — the "rich enough for a settler,
+  nothing to build, still under the city cap" window essentially never occurs
+  (rivals always have a completable next building, or are at the cap). Like the
+  space-race-defeat path, the settler branch is present-for-correctness +
+  poke-covered; its `alive_c` participation is inert in-gate (≡ `alive0` when no
+  settler fires, so the gates prove no regression) and correct-by-construction.
+
+### Deferrals / latents
+
+- **Tile purchase (`buyTile` rival twin) — OUT** per scope (no GPU verb on any
+  seat).
+- **A-5r settler branch is poke-only, not parity-validated** (0 in-gate fires).
+  The newborn-participation (`alive_c`) mirror is correct-by-construction but a
+  future trajectory that actually gold-buys a settler would be its first parity
+  exposure. Not a bug — a coverage gap flagged for the eventual settler-window
+  trajectory.
+## Slice T (#47r + G-2) — religion follow-ups
+
+Agent T. Base sha `7ffc9b0` (#46r: A-7r LIVE). Three commits, each
+independently gate-green (scripted parity 0.0 milli, forced-compaction
+RECLAIM_AT=12/RC=3 0.0 milli, tsc clean, vitest green, poke green):
+
+- `63a8ccd` G-2 player GP loop banks faith (col 4)
+- `e39dc30` B-18 rival enhancer race (third belief draw)
+- `54b1d6f` B-18 religious pressure spread (both engines, trace-proven)
+
+### G-2 — player Prophet banks faith
+
+Re-verified the diagnosis by reading both GP loops: the rival loop applies
+`gpEffects` col 4 into `r_faith` (engine.py), the player loop applied only
+cols 0-3. Root fact behind it: the player's GPU faith was deliberately
+UNMODELED (exporter note — "no consumer, worship is TS-only") and faith is
+NOT a parity-compared column. Fix mirrors the rival loop: a new
+`player_faith` accumulator (fp64, in `_MUTABLE`) receives col 4 under the
+same `shape>4` guard. Purely internal (no gate-visible effect); the
+per-turn YIELD-faith side for the player (game.ts `faithTotal += stats.faith`)
+stays unmodeled — that is the larger player religion-founding work. Poke:
+a fresh player Prophet (Confucius, fx.faith=100) banks exactly 100.
+
+### B-18 enhancer race — the third belief draw
+
+Rivals claim an ENHANCER belief after founding, gated
+`religionFounded && !enhancerClaimed && prophets>=2 && pool-open`. The draw
+sits AFTER the founder draw in BOTH engines with identical gating; the GPU's
+`_next_random(eopen)` advances only where `eopen`, so it is RNG-neutral when
+it never fires (the peace-roll pattern). New state:
+`RivalCiv.enhancerClaimed/enhancerBelief` (TS) and
+`enh_claimed/r_enhancer/r_enhancer_done/claimed_e_n` (GPU `_MUTABLE`).
+Effects stay unwired (all 7 enhancers are inert `{}`); `getRivalModifiers`
+applies the enhancer belief for symmetry — byte-identical while inert.
+EXERCISED: 31 enhancers claimed across all 24 seeds (max 4 rival prophets),
+both gates 0.0 milli — the engines pick identically in lockstep despite the
+RNG stream shifting.
+
+### B-18 pressure spread — EXACT rules (as built)
+
+Deterministic, zero-RNG, both engines, same phase (end of endTurn / step,
+after all foundings/settles/flips + the rc compaction).
+
+- **Religion index** = the unified civ id: 0 = player, i+1 = rival i.
+  `nRel = 1 + R`.
+- **Holy tile** = the founding civ's CAPITAL center tile, FROZEN at founding
+  (`ReligionState.holyTile` / `RivalCiv.holyTile`; GPU
+  `holy_tile[:, g]`, set to `cap_tile_rival` in the ropen block, latched by
+  `r_religion_done`). Simplification: real Civ 6's holy city is the founding
+  city (a Holy-Site city), proxied here by the capital for determinism and
+  robustness to capital capture (the tile is frozen, so who owns it later
+  is irrelevant).
+- **Accumulation**: each turn, for every LIVE city and every founded
+  religion g, if `hexDistance(cityCenter, holy[g]) <= RELIGION_PRESSURE_RANGE`
+  (=10, exported as `pressureRange`), `pressure[city][g] += 1` (integer —
+  keeps the argmax exact across the batch).
+- **Flip**: `followedReligion = argmax_g pressure[g]` among g with
+  pressure>0, ties to the LOWEST g; none => null/-1. TS uses strict `>`
+  iterating g ascending; GPU uses `argmax` (first-max). "Founding order"
+  emerges from the accumulator (earlier founder => more turns accrued =>
+  leads outright); the id tie-break only settles same-turn foundings.
+- **KILL hygiene**: dead/absent slots are zeroed each turn (GPU
+  `torch.where(alive, pressure+add, 0)`), so a razed-then-reused slot starts
+  fresh — mirroring the TS fresh City object a founded/flipped city gets.
+  `rc_pressure`/`rc_followed` permute with their city in `_reclaim_rc`
+  (pressure tracks the CITY, not the slot, through compaction).
+
+**Proof**: player-city `followedReligion` is now a COMPARED per-city trace
+column (gpu-trace.ts + parity_test `PER_CITY` + engine `trace_row`). Both
+parity gates are 0.0 milli across 24x250 INCLUDING the conversions — 24
+player cities flip to the two rival religions turn-exact (first flip ~t65),
+219/293 rival cities follow a religion by t250. The forced-compaction gate
+validates the rc permutation.
+
+### Deferred (exact next steps)
+
+- **B-18 pressure -> YIELDS coupling (the follow-up).** followedReligion is
+  computed + serialized + trace-proven but NOT yet read by the yield
+  pipeline: follower beliefs still apply UNIFORMLY per-civ (effects.ts
+  `getModifiers`/`getRivalModifiers` scale by the seat's total pop/cities).
+  Next: make a city's FOLLOWER-belief per-city yields (buildingYields,
+  growth, featureYields, gpp) key on `followedReligion` instead of the
+  owner's religion — a player city following a rival religion should draw
+  that religion's follower belief. This is the "small coupling surface" but
+  it restructures the per-civ-uniform `mods` into a per-city followed-religion
+  lookup in BOTH yield pipelines (the A-4 effect-placement magnet); land it
+  as its own gate-serialized stage. TS/GPU flip-carry-on-ownership-change
+  semantics also need reconciling then (GPU zeros on death; verify the TS
+  flipCityToRival path resets religionPressure identically).
+- **B-18 missionaries/apostles, theological combat, religious victory** —
+  OUT (recorded per mission). Depend on pressure (now present) + pooled unit
+  types.
+- **B-18 rival enhancer EFFECTS** — the claim/identity ships; effects wait on
+  a non-inert enhancer (all 7 boost pressure range / missionary spread /
+  religious combat / faith trade — none modeled).
+- **B-20 Great Works (building-slotted stores) + multi-charge people** — NOT
+  STARTED (budget; item 4 was gated on "budget clearly remains"). Writer/
+  Musician output stays the instant culture lump (Slice Q). Next: a per-
+  building work-slot store on City/RivalCity + the slot yield in the
+  buildings position of both yield pipelines (inert-plumbing-first behind a
+  flag, byte-identical fixtures, then flip), and a per-GP charge counter +
+  charge-spend action for multi-charge.
+
+### Latent parity issues noticed (not fixed)
+
+- The player's per-turn YIELD faith (game.ts `faithTotal`) remains GPU-
+  unmodeled (only the G-2 GP-faith bank exists on the GPU). Dormant: player
+  faith has no in-gate consumer and is not a compared column. Wire it with
+  the player religion-founding work.

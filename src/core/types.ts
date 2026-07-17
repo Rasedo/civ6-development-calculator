@@ -178,6 +178,20 @@ export interface City {
    * because the new owner's `buildings` start empty. RivalCity inherits it.
    */
   outerHp?: number;
+  /**
+   * B-18 religious pressure spread. `religionPressure[g]` is the integer
+   * pressure this city has accumulated from religion g (0 = the player's
+   * religion, i+1 = rival i's) — +1 each turn its holy city (the founding
+   * civ's capital) is within RELIGION_PRESSURE_RANGE tiles. `followedReligion`
+   * is the religion id with the most pressure (>0), ties to the lowest id
+   * (a founding-order proxy — earlier founders accrue more pressure); null =
+   * none. Deterministic, zero-RNG. Currently INERT: computed and serialized
+   * but not yet read by the yield pipeline (per-city follower-belief coupling
+   * is the deferred follow-up). Fresh objects (founded/flipped cities) start
+   * unset = no pressure, which is the reset-on-birth KILL hygiene.
+   */
+  religionPressure?: number[];
+  followedReligion?: number | null;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */
@@ -354,6 +368,14 @@ export interface RivalCiv {
   pantheon?: string | null;
   followerBelief?: string | null;
   founderBelief?: string | null;
+  /** B-18: the CLAIMED enhancer belief — a second earned Prophet enhances the
+   * founded religion, denying an enhancer from the shared pool (like the
+   * follower/founder claims). Unset until enhanced. */
+  enhancerClaimed?: boolean;
+  enhancerBelief?: string | null;
+  /** B-18: this rival's HOLY tile — its capital center at founding, frozen; the
+   * source of its religion's pressure spread (mirror of ReligionState.holyTile). */
+  holyTile?: number | null;
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   treasury?: number;
   /** P5/S5 (C-17): banked faith — the pantheon's consumer. */
@@ -378,6 +400,10 @@ export interface ReligionState {
   /** B-18: Enhancer belief id, added by enhancing a founded religion (needs a
    * second Great Prophet). Effects are inert this round; the slot is real. */
   enhancer?: string | null;
+  /** B-18: the HOLY tile — the founding city's center tile (the capital proxy),
+   * frozen at founding; the source of religious pressure spread. -1/null = the
+   * player has not founded. */
+  holyTile?: number | null;
 }
 
 export interface TradeRoute {

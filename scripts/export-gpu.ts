@@ -48,7 +48,7 @@ import {
   CS_MAX_HP,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TERRAINS } from '../src/data/terrains';
@@ -521,6 +521,8 @@ const rules = {
     // enhancer claiming + the mirrored draw are a deferred follow-up); this
     // documents the slot for that work.
     enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
+    // B-18: religious pressure spread radius (holy city -> cities within N tiles).
+    pressureRange: RELIGION_PRESSURE_RANGE,
   },
   // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
   // beliefs now APPLY to rival civs. Row order = the data-file key order;

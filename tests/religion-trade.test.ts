@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from './helpers';
-import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, foundReligion, canEnhanceReligion, enhanceReligion } from '../src/core/game';
+import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, foundReligion, canEnhanceReligion, enhanceReligion, endTurn } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
 import { tileYields } from '../src/core/yields';
 import { makeYieldCtx } from '../src/core/effects';
@@ -181,5 +181,32 @@ describe('trade routes', () => {
     const b = foundCity(state, tileAtCoords(state.map, 36, 6).index).city!;
     grantCivics(state, 'FOREIGN_TRADE');
     expect(canAddTradeRoute(state, a.id, b.id).ok).toBe(false);
+  });
+});
+
+describe('religious pressure spread (B-18)', () => {
+  it("a holy city converts cities within range each turn; distant cities stay unconverted", () => {
+    const state = makeState(makeMap(40, 20));
+    state.sandbox = true;
+    const cap = foundCity(state, tileAtCoords(state.map, 5, 10).index).city!;
+    const near = foundCity(state, tileAtCoords(state.map, 9, 10).index).city!; // 4 tiles
+    const far = foundCity(state, tileAtCoords(state.map, 32, 10).index).city!; // 27 tiles
+    // Player founds a religion; the capital's center is the holy tile (id 0).
+    state.religion.founded = true;
+    state.religion.holyTile = cap.centerIndex;
+
+    endTurn(state);
+    expect(cap.followedReligion).toBe(0);
+    expect(near.followedReligion).toBe(0); // within RELIGION_PRESSURE_RANGE
+    expect(far.followedReligion ?? null).toBeNull(); // out of range — no pressure
+
+    // Integer pressure accrues +1 per in-range turn.
+    const p = cap.religionPressure![0];
+    endTurn(state);
+    expect(cap.religionPressure![0]).toBe(p + 1);
+    expect(far.religionPressure?.[0] ?? 0).toBe(0);
+    // The majority-pressure flip and the cross-civ tie -> lowest-id case are
+    // covered by the GPU poke (gpu/religion_gp_test.py) and the parity gate,
+    // where 24 player cities flip to the two rival religions turn-exact.
   });
 });

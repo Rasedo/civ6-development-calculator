@@ -208,3 +208,10 @@ export const RELIGION_NAMES = [
 ];
 
 export const PANTHEON_FAITH_COST = 25;
+
+/** B-18: a founded religion's holy city spreads pressure to every city within
+ * this many tiles each turn (real Civ 6's base holy-city pressure radius). */
+export const RELIGION_PRESSURE_RANGE = 10;
+/** B-18: integer pressure added per in-range turn (integer keeps the flip
+ * comparison exact — no float association across the batch). */
+export const RELIGION_PRESSURE_PER_TURN = 1;

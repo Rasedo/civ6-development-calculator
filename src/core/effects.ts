@@ -395,6 +395,10 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
   if (rival.religionFounded) {
     applyBeliefEffects(state, mods, rival.followerBelief ? FOLLOWER_BELIEFS[rival.followerBelief] : undefined, seat);
     applyBeliefEffects(state, mods, rival.founderBelief ? FOUNDER_BELIEFS[rival.founderBelief] : undefined, seat);
+    // B-18: symmetric with the player (state.religion.enhancer above). Every
+    // enhancer effect is currently inert ({}), so this is byte-identical — the
+    // coupling surface is here for when a non-inert enhancer lands.
+    applyBeliefEffects(state, mods, rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief] : undefined, seat);
   }
   if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, rival.research);
   return mods;

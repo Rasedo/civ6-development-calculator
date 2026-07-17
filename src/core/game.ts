@@ -28,7 +28,7 @@ import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost } from '../data/gre
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
@@ -893,6 +893,10 @@ export function endTurn(state: GameState): void {
     // Invalid targets (map changed since planning) are simply dropped.
   }
 
+  // B-18: religious pressure spread — after all foundings/settles/flips this
+  // turn, so both engines scan the same final city + holy-tile set.
+  spreadReligiousPressure(state);
+
   state.turn += 1;
   // GV-3/GV-4: domination ends the game the instant a civ holds every capital;
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
@@ -952,6 +956,68 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
     }
   }
   state.greatPeople.earned.push(person.id);
+}
+
+/**
+ * B-18 religious pressure spread (deterministic, zero-RNG). Religions are
+ * indexed in the unified civ space: 0 = the player's, i+1 = rival i's. A
+ * founded religion's HOLY tile (its capital center, frozen at founding) emits
+ * pressure to every city (player + rival, symmetric) within
+ * RELIGION_PRESSURE_RANGE tiles: +RELIGION_PRESSURE_PER_TURN integer pressure
+ * to that city's accumulator for that religion, once per turn. A city then
+ * FOLLOWS the religion with the most accumulated pressure (>0); ties resolve
+ * to the lowest religion id — a founding-order proxy, since an earlier-founded
+ * religion has spent more turns accumulating and so leads outright in the
+ * common case, and the id tie-break only settles same-turn foundings.
+ *
+ * INERT this round: followedReligion/religionPressure are computed and
+ * serialized but NOT yet read by the yield pipeline (the per-city follower-
+ * belief coupling is the deferred follow-up — see gpu/ROUND_B2_LOG.md §T).
+ * The GPU mirror is BatchSim._spread_religious_pressure. Integer pressure
+ * keeps the argmax exact (no float association across the batch). Fresh City
+ * objects (founded/flipped cities) carry no pressure — the reset-on-birth KILL
+ * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
+ */
+function spreadReligiousPressure(state: GameState): void {
+  const R = state.rivals.length;
+  const nRel = 1 + R;
+  const holy: number[] = new Array(nRel).fill(-1);
+  if (state.religion?.founded && state.religion.holyTile != null && state.religion.holyTile >= 0) {
+    holy[0] = state.religion.holyTile;
+  }
+  for (let i = 0; i < R; i++) {
+    const rv = state.rivals[i];
+    if (rv.religionFounded && rv.holyTile != null && rv.holyTile >= 0) holy[i + 1] = rv.holyTile;
+  }
+  if (!holy.some((h) => h >= 0)) return; // no religion exists yet — nothing to spread
+  const tiles = state.map.tiles;
+  const allCities: City[] = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
+  for (const city of allCities) {
+    let pres = city.religionPressure;
+    if (!pres || pres.length !== nRel) {
+      pres = new Array(nRel).fill(0);
+      city.religionPressure = pres;
+    }
+    const cc = tiles[city.centerIndex];
+    for (let g = 0; g < nRel; g++) {
+      if (holy[g] < 0) continue;
+      const h = tiles[holy[g]];
+      if (hexDistance(cc.col, cc.row, h.col, h.row) <= RELIGION_PRESSURE_RANGE) {
+        pres[g] += RELIGION_PRESSURE_PER_TURN;
+      }
+    }
+    // Flip: the religion with the most pressure (>0); strict `>` iterating g
+    // ascending keeps the LOWEST id on a tie.
+    let best = -1;
+    let bestP = 0;
+    for (let g = 0; g < nRel; g++) {
+      if (pres[g] > bestP) {
+        bestP = pres[g];
+        best = g;
+      }
+    }
+    city.followedReligion = best >= 0 ? best : null;
+  }
 }
 
 function advanceGreatPeople(state: GameState): void {
@@ -1131,6 +1197,8 @@ export function foundReligion(
   state.religion.follower = choice.follower;
   state.religion.founder = choice.founder;
   state.religion.worship = choice.worship;
+  // B-18: freeze the holy tile (the capital's center) — the pressure source.
+  state.religion.holyTile = (state.cities.find((c) => c.isCapital) ?? state.cities[0])?.centerIndex ?? null;
   return { ok: true };
 }
 

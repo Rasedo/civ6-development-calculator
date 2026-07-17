@@ -103,6 +103,7 @@ def main() -> int:
             ],
             [
                 ("purchase", [py, "gpu/purchase_test.py"], 4),
+                ("rival_purchase", [py, "gpu/rival_purchase_test.py"], 4),
                 ("war", [py, "gpu/war_test.py"], 4),
                 ("ranged", [py, "gpu/ranged_test.py"], 4),
                 ("occupancy", [py, "gpu/occupancy_test.py"], 4),
