@@ -110,6 +110,65 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     spawn: { terrains: ['PLAINS', 'TUNDRA', 'GRASSLAND'], minLat: 0.45, maxLat: 0.88 },
     color: '#b8c8e8',
   },
+
+  // B-27: natural wonders 7 → 12. Effects use ONLY the fields tileYields()
+  // already bakes into the exported per-tile yields (tileYields / adjacentYields)
+  // plus the generic Holy-Site NATURAL_WONDER adjacency + the ASTROLOGY "near a
+  // wonder" eureka — so every new wonder is captured in the map export and the
+  // GPU (which reads the baked map) stays turn-exact.
+  MOUNT_KILIMANJARO: {
+    id: 'MOUNT_KILIMANJARO',
+    name: 'Mount Kilimanjaro',
+    code: 'KI',
+    size: 1,
+    impassable: true,
+    tileYields: {},
+    adjacentYields: { food: 1, science: 1 },
+    spawn: { terrains: ['GRASSLAND', 'PLAINS'], maxLat: 0.4 },
+    color: '#cfe0b0',
+  },
+  YOSEMITE: {
+    id: 'YOSEMITE',
+    name: 'Yosemite',
+    code: 'YO',
+    size: 2,
+    impassable: false,
+    tileYields: { gold: 1, science: 1 },
+    spawn: { terrains: ['PLAINS', 'TUNDRA', 'GRASSLAND'], minLat: 0.4 },
+    color: '#a8c890',
+  },
+  CLIFFS_OF_DOVER: {
+    id: 'CLIFFS_OF_DOVER',
+    name: 'Cliffs of Dover',
+    code: 'CD',
+    size: 2,
+    impassable: true,
+    tileYields: {},
+    adjacentYields: { gold: 2, culture: 1 },
+    spawn: { terrains: ['GRASSLAND', 'PLAINS'], minLat: 0.45 },
+    color: '#e8e8f0',
+  },
+  MOUNT_EVEREST: {
+    id: 'MOUNT_EVEREST',
+    name: 'Mount Everest',
+    code: 'EV',
+    size: 2,
+    impassable: true,
+    tileYields: {},
+    adjacentYields: { faith: 1, science: 1 },
+    spawn: { terrains: ['TUNDRA', 'PLAINS', 'GRASSLAND'], minLat: 0.5 },
+    color: '#dce6f2',
+  },
+  EYE_OF_THE_SAHARA: {
+    id: 'EYE_OF_THE_SAHARA',
+    name: 'Eye of the Sahara',
+    code: 'ES',
+    size: 3,
+    impassable: false,
+    tileYields: { science: 2, gold: 1 },
+    spawn: { terrains: ['DESERT'], minLat: 0.1, maxLat: 0.5 },
+    color: '#e0c088',
+  },
 };
 
 /** How many wonders to place per map size (scaled by tile count). */

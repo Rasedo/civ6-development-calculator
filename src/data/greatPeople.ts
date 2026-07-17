@@ -16,6 +16,11 @@ export const GP_CLASS_DISTRICT: Record<GreatPersonClass, DistrictId> = {
   ARTIST: 'THEATER_SQUARE',
   ADMIRAL: 'HARBOR',
   GENERAL: 'ENCAMPMENT',
+  // B-19: Writers and Musicians also earn from the Theater Square (real Civ 6
+  // splits the three culture classes across the same district). Appended last
+  // so PROPHET stays index 3.
+  WRITER: 'THEATER_SQUARE',
+  MUSICIAN: 'THEATER_SQUARE',
 };
 
 export const GP_CLASS_NAMES: Record<GreatPersonClass, string> = {
@@ -26,11 +31,24 @@ export const GP_CLASS_NAMES: Record<GreatPersonClass, string> = {
   ARTIST: 'Great Artist',
   ADMIRAL: 'Great Admiral',
   GENERAL: 'Great General',
+  WRITER: 'Great Writer',
+  MUSICIAN: 'Great Musician',
 };
 
-/** Point cost of the n-th person of a class (0-based). */
+/**
+ * B-19: real Civ 6 (GS) great-person cost ladder. The n-th person of a class
+ * (0-based, global first-come race) costs an ERA-ANCHORED threshold, not the
+ * old flat 60·2^n exponential. These are the standard-speed base GPP costs by
+ * era tier (Ancient..Information): each recruitment step climbs one era. The
+ * ladder is shared across every class (as the old formula was), so both
+ * engines read the SAME `gpCosts` array from the exporter — no per-class table.
+ */
+export const GP_COST_LADDER = [60, 120, 200, 290, 390, 500, 620, 750];
+
+/** Point cost of the n-th person of a class (0-based). Past the ladder end the
+ * top era cost holds (rosters never exceed the ladder length today). */
 export function gpCost(n: number): number {
-  return 60 * Math.pow(2, n);
+  return GP_COST_LADDER[Math.min(n, GP_COST_LADDER.length - 1)];
 }
 
 export interface GreatPersonDef {
@@ -98,6 +116,24 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
     P('GENERAL', 'GP_BOUDICA', 'Boudica', { productionToCapital: 120 }, '+120 production in the capital'),
     P('GENERAL', 'GP_HANNIBAL', 'Hannibal Barca', { productionToCapital: 280 }, '+280 production in the capital'),
     P('GENERAL', 'GP_EL_CID', 'El Cid', { productionToCapital: 600 }, '+600 production in the capital'),
+  ],
+  // B-19: per-era Writer/Musician rosters (4 each, one per era tier — keeps
+  // the gpEffects tensor rectangular). B-20 degradation: their real output is
+  // a Great Work of Writing / Music (culture + tourism, slotted into a
+  // building). Tourism is absent and Great-Work slots are deferred, so each
+  // lands as an INSTANT culture lump toward the current civic (the Artist
+  // channel). Recorded in gpu/ROUND_B2_LOG.md.
+  WRITER: [
+    P('WRITER', 'GP_LI_BAI', 'Li Bai', { culture: 45 }, '+45 culture toward the current civic'),
+    P('WRITER', 'GP_CHAUCER', 'Geoffrey Chaucer', { culture: 110 }, '+110 culture toward the current civic'),
+    P('WRITER', 'GP_SHELLEY', 'Mary Shelley', { culture: 260 }, '+260 culture toward the current civic'),
+    P('WRITER', 'GP_TOLSTOY', 'Leo Tolstoy', { culture: 600 }, '+600 culture toward the current civic'),
+  ],
+  MUSICIAN: [
+    P('MUSICIAN', 'GP_VIVALDI', 'Antonio Vivaldi', { culture: 50 }, '+50 culture toward the current civic'),
+    P('MUSICIAN', 'GP_MOZART', 'Wolfgang Amadeus Mozart', { culture: 130 }, '+130 culture toward the current civic'),
+    P('MUSICIAN', 'GP_CHOPIN', 'Frederic Chopin', { culture: 300 }, '+300 culture toward the current civic'),
+    P('MUSICIAN', 'GP_TCHAIKOVSKY', 'Pyotr Tchaikovsky', { culture: 700 }, '+700 culture toward the current civic'),
   ],
 };
 

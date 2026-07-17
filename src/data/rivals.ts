@@ -63,3 +63,28 @@ export const LOYALTY_AMENITY: Record<string, number> = {
   Displeased: -3,
   Unhappy: -6,
 };
+
+// --- war weariness (B-15) ------------------------------------------------------
+// A flat per-turn amenity drag while at war, decaying 4× faster in peace, real-
+// anchored to Civ 6's war-weariness unhappiness. Accrual is per-turn-at-war
+// (combat-location sensitivity is not cheaply/deterministically detectable in
+// this model, so the brief's flat option is used). The accumulator is an INTEGER
+// (turn counter), so the derived amenity penalty is integer too — no float
+// association risk. Applied empire-wide through the existing amenity aggregation
+// for the player AND, symmetrically, per rival civ.
+/** Accumulator gained per turn while at war with any live opponent. */
+export const WAR_WEARINESS_PER_TURN = 1;
+/** Accumulator shed per turn at peace (4× the accrual rate). */
+export const WAR_WEARINESS_DECAY = 4;
+/** Accumulator points per −1 amenity. Deliberately gentle: the SCRIPTED player
+ *  never sues for peace, so rival-initiated wars run their full RIVAL_WAR_MIN
+ *  course — a steep penalty would collapse the passive player's loyalty and
+ *  empty the scripted fixture. −1 amenity per 8 war-turns keeps the drag real
+ *  without inducing collapse (off-script/RL agents that make peace shed it). */
+export const WAR_WEARINESS_PER_AMENITY = 8;
+/** Accumulator ceiling → caps the amenity penalty at CAP / PER_AMENITY (= −2). */
+export const WAR_WEARINESS_CAP = 16;
+/** Empire-wide amenity penalty (≥0) for a weariness accumulator value. */
+export function warWearinessPenalty(weariness: number): number {
+  return Math.floor(Math.min(weariness, WAR_WEARINESS_CAP) / WAR_WEARINESS_PER_AMENITY);
+}

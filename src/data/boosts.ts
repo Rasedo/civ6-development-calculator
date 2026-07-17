@@ -62,6 +62,18 @@ export const BOOSTS: Record<string, BoostDef> = {
   STEEL: { desc: 'Mine coal.', check: { kind: 'improvement', id: 'MINE', count: 1, onResource: true } },
   REPLACEABLE_PARTS: { desc: 'Grow a city to 15 population.', check: { kind: 'cityPop', pop: 15 } },
 
+  // B-11 new-tech eurekas — only where the condition is expressible AND the
+  // target is exported to the GPU (Campus/Harbor building tiers, districts,
+  // roster improvements). Military/naval/absent-system eurekas are unboostable
+  // in this model (IRON_WORKING, MACHINERY, GUNPOWDER, METAL_CASTING,
+  // SQUARE_RIGGING, SIEGE_TACTICS, BALLISTICS, RIFLING, FLIGHT, COMBUSTION,
+  // PLASTICS, ELECTRONICS, and every Atomic/Information/Future node) —
+  // recorded in ROUND_B2_LOG.
+  CARTOGRAPHY: { desc: 'Build 2 Harbors.', check: { kind: 'district', type: 'HARBOR', count: 2 } },
+  PRINTING: { desc: 'Build 2 Universities.', check: { kind: 'building', id: 'UNIVERSITY', count: 2 } },
+  STEAM_POWER: { desc: 'Build 2 Shipyards.', check: { kind: 'building', id: 'SHIPYARD', count: 2 } },
+  REFINING: { desc: 'Build 2 Oil Wells.', check: { kind: 'improvement', id: 'OIL_WELL', count: 2 } },
+
   // --- civic inspirations -------------------------------------------------------
   CRAFTSMANSHIP: { desc: 'Improve 3 tiles.', check: { kind: 'improvement', id: 'FARM', count: 3 } },
   FOREIGN_TRADE: { desc: 'Discover a second continent. (manual)' },
@@ -93,4 +105,10 @@ export const BOOSTS: Record<string, BoostDef> = {
   SUFFRAGE: { desc: 'Build 4 Sewers.', check: { kind: 'building', id: 'SEWER', count: 4 } },
   CLASS_STRUGGLE: { desc: 'Build 3 Factories.', check: { kind: 'building', id: 'FACTORY', count: 3 } },
   TOTALITARIANISM: { desc: 'Build 3 Military Academies.', check: { kind: 'building', id: 'MILITARY_ACADEMY', count: 3 } },
+
+  // B-12 new-civic inspirations — only NUCLEAR_PROGRAM has an expressible,
+  // exported target (Research Lab, a Campus tier). Every other appended civic's
+  // real inspiration needs an absent system (trade routes, alliances, luxuries,
+  // multi-city population, wonder counts) and is uninspirable (recorded).
+  NUCLEAR_PROGRAM: { desc: 'Build a Research Lab.', check: { kind: 'building', id: 'RESEARCH_LAB', count: 1 } },
 };

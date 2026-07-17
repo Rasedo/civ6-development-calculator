@@ -1,15 +1,44 @@
 /**
- * Technology tree — a compact 22-node tree that keeps Civ 6's real names,
- * shape and gating for everything this calculator models. Costs are
- * eyeballed base-game science values. Pure-military techs are omitted.
+ * Technology tree — the full GS ~68-node tree (B-11). The first 32 nodes are
+ * the historical compact tree, kept BYTE-IDENTICAL (append-only) so every
+ * index/tie-break is preserved; the remainder fill the real topology through
+ * the Atomic/Information/Future eras. Costs are real-anchored base science.
+ *
+ * Nodes past the modeled roster are PURE TREE NODES: their real unlocks are
+ * military units (B-10 roster, a later round), naval hulls, or absent systems
+ * (aircraft, nukes), so they unlock nothing yet — recorded in ROUND_B2_LOG.
+ * Eurekas are attached only where the boost condition is expressible in
+ * data/boosts.ts terms AND the target is exported (Campus/Harbor tiers,
+ * districts, roster improvements); everything else is unboostable (recorded).
  */
 
 import type { DistrictId, ImprovementId, Yields } from '../core/types';
 import { GAME_SPEED } from './constants';
 
-export type Era = 'Ancient' | 'Classical' | 'Medieval' | 'Renaissance' | 'Industrial' | 'Modern';
+export type Era =
+  | 'Ancient'
+  | 'Classical'
+  | 'Medieval'
+  | 'Renaissance'
+  | 'Industrial'
+  | 'Modern'
+  | 'Atomic'
+  | 'Information'
+  | 'Future';
 
-export const ERAS: Era[] = ['Ancient', 'Classical', 'Medieval', 'Renaissance', 'Industrial', 'Modern'];
+// B-11/B-12: the full GS era ladder. Atomic/Information/Future are display-only
+// groupings (no core logic reads `.era`); adding them is purely additive.
+export const ERAS: Era[] = [
+  'Ancient',
+  'Classical',
+  'Medieval',
+  'Renaissance',
+  'Industrial',
+  'Modern',
+  'Atomic',
+  'Information',
+  'Future',
+];
 
 export type ResearchEffect =
   | { kind: 'unlockImprovement'; improvement: ImprovementId }
@@ -158,5 +187,63 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('REPLACEABLE_PARTS', 'Replaceable Parts', 'Modern', 1370, ['ECONOMICS'], [
       { kind: 'farmAdjacency' },
     ]),
+
+    // ========================================================================
+    // B-11: full-tree expansion (index 32+). All rows below unlock nothing in
+    // the modeled roster (military/naval/absent systems); they exist as tree
+    // topology + gating for late wonders/projects and the science victory.
+    // ========================================================================
+
+    // --- Classical (fill) ----------------------------------------------------
+    T('IRON_WORKING', 'Iron Working', 'Classical', 120, ['BRONZE_WORKING']),
+    T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']),
+
+    // --- Medieval (fill) -----------------------------------------------------
+    T('MACHINERY', 'Machinery', 'Medieval', 275, ['IRON_WORKING']),
+    T('MILITARY_TACTICS', 'Military Tactics', 'Medieval', 275, ['MATHEMATICS']),
+    T('STIRRUPS', 'Stirrups', 'Medieval', 390, ['HORSEBACK_RIDING']),
+    T('CASTLES', 'Castles', 'Medieval', 390, ['CONSTRUCTION']),
+
+    // --- Renaissance (fill) --------------------------------------------------
+    T('GUNPOWDER', 'Gunpowder', 'Renaissance', 490, ['MILITARY_ENGINEERING', 'STIRRUPS']),
+    T('METAL_CASTING', 'Metal Casting', 'Renaissance', 500, ['GUNPOWDER']),
+    T('CARTOGRAPHY', 'Cartography', 'Renaissance', 490, ['SHIPBUILDING']),
+    T('PRINTING', 'Printing', 'Renaissance', 490, ['MACHINERY']),
+    T('SQUARE_RIGGING', 'Square Rigging', 'Renaissance', 580, ['CARTOGRAPHY']),
+    T('SIEGE_TACTICS', 'Siege Tactics', 'Renaissance', 580, ['CASTLES']),
+
+    // --- Industrial (fill) ---------------------------------------------------
+    T('STEAM_POWER', 'Steam Power', 'Industrial', 930, ['INDUSTRIALIZATION', 'SQUARE_RIGGING']),
+    T('BALLISTICS', 'Ballistics', 'Industrial', 1070, ['METAL_CASTING']),
+    T('RIFLING', 'Rifling', 'Industrial', 1250, ['BALLISTICS', 'STEEL']),
+
+    // --- Modern (fill) -------------------------------------------------------
+    T('FLIGHT', 'Flight', 'Modern', 1250, ['RADIO', 'STEEL']),
+    T('COMBUSTION', 'Combustion', 'Modern', 1250, ['STEAM_POWER', 'RIFLING']),
+    T('REFINING', 'Refining', 'Modern', 1250, ['STEEL']),
+    T('PLASTICS', 'Plastics', 'Modern', 1560, ['COMBUSTION', 'REFINING']),
+    T('ELECTRONICS', 'Electronics', 'Modern', 1560, ['ELECTRICITY', 'RADIO']),
+
+    // --- Atomic (new era) ----------------------------------------------------
+    T('COMPUTERS', 'Computers', 'Atomic', 1800, ['ELECTRONICS']),
+    T('NUCLEAR_FISSION', 'Nuclear Fission', 'Atomic', 1800, ['COMBUSTION', 'PLASTICS']),
+    T('ROCKETRY', 'Rocketry', 'Atomic', 1900, ['FLIGHT', 'RADIO']),
+    T('ADVANCED_FLIGHT', 'Advanced Flight', 'Atomic', 1900, ['FLIGHT']),
+    T('COMBINED_ARMS', 'Combined Arms', 'Atomic', 2000, ['STEEL', 'FLIGHT']),
+    T('SYNTHETIC_MATERIALS', 'Synthetic Materials', 'Atomic', 2200, ['PLASTICS']),
+
+    // --- Information (new era) ------------------------------------------------
+    T('SATELLITES', 'Satellites', 'Information', 2470, ['ROCKETRY', 'COMPUTERS']),
+    T('GUIDANCE_SYSTEMS', 'Guidance Systems', 'Information', 2470, ['ROCKETRY', 'ADVANCED_FLIGHT']),
+    T('LASERS', 'Lasers', 'Information', 2600, ['NUCLEAR_FISSION']),
+    T('NANOTECHNOLOGY', 'Nanotechnology', 'Information', 2600, ['SYNTHETIC_MATERIALS']),
+    T('NUCLEAR_FUSION', 'Nuclear Fusion', 'Information', 2600, ['LASERS']),
+    T('ROBOTICS', 'Robotics', 'Information', 2470, ['COMPUTERS']),
+    T('TELECOMMUNICATIONS', 'Telecommunications', 'Information', 2600, ['SATELLITES', 'COMPUTERS']),
+
+    // --- Future (new era) -----------------------------------------------------
+    T('OFFWORLD_MISSION', 'Offworld Mission', 'Future', 3200, ['TELECOMMUNICATIONS', 'NUCLEAR_FUSION']),
+    T('SMART_MATERIALS', 'Smart Materials', 'Future', 3200, ['NANOTECHNOLOGY', 'ROBOTICS']),
+    T('ADVANCED_POWER_CELLS', 'Advanced Power Cells', 'Future', 3400, ['NUCLEAR_FUSION']),
   ].map((t) => [t.id, t]),
 );

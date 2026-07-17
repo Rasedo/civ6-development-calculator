@@ -185,5 +185,124 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       effects: { cityYieldMult: { gold: 1.1 } },
       description: '+6 gold and +10% gold in this city. River tile adjacent to a Commercial Hub.',
     }),
+
+    // ========================================================================
+    // B-27: world wonders 13 → 30 (index 13-29; stays within the 32-bit `wok`
+    // tile-bitmask ceiling). Effects use ONLY the supported wonder channels
+    // (cityYields / growthAllMult / regionalAmenities / cityYieldMult); every
+    // real effect needing an absent system (tourism/appeal, naval, Great-Work
+    // slots, envoys, era score, relic/martyr, policy slots, per-improvement
+    // amenities, tile-terrain bonuses) is DEGRADED to flat cityYields or
+    // dropped — each recorded in ROUND_B2_LOG. Placement predicates are drawn
+    // only from the combos the existing 13 already exercise.
+    // ========================================================================
+
+    // --- Ancient / Classical -------------------------------------------------
+    W({
+      id: 'TEMPLE_OF_ARTEMIS', name: 'Temple of Artemis', code: 'TA', cost: 180,
+      requiresTech: 'ARCHERY', placement: { flatOnly: true },
+      cityYields: { food: 4 },
+      description: '+4 food. (Real per-Camp/Pasture/Plantation amenities dropped — no channel.)',
+    }),
+    W({
+      id: 'GREAT_BATH', name: 'Great Bath', code: 'GT', cost: 90,
+      requiresTech: 'POTTERY', placement: { requiresRiver: true },
+      cityYields: { faith: 1 }, effects: { regionalAmenities: 1 },
+      description: '+1 faith, +1 regional amenity. (Housing + flood protection dropped.)',
+    }),
+    W({
+      id: 'ETEMENANKI', name: 'Etemenanki', code: 'ET', cost: 220,
+      requiresTech: 'WRITING', placement: { requiresRiver: true },
+      cityYields: { science: 2, faith: 1 },
+      description: '+2 science, +1 faith. (Marsh/Floodplains tile bonuses dropped.)',
+    }),
+    W({
+      id: 'APADANA', name: 'Apadana', code: 'AP', cost: 400,
+      requiresCivic: 'POLITICAL_PHILOSOPHY', placement: { flatOnly: true, adjacentDistrict: 'CITY_CENTER' },
+      cityYields: { culture: 2 },
+      description: '+2 culture. (Envoys-on-wonder-build dropped — no channel.)',
+    }),
+    W({
+      id: 'MAUSOLEUM_AT_HALICARNASSUS', name: 'Mausoleum at Halicarnassus', code: 'MH', cost: 290,
+      requiresTech: 'CELESTIAL_NAVIGATION', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      cityYields: { science: 1, faith: 1, culture: 1 },
+      description: '+1 science/faith/culture. (Free Great Engineer/Admiral charges dropped.)',
+    }),
+
+    // --- Medieval / Renaissance ----------------------------------------------
+    W({
+      id: 'ALHAMBRA', name: 'Alhambra', code: 'AL', cost: 710,
+      requiresTech: 'CASTLES', placement: { hillsOnly: true, adjacentDistrict: 'ENCAMPMENT' },
+      effects: { regionalAmenities: 2 },
+      description: '+2 regional amenities. (Military policy slot + defense dropped; Encampment adjacency ⇒ never placeable by scripted rivals.)',
+    }),
+    W({
+      id: 'HAGIA_SOPHIA', name: 'Hagia Sophia', code: 'HS', cost: 540,
+      requiresCivic: 'THEOLOGY', placement: { flatOnly: true, adjacentDistrict: 'HOLY_SITE' },
+      cityYields: { faith: 4 },
+      description: '+4 faith. (Missionary/Apostle spread bonus dropped.)',
+    }),
+    W({
+      id: 'MONT_ST_MICHEL', name: 'Mont St. Michel', code: 'MS', cost: 710,
+      requiresCivic: 'DIVINE_RIGHT', placement: { requiresRiver: true },
+      cityYields: { faith: 2 },
+      description: '+2 faith. (Relic slots / Apostle martyrdom dropped.)',
+    }),
+    W({
+      id: 'UNIVERSITY_OF_SANKORE', name: 'University of Sankoré', code: 'US', cost: 710,
+      requiresTech: 'EDUCATION', placement: { flatOnly: true, adjacentDistrict: 'CAMPUS' },
+      cityYields: { science: 2, faith: 1 },
+      description: '+2 science, +1 faith.',
+    }),
+    W({
+      id: 'VENETIAN_ARSENAL', name: 'Venetian Arsenal', code: 'VA', cost: 920,
+      requiresTech: 'MASS_PRODUCTION', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      cityYields: { production: 2 },
+      description: '+2 production. (Duplicate-naval-unit ability dropped.)',
+    }),
+    W({
+      id: 'ST_BASILS_CATHEDRAL', name: "St. Basil's Cathedral", code: 'SB', cost: 920,
+      requiresCivic: 'REFORMED_CHURCH', placement: { flatOnly: true },
+      cityYields: { faith: 3, culture: 1 },
+      description: '+3 faith, +1 culture. (Relic slots + tundra-yield bonus dropped.)',
+    }),
+    W({
+      id: 'TAJ_MAHAL', name: 'Taj Mahal', code: 'TM', cost: 850,
+      requiresCivic: 'HUMANISM', placement: { requiresRiver: true },
+      cityYields: { faith: 2, culture: 2 },
+      description: '+2 faith, +2 culture. (Era-score-on-completion bonus dropped.)',
+    }),
+    W({
+      id: 'POTALA_PALACE', name: 'Potala Palace', code: 'PP', cost: 1450,
+      requiresTech: 'ASTRONOMY', placement: { hillsOnly: true },
+      cityYields: { science: 2, faith: 1 },
+      description: '+2 science, +1 faith. (Diplomatic policy slot dropped.)',
+    }),
+
+    // --- Industrial / Modern -------------------------------------------------
+    W({
+      id: 'HERMITAGE', name: 'Hermitage', code: 'HM', cost: 1200,
+      requiresCivic: 'NATURAL_HISTORY', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
+      cityYields: { culture: 3 },
+      description: '+3 culture. (Great Work of Art slots dropped — Great-Works surface is Slice Q.)',
+    }),
+    W({
+      id: 'BOLSHOI_THEATRE', name: 'Bolshoi Theatre', code: 'BT', cost: 1450,
+      requiresCivic: 'OPERA_AND_BALLET', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
+      cityYields: { culture: 3 },
+      description: '+3 culture. (Great Writer/Musician points + Work slots dropped.)',
+    }),
+    W({
+      id: 'STATUE_OF_LIBERTY', name: 'Statue of Liberty', code: 'SL', cost: 1450,
+      requiresTech: 'ELECTRICITY', placement: { flatOnly: true, adjacentDistrict: 'HARBOR' },
+      cityYields: { culture: 3 },
+      description: '+3 culture. (Free-Great-Person + loyalty ability dropped.)',
+    }),
+    W({
+      id: 'CRISTO_REDENTOR', name: 'Cristo Redentor', code: 'CR', cost: 1600,
+      requiresTech: 'RADIO', placement: { hillsOnly: true },
+      cityYields: { culture: 4 },
+      description: '+4 culture. (Tourism / appeal ability dropped — no channel.)',
+    }),
   ].map((w) => [w.id, w]),
 );

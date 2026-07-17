@@ -49,7 +49,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null },
     tradeRoutes: [],
     settlers: 0,
     buildersTrained: 0, // P4/D-10
@@ -72,6 +72,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
+    claimedEnhancers: [],
   };
 }
 

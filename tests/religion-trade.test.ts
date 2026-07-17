@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from './helpers';
-import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, foundReligion } from '../src/core/game';
+import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, foundReligion, canEnhanceReligion, enhanceReligion } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
 import { tileYields } from '../src/core/yields';
 import { makeYieldCtx } from '../src/core/effects';
@@ -103,6 +103,31 @@ describe('founding a religion', () => {
     const stats = computeCityStats(state, city);
     expect(stats.breakdown.districts.production).toBeGreaterThanOrEqual(1);
     expect(stats.breakdown.districts.production).toBe(stats.breakdown.districts.faith);
+  });
+
+  // B-18: the Enhancer belief slot — a founded religion, a SECOND prophet,
+  // and the claimed-pool exclusion (mirrors the follower/founder gate). The
+  // rollout never founds a player religion, so this path is poke-only.
+  it('enhancing needs a founded religion and a second prophet; slot fills, pool excludes', () => {
+    const { state } = ready();
+    foundReligion(state, {
+      name: 'Zen', follower: 'CHORAL_MUSIC', founder: 'TITHE', worship: 'GURDWARA',
+    });
+    state.sandbox = false;
+    expect(canEnhanceReligion(state).ok).toBe(false); // no prophet yet
+    state.greatPeople.earned.push('GP_CONFUCIUS');
+    expect(canEnhanceReligion(state).ok).toBe(false); // only one
+    state.greatPeople.earned.push('GP_SIDDHARTHA');
+    expect(canEnhanceReligion(state).ok).toBe(true); // second prophet
+
+    // a rival already holding an enhancer excludes it from the pool
+    state.claimedEnhancers = ['CRUSADE'];
+    expect(enhanceReligion(state, 'CRUSADE').ok).toBe(false);
+    expect(enhanceReligion(state, 'ITINERANT_PREACHERS').ok).toBe(true);
+    expect(state.religion.enhancer).toBe('ITINERANT_PREACHERS');
+    expect(state.claimedEnhancers).toContain('ITINERANT_PREACHERS');
+    // no double-enhance
+    expect(enhanceReligion(state, 'HOLY_ORDER').ok).toBe(false);
   });
 });
 

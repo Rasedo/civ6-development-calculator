@@ -110,9 +110,12 @@ def main() -> int:
                 ("domination", [py, "gpu/domination_test.py"], 4),
                 ("bankruptcy", [py, "gpu/bankruptcy_test.py"], 4),
                 ("seat", [py, "gpu/seat_test.py"], 4),
+                ("government", [py, "gpu/government_test.py"], 4),
                 ("controlled", [py, "gpu/controlled_test.py"], 4),
                 ("duel", [py, "gpu/duel_test.py"], 4),
                 ("gumbel", [py, "gpu/gumbel_test.py"], 4),
+                ("religion_gp", [py, "gpu/religion_gp_test.py"], 4),
+                ("war_weariness", [py, "gpu/war_weariness_test.py"], 4),
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

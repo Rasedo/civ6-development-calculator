@@ -60,7 +60,10 @@ describe('RL environment', () => {
   });
 
   it('reaches policy and government decisions as civics complete', () => {
-    const env = new CivEnv({ ...OPTS, horizon: 60 });
+    // ROUND B2: CITIZEN_SCIENCE 0.7→0.5 (owner-ruled) slows the opening —
+    // first district candidate lands ~t66, first project ~t86 (seed 77),
+    // so the horizon must reach past them.
+    const env = new CivEnv({ ...OPTS, horizon: 100 });
     let r = env.reset();
     const seen = new Set<string>();
     let guard = 0;

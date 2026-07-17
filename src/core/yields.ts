@@ -100,8 +100,12 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return neighbor.district === 'HARBOR' && neighbor.districtComplete;
     case 'SEA_RESOURCE':
       return isWater(neighbor) && neighbor.resource !== null;
-    case 'MINE_OR_QUARRY':
-      return neighbor.improvement === 'MINE' || neighbor.improvement === 'QUARRY';
+    case 'MINE':
+      return neighbor.improvement === 'MINE';
+    case 'QUARRY':
+      return neighbor.improvement === 'QUARRY';
+    case 'AQUEDUCT':
+      return neighbor.district === 'AQUEDUCT' && neighbor.districtComplete;
     case 'RIVER':
       return false; // handled separately (it's about the tile itself)
   }

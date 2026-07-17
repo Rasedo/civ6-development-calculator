@@ -9,7 +9,7 @@ import { generateMap } from './mapgen';
 import { tilesWithin, hexDistance } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
-import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots } from './effects';
+import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost } from './units';
 import { barbarianPhase } from './combat';
@@ -17,6 +17,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
+import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP } from '../data/rivals';
 import { UNITS, WALLS_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -26,8 +27,8 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
+import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
@@ -114,7 +115,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null },
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null },
     tradeRoutes: [],
     settlers: 0,
     buildersTrained: 0, // P4/D-10
@@ -130,6 +131,8 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
+    warWeariness: 0, // B-15
+    spaceProjects: [], // B-25
     capitalTiles: [], // GV-3
     fogOfWar: false,
     explored: [],
@@ -140,6 +143,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
+    claimedEnhancers: [],
   };
 }
 
@@ -372,13 +376,21 @@ export function projectCost(state: GameState): number {
   return Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCost(state) * 0.5));
 }
 
-/** Projects this city can run (needs the matching completed district). */
+/** Projects this city can run (needs the matching completed district). B-25:
+ * space-race projects additionally require their gating tech, the previous
+ * chain step already completed by this empire, and are one-time (not repeated). */
 export function availableProjects(state: GameState, city: City): ProjectDef[] {
-  return Object.values(PROJECTS).filter((p) =>
-    city.districts.some(
-      (d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete,
-    ),
-  );
+  const done = state.spaceProjects ?? [];
+  return Object.values(PROJECTS).filter((p) => {
+    if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
+      return false;
+    }
+    if (!p.space) return true;
+    if (done.includes(p.id)) return false; // one-time
+    if (p.requiresTech && !state.research.techs.includes(p.requiresTech)) return false;
+    if (p.requiresProject && !done.includes(p.requiresProject)) return false;
+    return true;
+  });
 }
 
 export function queueProject(state: GameState, cityId: number, projectId: string): RuleResult {
@@ -395,6 +407,18 @@ export function queueProject(state: GameState, cityId: number, projectId: string
 function completeProject(state: GameState, city: City, projectId: string, cost: number): void {
   const def = PROJECTS[projectId];
   if (!def) return;
+  // B-25: space-race step — record chain progress; the final step wins.
+  if (def.space) {
+    if (!state.spaceProjects) state.spaceProjects = [];
+    if (!state.spaceProjects.includes(projectId)) state.spaceProjects.push(projectId);
+    state.eventLog.push(`${city.name} completed ${def.name}.`);
+    if (def.victory) {
+      state.victoryType = 3; // GV/B-25 science victory (player)
+      state.gameOver = true;
+      state.eventLog.push('Science Victory! The Exoplanet Expedition has launched.');
+    }
+    return;
+  }
   if (def.yield) {
     const amount = Math.round(cost * PROJECT_YIELD_FRACTION);
     applyLumpYield(state, city.centerIndex, { key: def.yield, amount });
@@ -714,8 +738,17 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
   }
   if (!r.civic && availableCivics(state).length === 0) r.civicProgress = Math.min(r.civicProgress, 0);
 
-  // First government comes free with Code of Laws.
-  if (!state.government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {
+  // A-7r: the scripted player adopts the newest unlocked government and fills
+  // its base slots greedily (the same deterministic rule the rivals use via
+  // getRivalModifiers / computeAdoption). Recomputed each turn — a pure
+  // function of research, so it re-seats on every civic unlock with zero RNG.
+  // Gated INERT behind GOVERNMENTS_ADOPTION_LIVE (see the flag's note); until
+  // flipped the player keeps the pre-A-7r free-Chiefdom-only behavior.
+  if (GOVERNMENTS_ADOPTION_LIVE) {
+    const adopted = computeAdoption(state.research);
+    state.government.current = adopted.government;
+    state.government.policies = adopted.policies;
+  } else if (!state.government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {
     setGovernment(state, 'CHIEFDOM');
   }
 }
@@ -725,6 +758,16 @@ export function endTurn(state: GameState): void {
   if (state.unitsMode) refreshUnits(state);
   const luxMap = luxuryAmenities(state);
   const mods = getModifiers(state);
+
+  // B-15: war weariness accrues once per turn while at war with any live rival
+  // (rival war-state as left by last turn's rivalPhase), decays 4× in peace.
+  // Read here, before the city loop, so this turn's amenities reflect it — the
+  // GPU updates at the same relative point (top of step, after the war block).
+  const atWarNow = state.rivals.some((rv) => rv.atWar && rv.cities.length > 0);
+  state.warWeariness = atWarNow
+    ? Math.min(WAR_WEARINESS_CAP, (state.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
+    : Math.max(0, (state.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
+
   let turnScience = 0;
   let turnCulture = 0;
   const defectors: City[] = [];
@@ -855,8 +898,11 @@ export function endTurn(state: GameState): void {
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // (GV-2 is indicator-only), so at the gate (dom == -1 by t100) this is inert.
   const dom = dominationWinner(state);
-  state.gameOver = dom >= 0 || state.turn > TURN_LIMIT;
-  state.victoryType = dom >= 0 ? 2 : state.gameOver ? 1 : 0;
+  // B-25: a science victory/defeat (3/4) set during this turn's project
+  // completions takes precedence over the domination/score recompute.
+  const spaceWon = state.victoryType === 3 || state.victoryType === 4;
+  state.gameOver = spaceWon || dom >= 0 || state.turn > TURN_LIMIT;
+  state.victoryType = spaceWon ? state.victoryType : dom >= 0 ? 2 : state.gameOver ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -949,7 +995,8 @@ export function deserialize(json: string): GameState {
     t.builtWonder ??= null;
     t.builtWonderComplete ??= false;
   }
-  state.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null };
+  state.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null };
+  state.religion.enhancer ??= null; // B-18
   state.tradeRoutes ??= [];
   state.settlers ??= 0;
   state.buildersTrained ??= 0; // P4/D-10
@@ -1004,6 +1051,7 @@ export function deserialize(json: string): GameState {
   }
   state.claimedPantheons ??= [];
   state.claimedBeliefs ??= [];
+  state.claimedEnhancers ??= []; // B-18
   for (const u of state.units) {
     u.owner ??= 'player';
     u.hp ??= 100;
@@ -1083,5 +1131,34 @@ export function foundReligion(
   state.religion.follower = choice.follower;
   state.religion.founder = choice.founder;
   state.religion.worship = choice.worship;
+  return { ok: true };
+}
+
+/** B-18: can the player enhance its religion (add the Enhancer belief)? Real
+ * Civ 6 spends a second Great Prophet — modeled here as a SECOND earned
+ * Prophet-class great person (the first funds founding). */
+export function canEnhanceReligion(state: GameState): RuleResult {
+  if (!state.religion.founded) return { ok: false, reason: 'Found a religion first.' };
+  if (state.religion.enhancer) return { ok: false, reason: 'Religion already enhanced.' };
+  if (!state.sandbox && greatPeopleEarned(state, 'PROPHET') < 2) {
+    return { ok: false, reason: 'Needs a second Great Prophet to enhance.' };
+  }
+  return { ok: true };
+}
+
+/** B-18: add an Enhancer belief to the player's founded religion. Effects are
+ * inert this round (they need religious pressure / missionary / combat systems
+ * that do not exist yet); the slot and claim are real and mirror the
+ * follower/founder claimed-pool exclusion. */
+export function enhanceReligion(state: GameState, beliefId: string): RuleResult {
+  const check = canEnhanceReligion(state);
+  if (!check.ok) return check;
+  if (!ENHANCER_BELIEFS[beliefId]) return { ok: false, reason: 'No such enhancer belief.' };
+  state.claimedEnhancers ??= [];
+  if (state.claimedEnhancers.includes(beliefId)) {
+    return { ok: false, reason: 'A rival religion already claimed that enhancer.' };
+  }
+  state.religion.enhancer = beliefId;
+  state.claimedEnhancers.push(beliefId);
   return { ok: true };
 }

@@ -14,6 +14,24 @@ import type { DistrictId, Yields } from '../core/types';
 
 export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
 
+/**
+ * A-7r behavioral master switch. The government/policy ADOPTION machinery
+ * (computeAdoption + getRivalModifiers government layering + the scripted
+ * player's autoGovernment + the GPU per-seat modifier tables) is fully
+ * implemented and turn-exact between the two engines. It is landed INERT
+ * (repo discipline: new tables/planes land changing nothing before behavior
+ * flips on) because flipping it live exposes a PRE-EXISTING, out-of-slice
+ * rival-unit-march ordering latent: URBAN_PLANNING's +1 production (applied
+ * turn-exactly to both seats) shifts the rival build/train trajectory onto a
+ * configuration where the rival war-march (`hostileUnitAct`, rivals.ts) —
+ * whose GPU twin iterates unit SLOTS while TS iterates spawn/insertion order —
+ * captures a player builder one turn apart (seed 9066 t98 `punits`, a single
+ * self-correcting off-by-one). That latent is in the rival-combat domain
+ * (chapter B / other slices), not economy. Flip this to `true` in the slice
+ * that fixes the rival-march ordering; the exporter mirrors it into
+ * rules.governmentsLive so both engines stay in lockstep. */
+export const GOVERNMENTS_ADOPTION_LIVE = false;
+
 export interface PolicyEffects {
   /** Flat yields added to every city. */
   cityYields?: Partial<Yields>;
@@ -111,6 +129,61 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('FIVE_YEAR_PLAN', 'Five-Year Plan', 'wildcard', '+100% Campus and Industrial Zone adjacency bonuses.', {
       adjacencyMult: { CAMPUS: 2, INDUSTRIAL_ZONE: 2 },
     }),
+
+    // B-13 catalog breadth (real Civ 6 GS card set, appended AFTER the
+    // originals so the greedy slot fill's table order — URBAN_PLANNING first
+    // in every economic slot — is preserved). The MAJORITY are inert: their
+    // real effects need systems this calculator does not model (unit combat,
+    // unit/settler/builder/wonder production multipliers, trade routes,
+    // tourism, envoys, grievances, spies, great-people points). Per common
+    // rule 2 they land as catalog rows with empty effects (recorded in
+    // ROUND_B2_LOG). Cards whose real effect maps to an existing channel carry
+    // it. Diplomatic cards exist now so diplomatic slots stop sitting idle.
+
+    // --- Military (combat / unit-production — inert) ---------------------------
+    P('DISCIPLINE', 'Discipline', 'military', '+combat strength vs barbarians (combat not modeled).', {}),
+    P('SURVEY', 'Survey', 'military', 'Faster tribal-village/goody rewards (not modeled).', {}),
+    P('MANEUVER', 'Maneuver', 'military', '+production toward heavy/light cavalry (not modeled).', {}),
+    P('AGOGE', 'Agoge', 'military', '+production toward ancient/classical melee & ranged (not modeled).', {}),
+    P('CHIVALRY', 'Chivalry', 'military', '+combat strength for cavalry (not modeled).', {}),
+    P('BASTIONS', 'Bastions', 'military', 'City-center defensive strength (not modeled).', {}),
+    P('FEUDAL_CONTRACT', 'Feudal Contract', 'military', '+production toward melee/ranged/anti-cavalry (not modeled).', {}),
+    P('CONSCRIPTION', 'Conscription', 'military', '-1 gold unit maintenance (per-unit upkeep not modeled).', {}),
+    P('LEVEE_EN_MASSE', 'Levée en Masse', 'military', '-1 gold land/naval/air maintenance (not modeled).', {}),
+    P('ELITE_FORCES', 'Elite Forces', 'military', '+movement/health for combat units (not modeled).', {}),
+    P('MILITARY_FIRST', 'Military First', 'military', '+combat strength & faster promotions (not modeled).', {}),
+    P('REDOUBT', 'Redoubt', 'military', 'Anti-cavalry/support strength (not modeled).', {}),
+    P('TOTAL_WAR', 'Total War', 'military', '+combat strength attacking, faster support (not modeled).', {}),
+
+    // --- Economic (production/trade/wonder/GP multipliers — mostly inert) ------
+    P('GOD_OF_THE_OPEN_SKY', 'God of the Open Sky', 'economic', '+culture from pastures (feature-yield not modeled here).', {}),
+    P('COLONIZATION', 'Colonization', 'economic', '+50% production toward Settlers (settler-production multiplier not modeled).', {}),
+    P('ILKUM', 'Ilkum', 'economic', '+30% production toward Builders (builder-production multiplier not modeled).', {}),
+    P('CARAVANSARIES', 'Caravansaries', 'economic', '+2 gold from trade routes (trade routes not modeled).', {}),
+    P('MARITIME_INDUSTRIES', 'Maritime Industries', 'economic', '+production toward naval units (naval not modeled).', {}),
+    P('CORVEE', 'Corvée', 'economic', '+15% production toward ancient/classical wonders (wonder multiplier not modeled).', {}),
+    P('SERFDOM', 'Serfdom', 'economic', '+2 Builder charges (builder charges not modeled).', {}),
+    P('PUBLIC_WORKS', 'Public Works', 'economic', '+15% production toward districts (district-production multiplier not modeled).', {}),
+    P('GOTHIC_ARCHITECTURE', 'Gothic Architecture', 'economic', '+15% production toward medieval/renaissance wonders (not modeled).', {}),
+    P('SKYSCRAPERS', 'Skyscrapers', 'economic', '-15% production cost of wonders (not modeled).', {}),
+    P('ECONOMIC_UNION', 'Economic Union', 'economic', '+gold from Commercial Hub/Harbor buildings (trade-adjacent; inert).', {}),
+    P('GRAND_MASTERS_CHAPEL', 'Grand Master’s Chapel', 'economic', 'Faith may buy land military units (faith-purchase of units not modeled).', {}),
+    P('FREE_TRADE', 'Free Trade', 'economic', '+1 trade-route capacity (trade routes not modeled).', {}),
+
+    // --- Diplomatic (envoys/grievances/spies/tourism — inert fillers) ---------
+    P('DIPLOMATIC_LEAGUE', 'Diplomatic League', 'diplomatic', 'First envoy to a city-state counts double (envoys not policy-driven here).', {}),
+    P('CHARISMATIC_LEADER', 'Charismatic Leader', 'diplomatic', '+influence-point generation (influence-per-turn not policy-driven here).', {}),
+    P('CONTAINMENT', 'Containment', 'diplomatic', 'Suzerain influence vs rivals (not modeled).', {}),
+    P('COLLECTIVE_ACTIVISM', 'Collective Activism', 'diplomatic', '+favor from city-states/alliances (diplomatic favor not modeled).', {}),
+    P('ONLINE_COMMUNITIES', 'Online Communities', 'diplomatic', '+tourism per government (tourism not modeled).', {}),
+    P('MARTYRDOM', 'Martyrdom', 'diplomatic', 'Great-Prophet/faith diplomacy (not modeled).', {}),
+
+    // --- Wildcard (great-people / faith / tourism — inert) --------------------
+    P('STRATEGOS', 'Strategos', 'wildcard', '+Great General points (GP points not modeled).', {}),
+    P('INSPIRATION', 'Inspiration', 'wildcard', '+Great Scientist points (GP points not modeled).', {}),
+    P('REVELATION', 'Revelation', 'wildcard', '+Great Prophet points (GP points not modeled).', {}),
+    P('LITERARY_TRADITION', 'Literary Tradition', 'wildcard', '+Great Writer points (GP points not modeled).', {}),
+    P('MONUMENTALITY', 'Monumentality', 'wildcard', 'Faith may buy builders/settlers in a Golden Age (Ages/faith-purchase not modeled).', {}),
   ].map((p) => [p.id, p]),
 );
 

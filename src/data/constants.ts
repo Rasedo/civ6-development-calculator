@@ -45,7 +45,7 @@ export const FAITH_PURCHASE_MULT = 2;
 export const FOOD_PER_CITIZEN = 2;
 
 /** Each citizen contributes these yields directly (Civ 6). */
-export const CITIZEN_SCIENCE = 0.7;
+export const CITIZEN_SCIENCE = 0.5;
 export const CITIZEN_CULTURE = 0.3;
 
 /** Worked city-center tile is floored to these yields. */

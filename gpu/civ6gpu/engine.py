@@ -115,6 +115,9 @@ class Rules:
     wonders: dict  # A-4: {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFid} in data order
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
+    governments: list  # A-7r: [{id, tier, unlockCivic, slots:[m,e,d,w], cityYields[6], capitalYields[6]}] table order
+    policies: list  # A-7r: [{id, kind, unlockCivic, cityYields[6], capitalYields[6]}] table order
+    governments_live: bool  # A-7r master switch (GOVERNMENTS_ADOPTION_LIVE) — inert until flipped
     district_scaffold: dict  # D2b: {campusIdx, campusUnlockTech}
     shipyard_bidx: int  # building-roster index of SHIPYARD (special: prod = Harbor adjacency), -1 if absent
     ancient_walls_bidx: int  # AUDIT B-1: building-roster index of ANCIENT_WALLS (outer HP + city strike), -1 if absent
@@ -135,6 +138,7 @@ class Rules:
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
     c_prereqs: list
+    war_weariness: dict  # B-15: {perTurn, decay, perAmenity, cap} — flat amenity drag at war
 
 
 def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
@@ -176,6 +180,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         wonders=r.get("wonders", {}),
         improvements=r.get("improvements", {}),
         districts=r.get("districts", []),
+        governments=r.get("governments", []),
+        policies=r.get("policies", []),
+        governments_live=bool(r.get("governmentsLive", False)),
         district_scaffold=r.get("districtScaffold", {}),
         shipyard_bidx=int(r.get("shipyardBidx", -1)),
         ancient_walls_bidx=int(r.get("ancientWallsBidx", -1)),
@@ -196,6 +203,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
         c_prereqs=[c["prereqs"] for c in r["civics"]],
+        war_weariness=r.get("warWeariness", {"perTurn": 1, "decay": 4, "perAmenity": 4, "cap": 24}),
     )
 
 
@@ -323,7 +331,7 @@ _MUTABLE = [
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
     "influence", "envoys_avail",
     "rival_at", "rvcity_at", "rv_at",
-    "r_atwar", "r_warturns", "r_peaceturns", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
@@ -519,6 +527,9 @@ class BatchSim:
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # B-15: war-weariness accumulators (integer turn counters), player + per rival
+        self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)
+        self.r_war_weariness = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.r_treasury = torch.tensor(
             [[float((rv.get("treasury") or 0)) for rv in (f.get("rivals") or [])[:r_pad]] + [0.0] * max(r_pad - len(f.get("rivals") or []), 0) for f in fixtures],
             dtype=torch.float64, device=device,
@@ -888,6 +899,50 @@ class BatchSim:
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
         self._dyn_harbor = torch.tensor([_src_amt(d, 9) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent Harbor
         self._dyn_searesource = torch.tensor([_src_amt(d, 10) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent live SEA resource (withdrawn on strip)
+        # B-16 (GS Industrial Zone): dynamic MINE (src 11, +0.5), QUARRY (src 12,
+        # +1), AQUEDUCT (src 13, +2) sources. Only the Industrial Zone carries
+        # them; IZ is rival-unreachable and never scaffolded, so these amounts
+        # stay 0 for every PLACED district — the branches in _district_adj_raw
+        # never fire in the current gate (inert), but keep the catalog faithful.
+        self._dyn_mine = torch.tensor([_src_amt(d, 11) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        self._dyn_quarry = torch.tensor([_src_amt(d, 12) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        self._dyn_aqueduct = torch.tensor([_src_amt(d, 13) for d in self.districts_cat], dtype=dtype, device=device)  # [nD]
+        self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
+        self._quarry_iidx = 3
+        # A-7r: government + policy modifier tables. Per seat, per turn the
+        # engine adopts the newest unlocked government (highest tier, ties to
+        # table order) and greedily fills its BASE slots in policy-table order
+        # among unlocked cards of matching kind — the computeAdoption twin.
+        # Only the cityYields/capitalYields channels are applied (the live gov/
+        # policy effects in the scripted gate: URBAN_PLANNING +1 production to
+        # every city, AUTOCRACY +1 to all yields in the capital). Wildcard
+        # slots are never filled (no reachable government carries one).
+        _govs = rules.governments or []
+        _pols = rules.policies or []
+        self._ngov = len(_govs)
+        self._npol = len(_pols)
+        if self._ngov:
+            self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
+            self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
+            self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w
+            self._gov_city_y = torch.tensor([[float(x) for x in g["cityYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
+            self._gov_cap_y = torch.tensor([[float(x) for x in g["capitalYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
+            self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
+        if self._npol:
+            self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)  # [nPol]
+            self._pol_unlock_civic = torch.tensor([int(p["unlockCivic"]) for p in _pols], dtype=torch.long, device=device)
+            self._pol_city_y = torch.tensor([[float(x) for x in p["cityYields"]] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
+            self._pol_cap_y = torch.tensor([[float(x) for x in p["capitalYields"]] for p in _pols], dtype=dtype, device=device)
+        # A-7r master switch (rules.governmentsLive), mirrored from the TS
+        # GOVERNMENTS_ADOPTION_LIVE. Landed inert; gates every gov/policy
+        # application + the influence-tier addition so the two engines flip in
+        # lockstep. When False the tables load but change nothing (the tables
+        # are inert plumbing until the rival-march latent is fixed).
+        self._gov_live = bool(getattr(rules, "governments_live", False))
+        self._gov_has_effects = self._gov_live and bool(
+            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum()) > 0)
+            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum()) > 0)
+        )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
         self._shipyard_bidx = int(rules.shipyard_bidx)
@@ -1177,6 +1232,18 @@ class BatchSim:
             grant = (top_v > -1e8) & act.unsqueeze(1)
             out.scatter_add_(1, top_i, grant.to(self.dtype))
         return out
+
+    def _ww_penalty_player(self) -> torch.Tensor:
+        """B-15: player war-weariness amenity penalty [B] (integer floor → dtype),
+        mirrors warWearinessPenalty(state.warWeariness)."""
+        per = int(self.rules.war_weariness.get("perAmenity", 4))
+        return torch.div(self.war_weariness, per, rounding_mode="floor").to(self.dtype)
+
+    def _ww_penalty_rival(self, r: int) -> torch.Tensor:
+        """B-15: rival r's war-weariness amenity penalty [B] (integer floor → float64),
+        mirrors warWearinessPenalty(rival.warWeariness)."""
+        per = int(self.rules.war_weariness.get("perAmenity", 4))
+        return torch.div(self.r_war_weariness[:, r], per, rounding_mode="floor").to(torch.float64)
 
     def _amenity_factors(self, balance: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         growth = torch.full_like(balance, self.rules.amenity_tiers[-1][1])
@@ -1597,6 +1664,70 @@ class BatchSim:
         hit = (self.res_id[:, nbc] == ri) & ~self.res_stripped[:, nbc] & (nb >= 0).unsqueeze(0)
         return hit.any(dim=2)
 
+    def _adopted_gov(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """A-7r: (adopted government index [B], has_gov [B]) for a seat's
+        researched civics [B, NC] — the newest unlocked government, highest
+        tier with ties broken by lowest table index (effects.computeAdoption)."""
+        B, dev = civics2.shape[0], self.device
+        guc = self._gov_unlock_civic  # [nGov]
+        gov_unlocked = torch.where(
+            guc.unsqueeze(0) >= 0,
+            civics2.gather(1, guc.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            torch.ones(B, self._ngov, dtype=torch.bool, device=dev),
+        )  # [B, nGov]
+        has_gov = gov_unlocked.any(dim=1)  # [B]
+        score = torch.where(
+            gov_unlocked,
+            self._gov_tier.unsqueeze(0) * self._ngov - self._gov_arange.unsqueeze(0),
+            torch.full((B, self._ngov), -(10 ** 9), dtype=torch.long, device=dev),
+        )
+        return score.argmax(dim=1), has_gov
+
+    def _adopted_gov_tier(self, civics2: torch.Tensor) -> torch.Tensor:
+        """A-7r: [B] the adopted government's tier (0 if none) — the
+        GOV_INFLUENCE_TIER lookup, which equals the government tier by
+        definition (data/cityStates.ts) — added to the city-state influence
+        rate exactly like cityStatePhase (cityStates.ts:248-249)."""
+        B = civics2.shape[0]
+        if not self._ngov:
+            return torch.zeros(B, dtype=torch.long, device=self.device)
+        adopted, has_gov = self._adopted_gov(civics2)
+        return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
+
+    def _gov_policy_mods(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """A-7r: ([B,6] cityYields, [B,6] capitalYields) from a seat's adopted
+        government + greedily slotted policies, computed from its researched
+        civics [B, NC]. The effects.computeAdoption / applyGovernment twin for
+        the cityYields+capitalYields channels. Wildcard slots stay empty (no
+        reachable government carries one; TS agrees since none is adopted)."""
+        B = civics2.shape[0]
+        dev, dt = self.device, self.dtype
+        city_y = torch.zeros(B, 6, dtype=dt, device=dev)
+        cap_y = torch.zeros(B, 6, dtype=dt, device=dev)
+        if not self._gov_has_effects or not self._ngov:
+            return city_y, cap_y
+        adopted, has_gov = self._adopted_gov(civics2)
+        gmask = has_gov.to(dt).unsqueeze(1)
+        city_y = city_y + self._gov_city_y[adopted] * gmask
+        cap_y = cap_y + self._gov_cap_y[adopted] * gmask
+        if self._npol:
+            nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
+            puc = self._pol_unlock_civic  # [nPol]
+            pol_unlocked = torch.where(
+                puc.unsqueeze(0) >= 0,
+                civics2.gather(1, puc.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
+            )  # [B, nPol]
+            slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
+            for k in range(3):  # military/economic/diplomatic; wildcard (3) never filled
+                uk = pol_unlocked & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
+                cum = uk.long().cumsum(dim=1)  # inclusive rank among unlocked-of-kind, table order
+                slotted = slotted | (uk & (cum <= nslots[:, k : k + 1]))
+            sd = slotted.to(dt)
+            city_y = city_y + sd @ self._pol_city_y
+            cap_y = cap_y + sd @ self._pol_cap_y
+        return city_y, cap_y
+
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         """[B, T] UNFLOORED districtAdjacency for district di: static (d_static_adj)
         + 0.5·adjacent-districts + CITY_CENTER·adjacent-centers + HARBOR_DISTRICT·
@@ -1607,6 +1738,22 @@ class BatchSim:
             raw = raw + self._dyn_center[di] * self._adj_center_count().to(self.dtype)
         if float(self._dyn_harbor[di]) != 0:
             raw = raw + self._dyn_harbor[di] * self._adj_harbor_count().to(self.dtype)
+        # B-16 (GS Industrial Zone): adjacent MINE/QUARRY improvements + adjacent
+        # completed AQUEDUCT. Amounts are nonzero only for the Industrial Zone,
+        # which is never placed in the current gate — inert but catalog-faithful.
+        if float(self._dyn_mine[di]) != 0 or float(self._dyn_quarry[di]) != 0 or float(self._dyn_aqueduct[di]) != 0:
+            nb = self.neigh
+            nbc = nb.clamp(min=0)
+            on_map = (nb >= 0).unsqueeze(0)
+            if float(self._dyn_mine[di]) != 0:
+                cnt = ((self.improvement[:, nbc] == self._mine_iidx) & on_map).sum(dim=2)
+                raw = raw + self._dyn_mine[di] * cnt.to(self.dtype)
+            if float(self._dyn_quarry[di]) != 0:
+                cnt = ((self.improvement[:, nbc] == self._quarry_iidx) & on_map).sum(dim=2)
+                raw = raw + self._dyn_quarry[di] * cnt.to(self.dtype)
+            if float(self._dyn_aqueduct[di]) != 0 and self._aqueduct_idx >= 0:
+                cnt = ((self.district[:, nbc] == self._aqueduct_idx) & self.district_complete[:, nbc] & on_map).sum(dim=2)
+                raw = raw + self._dyn_aqueduct[di] * cnt.to(self.dtype)
         return raw
 
     def _place_district(self, di: int, want: torch.Tensor, c: int, placement: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1950,13 +2097,24 @@ class BatchSim:
             cap_bonus.scatter_add_(1, self._cs_yidx, tier1)
             total[:, 0, :] += cap_bonus
 
+        # A-7r: the player's adopted government + slotted policies — cityYields
+        # to every city, capitalYields to the capital (computeCityStats'
+        # `bonuses`, city.ts:445-447), summed pre-amenity-factor. Food (col 0)
+        # is left unscaled by the amenity factor below, matching TS.
+        if self._gov_has_effects:
+            gpc_city, gpc_cap = self._gov_policy_mods(self.civics)
+            total += gpc_city.unsqueeze(1)
+            total += gpc_cap.unsqueeze(1) * self.is_cap.to(self.dtype).unsqueeze(2)
+
         amen_b = cc["amen_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_amenities)  # D-10
         amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + amen_b
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
         self._last_lux = lux_add  # the walk freezes this (TS: one luxMap per turn)
         amen_have = amen_have + lux_add
-        balance = amen_have - amen_need
+        # B-15: flat empire-wide war-weariness drag, applied after the luxury
+        # grant (mirrors city.ts `have -= warWearinessPenalty(...)`).
+        balance = amen_have - amen_need - self._ww_penalty_player().unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
         tier_idx = torch.full_like(self.pop, len(self.rules.amenity_tiers) - 1)
@@ -2318,6 +2476,20 @@ class BatchSim:
             sci = sci + capY[:, 3].unsqueeze(1) * isc
             cul = cul + capY[:, 4].unsqueeze(1) * isc
             faith = faith + capY[:, 5].unsqueeze(1) * isc
+        # A-7r: this rival's government + slotted-policy flat yields — cityYields
+        # to every alive city, capitalYields to the capital — pre-tier, the
+        # rivalCityYields `bonuses` position (rivals.ts). Same channels as the
+        # player path (getRivalModifiers layers gov+policy into these mods).
+        if self._gov_has_effects:
+            gcity, gcap = self._gov_policy_mods(self.r_civics[:, r])  # [B,6], [B,6]
+            acell = alive.double()  # [B, RC]
+            gisc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+            food = food + gcity[:, 0].unsqueeze(1) * acell + gcap[:, 0].unsqueeze(1) * gisc
+            prod = prod + gcity[:, 1].unsqueeze(1) * acell + gcap[:, 1].unsqueeze(1) * gisc
+            gold = gold + gcity[:, 2].unsqueeze(1) * acell + gcap[:, 2].unsqueeze(1) * gisc
+            sci = sci + gcity[:, 3].unsqueeze(1) * acell + gcap[:, 3].unsqueeze(1) * gisc
+            cul = cul + gcity[:, 4].unsqueeze(1) * acell + gcap[:, 4].unsqueeze(1) * gisc
+            faith = faith + gcity[:, 5].unsqueeze(1) * acell + gcap[:, 5].unsqueeze(1) * gisc
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
         yf = self._rival_amenity(r)[2]  # [B, RC]
@@ -4200,11 +4372,13 @@ class BatchSim:
         B = self.B
         self.cs_met = self.cs_met | self.cs_alive
         any_met = self.cs_met.any(dim=1)
-        self.influence = self.influence + torch.where(
-            any_met,
-            torch.tensor(float(r.get("influencePerTurn", 3)), dtype=self.dtype, device=self.device),
-            torch.zeros_like(self.influence),
-        )
+        # A-7r: the player's adopted-government influence tier joins the flat
+        # rate (cityStates.ts:248 `INFLUENCE_PER_TURN + GOV_INFLUENCE_TIER`).
+        # Gated on the A-7r switch — inert (tier 0) until adoption is live.
+        per_turn = float(r.get("influencePerTurn", 3))
+        if self._gov_live:
+            per_turn = per_turn + self._adopted_gov_tier(self.civics).to(self.dtype)
+        self.influence = self.influence + torch.where(any_met, per_turn, torch.zeros_like(self.influence))
         cost = float(r.get("envoyCost", 100))
         for _ in range(3):
             earn = any_met & (self.influence >= cost)
@@ -5235,6 +5409,18 @@ class BatchSim:
             sci = sci + capY[:, 3] * isc
             cul = cul + capY[:, 4] * isc
             faith = faith + capY[:, 5] * isc
+        # A-7r: government + slotted-policy flat yields (cityYields all cities,
+        # capitalYields the capital) — pre-tier, the batched twin's addition.
+        if self._gov_has_effects:
+            gcity, gcap = self._gov_policy_mods(self.r_civics[:, r])  # [B,6], [B,6]
+            mcell = mask.double()  # [B]
+            gisc = (self.rc_is_cap[:, r, j] & mask).double()  # [B]
+            food = food + gcity[:, 0] * mcell + gcap[:, 0] * gisc
+            prod = prod + gcity[:, 1] * mcell + gcap[:, 1] * gisc
+            gold = gold + gcity[:, 2] * mcell + gcap[:, 2] * gisc
+            sci = sci + gcity[:, 3] * mcell + gcap[:, 3] * gisc
+            cul = cul + gcity[:, 4] * mcell + gcap[:, 4] * gisc
+            faith = faith + gcity[:, 5] * mcell + gcap[:, 5] * gisc
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
@@ -5316,6 +5502,9 @@ class BatchSim:
             balance = have + out + extra - need
         else:
             balance = have + out - need
+        # B-15: rival war-weariness drag (symmetric with the player), subtracted
+        # from the tier balance after luxury grants (mirrors rivalAmenityTiers).
+        balance = balance - self._ww_penalty_rival(r).unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.rc_pop[:, r], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
@@ -6169,6 +6358,14 @@ class BatchSim:
             active = self.r_alive[:, r] & (n_cities > 0)
             if not bool(active.any()):
                 continue
+            # B-15: this rival's war weariness — accrue while at war, decay in
+            # peace (war state as of last turn; declare/peace run later in this
+            # phase). Symmetric with the player + the TS rival block top.
+            rww = self.rules.war_weariness
+            atw_r = self.r_atwar[:, r]
+            inc_r = (self.r_war_weariness[:, r] + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
+            dec_r = (self.r_war_weariness[:, r] - int(rww.get("decay", 4))).clamp(min=0)
+            self.r_war_weariness[:, r] = torch.where(active, torch.where(atw_r, inc_r, dec_r), self.r_war_weariness[:, r])
             # AUDIT A-3: eurekas/inspirations from this rival's seat — the
             # TS twin runs at the same point (the rival's block top).
             self._detect_rival_boosts(r, active)
@@ -7430,6 +7627,20 @@ class BatchSim:
                     self.r_atwar = self.r_atwar & ~oh
                     self.r_warturns = torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns)
                     self.r_peaceturns = torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns)
+
+        # --- war weariness: player accrual (B-15) --------------------------------
+        # Accrue once per turn while at war with any LIVE rival (state as left by
+        # last turn's rival phase — the war block above is inert in scripted mode);
+        # decay 4× in peace. Mirrors endTurn's top-of-turn update (game.ts).
+        rww = self.rules.war_weariness
+        if self.R > 0:
+            live = self.rc_alive[:, : self.R].any(dim=2)  # [B, R]
+            atwar_now = (self.r_atwar[:, : self.R] & live).any(dim=1)  # [B]
+        else:
+            atwar_now = torch.zeros(B, dtype=torch.bool, device=dev)
+        inc = (self.war_weariness + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
+        dec = (self.war_weariness - int(rww.get("decay", 4))).clamp(min=0)
+        self.war_weariness = torch.where(atwar_now, inc, dec)
 
         # --- player unit orders (before the turn advances) ----------------------
         if units is not None and self.units_mode:

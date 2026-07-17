@@ -79,11 +79,15 @@ describe('district adjacency', () => {
     expect(districtAdjacency(map, t, 'COMMERCIAL_HUB')).toBe(2);
   });
 
-  it('industrial zone: +1 per adjacent mine or quarry', () => {
+  it('industrial zone (GS): +0.5 per mine, +1 per quarry, floored', () => {
     const map = makeMap();
     const t = tileAtCoords(map, 5, 5);
-    tileAtCoords(map, 6, 5).improvement = 'MINE';
-    tileAtCoords(map, 4, 5).improvement = 'QUARRY';
+    tileAtCoords(map, 6, 5).improvement = 'MINE'; // +0.5
+    tileAtCoords(map, 4, 5).improvement = 'QUARRY'; // +1
+    // 0.5 + 1 = 1.5 -> floor 1
+    expect(districtAdjacency(map, t, 'INDUSTRIAL_ZONE')).toBe(1);
+    // two quarries = +2.0
+    tileAtCoords(map, 6, 5).improvement = 'QUARRY';
     expect(districtAdjacency(map, t, 'INDUSTRIAL_ZONE')).toBe(2);
   });
 
@@ -121,7 +125,7 @@ describe('shipyard special', () => {
     const harborTile = tileAtCoords(state.map, 8, 7);
     expect(queueDistrict(state, city.id, 'HARBOR', harborTile.index).ok).toBe(true);
     const adjacency = districtAdjacency(state.map, harborTile, 'HARBOR');
-    expect(adjacency).toBeGreaterThanOrEqual(2); // city center +2
+    expect(adjacency).toBeGreaterThanOrEqual(1); // GS: city center +1
 
     expect(queueBuilding(state, city.id, 'LIGHTHOUSE').ok).toBe(true);
     const before = computeCityStats(state, city).breakdown.buildings.production;

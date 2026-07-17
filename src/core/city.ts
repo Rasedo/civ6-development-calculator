@@ -18,6 +18,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { SPECIALIST_YIELDS } from '../data/greatPeople';
+import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
 import {
   CITY_WORK_RADIUS,
@@ -455,6 +456,10 @@ export function computeCityStats(
     m.amenitiesAll +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     ((luxMap ?? luxuryAmenities(state)).get(city.id) ?? 0);
+  // B-15: war weariness is a flat empire-wide amenity drag, applied AFTER the
+  // luxury grant (whose ranking stays building-amenities-based) so it shifts the
+  // balance/tier without touching the relative luxury distribution.
+  have -= warWearinessPenalty(state.warWeariness ?? 0);
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {
     if (specialtyCount >= rule.min) have += rule.amenities;

@@ -19,7 +19,9 @@ export type AdjacencySource =
   | 'CITY_CENTER' // per adjacent city center
   | 'HARBOR_DISTRICT' // per adjacent harbor
   | 'SEA_RESOURCE' // per adjacent water tile with a resource
-  | 'MINE_OR_QUARRY'; // per adjacent mine/quarry improvement
+  | 'MINE' // per adjacent mine improvement (GS: +0.5 for Industrial Zone)
+  | 'QUARRY' // per adjacent quarry improvement (GS: +1 for Industrial Zone)
+  | 'AQUEDUCT'; // per adjacent Aqueduct district (GS: +2 for Industrial Zone)
 
 export interface AdjacencyRule {
   source: AdjacencySource;
@@ -149,7 +151,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     allowMultiple: false,
     adjacencyYield: 'gold',
     adjacency: [
-      { source: 'CITY_CENTER', amount: 2 },
+      { source: 'CITY_CENTER', amount: 1 },
       { source: 'SEA_RESOURCE', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
@@ -167,7 +169,9 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     allowMultiple: false,
     adjacencyYield: 'production',
     adjacency: [
-      { source: 'MINE_OR_QUARRY', amount: 1 },
+      { source: 'MINE', amount: 0.5 },
+      { source: 'QUARRY', amount: 1 },
+      { source: 'AQUEDUCT', amount: 2 },
       { source: 'DISTRICT', amount: 0.5 },
     ],
     housing: 0,

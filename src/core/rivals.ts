@@ -72,6 +72,10 @@ import {
   LOYALTY_RANGE,
   LOYALTY_PRESSURE_SCALE,
   LOYALTY_AMENITY,
+  WAR_WEARINESS_PER_TURN,
+  WAR_WEARINESS_DECAY,
+  WAR_WEARINESS_CAP,
+  warWearinessPenalty,
 } from '../data/rivals';
 import { tileClaimed, tileOwnedByCiv, civOfRival } from './civs';
 
@@ -199,6 +203,8 @@ export function placeRivals(state: GameState, count?: number): void {
       atWar: false,
       warTurns: 0,
       peaceTurns: 0,
+      warWeariness: 0, // B-15
+      spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
       pantheonClaimed: false,
@@ -1032,6 +1038,9 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   // computeCityStats' have (city.ts:456-461); the luxury-grant RANKING
   // stays building-amenities-only, mirroring the player's luxuryAmenities.
   const m = getRivalModifiers(state, rival);
+  // B-15: this rival's flat war-weariness amenity penalty (symmetric with the
+  // player's), applied to the tier balance after the luxury grants.
+  const wwPenalty = warWearinessPenalty(rival.warWeariness ?? 0);
   const tiers = new Map<number, AmenityTier>();
   for (const rc of rival.cities) {
     let extra = 0;
@@ -1042,7 +1051,7 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
       ).length;
       for (const rule of m.amenitiesIfSpecialty) if (specialty >= rule.min) extra += rule.amenities;
     }
-    tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! + extra - amenitiesNeeded(rc.population)));
+    tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! + extra - wwPenalty - amenitiesNeeded(rc.population)));
   }
   return tiers;
 }
@@ -1159,6 +1168,12 @@ export function rivalCityYields(
     }
   }
   if (ctx.mods.faithPerWonder > 0) total.faith += ctx.mods.faithPerWonder * rcWonders.length;
+  // A-7r: the government/policy flat yields — cityYields to every city,
+  // capitalYields to the capital (computeCityStats' `bonuses`, city.ts:445-447)
+  // — added BEFORE the tier scaling. getRivalModifiers layers the rival's
+  // adopted government + slotted policies into these, so AUTOCRACY's capital
+  // yields and URBAN_PLANNING's +1 production flow here, the player twin.
+  for (const [k, v] of Object.entries(ctx.mods.cityYields)) total[k as keyof Yields] += v ?? 0;
   // A-7: the founder's capital incomes (perFollowers/perCity land in
   // capitalYields) — added BEFORE the tier scaling, the computeCityStats
   // bonuses position (city.ts:447/475-479).
@@ -1261,6 +1276,12 @@ export function rivalPhase(state: GameState): void {
 
   for (const rival of state.rivals) {
     if (rival.cities.length === 0) continue; // eliminated
+
+    // B-15: war weariness — symmetric with the player's endTurn-top update,
+    // read at this rival's block top before rivalAmenityTiers uses it.
+    rival.warWeariness = rival.atWar
+      ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
+      : Math.max(0, (rival.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
 
     // AUDIT A-3: eurekas/inspirations fire from the RIVAL's seat too — the
     // mirror of the player's endTurn-top detectBoosts (same conditions,
@@ -1514,7 +1535,18 @@ export function rivalPhase(state: GameState): void {
             // (the player's completeProject applies via applyLumpYield to
             // its civ streams; GP effects already use this rival pattern).
             const def = PROJECTS[q.project];
-            if (def?.yield) {
+            // B-25: a rival completing the space race ends the game as a player
+            // DEFEAT (victoryType 4 — the domination-defeat mirror). Rivals
+            // never queue space projects under the scripted greedy `.find`, so
+            // this is inert in-gate; present for correctness + the poke path.
+            if (def?.space) {
+              if (!rival.spaceProjects) rival.spaceProjects = [];
+              if (!rival.spaceProjects.includes(q.project)) rival.spaceProjects.push(q.project);
+              if (def.victory) {
+                state.victoryType = 4; // science defeat: a rival launched first
+                state.gameOver = true;
+              }
+            } else if (def?.yield) {
               const amount = Math.round(cost * PROJECT_YIELD_FRACTION);
               if (def.yield === 'science') rival.research.techProgress += amount;
               else if (def.yield === 'culture') rival.research.civicProgress += amount;

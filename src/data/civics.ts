@@ -1,7 +1,14 @@
 /**
- * Civics tree — compact but Civ 6-faithful: unlocks the culture-side
- * districts/buildings, policy cards, governments, hill farms and the
- * Feudalism farm-adjacency bonus. Costs are eyeballed culture values.
+ * Civics tree — the full GS ~50-node tree (B-12). The first 30 nodes are the
+ * historical compact tree, kept BYTE-IDENTICAL (append-only) so every index and
+ * tie-break is preserved; the remainder fill the real topology through the
+ * Atomic/Information eras. Costs are real-anchored culture.
+ *
+ * The appended nodes are PURE TREE NODES: their real unlocks are policy cards
+ * and tier-3 governments — the POLICIES/GOVERNMENTS surface owned by Slice P
+ * (#46) — so they carry NO unlock effects here (recorded in ROUND_B2_LOG),
+ * keeping the merge clean. Inspirations attach only where expressible against
+ * an exported target; the rest are uninspirable (recorded).
  */
 
 import type { Era, ResearchEffect } from './techs';
@@ -131,5 +138,47 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('TOTALITARIANISM', 'Totalitarianism', 'Modern', 1715, ['MASS_MEDIA'], [
       { kind: 'unlockGovernment', government: 'FASCISM' },
     ]),
+
+    // ========================================================================
+    // B-12: full-tree expansion (index 30+). Pure tree nodes — real policy /
+    // government unlocks belong to Slice P's POLICIES/GOVERNMENTS surface, so
+    // no unlock effects here. NUCLEAR_PROGRAM carries the one expressible
+    // inspiration (Research Lab, an exported Campus building).
+    // ========================================================================
+
+    // --- Classical (fill) ----------------------------------------------------
+    C('MILITARY_TRAINING', 'Military Training', 'Classical', 120, ['MILITARY_TRADITION', 'GAMES_AND_RECREATION']),
+    C('DEFENSIVE_TACTICS', 'Defensive Tactics', 'Classical', 175, ['GAMES_AND_RECREATION']),
+
+    // --- Medieval (fill) -----------------------------------------------------
+    C('MERCENARIES', 'Mercenaries', 'Medieval', 385, ['FEUDALISM']),
+
+    // --- Renaissance (fill) --------------------------------------------------
+    C('MERCANTILISM', 'Mercantilism', 'Renaissance', 655, ['HUMANISM']),
+    C('DIPLOMATIC_SERVICE', 'Diplomatic Service', 'Renaissance', 655, ['EXPLORATION']),
+
+    // --- Industrial (fill) ---------------------------------------------------
+    C('OPERA_AND_BALLET', 'Opera and Ballet', 'Industrial', 870, ['HUMANISM']),
+    C('COLONIALISM', 'Colonialism', 'Industrial', 920, ['MERCANTILISM']),
+    C('CONSERVATION', 'Conservation', 'Industrial', 1060, ['NATURAL_HISTORY']),
+
+    // --- Modern (fill) -------------------------------------------------------
+    C('MOBILIZATION', 'Mobilization', 'Modern', 1410, ['NATIONALISM']),
+    C('IDEOLOGY', 'Ideology', 'Modern', 660, ['MASS_MEDIA']),
+    C('NUCLEAR_PROGRAM', 'Nuclear Program', 'Modern', 1830, ['CLASS_STRUGGLE']),
+    C('CAPITALISM', 'Capitalism', 'Modern', 1620, ['MASS_MEDIA']),
+    C('CULTURAL_HERITAGE', 'Cultural Heritage', 'Modern', 1500, ['CONSERVATION']),
+
+    // --- Atomic (new era) ----------------------------------------------------
+    C('COLD_WAR', 'Cold War', 'Atomic', 2200, ['MOBILIZATION']),
+    C('SPACE_RACE', 'Space Race', 'Atomic', 2200, ['COLD_WAR']),
+    C('RAPID_DEPLOYMENT', 'Rapid Deployment', 'Atomic', 2200, ['COLD_WAR']),
+    C('ENVIRONMENTALISM', 'Environmentalism', 'Atomic', 2340, ['CULTURAL_HERITAGE']),
+
+    // --- Information (new era) ------------------------------------------------
+    C('GLOBALIZATION', 'Globalization', 'Information', 2500, ['SPACE_RACE', 'CAPITALISM']),
+    C('SOCIAL_MEDIA', 'Social Media', 'Information', 2500, ['GLOBALIZATION']),
+    C('NEAR_FUTURE_GOVERNANCE', 'Near Future Governance', 'Information', 2600, ['GLOBALIZATION']),
+    C('INFORMATION_WARFARE', 'Information Warfare', 'Information', 2600, ['RAPID_DEPLOYMENT']),
   ].map((c) => [c.id, c]),
 );

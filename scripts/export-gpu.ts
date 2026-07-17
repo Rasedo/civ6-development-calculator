@@ -48,7 +48,7 @@ import {
   CS_MAX_HP,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEON_FAITH_COST, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TERRAINS } from '../src/data/terrains';
@@ -65,6 +65,10 @@ import {
   PEACE_GOLD_COST,
   RIVAL_PROD_DIV,
   RIVAL_DEF_PER_TECH,
+  WAR_WEARINESS_PER_TURN,
+  WAR_WEARINESS_DECAY,
+  WAR_WEARINESS_PER_AMENITY,
+  WAR_WEARINESS_CAP,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -85,6 +89,7 @@ import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
 import { TECHS } from '../src/data/techs';
 import { CIVICS } from '../src/data/civics';
+import { GOVERNMENTS, POLICIES, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../src/data/policies';
 import { RESOURCES } from '../src/data/resources';
 import { BOOSTS, BOOST_FRACTION } from '../src/data/boosts';
 import {
@@ -300,7 +305,9 @@ for (const [id, def] of Object.entries(BOOSTS)) {
 // come first conceptually but the order here is just the stable wire encoding.
 const ADJ_SRC: AdjacencySource[] = [
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'BUILT_WONDER',
-  'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE', 'MINE_OR_QUARRY',
+  'RIVER', 'DISTRICT', 'CITY_CENTER', 'HARBOR_DISTRICT', 'SEA_RESOURCE',
+  // B-16 (GS Industrial Zone): dynamic improvement/district sources, indices 11-13.
+  'MINE', 'QUARRY', 'AQUEDUCT',
 ];
 
 // Terrain-permanent adjacency sources (known at t=0). The dynamic ones
@@ -321,6 +328,9 @@ const SCRIPTED_CAMPUS = true;
 // SCAFFOLD_DISTRICTS moved to data/districts.ts (C1-B4: the rival picker
 // shares it). ENCAMPMENT stays held out — see the note there and BUILD_PLAN D6.
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
+
+// A-7r: policy/government slot-kind wire encoding.
+const SLOT_KIND_IDX: Record<SlotKind, number> = { military: 0, economic: 1, diplomatic: 2, wildcard: 3 };
 
 const STATIC_ADJ_SRC = new Set<AdjacencySource>([
   'MOUNTAIN', 'RAINFOREST', 'WOODS', 'REEF', 'NATURAL_WONDER', 'RIVER', 'SEA_RESOURCE',
@@ -416,6 +426,14 @@ const rules = {
   // completion to fill the outer-defense pool, and B-2's city ranged strike
   // fires only from cities holding it. -1 if absent from the exported set.
   ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
+  // B-15 war weariness (mirrors data/rivals.ts): integer accumulator → flat
+  // empire-wide amenity penalty for the player AND each rival civ.
+  warWeariness: {
+    perTurn: WAR_WEARINESS_PER_TURN,
+    decay: WAR_WEARINESS_DECAY,
+    perAmenity: WAR_WEARINESS_PER_AMENITY,
+    cap: WAR_WEARINESS_CAP,
+  },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
   // 3/6-envoy district tiers are inert without districts, and the CHIEFDOM
@@ -499,6 +517,10 @@ const rules = {
     pantheonPool: Object.keys(PANTHEONS).length,
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,
     founderPool: Object.keys(FOUNDER_BELIEFS).length,
+    // B-18: Enhancer pool size. The GPU does not yet race enhancers (rival
+    // enhancer claiming + the mirrored draw are a deferred follow-up); this
+    // documents the slot for that work.
+    enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
   },
   // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
   // beliefs now APPLY to rival civs. Row order = the data-file key order;
@@ -512,6 +534,10 @@ const rules = {
     pantheons: Object.values(PANTHEONS).map(beliefRow),
     followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
     founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
+    // B-18: Enhancer effect rows (all inert this round). Exported so the
+    // deferred GPU enhancer race has the table ready; the engine currently
+    // builds only pan/fol/fou tables and ignores this key.
+    enhancers: Object.values(ENHANCER_BELIEFS).map(beliefRow),
   },
   // AUDIT A-4: rival wonders (data order). Static placement lives in the
   // per-tile `wok` bitmask below; LIVE terms (ownership, occupancy,
@@ -552,7 +578,12 @@ const rules = {
   // y = YIELD_KEYS idx or -1, g = GP_CLASSES idx or -1). Out-of-scaffold
   // districts export d=-1 and never fire — table-driven for A-9's future.
   projects: {
-    rows: Object.values(PROJECTS).map((p) => ({
+    // B-25: space-race projects are TS-only (the GPU space-race SIMULATION is
+    // deferred — see ROUND_B2_LOG). They are gated on Information/Future techs
+    // no civ reaches in the 100-turn gate AND sit last so the rival greedy
+    // `.find` never selects them, so filtering them here keeps the GPU project
+    // table (and every project index) byte-identical — both engines inert.
+    rows: Object.values(PROJECTS).filter((p) => !p.space).map((p) => ({
       d: PLACEABLE_DISTRICTS.indexOf(p.district),
       y: p.yield ? YIELD_KEYS.indexOf(p.yield) : -1,
       g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
@@ -730,6 +761,42 @@ const rules = {
     cost: c.cost,
     prereqs: (c.prereqs ?? []).map((p) => civicIdx.get(p)!),
   })),
+  // A-7r behavioral master switch (mirrored to the GPU so both engines gate
+  // adoption identically). Landed inert; see GOVERNMENTS_ADOPTION_LIVE.
+  governmentsLive: GOVERNMENTS_ADOPTION_LIVE,
+  // A-7r: government + policy modifier tables (the A-7 belief-table shape).
+  // Slot kinds: military=0, economic=1, diplomatic=2, wildcard=3. Only the
+  // cityYields/capitalYields channels are exported (the GPU-implemented gov/
+  // policy effects); other PolicyEffects channels (adjacencyMult,
+  // buildingYieldMult, housing/amenity conditionals, yieldMult,
+  // encampmentProdMult, tilePurchaseMult) are TS-only — no adopted government
+  // or slotted card in the scripted 100-turn gate uses a LIVE instance of one
+  // (verified: player slots VETERANCY[inert]+URBAN_PLANNING, rivals adopt
+  // AUTOCRACY and slot the same), so they stay inert here (see ROUND_B2_LOG).
+  governments: Object.values(GOVERNMENTS).map((g) => ({
+    id: g.id,
+    tier: g.tier,
+    unlockCivic: civicList.findIndex((c) =>
+      c.effects.some((e) => e.kind === 'unlockGovernment' && e.government === g.id),
+    ),
+    slots: [
+      g.slots.filter((s) => s === 'military').length,
+      g.slots.filter((s) => s === 'economic').length,
+      g.slots.filter((s) => s === 'diplomatic').length,
+      g.slots.filter((s) => s === 'wildcard').length,
+    ],
+    cityYields: YIELD_KEYS.map((k) => g.effects.cityYields?.[k] ?? 0),
+    capitalYields: YIELD_KEYS.map((k) => g.effects.capitalYields?.[k] ?? 0),
+  })),
+  policies: Object.values(POLICIES).map((p) => ({
+    id: p.id,
+    kind: SLOT_KIND_IDX[p.kind],
+    unlockCivic: civicList.findIndex((c) =>
+      c.effects.some((e) => e.kind === 'unlockPolicy' && e.policy === p.id),
+    ),
+    cityYields: YIELD_KEYS.map((k) => p.effects.cityYields?.[k] ?? 0),
+    capitalYields: YIELD_KEYS.map((k) => p.effects.capitalYields?.[k] ?? 0),
+  })),
 };
 writeFileSync(`${OUT}/rules.json`, JSON.stringify(rules));
 console.log(
@@ -754,6 +821,11 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
   2: 9028, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
+  // ROUND B2: the 0.5 citizen-science + war-weariness balance killed this
+  // seed's passive player (Egypt war t21, capital conquered t60, loyalty
+  // collapse t67-t70). Task #56 (scripted-250t survival heuristics) is the
+  // real fix; overrides shrink back once the script can defend itself.
+  4: 9054, // 9053: see above
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;

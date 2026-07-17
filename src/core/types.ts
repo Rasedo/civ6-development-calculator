@@ -126,7 +126,13 @@ export type GreatPersonClass =
   | 'PROPHET'
   | 'ARTIST'
   | 'ADMIRAL'
-  | 'GENERAL';
+  | 'GENERAL'
+  // B-19: Writer/Musician split off the condensed Artist class. Both share the
+  // Theater Square district (GP_CLASS_DISTRICT) and append at the END of
+  // GP_CLASSES so PROPHET keeps class index 3 (prophetCls) and the GPU's
+  // per-class tensors auto-extend from the exporter.
+  | 'WRITER'
+  | 'MUSICIAN';
 
 export interface City {
   id: number;
@@ -196,8 +202,15 @@ export interface GovernmentState {
 export interface GameState {
   /** GV-2: true once TURN_LIMIT turns are played (or a victory fires). */
   gameOver?: boolean;
-  /** GV-4/GV-3: 0 none, 1 score (TURN_LIMIT), 2 domination (all capitals). */
+  /** GV-4/GV-3/B-25: 0 none, 1 score (TURN_LIMIT), 2 domination (all
+   *  capitals), 3 science (space race), 4 science-defeat (a rival finished
+   *  the space race first). */
   victoryType?: number;
+  /** B-15: player war-weariness accumulator (integer turn counter); the
+   *  empire-wide amenity penalty is warWearinessPenalty(this). */
+  warWeariness?: number;
+  /** B-25: completed space-race project ids (empire-wide chain progress). */
+  spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
    *  Static once founded — capture never moves the tile, only its owner. */
   capitalTiles?: number[];
@@ -272,6 +285,8 @@ export interface GameState {
   claimedPantheons: string[];
   /** Follower/founder beliefs claimed by rival religions. */
   claimedBeliefs: string[];
+  /** B-18: Enhancer beliefs already claimed (player or, once wired, rivals). */
+  claimedEnhancers?: string[];
 }
 
 export interface Unit {
@@ -321,6 +336,11 @@ export interface RivalCiv {
   atWar: boolean;
   warTurns: number;
   peaceTurns: number;
+  /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
+   *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
+  warWeariness?: number;
+  /** B-25: this civ's completed space-race project ids (chain progress). */
+  spaceProjects?: string[];
   /** Real tech/civic trees (C1-B3): same shape as the player's. */
   research: ResearchState;
 
@@ -355,6 +375,9 @@ export interface ReligionState {
   founder: string | null;
   /** Worship building id unlocked by founding. */
   worship: string | null;
+  /** B-18: Enhancer belief id, added by enhancing a founded religion (needs a
+   * second Great Prophet). Effects are inert this round; the slot is real. */
+  enhancer?: string | null;
 }
 
 export interface TradeRoute {

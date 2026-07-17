@@ -6,8 +6,8 @@
 import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, RivalCiv, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
-import { GOVERNMENTS, POLICIES, type PolicyEffects } from '../data/policies';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, type BeliefEffects } from '../data/religion';
+import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, type BeliefEffects } from '../data/religion';
 import { csEnvoyBonuses } from './cityStates';
 
 // ---------------------------------------------------------------------------
@@ -259,6 +259,8 @@ export function getModifiers(state: GameState): Modifiers {
   if (state.religion?.founded) {
     applyBeliefEffects(state, mods, state.religion.follower ? FOLLOWER_BELIEFS[state.religion.follower] : undefined);
     applyBeliefEffects(state, mods, state.religion.founder ? FOUNDER_BELIEFS[state.religion.founder] : undefined);
+    // B-18: Enhancer belief (inert effects this round; wired for symmetry).
+    applyBeliefEffects(state, mods, state.religion.enhancer ? ENHANCER_BELIEFS[state.religion.enhancer] : undefined);
   }
 
   // City-state envoy bonuses
@@ -329,10 +331,60 @@ function applyBeliefEffects(
   }
 }
 
-/** AUDIT A-7: the rival's modifier head — its research boosts plus its OWN
- * claimed pantheon and (once its religion is founded) its two beliefs.
- * Government/policy/CS blocks stay player machinery. The follower counts
- * are the RIVAL's population/cities (the seat), not the player's. */
+/**
+ * A-7r: the scripted, deterministic government + policy adoption for a seat
+ * (player or rival) — a pure function of its research state. Rule:
+ *   - Adopt the NEWEST unlocked government: highest tier, ties broken by
+ *     GOVERNMENTS table (insertion) order.
+ *   - Fill the government's BASE slots greedily in POLICIES table order among
+ *     unlocked cards matching the slot kind (a wildcard slot takes the first
+ *     unfilled-eligible card). Zero RNG.
+ * The government's BASE slots are used (no wonder-granted Forbidden City
+ * wildcard) so the scripted player and rival seats adopt symmetrically — the
+ * GPU mirror computes the same set from the seat's tracked civics.
+ */
+export function computeAdoption(research: ResearchState): {
+  government: string | null;
+  policies: (string | null)[];
+} {
+  const u = computeUnlocksIn(research);
+  let chosen: GovernmentDef | null = null;
+  for (const g of Object.values(GOVERNMENTS)) {
+    if (!u.governments.has(g.id)) continue;
+    // Strict `>` keeps the first table-order government among equal tiers.
+    if (!chosen || g.tier > chosen.tier) chosen = g;
+  }
+  if (!chosen) return { government: null, policies: [] };
+  const slots = [...chosen.slots];
+  const policies: (string | null)[] = slots.map(() => null);
+  for (const card of Object.values(POLICIES)) {
+    if (!u.policies.has(card.id)) continue;
+    const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
+    if (slot >= 0) policies[slot] = card.id;
+  }
+  return { government: chosen.id, policies };
+}
+
+/** Layer a seat's adopted government + slotted policies onto `mods`, exactly
+ * as getModifiers does for the player's state.government (A-7r). */
+function applyGovernment(mods: Modifiers, research: ResearchState): void {
+  const { government, policies } = computeAdoption(research);
+  const gov = government ? GOVERNMENTS[government] : null;
+  if (!gov) return;
+  applyPolicyEffects(mods, gov.effects);
+  for (const cardId of policies) {
+    if (!cardId) continue;
+    const card = POLICIES[cardId];
+    if (card) applyPolicyEffects(mods, card.effects);
+  }
+}
+
+/** AUDIT A-7 / A-7r: the rival's modifier head — its research boosts, its OWN
+ * claimed pantheon and (once its religion is founded) its two beliefs, PLUS
+ * its scripted government + slotted policies (A-7r; the getModifiers
+ * government block, computed from the rival's research). CS blocks stay
+ * player machinery. The follower counts are the RIVAL's population/cities
+ * (the seat), not the player's. */
 export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers {
   const mods = modifiersFromResearch(rival.research);
   const seat = {
@@ -344,6 +396,7 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
     applyBeliefEffects(state, mods, rival.followerBelief ? FOLLOWER_BELIEFS[rival.followerBelief] : undefined, seat);
     applyBeliefEffects(state, mods, rival.founderBelief ? FOUNDER_BELIEFS[rival.founderBelief] : undefined, seat);
   }
+  if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, rival.research);
   return mods;
 }
 

@@ -42,18 +42,20 @@ untagged halves of tagged items stay Fable/main-session work.
   building/settler/unit codes) for controlled rivals — so the gap is
   the scripted policy's verbs (units/settlers) plus tile purchase,
   which has no rival or GPU twin on ANY seat (`buyTile` is
-  TS-player-only).
-- A-7 (remainder). No government/policy machinery for rivals:
-  `getModifiers` (effects.ts) layers `GOVERNMENTS`/`POLICIES`
-  (data/policies.ts) via `applyPolicyEffects` on top of research, while
-  `getRivalModifiers` (effects.ts) covers research + the rival's
-  pantheon/beliefs only; `unlockGovernment`/`unlockPolicy` unlocks
-  (`computeUnlocksIn`) have no rival consumer. No GPU government
-  tensors exist for either seat (inert while the scripted player never
-  adopts one). Re-scoped to land with the policy-breadth work (#46).
-  [opus-ok: the getRivalModifiers extension + GPU modifier tables +
-  exporter rows, off a settled effects list — the same shape as the
-  A-7 belief tables; the yield-path APPLICATION sites stay Fable.]
+  TS-player-only). [Round B2 note: slice P deferred this whole item —
+  still open, now the last piece of #46.]
+- A-7 (remainder — re-scoped 2026-07-17, Round B2). The machinery is
+  BUILT and turn-exact but SHIPPED INERT behind
+  `GOVERNMENTS_ADOPTION_LIVE=false` (mirrored as
+  `rules.governmentsLive`): TS `computeAdoption` + `getRivalModifiers`
+  government/policy layering + player `autoGovernment`; GPU per-seat
+  modifier tables + `_gov_policy_mods` at the matching pipeline
+  points; poke `gpu/government_test.py` forces it on in-memory.
+  BLOCKER to flipping live: the G-3 rival war-march ordering latent
+  (23/24 seeds exact; seed 9066 t98 punits off-by-one — see chapter
+  G). Residuals after the flip: GPU applies only the cityYields/
+  capitalYields channels; new-card `unlockPolicy` wiring; wildcard
+  slot fill.
 - A-9. Rival-unreachable catalog: `tryQueueRivalDistrict` (rivals.ts) /
   `_place_district_rival`+`rival_masks` (engine.py) iterate only
   `SCAFFOLD_DISTRICTS` (data/districts.ts: CAMPUS, HOLY_SITE,
@@ -242,9 +244,14 @@ gap; likewise GS disasters are modeled minus sea-level rise
   runs to Modern. [opus-ok: the UNITS/TECHS catalog rows + exporter
   tables off a settled roster list; combat integration and draw-count
   stay Fable.]
-- B-15. No war weariness: no amenity penalty from prolonged war
-  anywhere in the amenity aggregation (`computeCityStats`/`amenityTier`,
-  core/city.ts + `declareWar`, core/rivals.ts). Eternal wars are free.
+- B-15. **RESOLVED (2026-07-17, Round B2)**: war weariness — integer
+  accumulator (`warWeariness`, +1/turn at war, −4/turn decay at
+  peace) → flat amenity penalty via `computeCityStats`, symmetric
+  player+rival, both engines (`_MUTABLE`-registered tensors; poke
+  `gpu/war_weariness_test.py`). Magnitude DELIBERATELY gentle (−1 per
+  8 war-turns, cap −2): the passive scripted player never sues for
+  peace, so real magnitudes collapse the fixture. Raise toward real
+  values with #56's survival heuristics.
 - B-26. Map/barbarian fidelity: no cliffs (no such concept in
   data/terrains.ts or core/mapgen.ts). Barbarian era scaling is a
   single step (`barbarianPhase` spawns SPEARMAN after turn 60, else
@@ -284,45 +291,38 @@ gap; likewise GS disasters are modeled minus sea-level rise
   raiders pillage district buildings for heavy yields/heals.
 
 **Progression breadth:**
-- B-11. Tech tree is 32 of the real ~68: `TECHS` (data/techs.ts)
-  counted 32 entries; `ERAS` stops at Modern (no Atomic/Information/
-  Future). [opus-ok: TECHS rows + boost-condition rows + exporter off
-  a settled tree design; unlock/effect wiring stays Fable.]
-- B-12. Civics 31 of the real ~50: `CIVICS` (data/civics.ts) counted
-  31. [opus-ok: same split as B-11 — CIVICS rows are tables.]
-- B-13. Policy cards 19 (recounted) of the real 50+, and no diplomatic
-  cards: `POLICIES` counted 19 entries; data/policies.ts header
-  documents diplomatic slots sitting idle. `GOVERNMENTS` = all 10 base
-  ones. [opus-ok: POLICIES card rows + exporter; the effect channels
-  (applyPolicyEffects + GPU modifier tables) are the A-7r slice —
-  settle both briefs together in #46.]
-- B-14. `CITIZEN_SCIENCE` = 0.7/pop (data/constants.ts) vs real 0.5 —
-  verify intent; `CITIZEN_CULTURE` 0.3 matches real. ~40% extra base
-  science compounds over 250 turns. [opus-ok WHOLE item once the owner
-  rules on intent: one constant + fixture regen.]
-- B-27. Catalog sizes (recounted this sweep): world wonders 13
-  (`BUILT_WONDERS`, data/builtWonders.ts) vs ~30 in base game; natural
-  wonders 7 (`WONDERS`, data/wonders.ts) vs ~12; buildings 34
-  (`BUILDINGS`) vs ~45+ (walls excluded on both sides of that count);
-  pantheons 11 / follower beliefs 6 / founder beliefs 4 (`PANTHEONS`/
-  `FOLLOWER_BELIEFS`/`FOUNDER_BELIEFS`, data/religion.ts) vs real
-  ~25/~11/~8; great people 28 = 7 classes × 4 (`GREAT_PEOPLE`) vs real
-  9 classes (no Writer/Musician classes, no per-era rosters); projects
-  6 (`PROJECTS`, data/projects.ts); improvements 9 (`IMPROVEMENTS`).
-  [opus-ok: catalog ROWS off settled lists; every EFFECT-channel
-  placement stays Fable — the A-4 lesson: effect positions in the
-  yields pipeline are the hunt magnet.]
+- B-11. **RESOLVED (2026-07-17, Round B2)**: `TECHS` now the full GS
+  tree (68 entries), `ERAS` through Future — landed APPEND-ONLY so
+  existing indices/tie-breaks hold. Pure-military techs are tree nodes
+  that unlock nothing until B-10 lands the roster; eurekas only where
+  the condition is expressible (unboostable rows listed in
+  gpu/ROUND_B2_LOG.md §R).
+- B-12. **RESOLVED (2026-07-17, Round B2)**: `CIVICS` 31 → 51, same
+  append-only treatment, inspirations likewise.
+- B-13. **RESOLVED breadth (2026-07-17, Round B2)**: `POLICIES` 19 →
+  58 incl. 6 diplomatic cards; `GOVERNMENTS` layouts verified.
+  Residuals (gpu/ROUND_B2_LOG.md §P): ~30 new cards are inert (effects
+  need absent systems), and the new cards' `unlockPolicy` civic wiring
+  is deferred — cards exist but no civic grants them yet.
+- B-14. **RESOLVED (2026-07-17, Round B2, owner-ruled)**:
+  `CITIZEN_SCIENCE` 0.7 → 0.5 (real Civ 6). Reshuffled every
+  trajectory (fixture regen; rlenv coverage-test horizon 60→100; seed
+  9053 scripted collapse → SEED_OVERRIDES reroll pending #56).
+- B-27 (largely RESOLVED 2026-07-17, Round B2). Now: world wonders 30,
+  natural wonders 12, pantheons 25 / follower 9 / founder 8 (+7
+  enhancers), great people 9 classes incl. Writer/Musician, projects
+  incl. the space-race chain; buildings were already real-complete per
+  MODELED district (unmodeled districts' buildings arrive with A-9).
+  Degradation ledger: gpu/ROUND_B2_LOG.md (each row that needed an
+  absent system). Improvements 9 stays (rest need naval/appeal).
 
 **Economy/districts/religion:**
-- B-16. District adjacency magnitudes deviate from GS values:
-  `DISTRICTS.INDUSTRIAL_ZONE` gives +1 per `MINE_OR_QUARRY` (GS real:
-  +0.5 per mine, +1 per quarry, +2 per Aqueduct/Dam);
-  `DISTRICTS.HARBOR` gives +2 per `CITY_CENTER` (real +1). (The IZ +1
-  matches vanilla-launch values — the deviation is vs the GS ruleset
-  the repo otherwise follows, e.g. the district discount and loyalty.)
-  Campus/Holy Site/Theater/Commercial Hub magnitudes verified correct.
-  [opus-ok WHOLE item off owner-settled target values: DISTRICTS
-  constants + the GPU adjacency tables + fixture regen.]
+- B-16. **RESOLVED (2026-07-17, Round B2, owner-ruled → GS)**:
+  INDUSTRIAL_ZONE +0.5/mine +1/quarry +2/adjacent-Aqueduct (new
+  AQUEDUCT adjacency source), HARBOR +1 per CITY_CENTER (was +2,
+  gate-affecting). Fractional sums floor in `districtAdjacency` as
+  before. IZ channels are inert until A-9 makes IZ rival/scripted
+  reachable.
 - B-17 (re-scoped). Encampment is no longer inert: it earns +1 General
   GPP/turn plus +1 per building (`greatPersonPointsPerTurn`,
   core/game.ts; `GP_CLASS_DISTRICT`), and Barracks/Stable/Armory/
@@ -331,29 +331,30 @@ gap; likewise GS disasters are modeled minus sea-level rise
   slots (`SPECIALIST_YIELDS` (data/greatPeople.ts) has no ENCAMPMENT
   entry; `citySpecialistSlots` skips it), no district combat role (no
   HP/ranged strike/movement block), no unit-XP function.
-- B-18. Religion: no Enhancer belief slot (no enhancer list in
-  data/religion.ts), no spread/pressure — file header: "once founded,
-  all of your cities follow your religion"; no Missionaries/Apostles/
-  theological combat anywhere. Religious victory can't exist; faith is
-  a pure economy channel plus `WORSHIP_BUILDINGS`.
-- B-19. GP costs are flat 60·2^n per class per civ (`gpCost`,
-  data/greatPeople.ts) vs the real era-cost ladder and the global
-  first-come-first-served race between civs; no building GPP
-  differentiation beyond +1 per building (`greatPersonPointsPerTurn`).
-- B-20. GP effects are instant lumps only: `applyGreatPersonEffect`
-  (core/game.ts) pipes `GreatPersonDef.effect` straight into
-  science/culture/faith/gold/capital-production totals — no tile
-  activation, no Great Works/slots, no multi-charge people, no unique
-  per-person abilities.
-- B-21. City-states: no per-CS unique suzerain bonuses — the suzerain
-  perk is type-generic (`isSuzerain`/`SUZERAIN_ENVOYS`,
-  `csTradeCapacityBonus`, the militaristic levy in core/rivals.ts);
-  3/6-envoy bonuses key to districts via `CS_TYPE_DISTRICT`
-  (data/cityStates.ts) instead of the real building tiers
-  (Library/University etc.). Quests do exist (`questSatisfied`,
-  core/cityStates.ts) but are a small fixed set. [opus-ok: the CS data
-  rows (building-tier keys, per-CS bonus table); suzerain/quest logic
-  stays Fable.]
+- B-18 (re-scoped 2026-07-17, Round B2). LANDED: Enhancer belief slot
+  (catalog of 7, `enhanceReligion`, exporter pool+table — INERT
+  plumbing, no GPU behavior yet) + belief catalogs to real counts
+  (pantheons 25, follower 9, founder 8; degradations in
+  gpu/ROUND_B2_LOG.md §Q). STILL OPEN: pressure/spread (cities follow
+  the founder's religion wholesale), Missionaries/Apostles,
+  theological combat, rival enhancer claiming + GPU `r_enhancer` race
+  (needs a mirrored 3rd `_next_random` draw), religious victory.
+- B-19. **RESOLVED (2026-07-17, Round B2)**: era-anchored GP cost
+  ladder `[60,120,200,290,390,500,620,750]` (`gpCost`), global race
+  kept; WRITER/MUSICIAN classes added (n_gp=9, both → THEATER_SQUARE,
+  appended so PROPHET stays index 3). Poke `gpu/religion_gp_test.py`.
+  Building-GPP differentiation beyond +1/building still absent.
+- B-20 (re-scoped 2026-07-17, Round B2). Writer/Musician output
+  degrades to instant culture lumps. STILL OPEN: multi-charge people,
+  Great Works as building-slotted stores (Amphitheater/Museum line),
+  tile activation, per-person abilities.
+- B-21 (re-scoped 2026-07-17, Round B2). LANDED: `CS_TYPE_BUILDINGS`
+  (building-tier keys) + `CS_SUZERAIN_BONUS` (per-CS unique bonus
+  rows) data tables in data/cityStates.ts. STILL OPEN: the LIVE 3/6-
+  envoy channel still keys to districts via `CS_TYPE_DISTRICT` (inert
+  in-gate — no CS exceeds 1 envoy at 100t; re-key when a gate-reachable
+  scenario exists, likely with #56's 250t horizon), and the suzerain
+  perk stays type-generic in the live path.
 - B-23. Trade simplified: no Trader unit, no roads, no route duration
   or completion (`TradeRoute` in core/types.ts has a `toCs` target and
   nothing else), no international routes to rival civs —
@@ -370,11 +371,14 @@ gap; likewise GS disasters are modeled minus sea-level rise
   the governor/age multipliers, `GameState` (core/types.ts) for era
   tracking — carry none of it. Loyalty consequently runs un-modulated
   (no 0.5×/1.5× age factors, no +8 governor anchor).
-- B-25. Victories: only Domination + turn-limit Score — `endTurn`
-  (core/game.ts) sets `victoryType` from last-civ-standing or
-  `TURN_LIMIT` (250). No Science/Culture/Religious/Diplomatic victory
-  tracks (consistent with B-6/B-18/B-22 — their prerequisites don't
-  exist).
+- B-25 (re-scoped 2026-07-17, Round B2). LANDED: Science victory — a
+  6-step space-race project chain gated on late techs, `victoryType` 3
+  (player win) / 4 (rival completion = defeat) in `endTurn`; Campus is
+  the Spaceport proxy; TS-complete + vitest (`space-victory.test.ts`).
+  STILL OPEN: the GPU space-race SIMULATION (deferred as
+  gate-unreachable at 100t — the chain is filtered from the GPU
+  projects table; wire it with #56's 250t horizon), and
+  Culture/Religious/Diplomatic victories (systems absent).
 - B-33 (new; the fidelity face of A-19). Rivals never interact with
   each other: rival `atWar` is only vs the player (`declareWar`,
   core/rivals.ts; `hostileUnitAct` comment "they never war other
@@ -466,6 +470,25 @@ refresh) stays with the owner. Original items kept for reference:
   scenario 1 proves gains-are-current (red pre-fix), scenario 2 proves
   validity-is-snapshot (guards the seed-9274 catch against
   over-correction).
+- G-2 (found by Round B2 agent Q, 2026-07-17). The GPU PLAYER
+  GP-advance loop applies gpEffects columns 0-3 but not column 4
+  (faith), while the RIVAL loop applies faith — a player-earned
+  Prophet banks faith in TS but not on the GPU. Dormant: the scripted
+  player never earns a Prophet with a completed Holy Site in 100
+  turns. Fix at the player GP-claim site in engine.py (mirror the
+  rival loop's faith column) — cheap; pair with the #47 follow-up or
+  the #56 horizon extension, whichever lands first.
+- G-3 (found by Round B2 agent P, 2026-07-17; BLOCKS A-7r going
+  live). Rival war-march unit-iteration order: TS `hostileUnitAct`
+  callers iterate `state.units` (spawn/insertion order) while the GPU
+  war-march iterates unit SLOTS — the orders coincide today, but any
+  cross-civ timing shift decouples them. Observed: with adoption
+  forced live, URBAN_PLANNING's +1 production (turn-exact on both
+  seats) shifts a rival capture of a player builder by one turn on
+  seed 9066 t98 (punits off-by-one, self-correcting). Fix: make the
+  GPU rival-march iterate rival units in TS insertion order (the
+  city_seq lesson applied to units), then flip
+  `GOVERNMENTS_ADOPTION_LIVE=true` and regen.
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 
