@@ -915,8 +915,9 @@ class BatchSim:
         # among unlocked cards of matching kind — the computeAdoption twin.
         # Only the cityYields/capitalYields channels are applied (the live gov/
         # policy effects in the scripted gate: URBAN_PLANNING +1 production to
-        # every city, AUTOCRACY +1 to all yields in the capital). Wildcard
-        # slots are never filled (no reachable government carries one).
+        # every city, AUTOCRACY +1 to all yields in the capital; #46r:
+        # MONARCHY housingAll + the wildcard-overflow slot fill went live
+        # with the 250t horizon — see _gov_policy_mods).
         _govs = rules.governments or []
         _pols = rules.policies or []
         self._ngov = len(_govs)
@@ -927,12 +928,27 @@ class BatchSim:
             self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w
             self._gov_city_y = torch.tensor([[float(x) for x in g["cityYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_cap_y = torch.tensor([[float(x) for x in g["capitalYields"]] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
+            # #46r: MONARCHY's housingAll went live at the 250t horizon —
+            # PLAYER housing only (TS rivalHousing is deliberately mods-free).
+            self._gov_housing = torch.tensor([float(g.get("housingAll", 0)) for g in _govs], dtype=dtype, device=device)  # [nGov]
+            # #46r yieldMult: tier-2/3 governments multiply a yield ×1.1
+            # (MERCHANT_REPUBLIC gold — the rng-2026006082 t249 catch —
+            # THEOCRACY faith, DEMOCRACY culture, COMMUNISM production).
+            # PLAYER totals only: TS rivalCityYields never applies yieldMult.
+            self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)  # [nPol]
             self._pol_unlock_civic = torch.tensor([int(p["unlockCivic"]) for p in _pols], dtype=torch.long, device=device)
             self._pol_city_y = torch.tensor([[float(x) for x in p["cityYields"]] for p in _pols], dtype=dtype, device=device)  # [nPol,6]
             self._pol_cap_y = torch.tensor([[float(x) for x in p["capitalYields"]] for p in _pols], dtype=dtype, device=device)
+            self._pol_housing = torch.tensor([float(p.get("housingAll", 0)) for p in _pols], dtype=dtype, device=device)  # [nPol] (#46r)
+            # #46r housingIfDistricts (INSULAE {min 2, +1} — deterministically
+            # slotted via the wildcard overflow): +housing to PLAYER cities
+            # with >= min completed districts (rivalHousing is mods-free).
+            _hid = [p.get("housingIfDistricts", [-1, 0]) for p in _pols]
+            self._pol_hid_min = torch.tensor([int(x[0]) for x in _hid], dtype=torch.long, device=device)  # [nPol] (-1 = none)
+            self._pol_hid_house = torch.tensor([float(x[1]) for x in _hid], dtype=dtype, device=device)  # [nPol]
         # A-7r master switch (rules.governmentsLive), mirrored from the TS
         # GOVERNMENTS_ADOPTION_LIVE. Landed inert; gates every gov/policy
         # application + the influence-tier addition so the two engines flip in
@@ -940,8 +956,8 @@ class BatchSim:
         # are inert plumbing until the rival-march latent is fixed).
         self._gov_live = bool(getattr(rules, "governments_live", False))
         self._gov_has_effects = self._gov_live and bool(
-            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum()) > 0)
-            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum()) > 0)
+            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum()) > 0)
+            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum()) > 0)
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
@@ -1694,22 +1710,33 @@ class BatchSim:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
-    def _gov_policy_mods(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """A-7r: ([B,6] cityYields, [B,6] capitalYields) from a seat's adopted
-        government + greedily slotted policies, computed from its researched
-        civics [B, NC]. The effects.computeAdoption / applyGovernment twin for
-        the cityYields+capitalYields channels. Wildcard slots stay empty (no
-        reachable government carries one; TS agrees since none is adopted)."""
+    def _gov_policy_mods(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """A-7r: ([B,6] cityYields, [B,6] capitalYields, [B] housingAll,
+        [B,6] yieldMult, [B,nPol] slotted-mask) from a
+        seat's adopted government + greedily slotted policies, computed from
+        its researched civics [B, NC]. The effects.computeAdoption /
+        applyGovernment twin for the cityYields+capitalYields+housingAll
+        channels. #46r: WILDCARD slots fill with the within-kind OVERFLOW in
+        card-table order (TS findIndex: a card whose kind slots are full takes
+        the first open W; every catalog government lists its W slots LAST, so
+        kind-first matches findIndex — MONARCHY's W takes GOD_KING at ~t117).
+        housingAll is the PLAYER-only channel: TS rivalHousing is mods-free,
+        so the rival call sites discard it."""
         B = civics2.shape[0]
         dev, dt = self.device, self.dtype
         city_y = torch.zeros(B, 6, dtype=dt, device=dev)
         cap_y = torch.zeros(B, 6, dtype=dt, device=dev)
+        hous_all = torch.zeros(B, dtype=dt, device=dev)
+        ymult = torch.ones(B, 6, dtype=dt, device=dev)
+        slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
         if not self._gov_has_effects or not self._ngov:
-            return city_y, cap_y
+            return city_y, cap_y, hous_all, ymult, slotted
         adopted, has_gov = self._adopted_gov(civics2)
         gmask = has_gov.to(dt).unsqueeze(1)
         city_y = city_y + self._gov_city_y[adopted] * gmask
         cap_y = cap_y + self._gov_cap_y[adopted] * gmask
+        hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
+        ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         if self._npol:
             nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
             puc = self._pol_unlock_civic  # [nPol]
@@ -1718,15 +1745,20 @@ class BatchSim:
                 civics2.gather(1, puc.clamp(min=0).unsqueeze(0).expand(B, -1)),
                 torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
             )  # [B, nPol]
-            slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
-            for k in range(3):  # military/economic/diplomatic; wildcard (3) never filled
+            for k in range(3):  # military/economic/diplomatic
                 uk = pol_unlocked & (self._pol_kind == k).unsqueeze(0)  # [B, nPol]
                 cum = uk.long().cumsum(dim=1)  # inclusive rank among unlocked-of-kind, table order
                 slotted = slotted | (uk & (cum <= nslots[:, k : k + 1]))
+            # #46r wildcard: unlocked cards whose kind slots are full spill
+            # into W slots in table order, up to the W count.
+            overflow = pol_unlocked & ~slotted
+            w_rank = overflow.long().cumsum(dim=1)
+            slotted = slotted | (overflow & (w_rank <= nslots[:, 3:4]))
             sd = slotted.to(dt)
             city_y = city_y + sd @ self._pol_city_y
             cap_y = cap_y + sd @ self._pol_cap_y
-        return city_y, cap_y
+            hous_all = hous_all + sd @ self._pol_housing
+        return city_y, cap_y, hous_all, ymult, slotted
 
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         """[B, T] UNFLOORED districtAdjacency for district di: static (d_static_adj)
@@ -2025,6 +2057,7 @@ class BatchSim:
                 ship_add = cc["ship_add"]
                 d_maint = cc["d_maint"]
                 has_aq = cc["has_aq"]
+                dcount_all = cc["dcount_all"]  # #46r: INSULAE's housingIfDistricts
             else:
                 # District adjacency yields (D2b: Campus science only, placed where no
                 # dynamic source is live so the value is purely floor(static);
@@ -2036,6 +2069,9 @@ class BatchSim:
                 # yields/maintenance/Aqueduct housing all count COMPLETED districts
                 owned_d = owned_d & self.district_complete.gather(1, tcf).reshape(B, C, M)
                 owned_d = owned_d & ~self.district_dead.gather(1, tcf).reshape(B, C, M)  # P5/S1: captured = dead
+                # #46r: per-city COMPLETED live district count (ALL types —
+                # computeHousing's completedDistrictCount(state, city, false))
+                dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
                 adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
                 # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
                 # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
@@ -2102,9 +2138,11 @@ class BatchSim:
         # `bonuses`, city.ts:445-447), summed pre-amenity-factor. Food (col 0)
         # is left unscaled by the amenity factor below, matching TS.
         if self._gov_has_effects:
-            gpc_city, gpc_cap = self._gov_policy_mods(self.civics)
+            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted = self._gov_policy_mods(self.civics)
             total += gpc_city.unsqueeze(1)
             total += gpc_cap.unsqueeze(1) * self.is_cap.to(self.dtype).unsqueeze(2)
+        else:
+            gpc_hous = gpc_ymult = gpc_slotted = None
 
         amen_b = cc["amen_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_amenities)  # D-10
         amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + amen_b
@@ -2121,6 +2159,12 @@ class BatchSim:
         for i in reversed(range(len(self.rules.amenity_tiers))):
             tier_idx = torch.where(balance >= self.rules.amenity_tiers[i][0], torch.full_like(tier_idx, i), tier_idx)
         total[:, :, 1:] *= yield_f.unsqueeze(2)  # non-food × amenity factor
+        # #46r: government yieldMult AFTER the tier factor — TS
+        # computeCityStats order (tier.yieldFactor at city.ts:483, then the
+        # m.yieldMult loop). MERCHANT_REPUBLIC gold ×1.1 was the
+        # rng-2026006082 t249 off-script catch.
+        if gpc_ymult is not None:
+            total = total * gpc_ymult.unsqueeze(1)
         maint_b = cc["maint_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_maintenance)  # D-10
         maintenance = self.base_maintenance + maint_b
         if self.districts_on:
@@ -2155,6 +2199,19 @@ class BatchSim:
                 imp_owned = (tiles >= 0) & owned_c & (imp_win >= 0)
                 imp_add = (self._imp_housing[imp_win.clamp(min=0)] * imp_owned.to(self.dtype)).sum(dim=2)
             housing = housing + imp_add
+        # #46r: government/policy housingAll (MONARCHY +1) — PLAYER cities
+        # only, the computeHousing `total += m.housingAll` twin (rivalHousing
+        # is mods-free in TS, so the rival paths never add this).
+        if gpc_hous is not None:
+            housing = housing + gpc_hous.unsqueeze(1)
+        # #46r: housingIfDistricts (INSULAE) — +housing where the city's
+        # completed-district count meets the card's min (computeHousing's
+        # rule loop; player-only like every housing mod).
+        if gpc_slotted is not None and self._npol and self.districts_on:
+            _hid_act = gpc_slotted & (self._pol_hid_min >= 0).unsqueeze(0)  # [B, nPol]
+            if bool(_hid_act.any()):
+                _hid_ok = _hid_act.unsqueeze(1) & (dcount_all.unsqueeze(2) >= self._pol_hid_min.clamp(min=0).view(1, 1, -1))
+                housing = housing + (_hid_ok.to(self.dtype) * self._pol_hid_house.view(1, 1, -1)).sum(dim=2)
 
         # D-10: refresh the store on every miss (lux=None callers always land
         # here, so a fresh walk always starts from a same-version store).
@@ -2165,6 +2222,7 @@ class BatchSim:
                 store["ship_add"] = ship_add
                 store["d_maint"] = d_maint
                 store["has_aq"] = has_aq
+                store["dcount_all"] = dcount_all  # #46r
             if self.improvements_on:
                 store["imp_add"] = imp_add
             self._ct_cache = (self._eff_version, store)
@@ -2481,7 +2539,7 @@ class BatchSim:
         # rivalCityYields `bonuses` position (rivals.ts). Same channels as the
         # player path (getRivalModifiers layers gov+policy into these mods).
         if self._gov_has_effects:
-            gcity, gcap = self._gov_policy_mods(self.r_civics[:, r])  # [B,6], [B,6]
+            gcity, gcap, *_ = self._gov_policy_mods(self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
             acell = alive.double()  # [B, RC]
             gisc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
             food = food + gcity[:, 0].unsqueeze(1) * acell + gcap[:, 0].unsqueeze(1) * gisc
@@ -3361,6 +3419,12 @@ class BatchSim:
                 self.pciv_at[rows, dest[rows]] = p
                 self.p_tile[rows, p] = dest[rows]
                 self.p_acted[:, p] = self.p_acted[:, p] | move  # P4/D-2
+                # #46r gate-catch (seed 9170 t160): walkPath clears camps for
+                # ANY landing unit (+50 player treasury) — the scripted
+                # builder was the ONLY mover in the engine missing the
+                # mirror; dormant until a 250t trajectory walked one onto an
+                # empty camp.
+                self._clear_camp_at(move, dest)
 
     def _capture_rival_city(self, rows: torch.Tensor, civ: torch.Tensor, slot: torch.Tensor, ctr: torch.Tensor, plunder: bool = True) -> None:
         """V-W2: captureRivalCity — the rival city transfers to the PLAYER.
@@ -5424,7 +5488,7 @@ class BatchSim:
         # A-7r: government + slotted-policy flat yields (cityYields all cities,
         # capitalYields the capital) — pre-tier, the batched twin's addition.
         if self._gov_has_effects:
-            gcity, gcap = self._gov_policy_mods(self.r_civics[:, r])  # [B,6], [B,6]
+            gcity, gcap, *_ = self._gov_policy_mods(self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
             mcell = mask.double()  # [B]
             gisc = (self.rc_is_cap[:, r, j] & mask).double()  # [B]
             food = food + gcity[:, 0] * mcell + gcap[:, 0] * gisc

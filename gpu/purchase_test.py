@@ -82,15 +82,31 @@ def test_width_and_mask_when_on(rules, path):
     print("  active width OK (", w, ") + all-False when broke")
 
 
+def scan_to_purchasable(sim) -> list[int]:
+    """#46r: the live-adoption trajectory (URBAN_PLANNING +1 prod from ~t10)
+    emptied the old fixed t30 probe — scan deterministically for a turn with
+    a purchasable building (idling the capital each step keeps it from
+    building the candidates itself). The purchase sim and its baseline twin
+    both run THIS exact scan, so they land in the identical pre-step state."""
+    pb = pbase(sim)
+    for _ in range(80):
+        sim.step()
+        sim.current[:, 0] = -1
+        sim.progress[:, 0] = 0.0
+        sim.treasury[:] = RICH
+        mask = sim.production_mask()[0, 0]
+        js = [j for j in range(sim.NB) if bool(mask[pb + j])]
+        if js:
+            return js
+    return []
+
+
 def test_building_purchase(rules, path):
     sim = build(rules, path)
-    idle_capital(sim)
     sim._rl_purchase_active = True
-    sim.treasury[:] = RICH
     pb = pbase(sim)
-    mask = sim.production_mask()[0, 0]
-    js = [j for j in range(sim.NB) if bool(mask[pb + j])]
-    assert js, "no purchasable building at the probe turn (fixture drift?)"
+    js = scan_to_purchasable(sim)
+    assert js, "no purchasable building within 80 turns (fixture drift?)"
     j = js[0]
     cost = float(sim.rules_dev.b_cost[j]) * sim.rules.gold_purchase_mult
     assert not bool(sim.buildings[0, 0, j])
@@ -103,9 +119,8 @@ def test_building_purchase(rules, path):
     # bought building's own upkeep, which it pays this same turn (it exists
     # before the maintenance charge, exactly like a TS purchase before endTurn)
     sim2 = build(rules, path)
-    idle_capital(sim2)
     sim2._rl_purchase_active = True
-    sim2.treasury[:] = RICH
+    scan_to_purchasable(sim2)  # identical deterministic scan -> same pre-step state
     sim2.step(production=prod(sim2, 0, sim2.IDLE))
     base_spent = RICH - float(sim2.treasury[0])
     upkeep = float(sim.rules_dev.b_maintenance[j])

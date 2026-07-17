@@ -30,7 +30,7 @@ export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
  * (chapter B / other slices), not economy. Flip this to `true` in the slice
  * that fixes the rival-march ordering; the exporter mirrors it into
  * rules.governmentsLive so both engines stay in lockstep. */
-export const GOVERNMENTS_ADOPTION_LIVE = false;
+export const GOVERNMENTS_ADOPTION_LIVE = true; // #46r 2026-07-17: LIVE (see the G-3 hunt in gpu/AUDIT.md — the ordering theory above was re-verified before the flip)
 
 export interface PolicyEffects {
   /** Flat yields added to every city. */

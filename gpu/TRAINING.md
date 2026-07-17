@@ -14,6 +14,10 @@ npm run gpu:export -- 24            # 24 maps instead of the default 10
 python gpu/parity_test.py           # optional sanity: must print PARITY OK
 ```
 
+As of commit 609e311 (#56) the exporter's turn-horizon default is **250**
+(was 100) — the scripted fixtures now run the full game length. Pass a
+third argv to override (`npm run gpu:export -- 24 100 …`).
+
 More seeds = more map variety in the batch (games cycle through the
 fixture pool round-robin). 16–32 is a good training pool; the RNG is
 re-scrambled every episode anyway, so even one map never repeats a
@@ -447,7 +451,16 @@ ranged engine because its policy learned to never attack with (then
 weak, melee-locked) Slingers/Archers. A tune3 trained with ranged live
 is where that verb's value should appear.
 
-## Horizon-250 baselines (2026-07-10, the current reference point)
+## Horizon-250 baselines (2026-07-10)
+
+> STALE AS OF Round B2 (33199dc) + #56 (609e311): every baseline and net
+> in this file predates the B2 world change (full tech/civic/policy/wonder/
+> belief catalogs, war weariness, science victory, GS district adjacency,
+> CITIZEN_SCIENCE 0.7→0.5) AND the #56 scripted-survival heuristics that
+> keep seeds alive to t250. The numbers below are the pre-B2 reference
+> point — re-baseline (random + scripted, and any reference net) on the
+> post-B2 engine before the next training run. No post-B2 numbers are
+> recorded here yet.
 
 Every default now resolves to the game length (TURN_LIMIT = 250; commit
 b1e78a2), so all numbers above are horizon-100 HISTORY — and every net

@@ -25,8 +25,9 @@ trains on all of it with a native on-device PPO loop, and
 
 `python gpu/battery.py` runs everything an engine stage must pass —
 build, vitest, fixture export, BOTH parity gates, the five self-tests,
-and the two 50-episode baselines — in ~3 min wall (three parallel lanes
-after the serial build/export stage). `--full` adds mcts_test's
+and the two 50-episode baselines — in ~4 min wall (~253s; three parallel
+lanes after the serial build/export stage, the scripted lane now ~221s at
+the 250-turn horizon). `--full` adds mcts_test's
 closed-loop MPC quality benchmarks (~9 extra min; only needed when
 search code changes). `--no-eval` skips the baselines for mid-stage
 iteration.
@@ -67,7 +68,7 @@ half-to-even), and the damage curve's `30·e^(0.04·Δ)` table is computed
 in JS and shipped in the fixtures, since libm `exp()` may differ by an
 ulp between runtimes.
 
-Current status: scripted **24 seeds × 100 turns × 6 city slots + 3
+Current status: scripted **24 seeds × 250 turns × 6 city slots + 3
 city-states + 2 rival civs + disasters + builders** and off-script **72
 random games × 250 turns (the fixtures' turnLimit — proven exact to 300)**
 — across rival war declarations, loyalty
@@ -252,7 +253,8 @@ much experience per handful of updates. Long runs are the point.
 | Growth/starvation, housing (water+buildings+farms+Aqueduct), amenity tiers | Archer range-2 targets; multi-tile A* moves |
 | City Center + district buildings (12; tech/civic unlocks, river gate, prereqs, maintenance) | |
 | Districts: Campus/Holy Site/Commercial Hub/Aqueduct/Harbor — RL placement any-city, dynamic adjacency, specialty cap | Militaristic levies, CS trade-route quests |
-| Great people: Scientist/Merchant/Prophet accrual + effects, shared race pool | Policies/governments/religion modifiers |
+| Great people: Scientist/Merchant/Prophet accrual + effects, shared race pool | Religion modifiers beyond belief tables; policy channels beyond cityYields/capitalYields/housingAll |
+| **Governments + policies (#46r)**: both scripted seats adopt (`computeAdoption` twin), greedy slot fill incl. wildcard overflow, cityYields/capitalYields/housingAll live at 24×250 | |
 | **Gold purchases** (buy building/settler/unit at 4×, slot-order treasury) | Fog of war, trade routes |
 | Settlers: rising cost, training, purchase, auto-founding (with drops) | Luxury amenity sharing (inert in covered scope) |
 | Builders: training, single-step moves, FARM/MINE/LUMBER building, charges | Goody huts (reference maps exported without them) |

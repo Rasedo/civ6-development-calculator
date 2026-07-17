@@ -99,3 +99,10 @@ a hunt.
   IS the scripted path — the 24×250 scripted gate exercises every
   branch organically (H1 fills/replacements, H2 re-queues/repairs
   across all seeds), so no separate poke lane was added.
+- 2026-07-17: LANDED as commit 609e311. Scripted horizon default
+  100→250 (`N_TURNS` in scripts/export-gpu.ts), H1 army-scaling + H2
+  builder-replacement/repair heuristics live in both scripted chains,
+  scripted walker moved AFTER production in `step()`. Scripted gate
+  24×250 green (0.0 milli), forced-compaction gate green; battery wall
+  ~253s (scripted lane ~63→~221s, still under the gpu-gate lane).
+  Override 4:9054 kept; probes stripped. Stage CLOSED.

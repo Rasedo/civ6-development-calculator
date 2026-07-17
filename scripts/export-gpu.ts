@@ -787,6 +787,18 @@ const rules = {
     ],
     cityYields: YIELD_KEYS.map((k) => g.effects.cityYields?.[k] ?? 0),
     capitalYields: YIELD_KEYS.map((k) => g.effects.capitalYields?.[k] ?? 0),
+    // #46r full channel matrix: off-script research paths can adopt ANY
+    // government (the Merchant-Republic catch), so every effect channel a
+    // government or WIRED card carries is reachable and must export.
+    housingAll: g.effects.housingAll ?? 0,
+    amenitiesAll: g.effects.amenitiesAll ?? 0,
+    yieldMult: YIELD_KEYS.map((k) => g.effects.yieldMult?.[k] ?? 1),
+    adjacencyMult: PLACEABLE_DISTRICTS.map((d) => g.effects.adjacencyMult?.[d] ?? 1),
+    buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => g.effects.buildingYieldMult?.[d] ?? 1),
+    tilePurchaseMult: g.effects.tilePurchaseMult ?? 1,
+    housingIfDistricts: g.effects.housingIfDistricts ? [g.effects.housingIfDistricts.min, g.effects.housingIfDistricts.housing] : [-1, 0],
+    amenitiesIfSpecialty: g.effects.amenitiesIfSpecialty ? [g.effects.amenitiesIfSpecialty.min, g.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
+    newDeal: g.effects.newDeal ? [g.effects.newDeal.min, g.effects.newDeal.housing, g.effects.newDeal.amenities] : [-1, 0, 0],
   })),
   policies: Object.values(POLICIES).map((p) => ({
     id: p.id,
@@ -796,6 +808,15 @@ const rules = {
     ),
     cityYields: YIELD_KEYS.map((k) => p.effects.cityYields?.[k] ?? 0),
     capitalYields: YIELD_KEYS.map((k) => p.effects.capitalYields?.[k] ?? 0),
+    housingAll: p.effects.housingAll ?? 0,
+    amenitiesAll: p.effects.amenitiesAll ?? 0,
+    yieldMult: YIELD_KEYS.map((k) => p.effects.yieldMult?.[k] ?? 1),
+    adjacencyMult: PLACEABLE_DISTRICTS.map((d) => p.effects.adjacencyMult?.[d] ?? 1),
+    buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => p.effects.buildingYieldMult?.[d] ?? 1),
+    tilePurchaseMult: p.effects.tilePurchaseMult ?? 1,
+    housingIfDistricts: p.effects.housingIfDistricts ? [p.effects.housingIfDistricts.min, p.effects.housingIfDistricts.housing] : [-1, 0],
+    amenitiesIfSpecialty: p.effects.amenitiesIfSpecialty ? [p.effects.amenitiesIfSpecialty.min, p.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
+    newDeal: p.effects.newDeal ? [p.effects.newDeal.min, p.effects.newDeal.housing, p.effects.newDeal.amenities] : [-1, 0, 0],
   })),
 };
 writeFileSync(`${OUT}/rules.json`, JSON.stringify(rules));

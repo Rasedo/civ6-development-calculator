@@ -25,18 +25,22 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 35 | 4.8 | **14%** |
+| A symmetry | 35 | 5.6 | **16%** |
 | B fidelity | 88 | 36.0 | **41%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (E-16 with owner) | 6 | 5 | 83% |
-| G parity latents | 3 | 1 | 33% |
-| **Overall (incl. closed)** | **177** | **91.8** | **52%** |
-| Open chapters only (A+B+E+G) | 132 | 46.8 | **35%** |
+| G parity latents | 4 | 3 | 75% |
+| **Overall (incl. closed)** | **178** | **94.6** | **53%** |
+| Open chapters only (A+B+E+G) | 133 | 49.6 | **37%** |
+
+(2026-07-17 #46r update: A-7r 70%→90% — LIVE with residual channels;
+G-3 resolved-refuted, G-4 resolved-on-catch added.)
 
 Per-item weights (done% in parens where partial):
-- A: A-5r 2, A-7r 4 (70%), A-9 4, A-11 4, A-12 4, A-17 4, A-18 3,
-  A-19 4, A-20 2 (done), A-21 2, A-22 2.
+- A: A-5r 2, A-7r 4 (90% — LIVE, residual channels/wiring), A-9 4,
+  A-11 4, A-12 4, A-17 4, A-18 3, A-19 4, A-20 2 (done), A-21 2,
+  A-22 2.
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 (done); B-15 2
   (85% — magnitude waits on #56); B-26 3 (50%); B-4 3, B-6 8, B-7 2,
   B-8 2, B-9 3, B-10 3, B-29 2, B-30 2, B-31 1, B-32 2 (open).
@@ -46,7 +50,7 @@ Per-item weights (done% in parens where partial):
   (35%); B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
 - B meta: B-25 3 (50%); B-22 3, B-24 3, B-33 3 (open).
 - E: E-16 1 (open); the landed E-sweep counted as 5 done.
-- G: G-1 1 (done); G-2 1, G-3 1 (open).
+- G: G-1 1, G-3 1, G-4 1 (done); G-2 1 (open).
 
 ---
 
@@ -77,18 +81,26 @@ untagged halves of tagged items stay Fable/main-session work.
   which has no rival or GPU twin on ANY seat (`buyTile` is
   TS-player-only). [Round B2 note: slice P deferred this whole item —
   still open, now the last piece of #46.]
-- A-7 (remainder — re-scoped 2026-07-17, Round B2). The machinery is
-  BUILT and turn-exact but SHIPPED INERT behind
-  `GOVERNMENTS_ADOPTION_LIVE=false` (mirrored as
-  `rules.governmentsLive`): TS `computeAdoption` + `getRivalModifiers`
-  government/policy layering + player `autoGovernment`; GPU per-seat
-  modifier tables + `_gov_policy_mods` at the matching pipeline
-  points; poke `gpu/government_test.py` forces it on in-memory.
-  BLOCKER to flipping live: the G-3 rival war-march ordering latent
-  (23/24 seeds exact; seed 9066 t98 punits off-by-one — see chapter
-  G). Residuals after the flip: GPU applies only the cityYields/
-  capitalYields channels; new-card `unlockPolicy` wiring; wildcard
-  slot fill.
+- A-7 (remainder — LIVE 2026-07-17, #46r). `GOVERNMENTS_ADOPTION_LIVE
+  = true`: both scripted seats adopt governments and slot policies,
+  turn-exact at 24×250 (the flip hunt fixed housingAll + wildcard
+  overflow + the builder camp-clear latent — see G-3; the off-script
+  round then added yieldMult — the Merchant-Republic ×1.1 gold catch,
+  rng 2026006082 t249 — and INSULAE's housingIfDistricts). GPU
+  channels now: cityYields, capitalYields, housingAll +
+  housingIfDistricts (player-only per TS `rivalHousing`), yieldMult
+  (player-only per TS `rivalCityYields`), wildcard slot fill.
+  REMAINING channels are UNREACHABLE BY PROOF under deterministic
+  greedy adoption: W slots max out at 2 and the table-order overflow
+  is always LAND_SURVEYORS+INSULAE, so
+  adjacencyMult/buildingYieldMult/amenitiesIfSpecialty/newDeal cards
+  never slot; CLASSICAL_REPUBLIC (amenitiesAll) shares its unlock
+  civic with AUTOCRACY which wins table order. tilePurchaseMult
+  (LAND_SURVEYORS, slotted) is gate-inert: `buyTile` has no GPU verb
+  on any seat (A-5). These become due if the card table order, W
+  counts, or adoption rule ever change — the exporter already ships
+  every channel. STILL OPEN otherwise: new-card `unlockPolicy` civic
+  wiring (the ~30 inert B-13 cards).
 - A-9. Rival-unreachable catalog: `tryQueueRivalDistrict` (rivals.ts) /
   `_place_district_rival`+`rival_masks` (engine.py) iterate only
   `SCAFFOLD_DISTRICTS` (data/districts.ts: CAMPUS, HOLY_SITE,
@@ -521,17 +533,24 @@ refresh) stays with the owner. Original items kept for reference:
   boundary). Pre-existing latent exposed by the 250t horizon. Fixed
   structurally: the walker call moved AFTER production (TS order);
   the #56 slice-A pre-walker snapshot reverted to live reads.
-- G-3 (found by Round B2 agent P, 2026-07-17; BLOCKS A-7r going
-  live). Rival war-march unit-iteration order: TS `hostileUnitAct`
-  callers iterate `state.units` (spawn/insertion order) while the GPU
-  war-march iterates unit SLOTS — the orders coincide today, but any
-  cross-civ timing shift decouples them. Observed: with adoption
-  forced live, URBAN_PLANNING's +1 production (turn-exact on both
-  seats) shifts a rival capture of a player builder by one turn on
-  seed 9066 t98 (punits off-by-one, self-correcting). Fix: make the
-  GPU rival-march iterate rival units in TS insertion order (the
-  city_seq lesson applied to units), then flip
-  `GOVERNMENTS_ADOPTION_LIVE=true` and regen.
+- G-3. RESOLVED as REFUTED-AND-REPLACED (2026-07-17, #46r flip hunt).
+  Agent P's iteration-order theory was WRONG: `_reclaim_pool` is a
+  STABLE compaction and spawns append, so GPU slot order among living
+  units IS TS insertion order structurally — no ordering fix needed
+  or made. The ACTUAL blockers behind P's seed-9066 repro (and the
+  flip's real divergences at 250t) were three unrelated gaps, all
+  fixed: (1) MONARCHY's `housingAll` channel unimplemented on the GPU
+  (player-only — TS `rivalHousing` is mods-free; the t117-118
+  multi-seed foodBox cluster); (2) `_gov_policy_mods` never filled
+  WILDCARD slots ("no reachable government carries one" was
+  100t-true, 250t-false — MONARCHY's W takes GOD_KING via
+  within-kind overflow in table order); (3) `_scripted_builder`'s
+  move block was the ONLY mover in the engine missing the
+  `_clear_camp_at` mirror of walkPath's clearCampFor (seed 9170 t160:
+  a builder walked onto an empty camp, +50 player gold + camp splice
+  in TS only — rng-stream split). Poked by the extended
+  `gpu/government_test.py` (wildcard overflow, housingAll,
+  live-by-default).
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 

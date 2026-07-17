@@ -46,3 +46,23 @@ CB lines = every damage roll from the damageRoll/_damage_roll
 chokepoints. Probe at the exact batch shape of the failing run.
 PYTHONUTF8=1 on piped Windows runs. Never edit engine/TS sources while
 a gate/battery pipeline is in flight.
+
+**Lesson — positions are invisible to the scripted trace (only COUNTS
+are compared).** The scripted parity trace records aggregate/count state
+(empire techs/civics/settlers/city-count/treasury/science/culture/score;
+per-city population, owned-tile count, buildings, tiles-acquired, food/
+culture box) — NOT unit POSITIONS or improvement POSITIONS. So a
+walker/movement phase-ORDER bug (e.g. `_scripted_builder` running before
+vs after the production section in `step()`, so it sees a same-turn
+paved/pillaged tile the other engine doesn't) produces NO divergent
+trace row until the wrong position finally moves a COUNT — a farm landing
+on a different tile shifts the citizen's worked tile, which shifts food
+accrual, which crosses a growth boundary. Such bugs stay dormant for
+dozens of turns. The #56 case: seed 9287's GPU walker saw tile 296 as a
+job for ONE turn at t128 (production had just PAVED it; the walker's
+static farm plane can't see same-turn paves), planted a farm on the
+wrong tile, and the first VISIBLE divergence was a city-col4 growth/
+worked-tile mismatch at t142 — a 14-turn dormancy. Countermeasure: the
+statelog passes (above) surface positional state (RC til, TI rp, unit
+tiles) directly, so a position desync shows the turn it happens, not the
+turn it finally moves a count.

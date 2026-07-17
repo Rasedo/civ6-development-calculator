@@ -1217,7 +1217,9 @@ Ordered by how much each system changes what "best champion" MEANS:
       Remaining G-V slices (re-scoped): (ii) game-end semantics (per-game
       'done' + winner, traced); (iii) DOMINATION victory (capture exists —
       needs capital flags + all-capitals-lost); (iv) SCORE victory at the
-      limit. Science/culture/religious victories arrive with their systems.
+      limit. (UPDATE 33199dc/B-25: SCIENCE victory now landed TS-side —
+      space-race projects set `victoryType` in `endTurn`; culture/religious
+      victories still arrive with their systems.)
 - [ ] **G-C Combat depth** — makes domination a real axis (and plausibly
       dethrones the economist): city WALLS + ranged city strikes, siege
       units/classes (support vs melee vs ranged), promotions, healing,
@@ -1225,10 +1227,20 @@ Ordered by how much each system changes what "best champion" MEANS:
       was measured on wall-less 40-defense cities — this system re-opens it.
 - [ ] **G-R Religion** — a full yield economy (faith exists as a dead pool),
       pantheons/beliefs, religious units, pressure, the religious victory.
+      (UPDATE 33199dc/B-18: the full belief CATALOGS landed — 25 pantheons /
+      9 follower / 8 founder / 7 enhancer — with pantheon/follower/founder
+      effects live via the A-7 machinery; enhancer effects, religious
+      pressure/spread, missionary units and the religious victory remain
+      INERT/unbuilt this round, so this item is now the pressure+units+victory
+      remainder.)
 - [ ] **G-T Trade routes** — traders, route yields, roads, plunder.
 - [ ] **G-D Full trees** — the complete district roster (Theater/Entertainment/
       Aqueduct-as-real/Neighborhood...), full building trees, the full
       tech/civic trees to the modern era (today's trees end early).
+      (UPDATE 33199dc/B-11+B-12: the tech tree is now the full GS ~68-node
+      topology through Atomic/Information/Future eras and civics ~52 — the
+      trees no longer "end early"; the remaining G-D gap is the district roster
+      + building trees + wiring the late tree nodes to real unlocks.)
 - [ ] **G-S Scale** — 300 turns everywhere, 8-10 cities, bigger maps,
       more rivals; batch/memory work on the GPU side.
 

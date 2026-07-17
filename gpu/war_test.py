@@ -238,6 +238,16 @@ def test_cs_siege(rules, path):
         assert int(sim.p_hp[0, p_]) < 100 + 10, "attacker took no counter"  # +heal
     # capture: grind the hp to the brink, then one more hit
     sim.cs_hp[0, s] = 1
+    # #46r probe hardening: the live-adoption reshuffle can park a barbarian
+    # beside the CS — it would land the killing blow before the player's
+    # order and the CS dies WITHOUT a capture. This test probes the PLAYER
+    # capture path, so clear barbs within 2 tiles of the center first.
+    near = sim.pair_dist[ctr] <= 2
+    for u in (sim.u_alive[0] & near[sim.u_tile[0].clamp(min=0)]).nonzero(as_tuple=True)[0].tolist():
+        t_ = int(sim.u_tile[0, u])
+        sim.u_alive[0, u] = False
+        if int(sim.barb_at[0, t_]) == u:
+            sim.barb_at[0, t_] = -1
     if not bool(sim.p_alive[0, p_]):
         p_ = _melee_slot(sim)
         assert p_ is not None
@@ -249,7 +259,10 @@ def test_cs_siege(rules, path):
     ncity0 = int(sim.alive[0].sum())
     sim.step(units=ua)
     assert not bool(sim.cs_alive[0, s]), "CS at 1 hp must fall to the next hit"
-    assert int(sim.alive[0].sum()) == ncity0 + 1, "capture must found a player city"
+    # #46r: >= not == — the live-adoption pacing can land an ORGANIC settler
+    # founding in the same step as the capture (+2 total); the capture itself
+    # is pinned by the center_at/owner/pop assertions below.
+    assert int(sim.alive[0].sum()) >= ncity0 + 1, "capture must found a player city"
     c_new = int(sim.center_at[0, ctr])
     assert c_new >= 0 and bool(sim.alive[0, c_new]), "center must map to the new city"
     assert int(sim.owner[0, ctr]) == c_new, "center tile must transfer"

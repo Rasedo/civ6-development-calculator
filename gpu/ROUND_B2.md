@@ -126,3 +126,12 @@ Owner rulings baked in:
 ## Status log
 
 - 2026-07-17: round opened, briefs issued (this doc). Agents: P/Q/R.
+- 2026-07-17: LANDED as commit 33199dc (design note 8fc5966). Merged
+  gate-serialized stage: policies 19→56, techs 32→68, civics 31→52,
+  world wonders 13→30, natural wonders 7→12, belief catalogs 25/9/8/7,
+  GP era cost ladder + Writer/Musician classes, war weariness (B-15),
+  science victory TS-side (B-25), GS district adjacency (B-16),
+  CITIZEN_SCIENCE 0.7→0.5 (B-14). Government/policy adoption machinery
+  shipped INERT behind `GOVERNMENTS_ADOPTION_LIVE`; religion enhancer/
+  spread effects inert (no pressure/missionary system this round).
+  Degradations recorded in gpu/ROUND_B2_LOG.md. Both gates + battery green.
