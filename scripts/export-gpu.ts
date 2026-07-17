@@ -30,7 +30,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove, moveCostInto } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense } from '../src/core/combat';
@@ -120,7 +120,7 @@ const LUXURY_IDS = Object.values(RESOURCES)
   .map((r) => r.id);
 
 const N_SEEDS = Number(process.argv[2] ?? 24);
-const N_TURNS = Number(process.argv[3] ?? 100);
+const N_TURNS = Number(process.argv[3] ?? 250); // #56: scripted horizon 100→250 (survival heuristics H1/H2 keep the seeds alive)
 const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler
 const CS_MAX = 3;
@@ -821,10 +821,10 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
   2: 9028, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
-  // ROUND B2: the 0.5 citizen-science + war-weariness balance killed this
-  // seed's passive player (Egypt war t21, capital conquered t60, loyalty
-  // collapse t67-t70). Task #56 (scripted-250t survival heuristics) is the
-  // real fix; overrides shrink back once the script can defend itself.
+  // #56: NOT an army-fixable death — Egypt war t21, Brightwater defects by
+  // LOYALTY t54 (settled into Egypt's pressure blob), capital conquered t61.
+  // Structural for a passive script with fixed t0 settle sites (the 9027
+  // shape); H1/H2 verified not to help (diagnosed at 250t, 2026-07-17).
   4: 9054, // 9053: see above
 };
 for (let s = 0; s < N_SEEDS; s++) {
@@ -1175,7 +1175,39 @@ for (let s = 0; s < N_SEEDS; s++) {
   let settlersQueued = 0;
 
   const warriorTrained = new Set<number>();
-  let builderTrained = false;
+  // #56 H2: the once-ever builder flag is replaced by a dynamic gate — the
+  // capital re-trains a builder whenever none is alive or queued and a
+  // builder job (owned unimproved-farmable OR owned pillaged tile) exists.
+  const anyPlayerBuilder = (): boolean =>
+    state.units.some((u2) => u2.owner === 'player' && u2.type === 'BUILDER' && (u2.charges ?? 0) > 0) ||
+    state.cities.some((c2) => c2.queue.some((q) => q.kind === 'unit' && q.unit === 'BUILDER'));
+  const builderJobExists = (): boolean =>
+    state.map.tiles.some(
+      (t2) => t2.cityId !== -1 && (t2.pillaged || (!t2.improvement && validImprovements(state, t2).includes('FARM'))),
+    );
+  // #56 H1: army scaling — alive player military + queued military across all
+  // city queues (the per-city else-if loop naturally sees earlier cities'
+  // queues this turn; the GPU mirrors with a city_seq prefix walk). Best =
+  // highest combat among trainable units; strict > keeps UNITS table order on
+  // ties (the GPU's argmax-first twin).
+  const militaryCount = (): number => {
+    let n = 0;
+    for (const u2 of state.units) if (u2.owner === 'player' && (UNITS[u2.type]?.combat ?? 0) > 0) n += 1;
+    for (const c2 of state.cities)
+      for (const q of c2.queue) if (q.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) n += 1;
+    return n;
+  };
+  const bestMilitary = (): string => {
+    let bestId = 'WARRIOR';
+    let bestCombat = 0;
+    for (const d of trainableUnits(state)) {
+      if (d.combat > bestCombat) {
+        bestId = d.id;
+        bestCombat = d.combat;
+      }
+    }
+    return bestId;
+  };
   const placedDistricts = new Set<number>();
   // P2: districts cost production now — the capital QUEUES the next scaffold
   // district when idle (first unplaced spec, scaffold order, whose tech is in
@@ -1219,11 +1251,12 @@ for (let s = 0; s < N_SEEDS; s++) {
     }
     for (const city of state.cities) {
       if (city.queue.length > 0) continue;
-      if (city.isCapital && !builderTrained && city.population >= 2) {
-        // One builder from the capital FIRST (phase 6a): the capital trains
-        // settlers for the rest of the game, so the builder must precede them.
+      if (city.isCapital && city.population >= 2 && !anyPlayerBuilder() && builderJobExists()) {
+        // One builder from the capital FIRST (phase 6a) — #56 H2: re-trained
+        // whenever the last one spent its charges and jobs remain (was
+        // once-ever). First-builder timing is unchanged; settlers still yield
+        // to the builder.
         queueUnit(state, city.id, 'BUILDER');
-        builderTrained = true;
       } else if (city.isCapital && settlersQueued < chosen.length && city.population >= SETTLER_POP_GATE) {
         queueSettler(state, city.id);
         settlersQueued += 1;
@@ -1235,6 +1268,11 @@ for (let s = 0; s < N_SEEDS; s++) {
         warriorTrained.add(city.id);
       } else if (SCRIPTED_CAMPUS && city.isCapital && queueNextDistrict(city)) {
         // P2: queued the next scaffold district (it costs production now).
+      } else if (city.population >= 2 && militaryCount() < 2 * state.cities.length) {
+        // #56 H1: keep a standing army of 2 military units per city, replacing
+        // losses with the best trainable unit — the passive one-warrior script
+        // lost whole games to rival conquest before the 250t horizon.
+        queueUnit(state, city.id, bestMilitary());
       } else {
         const next = cheapestBuilding(state, city);
         if (next) queueBuilding(state, city.id, next);
@@ -1258,6 +1296,13 @@ for (let s = 0; s < N_SEEDS; s++) {
     for (const u of state.units) {
       if (u.owner !== 'player' || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
       const btile = state.map.tiles[u.tileIndex];
+      if (btile.pillaged && btile.cityId !== -1) {
+        // #56 H2: REPAIR first (the rival A-13 semantics — no charge spent,
+        // the turn is; barb raids on player farmland finally get answered).
+        btile.pillaged = false;
+        u.movesLeft = 0;
+        continue;
+      }
       if (!btile.improvement && validImprovements(state, btile).includes('FARM')) {
         builderImprove(state, u.id, 'FARM');
         continue;
@@ -1265,8 +1310,10 @@ for (let s = 0; s < N_SEEDS; s++) {
       let best = -1;
       let bestKey = Infinity;
       for (const t of state.map.tiles) {
-        if (t.cityId === -1 || t.improvement) continue;
-        if (!validImprovements(state, t).includes('FARM')) continue;
+        // #56 H2: a job is any owned tile that is unimproved-farmable OR
+        // pillaged (repair) — must match builderJobExists and the GPU walker.
+        if (t.cityId === -1) continue;
+        if (!(t.pillaged || (!t.improvement && validImprovements(state, t).includes('FARM')))) continue;
         const key = hexDistance(btile.col, btile.row, t.col, t.row) * (nTiles + 1) + t.index;
         if (key < bestKey) {
           bestKey = key;

@@ -3312,7 +3312,17 @@ class BatchSim:
             hill_h = self.farm_hill.gather(1, hc.unsqueeze(1)).squeeze(1)
             district_free = self.district.gather(1, hc.unsqueeze(1)).squeeze(1) < 0  # a district paves the tile (validImprovements returns [] there)
             wonder_free = self.built_wonder.gather(1, hc.unsqueeze(1)).squeeze(1) < 0  # A-8 gate-catch: in-flight wonder paves too
-            build = act & owned_here & not_center & unimproved & district_free & wonder_free & (flat_h | (hill_h & civ_done))
+            # #56 H2: REPAIR first — an owned pillaged tile underfoot clears
+            # the flag (no charge, the turn is spent via p_acted), exactly the
+            # rival A-13 branch and the exporter's repair-first order.
+            pill_h = self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
+            rep = act & owned_here & pill_h
+            if bool(rep.any()):
+                rrows = rep.nonzero(as_tuple=True)[0]
+                self.pillaged[rrows, here[rrows]] = False
+                self.p_acted[:, p] = self.p_acted[:, p] | rep
+                self._eff_version += 1
+            build = (act & ~rep) & owned_here & not_center & unimproved & district_free & wonder_free & (flat_h | (hill_h & civ_done))
             if bool(build.any()):
                 rows = build.nonzero(as_tuple=True)[0]
                 self.improvement[rows, here[rows]] = self.FARM
@@ -3325,11 +3335,13 @@ class BatchSim:
                     self.pciv_at[gr, here[gr]] = -1
                     self.p_alive[gr, p] = False
 
-            march = act & ~build
+            march = act & ~rep & ~build
             if not bool(march.any()):
                 continue
             farmable = self.farm_flat | (self.farm_hill & civ_done.unsqueeze(1))
-            job = (self.owner >= 0) & (self.center_at < 0) & (self.improvement < 0) & (self.district < 0) & (self.built_wonder < 0) & farmable
+            # #56 H2: a job is unimproved-farmable OR pillaged (repair),
+            # owned either way — the exporter walker's exact set.
+            job = ((self.owner >= 0) & (self.center_at < 0) & (self.improvement < 0) & (self.district < 0) & (self.built_wonder < 0) & farmable) | ((self.owner >= 0) & self.pillaged)
             has_job = job.any(dim=1)
             d_job = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
             jkey = torch.where(job, d_job * (T + 1) + arangeT, torch.full_like(d_job, 10**9))
@@ -7643,12 +7655,17 @@ class BatchSim:
         self.war_weariness = torch.where(atwar_now, inc, dec)
 
         # --- player unit orders (before the turn advances) ----------------------
+        # #56 phase-order: the EXPORTER's script runs envoys → production →
+        # builder walker; the scripted walker call therefore moved BELOW the
+        # production-choice section (it used to run here, before production,
+        # which (a) made production see post-walker builder state — seeds
+        # 9092 t78 / 9274 t77, the GPU re-queued a builder one turn early —
+        # and (b) let the walker target a tile THIS turn's production loop
+        # had already paved with a district/wonder — seed 9287 t128, tile
+        # 296, a one-turn phantom job that desynced the whole walk). Replay
+        # unit actions stay here (their ordering contract is the recording).
         if units is not None and self.units_mode:
             self._apply_unit_actions(units)
-        elif self.units_mode:
-            # Scripted path: builders auto-improve (mirrors the exporter);
-            # military units hold (passive garrisons), as before.
-            self._scripted_builder()
 
         # --- envoys --------------------------------------------------------------
         if self.S > 0:
@@ -7681,14 +7698,29 @@ class BatchSim:
             # the rest of the game, so the builder must precede them.
             if self.units_mode and self._builder_idx >= 0 and self.improvements_on:
                 empty = self.alive & (self.current == -1)
-                want_b = empty[:, 0] & (self.pop[:, 0] >= 2) & ~self.builder_trained
                 bcode = self.UNIT_BASE + self._builder_idx
+                # #56 H2: the once-ever builder_trained flag is replaced by a
+                # dynamic gate — re-train when no charged builder is alive or
+                # queued AND a builder job exists (owned unimproved-farmable OR
+                # owned pillaged; the walker's exact job set). Reads LIVE state:
+                # the walker now runs AFTER production (TS phase order), so the
+                # live view here IS what TS's loop saw. The legacy flag tensor
+                # stays registered for snapshot-format stability.
+                b_have = (self.p_alive & (self.p_type == self._builder_idx) & (self.p_charges > 0)).any(dim=1) | (self.current == bcode).any(dim=1)
+                if self._hillfarms_civic >= 0:
+                    farm_ok_b = self.farm_flat | (self.farm_hill & self.civics[:, self._hillfarms_civic].unsqueeze(1))
+                else:
+                    farm_ok_b = self.farm_flat
+                b_job = (
+                    ((self.owner >= 0) & (self.center_at < 0) & (self.improvement < 0) & (self.district < 0) & (self.built_wonder < 0) & farm_ok_b)
+                    | ((self.owner >= 0) & self.pillaged)
+                ).any(dim=1)
+                want_b = empty[:, 0] & (self.pop[:, 0] >= 2) & ~b_have & b_job
                 # P4/D-10: escalated price (queued count read BEFORE the write)
                 b_cost = self._builder_cost(self.builders_trained + (self.current == bcode).sum(dim=1))
                 self.current[:, 0] = torch.where(want_b, torch.full_like(self.current[:, 0], bcode), self.current[:, 0])
                 self.cur_cost[:, 0] = torch.where(want_b, b_cost, self.cur_cost[:, 0])
                 self.progress[:, 0] = torch.where(want_b, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
-                self.builder_trained = self.builder_trained | want_b
 
             # Then a settler when sites remain and pop reached the gate
             # (mirrors the exporter; cost mirrors settlerCost).
@@ -7706,6 +7738,11 @@ class BatchSim:
             # (mirrors the exporter script's warrior branch).
             if self.units_mode:
                 empty = self.alive & (self.current == -1)
+                # #56 H1: military queued BEFORE this turn's warrior/army
+                # writes (TS militaryCount sees pre-loop queues as its base;
+                # builders are in the unit code range but combat 0).
+                _in_urange = (self.current >= self.UNIT_BASE) & (self.current < self.UNIT_BASE + self.NU)
+                mil_q0 = (_in_urange & (self._p_combat[(self.current - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)] > 0)).sum(dim=1)
                 want_w = empty & (self.pop >= 2) & ~self.warrior_trained
                 wcode = self.UNIT_BASE + self._warrior_idx
                 self.current = torch.where(want_w, torch.full_like(self.current, wcode), self.current)
@@ -7745,6 +7782,43 @@ class BatchSim:
                         self.progress[:, 0] = torch.where(placed, torch.zeros_like(self.progress[:, 0]), self.progress[:, 0])
                         self.q_dtile[:, 0] = torch.where(placed, best, self.q_dtile[:, 0])
                         dtaken = dtaken | placed
+
+            # #56 H1: army scaling — a standing army of 2 military units per
+            # alive city, replacing losses with the best trainable unit.
+            # Mirrors the exporter's per-city else-if EXACTLY: city i's count
+            # sees this turn's queues from cities earlier in ARRAY order
+            # (city_seq), so the fill is a prefix walk in city_seq order —
+            # base_k + j is non-decreasing, the allowed set is a prefix, and a
+            # single cumsum reproduces the sequential greedy.
+            if self.units_mode:
+                empty = self.alive & (self.current == -1)
+                mil_alive = (self.p_alive & (self._p_combat[self.p_type.clamp(min=0, max=self.NU - 1)] > 0)).sum(dim=1)
+                quota = 2 * self.alive.sum(dim=1)
+                cand = empty & (self.pop >= 2)
+                if bool(cand.any()):
+                    ordc = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+                    w_ord = want_w.gather(1, ordc).long()
+                    cand_ord = cand.gather(1, ordc)
+                    cum_w = w_ord.cumsum(dim=1) - w_ord
+                    j_ord = cand_ord.long().cumsum(dim=1) - cand_ord.long()
+                    base_ord = (mil_alive + mil_q0).unsqueeze(1) + cum_w
+                    allow_ord = cand_ord & (base_ord + j_ord < quota.unsqueeze(1))
+                    want_a = torch.zeros_like(cand)
+                    want_a.scatter_(1, ordc, allow_ord)
+                    if bool(want_a.any()):
+                        # best trainable military: unique integer key
+                        # combat·NU − idx ⇒ argmax is unambiguous and ties
+                        # resolve to the LOWEST unit index = the TS strict->
+                        # first-wins over UNITS table order.
+                        tr_u = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+                        base_key = self._p_combat.long() * self.NU - torch.arange(self.NU, device=dev)
+                        key_u = torch.where(tr_u & (self._p_combat.unsqueeze(0) > 0), base_key.unsqueeze(0).expand(B, -1), torch.full((B, self.NU), -(10**9), dtype=torch.long, device=dev))
+                        best_u = key_u.argmax(dim=1)  # [B]
+                        ucode = (self.UNIT_BASE + best_u).unsqueeze(1).expand_as(self.current)
+                        ucost = self._p_cost[best_u].unsqueeze(1).expand_as(self.cur_cost)
+                        self.current = torch.where(want_a, ucode, self.current)
+                        self.cur_cost = torch.where(want_a, ucost, self.cur_cost)
+                        self.progress = torch.where(want_a, torch.zeros_like(self.progress), self.progress)
 
             # Everyone else: cheapest available City Center building.
             empty = self.alive & (self.current == -1)
@@ -7844,6 +7918,12 @@ class BatchSim:
         # (P2: the scripted district placement moved INTO the production chain
         # above — the capital queues the next scaffold district when idle,
         # paying districtCost like every other build.)
+
+        # --- scripted builder walker (#56 phase-order: AFTER production, the
+        # exporter's envoys → production → walker order — see the note at the
+        # old call site above). Builders auto-improve; military units hold. ---
+        if units is None and self.units_mode:
+            self._scripted_builder()
 
         # --- research choice (validated; -1 or invalid = keep pending) ---------
         if tech is not None:

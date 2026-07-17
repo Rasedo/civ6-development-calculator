@@ -15,6 +15,39 @@ by line number. Line numbers rot; symbols are greppable.**
 this file is clean — the chapters below ARE the roadmap (tasks #41-#48,
 then #50/A-18 with the ONE pre-P8 re-baseline).
 
+## Completion estimate (owner-requested 2026-07-17; guesstimates)
+
+Each item hand-weighted 1–8 by implementation size read off its
+description (1 = constant/table tweak, 2 = focused mechanic, 3 =
+mechanic + both-engine plumbing, 4 = big system, 8 = engine-wide);
+partial items carry fractional credit. Update this block at every
+stage that moves an item.
+
+| Chapter | Weight | Done | % |
+|---|---|---|---|
+| A symmetry | 35 | 4.8 | **14%** |
+| B fidelity | 88 | 36.0 | **41%** |
+| C order/slot latents (closed) | 30 | 30 | 100% |
+| D perf (closed) | 15 | 15 | 100% |
+| E docs (E-16 with owner) | 6 | 5 | 83% |
+| G parity latents | 3 | 1 | 33% |
+| **Overall (incl. closed)** | **177** | **91.8** | **52%** |
+| Open chapters only (A+B+E+G) | 132 | 46.8 | **35%** |
+
+Per-item weights (done% in parens where partial):
+- A: A-5r 2, A-7r 4 (70%), A-9 4, A-11 4, A-12 4, A-17 4, A-18 3,
+  A-19 4, A-20 2 (done), A-21 2, A-22 2.
+- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 (done); B-15 2
+  (85% — magnitude waits on #56); B-26 3 (50%); B-4 3, B-6 8, B-7 2,
+  B-8 2, B-9 3, B-10 3, B-29 2, B-30 2, B-31 1, B-32 2 (open).
+- B progression: B-11 4 / B-12 3 / B-14 1 (done); B-13 3 (80%);
+  B-27 4 (75%).
+- B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
+  (35%); B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
+- B meta: B-25 3 (50%); B-22 3, B-24 3, B-33 3 (open).
+- E: E-16 1 (open); the landed E-sweep counted as 5 done.
+- G: G-1 1 (done); G-2 1, G-3 1 (open).
+
 ---
 
 ## A. Player–rival asymmetry (the symmetry contract's open gaps)
@@ -478,6 +511,16 @@ refresh) stays with the owner. Original items kept for reference:
   turns. Fix at the player GP-claim site in engine.py (mirror the
   rival loop's faith column) — cheap; pair with the #47 follow-up or
   the #56 horizon extension, whichever lands first.
+- G-4. RESOLVED-ON-CATCH (2026-07-17, #56 hunt, seed 9287 t128→t142
+  visible): the GPU's scripted builder walker (`_scripted_builder`)
+  ran BEFORE the production-choice section while the exporter's script
+  runs envoys → production → walker — so the walker could target a
+  tile THIS turn's production had already paved (district/wonder
+  pave), a one-turn phantom job that desynced the walk (farm landed on
+  246 vs 290; worked-tile shift surfaced 14 turns later at a growth
+  boundary). Pre-existing latent exposed by the 250t horizon. Fixed
+  structurally: the walker call moved AFTER production (TS order);
+  the #56 slice-A pre-walker snapshot reverted to live reads.
 - G-3 (found by Round B2 agent P, 2026-07-17; BLOCKS A-7r going
   live). Rival war-march unit-iteration order: TS `hostileUnitAct`
   callers iterate `state.units` (spawn/insertion order) while the GPU
