@@ -4763,13 +4763,19 @@ class BatchSim:
                 # it here: FARM adds catalog food + THIS tile's farm-adjacency (>=2 adjacent FARMs,
                 # not whether the tile is already a farm); MINE adds catalog prod + the rival's own
                 # mine boost; LUMBER its flat catalog prod. Ties keep FARM > MINE > LUMBER (opts order).
+                # AUDIT G-1: the GAIN terms (tier/boost) ride CURRENT research —
+                # TS builds the Δ ctx from modifiersFromResearch(rival.research)
+                # at CALL time, after this turn's completions; only VALIDITY
+                # keeps the tk0/cv0 phase-top snapshot (rivalUnlocks, the
+                # seed-9274 catch). Snapshot gains flipped MINE-vs-FARM on the
+                # exact turn a boost landed (seed 9196 t248).
                 wt = self.rules_dev.focus_base.double()
-                tier_r = self._farmadj_tier(cv0, tk0).double()
+                tier_r = self._farmadj_tier(self.r_civics[:, r], self.r_techs[:, r]).double()
                 nbc = self.neigh.clamp(min=0)
                 fimp = self.improvement == self.FARM
                 adj2 = ((fimp[:, nbc] & (self.neigh >= 0).unsqueeze(0)).sum(dim=2) >= 2).double()  # [B,T]
                 adj_h = adj2.gather(1, here.unsqueeze(1)).squeeze(1)  # [B] hypothetical FARM's adjacency
-                mboost = (tk0[:, self._mine_boost_tech].double() * self._mine_boost_amt).sum(dim=1) if self._mine_boost_tech.numel() > 0 else torch.zeros(B, dtype=torch.float64, device=dev)
+                mboost = (self.r_techs[:, r][:, self._mine_boost_tech].double() * self._mine_boost_amt).sum(dim=1) if self._mine_boost_tech.numel() > 0 else torch.zeros(B, dtype=torch.float64, device=dev)
                 # A-8 hunt side-find: a bare tile CAN carry a lingering
                 # pillaged flag (a chop clears the LUMBER improvement, not the
                 # flag) — TS tileYields suppresses improvement yields on

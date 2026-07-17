@@ -451,17 +451,21 @@ refresh) stays with the owner. Original items kept for reference:
 
 ## G. Known parity latents (dormant, not currently gate-visible)
 
-- G-1. Rival-builder gain approximation: the GPU `_rival_builder_actions`
-  balanced-gain model and TS's exact `tileScore` delta (rivals.ts) can
-  RANK improvements differently on some tiles (observed: MINE (GPU) vs
-  FARM (TS) on plain hills once farm-hills + late mine boosts unlock).
-  Not triggered by current fixtures/rollout trajectories (off-script
-  250t gate green at the #42-#44 merge), but ANY future trajectory
-  shift can expose it — surfaced during the B-26/B-28 sweep at a
-  single-slice trajectory (seed 9196 t248, rival-0 rivalEmpireScore
-  673.238 vs 667.238). Fix when it goes gate-visible: pick the ranking
-  closer to real Civ 6, converge the two. Tracked in the deferred-fixes
-  memory.
+- G-1. RESOLVED (owner-ordered fix ahead of gate visibility). Root
+  cause was not the gain MODEL but its INPUTS: TS `rivalBuilderActions`
+  builds the Δ-gain ctx from `modifiersFromResearch(rival.research)` at
+  CALL time — after this turn's tech/civic completions in `rivalPhase`
+  — while only VALIDITY rides the phase-top `rivalUnlocks` snapshot
+  (the seed-9274-t100 catch on `_rival_job_mask`). The GPU had
+  flattened BOTH onto the tk0/cv0 snapshot, so on the exact turn a
+  farm-adjacency tech landed the gains ranked with the stale tier and
+  flipped MINE-vs-FARM (seed 9196 t248, ΔrivalEmpireScore 6). Fix:
+  `_rival_builder_actions` gain terms (`_farmadj_tier`, mine boost)
+  now read current `r_techs`/`r_civics`; validity keeps the snapshot.
+  Poked by `gpu/builder_gain_test.py` (battery lane `builder_gain`):
+  scenario 1 proves gains-are-current (red pre-fix), scenario 2 proves
+  validity-is-snapshot (guards the seed-9274 catch against
+  over-correction).
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 

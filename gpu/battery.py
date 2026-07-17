@@ -106,6 +106,7 @@ def main() -> int:
                 ("war", [py, "gpu/war_test.py"], 4),
                 ("ranged", [py, "gpu/ranged_test.py"], 4),
                 ("occupancy", [py, "gpu/occupancy_test.py"], 4),
+                ("builder_gain", [py, "gpu/builder_gain_test.py"], 4),
                 ("domination", [py, "gpu/domination_test.py"], 4),
                 ("bankruptcy", [py, "gpu/bankruptcy_test.py"], 4),
                 ("seat", [py, "gpu/seat_test.py"], 4),
