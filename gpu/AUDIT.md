@@ -34,8 +34,8 @@ stage that moves an item.
 | **Overall (incl. closed)** | **180** | **110.3** | **61%** |
 | Open chapters only (A+B+E) | 131 | 61.3 | **47%** |
 
-(2026-07-17 #46r: A-7r LIVE; A-5r+#47r: A-5 resolved-minus-tile-
-purchase, B-18 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
+(2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
+spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
 B-18 60%→75% — pressure→yields coupling LIVE; B-13 → 100% — full
 unlockPolicy wiring; A-7r → 100% — the residual card wiring was
 B-13's; B-25 50%→70% — GPU space-race sim poke-covered; B-29 done.
@@ -100,29 +100,11 @@ untagged halves of tagged items stay Fable/main-session work.
   (`gpu/rival_purchase_test.py`), a recorded coverage gap, not a bug.
   Tile purchase stays open (no GPU verb on any seat — fold into the
   A-18/#50 verb work).
-- A-7 (remainder — LIVE 2026-07-17, #46r). `GOVERNMENTS_ADOPTION_LIVE
-  = true`: both scripted seats adopt governments and slot policies,
-  turn-exact at 24×250 (the flip hunt fixed housingAll + wildcard
-  overflow + the builder camp-clear latent — see G-3; the off-script
-  round then added yieldMult — the Merchant-Republic ×1.1 gold catch,
-  rng 2026006082 t249 — and INSULAE's housingIfDistricts). GPU
-  channels now: cityYields, capitalYields, housingAll +
-  housingIfDistricts (player-only per TS `rivalHousing`), yieldMult
-  (player-only per TS `rivalCityYields`), wildcard slot fill.
-  REMAINING channels are UNREACHABLE BY PROOF under deterministic
-  greedy adoption: W slots max out at 2 and the table-order overflow
-  is always LAND_SURVEYORS+INSULAE, so
-  adjacencyMult/buildingYieldMult/amenitiesIfSpecialty/newDeal cards
-  never slot; CLASSICAL_REPUBLIC (amenitiesAll) shares its unlock
-  civic with AUTOCRACY which wins table order. tilePurchaseMult
-  (LAND_SURVEYORS, slotted) is gate-inert: `buyTile` has no GPU verb
-  on any seat (A-5). These become due if the card table order, W
-  counts, or adoption rule ever change — the exporter already ships
-  every channel. **CLOSED (2026-07-18, ROUND B3 slice V)**: the
-  new-card `unlockPolicy` wiring landed (see B-13); the reachability
-  proof was re-derived post-wiring and the unreachable-channel set is
-  UNCHANGED (append-only cards cannot displace earlier slotted ones
-  under the greedy fill — gpu/ROUND_B3_LOG.md §V). A-7 remainder done.
+- A-7 (remainder). RESOLVED (2026-07-17 #46r LIVE; 2026-07-18 ROUND B3
+  slice V closed): both scripted seats adopt governments/slot policies
+  turn-exact; remaining GPU channels proven unreachable under greedy
+  adoption (exporter ships all), tilePurchaseMult gate-inert pending
+  the A-5 tile-purchase verb.
 - A-9. Rival-unreachable catalog: `tryQueueRivalDistrict` (rivals.ts) /
   `_place_district_rival`+`rival_masks` (engine.py) iterate only
   `SCAFFOLD_DISTRICTS` (data/districts.ts: CAMPUS, HOLY_SITE,
@@ -170,20 +152,11 @@ untagged halves of tagged items stay Fable/main-session work.
   `_capture_city_state` (engine.py) are reachable only from the
   player's seat. Downstream: rival districts never earn the CS envoy
   district bonuses the player's `_city_totals` applies.
-- A-17. **RESOLVED (2026-07-18, task #41)**: rival territory has a
-  per-city tile registry — TS `Tile.rivalCityId` (the owning
-  `RivalCity.id`, per-civ ids) / GPU `rc_tile_id` plane, keyed on the
-  PERSISTENT rc id (not the slot) so `_reclaim_rc` compaction needs no
-  tile-plane remap. Landed inert (all mutation sites maintain it:
-  founding center+ring, border claims, capture/raze/transfer/defection)
-  then flipped three reads: `pickRivalBorderTile`/`_rival_border_growth`
-  adjacency is per-city (`n.rivalCityId === city.id`, the player's
-  `borderCandidates` twin — no more claiming across a sibling's
-  frontier), and `captureRivalCity`/`_capture_rival_city` +
-  `transferRivalCityToRival`/`_transfer_rc_to_rc` move EXACTLY the
-  city's own tiles (registry scan) — the old work-radius sweeps both
-  leaked the outer ring as orphaned civ territory and stole sibling
-  cities' frontage. Residual worked-tile asymmetry split out as A-23.
+- A-17. RESOLVED (2026-07-18, task #41): rival territory gained a
+  per-city tile registry (TS `Tile.rivalCityId` / GPU `rc_tile_id`,
+  persistent-rc-id keyed), fixing per-city border adjacency and exact
+  capture/transfer tile sets; residual civ-level worked-tile scan
+  split out as A-23.
 - A-18. RL action surface (deliberately batched with the P8
   re-baseline, one item — task #50): `unit_action_mask` (engine.py)
   offers move/melee/hold/FARM/MINE/LUMBER_MILL/chop only — no
@@ -207,15 +180,9 @@ untagged halves of tagged items stay Fable/main-session work.
   the player (rivals never besiege, pillage or conquer each other —
   see the "other rivals never besiege" guards in `rivalPhase` and
   `_rival_phase`).
-- A-20. **RESOLVED (2026-07-13, task #54)**: rival cities heal the
-  player's flat +20 when unbesieged — the 15-peace/5-war split was a
-  local invention; real Civ 6 city HP regen ignores war status. Both
-  engines read one source: new `CITY_HEAL_PER_TURN` (data/units.ts,
-  next to `CITY_MAX_HP`) in `rivalPhase`, and the already-exported
-  `cityHealPerTurn` rules field (the one `_barbarian_phase` reads) in
-  `_rival_phase`. The A-10 besieged pin and the max-HP clamp are
-  untouched. Fixture regen: all 24 seeds survived, no SEED_OVERRIDES
-  needed.
+- A-20. RESOLVED (2026-07-13, task #54): rival cities heal the flat +20
+  when unbesieged (the 15/5 war split was a local invention), one
+  source both engines (`CITY_HEAL_PER_TURN` / `cityHealPerTurn`).
 - A-21 (new). The player has no pillage verb at all: pillaging exists
   only on the hostile side (`hostileUnitAct` step 2 (combat.ts) /
   `_rival_unit_war_act` (engine.py) for at-war rivals, plus
@@ -274,25 +241,14 @@ gap; likewise GS disasters are modeled minus sea-level rise
 (`disasterPhase`, core/disasters.ts).
 
 **Combat/military:**
-- B-1. **RESOLVED (2026-07-13, task #42)**: one tier — `ANCIENT_WALLS`
-  (`BUILDINGS`, CITY_CENTER, cost 80, MASONRY unlock via `techs.ts`)
-  grants a 100-HP OUTER pool (`outerHp` on City/RivalCity; GPU
-  `outer_hp`/`rc_outer_hp`, `_MUTABLE` + `_RC_SLOT_FIELDS`) that
-  absorbs attack damage FIRST, spillover to city hp (the three melee
-  twins both engines). Heals with the +20 city heal (`CITY_HEAL_PER_TURN`
-  clamp), wiped on capture/transfer/raze. Walls do NOT raise
-  `cityDefenseStrength` (deliberate 1-tier simplification, commented).
-  City-states deferred (no build queue). Rivals build/buy it
-  data-driven (probe-confirmed).
-- B-2. **RESOLVED (2026-07-13, task #42)**: a city WITH `ANCIENT_WALLS`
-  strikes once/turn — range 2, nearest unit hostile to the city's civ
-  (tile-order tie-break), one `damageRoll` at `cityDefenseStrength`
-  (hostileRangedStrike conventions: single roll, no retaliation,
-  civilians take it, never captures; new `pcstk`/`rcstk` k-tags).
-  Player strike in `barbarianPhase`'s city section, rival in
-  `rivalPhase`, both immediately before the heal, identical draw order
-  both engines (per-rank `walk_ord` / rc slot order on the GPU). No CS
-  strike (no walls).
+- B-1. RESOLVED (2026-07-13, task #42): `ANCIENT_WALLS` grants a 100-HP
+  OUTER pool (`outerHp`/`outer_hp`/`rc_outer_hp`) absorbing damage
+  first; heals/wiped-on-capture, no `cityDefenseStrength` bump
+  (1-tier), CS deferred, rivals build/buy it data-driven.
+- B-2. RESOLVED (2026-07-13, task #42): a walled city strikes once/turn
+  (range 2, nearest hostile, one `damageRoll` at `cityDefenseStrength`,
+  no retaliation/capture); both seats, identical draw order, no CS
+  strike.
 - B-3. **RESOLVED for player+rival movement (2026-07-13, task #43)**:
   `inEnemyZoc` (units.ts) / `_in_enemy_zoc` (engine.py) — entering a
   tile adjacent to a hostile MILITARY unit halts the mover (movesLeft
@@ -304,15 +260,10 @@ gap; likewise GS disasters are modeled minus sea-level rise
   march). City-center ZOC also deferred.
 - B-4. No unit XP/promotions: `Unit` (core/types.ts) has no
   xp/promotion fields, `UnitDef` (data/units.ts) has no promotion tree.
-- B-5. **RESOLVED (2026-07-13, task #43)**: `fortifyTurns` (military
-  only, cap 2) accrues on the EXACT acted/moved gate the D-2 heal uses
-  (a unit that spent no MP digs in), reset by any move/attack; +3 CS
-  at >=1, +6 at >=2 added to the DEFENDER's strength at every
-  unit-defense roll site both engines. Symmetric (rival patrollers
-  fortify). Survives TS serialize + GPU snapshot/restore + every
-  `_reclaim_pool` permutation (`p/u/v_fortify` in `_MUTABLE` + the
-  field lists, zeroed on spawn). HOLD already existed — no RL
-  action-space growth.
+- B-5. RESOLVED (2026-07-13, task #43): `fortifyTurns` (military, cap 2)
+  accrues on the no-MP-spent gate, reset by move/attack, +3/+6 CS to
+  the defender at every roll site both engines; symmetric, snapshot-
+  and `_reclaim_pool`-safe.
 - B-6. No embarkation/naval anything: `unitPassable` (core/units.ts) is
   `!isWater && !isImpassable` — water is a wall; `UNITS` has zero naval
   entries. Island starts are unreachable, Harbor cities can't be
@@ -354,23 +305,13 @@ gap; likewise GS disasters are modeled minus sea-level rise
   vectorized multi-step loop mirroring `_rival_unit_war_act`; target
   semantics unchanged). STILL OPEN in B-26: no cliffs, single-step era
   scaling, no scout-then-raid escalation, no ranged/naval barbs.
-- B-28. **RESOLVED (2026-07-13, task #44)**: `terrainDefense` now gives
-  the defender −2 on MARSH and FLOODPLAINS (was +3). GPU decoupled the
-  dual-purpose `tdef` plane by adding a sibling `tmove` plane (enter
-  cost reads `tmove//3`, defense reads `tdef`) so marsh stays slow to
-  enter while its defense flips — movement cost proven unchanged
-  (0/27,456 tiles). Exporter emits `tmove`.
-- B-29. **RESOLVED (2026-07-18, ROUND B3 slice X)**: wounded units
-  fight at −1 CS per 10 HP lost (linear, to −10 at 0 HP) and melee
-  attacks across a river (`crossesRiver`) take −5 attacker CS — all
-  18 `damageRoll`/`_damage_roll` sites, every seat, ranged and wall
-  strikes river-immune; cities/CS centers/walls are not units and
-  keep full strength. Fractional diffs forced a quantization both
-  engines share: `q = round(diff·10)`, exp table 121→1201 entries at
-  0.1 granularity (float association made irrelevant by
-  construction); the CB statelog diff column now logs q. GPU river
-  lookup reuses the exported `riverMask` bit the movement walkers
-  read. Poke `gpu/combat_mod_test.py` (battery lane).
+- B-28. RESOLVED (2026-07-13, task #44): `terrainDefense` gives −2 on
+  MARSH/FLOODPLAINS (was +3); GPU split the dual-purpose plane into
+  `tdef` (defense) + `tmove` (enter cost) so movement is unchanged.
+- B-29. RESOLVED (2026-07-18, ROUND B3 slice X): wounded units fight at
+  −1 CS/10 HP lost and melee across a river (`crossesRiver`) −5
+  attacker CS at all `damageRoll` sites; float association eliminated
+  by a shared quantization `q = round(diff·10)` (exp table 1201).
 - B-30 (new). Conquest razes all infrastructure: `captureRivalCity`
   and `transferCityToRival` (combat.ts / core/rivals.ts) rebuild the
   city with `buildings: []` and only the CITY_CENTER district;
@@ -387,28 +328,19 @@ gap; likewise GS disasters are modeled minus sea-level rise
   raiders pillage district buildings for heavy yields/heals.
 
 **Progression breadth:**
-- B-11. **RESOLVED (2026-07-17, Round B2)**: `TECHS` now the full GS
-  tree (68 entries), `ERAS` through Future — landed APPEND-ONLY so
-  existing indices/tie-breaks hold. Pure-military techs are tree nodes
-  that unlock nothing until B-10 lands the roster; eurekas only where
-  the condition is expressible (unboostable rows listed in
-  gpu/ROUND_B2_LOG.md §R).
-- B-12. **RESOLVED (2026-07-17, Round B2)**: `CIVICS` 31 → 51, same
-  append-only treatment, inspirations likewise.
-- B-13. **RESOLVED (2026-07-18, ROUND B3 slice V; breadth Round B2)**:
-  `POLICIES` 19 → 58 incl. 6 diplomatic cards; all 37 Round-B2 cards
-  now carry `unlockPolicy` on their real granting civic (7 recorded
-  substitutions for civics real Civ 6 grants elsewhere —
-  gpu/ROUND_B3_LOG.md §V) — zero unreachable cards. The wiring
-  activated the dormant MEDIEVAL_FAIRES "run 4 policy cards"
-  inspiration, which the exporter dropped and `_detect_boosts` never
-  detected — both fixed, player-only (TS `rivalCheckSatisfied` is
-  false for it). ~30 cards remain effect-inert (their real effects
-  need absent systems) — that is catalog-faithful, not a gap.
-- B-14. **RESOLVED (2026-07-17, Round B2, owner-ruled)**:
-  `CITIZEN_SCIENCE` 0.7 → 0.5 (real Civ 6). Reshuffled every
-  trajectory (fixture regen; rlenv coverage-test horizon 60→100; seed
-  9053 scripted collapse → SEED_OVERRIDES reroll pending #56).
+- B-11. RESOLVED (2026-07-17, Round B2): `TECHS` is the full GS tree
+  (68 entries), `ERAS` through Future, append-only; pure-military techs
+  unlock nothing until B-10.
+- B-12. RESOLVED (2026-07-17, Round B2): `CIVICS` 31 → 51, append-only,
+  inspirations likewise.
+- B-13. RESOLVED (2026-07-18, ROUND B3 slice V; breadth Round B2):
+  `POLICIES` 19 → 58, all cards wired to a real `unlockPolicy` civic
+  (zero unreachable); the wiring activated the dormant MEDIEVAL_FAIRES
+  inspiration (fixed both engines). ~30 cards effect-inert pending
+  absent systems (catalog-faithful, not a gap).
+- B-14. RESOLVED (2026-07-17, Round B2, owner-ruled): `CITIZEN_SCIENCE`
+  0.7 → 0.5 (real Civ 6); reshuffled every trajectory (fixture regen,
+  seed 9053 reroll pending #56).
 - B-27 (largely RESOLVED 2026-07-17, Round B2). Now: world wonders 30,
   natural wonders 12, pantheons 25 / follower 9 / founder 8 (+7
   enhancers), great people 9 classes incl. Writer/Musician, projects
@@ -418,11 +350,9 @@ gap; likewise GS disasters are modeled minus sea-level rise
   absent system). Improvements 9 stays (rest need naval/appeal).
 
 **Economy/districts/religion:**
-- B-16. **RESOLVED (2026-07-17, Round B2, owner-ruled → GS)**:
-  INDUSTRIAL_ZONE +0.5/mine +1/quarry +2/adjacent-Aqueduct (new
-  AQUEDUCT adjacency source), HARBOR +1 per CITY_CENTER (was +2,
-  gate-affecting). Fractional sums floor in `districtAdjacency` as
-  before. IZ channels are inert until A-9 makes IZ rival/scripted
+- B-16. RESOLVED (2026-07-17, Round B2, owner-ruled → GS):
+  INDUSTRIAL_ZONE +0.5/mine +1/quarry +2/adjacent-Aqueduct, HARBOR +1
+  per CITY_CENTER (was +2); IZ channels inert until A-9 makes IZ
   reachable.
 - B-17 (re-scoped). Encampment is no longer inert: it earns +1 General
   GPP/turn plus +1 per building (`greatPersonPointsPerTurn`,
@@ -449,11 +379,9 @@ gap; likewise GS disasters are modeled minus sea-level rise
   (gpu/ROUND_B3_LOG.md §U). Pantheon/founder/enhancer stay per-civ.
   STILL OPEN: enhancer EFFECTS (all 7 inert), Missionaries/Apostles,
   theological combat, religious victory.
-- B-19. **RESOLVED (2026-07-17, Round B2)**: era-anchored GP cost
-  ladder `[60,120,200,290,390,500,620,750]` (`gpCost`), global race
-  kept; WRITER/MUSICIAN classes added (n_gp=9, both → THEATER_SQUARE,
-  appended so PROPHET stays index 3). Poke `gpu/religion_gp_test.py`.
-  Building-GPP differentiation beyond +1/building still absent.
+- B-19. RESOLVED (2026-07-17, Round B2): era-anchored GP cost ladder
+  (`gpCost`), global race kept, WRITER/MUSICIAN added (n_gp=9,
+  appended). Building-GPP differentiation beyond +1/building absent.
 - B-20 (re-scoped 2026-07-17, Round B2). Writer/Musician output
   degrades to instant culture lumps. STILL OPEN: multi-charge people,
   Great Works as building-slotted stores (Amphitheater/Museum line),
@@ -514,18 +442,11 @@ direct count. All other inherited items re-verified accurate.
 ## D. Engine optimizations — CHAPTER CLOSED 2026-07-13
 
 D-1..D-8 (task #36, f739d8c), D-10..D-18 (task #52, 1779904) and D-9
-(task #53) all landed bit-exact; landing logs live in git history.
-D-9, the one needs-gate-equivalence item, closed the chapter:
-`_rival_city_yields_all` batches the trace path's per-j city yields
-into one [B, RC, M] gather set + a single topk, `rival_empire_score`
-keeps the per-j accumulation order (the P4 ±1-ulp class) reading
-column slices, and the window cache rides the existing _eff_version
-key (every rc_center mutation site already bumps it — zero new
-invalidation sites). Proof: a direct bitwise probe (torch.equal, all
-6 columns × every alive (r,j) × 24 seeds × 100 turns) plus green
-scripted, forced-compaction and battery gates. Hard constraint for
-any future item stays: bit-exact, gate-equivalence is the bar; never
-read perf numbers off a contended machine.
+(task #53) all landed bit-exact; landing logs live in git history. D-9
+(`_rival_city_yields_all` batching, gate-equivalence-proven) closed
+the chapter. Hard constraint for any future item stays: bit-exact,
+gate-equivalence is the bar; never read perf numbers off a contended
+machine.
 
 ## E. Docs staleness
 
@@ -540,89 +461,30 @@ RETRO note re-scopes BUILD_PLAN VP-G1/G2's never-spend premise
 against shipped A-5/A-4/A-14. tsc clean. E-16 (AGENT_PROMPT.md
 refresh) stays with the owner. Original items kept for reference:
 
-- E-19. `src/data/improvements.ts` header docstring claims "Stage 1
-  has no builders/units: improvements are placed instantly and for
-  free (like a builder with infinite charges), and no tech gating is
-  applied." All three clauses are false in units mode: builders carry
-  real charges (`validImprovements` consumers gate on
-  `(u.charges ?? 0) > 0`), and `validImprovementsIn`
-  (src/core/rules.ts) applies tech/civic gating via
-  `unlocks.improvements.has(imp)` plus the `hillFarms` civic gate —
-  only sandbox mode bypasses it. The roster is also 9 improvements
-  now, not the stage-1 set the header implies.
-- E-20. gpu/README.md §"What phases 1–5 cover (and what they don't)" —
-  the "Not yet (runs in TS only)" cell reads "Improvements beyond
-  FARM/MINE/LUMBER_MILL (pasture/camp/plantation, chops/harvests)."
-  Contradicted for the rival economy since A-13: `_eff_prod`/gold
-  paths add QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL catalog yields via
-  `_imp_yields`, and `_rival_job_mask` lets rivals BUILD that resource
-  roster on their unlock techs (`res_imp >= 3` / `_imp_unlock`). Only
-  chops/harvests remain genuinely TS-only. The same staleness repeats
-  in the paired coverage-table cells elsewhere in gpu/README.md.
-- E-21. gpu/BUILD_PLAN.md §4b "Rival-seat verb parity", items
-  VP-G1/VP-G2 — the premise "scripted rivals never SPEND, so behavior
-  is inert-but-visible" (VP-G1) and "Scripted rivals keep
-  never-spending" (VP-G2) is overtaken by the AUDIT A-arc: the A-5
-  block in `rivalPhase` (rivals.ts) has scripted rivals spend banked
-  gold (one purchase/civ/turn, `rival.treasury -= price`), A-4 raises
-  world wonders, and the projects path (`queueProject`/`PROJECTS`)
-  runs. These are unchecked forward-plan boxes, not a
-  "current behavior" section, but the spend premise now directly
-  contradicts shipped scripted-rival code.
+- E-19. RESOLVED (2026-07-13, task #51): `improvements.ts` header
+  rewritten to current reality (9-improvement roster, real charges,
+  `validImprovementsIn` gating, sandbox bypass).
+- E-20. RESOLVED (2026-07-13, task #51): gpu/README coverage cells
+  corrected — chops/harvests are the only TS-only improvement
+  remainder since A-13.
+- E-21. RESOLVED (2026-07-13, task #51): a RETRO note re-scopes
+  BUILD_PLAN VP-G1/G2's never-spend premise against shipped
+  A-5/A-4/A-14.
 
-## G. Known parity latents (dormant, not currently gate-visible)
+## G. Known parity latents (dormant) — CHAPTER EMPTY
 
-- G-1. RESOLVED (owner-ordered fix ahead of gate visibility). Root
-  cause was not the gain MODEL but its INPUTS: TS `rivalBuilderActions`
-  builds the Δ-gain ctx from `modifiersFromResearch(rival.research)` at
-  CALL time — after this turn's tech/civic completions in `rivalPhase`
-  — while only VALIDITY rides the phase-top `rivalUnlocks` snapshot
-  (the seed-9274-t100 catch on `_rival_job_mask`). The GPU had
-  flattened BOTH onto the tk0/cv0 snapshot, so on the exact turn a
-  farm-adjacency tech landed the gains ranked with the stale tier and
-  flipped MINE-vs-FARM (seed 9196 t248, ΔrivalEmpireScore 6). Fix:
-  `_rival_builder_actions` gain terms (`_farmadj_tier`, mine boost)
-  now read current `r_techs`/`r_civics`; validity keeps the snapshot.
-  Poked by `gpu/builder_gain_test.py` (battery lane `builder_gain`):
-  scenario 1 proves gains-are-current (red pre-fix), scenario 2 proves
-  validity-is-snapshot (guards the seed-9274 catch against
-  over-correction).
-- G-2. RESOLVED (2026-07-17, #47r — re-verified before fixing per the
-  G-3 lesson; the asymmetry was real): the GPU player GP loop now
-  banks the faith effect column via a `player_faith` accumulator
-  mirroring the rival loop; poked in `gpu/religion_gp_test.py` (a
-  fresh player Prophet banks exactly 100 faith + snapshot coverage).
-  Noted residual: per-turn player yield-faith (`faithTotal`) remains
-  GPU-unmodeled beyond this bank — dormant, no in-gate consumer; wire
-  with player religion-founding. **Chapter G is EMPTY.**
-- G-4. RESOLVED-ON-CATCH (2026-07-17, #56 hunt, seed 9287 t128→t142
-  visible): the GPU's scripted builder walker (`_scripted_builder`)
-  ran BEFORE the production-choice section while the exporter's script
-  runs envoys → production → walker — so the walker could target a
-  tile THIS turn's production had already paved (district/wonder
-  pave), a one-turn phantom job that desynced the walk (farm landed on
-  246 vs 290; worked-tile shift surfaced 14 turns later at a growth
-  boundary). Pre-existing latent exposed by the 250t horizon. Fixed
-  structurally: the walker call moved AFTER production (TS order);
-  the #56 slice-A pre-walker snapshot reverted to live reads.
-- G-3. RESOLVED as REFUTED-AND-REPLACED (2026-07-17, #46r flip hunt).
-  Agent P's iteration-order theory was WRONG: `_reclaim_pool` is a
-  STABLE compaction and spawns append, so GPU slot order among living
-  units IS TS insertion order structurally — no ordering fix needed
-  or made. The ACTUAL blockers behind P's seed-9066 repro (and the
-  flip's real divergences at 250t) were three unrelated gaps, all
-  fixed: (1) MONARCHY's `housingAll` channel unimplemented on the GPU
-  (player-only — TS `rivalHousing` is mods-free; the t117-118
-  multi-seed foodBox cluster); (2) `_gov_policy_mods` never filled
-  WILDCARD slots ("no reachable government carries one" was
-  100t-true, 250t-false — MONARCHY's W takes GOD_KING via
-  within-kind overflow in table order); (3) `_scripted_builder`'s
-  move block was the ONLY mover in the engine missing the
-  `_clear_camp_at` mirror of walkPath's clearCampFor (seed 9170 t160:
-  a builder walked onto an empty camp, +50 player gold + camp splice
-  in TS only — rng-stream split). Poked by the extended
-  `gpu/government_test.py` (wildcard overflow, housingAll,
-  live-by-default).
+All four latents resolved (detail in git history / the cited logs):
+- G-1. RESOLVED: `_rival_builder_actions` gain terms read current
+  `r_techs`/`r_civics` (validity keeps the snapshot); poke
+  `gpu/builder_gain_test.py`.
+- G-2. RESOLVED (2026-07-17, #47r): GPU player GP loop banks faith via
+  a `player_faith` accumulator mirroring the rival loop.
+- G-3. RESOLVED-AS-REFUTED (2026-07-17, #46r): the iteration-order
+  theory was wrong (`_reclaim_pool` is stable); the real flip blockers
+  were housingAll, wildcard-slot overflow, and the builder camp-clear
+  mirror — all fixed (`gpu/government_test.py`).
+- G-4. RESOLVED-ON-CATCH (2026-07-17, #56): scripted builder walker
+  moved AFTER production (TS order), fixing a one-turn phantom job.
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 
