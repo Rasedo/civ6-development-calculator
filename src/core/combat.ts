@@ -489,6 +489,8 @@ export function captureCityState(state: GameState, cs: CityState): void {
  * and elimination semantics, no +40 and no conquest log line. */
 export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity, plunder = true): void {
   rival.cities = rival.cities.filter((c) => c.id !== city.id);
+  // A-11: routes die with their endpoint (the state.tradeRoutes twin).
+  rival.tradeRoutes = rival.tradeRoutes?.filter((x) => x.from !== city.id && x.to !== city.id);
   const center = state.map.tiles[city.centerIndex];
   // V-W2 slot cap (mirrors the GPU's fixed city slots): a full empire
   // RAZES instead — the rival city and its claim simply cease.

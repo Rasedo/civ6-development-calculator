@@ -139,6 +139,7 @@ class Rules:
     c_cost: torch.Tensor
     c_prereqs: list
     war_weariness: dict  # B-15: {perTurn, decay, perAmenity, cap} — flat amenity drag at war
+    trade: dict  # A-11: {marketBidx, lighthouseBidx, foreignTradeCidx, capWonderWidx, range} — rival trade capacity/route anchors
 
 
 def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
@@ -204,6 +205,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
         c_prereqs=[c["prereqs"] for c in r["civics"]],
         war_weariness=r.get("warWeariness", {"perTurn": 1, "decay": 4, "perAmenity": 4, "cap": 24}),
+        trade=r.get("trade", {}),
     )
 
 
@@ -334,6 +336,7 @@ _MUTABLE = [
     "r_atwar", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
+    "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
     "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
@@ -608,6 +611,12 @@ class BatchSim:
         # capitalTiles[r+1] — static like TS's (game.ts:234): only an
         # isCapital founding (t0 or a total-collapse refound) writes it.
         self.cap_tile_rival = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # AUDIT A-11: domestic trade routes per civ — (from_id, to_id) rc-id
+        # pairs, -1 = empty column. Id-keyed like rc_tile_id, so _reclaim_rc
+        # slot permutations never touch it; K=10 > the max capacity
+        # (FOREIGN_TRADE 1 + maxCities 6 + 2 wonders). t0 fixtures carry no
+        # routes (single-city civs), so no fixture field is needed.
+        self.r_routes = torch.full((B, r_pad, 10, 2), -1, dtype=torch.long, device=device)
         self.rvcity_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at rival centers
         self.v_alive = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # rival units, spawn order
         self.v_acted = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # P4/D-2: spent MP since the last refresh (blocks healing)
@@ -1018,6 +1027,14 @@ class BatchSim:
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
         self._shipyard_bidx = int(rules.shipyard_bidx)
         self._walls_bidx = int(rules.ancient_walls_bidx)  # AUDIT B-1/B-2
+        # AUDIT A-11: rival trade anchors (id-anchored capacity sources +
+        # route constants — the rivalTradeCapacity/routeYields mirror).
+        _tr = rules.trade or {}
+        self._trade_mkt = int(_tr.get("marketBidx", -1))
+        self._trade_lgh = int(_tr.get("lighthouseBidx", -1))
+        self._trade_ftc = int(_tr.get("foreignTradeCidx", -3))
+        self._trade_wonders = [int(x) for x in _tr.get("capWonderWidx", [])]
+        self._trade_range = int(_tr.get("range", 15))
         self._walls_hp = int(rules.combat.get("wallsHp", 100))
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
@@ -2692,6 +2709,12 @@ class BatchSim:
             sci = sci + gcity[:, 3].unsqueeze(1) * acell + gcap[:, 3].unsqueeze(1) * gisc
             cul = cul + gcity[:, 4].unsqueeze(1) * acell + gcap[:, 4].unsqueeze(1) * gisc
             faith = faith + gcity[:, 5].unsqueeze(1) * acell + gcap[:, 5].unsqueeze(1) * gisc
+        # A-11: outgoing unraided route income — pre-tier, the per-j twin's
+        # position (integer-valued adds in f64: batching is exact).
+        _route_inc = self._rival_route_income(r)
+        if _route_inc is not None:
+            food = food + _route_inc * alive.double()
+            prod = prod + _route_inc * alive.double()
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
         yf = self._rival_amenity(r)[2]  # [B, RC]
@@ -3637,7 +3660,11 @@ class BatchSim:
             # A-17: exactly this city's tiles leave the rival (registry scan)
             # — the old radius-3 sweep leaked the outer ring as orphaned civ
             # territory and stole sibling cities' frontage.
-            ring = (self.rc_tile_id[b] == int(self.rc_id[b, r, j])) & (self.rival_at[b] == r)
+            cid = int(self.rc_id[b, r, j])
+            ring = (self.rc_tile_id[b] == cid) & (self.rival_at[b] == r)
+            # A-11: routes die with their endpoint (the TS filter twin).
+            kill = (self.r_routes[b, r, :, 0] == cid) | (self.r_routes[b, r, :, 1] == cid)
+            self.r_routes[b, r][kill] = -1
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
             self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], -1), self.rc_tile_id[b])  # A-17
             # P5/S2 gate-catch (seed 9235 t241): TS APPENDS the captured city
@@ -5474,6 +5501,48 @@ class BatchSim:
         plane = plane + impY.gather(1, self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)) * imp_live
         return plane
 
+    def _rival_route_income(self, r: int) -> torch.Tensor | None:
+        """AUDIT A-11: per-slot ORIGIN income from this civ's unraided
+        domestic routes — [B, RC] double (food == production: routeYields
+        pays 1 + floor(destCompletedSpecialty/2) to BOTH columns), or None
+        when the civ holds no routes batch-wide. Mirrors the rivalCityYields
+        route loop: dest resolved by rc id among LIVING cities, a route is
+        suspended while a barbarian (always) or player unit (at war) sits
+        within 3 of either endpoint. NOT cacheable across the city loop —
+        a district completing mid-loop raises a later origin's dest bonus,
+        exactly like TS's sequential rivalCityYields calls."""
+        rr = self.r_routes[:, r]  # [B, K, 2]
+        act = rr[:, :, 0] >= 0
+        if not bool(act.any()):
+            return None
+        B, RC = self.B, self.RC
+        ids = self.rc_id[:, r]  # [B, RC]
+        alive = self.rc_alive[:, r]
+        fm = (rr[:, :, 0].unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)  # [B, K, RC]
+        dm = (rr[:, :, 1].unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)
+        has_from = fm.any(dim=2)
+        has_dest = dm.any(dim=2)
+        from_j = fm.long().argmax(dim=2)  # ids unique per civ → at most one hit
+        dest_j = dm.long().argmax(dim=2)
+        dt = self.rc_dist_tile[:, r]  # [B, RC, nD]
+        comp = (dt >= 0) & self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
+        spec = (comp & self._is_specialty.view(1, 1, -1)).sum(dim=2)  # [B, RC]
+        per = (1 + spec // 2).double()  # [B, RC] — routeYields' food (= prod) column
+        centers = self.rc_center[:, r].clamp(min=0)  # [B, RC]
+        # hostile-near-endpoint [B, RC]: barbarians always; player units at war
+        near = torch.zeros(B, RC, dtype=torch.bool, device=self.device)
+        if self.u_tile.numel():
+            d_b = self.pair_dist[centers.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, U]
+            near = near | (d_b & self.u_alive.unsqueeze(1)).any(dim=2)
+        if self.p_tile.numel():
+            d_p = self.pair_dist[centers.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, P]
+            near = near | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].view(B, 1))
+        raided = near.gather(1, from_j) | near.gather(1, dest_j)  # [B, K]
+        pays = act & has_from & has_dest & ~raided
+        inc = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
+        inc.scatter_add_(1, from_j, per.gather(1, dest_j) * pays.double())
+        return inc
+
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
         defaultModifiers). Candidates = owned, citizen-workable (water yes,
@@ -5757,6 +5826,12 @@ class BatchSim:
             sci = sci + gcity[:, 3] * mcell + gcap[:, 3] * gisc
             cul = cul + gcity[:, 4] * mcell + gcap[:, 4] * gisc
             faith = faith + gcity[:, 5] * mcell + gcap[:, 5] * gisc
+        # A-11: outgoing unraided route income — pre-tier, the trade position
+        # in computeCityStats (production scales with the tier, food doesn't).
+        _route_inc = self._rival_route_income(r)
+        if _route_inc is not None:
+            food = food + _route_inc[:, j] * mask.double()
+            prod = prod + _route_inc[:, j] * mask.double()
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
@@ -5871,7 +5946,12 @@ class BatchSim:
         # A-17: exactly the flipping city's tiles re-tag (registry scan) —
         # the transferRivalCityToRival twin (rc_id read before the hygiene
         # writes; the slot's id field itself is never reset on death).
-        own_t = (self.rc_tile_id[b] == int(self.rc_id[b, r_from, j])) & (self.rival_at[b] == r_from)
+        id_from = int(self.rc_id[b, r_from, j])
+        own_t = (self.rc_tile_id[b] == id_from) & (self.rival_at[b] == r_from)
+        # A-11: the loser's routes die with their endpoint (receiver starts
+        # route-less — the TS from.tradeRoutes filter twin).
+        kill = (self.r_routes[b, r_from, :, 0] == id_from) | (self.r_routes[b, r_from, :, 1] == id_from)
+        self.r_routes[b, r_from][kill] = -1
         self.rival_at[b] = torch.where(own_t, torch.full_like(self.rival_at[b], r_to), self.rival_at[b])
         # A-17: re-tagged tiles register to the receiving rc (its id is
         # assigned below from r_next_city_id — same value, read here first)
@@ -6717,6 +6797,80 @@ class BatchSim:
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
 
+    def _rival_trade_phase(self, r: int, active: torch.Tensor) -> None:
+        """AUDIT A-11: ONE new domestic route per civ per turn while under
+        capacity — the rivalPhase creation block. Capacity mirrors
+        rivalTradeCapacity: FOREIGN_TRADE civic +1, Market-OR-Lighthouse per
+        living city +1 (non-cumulative, the D-7 rule), completed
+        Colossus/Great Zimbabwe +1 each (no CS-suzerain term until A-12).
+        Pair pick mirrors the TS scan exactly: best NEW in-range pair by
+        routeYields(dest) food+prod sum — dest-only, 2 + 2*floor(
+        destCompletedSpecialty/2) — with strictly-greater-beats semantics,
+        so ties keep the FIRST pair in (from asc, to asc) slot order (rc
+        slot order == TS array order: founding/capture/transfer all append
+        at last-alive+1 and _reclaim_rc is stable)."""
+        B, RC, dev = self.B, self.RC, self.device
+        alive = self.rc_alive[:, r]  # [B, RC]
+        want = active & (alive.sum(dim=1) >= 2)
+        if not bool(want.any()):
+            return
+        cap = torch.zeros(B, dtype=torch.long, device=dev)
+        if self._trade_ftc >= 0:
+            cap = cap + self.r_civics[:, r, self._trade_ftc].long()
+        mkt = torch.zeros(B, RC, dtype=torch.bool, device=dev)
+        if self._trade_mkt >= 0:
+            mkt = mkt | self.rc_bldg[:, r, :, self._trade_mkt]
+        if self._trade_lgh >= 0:
+            mkt = mkt | self.rc_bldg[:, r, :, self._trade_lgh]
+        cap = cap + (mkt & alive).sum(dim=1)
+        for wi in self._trade_wonders:
+            wt = self.rc_wonder[:, r, :, wi]  # [B, RC] — wonder wi's tile per slot
+            cap = cap + ((wt >= 0) & alive & self.built_wonder_complete.gather(1, wt.clamp(min=0))).sum(dim=1)
+        used = (self.r_routes[:, r, :, 0] >= 0).sum(dim=1)
+        want = want & (used < cap)
+        if not bool(want.any()):
+            return
+        # dest score (j-only): routeYields food+prod = 2 + 2*floor(spec/2)
+        dt = self.rc_dist_tile[:, r]  # [B, RC, nD]
+        comp = (dt >= 0) & self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
+        spec = (comp & self._is_specialty.view(1, 1, -1)).sum(dim=2)  # [B, RC]
+        ysum = 2 + 2 * (spec // 2)  # [B, RC] long, >= 2
+        centers = self.rc_center[:, r].clamp(min=0)  # [B, RC]
+        d = self.pair_dist[centers.unsqueeze(2), centers.unsqueeze(1)]  # [B, RC, RC]
+        ids = self.rc_id[:, r]  # [B, RC]
+        rr = self.r_routes[:, r]  # [B, K, 2]
+        exists = (
+            (rr[:, :, 0].view(B, 1, 1, -1) == ids.view(B, RC, 1, 1))
+            & (rr[:, :, 1].view(B, 1, 1, -1) == ids.view(B, 1, RC, 1))
+        ).any(dim=3)  # [B, RC, RC]
+        eye = torch.eye(RC, dtype=torch.bool, device=dev).view(1, RC, RC)
+        valid = (
+            alive.unsqueeze(2)
+            & alive.unsqueeze(1)
+            & ~eye
+            & (d <= self._trade_range)
+            & ~exists
+            & want.view(B, 1, 1)
+        )
+        key = torch.where(valid, ysum.unsqueeze(1).expand(B, RC, RC), torch.full((B, RC, RC), -1, dtype=torch.long, device=dev))
+        kf = key.reshape(B, RC * RC)  # i-major flat order = the TS from-asc/to-asc scan
+        kmax, _ = kf.max(dim=1)
+        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * RC, device=dev).view(1, -1), torch.full((1, RC * RC), RC * RC, device=dev)).min(dim=1).values
+        do = want & (kmax >= 0)
+        if not bool(do.any()):
+            return
+        rows = do.nonzero(as_tuple=True)[0]
+        i_pick = (first[rows] // RC)
+        j_pick = (first[rows] % RC)
+        from_id = ids[rows, i_pick]
+        to_id = ids[rows, j_pick]
+        free = self.r_routes[rows, r, :, 0] < 0  # [n, K]
+        K = free.shape[1]
+        slot = torch.where(free, torch.arange(K, device=dev).view(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values
+        assert int(slot.max()) < K, "r_routes columns exhausted — raise K above the capacity bound"
+        self.r_routes[rows, r, slot, 0] = from_id
+        self.r_routes[rows, r, slot, 1] = to_id
+
     def _rival_phase(self) -> None:
         """Mirrors rivalPhase, rival by rival in id order — queue picks for
         the pre-turn city set, then per-city economy (yields, growth, queue
@@ -7123,6 +7277,9 @@ class BatchSim:
                     price_u5 = self._p_cost.gather(0, pick_ty5).double() * mult_r5
                     self.r_treasury[:, r] = torch.where(landed_u5, self.r_treasury[:, r] - price_u5, self.r_treasury[:, r])
                     bought_r5 = bought_r5 | landed_u5
+            # AUDIT A-11: the trade creation block sits between the buy block
+            # and the city-loop snapshot — the exact rivalPhase position.
+            self._rival_trade_phase(r, active)
             # A-5r: the city-loop snapshot is taken AFTER the buy block (the TS
             # [...rival.cities] discipline) — an A-5r settler newborn acts this
             # turn (amenity + yields), a queue-completion newborn (founded

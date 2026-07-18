@@ -16,6 +16,7 @@ import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlo
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
+import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, TRADE_ROUTE_RANGE } from './trade';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import type { RuleResult } from './rules';
@@ -1227,6 +1228,19 @@ export function rivalCityYields(
   if (rc.isCapital) {
     for (const [k, v] of Object.entries(ctx.mods.capitalYields)) total[k as keyof Yields] += v ?? 0;
   }
+  // A-11: outgoing unraided trade routes pay the origin — the trade position
+  // in computeCityStats (added BEFORE the tier scaling, city.ts:486; the
+  // production half scales with the tier, the food half does not — exactly
+  // like the player's).
+  for (const route of rival.tradeRoutes ?? []) {
+    if (route.from !== rc.id) continue;
+    const dest = rival.cities.find((c) => c.id === route.to);
+    if (!dest) continue;
+    if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, dest.centerIndex])) continue;
+    const ry = routeYields(state, dest);
+    total.food += ry.food;
+    total.production += ry.production;
+  }
   // P5/S6 (C-20): the amenity tier scales non-food yields, exactly like
   // computeCityStats. External callers (score/statelog) re-rank FRESH;
   // the phase loop passes its loop-top frozen map — the player's luxMap
@@ -1286,6 +1300,8 @@ function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void
  * the transferCityToRival shape on the rival side. */
 function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
   from.cities = from.cities.filter((c) => c.id !== rc.id);
+  // A-11: routes die with their endpoint (the receiver starts route-less).
+  from.tradeRoutes = from.tradeRoutes?.filter((x) => x.from !== rc.id && x.to !== rc.id);
   // A-17: exactly the flipping city's tiles re-tag (registry scan) — the old
   // work-radius sweep both leaked its outer ring and stole sibling frontage.
   for (const t of state.map.tiles) {
@@ -1520,6 +1536,31 @@ export function rivalPhase(state: GameState): void {
             bought = true;
           }
         }
+      }
+    }
+
+    // AUDIT A-11: trade — ONE new domestic route per civ per turn while
+    // capacity allows (trader-training pacing). Scan origins × destinations
+    // in city-array order; the best NEW in-range pair by routeYields sum
+    // (dest-development only), strictly-greater beats so ties keep the
+    // first-found (from asc, to asc) — the deterministic GPU-mirrorable key.
+    {
+      const routes = (rival.tradeRoutes ??= []);
+      if (routes.length < rivalTradeCapacity(state, rival) && rival.cities.length >= 2) {
+        let best: { from: number; to: number; ySum: number } | null = null;
+        for (const from of rival.cities) {
+          const ft = state.map.tiles[from.centerIndex];
+          for (const to of rival.cities) {
+            if (to.id === from.id) continue;
+            if (routes.some((x) => x.from === from.id && x.to === to.id)) continue;
+            const tt = state.map.tiles[to.centerIndex];
+            if (hexDistance(ft.col, ft.row, tt.col, tt.row) > TRADE_ROUTE_RANGE) continue;
+            const y = routeYields(state, to);
+            const ySum = y.food + y.production;
+            if (!best || ySum > best.ySum) best = { from: from.id, to: to.id, ySum };
+          }
+        }
+        if (best) routes.push({ from: best.from, to: best.to });
       }
     }
 

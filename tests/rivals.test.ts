@@ -13,6 +13,7 @@ import { canFoundCity } from '../src/core/rules';
 import { tilesWithin, hexDistance } from '../src/core/hex';
 import { rivalPhase, declareWar, sueForPeace, rivalUnits } from '../src/core/rivals';
 import { meleeAttack, attackTargets } from '../src/core/combat';
+import { rivalTradeCapacity, rivalRouteRaidedAt, routeRaidedAt } from '../src/core/trade';
 import { spawnUnit, unitsHostile } from '../src/core/units';
 import { gpCost } from '../src/data/greatPeople';
 import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
@@ -246,5 +247,99 @@ describe('determinism', () => {
       endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
+  });
+});
+
+describe('rival trade routes (A-11)', () => {
+  function addSecondCity(state: GameState, rival: RivalCiv, col: number, row: number): RivalCity {
+    const tile = tileAtCoords(state.map, col, row);
+    const city: RivalCity = {
+      id: rival.nextCityId++,
+      name: 'Ostia',
+      civId: rival.id + 1,
+      centerIndex: tile.index,
+      population: 3,
+      foodBox: 0,
+      cultureBox: 0,
+      tilesAcquired: 0,
+      lockedTiles: [],
+      focus: 'balanced',
+      queue: [],
+      isCapital: false,
+      buildings: [],
+      districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
+      wonders: [],
+      specialists: {},
+      hp: 200,
+      foundedTurn: 1,
+    };
+    tile.district = 'CITY_CENTER';
+    tile.districtComplete = true;
+    tile.rivalId = rival.id;
+    tile.rivalCityId = city.id;
+    rival.cities.push(city);
+    return city;
+  }
+
+  it('capacity counts FOREIGN_TRADE, Market/Lighthouse per city (non-cumulative)', () => {
+    const state = makeState();
+    const rival = addRival(state, 8, 8);
+    expect(rivalTradeCapacity(state, rival)).toBe(0);
+    rival.research.civics.push('FOREIGN_TRADE');
+    expect(rivalTradeCapacity(state, rival)).toBe(1);
+    rival.cities[0].buildings.push('MARKET');
+    expect(rivalTradeCapacity(state, rival)).toBe(2);
+    rival.cities[0].buildings.push('LIGHTHOUSE'); // same city: still +1
+    expect(rivalTradeCapacity(state, rival)).toBe(2);
+  });
+
+  it('rivalPhase forms one route per turn up to capacity; routes die with the city', () => {
+    const state = makeState();
+    const rival = addRival(state, 8, 8);
+    const second = addSecondCity(state, rival, 11, 8);
+    rival.research.civics.push('FOREIGN_TRADE');
+    rivalPhase(state);
+    expect(rival.tradeRoutes?.length).toBe(1);
+    const r0 = rival.tradeRoutes![0];
+    expect([rival.cities[0].id, second.id]).toContain(r0.from);
+    expect([rival.cities[0].id, second.id]).toContain(r0.to);
+    expect(r0.from).not.toBe(r0.to);
+    rivalPhase(state);
+    expect(rival.tradeRoutes?.length).toBe(1); // capacity 1: no second route
+    // endpoint death prunes
+    rival.tradeRoutes = rival.tradeRoutes!.filter(() => true);
+    rival.cities = rival.cities.filter((c) => c.id !== second.id);
+    rival.tradeRoutes = rival.tradeRoutes.filter((x) => x.from !== second.id && x.to !== second.id);
+    expect(rival.tradeRoutes.length).toBe(0);
+  });
+
+  it('rival routes suspend for barbarians always and player units only at war', () => {
+    const state = makeState();
+    state.unitsMode = true;
+    const rival = addRival(state, 8, 8);
+    const center = state.map.tiles[rival.cities[0].centerIndex];
+    const ends = [center.index];
+    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false);
+    const mine = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index)!;
+    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false); // at peace
+    rival.atWar = true;
+    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(true);
+    state.units = state.units.filter((u) => u.id !== mine.id);
+    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false);
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index, 'barbarian');
+    rival.atWar = false;
+    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(true); // barbs always
+  });
+
+  it('player routes suspend for AT-WAR rival units (the A-11 symmetry fix)', () => {
+    const state = makeState();
+    state.unitsMode = true;
+    const rival = addRival(state, 10, 10);
+    const home = tileAtCoords(state.map, 4, 4);
+    const ends = [home.index];
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 4).index, 'rival', rival.id);
+    expect(routeRaidedAt(state, ends)).toBe(false); // at peace: no interdiction
+    rival.atWar = true;
+    expect(routeRaidedAt(state, ends)).toBe(true);
   });
 });

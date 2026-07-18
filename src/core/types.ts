@@ -359,6 +359,9 @@ export interface RivalCiv {
   warWeariness?: number;
   /** B-25: this civ's completed space-race project ids (chain progress). */
   spaceProjects?: string[];
+  /** AUDIT A-11: this civ's domestic trade routes (RivalCity ids, both
+   *  endpoints own cities). Routes to city-states wait on A-12 (envoys). */
+  tradeRoutes?: { from: number; to: number }[];
   /** Real tech/civic trees (C1-B3): same shape as the player's. */
   research: ResearchState;
 

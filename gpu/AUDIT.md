@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 37 | 11.9 | **32%** |
+| A symmetry | 37 | 15.5 | **42%** |
 | B fidelity | 88 | 40.8 | **46%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (E-16 with owner) | 6 | 5 | 83% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **180** | **106.7** | **59%** |
-| Open chapters only (A+B+E) | 131 | 57.7 | **44%** |
+| **Overall (incl. closed)** | **180** | **110.3** | **61%** |
+| Open chapters only (A+B+E) | 131 | 61.3 | **47%** |
 
 (2026-07-17 #46r: A-7r LIVE; A-5r+#47r: A-5 resolved-minus-tile-
 purchase, B-18 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -41,13 +41,16 @@ unlockPolicy wiring; A-7r → 100% — the residual card wiring was
 B-13's; B-25 50%→70% — GPU space-race sim poke-covered; B-29 done.
 2026-07-18 #41 stage 1: A-17 RESOLVED — per-rc tile registry both
 engines, per-city border adjacency + exact capture/transfer tile
-sets; residual worked-tile civ-level scan split out as new A-23 w2.)
+sets; residual worked-tile civ-level scan split out as new A-23 w2.
+Stage 2: A-11 → 90% — rival domestic trade routes live both engines
++ symmetric route interdiction; rival→CS routes wait on A-12.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
-  closed the card wiring), A-9 4, A-11 4, A-12 4, A-17 4 (done —
-  #41 stage 1), A-18 3, A-19 4, A-20 2 (done), A-21 2, A-22 2,
-  A-23 2 (new — split from A-17: civ-level worked-tile scan).
+  closed the card wiring), A-9 4, A-11 4 (90% — CS routes → A-12),
+  A-12 4, A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
+  A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
+  worked-tile scan).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 / B-29 2 (done);
   B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%); B-4 3,
   B-6 8, B-7 2, B-8 2, B-9 3, B-10 3, B-30 2, B-31 1, B-32 2 (open).
@@ -138,14 +141,25 @@ untagged halves of tagged items stay Fable/main-session work.
   off a settled breadth list; the rival QUEUE/PICK logic
   (tryQueueRivalDistrict order, purchase interplay, draw-count) stays
   Fable.]
-- A-11. Rivals have no trade routes — trade.ts is player-keyed
-  throughout (`tradeCapacity` iterates `state.cities`,
-  `cityTradeYields`/`routeYields`/`addTradeRoute`/`addCsTradeRoute` all
-  read player structures); the GPU has no route machinery at all
-  (`_city_state_phase` (engine.py) notes trade-route quests "remain
-  uncompletable"). Related one-sidedness: `routeRaidedAt` (trade.ts)
-  suspends routes for BARBARIAN proximity only — at-war rival units
-  never interdict player trade.
+- A-11 (90% — 2026-07-18, task #41 stage 2). Rivals RUN domestic trade
+  routes now: `RivalCiv.tradeRoutes` (rc-id pairs) / GPU `r_routes`
+  [B,R,K,2] (id-keyed like `rc_tile_id` — compaction-immune), capacity
+  via `rivalTradeCapacity` (trade.ts: FOREIGN_TRADE civic,
+  Market-OR-Lighthouse per city, Colossus/Great Zimbabwe; no
+  CS-suzerain term until A-12), ONE new route per civ per turn picked
+  by the deterministic best-dest scan (`rivalPhase` creation block /
+  `_rival_trade_phase`), origin income = `routeYields(dest)` added
+  pre-tier in `rivalCityYields` / BOTH `_rival_city_yields` paths
+  (per-j and the D-9 `_all` trace path), routes die with either
+  endpoint (capture/transfer pruning both engines). Interdiction is
+  SYMMETRIC now: `rivalRouteRaidedAt` suspends rival routes for
+  barbarians always + player units at war, and `routeRaidedAt` gained
+  the at-war-rival check (the old one-sidedness). Gate-reachable and
+  gate-proven (scripted trajectories reshuffled). REMAINING 10%:
+  rival→CS routes (blocked on A-12 — rivals have no CS relationship);
+  the GPU still has no PLAYER route machinery (unreachable in gated
+  trajectories — no trade RL verb; batch with A-18/#50 if the P8
+  surface ever gains one).
 - A-12. Rivals don't interact with city-states: no envoys/influence/
   levy (`levyUnits` (rivals.ts) is suzerain-player-only;
   `envoy_mask`+`_city_state_phase` (engine.py) are seat-0;

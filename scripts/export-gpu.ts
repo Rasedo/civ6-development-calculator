@@ -51,6 +51,7 @@ import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
+import { TRADE_ROUTE_RANGE } from '../src/core/trade';
 import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_CITIES,
@@ -433,6 +434,17 @@ const rules = {
   // completion to fill the outer-defense pool, and B-2's city ranged strike
   // fires only from cities holding it. -1 if absent from the exported set.
   ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
+  // AUDIT A-11: rival trade — id-anchored capacity sources + route constants
+  // (the rivalTradeCapacity/routeYields mirror; no CS term until A-12).
+  trade: {
+    marketBidx: buildingIdx.get('MARKET') ?? -1,
+    lighthouseBidx: buildingIdx.get('LIGHTHOUSE') ?? -1,
+    foreignTradeCidx: civicIdx.get('FOREIGN_TRADE') ?? -3,
+    capWonderWidx: ['COLOSSUS', 'GREAT_ZIMBABWE']
+      .map((id) => BUILT_WONDER_LIST.findIndex((w) => w.id === id))
+      .filter((i) => i >= 0),
+    range: TRADE_ROUTE_RANGE,
+  },
   // B-15 war weariness (mirrors data/rivals.ts): integer accumulator → flat
   // empire-wide amenity penalty for the player AND each rival civ.
   warWeariness: {

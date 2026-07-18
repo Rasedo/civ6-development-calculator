@@ -4,7 +4,7 @@
  * met city-states pay gold plus the city-state's specialty yield.
  */
 
-import { addYields, emptyYields, type City, type CityState, type GameState, type Yields } from './types';
+import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
 import { hexDistance } from './hex';
 import { isCivicComplete } from './effects';
 import { DISTRICTS } from '../data/districts';
@@ -31,6 +31,41 @@ export function tradeCapacity(state: GameState): number {
   return cap + csTradeCapacityBonus(state);
 }
 
+/** AUDIT A-11: the rival twin of tradeCapacity, off the rival's OWN
+ * structures — FOREIGN_TRADE from its civic tree, Market/Lighthouse per
+ * city (non-cumulative, the D-7 rule), Colossus/Great Zimbabwe. No
+ * CS-suzerain term: rivals hold no envoys (A-12). */
+export function rivalTradeCapacity(state: GameState, rival: RivalCiv): number {
+  let cap = 0;
+  if (rival.research.civics.includes('FOREIGN_TRADE')) cap += 1;
+  for (const rc of rival.cities) {
+    if (rc.buildings.includes('MARKET') || rc.buildings.includes('LIGHTHOUSE')) cap += 1;
+    for (const w of rc.wonders ?? []) {
+      if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
+      if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
+    }
+  }
+  return cap;
+}
+
+/** AUDIT A-11: a rival route is suspended while units HOSTILE TO THAT
+ * RIVAL prowl within 3 of either endpoint — barbarians always, player
+ * units while at war (rival-rival war is impossible until A-19). The
+ * routeRaidedAt twin from the rival's seat. */
+export function rivalRouteRaidedAt(state: GameState, rival: RivalCiv, endpoints: number[]): boolean {
+  if (!state.unitsMode) return false;
+  for (const u of state.units) {
+    const hostile = u.owner === 'barbarian' || (u.owner === 'player' && rival.atWar);
+    if (!hostile) continue;
+    const t = state.map.tiles[u.tileIndex];
+    for (const index of endpoints) {
+      const c = state.map.tiles[index];
+      if (hexDistance(t.col, t.row, c.col, c.row) <= 3) return true;
+    }
+  }
+  return false;
+}
+
 function specialtyDistricts(state: GameState, city: City): number {
   return city.districts.filter(
     (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
@@ -54,11 +89,16 @@ export function csRouteYields(cs: CityState): Yields {
   return out;
 }
 
-/** A route is suspended while barbarians prowl near either endpoint. */
+/** A route is suspended while hostiles prowl near either endpoint —
+ * barbarians always, and (A-11) AT-WAR rival units: the audit-named
+ * one-sidedness fix (rivals interdict player trade like barbs do). */
 export function routeRaidedAt(state: GameState, endpoints: number[]): boolean {
   if (!state.unitsMode) return false;
   for (const u of state.units) {
-    if (u.owner !== 'barbarian') continue;
+    const hostile =
+      u.owner === 'barbarian' ||
+      (u.owner === 'rival' && (state.rivals.find((r) => r.id === u.civId)?.atWar ?? false));
+    if (!hostile) continue;
     const t = state.map.tiles[u.tileIndex];
     for (const index of endpoints) {
       const c = state.map.tiles[index];
