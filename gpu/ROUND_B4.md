@@ -19,8 +19,9 @@ an agent believes necessary go in its log file, not silently into code.
   text output for crashes) → scripted gate `PYTHONUTF8=1 python
   gpu/parity_test.py` → forced-compaction gate (same, prefixed
   `CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3`) → off-script `python
-  gpu/rollout.py --shards 4 --pipeline-replay` → ONE full battery
-  `python gpu/battery.py --no-eval` green (~268s).
+  gpu/rollout.py --shards 4 --pipeline-replay`. NO battery in
+  worktrees (owner catch 2026-07-18): the battery CONTAINS the gates
+  and runs ONCE per serial merge in the main session.
 - Worktree setup: verify `git rev-parse HEAD` == the round-base sha
   (reset --hard to it if stale); copy the gitignored `gpu/fixtures`
   AND `gpu/fixtures_o4` from the main checkout
