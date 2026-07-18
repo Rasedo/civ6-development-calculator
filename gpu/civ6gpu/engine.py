@@ -1081,6 +1081,7 @@ class BatchSim:
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
         self._rcy_all_cache = None       # G4: ((turn,r,eff,bel,kill,claim), 6-tuple [B,RC])
+        self._dadj_cache = None          # G5: (_eff_version, {di: floored [B,T] adjacency})
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
         def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1287,6 +1288,7 @@ class BatchSim:
         self._score_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
+        self._dadj_cache = None  # G5
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
         self._ct_cache = None  # D-10
         # G1: beliefs/units reset to pristine — bump the counters and drop the
@@ -1317,6 +1319,7 @@ class BatchSim:
         self._score_cache = None
         self._nprod_cache = None
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
+        self._dadj_cache = None  # G5
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
         self._ct_cache = None  # D-10
         # G1: the restored snapshot may carry different beliefs/units — bump the
@@ -1928,6 +1931,23 @@ class BatchSim:
                 raw = raw + self._dyn_aqueduct[di] * cnt.to(self.dtype)
         return raw
 
+    def _district_adj_floor(self, di: int) -> torch.Tensor:
+        """G5: (di, _eff_version)-keyed memo of floor(_district_adj_raw(di,
+        _adj_district_count())) — the exact expression every caller built
+        fresh (14.4k calls/run). Sound: d_static_adj's four in-place
+        mutation sites all bump _eff_version, the three adjacency-count
+        helpers are D-3 eff-cached, and improvement/district planes bump
+        eff at their mutation sites. Callers only gather/multiply the
+        returned plane — read-only sharing."""
+        if self._dadj_cache is None or self._dadj_cache[0] != self._eff_version:
+            self._dadj_cache = (self._eff_version, {})
+        d = self._dadj_cache[1]
+        v = d.get(di)
+        if v is None:
+            v = torch.floor(self._district_adj_raw(di, self._adj_district_count().to(self.dtype)))
+            d[di] = v
+        return v
+
     def _place_district(self, di: int, want: torch.Tensor, c: int, placement: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
         """QUEUE district-type `di` in city slot `c` on its best tile, for batch
         rows where `want` is set AND an eligible tile exists. Mirrors the exporter's
@@ -1944,7 +1964,6 @@ class BatchSim:
         reproduces the replay's sequential act.p loop. Returns ([B] placed, [B] tile)."""
         B, T, dev = self.B, self.T, self.device
         site_c = self.site[:, c].clamp(min=0)
-        adjc = self._adj_district_count().to(self.dtype)  # [B, T]
         surface = self.coastal_water if placement == 2 else self.d_usable  # Harbor sits on coastal water, others on land
         elig = ((self.owner == c) & surface & (self.district < 0) & (self.built_wonder < 0) & (self.improvement < 0) & (self.res_priority <= 1) & (self.dist[:, c] <= 3))  # C-6/A-4
         elig[torch.arange(B, device=dev), site_c] = False
@@ -1953,7 +1972,7 @@ class BatchSim:
             elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))  # Aqueduct: adjacent-center+water; Encampment: NOT adjacent-center
             adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)  # no yield → lowest-index tie-break
         else:  # economic (land) or Harbor (coastal) — full districtAdjacency
-            adjf = torch.floor(self._district_adj_raw(di, adjc))  # [B, T]
+            adjf = self._district_adj_floor(di)  # [B, T] (G5 memo)
         key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)  # D-7
         best = key.argmax(dim=1)  # [B]
         place = want & elig.any(dim=1)
@@ -1982,7 +2001,6 @@ class BatchSim:
         per-city registry gains the type. Returns the placed mask."""
         B, T, dev = self.B, self.T, self.device
         center = self.rc_center[:, r, j].clamp(min=0)
-        adjc = self._adj_district_count().to(self.dtype)
         surface = self.coastal_water if placement == 2 else self.d_usable
         d_center = self.pair_dist[center]  # [B, T]
         elig = (
@@ -2000,7 +2018,7 @@ class BatchSim:
             elig = elig & ((cc >= 1) & self.aqsrc if placement == 1 else (cc == 0))
             adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)
         else:
-            adjf = torch.floor(self._district_adj_raw(di, adjc))
+            adjf = self._district_adj_floor(di)  # (G5 memo)
         key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)  # D-7
         best = key.argmax(dim=1)
         place = want & elig.any(dim=1)
@@ -2267,7 +2285,6 @@ class BatchSim:
                 dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
                 # B-18: per-city COMPLETED specialty district count (Zen Meditation min).
                 spec_count = (owned_d & self._is_specialty[dt.clamp(min=0)]).to(torch.long).sum(dim=2)  # [B, C]
-                adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
                 # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
                 # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
                 # completed district of its type. Sum per district idx here; the CS
@@ -2294,7 +2311,7 @@ class BatchSim:
                     if yc < 0:
                         continue
                     di = int(d["idx"])
-                    adjv = torch.floor(self._district_adj_raw(di, adjc))  # [B, T] full districtAdjacency
+                    adjv = self._district_adj_floor(di)  # [B, T] full districtAdjacency (G5 memo)
                     mask = owned_d & (dt == di)
                     dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
                     _adj_sum = (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2)  # [B, C]
@@ -2307,7 +2324,7 @@ class BatchSim:
                 ship_add = None
                 if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
                     _hm = (owned_d & (dt == self._harbor_idx)).to(self.dtype)  # [B, C, M] this city's Harbor tiles
-                    _hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc))  # [B, T]
+                    _hadj = self._district_adj_floor(self._harbor_idx)  # [B, T] (G5 memo)
                     _hadj_c = (_hadj.gather(1, tcf).reshape(B, C, M) * _hm).sum(dim=2)  # [B, C]
                     ship_add = _hadj_c * self.buildings[:, :, self._shipyard_bidx].to(self.dtype)
                 # districtMaintenance: per-type upkeep (0 for City Center / Neighborhood
@@ -2671,7 +2688,6 @@ class BatchSim:
         if self.districts_on:
             reg = self.rc_dist_tile[:, r]  # [B, RC, nD]
             if bool((reg >= 0).any()):
-                adjc_b4 = self._adj_district_count().to(self.dtype)
                 for di, dd in enumerate(self.districts_cat):
                     yc = int(dd.get("adjYield", -1))
                     if yc < 0:
@@ -2683,7 +2699,7 @@ class BatchSim:
                     has = has & self.district_complete.gather(1, tile_d.clamp(min=0))
                     if not bool(has.any()):
                         continue
-                    adjf = torch.floor(self._district_adj_raw(di, adjc_b4)).gather(1, tile_d.clamp(min=0)).double()
+                    adjf = self._district_adj_floor(di).gather(1, tile_d.clamp(min=0)).double()  # (G5 memo)
                     add = torch.where(has, adjf, torch.zeros_like(adjf))
                     if di == self._hs_idx and _has_bel:  # A-7/B-18 Work Ethic (per-city)
                         prod = prod + add * self._fol_tab("we", _fol_rc)
@@ -2727,8 +2743,7 @@ class BatchSim:
                     has_sy = alive & selb[:, :, self._shipyard_bidx] & (hb_tile >= 0)
                     has_sy = has_sy & self.district_complete.gather(1, hb_tile.clamp(min=0))
                     if bool(has_sy.any()):
-                        adjc_sy = self._adj_district_count().to(self.dtype)
-                        hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0)).double()
+                        hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0)).double()  # (G5 memo)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
         # A-4: completed wonders — flat city yields + belief faithPerWonder
         if compw is not None and bool(compw.any()):
@@ -5879,7 +5894,6 @@ class BatchSim:
         if self.districts_on:
             reg = self.rc_dist_tile[:, r, j]  # [B, nD]
             if bool((reg >= 0).any()):
-                adjc_b4 = self._adj_district_count().to(self.dtype)
                 for di, dd in enumerate(self.districts_cat):
                     yc = int(dd.get("adjYield", -1))
                     if yc < 0:
@@ -5891,7 +5905,7 @@ class BatchSim:
                     has = has & self.district_complete.gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1)
                     if not bool(has.any()):
                         continue
-                    adjf = torch.floor(self._district_adj_raw(di, adjc_b4)).gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1).double()
+                    adjf = self._district_adj_floor(di).gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1).double()  # (G5 memo)
                     add = torch.where(has, adjf, torch.zeros_like(adjf))
                     # A-7 Work Ethic: Holy Site adjacency ALSO yields
                     # production (the rivals.ts floored-adjacency twin)
@@ -5945,8 +5959,7 @@ class BatchSim:
                     has_sy = mask & selb[:, self._shipyard_bidx] & (hb_tile >= 0)
                     has_sy = has_sy & self.district_complete.gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1)
                     if bool(has_sy.any()):
-                        adjc_sy = self._adj_district_count().to(self.dtype)
-                        hadj = torch.floor(self._district_adj_raw(self._harbor_idx, adjc_sy)).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()
+                        hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()  # (G5 memo)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
         # A-4: this city's completed wonders — flat city yields pre-tier
         # (computeCityStats' buildings position) + the belief faithPerWonder
@@ -7616,6 +7629,54 @@ class BatchSim:
             cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
             cact_any_l = cact_all.any(dim=0).tolist()
             _rcy_bel = self._r_has_beliefs(r)  # G4: capital fallback gate (capY live-pop)
+            # G5: the per-j housing/maintenance/growth-need math batched over
+            # j. Inputs are planes (eff-covered), own-column registries (a
+            # city's own completions land at the END of its iteration, after
+            # these values are consumed — no cross-column write exists), and
+            # ONE live edge: rival_at at window tiles in the A-13 improvement
+            # -housing term (a mid-loop border claim can put an ORPHANED
+            # improvement into a later city's window), so the batch recomputes
+            # when (_eff_version, _claim_version) moves — the same key
+            # discipline as the G4 yields cache. Every batched sum is
+            # dyadic/int-valued: bit-exact in any shape.
+            _gmul_r = self._bel_mul("growth", r) if _rcy_bel else 1.0
+            _riv_h = self._bel_add("river", r)[:, 1] if _rcy_bel else None
+            _fol_h_rc = self._follower_id_for(self._rc_rel(r)) if _rcy_bel else None
+            _ctr_r = self.rc_center[:, r].clamp(min=0)  # [B, RC]
+
+            def _g5_hm() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
+                dd_all = (dt_all >= 0) & self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)
+                maint = (self._d_maint.view(1, 1, -1) * dd_all.to(torch.float64)).sum(dim=2)
+                maint = maint + torch.einsum("bjn,n->bj", self.rc_bldg[:, r].to(torch.float64), self.rules_dev.b_maintenance.double())
+                wh = self.tile_wh.gather(1, _ctr_r)  # [B, RC]
+                fresh = wh == float(self._h_fresh)
+                if self._aqueduct_idx >= 0:
+                    aq_t = self.rc_dist_tile[:, r, :, self._aqueduct_idx]  # [B, RC]
+                    has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_t.clamp(min=0))
+                else:
+                    has_aq = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
+                water = torch.where(
+                    has_aq,
+                    torch.where(fresh, wh + self._aq_fresh_bonus, torch.maximum(wh, torch.full_like(wh, self._aq_no_fresh_total))),
+                    wh,
+                )
+                bh = self.rc_bldg[:, r].double() @ self.rules.b_housing.to(dev).double()  # [B, RC]
+                win3a = tiles_from_offsets(_ctr_r.reshape(-1), self._off3, self.W, self.H).reshape(B, self.RC, -1)
+                w3f = win3a.clamp(min=0).reshape(B, -1)
+                imp_w3 = self.improvement.gather(1, w3f).reshape_as(win3a)
+                imp_own = (win3a >= 0) & (self.rival_at.gather(1, w3f).reshape_as(win3a) == r) & (imp_w3 >= 0)
+                farm = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own.double()).sum(dim=2)
+                housing = water + bh + farm
+                if _rcy_bel:
+                    housing = housing + torch.einsum("bjn,bjn->bj", self.rc_bldg[:, r].double(), self._fol_tab("bldgH", _fol_h_rc))
+                    housing = housing + _riv_h.unsqueeze(1) * self.tile_river.gather(1, _ctr_r).double()
+                p64a = self.rc_pop[:, r].double()
+                need = torch.floor(15 + 8 * (p64a - 1) + (p64a - 1).clamp(min=0) ** 1.5)
+                return maint, housing, need
+
+            _h_key = None
+            maint_all = housing_all = need_all = None
             for j in range(self.RC):
                 if not cact_any_l[j]:
                     continue
@@ -7684,11 +7745,12 @@ class BatchSim:
                 cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
                 # P5/S1 (C-12): net of the city's upkeep — completed districts
                 # + buildings, the player's tables (TS: y.gold - maintenance
-                # as ONE term inside the +=).
-                dtj = self.rc_dist_tile[:, r, j]  # [B, nD]
-                d_done = (dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0))
-                maint_j = (self._d_maint.unsqueeze(0) * d_done.to(torch.float64)).sum(dim=1)
-                maint_j = maint_j + torch.einsum("bn,n->b", self.rc_bldg[:, r, j].to(torch.float64), self.rules_dev.b_maintenance.double())
+                # as ONE term inside the +=). G5: batched above; the key check
+                # re-runs the batch after a mid-loop eff/claim event.
+                if _h_key != (self._eff_version, self._claim_version):
+                    _h_key = (self._eff_version, self._claim_version)
+                    maint_all, housing_all, need_all = _g5_hm()
+                maint_j = maint_all[:, j]
                 gold_sum = torch.where(cact, gold_sum + (gold_y - maint_j), gold_sum)  # VP-G1 + C-12
                 faith_sum = torch.where(cact, faith_sum + faith_y, faith_sum)  # P5/S5 (C-17)
                 # C1-B1: the real growth accounting — true surplus (can be
@@ -7696,46 +7758,19 @@ class BatchSim:
                 # need, starvation shrinks (pop floor 1, box reset).
                 # C1-B5b-iii: real housing throttles positive surplus
                 # (housingGrowthFactor); RIVAL_MAX_POP is retired.
-                ctr_j = self.rc_center[:, r, j].clamp(min=0)
-                wh_c = self.tile_wh.gather(1, ctr_j.unsqueeze(1)).squeeze(1)
-                fresh_c = wh_c == float(self._h_fresh)
-                if self._aqueduct_idx >= 0:
-                    aq_t = self.rc_dist_tile[:, r, j, self._aqueduct_idx]
-                    has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_t.clamp(min=0).unsqueeze(1)).squeeze(1)
-                else:
-                    has_aq = torch.zeros(B, dtype=torch.bool, device=dev)
-                water_j = torch.where(
-                    has_aq,
-                    torch.where(fresh_c, wh_c + self._aq_fresh_bonus, torch.maximum(wh_c, torch.full_like(wh_c, self._aq_no_fresh_total))),
-                    wh_c,
-                )
-                bh_j = self.rc_bldg[:, r, j].double() @ self.rules.b_housing.to(dev).double()
-                # A-13: table-gathered improvement housing (rivalHousing reads
-                # the catalog generically); computeHousing counts PILLAGED
-                # improvements too. D-11: restricted to the radius-3 window
-                # (tiles_from_offsets' 37 offsets = the ≤3 hex set exactly,
-                # off-map -1) instead of a full [B, T] pair_dist plane per
-                # (r, j); the summands are catalog halves (0.5/0 — exact
-                # dyadics), so the shorter sum is bit-identical.
-                win3 = tiles_from_offsets(ctr_j, self._off3, self.W, self.H)  # [B, 37]
-                w3c = win3.clamp(min=0)
-                imp_w3 = self.improvement.gather(1, w3c)
-                imp_own_j = (win3 >= 0) & (self.rival_at.gather(1, w3c) == r) & (imp_w3 >= 0)
-                farm_j = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own_j.double()).sum(dim=1)
-                housing_j = water_j + bh_j + farm_j
-                if self._r_has_beliefs(r):
-                    # A-7/B-18: Religious Community building housing keys per-city
-                    # on the followed religion (owner when inert); River Goddess
-                    # housing (pantheon) stays per-civ.
-                    _fol_h = self._follower_id_for(self._rc_rel(r)[:, j])  # [B]
-                    housing_j = housing_j + torch.einsum("bn,bn->b", self.rc_bldg[:, r, j].double(), self._fol_tab("bldgH", _fol_h))
-                    housing_j = housing_j + self._bel_add("river", r)[:, 1] * self.tile_river.gather(1, ctr_j.unsqueeze(1)).squeeze(1).double()
+                # A-13/D-11/A-7/B-18 housing chain — G5: the whole per-j block
+                # (water/aqueduct, building housing, windowed improvement
+                # housing, belief housing) is batched in _g5_hm above; the
+                # dyadic/int-valued sums make the batched shapes bit-exact.
+                housing_j = housing_all[:, j]
                 head_j = housing_j - self.rc_pop[:, r, j].double()
                 hfac = torch.where(head_j >= 2, torch.ones_like(head_j), torch.where(head_j >= 1, torch.full_like(head_j, 0.5), torch.full_like(head_j, 0.25)))
                 surplus = food - self.rules.food_per_citizen * self.rc_pop[:, r, j].double()
                 # A-7: Fertility Rites — the belief growth multiplier rides the
                 # chain like computeCityStats (hf × tier × growthMult).
-                gmul = self._bel_mul("growth", r) if self._r_has_beliefs(r) else 1.0
+                # G5: hoisted (belief ids are static mid-loop — claims are
+                # post-phase); gmul rebinds below, never mutates in place.
+                gmul = _gmul_r
                 # A-4: Hanging Gardens — the civ-wide completed-wonder growth
                 # product (rivalGrowthAllMult, LIVE per city like TS's call;
                 # D-11: hoisted per r above, recomputed on completion flag)
@@ -7746,8 +7781,7 @@ class BatchSim:
                         gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
                     gmul = gmul * gw_cache
                 self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j] * gmul, surplus), self.rc_growth[:, r, j])
-                p64 = self.rc_pop[:, r, j].double()
-                need = torch.floor(15 + 8 * (p64 - 1) + (p64 - 1).clamp(min=0) ** 1.5)
+                need = need_all[:, j]  # G5: pre-growth pop == the batch's entry value for this column
                 grow = cact & (self.rc_growth[:, r, j] >= need)
                 self.rc_pop[:, r, j] = self.rc_pop[:, r, j] + grow.long()
                 self.rc_growth[:, r, j] = torch.where(grow, self.rc_growth[:, r, j] - need, self.rc_growth[:, r, j])
