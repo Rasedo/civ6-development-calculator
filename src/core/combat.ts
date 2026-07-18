@@ -596,7 +596,13 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     }
   }
   center.cityId = id;
-  state.cities.push({
+  // AUDIT B-30: conquest keeps infrastructure. The captured city carries its
+  // districts (live, re-owned — the tiles above already re-tag to the new
+  // owner) and its buildings MINUS PALACE (never transfers) and wonders.
+  // ANCIENT_WALLS is kept but its outer pool resets to 0 (it heals back via
+  // B-1, and the new owner gains the B-2 walls strike once it stands again).
+  const keptBuildings = city.buildings.filter((b) => b !== 'PALACE');
+  const captured: City = {
     id,
     name: city.name,
     centerIndex: city.centerIndex,
@@ -608,11 +614,13 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     focus: 'balanced',
     queue: [],
     isCapital: false,
-    buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: city.centerIndex }],
-    wonders: [],
+    buildings: keptBuildings,
+    districts: city.districts.map((d) => ({ ...d })),
+    wonders: city.wonders.map((w) => ({ ...w })),
     specialists: {},
-  });
+  };
+  if (keptBuildings.includes('ANCIENT_WALLS')) captured.outerHp = 0; // B-30: walls kept, outer pool 0
+  state.cities.push(captured);
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, city.centerIndex, 3);
   if (plunder) {

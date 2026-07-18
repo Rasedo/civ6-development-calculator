@@ -438,7 +438,11 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
       t.rivalCityId = winner.nextCityId; // A-17: the rc pushed below
     }
   }
-  winner.cities.push({
+  // AUDIT B-30: conquest keeps infrastructure. The city carries its districts
+  // (live, re-owned via the tile re-tag above), buildings MINUS PALACE, and
+  // wonders into the rival. ANCIENT_WALLS kept with outerHp 0 (heals via B-1).
+  const keptBuildings = city.buildings.filter((b) => b !== 'PALACE');
+  const defected: RivalCity = {
     id: winner.nextCityId++,
     name: city.name,
     civId: civOfRival(winner.id),
@@ -451,13 +455,15 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     focus: 'balanced',
     queue: [],
     isCapital: false,
-    buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: city.centerIndex }],
-    wonders: [],
+    buildings: keptBuildings,
+    districts: city.districts.map((d) => ({ ...d })),
+    wonders: city.wonders.map((w) => ({ ...w })),
     specialists: {},
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
-  });
+  };
+  if (keptBuildings.includes('ANCIENT_WALLS')) defected.outerHp = 0; // B-30: walls kept, outer pool 0
+  winner.cities.push(defected);
   state.eventLog.push(`${city.name} has defected to ${winner.name}! (${why})`);
   return true;
 }
@@ -1342,7 +1348,11 @@ function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv
       t.rivalCityId = to.nextCityId; // the rc pushed below
     }
   }
-  to.cities.push({
+  // AUDIT B-30: conquest keeps infrastructure — the flipping city carries its
+  // districts (live, re-tagged above), buildings MINUS PALACE, and wonders to
+  // the new rival. ANCIENT_WALLS kept with outerHp 0 (heals via B-1).
+  const keptBuildings = rc.buildings.filter((b) => b !== 'PALACE');
+  const flipped: RivalCity = {
     id: to.nextCityId++,
     name: rc.name,
     civId: civOfRival(to.id),
@@ -1355,13 +1365,15 @@ function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv
     focus: 'balanced',
     queue: [],
     isCapital: false,
-    buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: rc.centerIndex }],
-    wonders: [],
+    buildings: keptBuildings,
+    districts: rc.districts.map((d) => ({ ...d })),
+    wonders: rc.wonders.map((w) => ({ ...w })),
     specialists: {},
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
-  });
+  };
+  if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // B-30: walls kept, outer pool 0
+  to.cities.push(flipped);
   state.eventLog.push(`${rc.name} defected from ${from.name} to ${to.name}!`);
 }
 
