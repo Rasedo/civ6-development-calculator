@@ -16,7 +16,7 @@ import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlo
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
-import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, TRADE_ROUTE_RANGE } from './trade';
+import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from './trade';
 import { isSuzerain, csRivalEnvoyBonuses } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE } from '../data/cityStates';
 import { computeAdoption } from './effects';
@@ -1251,6 +1251,21 @@ export function rivalCityYields(
   // like the player's).
   for (const route of rival.tradeRoutes ?? []) {
     if (route.from !== rc.id) continue;
+    if (route.toCs !== undefined) {
+      // A-12b: a CS route pays gold + the CS specialty (the player's
+      // csRouteYields), the same pre-tier trade position.
+      const cs = state.cityStates.find((c) => c.id === route.toCs);
+      if (!cs) continue;
+      if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, cs.centerIndex])) continue;
+      const cy = csRouteYields(cs);
+      total.food += cy.food;
+      total.production += cy.production;
+      total.gold += cy.gold;
+      total.science += cy.science;
+      total.culture += cy.culture;
+      total.faith += cy.faith;
+      continue;
+    }
     const dest = rival.cities.find((c) => c.id === route.to);
     if (!dest) continue;
     if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, dest.centerIndex])) continue;
@@ -1609,15 +1624,18 @@ export function rivalPhase(state: GameState): void {
       }
     }
 
-    // AUDIT A-11: trade — ONE new domestic route per civ per turn while
+    // AUDIT A-11/A-12b: trade — ONE new route per civ per turn while
     // capacity allows (trader-training pacing). Scan origins × destinations
-    // in city-array order; the best NEW in-range pair by routeYields sum
-    // (dest-development only), strictly-greater beats so ties keep the
-    // first-found (from asc, to asc) — the deterministic GPU-mirrorable key.
+    // in city-array order — own cities first, then MET city-states (from
+    // asc, to asc, cs asc — the deterministic GPU-mirrorable flat order);
+    // the best NEW in-range pair by the route's TOTAL yields (identical to
+    // the old food+prod for domestic routeYields, whose only channels those
+    // are; a CS route is 3 gold + 1 specialty = 4 flat), strictly-greater
+    // beats so ties keep the first-found.
     {
       const routes = (rival.tradeRoutes ??= []);
-      if (routes.length < rivalTradeCapacity(state, rival) && rival.cities.length >= 2) {
-        let best: { from: number; to: number; ySum: number } | null = null;
+      if (routes.length < rivalTradeCapacity(state, rival) && rival.cities.length >= 1) {
+        let best: { from: number; to?: number; toCs?: number; ySum: number } | null = null;
         for (const from of rival.cities) {
           const ft = state.map.tiles[from.centerIndex];
           for (const to of rival.cities) {
@@ -1629,8 +1647,19 @@ export function rivalPhase(state: GameState): void {
             const ySum = y.food + y.production;
             if (!best || ySum > best.ySum) best = { from: from.id, to: to.id, ySum };
           }
+          for (const cs of state.cityStates) {
+            if (!cs.rivalMet?.[rival.id]) continue;
+            if (routes.some((x) => x.from === from.id && x.toCs === cs.id)) continue;
+            const ct = state.map.tiles[cs.centerIndex];
+            if (hexDistance(ft.col, ft.row, ct.col, ct.row) > TRADE_ROUTE_RANGE) continue;
+            const cy = csRouteYields(cs);
+            const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith;
+            if (!best || ySum > best.ySum) best = { from: from.id, toCs: cs.id, ySum };
+          }
         }
-        if (best) routes.push({ from: best.from, to: best.to });
+        if (best) {
+          routes.push(best.toCs !== undefined ? { from: best.from, toCs: best.toCs } : { from: best.from, to: best.to! });
+        }
       }
     }
 

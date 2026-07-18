@@ -442,6 +442,11 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
 export function captureCityState(state: GameState, cs: CityState): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
+  // A-12b: rival CS routes die with the city-state too (the A-11
+  // routes-die-with-their-endpoint rule).
+  for (const rv of state.rivals) {
+    rv.tradeRoutes = rv.tradeRoutes?.filter((x) => x.toCs !== cs.id);
+  }
   const center = state.map.tiles[cs.centerIndex];
   // AUDIT A-16: the V-W2 slot cap applies here too — a full empire RAZES
   // the city-state instead of annexing it (captureRivalCity's exact rule;

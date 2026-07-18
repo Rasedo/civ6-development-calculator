@@ -2811,12 +2811,17 @@ class BatchSim:
             sci = sci + _cols[3] + capb_r[:, 3].unsqueeze(1) * _isc
             cul = cul + _cols[4] + capb_r[:, 4].unsqueeze(1) * _isc
             faith = faith + _cols[5] + capb_r[:, 5].unsqueeze(1) * _isc
-        # A-11: outgoing unraided route income — pre-tier, the per-j twin's
-        # position (integer-valued adds in f64: batching is exact).
+        # A-11/A-12b: outgoing unraided route income — pre-tier, the per-j
+        # twin's position (integer-valued adds in f64: batching is exact).
         _route_inc = self._rival_route_income(r)
         if _route_inc is not None:
-            food = food + _route_inc * alive.double()
-            prod = prod + _route_inc * alive.double()
+            a6 = alive.double()
+            food = food + _route_inc[:, :, 0] * a6
+            prod = prod + _route_inc[:, :, 1] * a6
+            gold = gold + _route_inc[:, :, 2] * a6  # A-12b: CS-route gold/specialty
+            sci = sci + _route_inc[:, :, 3] * a6
+            cul = cul + _route_inc[:, :, 4] * a6
+            faith = faith + _route_inc[:, :, 5] * a6
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
         # G4: the economy loop passes its loop-top FROZEN factors instead
@@ -3871,6 +3876,10 @@ class BatchSim:
             c_t = int(self.cs_center[b, s])
             pop = max(1, (int(self.cs_pop[b, s]) * 3) // 4)
             self.cs_alive[b, s] = False
+            # A-12b: rival CS routes die with the city-state (TS
+            # captureCityState prunes rv.tradeRoutes; dest encoding -(2+s)).
+            dead_cs = self.r_routes[b, :, :, 1] == -(2 + s)  # [R, K]
+            self.r_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.r_routes[b], -1), self.r_routes[b])
             ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
             self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
             # AUDIT A-16: raze at TS's count (state.cities.length >= 6) —
@@ -5670,11 +5679,16 @@ class BatchSim:
         return plane
 
     def _rival_route_income(self, r: int) -> torch.Tensor | None:
-        """AUDIT A-11: per-slot ORIGIN income from this civ's unraided
-        domestic routes — [B, RC] double (food == production: routeYields
-        pays 1 + floor(destCompletedSpecialty/2) to BOTH columns), or None
-        when the civ holds no routes batch-wide. Mirrors the rivalCityYields
-        route loop: dest resolved by rc id among LIVING cities, a route is
+        """AUDIT A-11/A-12b: per-slot ORIGIN income from this civ's unraided
+        routes — [B, RC, 6] double in engine yield order (food, prod, gold,
+        sci, cul, faith), or None when the civ holds no routes batch-wide.
+        Domestic routes pay routeYields' 1 + floor(destCompletedSpecialty/2)
+        to food AND production; a CS route (dest encoded -(2+csIdx) in
+        r_routes) pays csRouteGold to gold + csRouteSpec to the CS type's
+        specialty column (_cs_yidx), gated on cs_alive (a captured CS is
+        removed in TS; its routes are pruned at capture, this gate is the
+        mirror for the same-turn read). Mirrors the rivalCityYields route
+        loop: dest resolved by rc id among LIVING cities, a route is
         suspended while a barbarian (always) or player unit (at war) sits
         within 3 of either endpoint.
         G1: cached single-slot on (turn, r, _eff_version, _rp_kill_version). Reads
@@ -5699,6 +5713,8 @@ class BatchSim:
         B, RC = self.B, self.RC
         ids = self.rc_id[:, r]  # [B, RC]
         alive = self.rc_alive[:, r]
+        is_cs = rr[:, :, 1] <= -2  # A-12b: CS dest encoding -(2+csIdx)
+        cs_s = (-rr[:, :, 1] - 2).clamp(min=0)  # [B, K] cs index (garbage where ~is_cs)
         fm = (rr[:, :, 0].unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)  # [B, K, RC]
         dm = (rr[:, :, 1].unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)
         has_from = fm.any(dim=2)
@@ -5718,10 +5734,35 @@ class BatchSim:
         if self.p_tile.numel():
             d_p = self.pair_dist[centers.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, P]
             near = near | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].view(B, 1))
-        raided = near.gather(1, from_j) | near.gather(1, dest_j)  # [B, K]
-        pays = act & has_from & has_dest & ~raided
-        inc = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
-        inc.scatter_add_(1, from_j, per.gather(1, dest_j) * pays.double())
+        inc = torch.zeros(B, RC * 6, dtype=torch.float64, device=self.device)
+        # domestic legs
+        raided_d = near.gather(1, from_j) | near.gather(1, dest_j)  # [B, K]
+        pays_d = act & ~is_cs & has_from & has_dest & ~raided_d
+        pd = pays_d.double()
+        inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
+        inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        # CS legs (A-12b)
+        if self.S > 0 and bool(is_cs.any()):
+            S = self.S
+            _tr = self.rules.trade or {}
+            cs_gold = float(_tr.get("csRouteGold", 3))
+            cs_spec = float(_tr.get("csRouteSpec", 1))
+            csc = self.cs_center[:, :S].clamp(min=0)  # [B, S]
+            near_cs = torch.zeros(B, S, dtype=torch.bool, device=self.device)
+            if self.u_tile.numel():
+                d_bc = self.pair_dist[csc.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, S, U]
+                near_cs = near_cs | (d_bc & self.u_alive.unsqueeze(1)).any(dim=2)
+            if self.p_tile.numel():
+                d_pc = self.pair_dist[csc.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, S, P]
+                near_cs = near_cs | ((d_pc & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].view(B, 1))
+            cs_ok = self.cs_alive[:, :S].gather(1, cs_s) & (cs_s < S)
+            raided_c = near.gather(1, from_j) | near_cs.gather(1, cs_s)
+            pays_c = act & is_cs & has_from & cs_ok & ~raided_c
+            pc = pays_c.double()
+            inc.scatter_add_(1, from_j * 6 + 2, cs_gold * pc)
+            ycol = self._cs_yidx[:, :S].gather(1, cs_s)  # [B, K] specialty column per route
+            inc.scatter_add_(1, from_j * 6 + ycol, cs_spec * pc)
+        inc = inc.reshape(B, RC, 6)
         self._rival_route_cache = (key, inc)
         return inc
 
@@ -6038,8 +6079,13 @@ class BatchSim:
         # in computeCityStats (production scales with the tier, food doesn't).
         _route_inc = self._rival_route_income(r)
         if _route_inc is not None:
-            food = food + _route_inc[:, j] * mask.double()
-            prod = prod + _route_inc[:, j] * mask.double()
+            m6 = mask.double()
+            food = food + _route_inc[:, j, 0] * m6
+            prod = prod + _route_inc[:, j, 1] * m6
+            gold = gold + _route_inc[:, j, 2] * m6  # A-12b: CS-route gold/specialty
+            sci = sci + _route_inc[:, j, 3] * m6
+            cul = cul + _route_inc[:, j, 4] * m6
+            faith = faith + _route_inc[:, j, 5] * m6
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
@@ -7086,7 +7132,10 @@ class BatchSim:
         at last-alive+1 and _reclaim_rc is stable)."""
         B, RC, dev = self.B, self.RC, self.device
         alive = self.rc_alive[:, r]  # [B, RC]
-        want = active & (alive.sum(dim=1) >= 2)
+        # A-12b: ONE city suffices now — a met CS is a routable dest (the TS
+        # gate is rival.cities.length >= 1); domestic pairs still need 2 via
+        # the pair masks below.
+        want = active & (alive.sum(dim=1) >= 1)
         if not bool(want.any()):
             return
         cap = torch.zeros(B, dtype=torch.long, device=dev)
@@ -7101,6 +7150,25 @@ class BatchSim:
         for wi in self._trade_wonders:
             wt = self.rc_wonder[:, r, :, wi]  # [B, RC] — wonder wi's tile per slot
             cap = cap + ((wt >= 0) & alive & self.built_wonder_complete.gather(1, wt.clamp(min=0))).sum(dim=1)
+        # A-12b: +1 per trade-type CS this rival is SUZERAIN of (the strict
+        # contest: >= suzerainEnvoys, strictly more than the player AND every
+        # other rival — rivalIsSuzerain's exact predicate; alive-gated, the
+        # TS existing-cityStates iteration).
+        S = self.S
+        if S > 0:
+            trade_ti = int(self.rules.cs.get("tradeIdx", -1))
+            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+            mine_e = self.cs_r_envoys[:, r, :S]  # [B, S]
+            oth_e = self.cs_r_envoys[:, :, :S].clone()
+            oth_e[:, r] = -1
+            oth_max = oth_e.max(dim=1).values  # [B, S]
+            suz_r = (
+                (mine_e >= suz_min)
+                & (mine_e > self.cs_envoys[:, :S])
+                & (mine_e > oth_max)
+                & self.cs_alive[:, :S]
+            )
+            cap = cap + (suz_r & (self.cs_type[:, :S] == trade_ti)).sum(dim=1)
         used = (self.r_routes[:, r, :, 0] >= 0).sum(dim=1)
         want = want & (used < cap)
         if not bool(want.any()):
@@ -7128,17 +7196,42 @@ class BatchSim:
             & want.view(B, 1, 1)
         )
         key = torch.where(valid, ysum.unsqueeze(1).expand(B, RC, RC), torch.full((B, RC, RC), -1, dtype=torch.long, device=dev))
-        kf = key.reshape(B, RC * RC)  # i-major flat order = the TS from-asc/to-asc scan
+        # A-12b: MET city-states join each origin's candidate list AFTER the
+        # domestic dests (the TS per-from iteration order: cities asc, then
+        # CS asc — the i-major flat scan preserves it). A CS route's ySum is
+        # the flat csRouteYields total (gold + specialty).
+        W2 = RC
+        if S > 0:
+            _tr = self.rules.trade or {}
+            ysum_cs = int(_tr.get("csRouteGold", 3)) + int(_tr.get("csRouteSpec", 1))
+            csc = self.cs_center[:, :S].clamp(min=0)  # [B, S]
+            d_cs = self.pair_dist[centers.unsqueeze(2), csc.unsqueeze(1)]  # [B, RC, S]
+            cs_to = -(2 + torch.arange(S, device=dev))  # encoded dest ids
+            exists_cs = (
+                (rr[:, :, 0].view(B, 1, 1, -1) == ids.view(B, RC, 1, 1))
+                & (rr[:, :, 1].view(B, 1, 1, -1) == cs_to.view(1, 1, S, 1))
+            ).any(dim=3)  # [B, RC, S]
+            valid_cs = (
+                alive.unsqueeze(2)
+                & (self.cs_r_met[:, r, :S] & self.cs_alive[:, :S]).unsqueeze(1)
+                & (d_cs <= self._trade_range)
+                & ~exists_cs
+                & want.view(B, 1, 1)
+            )
+            key_cs = torch.where(valid_cs, torch.full((B, RC, S), ysum_cs, dtype=torch.long, device=dev), torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
+            key = torch.cat([key, key_cs], dim=2)  # [B, RC, RC+S]
+            W2 = RC + S
+        kf = key.reshape(B, RC * W2)  # i-major flat order = the TS from-asc, dests-then-CS scan
         kmax, _ = kf.max(dim=1)
-        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * RC, device=dev).view(1, -1), torch.full((1, RC * RC), RC * RC, device=dev)).min(dim=1).values
+        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).view(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
         do = want & (kmax >= 0)
         if not bool(do.any()):
             return
         rows = do.nonzero(as_tuple=True)[0]
-        i_pick = (first[rows] // RC)
-        j_pick = (first[rows] % RC)
+        i_pick = (first[rows] // W2)
+        jj_pick = (first[rows] % W2)
         from_id = ids[rows, i_pick]
-        to_id = ids[rows, j_pick]
+        to_id = torch.where(jj_pick < RC, ids[rows, jj_pick.clamp(max=RC - 1)], -(2 + (jj_pick - RC)))
         free = self.r_routes[rows, r, :, 0] < 0  # [n, K]
         K = free.shape[1]
         slot = torch.where(free, torch.arange(K, device=dev).view(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values

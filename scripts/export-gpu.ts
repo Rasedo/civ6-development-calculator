@@ -52,7 +52,8 @@ import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
-import { TRADE_ROUTE_RANGE } from '../src/core/trade';
+import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC } from '../src/core/trade';
+import { SUZERAIN_ENVOYS } from '../src/data/cityStates';
 import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_CITIES,
@@ -445,6 +446,9 @@ const rules = {
       .map((id) => BUILT_WONDER_LIST.findIndex((w) => w.id === id))
       .filter((i) => i >= 0),
     range: TRADE_ROUTE_RANGE,
+    // A-12b: rival CS-route income constants (csRouteYields mirror).
+    csRouteGold: CS_ROUTE_GOLD,
+    csRouteSpec: CS_ROUTE_SPEC,
   },
   // B-15 war weariness (mirrors data/rivals.ts): integer accumulator → flat
   // empire-wide amenity penalty for the player AND each rival civ.
@@ -468,6 +472,8 @@ const rules = {
     // V-CS: attackCityState/captureCityState (siege hp + the militaristic +6)
     maxHp: CS_MAX_HP,
     militaristicIdx: CITY_STATE_TYPES.indexOf('militaristic'),
+    tradeIdx: CITY_STATE_TYPES.indexOf('trade'), // A-12b: suzerain trade capacity
+    suzerainEnvoys: SUZERAIN_ENVOYS, // A-12b: the strict-contest minimum
     // per CS type (by index): which yield column its envoys boost
     typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CS_TYPE_YIELD[t])),
     // per CS type: the district whose count carries the 3-/6-envoy bonus, and

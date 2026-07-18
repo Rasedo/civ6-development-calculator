@@ -8,7 +8,7 @@ import { addYields, emptyYields, type City, type CityState, type GameState, type
 import { hexDistance } from './hex';
 import { isCivicComplete } from './effects';
 import { DISTRICTS } from '../data/districts';
-import { csTradeCapacityBonus } from './cityStates';
+import { csTradeCapacityBonus, rivalIsSuzerain } from './cityStates';
 import { CS_TYPE_YIELD } from '../data/cityStates';
 import type { RuleResult } from './rules';
 
@@ -31,10 +31,11 @@ export function tradeCapacity(state: GameState): number {
   return cap + csTradeCapacityBonus(state);
 }
 
-/** AUDIT A-11: the rival twin of tradeCapacity, off the rival's OWN
+/** AUDIT A-11/A-12b: the rival twin of tradeCapacity, off the rival's OWN
  * structures — FOREIGN_TRADE from its civic tree, Market/Lighthouse per
- * city (non-cumulative, the D-7 rule), Colossus/Great Zimbabwe. No
- * CS-suzerain term: rivals hold no envoys (A-12). */
+ * city (non-cumulative, the D-7 rule), Colossus/Great Zimbabwe, plus +1
+ * per trade city-state this rival is suzerain of (the csTradeCapacityBonus
+ * twin on the rival seat's strict-contest suzerainty). */
 export function rivalTradeCapacity(state: GameState, rival: RivalCiv): number {
   let cap = 0;
   if (rival.research.civics.includes('FOREIGN_TRADE')) cap += 1;
@@ -44,6 +45,9 @@ export function rivalTradeCapacity(state: GameState, rival: RivalCiv): number {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
     }
+  }
+  for (const cs of state.cityStates) {
+    if (cs.type === 'trade' && rivalIsSuzerain(cs, rival.id)) cap += 1;
   }
   return cap;
 }
@@ -81,11 +85,16 @@ export function routeYields(state: GameState, dest: City): Yields {
   return out;
 }
 
+/** csRouteYields' flat gold / specialty amounts — exported for the GPU
+ * rules dump (A-12b: rival CS routes mirror these exactly). */
+export const CS_ROUTE_GOLD = 3;
+export const CS_ROUTE_SPEC = 1;
+
 /** Yields from one route to a city-state: gold-forward plus its specialty. */
 export function csRouteYields(cs: CityState): Yields {
   const out = emptyYields();
-  out.gold += 3;
-  out[CS_TYPE_YIELD[cs.type]] += 1;
+  out.gold += CS_ROUTE_GOLD;
+  out[CS_TYPE_YIELD[cs.type]] += CS_ROUTE_SPEC;
   return out;
 }
 

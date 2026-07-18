@@ -359,9 +359,10 @@ export interface RivalCiv {
   warWeariness?: number;
   /** B-25: this civ's completed space-race project ids (chain progress). */
   spaceProjects?: string[];
-  /** AUDIT A-11: this civ's domestic trade routes (RivalCity ids, both
-   *  endpoints own cities). Routes to city-states wait on A-12 (envoys). */
-  tradeRoutes?: { from: number; to: number }[];
+  /** AUDIT A-11/A-12b: this civ's trade routes — `from` is always an own
+   *  RivalCity id; domestic routes set `to` (own RivalCity id), routes to
+   *  a met city-state set `toCs` (CityState id) instead. */
+  tradeRoutes?: { from: number; to?: number; toCs?: number }[];
   /** AUDIT A-12: this civ's influence accumulator + banked envoys — the
    *  player's influencePoints/envoysAvailable twins. */
   influencePoints?: number;
