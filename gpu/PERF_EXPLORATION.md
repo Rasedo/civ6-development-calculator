@@ -254,3 +254,38 @@ so per-stage before/after deltas are attributable.
   `search_production` glue ~0, `snapshot/restore` ~0. Tree overhead is
   negligible — engine cuts propagate ~1:1 to the mcts lanes; no
   mcts-specific perf work is warranted.
+
+## Stage-5 closing measurements (2026-07-18, quiet box — the round's results)
+
+All stages hunt-free, one green battery each. Commits: T1 6e5caac,
+G1 74a91fe, G2 870eec9, G3 0f407c3, G4 ef4e104.
+
+| metric                  | S0 baseline | post-round | delta |
+|-------------------------|-------------|------------|-------|
+| battery wall            | 354s        | **268s**   | −24%  |
+| gpu-gate lane           | 315.1s      | 242.2s     | −23%  |
+| parity lane             | 282.1s      | 233.5s     | −17%  |
+| mcts-search lane        | 246.9s      | 215.9s     | −13%  |
+| export (TS, stage 0)    | 36.9s       | 22.5s      | −39%  |
+| profile parity driver   | 70.1s       | 59.0s      | −16%  |
+| profile rollout driver  | 104.7s      | 92.6s      | −12%  |
+| TS perf-rivals          | 286 t/s     | 408 t/s    | +43%  |
+
+Intermediate driver points: parity 63.7s after G1+G2+G3 (G4 alone −7.4%).
+Post-G4 shape: `_rival_city_yields` per-j calls 3566 → 400 (the
+capital-under-beliefs fallback only); the cached batched twin recomputes
+~2×/civ/turn (claim/eff bumps) vs 7 per-j passes. Guard storm 449k → 366k
+`Tensor.any` calls on the parity driver. `_apply_unit_actions` residual
+12.0s tottime in rollout — the G2 pre-filter win was bounded exactly as
+predicted (the attack-preferring policy keeps most slots active); further
+cuts there need per-slot body vectorization, not filtering.
+
+**P5 verdict: NO-GO.** The lane tie did not break in parity's favor —
+gpu-gate (242s) is still the wall with parity (233s) just behind; sharding
+the parity lane cannot cut the wall. OMP×shards stays 4×4. Revisit only
+if a future engine cut drops gpu-gate below the parity lane.
+
+Remaining ranked residuals (post-round): _rival_phase glue tottime 9.4s
+(P3's full-loop vectorization — settler/spec coupling made it
+main-session; partially done via G3 slice B), _apply_unit_actions body
+12.0s (per-slot [B]-op storm), _barbarian_phase 5.5s, _city_totals 5.0s.
