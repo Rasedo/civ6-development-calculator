@@ -289,3 +289,33 @@ Remaining ranked residuals (post-round): _rival_phase glue tottime 9.4s
 (P3's full-loop vectorization — settler/spec coupling made it
 main-session; partially done via G3 slice B), _apply_unit_actions body
 12.0s (per-slot [B]-op storm), _barbarian_phase 5.5s, _city_totals 5.0s.
+
+## #59 residuals round (2026-07-18, same day — Stage G5, 026b1eb)
+
+Attribution first (fresh dumps, quiet box): _city_totals' cost was
+mostly `_district_adj_raw` (14.4k calls/run building the same floored
+planes); _rival_phase's glue was the economy loop's per-j housing/
+maintenance/growth-need [B]-op storm; _apply_unit_actions' 11.8s
+tottime is raw dispatch (360k gathers/207k clamps) with tiny callees.
+
+**G5 landed** (green first try): `_district_adj_floor(di)` — a
+(di, _eff_version)-keyed memo replacing all eight fresh-build sites;
+and `_g5_hm` — the economy loop's housing/maint/growth-need math
+batched over j under the G4 (eff, claim) key discipline (the one live
+edge: rival_at in the A-13 improvement-housing window). Measured:
+parity driver 59.0 → **55.4s** (step 52.3 → 48.9s), rollout 92.6 →
+**87.7s**. Round-cumulative vs the S0 baseline: parity −21%, rollout
+−16%.
+
+**PARKED (win/risk too poor — do not pick up without new evidence):**
+- `_apply_unit_actions` body vectorization: the 11.8s is per-slot
+  dispatch across ~30 ops × ~50 slots, but combat is sequential by
+  parity contract (draw order, live occupancy/HP reads). Only the
+  STATIC-plane reads (terrain/river/feature defense inputs) could be
+  pre-gathered batched — est. 2-4s of one lane for a delicate rewrite
+  of the largest combat body (A-18/B-29/capture paths). A hunt there
+  costs more than the win.
+- `_barbarian_phase` (2.6s tot parity): same sequential-combat shape,
+  smaller prize; callees are already thin.
+- `_city_totals` residual (~3s cum): post-G5 it is mostly _eff_yields
+  + genuine cache misses; nothing cheap left.
