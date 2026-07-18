@@ -289,8 +289,32 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
-    // Civilians are simply killed (Civ 6 captures; we don't model capture).
-    killUnit(state, defender);
+    // AUDIT B-31: a melee attack on a lone civilian CAPTURES it — no combat
+    // roll (draw-count neutral). Player and rival attackers flip the
+    // defender to their side in place (movesLeft=0, hp and charges kept,
+    // unit stays on its tile); the attacker spends its attack but does NOT
+    // advance (single-occupancy model). Barbarians still merely kill — no
+    // prisoner/camp system is modeled (recorded simplification).
+    if (attacker.owner === 'barbarian') {
+      killUnit(state, defender);
+    } else {
+      defender.owner = attacker.owner;
+      if (attacker.owner === 'rival') defender.civId = attacker.civId;
+      else delete defender.civId;
+      defender.movesLeft = 0;
+      attacker.movesLeft = 0;
+      // GPU parity: the batch engine transfers the captured unit to the END
+      // of the winning pool (append at next_slot). Mirror that here — splice
+      // it out of state.units and push it back — so both engines iterate the
+      // captured unit LAST in every array-order loop (rivalBuilderActions,
+      // the war loop, the builder walker). Flipping owner in place would keep
+      // the unit at its original PLAYER-spawn index, which the pooled GPU has
+      // no way to reproduce; the resulting order desync surfaces (dormant)
+      // when two same-civ builders contend for a job the same turn.
+      state.units = state.units.filter((u) => u.id !== defender.id);
+      state.units.push(defender);
+      return ok;
+    }
   } else {
     // B-7: flanking helps the attacker, support helps the defender. Applied
     // ONCE so both paired rolls see the same adjusted CS.
