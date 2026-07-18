@@ -115,8 +115,9 @@ function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defe
 }
 
 /** B-7 support count: MILITARY units friendly to the defender (same owner AND
- * civId), adjacent to the defender's tile. */
-function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
+ * civId), adjacent to the defender's tile. Exported for the rival walls
+ * strike (rcstk, rivals.ts) — the pcstk mirror. */
+export function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
   let n = 0;
   for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
     for (const u of unitsAt(state, t.index)) {

@@ -8219,6 +8219,12 @@ class BatchSim:
                             # B-29: the defending unit is wounded (attacker is the city).
                             def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_pmil, self.p_hp[bidx, pm_slot.clamp(min=0)], self.p_hp[bidx, pc_slot.clamp(min=0)]))
                             def_e = def_cs - self._wound(def_hp)
+                            # B-7 support (the pcstk mirror): the struck unit — barb
+                            # or player — gains support from adjacent same-side
+                            # military; the attacker is the city, no flanking.
+                            _dside = torch.where(is_barb, torch.ones(Bn, dtype=torch.long, device=dev2), torch.zeros(Bn, dtype=torch.long, device=dev2))
+                            _, _sp = self._flank_support(tt, _dside, torch.zeros(Bn, dtype=torch.long, device=dev2), torch.full((Bn,), -1, dtype=torch.long, device=dev2))
+                            def_e = def_e + SUPPORT_CS * _sp
                             d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
                             for grp, at_map, hp_t, alive_t, slot_t in (
