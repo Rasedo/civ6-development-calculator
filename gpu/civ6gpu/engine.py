@@ -1067,6 +1067,10 @@ class BatchSim:
         #                   u_alive/p_alive (route raided-mask) with no eff bump.
         self._bel_version = 0
         self._rp_kill_version = 0
+        # G4: bumped when a border-growth claim lands INSIDE a later same-civ
+        # city's worked-tile window (rival_at is the valid-mask input the eff
+        # epoch misses); claims elsewhere leave the yields cache intact.
+        self._claim_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._score_cache: tuple[int, torch.Tensor] | None = None
@@ -1076,6 +1080,7 @@ class BatchSim:
         self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
         self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
         self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
+        self._rcy_all_cache = None       # G4: ((turn,r,eff,bel,kill,claim), 6-tuple [B,RC])
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
         def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1288,8 +1293,10 @@ class BatchSim:
         # rival-phase caches (bel_add memo is keyed on _bel_version alone).
         self._bel_version += 1
         self._rp_kill_version += 1
+        self._claim_version += 1
         self._rival_route_cache = self._belief_feat_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
+        self._rcy_all_cache = None  # G4
 
     def snapshot(self) -> dict:
         """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
@@ -1316,8 +1323,10 @@ class BatchSim:
         # counters (mcts self-test covers this) and drop the rival-phase caches.
         self._bel_version += 1
         self._rp_kill_version += 1
+        self._claim_version += 1
         self._rival_route_cache = self._belief_feat_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
+        self._rcy_all_cache = None  # G4
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -2514,7 +2523,7 @@ class BatchSim:
             yt = yt + F[:, j] * float(w[0]) + PR[:, j] * float(w[1]) + GO[:, j] * float(w[2]) + SC[:, j] * float(w[3]) + CU[:, j] * float(w[4]) + FA[:, j] * float(w[5])
         return yt.to(self.dtype)
 
-    def _rival_city_yields_all(self, r: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _rival_city_yields_all(self, r: int, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """D-9: the batched-j twin of _rival_city_yields for the POST-STEP
         score/trace path (FRESH amenity factors, state frozen between j's)
         — one [B, RC, M] window + plane gather + a single topk instead of
@@ -2795,7 +2804,9 @@ class BatchSim:
             prod = prod + _route_inc * alive.double()
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
-        yf = self._rival_amenity(r)[2]  # [B, RC]
+        # G4: the economy loop passes its loop-top FROZEN factors instead
+        # (the per-j twin's amen_yf contract).
+        yf = amen_yf if amen_yf is not None else self._rival_amenity(r)[2]  # [B, RC]
         prod = prod * yf
         sci = sci * yf
         cul = cul * yf
@@ -2824,6 +2835,29 @@ class BatchSim:
             torch.where(alive, gold, z),
             torch.where(alive, faith, z),
         )
+
+    def _rcy_all_cached(self, r: int, amen_yf: torch.Tensor) -> tuple:
+        """G4: the economy loop's keyed slot over the D-9 batched twin (with
+        the loop's FROZEN amenity factors). Key exactness — every mid-loop
+        mutation that can change a LATER column's yields bumps a component:
+        completions/paves/founding/civic-completion (_eff_version), belief
+        claims (_bel_version), the economy strike-kill (_rp_kill_version,
+        the route raided-mask), border claims landing inside a later
+        same-civ window (_claim_version — rival_at is the valid-mask input;
+        claims elsewhere, and any r0 claim seen by r1, cannot flip a valid
+        bit: a claimed tile goes -1 -> r0, never == r1). A city's own-column
+        inputs (pop, buildings) are written only AT its iteration, after its
+        yields are consumed. The one live read a snapshot cannot honor is
+        capY's civ-total follower pop under beliefs — the economy loop keeps
+        the per-j path for capital columns in that case (see the call site).
+        Post-phase callers (trace/leader/rival_score) stay on the raw twin:
+        fresh amenity factors, post-war state."""
+        key = (self.turn, r, self._eff_version, self._bel_version, self._rp_kill_version, self._claim_version)
+        if self._rcy_all_cache is not None and self._rcy_all_cache[0] == key:
+            return self._rcy_all_cache[1]
+        out = self._rival_city_yields_all(r, amen_yf=amen_yf)
+        self._rcy_all_cache = (key, out)
+        return out
 
     def leader(self) -> torch.Tensor:
         """GV-1: [B] the current score-leader as a unified civ id — 0 =
@@ -6239,6 +6273,15 @@ class BatchSim:
                 spot = tiles[rows, best[rows]]
                 self.rival_at[rows, spot] = r
                 self.rc_tile_id[rows, spot] = self.rc_id[rows, r, j]  # A-17: claim registers to THIS city
+                # G4: invalidate the batched-yields cache ONLY if this claim
+                # can change a later column — i.e. the spot lands inside a
+                # LATER same-civ city's radius-3 worked window (columns <= j
+                # are already consumed this turn; padding -1 never matches a
+                # real spot >= 0). Cross-civ claims can't flip a valid bit.
+                if j + 1 < self.RC:
+                    _win = self._rcy_globals().get("win_r", {}).get(r)
+                    if _win is None or bool((_win[rows, j + 1 :, :] == spot.view(-1, 1, 1)).any()):
+                        self._claim_version += 1
                 self.rc_acquired[rows, r, j] += 1
                 self.rc_cbox[rows, r, j] -= cost[rows]
                 # D-13: only rival_at[spot] changed (-1 → r, per the unowned
@@ -7572,6 +7615,7 @@ class BatchSim:
             # so the precomputed columns equal the old per-j computes.
             cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
             cact_any_l = cact_all.any(dim=0).tolist()
+            _rcy_bel = self._r_has_beliefs(r)  # G4: capital fallback gate (capY live-pop)
             for j in range(self.RC):
                 if not cact_any_l[j]:
                     continue
@@ -7613,7 +7657,22 @@ class BatchSim:
                     nxt_l = (self.rc_loyalty[:, r, j] + delta_l).clamp(min=0, max=float(rr.get("loyaltyMax", 100)))
                     self.rc_loyalty[:, r, j] = torch.where(upd_l, nxt_l, self.rc_loyalty[:, r, j])
                     rc_flip[:, j] = upd_l & (self.rc_loyalty[:, r, j] <= 0)
-                food, prod, sci, cul, gold_y, faith_y = self._rival_city_yields(r, j, cact, amen_yf=amen_yf[:, j])
+                # G4: column j of the keyed batched twin replaces the per-j
+                # pass (see _rcy_all_cached's exactness argument). The one
+                # snapshot-vs-live divergence is capY's civ-total follower pop
+                # under beliefs — TS sums pops LIVE at the capital's own loop
+                # position, so capital columns keep the per-j path there.
+                if _rcy_bel and bool(self.rc_is_cap[:, r, j].any()):
+                    food, prod, sci, cul, gold_y, faith_y = self._rival_city_yields(r, j, cact, amen_yf=amen_yf[:, j])
+                else:
+                    F6 = self._rcy_all_cached(r, amen_yf)
+                    zj = torch.zeros_like(F6[0][:, j])
+                    food = torch.where(cact, F6[0][:, j], zj)
+                    prod = torch.where(cact, F6[1][:, j], zj)
+                    sci = torch.where(cact, F6[2][:, j], zj)
+                    cul = torch.where(cact, F6[3][:, j], zj)
+                    gold_y = torch.where(cact, F6[4][:, j], zj)
+                    faith_y = torch.where(cact, F6[5][:, j], zj)
                 prod_sum = torch.where(cact, prod_sum + prod, prod_sum)
                 # C1-B3a: tile/center columns plus the citizens' contribution.
                 # ASSOCIATION MATTERS: TS `sciSum += y.science + 0.7*pop`
