@@ -7170,10 +7170,61 @@ class BatchSim:
                 has_rng_type = torch.zeros(B, dtype=torch.bool, device=dev)
             settle_cost = rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities - 1).clamp(min=0).double()
             scripted_r = ~self.controlled[:, r]  # C2b: the picker only drives scripted rivals
+            # G3-A: ONE guard sync for the whole pick loop instead of a per-j
+            # any(). Exact because iteration j writes only column j of
+            # rc_current[:, r] (every pick targets city j) and active/
+            # scripted_r/alive0 are loop-invariant clones/locals.
+            idle_all = (active & scripted_r).unsqueeze(1) & alive0 & (self.rc_current[:, r] == -1)
+            idle_any_l = idle_all.any(dim=0).tolist()
+            if self.districts_on and (self._scaffold or self._proj_rows):
+                # G3-B hoist: the district-cost curve reads r_techs/r_civics,
+                # which nothing in the pick loop writes — j-invariant.
+                dcp = self.rules.district_cost
+                t_pct = self.r_techs[:, r].sum(dim=1).double() / float(self.rules_dev.t_cost.shape[0])
+                c_pct = self.r_civics[:, r].sum(dim=1).double() / float(self.rules_dev.c_cost.shape[0])
+                d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)))
+            if self.districts_on:
+                # G3-B: the req-building pick block vectorized over j. Inputs:
+                # rc_bldg / r_techs / r_civics / rc_center / tile_river /
+                # rc_dist_tile / district_complete — none written by the pick
+                # loop. The one same-j write, _place_district_rival registering
+                # rc_dist_tile[:, r, j, di] before the building block runs, is
+                # value-neutral: a just-placed district is INCOMPLETE, so its
+                # dcomp term is False exactly as the pre-placement reg_t = -1
+                # was (wonder paves touch feature/improvement planes only).
+                rdv3 = self.rules_dev
+                NBn = rdv3.b_cost.shape[0]
+                have_bA = self.rc_bldg[:, r]  # [B, RC, NB]
+                ones_nb = torch.ones(B, NBn, dtype=torch.bool, device=dev)
+                unl_b = torch.where(
+                    rdv3.b_unlock.unsqueeze(0) >= 0,
+                    self.r_techs[:, r].gather(1, rdv3.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                    ones_nb,
+                ) & torch.where(
+                    rdv3.b_unlock_civic.unsqueeze(0) >= 0,
+                    self.r_civics[:, r].gather(1, rdv3.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+                    ones_nb,
+                )  # [B, NB] — j-invariant (previously rebuilt per j)
+                riv_cA = self.tile_river.gather(1, self.rc_center[:, r].clamp(min=0))  # [B, RC]
+                ok_bA = unl_b.unsqueeze(1) & ~have_bA & (~rdv3.b_river.view(1, 1, -1) | riv_cA.unsqueeze(2))
+                reqd_b = rdv3.b_req_district  # [NB]
+                reg_tA = self.rc_dist_tile[:, r].gather(2, reqd_b.clamp(min=0).view(1, 1, -1).expand(B, self.RC, -1))
+                dcompA = (reg_tA >= 0) & self.district_complete.gather(1, reg_tA.clamp(min=0).reshape(B, -1)).reshape_as(reg_tA)
+                ok_bA &= torch.where(reqd_b.view(1, 1, -1) >= 0, dcompA, torch.ones_like(dcompA))
+                for bi2, reqs in enumerate(self.rules.b_req_buildings):
+                    if reqs:
+                        ok_bA[:, :, bi2] &= have_bA[:, :, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=2)
+                arNB = torch.arange(NBn, device=dev, dtype=rdv3.b_cost.dtype)
+                inf_bA = torch.full((B, self.RC, NBn), float("inf"), dtype=rdv3.b_cost.dtype, device=dev)
+                key_bA = torch.where(ok_bA, rdv3.b_cost.view(1, 1, -1) * 1024 + arNB, inf_bA)  # the *1024+arNB tie-break key, verbatim
+                bi_A = key_bA.argmin(dim=2)  # [B, RC]
+                okb_anyA = ok_bA.any(dim=2)  # [B, RC]
+                code_bA = bi_A + (1 + self.NU + len(self._scaffold))
+                cost_bA = rdv3.b_cost[bi_A].double()
             for j in range(self.RC):
-                idle = active & scripted_r & alive0[:, j] & (self.rc_current[:, r, j] == -1)
-                if not bool(idle.any()):
+                if not idle_any_l[j]:
                     continue
+                idle = idle_all[:, j]
                 want_s = idle & ~settler_q & (n_cities < rr.get("maxCities", 6)) & self.rc_is_cap[:, r, j]
                 if bool(want_s.any()):
                     self.rc_current[:, r, j] = torch.where(want_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
@@ -7181,17 +7232,16 @@ class BatchSim:
                     self.rc_progress[:, r, j] = torch.where(want_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                     settler_q = settler_q | want_s
                 # C1-B4: districts outrank units (the economy compounds).
+                # G3-A: rem_any is a live Python mirror of bool(rem.any()),
+                # recomputed ONLY when rem is reassigned — replaces the per-si
+                # re-test storm (the d_cost curve itself hoisted above).
                 rem = idle & ~want_s
-                if self.districts_on and self._scaffold and bool(rem.any()):
-                    dcp = self.rules.district_cost
-                    # P4/D-8: floor(54·(1 + 9·max(tech%, civic%))) — the real curve
-                    t_pct = self.r_techs[:, r].sum(dim=1).double() / float(self.rules_dev.t_cost.shape[0])
-                    c_pct = self.r_civics[:, r].sum(dim=1).double() / float(self.rules_dev.c_cost.shape[0])
-                    d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)))
+                rem_any = bool(rem.any())
+                if self.districts_on and self._scaffold and rem_any:
                     cap_max = torch.div(self.rc_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
                     spec_cnt = ((self.rc_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
                     for si, (di, utech, plc) in enumerate(self._scaffold):
-                        if not bool(rem.any()):
+                        if not rem_any:
                             break
                         has_tech = self.r_techs[:, r, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
                         not_owned = self.rc_dist_tile[:, r, j, di] < 0
@@ -7209,53 +7259,30 @@ class BatchSim:
                             self.rc_progress[:, r, j] = torch.where(placed, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                             spec_cnt = spec_cnt + (placed & torch.tensor(bool(self._is_specialty[di]), device=dev)).long()
                             rem = rem & ~placed
+                            rem_any = bool(rem.any())
                 # C1-B4b-2: then the CHEAPEST available building (catalog
                 # order breaks cost ties, mirroring the TS scan). Gates: the
                 # rival's own tech/civic unlocks, required district COMPLETE
                 # (single-slot queues can't wait on one in flight), prereq
-                # buildings, river for the Water Mill.
-                if self.districts_on and bool(rem.any()):
-                    rdv3 = self.rules_dev
-                    NBn = rdv3.b_cost.shape[0]
-                    have_b = self.rc_bldg[:, r, j]  # [B, NB]
-                    ones_nb = torch.ones(B, NBn, dtype=torch.bool, device=dev)
-                    unl_b = torch.where(
-                        rdv3.b_unlock.unsqueeze(0) >= 0,
-                        self.r_techs[:, r].gather(1, rdv3.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
-                        ones_nb,
-                    ) & torch.where(
-                        rdv3.b_unlock_civic.unsqueeze(0) >= 0,
-                        self.r_civics[:, r].gather(1, rdv3.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
-                        ones_nb,
-                    )
-                    ctile = self.rc_center[:, r, j].clamp(min=0)
-                    riv_c = self.tile_river.gather(1, ctile.unsqueeze(1)).squeeze(1)
-                    ok_b = unl_b & ~have_b & (~rdv3.b_river.view(1, -1) | riv_c.unsqueeze(1))
-                    reqd_b = rdv3.b_req_district  # [NB]
-                    reg_t = self.rc_dist_tile[:, r, j].gather(1, reqd_b.clamp(min=0).unsqueeze(0).expand(B, -1))
-                    dcomp = (reg_t >= 0) & self.district_complete.gather(1, reg_t.clamp(min=0))
-                    ok_b &= torch.where(reqd_b.unsqueeze(0) >= 0, dcomp, ones_nb)
-                    for bi2, reqs in enumerate(self.rules.b_req_buildings):
-                        if reqs:
-                            ok_b[:, bi2] &= have_b[:, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=1)
-                    want_b = rem & ok_b.any(dim=1)
+                # buildings, river for the Water Mill. G3-B: eligibility +
+                # argmin precomputed for all j above; this is just the column
+                # read under the surviving rem mask.
+                if self.districts_on and rem_any:
+                    want_b = rem & okb_anyA[:, j]
                     if bool(want_b.any()):
-                        arNB = torch.arange(NBn, device=dev, dtype=rdv3.b_cost.dtype)
-                        inf_b = torch.full((B, NBn), float("inf"), dtype=rdv3.b_cost.dtype, device=dev)
-                        key_b = torch.where(ok_b, rdv3.b_cost.unsqueeze(0) * 1024 + arNB, inf_b)
-                        bi = key_b.argmin(dim=1)
-                        code_b = 1 + self.NU + len(self._scaffold) + bi
-                        self.rc_current[:, r, j] = torch.where(want_b, code_b, self.rc_current[:, r, j])
-                        self.rc_cost[:, r, j] = torch.where(want_b, rdv3.b_cost.gather(0, bi).double(), self.rc_cost[:, r, j])
+                        self.rc_current[:, r, j] = torch.where(want_b, code_bA[:, j], self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(want_b, cost_bA[:, j], self.rc_cost[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(want_b, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         rem = rem & ~want_b
+                        rem_any = bool(rem.any())
                 # AUDIT A-4: the CAPITAL raises a world wonder once
                 # buildings run dry — first unlocked wonder in data order,
                 # first eligible owned tile (LOWEST index); one per world
                 # (the built_wonder plane counts in-flight: queueing paves
                 # the tile, exactly like TS queueWonder).
-                if self.districts_on and self._wond_n > 0 and bool((rem & self.rc_is_cap[:, r, j]).any()):
+                if self.districts_on and self._wond_n > 0 and rem_any and bool((rem & self.rc_is_cap[:, r, j]).any()):
                     remw = rem & self.rc_is_cap[:, r, j]
+                    remw_any = True  # guarded non-empty above; live mirror below
                     d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
                     base_ok = (
                         (self.rival_at == r)
@@ -7267,7 +7294,7 @@ class BatchSim:
                         & (self.res_priority <= 1)
                     )
                     for wi in range(self._wond_n):
-                        if not bool(remw.any()):
+                        if not remw_any:
                             break
                         wrow = self._wond_rows[wi]
                         if int(wrow.get("ut", -1)) == -3 or int(wrow.get("uc", -1)) == -3:
@@ -7318,10 +7345,12 @@ class BatchSim:
                         self.rc_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         self._eff_version += 1  # a pave: features/improvements changed under the caches
                         remw = remw & ~has_w
+                        remw_any = bool(remw.any())
                         rem = rem & ~has_w
+                        rem_any = bool(rem.any())
                 # C1-B5b: one BUILDER per civ at a time, while a job exists.
                 # A builder is a unit — it takes a cap slot like any other.
-                if self.improvements_on and self._builder_idx >= 0 and bool(rem.any()):
+                if self.improvements_on and self._builder_idx >= 0 and rem_any:
                     has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
                     # alive-masked (P5/S5): dead slots' queues are cleared at
                     # capture, but never trust a hole
@@ -7336,6 +7365,7 @@ class BatchSim:
                         self.rc_progress[:, r, j] = torch.where(want_bd, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         unit_count = unit_count + want_bd.long()
                         rem = rem & ~want_bd
+                        rem_any = bool(rem.any())
                 want_u = rem & (unit_count < cap)
                 if bool(want_u.any()):
                     # A-6: the composition pick — ranged while under-shared,
@@ -7356,12 +7386,11 @@ class BatchSim:
                 if self.districts_on and self._proj_rows:
                     left_p = rem & ~want_u
                     if bool(left_p.any()):
-                        dcp2 = self.rules.district_cost
-                        t_pct2 = self.r_techs[:, r].sum(dim=1).double() / float(self.rules_dev.t_cost.shape[0])
-                        c_pct2 = self.r_civics[:, r].sum(dim=1).double() / float(self.rules_dev.c_cost.shape[0])
-                        d_cost2 = torch.floor(dcp2.get("base", 32) * (1 + dcp2.get("scale", 9) * torch.maximum(t_pct2, c_pct2)))
+                        # G3-B: d_cost hoisted above the j loop (same formula,
+                        # same r_techs/r_civics inputs — nothing in the pick
+                        # loop writes them, so the value is identical per j).
                         p_floor = float(round(15 * self.rules.game_speed))
-                        p_cost = torch.maximum(torch.full_like(d_cost2, p_floor), js_round(d_cost2 * 0.5))
+                        p_cost = torch.maximum(torch.full_like(d_cost, p_floor), js_round(d_cost * 0.5))
                         for pi_, prow in enumerate(self._proj_rows):
                             if not bool(left_p.any()):
                                 break
@@ -7536,10 +7565,17 @@ class BatchSim:
                 wregG = self.rc_wonder[:, r]  # [B, RC, nW]
                 compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
                 gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
+            # G3-A: one guard sync for the whole economy loop. Exact: alive_c
+            # is a pre-loop CLONE (a queue-completion newborn founded inside
+            # the loop deliberately does not act this turn — the [...rival.
+            # cities] discipline above) and `active` is a loop-invariant local,
+            # so the precomputed columns equal the old per-j computes.
+            cact_all = active.unsqueeze(1) & alive_c  # [B, RC]
+            cact_any_l = cact_all.any(dim=0).tolist()
             for j in range(self.RC):
-                cact = active & alive_c[:, j]  # A-5r: post-buy snapshot (settler newborn acts this turn)
-                if not bool(cact.any()):
+                if not cact_any_l[j]:
                     continue
+                cact = cact_all[:, j]  # A-5r: post-buy snapshot (settler newborn acts this turn)
                 # P5/S6 (C-19): rival city loyalty at the loop top (the TS
                 # position, before yields/growth) — own = THIS civ, foreign
                 # = the player + every other rival; LIVE pops (earlier slots
@@ -8164,6 +8200,13 @@ class BatchSim:
             if bool(declare.any()):
                 self.r_atwar[:, r] = self.r_atwar[:, r] | declare
                 self.r_warturns[:, r] = torch.where(declare, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
+        # G3 hardening: drop the G1 route-income cache at phase end. Its key
+        # (turn, r, eff, _rp_kill_version) does not cover unit deaths in the
+        # war/peace acts above, so post-phase callers (leader/domination/
+        # trace) must recompute against post-war state. With R>=2 the single
+        # slot is overwritten before any same-r re-read (the G1 argument),
+        # but that R-parity must not be load-bearing for R=1 configs.
+        self._rival_route_cache = None
 
     def _apply_loyalty_and_flips(self, tier_idx: torch.Tensor, pop_before: torch.Tensor) -> None:
         """Mirrors applyLoyalty inside the city loop + the deferred flips.
