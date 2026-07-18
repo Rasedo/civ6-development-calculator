@@ -29,7 +29,6 @@ import {
   crossesRiver,
 } from './units';
 import { revealAround } from './fog';
-import { CITY_WORK_RADIUS } from '../data/constants';
 import { transferCityToRival } from './rivals';
 import type { RuleResult } from './rules';
 import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
@@ -494,8 +493,13 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   // V-W2 slot cap (mirrors the GPU's fixed city slots): a full empire
   // RAZES instead — the rival city and its claim simply cease.
   if (state.cities.length >= 6) {
-    for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
-      if (tileOwnedByCiv(t, civOfRival(rival.id))) t.rivalId = undefined;
+    // A-17: exactly this city's tiles free (registry scan) — the old
+    // work-radius sweep leaked the outer ring as orphaned civ territory.
+    for (const t of state.map.tiles) {
+      if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
+        t.rivalId = undefined;
+        t.rivalCityId = undefined;
+      }
     }
     center.district = null;
     center.districtComplete = false;
@@ -503,10 +507,12 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     return;
   }
   const id = state.nextCityId++;
-  // Their territory within working range transfers to the new owner.
-  for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
-    if (tileOwnedByCiv(t, civOfRival(rival.id))) {
+  // A-17: exactly this city's territory transfers to the new owner (registry
+  // scan) — the old work-radius sweep also stole sibling cities' frontage.
+  for (const t of state.map.tiles) {
+    if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
       t.rivalId = undefined;
+      t.rivalCityId = undefined;
       if (t.cityId === -1) t.cityId = id;
     }
   }

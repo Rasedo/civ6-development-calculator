@@ -161,11 +161,15 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
   tile.rivalId = rival.id;
+  tile.rivalCityId = city.id; // A-17: per-city registry
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
     // Mirrors foundCity: the full first ring, water included — a coastal
     // rival must own its harbor water (AUDIT C-1; the water skip made the
     // whole Harbor line structurally unreachable for rivals).
-    if (!tileOwned(t)) t.rivalId = rival.id;
+    if (!tileOwned(t)) {
+      t.rivalId = rival.id;
+      t.rivalCityId = city.id;
+    }
   }
   rival.cities.push(city);
   // GV-3: rival r's capital tile lives at civ index r+1, static once founded.
@@ -428,6 +432,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     if (t.cityId === city.id) {
       t.cityId = -1;
       t.rivalId = winner.id;
+      t.rivalCityId = winner.nextCityId; // A-17: the rc pushed below
     }
   }
   winner.cities.push({
@@ -463,9 +468,9 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
  * tiles, dist asc → resource priority desc → yield sum desc → index asc)
  * under the rival's OWN research modifiers (the rivalCityYields ctx).
  * Water, impassables and natural wonders are all claimable, exactly like
- * borderCandidates. One documented delta: adjacency is CIV-level (rival
- * territory has no per-city tile registry — P7 material), where the
- * player's is per-city. */
+ * borderCandidates. A-17: adjacency is PER-CITY via the rivalCityId tile
+ * registry — a rival city can no longer claim across a sibling's frontier,
+ * exactly like the player's n.cityId === city.id check. */
 function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity): number | null {
   const center = state.map.tiles[city.centerIndex];
   const ctx = { map: state.map, mods: getRivalModifiers(state, rival) };  // A-7: belief tile yields rank candidates too
@@ -473,7 +478,7 @@ function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity)
   for (const t of tilesWithin(state.map, center.col, center.row, 5)) {
     if (tileOwned(t)) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
-      (n) => n.index !== t.index && tileOwnedByCiv(n, civOfRival(rival.id)),
+      (n) => n.index !== t.index && tileOwnedByCiv(n, civOfRival(rival.id)) && n.rivalCityId === city.id,
     );
     if (!adjOwn) continue;
     const y = tileYields(ctx, t);
@@ -1281,9 +1286,13 @@ function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void
  * the transferCityToRival shape on the rival side. */
 function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
   from.cities = from.cities.filter((c) => c.id !== rc.id);
-  const center = state.map.tiles[rc.centerIndex];
-  for (const t of tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)) {
-    if (tileOwnedByCiv(t, civOfRival(from.id))) t.rivalId = to.id;
+  // A-17: exactly the flipping city's tiles re-tag (registry scan) — the old
+  // work-radius sweep both leaked its outer ring and stole sibling frontage.
+  for (const t of state.map.tiles) {
+    if (tileOwnedByCiv(t, civOfRival(from.id)) && t.rivalCityId === rc.id) {
+      t.rivalId = to.id;
+      t.rivalCityId = to.nextCityId; // the rc pushed below
+    }
   }
   to.cities.push({
     id: to.nextCityId++,
@@ -1674,6 +1683,7 @@ export function rivalPhase(state: GameState): void {
         }
         rc.cultureBox -= rcBorderCost();
         state.map.tiles[next].rivalId = rival.id;
+        state.map.tiles[next].rivalCityId = rc.id; // A-17
         rc.tilesAcquired += 1;
       }
       // AUDIT B-2: the rival mirror of the player city strike (combat.ts) —

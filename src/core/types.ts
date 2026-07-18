@@ -100,6 +100,10 @@ export interface Tile {
   csId?: number;
   /** Owning rival-civ id; absent = none. */
   rivalId?: number;
+  /** AUDIT A-17: owning rival CITY (RivalCity.id, per-civ ids — meaningful
+   * only with rivalId set). The per-city registry the player's cityId gives
+   * player tiles; capture/raze/transfer and border adjacency key on it. */
+  rivalCityId?: number;
 }
 
 export interface GameMap {

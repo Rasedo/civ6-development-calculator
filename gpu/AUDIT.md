@@ -25,25 +25,29 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 35 | 7.9 | **23%** |
+| A symmetry | 37 | 11.9 | **32%** |
 | B fidelity | 88 | 40.8 | **46%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (E-16 with owner) | 6 | 5 | 83% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **178** | **102.7** | **58%** |
-| Open chapters only (A+B+E) | 129 | 53.7 | **42%** |
+| **Overall (incl. closed)** | **180** | **106.7** | **59%** |
+| Open chapters only (A+B+E) | 131 | 57.7 | **44%** |
 
 (2026-07-17 #46r: A-7r LIVE; A-5r+#47r: A-5 resolved-minus-tile-
 purchase, B-18 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
 B-18 60%→75% — pressure→yields coupling LIVE; B-13 → 100% — full
 unlockPolicy wiring; A-7r → 100% — the residual card wiring was
-B-13's; B-25 50%→70% — GPU space-race sim poke-covered; B-29 done.)
+B-13's; B-25 50%→70% — GPU space-race sim poke-covered; B-29 done.
+2026-07-18 #41 stage 1: A-17 RESOLVED — per-rc tile registry both
+engines, per-city border adjacency + exact capture/transfer tile
+sets; residual worked-tile civ-level scan split out as new A-23 w2.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
-  closed the card wiring), A-9 4, A-11 4, A-12 4, A-17 4, A-18 3,
-  A-19 4, A-20 2 (done), A-21 2, A-22 2.
+  closed the card wiring), A-9 4, A-11 4, A-12 4, A-17 4 (done —
+  #41 stage 1), A-18 3, A-19 4, A-20 2 (done), A-21 2, A-22 2,
+  A-23 2 (new — split from A-17: civ-level worked-tile scan).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 / B-29 2 (done);
   B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%); B-4 3,
   B-6 8, B-7 2, B-8 2, B-9 3, B-10 3, B-30 2, B-31 1, B-32 2 (open).
@@ -152,16 +156,20 @@ untagged halves of tagged items stay Fable/main-session work.
   `_capture_city_state` (engine.py) are reachable only from the
   player's seat. Downstream: rival districts never earn the CS envoy
   district bonuses the player's `_city_totals` applies.
-- A-17. Rival border-growth adjacency is CIV-level:
-  `pickRivalBorderTile` (rivals.ts) accepts any tile adjacent to
-  `tileOwnedByCiv(·, civOfRival(r))`, and rival territory has no
-  per-city tile registry (`t.rivalId` only), vs the player's
-  `borderCandidates` (city.ts) requiring `n.cityId === city.id`;
-  consumption runs in `rivalPhase`'s `rcBorderCost` loop with
-  `borderGrowthCost` × `getRivalModifiers().borderCostMult`. GPU twin
-  `_rival_border_growth` (engine.py) mirrors the civ-level scan.
-  Impact: a rival city can claim across a sibling city's frontier, and
-  acquired tiles belong to the civ blob, not a city. P7 material.
+- A-17. **RESOLVED (2026-07-18, task #41)**: rival territory has a
+  per-city tile registry — TS `Tile.rivalCityId` (the owning
+  `RivalCity.id`, per-civ ids) / GPU `rc_tile_id` plane, keyed on the
+  PERSISTENT rc id (not the slot) so `_reclaim_rc` compaction needs no
+  tile-plane remap. Landed inert (all mutation sites maintain it:
+  founding center+ring, border claims, capture/raze/transfer/defection)
+  then flipped three reads: `pickRivalBorderTile`/`_rival_border_growth`
+  adjacency is per-city (`n.rivalCityId === city.id`, the player's
+  `borderCandidates` twin — no more claiming across a sibling's
+  frontier), and `captureRivalCity`/`_capture_rival_city` +
+  `transferRivalCityToRival`/`_transfer_rc_to_rc` move EXACTLY the
+  city's own tiles (registry scan) — the old work-radius sweeps both
+  leaked the outer ring as orphaned civ territory and stole sibling
+  cities' frontage. Residual worked-tile asymmetry split out as A-23.
 - A-18. RL action surface (deliberately batched with the P8
   re-baseline, one item — task #50): `unit_action_mask` (engine.py)
   offers move/melee/hold/FARM/MINE/LUMBER_MILL/chop only — no
@@ -212,6 +220,15 @@ untagged halves of tagged items stay Fable/main-session work.
   scope-out in gpu/BUILD_PLAN.md). Inert under scripted play today,
   but it becomes a live asymmetry the moment the P8 surface gains the
   verb — track alongside A-18.
+- A-23 (new, split from A-17). The rival WORKED-TILE scan is still
+  CIV-level: `rivalCityYields` (rivals.ts) ranks
+  `tileOwnedByCiv(t, civOfRival(r))` tiles in the work radius (twin
+  `_rival_city_yields` planes key on `rival_at == r`), vs the player's
+  per-city `workableTiles` — two adjacent rival cities can both work
+  the same civ tile (double-counting the player structurally cannot
+  do). A-17's `rivalCityId`/`rc_tile_id` registry now makes the
+  per-city convergence implementable; it reshuffles every rival yield
+  every turn, so it needs its own gated stage.
 
 ## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 

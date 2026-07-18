@@ -979,6 +979,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       cs: t.csId ?? -1,
       // rival territory at t=0 (grows dynamically in the engine)
       rv: t.rivalId ?? -1,
+      rci: t.rivalCityId ?? -1, // A-17: per-rc tile registry (RivalCity.id, per-civ)
       // C1-B4b-2: Water Mill gates on a river at RIVAL centers too
       riv: hasRiver(t) ? 1 : 0,
       // C1-B5b-iii: water housing IF a center stood here (fresh 5 /

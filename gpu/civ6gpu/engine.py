@@ -330,7 +330,7 @@ _MUTABLE = [
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
     "influence", "envoys_avail",
-    "rival_at", "rvcity_at", "rv_at",
+    "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
     "r_atwar", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -513,6 +513,11 @@ class BatchSim:
         self._rc_reclaim_at = int(_os.environ.get("CIV6_RC_RECLAIM_AT", self.RC - 8))
         r_pad, rc_pad = max(self.R, 1), self.RC
         self.rival_at = torch.tensor([[t.get("rv", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # AUDIT A-17: per-rc tile registry — the owning rival CITY as its
+        # persistent rc_id (per-civ ids, meaningful only where rival_at>=0).
+        # Keyed on the ID, not the slot, so _reclaim_rc compaction needs no
+        # tile-plane remap (ids survive the slot permutation; rc_id rides it).
+        self.rc_tile_id = torch.tensor([[t.get("rci", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.water = torch.tensor([[t.get("wt", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.nwonder = torch.tensor([[t.get("nw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.fresh_water = torch.tensor([[t.get("fw", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -3604,8 +3609,8 @@ class BatchSim:
     def _capture_rival_city(self, rows: torch.Tensor, civ: torch.Tensor, slot: torch.Tensor, ctr: torch.Tensor, plunder: bool = True) -> None:
         """V-W2: captureRivalCity — the rival city transfers to the PLAYER.
         Into a FREE player slot when one exists (TS gains the matching cap:
-        beyond C cities the capture razes instead); tiles within the work
-        radius move rivalId -> cityId, pop lands at x0.75 (min 1), the slot
+        beyond C cities the capture razes instead); the city's OWN tiles
+        (A-17 registry) move rivalId -> cityId, pop lands at x0.75 (min 1), the slot
         initializes from the live planes (site = the center, water housing
         from wh, river from riv, dist from the pair_dist row)."""
         for i in range(len(rows)):
@@ -3629,9 +3634,12 @@ class BatchSim:
             self.rc_cost[b, r, j] = 0
             self.rc_progress[b, r, j] = 0
             self.rc_qtile[b, r, j] = -1
-            # territory within radius 3 leaves the rival
-            ring = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r)
+            # A-17: exactly this city's tiles leave the rival (registry scan)
+            # — the old radius-3 sweep leaked the outer ring as orphaned civ
+            # territory and stole sibling cities' frontage.
+            ring = (self.rc_tile_id[b] == int(self.rc_id[b, r, j])) & (self.rival_at[b] == r)
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
+            self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], -1), self.rc_tile_id[b])  # A-17
             # P5/S2 gate-catch (seed 9235 t241): TS APPENDS the captured city
             # (its trace keeps dead cities' columns and the new city gets a
             # NEW column), so the slot must be the founding HIGH-WATER mark
@@ -5844,9 +5852,9 @@ class BatchSim:
 
     def _transfer_rc_to_rc(self, b: int, r_from: int, j: int, r_to: int) -> None:
         """P5/S6 (C-19): a loyalty flip between rivals — pop ×0.75 floor 1,
-        fresh boxes, CITY_CENTER-only registry, half HP, territory within
-        the work radius re-tags (the transferRivalCityToRival mirror). The
-        loser slot dies with full queue/registry hygiene (the S5 lesson)."""
+        fresh boxes, CITY_CENTER-only registry, half HP, the city's own
+        tiles re-tag (A-17 registry; the transferRivalCityToRival mirror).
+        The loser slot dies with full queue/registry hygiene (the S5 lesson)."""
         c_t = int(self.rc_center[b, r_from, j])
         old_pop = int(self.rc_pop[b, r_from, j])
         old_acq = int(self.rc_acquired[b, r_from, j])
@@ -5860,8 +5868,14 @@ class BatchSim:
         self.rc_cost[b, r_from, j] = 0
         self.rc_progress[b, r_from, j] = 0
         self.rc_qtile[b, r_from, j] = -1
-        own_t = (self.pair_dist[c_t] <= 3) & (self.rival_at[b] == r_from)
+        # A-17: exactly the flipping city's tiles re-tag (registry scan) —
+        # the transferRivalCityToRival twin (rc_id read before the hygiene
+        # writes; the slot's id field itself is never reset on death).
+        own_t = (self.rc_tile_id[b] == int(self.rc_id[b, r_from, j])) & (self.rival_at[b] == r_from)
         self.rival_at[b] = torch.where(own_t, torch.full_like(self.rival_at[b], r_to), self.rival_at[b])
+        # A-17: re-tagged tiles register to the receiving rc (its id is
+        # assigned below from r_next_city_id — same value, read here first)
+        self.rc_tile_id[b] = torch.where(own_t, torch.full_like(self.rc_tile_id[b], int(self.r_next_city_id[b, r_to])), self.rc_tile_id[b])
         occ = self.rc_alive[b, r_to].nonzero(as_tuple=True)[0]
         slot = int(occ.max()) + 1 if len(occ) else 0
         assert slot < self.RC, "rival city slots exhausted - raise RC (compaction already ran; this is true living capacity)"
@@ -5894,9 +5908,9 @@ class BatchSim:
         desc, index asc; radius 5; fully unowned tiles — water, impassables
         and natural wonders all claimable like borderCandidates). The yield
         sum uses the RIVAL's planes (strip-adjusted food/prod + its own
-        farm-adjacency and mine boosts — the rivalCityYields ctx). One
-        documented delta shared with TS: adjacency is CIV-level (no per-rc
-        tile registry — P7 material)."""
+        farm-adjacency and mine boosts — the rivalCityYields ctx). A-17:
+        adjacency is PER-CITY via the rc_tile_id registry, mirroring the
+        player's n.cityId === city.id borderCandidates check."""
         self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
         B, dev = self.B, self.device
         center = self.rc_center[:, r, j]
@@ -5965,7 +5979,15 @@ class BatchSim:
                 return
             if unowned is None:
                 unowned = (self.owner.gather(1, tc) < 0) & (self.cs_at.gather(1, tc) < 0) & (self.rival_at.gather(1, tc) < 0)
-                adj_own = ((self.rival_at.gather(1, nbs.clamp(min=0).reshape(B, -1)).reshape(B, -1, 6) == r) & (nbs >= 0)).any(dim=2)
+                # A-17: adjacency is PER-CITY — the neighbor must belong to
+                # THIS rc's registry (rival_at alone let a city claim across
+                # a sibling's frontier), the pickRivalBorderTile twin.
+                nb_flat = nbs.clamp(min=0).reshape(B, -1)
+                adj_own = (
+                    (self.rival_at.gather(1, nb_flat).reshape(B, -1, 6) == r)
+                    & (self.rc_tile_id.gather(1, nb_flat).reshape(B, -1, 6) == self.rc_id[:, r, j].view(B, 1, 1))
+                    & (nbs >= 0)
+                ).any(dim=2)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
             key = torch.where(ok, key0, self._inf_f)
             best = key.argmin(dim=1)
@@ -5975,6 +5997,7 @@ class BatchSim:
                 rows = claim.nonzero(as_tuple=True)[0]
                 spot = tiles[rows, best[rows]]
                 self.rival_at[rows, spot] = r
+                self.rc_tile_id[rows, spot] = self.rc_id[rows, r, j]  # A-17: claim registers to THIS city
                 self.rc_acquired[rows, r, j] += 1
                 self.rc_cbox[rows, r, j] -= cost[rows]
                 # D-13: only rival_at[spot] changed (-1 → r, per the unowned
@@ -6098,9 +6121,11 @@ class BatchSim:
         self.rc_wonder[rows, r, slot, :] = -1
         self.rc_bldg[rows, r, slot, :] = False
         self.rc_id[rows, r, slot] = self.r_next_city_id[rows, r]
+        _new_cid = self.r_next_city_id[rows, r].clone()  # A-17: this city's persistent id
         self.r_next_city_id[rows, r] += 1
         self.rvcity_at[rows, s_idx] = r
         self.rival_at[rows, s_idx] = r
+        self.rc_tile_id[rows, s_idx] = _new_cid  # A-17
         # P5/S3 (C-14): rival founding strips like foundCity — the removable
         # feature dies (tdef drops to the hills component, feature yields
         # vanish via feat_stripped, the lent district adjacency withdraws)
@@ -6141,6 +6166,7 @@ class BatchSim:
                 & (self.rival_at[rows, ndc] < 0)
             )
             self.rival_at[rows[free], n_d[free]] = r
+            self.rc_tile_id[rows[free], n_d[free]] = _new_cid[free]  # A-17: ring joins the founder's registry
         self._eff_version += 1  # feat_stripped / d_static_adj changed
 
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
@@ -7840,6 +7866,9 @@ class BatchSim:
             return False
         self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
         self.rival_at[b] = torch.where(owned, torch.full_like(self.rival_at[b], w_), self.rival_at[b])
+        # A-17: the defecting city's tiles register to the receiving rc (id
+        # assigned below from r_next_city_id — same value, read here first)
+        self.rc_tile_id[b] = torch.where(owned, torch.full_like(self.rc_tile_id[b], int(self.r_next_city_id[b, w_])), self.rc_tile_id[b])
         self.center_at[b, self.site[b, c]] = -1
         # ...and joins the winner. P5/S1: last-alive+1, NOT the alive count —
         # a capture hole would make the count point at a live city (see

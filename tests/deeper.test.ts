@@ -56,8 +56,12 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
   tile.rivalId = rival.id;
+  tile.rivalCityId = city.id; // A-17: per-city registry
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) t.rivalId = rival.id;
+    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
+      t.rivalId = rival.id;
+      t.rivalCityId = city.id;
+    }
   }
   rival.cities.push(city);
   state.rivals.push(rival);
