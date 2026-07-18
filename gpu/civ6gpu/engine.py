@@ -1276,6 +1276,12 @@ class BatchSim:
         # gate. Read at the war-march passability composition.
         self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
         self._p_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
+        # AUDIT B-9: per-roster strategic-resource requirement (index into the
+        # resource list the tile res_id plane uses; -1 = ungated). _res_unit_pairs
+        # caches (unit_idx, res_idx) for the access scan — empty when the roster
+        # requires nothing, so _res_avail_mask short-circuits to all-True.
+        self._p_res = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
+        self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
         self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
         # #45/B-6: the scripted galley-policy build target (the naval MELEE unit,
@@ -2995,6 +3001,22 @@ class BatchSim:
 
     # --- action masks (the macro-action surface) --------------------------------
 
+    def _res_avail_mask(self, owned: torch.Tensor) -> torch.Tensor:
+        """AUDIT B-9: [B, NU] — for every roster unit, does the civ owning the
+        `owned` [B,T] tiles have strategic-resource ACCESS to build/buy it? A tile
+        provides access to its resource iff it carries a resource, its improvement
+        matches the resource's required improvement (res_imp, the exported `rq`
+        plane), it is unpillaged, and the civ owns it. Ungated units are all-True;
+        an empty requirement set short-circuits. Mirrors TS civHasStrategic."""
+        B, dev = self.B, self.device
+        out = torch.ones(B, self.NU, dtype=torch.bool, device=dev)
+        if not self._res_unit_pairs:
+            return out
+        provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged & owned  # [B,T]
+        for u_idx, res_idx in self._res_unit_pairs:
+            out[:, u_idx] = (provides & (self.res_id == res_idx)).any(dim=1)
+        return out
+
     def production_mask(self) -> torch.Tensor:
         """[B, C, NB+2+NU+nScaffold(+NB+1+NU)] valid production actions for idle
         cities: columns 0..NB-1 = City Center buildings, NB = settler (always
@@ -3013,6 +3035,7 @@ class BatchSim:
             unit_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )
+            unit_ok = unit_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate
             unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1)
             if bool(self.unit_naval.any()):
                 # #45/B-6: the controlled/RL player builds NO naval (mirrors the
@@ -3078,6 +3101,7 @@ class BatchSim:
                 u_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                     1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
                 )
+                u_ok = u_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate (purchase)
                 u_cost = self._p_cost.unsqueeze(0).expand(B, -1)
                 if self._builder_idx >= 0:
                     # P4/D-10: the builder column prices off the live escalator
@@ -5355,6 +5379,7 @@ class BatchSim:
                 has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
                 has_q = ((self.rc_current[:, r] == self._builder_idx + 1) & self.rc_alive[:, r]).any(dim=1)  # P5/S5: alive-masked
                 ok_u[:, self._builder_idx] = ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1)
+            ok_u = ok_u & self._res_avail_mask(self.rival_at == r)  # B-9: rival strategic-resource gate (builder ungated → all-True)
             # scaffold districts: placeable NOW under the B4 gates
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
             if self.districts_on and self._scaffold:
@@ -7849,7 +7874,12 @@ class BatchSim:
             rres = rr.get("research", {})
             sp_t, ho_t = int(rres.get("spearTech", -1)), int(rres.get("horseTech", -1))
             zb = torch.zeros(B, dtype=torch.bool, device=dev)
+            # B-9: this rival's per-unit strategic-resource access (reused by the
+            # A-5r buy block below). HORSEMAN needs HORSES — gate the ladder pick.
+            res_ok_r = self._res_avail_mask(self.rival_at == r)  # [B, NU]
             has_h = self.r_techs[:, r, ho_t] if ho_t >= 0 else zb
+            if self._r_horseman >= 0:
+                has_h = has_h & res_ok_r[:, self._r_horseman]
             has_s = self.r_techs[:, r, sp_t] if sp_t >= 0 else zb
             ty = torch.where(
                 has_h,
@@ -8255,6 +8285,7 @@ class BatchSim:
                     ok_u5[:, self._r_slinger] = True
                 if ar_t >= 0 and self._r_archer >= 0:
                     ok_u5[:, self._r_archer] = self.r_techs[:, r, ar_t]
+                ok_u5 = ok_u5 & res_ok_r  # B-9: strategic-resource gate on the gold buy (HORSEMAN needs HORSES)
                 mil5 = ok_u5 & (self._p_combat.unsqueeze(0) > 0)  # military only (excludes the builder)
                 afford_u5 = self._afford(self.r_treasury[:, r].unsqueeze(1), self._p_cost.double().unsqueeze(0) * mult_r5)
                 cand_u5 = mil5 & afford_u5
@@ -9227,6 +9258,10 @@ class BatchSim:
                 utp = pu.clamp(min=0, max=self.NU - 1)
                 p_tech = self._p_tech[utp]
                 tech_ok = (p_tech < 0) | self.techs.gather(1, p_tech.clamp(min=0).unsqueeze(1)).squeeze(1)
+                # B-9: strategic-resource access gates the purchase (mirrors TS
+                # purchaseUnit → trainableUnits), per this slot's chosen unit.
+                res_ok = self._res_avail_mask(self.owner >= 0).gather(1, utp.unsqueeze(1)).squeeze(1)
+                tech_ok = tech_ok & res_ok
                 cost = self._p_cost[utp] * mult
                 if self._builder_idx >= 0:
                     # P4/D-10: bought builders price off the live escalator…
@@ -9527,6 +9562,7 @@ class BatchSim:
                         # resolve to the LOWEST unit index = the TS strict->
                         # first-wins over UNITS table order.
                         tr_u = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+                        tr_u = tr_u & self._res_avail_mask(self.owner >= 0)  # B-9: bestMilitary respects strategic-resource access
                         base_key = self._p_combat.long() * self.NU - torch.arange(self.NU, device=dev)
                         # #45/B-6: the scripted player's bestMilitary() reads
                         # trainableUnits(state) WITHOUT a city → naval EXCLUDED
@@ -9558,6 +9594,7 @@ class BatchSim:
             trainable = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
+            trainable = trainable & self._res_avail_mask(self.owner >= 0)  # B-9: RL apply re-validates strategic-resource access
             valid_u = is_u & trainable.gather(1, ut)
             if self._rl_purchase_active and self._builder_idx >= 0:
                 # P4/D-10: with purchases live, builder queues are order-coupled

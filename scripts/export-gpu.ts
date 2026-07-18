@@ -675,6 +675,10 @@ const rules = {
     civilian: u.charges !== undefined ? 1 : 0,
     charges: u.charges ?? 0,
     requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
+    // AUDIT B-9: strategic-resource ACCESS gate — index into RESOURCE_IDS (the
+    // same order the tile `rid` plane uses), or -1 = ungated. The GPU joins it
+    // with the per-tile `rq`/res_imp plane to gate build+purchase per civ.
+    requiresResource: u.requiresResource ? RESOURCE_IDS.indexOf(u.requiresResource) : -1,
     // V-R: ranged strike stats (Slinger 15/1, Archer 25/2); 0 = melee-only.
     rangedStrength: u.ranged?.strength ?? 0,
     rangedRange: u.ranged?.range ?? 0,

@@ -83,7 +83,7 @@ import {
   WAR_WEARINESS_CAP,
   warWearinessPenalty,
 } from '../data/rivals';
-import { tileClaimed, tileOwnedByCiv, civOfRival } from './civs';
+import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -1586,7 +1586,13 @@ export function rivalPhase(state: GameState): void {
         // fewer than 1 ranged per 2 melee; best types off the rival's OWN
         // techs (ARCHER once ARCHERY lands, SLINGER before — it is ungated,
         // exactly like the player's catalog; the melee ladder unchanged).
-        const meleeType = rival.research.techs.includes('HORSEBACK_RIDING')
+        // AUDIT B-9: HORSEMAN needs HORSES access (data-driven off requiresResource);
+        // without it the ladder falls back to SPEARMAN/WARRIOR — the retroactive gate.
+        const horseReq = UNITS.HORSEMAN.requiresResource;
+        const canHorse =
+          rival.research.techs.includes('HORSEBACK_RIDING') &&
+          (!horseReq || civHasStrategic(state, civOfRival(rival.id), horseReq));
+        const meleeType = canHorse
           ? 'HORSEMAN'
           : rival.research.techs.includes('BRONZE_WORKING')
             ? 'SPEARMAN'
@@ -1701,6 +1707,9 @@ export function rivalPhase(state: GameState): void {
           if (cand.tech && !rival.research.techs.includes(cand.tech)) continue;
           const def = UNITS[cand.id];
           if (!def) continue;
+          // AUDIT B-9: strategic-resource access gates the gold buy too (HORSEMAN
+          // needs HORSES) — data-driven off requiresResource, mirroring the ladder.
+          if (def.requiresResource && !civHasStrategic(state, civOfRival(rival.id), def.requiresResource)) continue;
           if (!goldAffordable(rival.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
