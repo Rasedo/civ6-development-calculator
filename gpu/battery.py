@@ -119,6 +119,7 @@ def main() -> int:
                 ("religion_gp", [py, "gpu/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "gpu/space_race_test.py"], 4),
+                ("naval", [py, "gpu/naval_test.py"], 4),  # #45/B-6 gate-unreachable naval surfaces
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

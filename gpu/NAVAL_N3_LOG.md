@@ -8,19 +8,24 @@ TS twins in tests/naval-embark.test.ts where natural, and a `naval` battery
 lane. The engine already has the mechanics; N3 pins the semantics the 24×250
 scripted parity gate cannot reach.
 
-## Poke coverage (gpu/naval_test.py)
-- [ ] GALLEY naval melee attack + CAPTURE of a coastal rival city
-      (siege → _player_attack_rival_city → _capture_rival_city)
-- [ ] GALLEY naval melee attack + CAPTURE of a coastal CS
-      (cs_hit → _capture_city_state)
-- [ ] QUADRIREME bombard vs a rival UNIT (r_att ranged, no retaliation/advance)
-- [ ] QUADRIREME bombard vs a rival CITY (r_sieg, HP floors at 1, no capture)
-- [ ] PLAYER naval spawn-on-water (_spawn_player naval probe) + attack
-- [ ] OCEAN gate pre/post CARTOGRAPHY (naval spawn probe + war-march water_gate)
-- [ ] pcstk (player city walls) strikes a ship + an embarked unit (override)
-- [ ] rcstk (rival city walls) strikes a player ship + embarked unit (override)
-- [ ] embarked-civilian capture POOL-END invariant + keeps-embarked (GPU)
-- [ ] naval ally counts in B-7 flank/support; embarked contributes nothing
+## Poke coverage (gpu/naval_test.py) — ALL GREEN
+- [x] 1  GALLEY naval melee + CAPTURE of a coastal rival city
+        (siege → _player_attack_rival_city → _capture_rival_city)
+- [x] 2  GALLEY naval melee + CAPTURE of a coastal CS (cs_hit → _capture_city_state)
+- [x] 3  QUADRIREME range-1 bombard vs a rival UNIT (r_att: no retaliation/advance)
+- [x] 4  QUADRIREME range-1 bombard vs a rival CITY (r_sieg: HP floors at 1, no capture)
+- [x] 5  PLAYER naval spawn-on-water (_spawn_player naval probe) + attack;
+        + the #50 residual: RL/controlled MOVE cannot step a ship onto water
+- [x] 6  OCEAN gate pre/post CARTOGRAPHY (naval spawn probe; COAST ungated)
+- [x] 7a pcstk (player city walls) strikes a ship + embarked target (override proven)
+- [x] 7b rcstk (rival city walls) strikes a player ship + embarked target (override proven)
+- [x] 8  embarked-civilian capture POOL-END invariant + keeps-embarked (GPU)
+- [x] 9  naval ally counts in B-7 flank/support; embarked contributes nothing
+
+TS twin added (tests/naval-embark.test.ts): PLAYER galley MOVES across water
+(orderMove/findPath/walkPath naval-aware) then batters a coastal city — the
+move end-to-end the GPU RL head defers to #50. (Embarked OCEAN gate + embarked-
+defender flat CS + embarked-civilian capture pool-end already TS-covered.)
 
 ## Engine-surface notes (read while designing — no edits)
 - Player attack apply (`_apply_unit_actions`): direction codes 6..11 hit the
@@ -51,4 +56,28 @@ scripted parity gate cannot reach.
   takes STRICTLY more damage. That pins the flat-CS override.
 
 ## Deviations / findings
-(none yet)
+- NO engine divergences or crashes. Every poke mirrors the TS design; no item
+  was skipped/xfail'd. The naval mechanics behave exactly as N1/N2 shipped them.
+- ENVIRONMENT (not an engine bug): the fixtures on disk in the MAIN checkout
+  (and thus copied into this worktree) were STALE — rules.json listed 7 units
+  with no GALLEY/QUADRIREME and no embark/cartography rules (mtime predated the
+  N1/N2 naval catalog). They were never re-exported after naval merged. The
+  b097400 SOURCE has the full naval catalog, and `load_rules` reads
+  fixtures/rules.json, so the naval pokes were untestable against the stale set.
+  Re-exported from b097400 (deterministic, data-driven, parity-neutral) →
+  fixtures now carry GALLEY (combat 30, naval), QUADRIREME (combat 20, rng 25,
+  naval), embarkLive=1, embarkedDefenseCs=10, cartographyTech=40 — and
+  parity_test is 0.0 milli. The main session's battery re-exports at stage 0
+  anyway, so the naval lane runs against a fresh export there regardless.
+- Confirmed (design, not a bug): the GPU player MOVE apply (_apply_unit_actions,
+  0..5 branch) uses the land `passable` plane with no wpass composition, so the
+  RL/controlled head cannot step a ship onto water. This is the documented #45
+  residual (controlled water-move columns → #50; N2 removed _naval_cap_player).
+  Poke 5 pins it; the player-naval MOVE end-to-end is TS-side (findPath naval).
+
+## Gate results (all foreground)
+- PYTHONUTF8=1 python gpu/naval_test.py: NAVAL (B-6) POKES OK (10 pokes)
+- npx tsc --noEmit: clean
+- npx vitest run tests/naval-embark.test.ts: 16 passed (1 new player-naval move)
+- PYTHONUTF8=1 python gpu/parity_test.py: PARITY OK — 0.0 milli
+- battery.py: new `naval` lane wired into the cputests group (gpu/naval_test.py)
