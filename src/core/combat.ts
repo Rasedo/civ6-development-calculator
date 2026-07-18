@@ -100,6 +100,45 @@ export function woundPenalty(unit: { hp: number }): number {
 export const FLANKING_CS = 2;
 export const SUPPORT_CS = 2;
 
+// AUDIT B-4 XP & levels. Real Civ 6: units earn experience and promote. Modeled
+// scope (promotion TREES/abilities are the recorded residual): +5 XP per attack
+// EXECUTED (any roll-producing melee/ranged, vs unit/city/CS/rc), +2 per attack
+// SURVIVED as a MILITARY defender (incl. city/walls strikes). Barbarians accrue
+// nothing; civilians never fight (stay 0). XP_LEVELS grant a flat +5 CS per level
+// at EVERY roll the unit fights (attack AND defense), an integer add entering the
+// CS assembly exactly like the B-7 terms (once, before paired rolls, preserved by
+// the B-29 diff quantization). No promotion choice / heal / level-4+.
+export const XP_ATTACK = 5;
+export const XP_DEFEND = 2;
+export const XP_LEVEL_CS = 5;
+export const XP_LEVELS: readonly number[] = [15, 45, 90];
+
+/** B-4: 0..3 — the number of XP_LEVELS thresholds this unit's xp has crossed. */
+export function unitLevel(unit: { xp?: number }): number {
+  const xp = unit.xp ?? 0;
+  let level = 0;
+  for (const t of XP_LEVELS) if (xp >= t) level++;
+  return level;
+}
+
+/** B-4: the flat CS bonus a unit's veterancy grants at every roll it fights. */
+export function xpLevelBonus(unit: { xp?: number }): number {
+  return XP_LEVEL_CS * unitLevel(unit);
+}
+
+/** B-4: award XP to a unit (barbarians never accrue). */
+function gainXp(unit: Unit, amount: number): void {
+  if (unit.owner === 'barbarian') return;
+  unit.xp = (unit.xp ?? 0) + amount;
+}
+
+/** B-4: a surviving MILITARY defender earns +2 (civilians never fight; barbs
+ * never accrue — gainXp guards that). Called after the defender's HP is set.
+ * Exported for the rival walls strike (rcstk, rivals.ts) — the pcstk mirror. */
+export function awardDefenseXp(defender: Unit): void {
+  if (defender.hp > 0 && unitDomain(defender.type) === 'military') gainXp(defender, XP_DEFEND);
+}
+
 /** B-7 flanking count: MILITARY units u ≠ attacker, adjacent to the defender's
  * tile, that are hostile to the defender. */
 function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defender: Unit): number {
@@ -144,7 +183,8 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     terrainDefense(tile) +
     fortifyBonus(defender) -
     woundPenalty(defender) +
-    SUPPORT_CS * supportCount(state, defTileIndex, defender)
+    SUPPORT_CS * supportCount(state, defTileIndex, defender) +
+    xpLevelBonus(defender) // B-4: veterancy — an embarked defender got the flat override above (no xp)
   );
 }
 
@@ -207,10 +247,12 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
   const atkCS =
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0);
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
+    xpLevelBonus(attacker); // B-4: attacker veterancy (the city is not a unit — no defender xp)
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'pctyc', city.centerIndex);
+  gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   // AUDIT B-1: the ANCIENT_WALLS outer pool soaks the hit first — only the
   // spillover reaches city HP (a deliberate simplification of Civ 6's
   // percentage wall rules: outer absorbs the whole roll until depleted).
@@ -339,10 +381,14 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // B-7: flanking helps the attacker, support helps the defender. Applied
     // ONCE so both paired rolls see the same adjusted CS. #45/B-6: defenderCS
     // folds in support AND the embarked-defender override (flat CS, no terms).
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender);
+    // B-4: attacker veterancy joins the flank term; defenderCS folds in the
+    // defender's own level bonus. Applied once so both paired rolls agree.
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker);
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
+    gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
+    awardDefenseXp(defender); // B-4: +2 to a surviving military defender
     if (defender.hp <= 0) {
       killUnit(state, defender);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
@@ -384,15 +430,17 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
         const defCS = rivalCityDefense(state, rc.rival, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rngrc', targetIndex));
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'rngrc', targetIndex));
         attacker.movesLeft = 0;
+        gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
         return ok;
       }
       const cs = cityStateAt(state, targetIndex);
       if (cs && cs.centerIndex === targetIndex) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rngcs', targetIndex));
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'rngcs', targetIndex));
         attacker.movesLeft = 0;
+        gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
         return ok;
       }
     }
@@ -402,7 +450,9 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'rng', targetIndex);
+  gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged attack executed
+  awardDefenseXp(defender); // B-4: +2 to a surviving military defender (civilians excluded)
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
   return ok;
@@ -430,9 +480,10 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     const defCS = cityDefenseStrength(state, enemyCity);
     state.cityHp[String(enemyCity.id)] = Math.max(
       1,
-      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'vrngc', targetIndex),
+      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'vrngc', targetIndex),
     );
     attacker.movesLeft = 0;
+    gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
     return;
   }
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
@@ -441,7 +492,9 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'vrng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'vrng', targetIndex);
+  gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged strike executed
+  awardDefenseXp(defender); // B-4: +2 to a surviving military defender
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
 }
@@ -500,7 +553,8 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
   const atkCS =
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0); // B-29 wound + river (city not a unit)
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
+    xpLevelBonus(attacker); // B-29 wound + river (city not a unit) + B-4 attacker veterancy
   const defCS = rivalCityDefense(state, rival, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
   const dmgToCity = damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
@@ -510,6 +564,7 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
   city.hp -= dmgToCity - absorbed;
   attacker.hp -= damageRoll(state, defCS - atkCS, 'rctyc', city.centerIndex);
   attacker.movesLeft = 0;
+  gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker);
   if (city.hp <= 0) {
     if (attacker.owner === 'player') {
@@ -536,11 +591,13 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
   const atkCS =
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0); // B-29 wound + river (CS center not a unit)
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
+    xpLevelBonus(attacker); // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
   attacker.movesLeft = 0;
+  gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker);
   if ((cs.hp ?? 0) <= 0) {
     // A-12b: a rival conqueror lands the CS as its own city.
@@ -1000,9 +1057,10 @@ export function barbarianPhase(state: GameState): void {
     // #45/B-6: an embarked target defends at the flat EMBARKED_DEFENSE_CS.
     const defCS = defender.embarked
       ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-      : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
+      : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
+    awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city — no attacker xp)
     if (defender.hp <= 0) killUnit(state, defender);
   }
 

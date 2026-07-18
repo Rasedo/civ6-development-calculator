@@ -236,6 +236,17 @@ P_MAX = 256  # player unit slots per game (append-only; runtime-asserted)
 FLANKING_CS = 2
 SUPPORT_CS = 2
 
+# AUDIT B-4 XP & levels (mirrors combat.ts). +5 XP per attack executed (any
+# roll-producing melee/ranged vs unit/city/CS/rc), +2 per attack survived as a
+# MILITARY defender (incl. city/walls strikes). Barbarians accrue nothing (no
+# barb xp plane); civilians never fight. XP_LEVELS grant a flat +5 CS per level
+# at every roll the unit fights — an integer add into the CS assembly like the
+# B-7 terms, preserved by the B-29 diff quantization.
+XP_ATTACK = 5
+XP_DEFEND = 2
+XP_LEVEL_CS = 5
+XP_LEVELS = (15, 45, 90)
+
 # --- one civ-id space (C1-A3, mirrors src/core/civs.ts) -----------------------
 # The player is civ 0; rival r (fixture array index == TS rival.id, asserted
 # at export) is civ r+1. City-states and barbarians stay outside the
@@ -329,6 +340,7 @@ _MUTABLE = [
     "rng_state", "city_hp", "outer_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef", "tmove",
     "p_acted", "u_acted", "v_acted",
     "p_fortify", "u_fortify", "v_fortify",  # B-5 FORTIFY (military; cap 2)
+    "p_xp", "v_xp",  # AUDIT B-4 XP (player/rival units; barbs accrue none — no plane)
     "p_emb", "v_emb",  # #45/B-6 EMBARK: a land unit is on water (bool per slot)
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # B-25 (Round B3): space-race chain progress
@@ -656,6 +668,7 @@ class BatchSim:
         self.v_tile = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.v_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.v_fortify = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
+        self.v_xp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # B-4: combat experience (rival units)
         self.v_emb = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # #45/B-6: embarked (rival units)
         self.v_next = torch.zeros(B, dtype=torch.long, device=device)
         self.rv_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # rival-unit slot at tile
@@ -1232,6 +1245,7 @@ class BatchSim:
         self.p_tile = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
         self.p_hp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
         self.p_fortify = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
+        self.p_xp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # B-4: combat experience (player units)
         self.p_emb = torch.zeros(B, P_MAX, dtype=torch.bool, device=device)  # #45/B-6: embarked (player units)
         self.p_next = torch.zeros(B, dtype=torch.long, device=device)
         self.warrior_trained = torch.zeros(B, C, dtype=torch.bool, device=device)  # scripted-policy flag
@@ -1246,7 +1260,7 @@ class BatchSim:
         self.tmove = torch.tensor([[t.get("tmove", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Damage table stays float64 regardless of sim dtype: the RNG factor
         # is float64 and damage rounds to integers the TS engine must match.
-        self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 1201), dtype=torch.float64, device=device)  # B-29: 0.1-granular exp table
+        self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 4001), dtype=torch.float64, device=device)  # B-29: 0.1-granular exp table (B-4: widened to +-200 for XP)
         self._unit_combat = torch.tensor(cb.get("unitCombat", [20, 25]), dtype=torch.long, device=device)
         # #45/B-6 EMBARK: flat embarked MP, the LIVE war-march water-step master
         # switch (N1 ships it INERT — mirrors TS embarkState.live; poke
@@ -3291,7 +3305,11 @@ class BatchSim:
         # look up 30·e^(0.04·q/10) — the fixture table (indexed i = q+600) is
         # the EXACT JS double damageRoll computes, so parity survives the ulp.
         q = js_round(diff * 10).to(torch.long)
-        base = self._dmg_base[(q + 600).clamp(0, 1200)]
+        # B-4: table widened to q in [-2000, 2000] (diff +-200) so XP level bonuses
+        # (up to +15 CS) can't push |diff| past the table as they could past B-29's
+        # +-60 (wounds/river only shrink |diff|; XP grows it). TS damageRoll has no
+        # clamp — the wider table keeps the two engines bit-exact under veterancy.
+        base = self._dmg_base[(q + 2000).clamp(0, 4000)]
         dmg = js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
         if log_hit:
             t_ = int(tile[b]) if tile is not None else -1
@@ -3306,6 +3324,16 @@ class BatchSim:
         (damageRoll quantizes the final diff). hp is a unit-HP tensor; cities /
         city-states / walls are NOT units and never pass through here."""
         return 10.0 * ((100.0 - hp.double()) / 100.0)
+
+    def _xp_lvl_bonus(self, xp: torch.Tensor) -> torch.Tensor:
+        """B-4 (mirrors combat.ts xpLevelBonus): the flat CS bonus a unit's
+        veterancy grants — XP_LEVEL_CS per XP_LEVELS threshold crossed. Integer
+        add (long) into the CS assembly, exactly like the B-7 terms. Barb slots
+        never carry xp; pass a zero tensor for them."""
+        level = torch.zeros_like(xp)
+        for t in XP_LEVELS:
+            level = level + (xp >= t).long()
+        return XP_LEVEL_CS * level
 
     def _river_cross(self, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
         """B-29 (mirrors crossesRiver): returns 1 where the melee edge
@@ -3492,6 +3520,7 @@ class BatchSim:
         self.p_tile[rows, slot] = spot[rows]
         self.p_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.p_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
+        self.p_xp[rows, slot] = 0  # B-4: a fresh (possibly reclaimed) slot starts at 0 xp
         self.p_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.p_charges[rows, slot] = self._p_charges[type_idx[rows]]
         civ_rows = civ[rows]
@@ -4203,7 +4232,7 @@ class BatchSim:
         gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.p_type[:, p]]
-        atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(self.p_tile[:, p], tgt)  # B-29 wound + river (city not a unit)
+        atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(self.p_tile[:, p], tgt) + self._xp_lvl_bonus(self.p_xp[:, p])  # B-29 wound + river (city not a unit) + B-4 veterancy
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
@@ -4327,6 +4356,9 @@ class BatchSim:
             alive = self.p_alive[:, p]
             here = self.p_tile[:, p]
             nb = self.neigh[here.clamp(min=0)]  # [B, 6]
+            # B-4: this player attacker's veterancy bonus (pre-attack xp), added
+            # to every atk CS assembly below; accrued at the loop-body end.
+            p_lvl5 = self._xp_lvl_bonus(self.p_xp[:, p])
 
             # --- melee attack (6..11): a barbarian or an at-war rival unit -----
             dirs = (a - 6).clamp(min=0, max=5)
@@ -4369,6 +4401,7 @@ class BatchSim:
                 cap_hp = self.v_hp[kr, ks]
                 cap_ch = self.v_charges[kr, ks]
                 cap_emb = self.v_emb[kr, ks]  # #45/B-6: read BEFORE despawn
+                cap_xp = self.v_xp[kr, ks]  # B-4: read BEFORE despawn (civilian xp 0, but carry it)
                 self.v_alive[kr, ks] = False
                 self.rvciv_at[kr, ct] = -1
                 nslot = self.p_next[kr]
@@ -4379,6 +4412,7 @@ class BatchSim:
                 self.p_hp[kr, nslot] = cap_hp
                 self.p_charges[kr, nslot] = cap_ch
                 self.p_fortify[kr, nslot] = 0  # B-5: a civilian never fortifies
+                self.p_xp[kr, nslot] = cap_xp  # B-4: ownership transfer carries xp
                 self.p_emb[kr, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
                 self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.pciv_at[kr, ct] = nslot
@@ -4401,7 +4435,11 @@ class BatchSim:
                 v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
-                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3  # B-5
+                # B-4: a rival defender's veterancy (barbs have no xp). Folded into
+                # the base def_cs so the embarked override below drops it (like B-7
+                # support), exactly matching TS defenderCS.
+                v_lvl5 = torch.where(is_b, torch.zeros_like(is_b, dtype=torch.long), self._xp_lvl_bonus(self.v_xp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)))
+                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3 + v_lvl5  # B-5 + B-4
                 # #45/B-6: an EMBARKED rival defender overrides to a flat CS —
                 # no terrain/fortify (and no support below). Barbs never embark.
                 v_embd = self.v_emb.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1) & ~is_b
@@ -4409,7 +4447,7 @@ class BatchSim:
                 # B-29: attacker AND defender fight at HP-reduced strength.
                 b_hp = self.u_hp.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
-                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt)  # B-29 river
+                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt) + p_lvl5  # B-29 river + B-4 attacker veterancy
                 def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
                 # B-7: flanking helps the player attacker, support helps the
                 # defender (barb or at-war rival). Applied once so both paired
@@ -4436,6 +4474,11 @@ class BatchSim:
                     def_dead[g[dead]] = True
                     at_map[g[dead], tc[g[dead]]] = -1
                     alive_t[g[dead], ds[dead]] = False
+                # B-4: a surviving rival MILITARY defender earns +2 (barbs never
+                # accrue; rv_at is the rival-military map, so no civilian here).
+                surv_rv = (att & ~is_b & ~def_dead).nonzero(as_tuple=True)[0]
+                if len(surv_rv) > 0:
+                    self.v_xp[surv_rv, vslot[surv_rv]] += XP_DEFEND
                 self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
                 atk_dead = att & (self.p_hp[:, p] <= 0)
                 both = def_dead & atk_dead
@@ -4465,14 +4508,17 @@ class BatchSim:
                 v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
-                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3  # B-5
+                # B-4: rival defender veterancy (barbs none), dropped by the
+                # embarked override below (like B-7 support).
+                v_lvl5 = torch.where(is_b, torch.zeros_like(is_b, dtype=torch.long), self._xp_lvl_bonus(self.v_xp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)))
+                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3 + v_lvl5  # B-5 + B-4
                 # #45/B-6: embarked rival defender → flat CS, no terrain/support.
                 v_embd = self.v_emb.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1) & ~is_b
                 def_cs = torch.where(v_embd, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # B-29: ranged attacker + defender wounded (no river for ranged).
                 b_hp = self.u_hp.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
-                atk_e = atk_rs - self._wound(self.p_hp[:, p])
+                atk_e = atk_rs - self._wound(self.p_hp[:, p]) + p_lvl5  # B-4 attacker veterancy
                 def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
                 # B-7 support (no flanking: a ranged attacker takes no retaliation).
                 _dside = torch.where(is_b, torch.ones_like(v_civ), torch.full_like(v_civ, 2))
@@ -4480,6 +4526,7 @@ class BatchSim:
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
+                r_def_dead = torch.zeros_like(r_att)
                 for grp, at_map, hp_t, alive_t, slot_t in (
                     (is_b, self.barb_at, self.u_hp, self.u_alive, bslot),
                     (~is_b, self.rv_at, self.v_hp, self.v_alive, vslot),
@@ -4490,8 +4537,13 @@ class BatchSim:
                     ds = slot_t[g]
                     hp_t[g, ds] -= d_def[g]
                     dead = hp_t[g, ds] <= 0
+                    r_def_dead[g[dead]] = True
                     at_map[g[dead], tc[g[dead]]] = -1
                     alive_t[g[dead], ds[dead]] = False
+                # B-4: a surviving rival MILITARY defender earns +2 (rv_at map).
+                surv_rv = (r_att & ~is_b & ~r_def_dead).nonzero(as_tuple=True)[0]
+                if len(surv_rv) > 0:
+                    self.v_xp[surv_rv, vslot[surv_rv]] += XP_DEFEND
             # P4/D-2: any fight spends the attacker's MP (att|r_att = the
             # original validated attack set — both branches always execute)
             self.p_acted[:, p] = self.p_acted[:, p] | att | r_att
@@ -4510,8 +4562,10 @@ class BatchSim:
                 civ_embd = self.v_emb.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
                 def_cs = torch.where(civ_embd, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # B-29: attacker + the lone rival civilian defender both wounded.
+                # B-4: attacker veterancy; the civilian defender never accrues xp
+                # (never fights) so its CS carries no level term.
                 civ_hp = self.v_hp.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
-                atk_e = atk_rs - self._wound(self.p_hp[:, p])
+                atk_e = atk_rs - self._wound(self.p_hp[:, p]) + p_lvl5  # B-4 attacker veterancy
                 def_e = def_cs - self._wound(civ_hp)
                 # B-7 support: the lone rival civilian is aided by adjacent
                 # same-civ rival military (no flanking on a ranged strike).
@@ -4551,7 +4605,7 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
                 )
-                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt)  # B-29 wound + river (CS center not a unit)
+                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt) + p_lvl5  # B-29 wound + river (CS center not a unit) + B-4 veterancy
                 d_cs = self._damage_roll(cs_hit, atk_e - def_cs, k="csty", tile=tgt)
                 d_atk = self._damage_roll(cs_hit, def_cs - atk_e, k="cstyc", tile=tgt)
                 rows = cs_hit.nonzero(as_tuple=True)[0]
@@ -4582,7 +4636,7 @@ class BatchSim:
                 gslot2 = self.rv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                 gar2 = ((gslot2 >= 0) & (self.v_civ[bidx2, gslot2.clamp(min=0)] == civ2)).long()
                 def_cs2 = torch.maximum(best_r2, torch.full_like(best_r2, 15)) + gar2 * 5
-                atk_e2 = self._p_rng_str[self.p_type[:, p]] - self._wound(self.p_hp[:, p])  # B-29 (city not a unit)
+                atk_e2 = self._p_rng_str[self.p_type[:, p]] - self._wound(self.p_hp[:, p]) + p_lvl5  # B-29 (city not a unit) + B-4 veterancy
                 d_city2 = self._damage_roll(r_sieg, atk_e2 - def_cs2, k="rngrc", tile=tgt)
                 rows2 = r_sieg.nonzero(as_tuple=True)[0]
                 self.rc_hp[rows2, civ2[rows2], slot2[rows2]] = torch.maximum(
@@ -4604,7 +4658,7 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx2).long() * 6
                 )
-                atk_e3 = self._p_rng_str[self.p_type[:, p]] - self._wound(self.p_hp[:, p])  # B-29 (CS center not a unit)
+                atk_e3 = self._p_rng_str[self.p_type[:, p]] - self._wound(self.p_hp[:, p]) + p_lvl5  # B-29 (CS center not a unit) + B-4 veterancy
                 d_cs3 = self._damage_roll(r_cs, atk_e3 - def_cs3, k="rngcs", tile=tgt)
                 rows3 = r_cs.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows3, cs_sc[rows3]] = torch.maximum(
@@ -4612,6 +4666,14 @@ class BatchSim:
                     torch.ones_like(d_cs3[rows3]),
                 )
                 self.p_acted[:, p] = self.p_acted[:, p] | r_cs
+
+            # B-4: the player attacker earns +5 for ANY attack it executed this
+            # iteration that produced a damage roll (melee vs unit, ranged vs
+            # unit/civilian, city-state melee, rival-city/CS bombardment, and the
+            # rival-city siege). The roll-free B-31 civilian CAPTURE (civk) grants
+            # no xp. Player units are never barbarian, so accrue unconditionally.
+            p_attacked = att | r_att | r_civ | cs_hit | r_sieg | r_cs | siege
+            self.p_xp[:, p] = torch.where(p_attacked, self.p_xp[:, p] + XP_ATTACK, self.p_xp[:, p])
 
             # --- build FARM/MINE/LUMBER_MILL (13/14/15): a builder on a tile
             # where that improvement is valid. No RNG, re-validated at
@@ -5075,7 +5137,9 @@ class BatchSim:
                 d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
                 d_cs_rmil = self._p_combat[self.v_type[bidx, m_slot.clamp(min=0)]]
                 d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
-                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt]
+                # B-4: only a rival MILITARY target (is_rmil) carries veterancy.
+                def_xp = torch.where(is_rmil, self._xp_lvl_bonus(self.v_xp[bidx, m_slot.clamp(min=0)]), torch.zeros_like(tt))
+                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt] + def_xp  # + B-4
                 # #45/B-6: an embarked rival target (military/civilian; barbs
                 # never embark) → flat CS, no terrain (and no support below).
                 d_emb = (self.v_emb[bidx, m_slot.clamp(min=0)] & is_rmil) | (self.v_emb[bidx, c_slot.clamp(min=0)] & is_rciv)
@@ -5107,6 +5171,14 @@ class BatchSim:
                     dead = hp_t[g, ds] <= 0
                     at_map[g[dead], tt[g[dead]]] = -1
                     alive_t[g[dead], ds[dead]] = False
+                # B-4: a surviving rival MILITARY defender earns +2 (attacker is
+                # the city — no attacker xp; barb / rival civilian never accrue).
+                surv_rm = (strike & is_rmil).nonzero(as_tuple=True)[0]
+                if len(surv_rm) > 0:
+                    alive_now = self.v_hp[surv_rm, m_slot[surv_rm]] > 0
+                    sp = surv_rm[alive_now]
+                    if len(sp) > 0:
+                        self.v_xp[sp, m_slot[sp]] += XP_DEFEND
 
         # Cities heal +20 when no hostile stands adjacent (barbarians, or
         # rival units whose civ is at war — TS unitsHostile counts rival
@@ -5264,6 +5336,7 @@ class BatchSim:
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.v_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
+        self.v_xp[rows, slot] = 0  # B-4: a fresh (possibly reclaimed) slot starts at 0 xp
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
@@ -5657,6 +5730,7 @@ class BatchSim:
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.v_fortify[rows, slot] = 0  # B-5: civilian never fortifies; keep the (reclaimed) slot clean
+        self.v_xp[rows, slot] = 0  # B-4: civilian never fights; keep the (reclaimed) slot at 0 xp
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = self._p_charges[self._builder_idx]
         self.rvciv_at[rows, spot[rows]] = slot
@@ -6911,7 +6985,17 @@ class BatchSim:
             f_b = self.u_fortify.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
             f_v = self.v_fortify.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
             def_fort = torch.where(def_is_barb, f_b, torch.where(def_is_rv, f_v, f_p)) * 3  # B-5
-            def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort
+            # B-4: defender veterancy — player via p_xp, rival via v_xp, barb none.
+            # Folded into base def_cs so the embarked override drops it (like B-7).
+            def_xp = torch.where(
+                def_is_barb, torch.zeros_like(dm),
+                torch.where(
+                    def_is_rv,
+                    self._xp_lvl_bonus(self.v_xp.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)),
+                    self._xp_lvl_bonus(self.p_xp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)),
+                ),
+            )
+            def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort + def_xp  # B-5 + B-4
             # #45/B-6: an EMBARKED defender (player p_emb, or rival v_emb — barbs
             # never embark) overrides to a flat CS, no terrain/fortify/support.
             d_emb = (self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) & ~def_is_barb & ~def_is_rv) | (self.v_emb.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1) & def_is_rv)
@@ -6921,7 +7005,9 @@ class BatchSim:
             d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
             d_hp_v = self.v_hp.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
             def_hp = torch.where(def_is_barb, d_hp_b, torch.where(def_is_rv, d_hp_v, d_hp_p))
-            atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt)  # B-29 river
+            # B-4: attacker veterancy — a rival attacker via v_xp; barbs never accrue.
+            atk_lvl5 = torch.zeros_like(a_hp[:, u]) if atk_kind == "barb" else self._xp_lvl_bonus(self.v_xp[:, u])
+            atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt) + atk_lvl5  # B-29 river + B-4 veterancy
             def_e = def_cs - self._wound(def_hp)
             # B-7: flanking helps the hostile attacker (barb/rival at `here`),
             # support helps the defender (player, barb or rival).
@@ -6948,6 +7034,17 @@ class BatchSim:
                 def_dead[g[dead]] = True
                 at_map[g[dead], ttc[g[dead]]] = -1
                 alive_t[g[dead], ds[dead]] = False
+            # B-4: a rival attacker earns +5 for the attack executed (barbs none);
+            # a surviving MILITARY defender earns +2 (player via p_xp / dm, rival
+            # via v_xp / dv; barb defenders never accrue).
+            if atk_kind == "rival":
+                self.v_xp[:, u] = torch.where(mil_att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
+            surv_p = (mil_att & ~def_is_barb & ~def_is_rv & ~def_dead).nonzero(as_tuple=True)[0]
+            if len(surv_p) > 0:
+                self.p_xp[surv_p, dm[surv_p]] += XP_DEFEND
+            surv_v = (mil_att & def_is_rv & ~def_dead).nonzero(as_tuple=True)[0]
+            if len(surv_v) > 0:
+                self.v_xp[surv_v, dv[surv_v]] += XP_DEFEND
             a_hp[:, u] = torch.where(mil_att, a_hp[:, u] - d_atk, a_hp[:, u])
             atk_dead = mil_att & (a_hp[:, u] <= 0)
             both = def_dead & atk_dead
@@ -6980,6 +7077,7 @@ class BatchSim:
                 cap_hp = self.p_hp[rows, ds]
                 cap_ch = self.p_charges[rows, ds]
                 cap_emb = self.p_emb[rows, ds]  # #45/B-6: read BEFORE despawn
+                cap_xp = self.p_xp[rows, ds]  # B-4: read BEFORE despawn (civilian xp 0, but carry it)
                 self.pciv_at[rows, ct] = -1
                 self.p_alive[rows, ds] = False
                 nslot = self.v_next[rows]
@@ -6991,6 +7089,7 @@ class BatchSim:
                 self.v_hp[rows, nslot] = cap_hp
                 self.v_charges[rows, nslot] = cap_ch
                 self.v_fortify[rows, nslot] = 0  # B-5: a civilian never fortifies
+                self.v_xp[rows, nslot] = cap_xp  # B-4: ownership transfer carries xp
                 self.v_emb[rows, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
                 self.v_acted[rows, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.rvciv_at[rows, ct] = nslot
@@ -7178,9 +7277,11 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
                 )
-                atk_e = self._p_combat[vt0] - self._wound(self.v_hp[:, v]) - 5.0 * self._river_cross(hc0, ttc)  # B-29 wound + river (CS center not a unit)
+                atk_e = self._p_combat[vt0] - self._wound(self.v_hp[:, v]) - 5.0 * self._river_cross(hc0, ttc) + self._xp_lvl_bonus(self.v_xp[:, v])  # B-29 wound + river (CS center not a unit) + B-4 veterancy
                 d_cs = self._damage_roll(cs_att, atk_e - def_cs, k="csty", tile=ttc)
                 d_atk = self._damage_roll(cs_att, def_cs - atk_e, k="cstyc", tile=ttc)
+                # B-4: +5 for the attack executed (CS center is not a unit — no defender xp).
+                self.v_xp[:, v] = torch.where(cs_att, self.v_xp[:, v] + XP_ATTACK, self.v_xp[:, v])
                 rows = cs_att.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
                 self.v_hp[:, v] = torch.where(cs_att, self.v_hp[:, v] - d_atk, self.v_hp[:, v])
@@ -7371,9 +7472,14 @@ class BatchSim:
         gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
         def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
         _ct = self.site.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
-        atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], _ct)  # B-29 wound + river (city not a unit)
+        # B-4: attacker veterancy — a rival attacker via v_xp; barbs never accrue.
+        atk_lvl5 = torch.zeros_like(a_hp[:, u]) if atk_kind == "barb" else self._xp_lvl_bonus(self.v_xp[:, u])
+        atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], _ct) + atk_lvl5  # B-29 wound + river (city not a unit) + B-4 veterancy
         d_city = self._damage_roll(att, atk_e - def_cs, k="pcty", tile=_ct)
         d_self = self._damage_roll(att, def_cs - atk_e, k="pctyc", tile=_ct)
+        # B-4: +5 for the attack executed (city is not a unit — no defender xp).
+        if atk_kind == "rival":
+            self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         cs = slot[rows]
         # AUDIT B-1: the ANCIENT_WALLS outer pool soaks the hit first, only
@@ -7445,7 +7551,7 @@ class BatchSim:
             gm = self.pmil_at.gather(1, self.site.clamp(min=0))
             gar = (gm.gather(1, tgt_city.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
             def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
-            atk_e = atk_rs - self._wound(self.v_hp[:, v])  # B-29 (city not a unit)
+            atk_e = atk_rs - self._wound(self.v_hp[:, v]) + self._xp_lvl_bonus(self.v_xp[:, v])  # B-29 (city not a unit) + B-4 veterancy
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             rows = city_att.nonzero(as_tuple=True)[0]
             cs_ = tgt_city[rows]
@@ -7466,7 +7572,10 @@ class BatchSim:
             f_b = self.u_fortify.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
             f_c = self.p_fortify.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1)  # player civilian: never fortifies (0)
             def_fort = torch.where(def_is_b, f_b, torch.where(def_is_c, f_c, f_p)) * 3  # B-5
-            def_cs = torch.where(def_is_b, d_cs_b, torch.where(def_is_c, d_cs_c, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort
+            # B-4: only a player MILITARY defender (dm>=0) carries veterancy; the
+            # lone player civilian never fights (xp 0), barbs have no plane.
+            def_xp = torch.where(dm >= 0, self._xp_lvl_bonus(self.p_xp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)), torch.zeros_like(dm))
+            def_cs = torch.where(def_is_b, d_cs_b, torch.where(def_is_c, d_cs_c, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort + def_xp  # B-5 + B-4
             # #45/B-6: an embarked player defender (military dm or civilian dc_;
             # barbs never embark) → flat CS, no terrain/fortify/support.
             d_emb = (self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) & (dm >= 0)) | (self.p_emb.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1) & def_is_c)
@@ -7476,7 +7585,7 @@ class BatchSim:
             d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
             d_hp_c = self.p_hp.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1)
             def_hp = torch.where(def_is_b, d_hp_b, torch.where(def_is_c, d_hp_c, d_hp_p))
-            atk_e = atk_rs - self._wound(self.v_hp[:, v])
+            atk_e = atk_rs - self._wound(self.v_hp[:, v]) + self._xp_lvl_bonus(self.v_xp[:, v])  # B-4 attacker veterancy
             def_e = def_cs - self._wound(def_hp)
             # B-7 support: the defender (player military, barb, or the lone
             # player civilian — all player-side units are aided by adjacent
@@ -7499,6 +7608,17 @@ class BatchSim:
                 dead = hp_t[g, ds] <= 0
                 at_map[g[dead], ttc[g[dead]]] = -1
                 alive_t[g[dead], ds[dead]] = False
+            # B-4: a surviving player MILITARY defender (dm>=0) earns +2 (barb /
+            # lone civilian defenders never accrue).
+            surv_pm = (unit_att & (dm >= 0)).nonzero(as_tuple=True)[0]
+            if len(surv_pm) > 0:
+                alive_now = self.p_hp[surv_pm, dm[surv_pm]] > 0
+                sp = surv_pm[alive_now]
+                if len(sp) > 0:
+                    self.p_xp[sp, dm[sp]] += XP_DEFEND
+        # B-4: the rival attacker earns +5 for the attack executed (vs city or
+        # unit); a "quirk" strike that hit neither returns empty and spends none.
+        self.v_xp[:, v] = torch.where(city_att | unit_att, self.v_xp[:, v] + XP_ATTACK, self.v_xp[:, v])
         return city_att | unit_att
 
     def _rival_unit_peace_act(self, v: int, act: torch.Tensor, r: int) -> None:
@@ -8610,7 +8730,9 @@ class BatchSim:
                             d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
                             d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
                             d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
-                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self.tdef[bidx, tt]
+                            # B-4: only a player MILITARY target (is_pmil) carries veterancy.
+                            def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
+                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self.tdef[bidx, tt] + def_xp  # + B-4
                             # #45/B-6: an embarked player target (military/civilian;
                             # barbs never embark) → flat CS, no terrain (no support).
                             d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
@@ -8644,6 +8766,14 @@ class BatchSim:
                                 alive_t[g[dead], ds[dead]] = False
                                 if bool(dead.any()):
                                     self._rp_kill_version += 1  # G1: u_alive/p_alive death -> _rival_route_income raided-mask changes for city j+1
+                            # B-4: a surviving player MILITARY defender earns +2
+                            # (attacker is the city; barb / player civilian never accrue).
+                            surv_pm = (strike & is_pmil).nonzero(as_tuple=True)[0]
+                            if len(surv_pm) > 0:
+                                alive_now = self.p_hp[surv_pm, pm_slot[surv_pm]] > 0
+                                sp = surv_pm[alive_now]
+                                if len(sp) > 0:
+                                    self.p_xp[sp, pm_slot[sp]] += XP_DEFEND
                 # AUDIT A-10: a siege pins the HP, exactly like the player's
                 # heal — any adjacent unit hostile to THIS civ (the player's
                 # at-war units, CIVILIANS included per unitsHostile — the
@@ -9254,9 +9384,9 @@ class BatchSim:
         if prefix == "u":
             fields, counter, maps = ["u_acted", "u_type", "u_tile", "u_hp", "u_fortify"], "next_slot", ["barb_at"]
         elif prefix == "v":
-            fields, counter, maps = ["v_acted", "v_civ", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify", "v_emb"], "v_next", ["rv_at", "rvciv_at"]
+            fields, counter, maps = ["v_acted", "v_civ", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify", "v_xp", "v_emb"], "v_next", ["rv_at", "rvciv_at"]
         else:
-            fields, counter, maps = ["p_acted", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify", "p_emb"], "p_next", ["pmil_at", "pciv_at"]
+            fields, counter, maps = ["p_acted", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify", "p_xp", "p_emb"], "p_next", ["pmil_at", "pciv_at"]
         alive = getattr(self, f"{prefix}_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept

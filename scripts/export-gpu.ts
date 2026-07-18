@@ -637,9 +637,11 @@ const rules = {
   // Barbarian rules (mirrors combat.ts). B-29: strengthDiff is now a multiple
   // of 0.1 (wounded units subtract hp/10, a river melee subtracts 5), so the
   // table is indexed by q = round(diff·10) at 0.1 granularity — entry i holds
-  // 30·e^(0.04·(i−600)/10), the EXACT expression damageRoll evaluates for
-  // q = i−600. Computed HERE so both engines share the same doubles: libm
+  // 30·e^(0.04·(i−2000)/10), the EXACT expression damageRoll evaluates for
+  // q = i−2000. Computed HERE so both engines share the same doubles: libm
   // exp() may differ by an ulp between runtimes, and damage rounds to integers.
+  // B-4: widened from 1201 (±60) to 4001 (±200) — XP level bonuses (up to +15 CS)
+  // can grow |diff| past ±60 where B-29's wounds/river only shrank it.
   combat: {
     unitHp: UNIT_HP,
     cityMaxHp: CITY_MAX_HP,
@@ -652,7 +654,7 @@ const rules = {
     unitHealPerTurn: 10,
     unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
     campClearReward: 50,
-    dmgBase: Array.from({ length: 1201 }, (_, i) => 30 * Math.exp((0.04 * (i - 600)) / 10)),
+    dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1
     // ships it INERT), and the embark/ocean tech gates (index into rules techs;
     // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs

@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
@@ -1951,9 +1951,10 @@ export function rivalPhase(state: GameState): void {
           // #45/B-6: an embarked target defends at the flat EMBARKED_DEFENSE_CS.
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
-            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
           const atkCS = rivalCityDefense(state, rival, rc);
           defender.hp -= damageRoll(state, atkCS - defCS, 'rcstk', bestTile);
+          awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
           if (defender.hp <= 0) disbandUnit(state, defender.id);
         }
       }
