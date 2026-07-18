@@ -116,7 +116,16 @@ export function metCityStates(state: GameState): CityState[] {
 }
 
 export function isSuzerain(cs: CityState): boolean {
-  return cs.envoys >= SUZERAIN_ENVOYS;
+  // A-12: the suzerain CONTEST — most envoys, minimum 3, STRICTLY more
+  // than every rival (real Civ 6: a tie leaves no suzerain).
+  return cs.envoys >= SUZERAIN_ENVOYS && (cs.rivalEnvoys ?? []).every((e) => cs.envoys > (e ?? 0));
+}
+
+/** A-12: the rival-seat suzerain test — strictly most envoys, minimum 3. */
+export function rivalIsSuzerain(cs: CityState, rivalId: number): boolean {
+  const mine = cs.rivalEnvoys?.[rivalId] ?? 0;
+  if (mine < SUZERAIN_ENVOYS || mine <= cs.envoys) return false;
+  return (cs.rivalEnvoys ?? []).every((e, i) => i === rivalId || mine > (e ?? 0));
 }
 
 /** Extra trade-route capacity from being suzerain of trade city-states. */
@@ -142,6 +151,27 @@ export function csEnvoyBonuses(state: GameState): CsBonuses {
     let perDistrict = 0;
     if (cs.envoys >= 3) perDistrict += CS_DISTRICT_BONUS;
     if (cs.envoys >= 6) perDistrict += CS_DISTRICT_BONUS;
+    if (perDistrict > 0) {
+      const cur = (districtAdd[district] ??= {});
+      cur[key] = (cur[key] ?? 0) + perDistrict;
+    }
+  }
+  return { capital, districtAdd };
+}
+
+/** A-12: the rival twin of csEnvoyBonuses — the same 1/3/6 thresholds off
+ * THAT RIVAL's envoy counts (bonuses are count-based, not suzerain-based). */
+export function csRivalEnvoyBonuses(state: GameState, rivalId: number): CsBonuses {
+  const capital: Partial<Yields> = {};
+  const districtAdd: CsBonuses['districtAdd'] = {};
+  for (const cs of state.cityStates) {
+    const mine = cs.rivalEnvoys?.[rivalId] ?? 0;
+    const key = CS_TYPE_YIELD[cs.type];
+    if (mine >= 1) capital[key] = (capital[key] ?? 0) + CS_CAPITAL_BONUS;
+    const district = CS_TYPE_DISTRICT[cs.type];
+    let perDistrict = 0;
+    if (mine >= 3) perDistrict += CS_DISTRICT_BONUS;
+    if (mine >= 6) perDistrict += CS_DISTRICT_BONUS;
     if (perDistrict > 0) {
       const cur = (districtAdd[district] ??= {});
       cur[key] = (cur[key] ?? 0) + perDistrict;

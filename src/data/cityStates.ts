@@ -129,8 +129,12 @@ export const INFLUENCE_PER_TURN = 3;
 export const ENVOY_THRESHOLDS = [1, 3, 6] as const;
 export const CS_CAPITAL_BONUS = 2;
 export const CS_DISTRICT_BONUS = 2;
-/** Envoys needed to be suzerain (solo: no competition). */
+/** Envoys needed to be suzerain (A-12: strictly most among all civs). */
 export const SUZERAIN_ENVOYS = 3;
+/** A-12: a rival meets a CS once one of its cities or units sits within
+ * this range of the CS center — the explore-to-meet mirror (rivals have
+ * no fog; the player meets via isExplored). */
+export const CS_MEET_RANGE = 3;
 /** New quests are issued this many turns after the last one resolved. */
 export const QUEST_COOLDOWN = 12;
 /** Quest reward. */

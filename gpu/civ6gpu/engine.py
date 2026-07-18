@@ -337,6 +337,7 @@ _MUTABLE = [
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
+    "cs_r_envoys", "cs_r_met", "r_influence", "r_envoys_avail",  # A-12: rival↔CS diplomacy
     "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
@@ -617,6 +618,13 @@ class BatchSim:
         # (FOREIGN_TRADE 1 + maxCities 6 + 2 wonders). t0 fixtures carry no
         # routes (single-city civs), so no fixture field is needed.
         self.r_routes = torch.full((B, r_pad, 10, 2), -1, dtype=torch.long, device=device)
+        # AUDIT A-12: rival↔CS diplomacy — per-rival envoys/met planes plus
+        # the influence/envoy-bank accumulators (the player twins). t0
+        # fixtures carry none of it (rivals start unmet, zero everywhere).
+        self.cs_r_envoys = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
+        self.cs_r_met = torch.zeros(B, r_pad, s_pad, dtype=torch.bool, device=device)
+        self.r_influence = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        self.r_envoys_avail = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.rvcity_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at rival centers
         self.v_alive = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # rival units, spawn order
         self.v_acted = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # P4/D-2: spent MP since the last refresh (blocks healing)
@@ -2709,6 +2717,33 @@ class BatchSim:
             sci = sci + gcity[:, 3].unsqueeze(1) * acell + gcap[:, 3].unsqueeze(1) * gisc
             cul = cul + gcity[:, 4].unsqueeze(1) * acell + gcap[:, 4].unsqueeze(1) * gisc
             faith = faith + gcity[:, 5].unsqueeze(1) * acell + gcap[:, 5].unsqueeze(1) * gisc
+        # A-12: CS envoy bonuses, j-batched (per-completed-district adds at
+        # 3/6 + capital yield at 1+) — the per-j twin's position and values
+        # (integer-valued adds in f64: batching is exact).
+        if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
+            _acs = self.cs_alive.double()
+            perD_r = ((self.cs_r_envoys[:, r] >= 3).double() + (self.cs_r_envoys[:, r] >= 6).double()) * self._cs_district_bonus * _acs
+            csd_r = torch.zeros(B, len(self.districts_cat), dtype=torch.float64, device=self.device)
+            csd_r.scatter_add_(1, self._cs_didx.clamp(min=0), perD_r)
+            dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
+            comp_all = ((dt_all >= 0) & self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)).double() * alive.double().unsqueeze(2)
+            _cols = [torch.zeros(B, self.RC, dtype=torch.float64, device=self.device) for _ in range(6)]
+            for _d in self.districts_cat:
+                _yc = int(_d.get("adjYield", -1))
+                if _yc < 0:
+                    continue
+                _di = int(_d["idx"])
+                _cols[_yc] = _cols[_yc] + csd_r[:, _di].unsqueeze(1) * comp_all[:, :, _di]
+            tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
+            capb_r = torch.zeros(B, 6, dtype=torch.float64, device=self.device)
+            capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
+            _isc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+            food = food + _cols[0] + capb_r[:, 0].unsqueeze(1) * _isc
+            prod = prod + _cols[1] + capb_r[:, 1].unsqueeze(1) * _isc
+            gold = gold + _cols[2] + capb_r[:, 2].unsqueeze(1) * _isc
+            sci = sci + _cols[3] + capb_r[:, 3].unsqueeze(1) * _isc
+            cul = cul + _cols[4] + capb_r[:, 4].unsqueeze(1) * _isc
+            faith = faith + _cols[5] + capb_r[:, 5].unsqueeze(1) * _isc
         # A-11: outgoing unraided route income — pre-tier, the per-j twin's
         # position (integer-valued adds in f64: batching is exact).
         _route_inc = self._rival_route_income(r)
@@ -5826,6 +5861,34 @@ class BatchSim:
             sci = sci + gcity[:, 3] * mcell + gcap[:, 3] * gisc
             cul = cul + gcity[:, 4] * mcell + gcap[:, 4] * gisc
             faith = faith + gcity[:, 5] * mcell + gcap[:, 5] * gisc
+        # A-12: this civ's CS envoy bonuses — per-completed-district adds at
+        # 3/6 envoys + the capital yield at 1+ (count-based, the
+        # csRivalEnvoyBonuses twin; the CS yield column equals its district's
+        # adjYield, the player-block invariant). Pre-tier, before A-11 trade.
+        if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
+            _acs = self.cs_alive.double()
+            perD_r = ((self.cs_r_envoys[:, r] >= 3).double() + (self.cs_r_envoys[:, r] >= 6).double()) * self._cs_district_bonus * _acs
+            csd_r = torch.zeros(self.B, len(self.districts_cat), dtype=torch.float64, device=self.device)
+            csd_r.scatter_add_(1, self._cs_didx.clamp(min=0), perD_r)
+            dtj = self.rc_dist_tile[:, r, j]  # [B, nD] — one tile per district type
+            compj = ((dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0))).double() * mask.double().unsqueeze(1)
+            _cols = [torch.zeros(self.B, dtype=torch.float64, device=self.device) for _ in range(6)]
+            for _d in self.districts_cat:
+                _yc = int(_d.get("adjYield", -1))
+                if _yc < 0:
+                    continue
+                _di = int(_d["idx"])
+                _cols[_yc] = _cols[_yc] + csd_r[:, _di] * compj[:, _di]
+            tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
+            capb_r = torch.zeros(self.B, 6, dtype=torch.float64, device=self.device)
+            capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
+            _isc = (self.rc_is_cap[:, r, j] & mask).double()
+            food = food + _cols[0] + capb_r[:, 0] * _isc
+            prod = prod + _cols[1] + capb_r[:, 1] * _isc
+            gold = gold + _cols[2] + capb_r[:, 2] * _isc
+            sci = sci + _cols[3] + capb_r[:, 3] * _isc
+            cul = cul + _cols[4] + capb_r[:, 4] * _isc
+            faith = faith + _cols[5] + capb_r[:, 5] * _isc
         # A-11: outgoing unraided route income — pre-tier, the trade position
         # in computeCityStats (production scales with the tier, food doesn't).
         _route_inc = self._rival_route_income(r)
@@ -6797,6 +6860,64 @@ class BatchSim:
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
 
+    def _rival_cs_phase(self, r: int, active: torch.Tensor) -> None:
+        """AUDIT A-12: CS diplomacy from the rival's seat — the rivalPhase
+        block after boost detection. Meet by PROXIMITY (a living city center
+        or unit of this civ within meetRange of the CS center — rivals have
+        no fog; the player meets via isExplored), then the player's
+        influence→envoy accrual (flat rate + the adopted government's tier,
+        gated on the A-7r switch), then the scripted greedy assignment:
+        neediest met CS by THIS civ's own envoys, ties to the lowest id,
+        until the bank is spent (the envoys*64+id key, the player's
+        scripted-assign encoding)."""
+        if self.S == 0:
+            return
+        B, S, dev = self.B, self.S, self.device
+        rr = self.rules.cs
+        csc = self.cs_center[:, :S].clamp(min=0)  # [B, S]
+        meet_range = int(rr.get("meetRange", 3))
+        # cities within range
+        rcc = self.rc_center[:, r].clamp(min=0)  # [B, RC]
+        d_city = self.pair_dist[csc.unsqueeze(2), rcc.unsqueeze(1)] <= meet_range  # [B, S, RC]
+        near = (d_city & self.rc_alive[:, r].unsqueeze(1)).any(dim=2)
+        # units of this civ within range
+        vmask = self.v_alive & (self.v_civ == r)  # [B, V]
+        if bool(vmask.any()):
+            d_unit = self.pair_dist[csc.unsqueeze(2), self.v_tile.clamp(min=0).unsqueeze(1)] <= meet_range  # [B, S, V]
+            near = near | (d_unit & vmask.unsqueeze(1)).any(dim=2)
+        newly = active.unsqueeze(1) & self.cs_alive[:, :S] & ~self.cs_r_met[:, r, :S] & near
+        self.cs_r_met[:, r, :S] = self.cs_r_met[:, r, :S] | newly
+        met_live = self.cs_r_met[:, r, :S] & self.cs_alive[:, :S]
+        any_met = active & met_live.any(dim=1)
+        if not bool(any_met.any()):
+            return
+        pt = torch.full((B,), float(rr.get("influencePerTurn", 3)), dtype=torch.float64, device=dev)
+        if self._gov_live:
+            # the rival's adopted government tier (derived from ITS civics —
+            # the computeAdoption twin the A-7r machinery already provides)
+            pt = pt + self._adopted_gov_tier(self.r_civics[:, r]).double()
+        self.r_influence[:, r] = self.r_influence[:, r] + torch.where(any_met, pt, torch.zeros_like(pt))
+        cost = float(rr.get("envoyCost", 100))
+        for _ in range(3):  # the player conversion loop's bound
+            earn = any_met & (self.r_influence[:, r] >= cost)
+            if not bool(earn.any()):
+                break
+            self.r_influence[:, r] = torch.where(earn, self.r_influence[:, r] - cost, self.r_influence[:, r])
+            self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] + earn.long()
+        for _ in range(4):  # assignment until spent (bank grows ≤1/turn)
+            can = any_met & (self.r_envoys_avail[:, r] > 0)
+            if not bool(can.any()):
+                return
+            key = torch.where(
+                met_live,
+                self.cs_r_envoys[:, r, :S] * 64 + torch.arange(S, device=dev).view(1, -1),
+                torch.full((B, S), 10**9, dtype=torch.long, device=dev),
+            )
+            pick = key.argmin(dim=1)
+            rows = can.nonzero(as_tuple=True)[0]
+            self.cs_r_envoys[rows, r, pick[rows]] += 1
+            self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] - can.long()
+
     def _rival_trade_phase(self, r: int, active: torch.Tensor) -> None:
         """AUDIT A-11: ONE new domestic route per civ per turn while under
         capacity — the rivalPhase creation block. Capacity mirrors
@@ -6897,6 +7018,9 @@ class BatchSim:
             # AUDIT A-3: eurekas/inspirations from this rival's seat — the
             # TS twin runs at the same point (the rival's block top).
             self._detect_rival_boosts(r, active)
+            # AUDIT A-12: the CS-diplomacy block sits right after boost
+            # detection — the exact rivalPhase position.
+            self._rival_cs_phase(r, active)
             # C1-B2: queue PICKS for the PRE-TURN city set, in slot order —
             # the capital (rc_is_cap, the rivals.ts:1077 rc.isCapital gate;
             # P7-FULL: compaction can move it off slot 0) prefers the

@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 37 | 15.5 | **42%** |
+| A symmetry | 37 | 17.5 | **47%** |
 | B fidelity | 88 | 40.8 | **46%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (E-16 with owner) | 6 | 5 | 83% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **180** | **110.3** | **61%** |
-| Open chapters only (A+B+E) | 131 | 61.3 | **47%** |
+| **Overall (incl. closed)** | **180** | **112.3** | **62%** |
+| Open chapters only (A+B+E) | 131 | 63.3 | **48%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -43,12 +43,15 @@ B-13's; B-25 50%→70% — GPU space-race sim poke-covered; B-29 done.
 engines, per-city border adjacency + exact capture/transfer tile
 sets; residual worked-tile civ-level scan split out as new A-23 w2.
 Stage 2: A-11 → 90% — rival domestic trade routes live both engines
-+ symmetric route interdiction; rival→CS routes wait on A-12.)
++ symmetric route interdiction; rival→CS routes wait on A-12.
+Stage 3a: A-12 → 50% — per-civ envoys/influence/greedy assignment,
+rival envoy bonuses, strict suzerain contest; CS verbs = stage 3b.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
   closed the card wiring), A-9 4, A-11 4 (90% — CS routes → A-12),
-  A-12 4, A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
+  A-12 4 (50% — #41 stage 3a: diplomatic layer), A-17 4 (done — #41
+  stage 1), A-18 3, A-19 4, A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 / B-29 2 (done);
@@ -142,16 +145,23 @@ untagged halves of tagged items stay Fable/main-session work.
   the GPU still has no PLAYER route machinery (unreachable in gated
   trajectories — no trade RL verb; batch with A-18/#50 if the P8
   surface ever gains one).
-- A-12. Rivals don't interact with city-states: no envoys/influence/
-  levy (`levyUnits` (rivals.ts) is suzerain-player-only;
-  `envoy_mask`+`_city_state_phase` (engine.py) are seat-0;
-  `rival_masks` (engine.py) documents "envoys have no rival analog —
-  all-False"), and rivals cannot even attack a CS — `meleeAttack`'s
-  `csTarget` scan (combat.ts) is `attacker.owner === 'player'`-gated,
-  and `attackCityState`/`captureCityState` (combat.ts) /
-  `_capture_city_state` (engine.py) are reachable only from the
-  player's seat. Downstream: rival districts never earn the CS envoy
-  district bonuses the player's `_city_totals` applies.
+- A-12 (50% — 2026-07-18, task #41 stage 3a). The DIPLOMATIC layer is
+  live both engines: per-civ envoys (`CityState.rivalEnvoys`/
+  `rivalMet` / GPU `cs_r_envoys`/`cs_r_met`), rival influence→envoy
+  accrual with the adopted-government tier (`rivalPhase` CS block /
+  `_rival_cs_phase` — meet by PROXIMITY, `CS_MEET_RANGE` 3, rivals
+  have no fog), the player's scripted greedy assignment mirrored
+  (neediest-own-envoys, envoys*64+id key), rival capital/district
+  envoy bonuses at 1/3/6 in `rivalCityYields` / both
+  `_rival_city_yields` paths, and the suzerain CONTEST — `isSuzerain`
+  is strictly-most-envoys now (ties → nobody), `rivalIsSuzerain` the
+  rival test. Gate-reachable (probe: 6/8 seeds meet, envoys to 9).
+  REMAINING 50%: rival→CS trade routes + suzerain trade-capacity for
+  rivals (with the A-11 residual), rival-seat CS attack/capture
+  (`meleeAttack` `csTarget` is player-gated; `_capture_city_state`
+  seat-0 — the join-the-suzerain's-war rule is the designed shape),
+  rival levy (verb exists player-only), rival CS quests (needs
+  per-civ quest RNG — draw-count risk, deliberately deferred).
 - A-17. RESOLVED (2026-07-18, task #41): rival territory gained a
   per-city tile registry (TS `Tile.rivalCityId` / GPU `rc_tile_id`,
   persistent-rc-id keyed), fixing per-city border adjacency and exact

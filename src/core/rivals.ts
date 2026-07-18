@@ -17,8 +17,10 @@ import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, TRADE_ROUTE_RANGE } from './trade';
-import { isSuzerain } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { isSuzerain, csRivalEnvoyBonuses } from './cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE } from '../data/cityStates';
+import { computeAdoption } from './effects';
+import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
@@ -1228,6 +1230,21 @@ export function rivalCityYields(
   if (rc.isCapital) {
     for (const [k, v] of Object.entries(ctx.mods.capitalYields)) total[k as keyof Yields] += v ?? 0;
   }
+  // A-12: this civ's CS envoy bonuses — capital yield at 1+ envoys,
+  // per-completed-district adds at 3/6 (count-based like the player's
+  // csEnvoyBonuses; suzerainty not required). Pre-tier, the player's
+  // modifiers position.
+  {
+    const csb = csRivalEnvoyBonuses(state, rival.id);
+    if (rc.isCapital) {
+      for (const [k, v] of Object.entries(csb.capital)) total[k as keyof Yields] += v ?? 0;
+    }
+    for (const d of rc.districts) {
+      const add = csb.districtAdd[d.type];
+      if (!add || !state.map.tiles[d.tileIndex].districtComplete) continue;
+      for (const [k, v] of Object.entries(add)) total[k as keyof Yields] += v ?? 0;
+    }
+  }
   // A-11: outgoing unraided trade routes pay the origin — the trade position
   // in computeCityStats (added BEFORE the tier scaling, city.ts:486; the
   // production half scales with the tier, the food half does not — exactly
@@ -1355,6 +1372,53 @@ export function rivalPhase(state: GameState): void {
     // this civ's cities/research/territory; the discounts apply in the
     // research loops below).
     detectRivalBoosts(state, rival);
+
+    // AUDIT A-12: city-state diplomacy from the rival's seat — meet by
+    // PROXIMITY (a city or unit within CS_MEET_RANGE; rivals have no fog),
+    // then the player's influence→envoy accrual (cityStatePhase mirror:
+    // flat rate + the adopted government's tier), then the scripted
+    // greedy assignment (neediest met CS by OWN envoys, ties lowest id).
+    {
+      for (const cs of state.cityStates) {
+        const met = (cs.rivalMet ??= []);
+        if (met[rival.id]) continue;
+        const ct = state.map.tiles[cs.centerIndex];
+        const near =
+          rival.cities.some((rc) => {
+            const t = state.map.tiles[rc.centerIndex];
+            return hexDistance(t.col, t.row, ct.col, ct.row) <= CS_MEET_RANGE;
+          }) ||
+          rivalUnits(state, rival.id).some((u) => {
+            const t = state.map.tiles[u.tileIndex];
+            return hexDistance(t.col, t.row, ct.col, ct.row) <= CS_MEET_RANGE;
+          });
+        if (near) {
+          met[rival.id] = true;
+          state.eventLog.push(`${rival.name} met the city-state of ${cs.name}.`);
+        }
+      }
+      if (state.cityStates.some((cs) => cs.rivalMet?.[rival.id])) {
+        const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(rival.research).government : null;
+        const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
+        rival.influencePoints = (rival.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier;
+        while (rival.influencePoints >= ENVOY_COST) {
+          rival.influencePoints -= ENVOY_COST;
+          rival.envoysAvailable = (rival.envoysAvailable ?? 0) + 1;
+        }
+        while ((rival.envoysAvailable ?? 0) > 0) {
+          let pick: (typeof state.cityStates)[number] | null = null;
+          for (const cs of state.cityStates) {
+            if (!cs.rivalMet?.[rival.id]) continue;
+            const mine = cs.rivalEnvoys?.[rival.id] ?? 0;
+            if (!pick || mine < (pick.rivalEnvoys?.[rival.id] ?? 0)) pick = cs;
+          }
+          if (!pick) break;
+          const env = (pick.rivalEnvoys ??= []);
+          env[rival.id] = (env[rival.id] ?? 0) + 1;
+          rival.envoysAvailable = (rival.envoysAvailable ?? 0) - 1;
+        }
+      }
+    }
 
     // C1-B2: per-city REAL production queues (settler + units at real
     // costs) replace the pooled prodstock/milstock, their pace/split

@@ -46,6 +46,7 @@ import {
   CS_TYPE_DISTRICT,
   CS_DISTRICT_BONUS,
   CS_MAX_HP,
+  CS_MEET_RANGE,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects } from '../src/data/religion';
@@ -461,6 +462,7 @@ const rules = {
     envoyCost: ENVOY_COST,
     influencePerTurn: INFLUENCE_PER_TURN,
     capitalBonus: CS_CAPITAL_BONUS,
+    meetRange: CS_MEET_RANGE, // A-12: rival proximity-meet radius
     questCooldown: QUEST_COOLDOWN,
     questEnvoys: QUEST_ENVOYS,
     // V-CS: attackCityState/captureCityState (siege hp + the militaristic +6)

@@ -10,6 +10,8 @@ import {
   envoyBonusDelta,
   csEnvoyBonuses,
   isSuzerain,
+  rivalIsSuzerain,
+  csRivalEnvoyBonuses,
 } from '../src/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../src/core/trade';
 import { ENVOY_COST } from '../src/data/cityStates';
@@ -223,5 +225,34 @@ describe('determinism', () => {
       endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
+  });
+});
+
+describe('rival envoys and the suzerain contest (A-12)', () => {
+  it('suzerainty needs strictly more envoys than every rival', () => {
+    const state = makeState();
+    const cs = addCs(state, 8, 8, { type: 'trade', envoys: 3 });
+    expect(isSuzerain(cs)).toBe(true); // uncontested
+    cs.rivalEnvoys = [3];
+    expect(isSuzerain(cs)).toBe(false); // tied: nobody rules
+    expect(rivalIsSuzerain(cs, 0)).toBe(false);
+    cs.rivalEnvoys = [4];
+    expect(isSuzerain(cs)).toBe(false);
+    expect(rivalIsSuzerain(cs, 0)).toBe(true);
+    cs.envoys = 5;
+    expect(isSuzerain(cs)).toBe(true);
+    expect(rivalIsSuzerain(cs, 0)).toBe(false);
+  });
+
+  it('csRivalEnvoyBonuses applies the 1/3/6 thresholds off that rival only', () => {
+    const state = makeState();
+    const cs = addCs(state, 8, 8, { type: 'scientific' });
+    cs.rivalEnvoys = [6, 1];
+    const b0 = csRivalEnvoyBonuses(state, 0);
+    expect(b0.capital.science).toBe(2);
+    expect(b0.districtAdd.CAMPUS?.science).toBe(4); // both thresholds
+    const b1 = csRivalEnvoyBonuses(state, 1);
+    expect(b1.capital.science).toBe(2);
+    expect(b1.districtAdd.CAMPUS).toBeUndefined(); // 1 envoy: capital only
   });
 });

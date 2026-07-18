@@ -362,6 +362,10 @@ export interface RivalCiv {
   /** AUDIT A-11: this civ's domestic trade routes (RivalCity ids, both
    *  endpoints own cities). Routes to city-states wait on A-12 (envoys). */
   tradeRoutes?: { from: number; to: number }[];
+  /** AUDIT A-12: this civ's influence accumulator + banked envoys — the
+   *  player's influencePoints/envoysAvailable twins. */
+  influencePoints?: number;
+  envoysAvailable?: number;
   /** Real tech/civic trees (C1-B3): same shape as the player's. */
   research: ResearchState;
 
@@ -455,6 +459,12 @@ export interface CityState {
   hp?: number;
   /** Turn of the player's last militaristic levy here (cooldown). */
   lastLevyTurn?: number;
+  /** AUDIT A-12: envoys each RIVAL civ has assigned here (index = rival
+   *  id). The suzerain contest reads player `envoys` vs these. */
+  rivalEnvoys?: number[];
+  /** AUDIT A-12: which rivals have met this CS (index = rival id) —
+   *  proximity contact (a rival city or unit within 3), not fog. */
+  rivalMet?: boolean[];
 }
 
 export interface MapGenOptions {
