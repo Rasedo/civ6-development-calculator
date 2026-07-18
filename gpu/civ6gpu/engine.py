@@ -633,10 +633,14 @@ class BatchSim:
         self.cap_tile_rival = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # AUDIT A-11: domestic trade routes per civ — (from_id, to_id) rc-id
         # pairs, -1 = empty column. Id-keyed like rc_tile_id, so _reclaim_rc
-        # slot permutations never touch it; K=10 > the max capacity
-        # (FOREIGN_TRADE 1 + maxCities 6 + 2 wonders). t0 fixtures carry no
-        # routes (single-city civs), so no fixture field is needed.
-        self.r_routes = torch.full((B, r_pad, 10, 2), -1, dtype=torch.long, device=device)
+        # slot permutations never touch it. Capacity bound (rivalTradeCapacity):
+        # FOREIGN_TRADE 1 + maxCities MARKET/LIGHTHOUSE + 2 wonders (COLOSSUS,
+        # GREAT_ZIMBABWE) + one per suzerained TRADE city-state (A-12b). The old
+        # K=10 omitted the trade-CS term (true max = 1 + maxCities + 2 + S); the
+        # #45 naval reshuffle let a rival actually reach it (rollout assert). Size
+        # K to the real bound + slack. t0 fixtures carry no routes (single-city).
+        k_routes = 1 + int(self.rules.rivals.get("maxCities", 6)) + 2 + max(int(self.S), 0) + 2
+        self.r_routes = torch.full((B, r_pad, k_routes, 2), -1, dtype=torch.long, device=device)
         # AUDIT A-12: rival↔CS diplomacy — per-rival envoys/met planes plus
         # the influence/envoy-bank accumulators (the player twins). t0
         # fixtures carry none of it (rivals start unmet, zero everywhere).
@@ -1250,6 +1254,7 @@ class BatchSim:
         # gate indices (military embarks on SHIPBUILDING, civilians on SAILING,
         # OCEAN needs CARTOGRAPHY).
         self._embark_moves = int(cb.get("embarkMoves", 2))
+        self._embarked_defense_cs = float(cb.get("embarkedDefenseCs", 10))
         self._embark_live = bool(cb.get("embarkLive", 0))
         self._sailing_tech = int(cb.get("sailingTech", -1))
         self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
@@ -1273,6 +1278,9 @@ class BatchSim:
         self._p_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
+        # #45/B-6: the scripted galley-policy build target (the naval MELEE unit,
+        # requiresTech SAILING). -1 if the roster has no galley.
+        self._galley_idx = next((i for i, u in enumerate(ru) if u["id"] == "GALLEY"), -1)
 
         # Precomputed static prereq masks would race with completion inside a
         # turn; availability is recomputed per loop (cheap: NT ≤ 32).
@@ -3005,7 +3013,15 @@ class BatchSim:
             unit_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )
-            cols.append(unit_ok.unsqueeze(1).expand(-1, C, -1))
+            unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1)
+            if bool(self.unit_naval.any()):
+                # #45/B-6: the controlled/RL player builds NO naval (mirrors the
+                # controlled rival's rival_masks ladder and the scripted player's
+                # bestMilitary); player naval rides #50 with its move/attack
+                # verbs. The scripted RIVAL galley policy is the only in-gate
+                # naval production.
+                unit_col = unit_col & ~self.unit_naval.view(1, 1, -1)
+            cols.append(unit_col)
         else:
             cols.append(torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev))
         nS = len(self._scaffold)
@@ -3070,6 +3086,8 @@ class BatchSim:
                     u_cost = u_cost.clone()
                     u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained + bq)
                 pu = (u_ok & self._afford(tre.unsqueeze(1), u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
+                if bool(self.unit_naval.any()):
+                    pu = pu & ~self.unit_naval.view(1, 1, -1)  # #45/B-6: no controlled-player naval buy (rides #50)
             else:
                 pu = torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
             cols.append(torch.cat([pb, ps, pu], dim=2))
@@ -3327,9 +3345,12 @@ class BatchSim:
         nbc = nb.clamp(min=0)
         on = nb >= 0
         has_barb = (self.barb_at.gather(1, nbc) >= 0) & on
-        has_pmil = (self.pmil_at.gather(1, nbc) >= 0) & on
+        # #45/B-6: EMBARKED military units flank/support for NOBODY (barbs never
+        # embark). Exclude an embarked occupant from the player/rival counts.
+        pm_slot_n = self.pmil_at.gather(1, nbc)
+        has_pmil = (pm_slot_n >= 0) & on & ~self.p_emb.gather(1, pm_slot_n.clamp(min=0))
         rvn = self.rv_at.gather(1, nbc)
-        has_rv = (rvn >= 0) & on
+        has_rv = (rvn >= 0) & on & ~self.v_emb.gather(1, rvn.clamp(min=0))
         rv_civ_n = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=rcap)  # [B, 6]
         # a rival military neighbour whose civ is at war with the player
         rv_war_n = has_rv & self.r_atwar.gather(1, rv_civ_n)
@@ -3387,11 +3408,14 @@ class BatchSim:
         # 'barb': anything standing there blocks.
         return barb | pmil | pciv | rv | rvc
 
-    def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
         first free neighbor in direction order (the stable distance sort
         keeps exactly that order). side: 'barb' | 'player' | 'rival';
         civ_mask [B] bool (player only) — True = civilian probe.
+        #45/B-6: naval_mask [B] bool marks rows spawning a NAVAL unit — those
+        probe over enterable WATER (wpass; OCEAN needs the owner's CARTOGRAPHY,
+        passed as cart [B]) instead of the land plane, so ships land on water.
         Returns (found [B], spot [B])."""
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)  # [B, 7]
         okc = cand7.clamp(min=0)
@@ -3412,7 +3436,16 @@ class BatchSim:
             blocked = barb | pmil | pciv | rv | rvc_foreign
         else:  # barb: every other unit blocks
             blocked = barb | pmil | pciv | rv | rvc
-        ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~blocked
+        terr = self.passable.gather(1, okc)
+        if naval_mask is not None and bool(naval_mask.any()):
+            # #45/B-6: naval rows use the water plane — wpass, OCEAN gated on the
+            # owner's CARTOGRAPHY (else all-false → coast/lake only).
+            ocean_ok = ~self.ocean_tile.gather(1, okc)
+            if cart is not None:
+                ocean_ok = ocean_ok | cart.unsqueeze(1)
+            water_terr = self.wpass.gather(1, okc) & ocean_ok
+            terr = torch.where(naval_mask.unsqueeze(1), water_terr, terr)
+        ok7 = (cand7 >= 0) & terr & ~blocked
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         return first < 7, spot
@@ -3442,7 +3475,12 @@ class BatchSim:
         if not bool(mask.any()):
             return
         civ = self._p_civ[type_idx.clamp(min=0)]
-        found, spot = self._first_free_spot(at_tile, "player", civ)
+        # #45/B-6: naval units probe over water (OCEAN gated on the player's
+        # CARTOGRAPHY) — poke/#50 player-naval path; scripted player builds none.
+        ti_pn = type_idx.clamp(min=0, max=self.NU - 1)
+        naval_mp = self.unit_naval[ti_pn] & mask
+        cart_p = self.techs[:, self._cartography_tech] if self._cartography_tech >= 0 else None
+        found, spot = self._first_free_spot(at_tile, "player", civ, naval_mask=naval_mp, cart=cart_p)
         can = mask & found
         if not bool(can.any()):
             return
@@ -4330,6 +4368,7 @@ class BatchSim:
                 cap_type = self.v_type[kr, ks]
                 cap_hp = self.v_hp[kr, ks]
                 cap_ch = self.v_charges[kr, ks]
+                cap_emb = self.v_emb[kr, ks]  # #45/B-6: read BEFORE despawn
                 self.v_alive[kr, ks] = False
                 self.rvciv_at[kr, ct] = -1
                 nslot = self.p_next[kr]
@@ -4340,7 +4379,7 @@ class BatchSim:
                 self.p_hp[kr, nslot] = cap_hp
                 self.p_charges[kr, nslot] = cap_ch
                 self.p_fortify[kr, nslot] = 0  # B-5: a civilian never fortifies
-                self.p_emb[kr, nslot] = False  # #45/B-6: no embarked captures in N1 (N2: inherit v_emb)
+                self.p_emb[kr, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
                 self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.pciv_at[kr, ct] = nslot
                 self.p_next[kr] += 1
@@ -4363,6 +4402,10 @@ class BatchSim:
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3  # B-5
+                # #45/B-6: an EMBARKED rival defender overrides to a flat CS —
+                # no terrain/fortify (and no support below). Barbs never embark.
+                v_embd = self.v_emb.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1) & ~is_b
+                def_cs = torch.where(v_embd, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # B-29: attacker AND defender fight at HP-reduced strength.
                 b_hp = self.u_hp.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -4370,11 +4413,12 @@ class BatchSim:
                 def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
                 # B-7: flanking helps the player attacker, support helps the
                 # defender (barb or at-war rival). Applied once so both paired
-                # rolls see the same adjusted CS.
+                # rolls see the same adjusted CS. #45/B-6: an embarked defender
+                # receives NO support.
                 _dside = torch.where(is_b, torch.ones_like(v_civ), torch.full_like(v_civ, 2))
                 _fl, _sp = self._flank_support(tgt, _dside, v_civ, here)
                 atk_e = atk_e + FLANKING_CS * _fl
-                def_e = def_e + SUPPORT_CS * _sp
+                def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
@@ -4422,6 +4466,9 @@ class BatchSim:
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3  # B-5
+                # #45/B-6: embarked rival defender → flat CS, no terrain/support.
+                v_embd = self.v_emb.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1) & ~is_b
+                def_cs = torch.where(v_embd, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # B-29: ranged attacker + defender wounded (no river for ranged).
                 b_hp = self.u_hp.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -4430,7 +4477,7 @@ class BatchSim:
                 # B-7 support (no flanking: a ranged attacker takes no retaliation).
                 _dside = torch.where(is_b, torch.ones_like(v_civ), torch.full_like(v_civ, 2))
                 _, _sp = self._flank_support(tgt, _dside, v_civ, torch.full_like(tgt, -1))
-                def_e = def_e + SUPPORT_CS * _sp
+                def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
@@ -4458,14 +4505,19 @@ class BatchSim:
             if bool(r_civ.any()):
                 atk_rs = self._p_rng_str[self.p_type[:, p]]
                 def_cs = self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1).to(atk_rs.dtype)  # civilian combat 0 + terrain
+                # #45/B-6: an embarked lone civilian defends at the flat CS (TS
+                # defenderCS applies the override to any defender, civilian too).
+                civ_embd = self.v_emb.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
+                def_cs = torch.where(civ_embd, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # B-29: attacker + the lone rival civilian defender both wounded.
                 civ_hp = self.v_hp.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
                 atk_e = atk_rs - self._wound(self.p_hp[:, p])
                 def_e = def_cs - self._wound(civ_hp)
                 # B-7 support: the lone rival civilian is aided by adjacent
                 # same-civ rival military (no flanking on a ranged strike).
+                # #45/B-6: an embarked civilian receives NO support.
                 _, _sp = self._flank_support(tgt, torch.full_like(tgt, 2), rvc_civ_t, torch.full_like(tgt, -1))
-                def_e = def_e + SUPPORT_CS * _sp
+                def_e = def_e + SUPPORT_CS * torch.where(civ_embd, torch.zeros_like(_sp), _sp)
                 d_def = self._damage_roll(r_civ, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
@@ -5024,6 +5076,10 @@ class BatchSim:
                 d_cs_rmil = self._p_combat[self.v_type[bidx, m_slot.clamp(min=0)]]
                 d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
                 def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt]
+                # #45/B-6: an embarked rival target (military/civilian; barbs
+                # never embark) → flat CS, no terrain (and no support below).
+                d_emb = (self.v_emb[bidx, m_slot.clamp(min=0)] & is_rmil) | (self.v_emb[bidx, c_slot.clamp(min=0)] & is_rciv)
+                def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 gar = (self.pmil_at[bidx, ctr] >= 0).long()  # cityDefenseStrength garrison +5
                 atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
                 # B-29: the defending unit is wounded (the attacker is the city).
@@ -5035,7 +5091,7 @@ class BatchSim:
                 _dside = torch.where(is_barb, torch.ones(Bn, dtype=torch.long, device=dev2), torch.full((Bn,), 2, dtype=torch.long, device=dev2))
                 _dciv = torch.where(is_rmil, self.v_civ[bidx, m_slot.clamp(min=0)], self.v_civ[bidx, c_slot.clamp(min=0)])
                 _, _sp = self._flank_support(tt, _dside, _dciv, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
-                def_e = def_e + SUPPORT_CS * _sp
+                def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
                 d = self._damage_roll(strike, atk_cs - def_e, k="pcstk", tile=tt)
                 rows = strike.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
@@ -5190,7 +5246,12 @@ class BatchSim:
         Returns the LANDED mask (P5/S8: purchases refund on no spawn spot)."""
         if not bool(mask.any()):
             return torch.zeros_like(mask)
-        found, spot = self._first_free_spot(at_tile, "rival", civ=civ)
+        # #45/B-6: naval units probe over water (OCEAN gated on the civ's
+        # CARTOGRAPHY). type_idx may be scalar or [B].
+        ti_n = (type_idx if type_idx.dim() > 0 else type_idx.expand(self.B)).clamp(min=0, max=self.NU - 1)
+        naval_m = self.unit_naval[ti_n] & mask
+        cart_r = self.r_techs[:, civ, self._cartography_tech] if self._cartography_tech >= 0 else None
+        found, spot = self._first_free_spot(at_tile, "rival", civ=civ, naval_mask=naval_m, cart=cart_r)
         can = mask & found
         if not bool(can.any()):
             return can
@@ -6851,6 +6912,10 @@ class BatchSim:
             f_v = self.v_fortify.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
             def_fort = torch.where(def_is_barb, f_b, torch.where(def_is_rv, f_v, f_p)) * 3  # B-5
             def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort
+            # #45/B-6: an EMBARKED defender (player p_emb, or rival v_emb — barbs
+            # never embark) overrides to a flat CS, no terrain/fortify/support.
+            d_emb = (self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) & ~def_is_barb & ~def_is_rv) | (self.v_emb.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1) & def_is_rv)
+            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
             # B-29: attacker AND defender fight at HP-reduced strength.
             d_hp_p = self.p_hp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
             d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -6864,7 +6929,7 @@ class BatchSim:
             _dciv = self.v_civ.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
             _fl, _sp = self._flank_support(tgt, _dside, _dciv, here)
             atk_e = atk_e + FLANKING_CS * _fl
-            def_e = def_e + SUPPORT_CS * _sp
+            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
             d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
@@ -6914,6 +6979,7 @@ class BatchSim:
                 cap_type = self.p_type[rows, ds]
                 cap_hp = self.p_hp[rows, ds]
                 cap_ch = self.p_charges[rows, ds]
+                cap_emb = self.p_emb[rows, ds]  # #45/B-6: read BEFORE despawn
                 self.pciv_at[rows, ct] = -1
                 self.p_alive[rows, ds] = False
                 nslot = self.v_next[rows]
@@ -6925,7 +6991,7 @@ class BatchSim:
                 self.v_hp[rows, nslot] = cap_hp
                 self.v_charges[rows, nslot] = cap_ch
                 self.v_fortify[rows, nslot] = 0  # B-5: a civilian never fortifies
-                self.v_emb[rows, nslot] = False  # #45/B-6: no embarked captures in N1 (N2: inherit p_emb)
+                self.v_emb[rows, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
                 self.v_acted[rows, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.rvciv_at[rows, ct] = nslot
                 self.v_next[rows] += 1
@@ -7019,7 +7085,9 @@ class BatchSim:
         sit adjacent to a MILITARY unit hostile to the mover? Barbarians exert
         it always; player military only while that mover's civ is at war
         (rivals never war each other, so their military never exerts). [B]->[B]."""
-        hostmil = (self.barb_at >= 0) | ((self.pmil_at >= 0) & atwar.unsqueeze(1))
+        # #45/B-6: EMBARKED player military exert NO ZOC (barbs never embark).
+        pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
+        hostmil = (self.barb_at >= 0) | (pmil_exert & atwar.unsqueeze(1))
         dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
         return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
 
@@ -7067,7 +7135,10 @@ class BatchSim:
             valid = valid | (cs_suz_t & (d_all == 1) & ~rngd.unsqueeze(1))
         tkey = torch.where(valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
         target_tile = tkey.min(dim=1).values
-        attack = act & (target_tile <= T)
+        # #45/B-6: an EMBARKED unit cannot attack (attackTargets returns [] in
+        # TS) — it falls through to the march (its water tile has no improvement
+        # to pillage, so the pillage branch is naturally inert too).
+        attack = act & (target_tile <= T) & ~self.v_emb[:, v]
         ttc = target_tile.clamp(max=T - 1)
         tgt_city = self.center_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         has_u = units_pl.gather(1, ttc.unsqueeze(1)).squeeze(1)
@@ -7396,6 +7467,10 @@ class BatchSim:
             f_c = self.p_fortify.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1)  # player civilian: never fortifies (0)
             def_fort = torch.where(def_is_b, f_b, torch.where(def_is_c, f_c, f_p)) * 3  # B-5
             def_cs = torch.where(def_is_b, d_cs_b, torch.where(def_is_c, d_cs_c, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort
+            # #45/B-6: an embarked player defender (military dm or civilian dc_;
+            # barbs never embark) → flat CS, no terrain/fortify/support.
+            d_emb = (self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) & (dm >= 0)) | (self.p_emb.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1) & def_is_c)
+            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
             # B-29: ranged attacker + defender wounded (no river for ranged).
             d_hp_p = self.p_hp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
             d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -7408,7 +7483,7 @@ class BatchSim:
             # player military) gains support; no flanking (ranged, no retaliation).
             _dside = torch.where(def_is_b, torch.ones_like(dm), torch.zeros_like(dm))
             _, _sp = self._flank_support(tgt, _dside, torch.zeros_like(dm), torch.full_like(tgt, -1))
-            def_e = def_e + SUPPORT_CS * _sp
+            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             rows = unit_att.nonzero(as_tuple=True)[0]
             for grp, at_map, hp_t, alive_t, slot_t in (
@@ -7445,7 +7520,7 @@ class BatchSim:
         valid = (d_all >= 1) & (d_all <= rng_u.unsqueeze(1)) & (self.barb_at >= 0)
         tkey = torch.where(valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
         target_tile = tkey.min(dim=1).values
-        attack = act & (target_tile <= T)
+        attack = act & (target_tile <= T) & ~self.v_emb[:, v]  # #45/B-6: embarked cannot attack
         ttc = target_tile.clamp(max=T - 1)
         if bool((attack & ~rngd).any()):
             self._hostile_vs_unit(attack & ~rngd, ttc, "rival", v)
@@ -7465,10 +7540,24 @@ class BatchSim:
         # charge; a full-MP unit always affords its first step.
         arange6 = torch.arange(6, device=dev)
         perm_t = torch.tensor(PATROL_DIR_PERM, device=dev, dtype=torch.long)
-        full_mp = self._p_moves[vt0]
         aw = self.r_atwar.gather(1, self.v_civ[:, v].clamp(min=0).unsqueeze(1)).squeeze(1)  # B-3 (False at peace)
+        # #45/B-6: the peace-act mirror of the war-march embark handling — a
+        # NAVAL galley patrols on water; an EMBARKED land unit that survived a
+        # war-march into a peace turn comes home coherently (EMBARK_MOVES pool +
+        # disembark transition). Water steps are LIVE-gated; a grounded land unit
+        # stays land-only, so with the flag off this is byte-identical to pre-N2.
+        emb0 = self.v_emb[:, v]
+        if self._embark_live:
+            full_mp = torch.where(emb0, torch.full_like(self._p_moves[vt0], self._embark_moves), self._p_moves[vt0])
+            bidx_p = torch.arange(B, device=dev)
+            civ_rp = self.v_civ[:, v].clamp(min=0)
+            cart_p = (self.r_techs[bidx_p, civ_rp, self._cartography_tech] if self._cartography_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev))
+            is_naval_p = self.unit_naval[vt0]
+        else:
+            full_mp = self._p_moves[vt0]
         mp = full_mp.clone()
         cur = here.clone()
+        emb = emb0.clone()
         moving = patrol & (hkey.min(dim=1).values < 10**9)
         while bool(moving.any()):
             curc = cur.clamp(min=0)
@@ -7478,9 +7567,17 @@ class BatchSim:
                 break
             nbp = self.neigh[curc][:, PATROL_DIR_PERM]
             nbpc = nbp.clamp(min=0)
+            if self._embark_live:
+                land_ok = self.passable.gather(1, nbpc)
+                water_gate = self.wpass.gather(1, nbpc) & (~self.ocean_tile.gather(1, nbpc) | cart_p.unsqueeze(1))
+                # naval → water; embarked land unit → land (disembark) or water;
+                # grounded land unit → land only (no embark at peace).
+                terr = torch.where(is_naval_p.unsqueeze(1), water_gate, torch.where(emb.unsqueeze(1), land_ok | water_gate, land_ok))
+            else:
+                terr = self.passable.gather(1, nbpc)
             free = (
                 (nbp >= 0)
-                & self.passable.gather(1, nbpc)
+                & terr
                 & (self.barb_at.gather(1, nbpc) < 0)
                 & (self.pmil_at.gather(1, nbpc) < 0)
                 & (self.pciv_at.gather(1, nbpc) < 0)
@@ -7493,11 +7590,17 @@ class BatchSim:
             pdir = (best % 8).clamp(max=5)
             dest = nbp.gather(1, pdir.unsqueeze(1)).squeeze(1)
             true_dir = perm_t[pdir]  # river bits index the NEIGH direction, not the patrol order
-            cost = (
+            land_cost = (
                 1
                 + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
                 + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> true_dir) & 1)
             )
+            if self._embark_live:
+                to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
+                transition = (emb != to_water) & ~is_naval_p
+                cost = torch.where(transition, mp, torch.where(to_water, torch.ones_like(land_cost), land_cost))
+            else:
+                cost = land_cost
             mv = (
                 roam
                 & (best < 10**9)
@@ -7513,11 +7616,15 @@ class BatchSim:
             self.v_acted[rows, v] = True  # P4/D-2
             self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
             mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
+            if self._embark_live:
+                emb = torch.where(mv, to_water & ~is_naval_p, emb)  # embarked ⟺ on a water tile
             # B-3 ZOC: a patrol step adjacent to a hostile military unit halts
             # (at peace only barbarians exert it — aw is False here).
             mp = torch.where(mv & self._in_enemy_zoc(dest, aw), torch.zeros_like(mp), mp)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
+        if self._embark_live:
+            self.v_emb[:, v] = emb  # persist embark state across turns
 
     def _rival_cs_phase(self, r: int, active: torch.Tensor) -> None:
         """AUDIT A-12: CS diplomacy from the rival's seat — the rivalPhase
@@ -7987,6 +8094,36 @@ class BatchSim:
                     unit_count = unit_count + want_u.long()
                     n_ranged = n_ranged + (want_u & use_rng).long()
                     n_melee = n_melee + (want_u & ~use_rng).long()
+                # #45/B-6 SCRIPTED GALLEY POLICY (the TS rivals.ts mirror): a civ
+                # with SAILING and a naval-capable city (center adjacent to water
+                # OR a completed Harbor) builds exactly ONE GALLEY when it owns
+                # zero naval units — priority JUST BELOW the military floor (only
+                # on a want_u miss, i.e. army at cap), ABOVE projects. has_naval
+                # reads live + queued across all this civ's cities, so a galley
+                # queued in an earlier city j blocks a second one same turn.
+                if self._galley_idx >= 0 and self._sailing_tech >= 0:
+                    has_sail_g = self.r_techs[:, r, self._sailing_tech]
+                    ctr_jg = self.rc_center[:, r, j].clamp(min=0)  # [B]
+                    nb_jg = self.neigh[ctr_jg]  # [B, 6]
+                    coastal_jg = ((nb_jg >= 0) & self.wpass.gather(1, nb_jg.clamp(min=0))).any(dim=1)
+                    if self._harbor_idx >= 0:
+                        hb_jg = self.rc_dist_tile[:, r, j, self._harbor_idx]
+                        harbor_jg = (hb_jg >= 0) & self.district_complete.gather(1, hb_jg.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    else:
+                        harbor_jg = torch.zeros(B, dtype=torch.bool, device=dev)
+                    naval_cap_jg = coastal_jg | harbor_jg
+                    naval_live_g = (self.v_alive & (self.v_civ == r) & self.unit_naval[vt_all]).any(dim=1)
+                    qcur_g = self.rc_current[:, r]  # [B, RC]
+                    q_nav_g = (qcur_g >= 1) & (qcur_g <= self.NU) & self.rc_alive[:, r] & self.unit_naval[(qcur_g - 1).clamp(min=0, max=self.NU - 1)]
+                    has_naval_g = naval_live_g | q_nav_g.any(dim=1)
+                    want_g = rem & ~want_u & has_sail_g & naval_cap_jg & ~has_naval_g
+                    if bool(want_g.any()):
+                        self.rc_current[:, r, j] = torch.where(want_g, torch.full_like(self.rc_current[:, r, j], self._galley_idx + 1), self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(want_g, self._p_cost[self._galley_idx].double(), self.rc_cost[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(want_g, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                        unit_count = unit_count + want_g.long()
+                        rem = rem & ~want_g
+                        rem_any = bool(rem.any())
                 # AUDIT A-14: army capped, nothing else queueable — run the
                 # FIRST project whose district is COMPLETE (exported data
                 # order); cost = the player's projectCost curve on the
@@ -8474,6 +8611,10 @@ class BatchSim:
                             d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
                             d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
                             def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self.tdef[bidx, tt]
+                            # #45/B-6: an embarked player target (military/civilian;
+                            # barbs never embark) → flat CS, no terrain (no support).
+                            d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
+                            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                             gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
                             gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
                             atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
@@ -8485,7 +8626,7 @@ class BatchSim:
                             # military; the attacker is the city, no flanking.
                             _dside = torch.where(is_barb, torch.ones(Bn, dtype=torch.long, device=dev2), torch.zeros(Bn, dtype=torch.long, device=dev2))
                             _, _sp = self._flank_support(tt, _dside, torch.zeros(Bn, dtype=torch.long, device=dev2), torch.full((Bn,), -1, dtype=torch.long, device=dev2))
-                            def_e = def_e + SUPPORT_CS * _sp
+                            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
                             d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
                             for grp, at_map, hp_t, alive_t, slot_t in (
@@ -9387,7 +9528,10 @@ class BatchSim:
                         # first-wins over UNITS table order.
                         tr_u = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
                         base_key = self._p_combat.long() * self.NU - torch.arange(self.NU, device=dev)
-                        key_u = torch.where(tr_u & (self._p_combat.unsqueeze(0) > 0), base_key.unsqueeze(0).expand(B, -1), torch.full((B, self.NU), -(10**9), dtype=torch.long, device=dev))
+                        # #45/B-6: the scripted player's bestMilitary() reads
+                        # trainableUnits(state) WITHOUT a city → naval EXCLUDED
+                        # (player naval rides #50). Mirror that here.
+                        key_u = torch.where(tr_u & (self._p_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0), base_key.unsqueeze(0).expand(B, -1), torch.full((B, self.NU), -(10**9), dtype=torch.long, device=dev))
                         best_u = key_u.argmax(dim=1)  # [B]
                         ucode = (self.UNIT_BASE + best_u).unsqueeze(1).expand_as(self.current)
                         ucost = self._p_cost[best_u].unsqueeze(1).expand_as(self.cur_cost)
@@ -9556,12 +9700,14 @@ class BatchSim:
                 self.u_alive & u_mil & ~self.u_acted, (self.u_fortify + 1).clamp(max=2),
                 torch.where(self.u_alive & u_mil & self.u_acted, torch.zeros_like(self.u_fortify), self.u_fortify),
             )
-            v_mil = self._p_combat[self.v_type] > 0
+            # #45/B-6: NAVAL units never fortify (TS refreshUnits gates on
+            # !naval; barbs are never naval so u_fortify is untouched).
+            v_mil = (self._p_combat[self.v_type] > 0) & ~self.unit_naval[self.v_type]
             self.v_fortify = torch.where(
                 self.v_alive & v_mil & ~self.v_acted, (self.v_fortify + 1).clamp(max=2),
                 torch.where(self.v_alive & v_mil & self.v_acted, torch.zeros_like(self.v_fortify), self.v_fortify),
             )
-            p_mil = self._p_combat[self.p_type] > 0
+            p_mil = (self._p_combat[self.p_type] > 0) & ~self.unit_naval[self.p_type]
             self.p_fortify = torch.where(
                 self.p_alive & p_mil & ~self.p_acted, (self.p_fortify + 1).clamp(max=2),
                 torch.where(self.p_alive & p_mil & self.p_acted, torch.zeros_like(self.p_fortify), self.p_fortify),

@@ -493,7 +493,9 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
 export function purchaseUnit(state: GameState, cityId: number, unitType: string): RuleResult {
   const city = state.cities.find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  if (!trainableUnits(state).some((d) => d.id === unitType)) {
+  // #45/B-6: trainableUnits(state, city) offers naval units ONLY when the city
+  // is naval-capable (coastal center or completed Harbor) — the buy gate.
+  if (!trainableUnits(state, city).some((d) => d.id === unitType)) {
     return { ok: false, reason: 'Unit not available (enable units mode / research).' };
   }
   const cost = unitPurchaseCost(state, unitType);

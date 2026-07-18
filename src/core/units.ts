@@ -214,7 +214,14 @@ export function tileFreeForUnit(
 export function findPath(state: GameState, unit: Unit, targetIndex: number): number[] | null {
   const map = state.map;
   const target = map.tiles[targetIndex];
-  if (!unitPassable(target)) return null;
+  // #45/B-6: a NAVAL unit routes over enterable water only (OCEAN needs the
+  // owner's CARTOGRAPHY); a LAND unit keeps the land plane (no player-ordered
+  // embark routing in v1 — that rides #50). The scripted walkers never use
+  // findPath, so this only serves player-ordered ship moves / auto-explore.
+  const naval = !!UNITS[unit.type]?.naval;
+  const passOk = (t: Tile): boolean =>
+    naval ? isWater(t) && !isImpassable(t) && waterEnterable(state, t, unit) : unitPassable(t);
+  if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
 
   const open = new Map<number, { g: number; f: number; from: number }>();
@@ -245,9 +252,10 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
     }
     const curTile = map.tiles[bestIdx];
     for (const n of neighbors(map, curTile)) {
-      if (closed.has(n.index) || !unitPassable(n)) continue;
-      // Rivers cost +3 to cross — the same charge the walker pays.
-      const g = cur.g + moveCostInto(n) + (crossesRiver(curTile, n) ? 3 : 0);
+      if (closed.has(n.index) || !passOk(n)) continue;
+      // Rivers cost +3 to cross — the same charge the walker pays (water steps
+      // never pay a river charge, so naval routing skips it).
+      const g = cur.g + moveCostInto(n) + (!naval && crossesRiver(curTile, n) ? 3 : 0);
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
         open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
@@ -343,18 +351,46 @@ export function builderCost(state: GameState): number {
   return Math.round((50 + 4 * ((state.buildersTrained ?? 0) + queued)) * GAME_SPEED);
 }
 
-/** Unit types a city can train right now. */
-export function trainableUnits(state: GameState): UnitDef[] {
-  if (!state.unitsMode) return [];
-  return Object.values(UNITS).filter(
-    (d) => !d.requiresTech || state.sandbox || isTechComplete(state, d.requiresTech),
+/**
+ * #45/B-6: a city may build/buy NAVAL units iff its CENTER is adjacent to a
+ * water tile OR it owns a COMPLETED Harbor. Mirrors the GPU naval-build gate
+ * (static center-water-adjacency plane | dynamic completed-Harbor). Works for
+ * both player City and RivalCity (both carry centerIndex + districts).
+ */
+export function cityNavalCapable(
+  state: GameState,
+  city: { centerIndex: number; districts: { type: string; tileIndex: number }[] },
+): boolean {
+  const center = state.map.tiles[city.centerIndex];
+  // Enterable water only (the GPU `wpass` plane = isWater && !impassable): a
+  // center facing only impassable water (ice) cannot field ships. Matching this
+  // exactly keeps the naval-build gate turn-identical across the engines.
+  if (neighbors(state.map, center).some((n) => isWater(n) && !isImpassable(n))) return true;
+  return city.districts.some(
+    (d) => d.type === 'HARBOR' && state.map.tiles[d.tileIndex].districtComplete,
   );
+}
+
+/** Unit types a city can train right now. #45/B-6: NAVAL units are offered ONLY
+ * when a naval-capable `city` is supplied (center-coastal or a completed
+ * Harbor) — callers without a city (RL candidate scan) never see naval, which
+ * keeps player naval to poke tests until #50 gives the RL verbs. */
+export function trainableUnits(
+  state: GameState,
+  city?: { centerIndex: number; districts: { type: string; tileIndex: number }[] },
+): UnitDef[] {
+  if (!state.unitsMode) return [];
+  return Object.values(UNITS).filter((d) => {
+    if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech)) return false;
+    if (d.naval) return !!city && cityNavalCapable(state, city);
+    return true;
+  });
 }
 
 export function queueUnit(state: GameState, cityId: number, unitType: string): RuleResult {
   const city = state.cities.find((c) => c.id === cityId);
   if (!city) return no('No such city.');
-  if (!trainableUnits(state).some((d) => d.id === unitType)) {
+  if (!trainableUnits(state, city).some((d) => d.id === unitType)) {
     return no('Unit not available (enable units mode / research).');
   }
   if (state.sandbox) {

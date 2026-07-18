@@ -110,6 +110,7 @@ import {
   LUXURY_AMENITY_CITIES,
   GAME_SPEED,
   EMBARK_MOVES,
+  EMBARKED_DEFENSE_CS,
   embarkState,
 } from '../src/data/constants';
 
@@ -657,6 +658,7 @@ const rules = {
     // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs
     // CARTOGRAPHY). The GPU mirrors these exactly.
     embarkMoves: EMBARK_MOVES,
+    embarkedDefenseCs: EMBARKED_DEFENSE_CS, // #45/B-6: flat embarked-defender CS
     embarkLive: embarkState.live ? 1 : 0,
     sailingTech: techIdx.get('SAILING') ?? -1,
     shipbuildingTech: techIdx.get('SHIPBUILDING') ?? -1,

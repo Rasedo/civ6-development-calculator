@@ -49,6 +49,11 @@ export const FOOD_PER_CITIZEN = 2;
  * at cost 1; embark/disembark transitions cost ALL remaining MP (real Civ 6). */
 export const EMBARK_MOVES = 2;
 
+/** #45/B-6: an EMBARKED land unit defends at this flat combat strength (minus
+ * its wound penalty) — NO terrain, fortify or support terms, and it cannot
+ * attack. Real Civ 6 embarked units are highly vulnerable at sea. */
+export const EMBARKED_DEFENSE_CS = 10;
+
 /** #45/B-6: master switch for the LIVE scripted WATER movement (the rival
  * war-march taking water steps). N1 lands the full embark/movement MODEL and
  * plumbing but keeps the scripted water-stepping INERT (false): turning it on
@@ -60,7 +65,7 @@ export const EMBARK_MOVES = 2;
  * The exporter ships it as rules.embarkLive so the GPU mirror stays in lockstep;
  * tests poke both engines (setEmbarkLive / sim._embark_live) to exercise the
  * water-step path. */
-export const embarkState = { live: false };
+export const embarkState = { live: true };
 export function setEmbarkLive(v: boolean): void {
   embarkState.live = v;
 }

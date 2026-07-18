@@ -51,6 +51,9 @@ import {
   amenitiesNeeded,
   amenityTier,
   LUXURY_AMENITY_CITIES,
+  EMBARK_MOVES,
+  EMBARKED_DEFENSE_CS,
+  embarkState,
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
@@ -58,7 +61,7 @@ import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenanc
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { disbandUnit, tileFreeForUnit } from './units';
+import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from './units';
 import { districtCostIn, goldAffordable } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
@@ -684,13 +687,27 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
     .map((c) => c.centerIndex)
     .sort((a, b) => nearestDistance(state, unit.tileIndex, [a]) - nearestDistance(state, unit.tileIndex, [b]))[0];
   const home = state.map.tiles[homeIdx];
-  const full = UNITS[unit.type]?.moves ?? 2;
+  const naval = !!UNITS[unit.type]?.naval;
+  // #45/B-6: a NAVAL galley patrols on water; an EMBARKED land unit that
+  // survived a war-march into a peace turn comes home coherently — steps on the
+  // flat EMBARK_MOVES pool and disembarks onto land (all-MP transition). A
+  // grounded land unit stays land-only (the v1 peace rule). The occupancy rule
+  // is UNCHANGED from the pre-N2 patrol (ANY unit blocks — the GPU peace-act
+  // mirror); only the terrain half becomes mover-aware.
+  const passOk = (t: Tile): boolean => {
+    if (isImpassable(t)) return false;
+    // Water steps are the LIVE-gated surface (mirror of the war-march and the
+    // GPU peace-act's _embark_live gate); with the flag off every mover here is
+    // land-only, exactly as pre-N2.
+    if (isWater(t)) return embarkState.live && (naval || !!unit.embarked) && waterEnterable(state, t, unit);
+    return !naval; // land step: naval cannot; grounded/disembarking land units can
+  };
   for (;;) {
     const here = state.map.tiles[unit.tileIndex];
     if (hexDistance(here.col, here.row, home.col, home.row) <= 3) return;
+    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     const step = tilesWithin(state.map, here.col, here.row, 1)
-      .filter((t) => t.index !== here.index && !isWater(t) && !isImpassable(t))
-      .filter((t) => unitsAt(state, t.index).length === 0)
+      .filter((t) => t.index !== here.index && passOk(t) && unitsAt(state, t.index).length === 0)
       .sort(
         (a, b) =>
           hexDistance(a.col, a.row, home.col, home.row) - hexDistance(b.col, b.row, home.col, home.row),
@@ -698,8 +715,14 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
     if (!step || hexDistance(step.col, step.row, home.col, home.row) >= hexDistance(here.col, here.row, home.col, home.row)) {
       return;
     }
-    const cost = moveCostInto(step) + (crossesRiver(here, step) ? 3 : 0);
+    // Embark/disembark (a LAND unit crossing land↔water) costs ALL remaining MP;
+    // water steps enter at 1 and never pay a river charge.
+    const transition = !naval && isWater(here) !== isWater(step);
+    const cost = transition
+      ? unit.movesLeft
+      : moveCostInto(step) + (isWater(step) ? 0 : crossesRiver(here, step) ? 3 : 0);
     if (unit.movesLeft < cost && unit.movesLeft < full) return;
+    if (transition) unit.embarked = isWater(step);
     unit.tileIndex = step.index;
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3)
@@ -1419,8 +1442,12 @@ export function rivalPhase(state: GameState): void {
   if (state.rivals.length === 0) return;
 
   // Rival units get their movement in this phase (like barbarians).
+  // #45/B-6: an EMBARKED land unit moves on the flat EMBARK_MOVES pool (not its
+  // land moves) — mirrors refreshUnits and the GPU war-march's full_mp. Naval
+  // units keep their own moves.
   for (const u of state.units) {
-    if (u.owner === 'rival') u.movesLeft = UNITS[u.type]?.moves ?? 2;
+    if (u.owner !== 'rival') continue;
+    u.movesLeft = u.embarked && !UNITS[u.type]?.naval ? EMBARK_MOVES : UNITS[u.type]?.moves ?? 2;
   }
 
   for (const rival of state.rivals) {
@@ -1508,6 +1535,9 @@ export function rivalPhase(state: GameState): void {
     // each other — the ranged share targets 1 ranged per 2 melee.
     let meleeCount = 0;
     let rangedCount = 0;
+    // #45/B-6 galley policy: does this civ already own or have queued a NAVAL
+    // unit? The scripted lever builds exactly ONE galley, ever (zero-naval gate).
+    let hasNaval = rivalUnitList.some((u) => !!UNITS[u.type]?.naval);
     for (const u of rivalUnitList) {
       const d = UNITS[u.type];
       if (!d || d.combat <= 0) continue;
@@ -1523,6 +1553,7 @@ export function rivalPhase(state: GameState): void {
           if (d.ranged) rangedCount += 1;
           else meleeCount += 1;
         }
+        if (q.unit && UNITS[q.unit]?.naval) hasNaval = true;
       }
       if (q?.kind === 'settler') settlerQueued = true;
     }
@@ -1567,6 +1598,20 @@ export function rivalPhase(state: GameState): void {
         unitCount += 1;
         if (wantRanged) rangedCount += 1;
         else meleeCount += 1;
+      } else if (
+        // #45/B-6 SCRIPTED GALLEY POLICY (the minimal in-gate naval lever): a
+        // civ with SAILING and a naval-capable city (coastal center or a
+        // completed Harbor) builds exactly ONE GALLEY when it owns zero naval
+        // units — priority JUST BELOW the military floor (above projects, so it
+        // only diverts otherwise-idle production). The galley then joins the
+        // patrol walker at peace (water steps) and hostileUnitAct at war.
+        !hasNaval &&
+        rival.research.techs.includes('SAILING') &&
+        cityNavalCapable(state, rc)
+      ) {
+        rc.queue.push({ kind: 'unit', unit: 'GALLEY', progress: 0 });
+        unitCount += 1;
+        hasNaval = true;
       } else {
         // AUDIT A-14: army capped, nothing else queueable — run the first
         // project whose district is COMPLETE (PROJECTS data order),
@@ -1903,7 +1948,10 @@ export function rivalPhase(state: GameState): void {
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
           // B-29 + B-7 support (the pcstk mirror; attacker is the city — no flanking).
-          const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
+          // #45/B-6: an embarked target defends at the flat EMBARKED_DEFENSE_CS.
+          const defCS = defender.embarked
+            ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
           const atkCS = rivalCityDefense(state, rival, rc);
           defender.hp -= damageRoll(state, atkCS - defCS, 'rcstk', bestTile);
           if (defender.hp <= 0) disbandUnit(state, defender.id);
