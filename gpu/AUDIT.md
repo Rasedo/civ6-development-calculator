@@ -31,8 +31,8 @@ stage that moves an item.
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **180** | **114.7** | **64%** |
-| Open chapters only (A+B) | 125 | 59.7 | **48%** |
+| **Overall (incl. closed)** | **180** | **115.3** | **64%** |
+| Open chapters only (A+B) | 125 | 60.3 | **48%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -51,8 +51,8 @@ Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
   closed the card wiring), A-9 4, A-11 4 (done — A-12b closed the CS
   residual; the GPU player-route note rides A-18/#50),
-  A-12 4 (75% — stage 3b-1: CS routes/capacity live; attack/capture
-  remains), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
+  A-12 4 (90% — 3b-2 landed attack/capture; levy + quests are recorded
+  deferrals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 / B-29 2 (done);
@@ -163,13 +163,18 @@ untagged halves of tagged items stay Fable/main-session work.
   rival test. Gate-reachable (probe: 6/8 seeds meet, envoys to 9).
   Stage 3b-1 (2026-07-18, 34ddb51): rival→CS trade routes + the
   suzerain trade-capacity term are LIVE both engines (see A-11).
-  REMAINING 25%: rival-seat CS attack/capture (`meleeAttack`
-  `csTarget` is player-gated; `_capture_city_state` seat-0 — the
-  join-the-suzerain's-war designed shape: an AT-WAR rival may attack
-  a CS whose suzerain is the player, capture landing the CS as an rc
-  via a rival `_capture_city_state` twin), rival levy (verb exists
-  player-only), rival CS quests (needs per-civ quest RNG — draw-count
-  risk, deliberately deferred).
+  Stage 3b-2 (2026-07-18, 68ef7d5): JOIN-THE-SUZERAIN'S-WAR is live —
+  an AT-WAR rival MELEE unit attacks an adjacent CS whose suzerain is
+  the player (attackTargets csWar / the war-act's strict-isSuzerain
+  plane), the csty/cstyc pair at the player block's exact position,
+  conquest lands the CS as an rc (`captureCityStateForRival` /
+  `_capture_city_state_rival` — transfer-style last-alive+1 append,
+  ring re-tag to the A-17 registry, maxCities raze, route pruning).
+  PROVEN IN-GATE: seed 9131's reference run contains a real rival CS
+  conquest (it exposed the exporter's live-roster t0 dump — now
+  snapshotted pre-run). REMAINING 10% (recorded deferrals): rival
+  levy (verb exists player-only), rival CS quests (needs per-civ
+  quest RNG — draw-count risk, deliberately deferred).
 - A-17. RESOLVED (2026-07-18, task #41): rival territory gained a
   per-city tile registry (TS `Tile.rivalCityId` / GPU `rc_tile_id`,
   persistent-rc-id keyed), fixing per-city border adjacency and exact
