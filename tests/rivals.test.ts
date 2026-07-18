@@ -248,6 +248,15 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     wonderTile.rivalId = rival.id;
     wonderTile.rivalCityId = rc.id;
     rc.wonders.push({ id: 'PYRAMIDS', tileIndex: wonderTile.index });
+    // An INCOMPLETE district must NOT carry (stays paved-but-dead): a carried
+    // incomplete Holy Site would let availableBuildings offer a Shrine the GPU
+    // (district-complete gated) never could — seed 9235.
+    const holyTile = ring[2];
+    holyTile.district = 'HOLY_SITE';
+    holyTile.districtComplete = false;
+    holyTile.rivalId = rival.id;
+    holyTile.rivalCityId = rc.id;
+    rc.districts.push({ type: 'HOLY_SITE', tileIndex: holyTile.index });
     // PALACE must never transfer; MARKET + ANCIENT_WALLS are kept.
     rc.buildings.push('PALACE', 'MARKET', 'ANCIENT_WALLS');
 
@@ -255,8 +264,10 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
 
     const taken = state.cities.find((c) => c.centerIndex === center.index)!;
     expect(taken).toBeDefined();
-    // districts kept (live, re-owned): CITY_CENTER + CAMPUS.
+    // districts kept (live, re-owned): CITY_CENTER + CAMPUS. The incomplete
+    // HOLY_SITE is dropped (paved-but-dead), not carried.
     expect(taken.districts.map((d) => d.type).sort()).toEqual(['CAMPUS', 'CITY_CENTER']);
+    expect(taken.districts.map((d) => d.type)).not.toContain('HOLY_SITE');
     // buildings kept minus PALACE.
     expect(taken.buildings).not.toContain('PALACE');
     expect(taken.buildings).toContain('MARKET');
