@@ -109,6 +109,8 @@ import {
   GOLD_PURCHASE_MULT,
   LUXURY_AMENITY_CITIES,
   GAME_SPEED,
+  EMBARK_MOVES,
+  embarkState,
 } from '../src/data/constants';
 
 // The GPU improvement index space (tile.improvement values, build codes 13-15).
@@ -650,6 +652,15 @@ const rules = {
     unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
     campClearReward: 50,
     dmgBase: Array.from({ length: 1201 }, (_, i) => 30 * Math.exp((0.04 * (i - 600)) / 10)),
+    // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1
+    // ships it INERT), and the embark/ocean tech gates (index into rules techs;
+    // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs
+    // CARTOGRAPHY). The GPU mirrors these exactly.
+    embarkMoves: EMBARK_MOVES,
+    embarkLive: embarkState.live ? 1 : 0,
+    sailingTech: techIdx.get('SAILING') ?? -1,
+    shipbuildingTech: techIdx.get('SHIPBUILDING') ?? -1,
+    cartographyTech: techIdx.get('CARTOGRAPHY') ?? -1,
   },
   // The trainable roster (mirrors trainableUnits + UNITS data). `civilian`
   // marks builder-type units (charges) — they hold the civilian stacking
@@ -667,6 +678,9 @@ const rules = {
     rangedRange: u.ranged?.range ?? 0,
     // AUDIT A-8: full MP per turn — the rival walkers' budget.
     moves: u.moves,
+    // #45/B-6: NAVAL unit (lives on water, never embarks). All-false for the
+    // current land-only roster — N2 adds GALLEY/QUADRIREME.
+    naval: u.naval ? 1 : 0,
   })),
   // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
   // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a
@@ -981,8 +995,15 @@ for (let s = 0; s < N_SEEDS; s++) {
       rid: t.resource ? RESOURCE_IDS.indexOf(t.resource) : -1,
       des: t.terrain === 'DESERT' ? 1 : 0,
       wok: BUILT_WONDER_LIST.reduce((m2, w, i) => m2 | (wonderStaticOk(w, t, map) ? 1 << i : 0), 0),
-      // land units may stand here (mirrors unitPassable)
+      // land units may stand here (mirrors unitPassable land plane)
       pass: unitPassable(t) ? 1 : 0,
+      // #45/B-6: WATER passability plane — a water tile that is not impassable
+      // (mirrors unitPassable for a naval unit / an embarked land unit, terrain
+      // layer only). Tech gating (embark-capability, OCEAN needing CARTOGRAPHY)
+      // is composed in the engine at the war-march gather site.
+      wpass: isWater(t) && !isImpassable(t) ? 1 : 0,
+      // #45/B-6: OCEAN tile — needs CARTOGRAPHY to enter (COAST/LAKE ungated).
+      ocean: t.terrain === 'OCEAN' ? 1 : 0,
       work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)
       // Luxury amenity source (mirrors luxuryAmenities): the luxury's catalog
       // index + the improvement index that activates it (-9 = its improvement

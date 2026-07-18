@@ -329,6 +329,7 @@ _MUTABLE = [
     "rng_state", "city_hp", "outer_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef", "tmove",
     "p_acted", "u_acted", "v_acted",
     "p_fortify", "u_fortify", "v_fortify",  # B-5 FORTIFY (military; cap 2)
+    "p_emb", "v_emb",  # #45/B-6 EMBARK: a land unit is on water (bool per slot)
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # B-25 (Round B3): space-race chain progress
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
@@ -394,6 +395,15 @@ class BatchSim:
         self.wonder_near = torch.tensor([[t.get("wnear", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)  # A-3: isCoastalLand (rc coastalCity eurekas)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # #45/B-6: the WATER passability plane (a water tile that is not
+        # impassable). Static terrain layer — tech gating (embark-capability +
+        # OCEAN needing CARTOGRAPHY) is composed at the war-march gather site.
+        # Defaults to 0 for pre-N1 fixtures (no water movement).
+        self.wpass = torch.tensor([[t.get("wpass", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # #45/B-6: OCEAN tiles need CARTOGRAPHY to enter (COAST/LAKE do not).
+        # Static per-tile flag; the CARTOGRAPHY gate is applied per-mover.
+        self.ocean_tile = torch.tensor([[t.get("ocean", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+
         # C1-B1: citizen-workability (= !isImpassable — water IS workable,
         # unlike unit passability). Defaults to `pass` for pre-B1 fixtures.
         self.work_ok = torch.tensor([[t.get("work", t["pass"]) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -642,6 +652,7 @@ class BatchSim:
         self.v_tile = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.v_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.v_fortify = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
+        self.v_emb = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # #45/B-6: embarked (rival units)
         self.v_next = torch.zeros(B, dtype=torch.long, device=device)
         self.rv_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # rival-unit slot at tile
         # C1-B5a: rival CIVILIAN occupancy (slot at tile; civ via v_civ) and
@@ -1217,6 +1228,7 @@ class BatchSim:
         self.p_tile = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
         self.p_hp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
         self.p_fortify = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
+        self.p_emb = torch.zeros(B, P_MAX, dtype=torch.bool, device=device)  # #45/B-6: embarked (player units)
         self.p_next = torch.zeros(B, dtype=torch.long, device=device)
         self.warrior_trained = torch.zeros(B, C, dtype=torch.bool, device=device)  # scripted-policy flag
         self.builder_trained = torch.zeros(B, dtype=torch.bool, device=device)  # scripted-policy flag (capital, once)
@@ -1232,6 +1244,16 @@ class BatchSim:
         # is float64 and damage rounds to integers the TS engine must match.
         self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 1201), dtype=torch.float64, device=device)  # B-29: 0.1-granular exp table
         self._unit_combat = torch.tensor(cb.get("unitCombat", [20, 25]), dtype=torch.long, device=device)
+        # #45/B-6 EMBARK: flat embarked MP, the LIVE war-march water-step master
+        # switch (N1 ships it INERT — mirrors TS embarkState.live; poke
+        # sim._embark_live=True to exercise the path), and the embark/ocean tech
+        # gate indices (military embarks on SHIPBUILDING, civilians on SAILING,
+        # OCEAN needs CARTOGRAPHY).
+        self._embark_moves = int(cb.get("embarkMoves", 2))
+        self._embark_live = bool(cb.get("embarkLive", 0))
+        self._sailing_tech = int(cb.get("sailingTech", -1))
+        self._shipbuilding_tech = int(cb.get("shipbuildingTech", -1))
+        self._cartography_tech = int(cb.get("cartographyTech", -1))
         # Trainable roster tables (index = position in rules.units).
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
@@ -1243,6 +1265,11 @@ class BatchSim:
         self._p_rng_str = torch.tensor([u.get("rangedStrength", 0) for u in ru], dtype=torch.long, device=device)  # V-R: 0 = melee-only
         self._p_rng_rng = torch.tensor([u.get("rangedRange", 0) for u in ru], dtype=torch.long, device=device)  # A-6: strike range
         self._p_moves = torch.tensor([u.get("moves", 2) for u in ru], dtype=torch.long, device=device)  # A-8: full MP per turn
+        # #45/B-6: NAVAL unit flag per roster index (all-false for the current
+        # land-only roster; N2 adds GALLEY/QUADRIREME). A naval mover stands on
+        # water natively; an embarked LAND mover stands on water via the embark
+        # gate. Read at the war-march passability composition.
+        self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
         self._p_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
         self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
@@ -3427,6 +3454,7 @@ class BatchSim:
         self.p_tile[rows, slot] = spot[rows]
         self.p_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.p_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
+        self.p_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.p_charges[rows, slot] = self._p_charges[type_idx[rows]]
         civ_rows = civ[rows]
         mil_rows = rows[~civ_rows]
@@ -4312,6 +4340,7 @@ class BatchSim:
                 self.p_hp[kr, nslot] = cap_hp
                 self.p_charges[kr, nslot] = cap_ch
                 self.p_fortify[kr, nslot] = 0  # B-5: a civilian never fortifies
+                self.p_emb[kr, nslot] = False  # #45/B-6: no embarked captures in N1 (N2: inherit v_emb)
                 self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.pciv_at[kr, ct] = nslot
                 self.p_next[kr] += 1
@@ -5174,6 +5203,7 @@ class BatchSim:
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.v_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
+        self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
@@ -5566,6 +5596,7 @@ class BatchSim:
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.v_fortify[rows, slot] = 0  # B-5: civilian never fortifies; keep the (reclaimed) slot clean
+        self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = self._p_charges[self._builder_idx]
         self.rvciv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
@@ -6894,6 +6925,7 @@ class BatchSim:
                 self.v_hp[rows, nslot] = cap_hp
                 self.v_charges[rows, nslot] = cap_ch
                 self.v_fortify[rows, nslot] = 0  # B-5: a civilian never fortifies
+                self.v_emb[rows, nslot] = False  # #45/B-6: no embarked captures in N1 (N2: inherit p_emb)
                 self.v_acted[rows, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.rvciv_at[rows, ct] = nslot
                 self.v_next[rows] += 1
@@ -7164,26 +7196,61 @@ class BatchSim:
         # default "any unit blocks" — an at-war rival MILITARY unit must be able to stack onto
         # its OWN-civ civilian (Civ 6 cross-domain), matching TS tileFreeForUnit; else it detours.
         arange6 = torch.arange(6, device=dev)
-        full_mp = self._p_moves[vt0]
         aw = self.r_atwar.gather(1, self.v_civ[:, v].clamp(min=0).unsqueeze(1)).squeeze(1)  # B-3: player-mil ZOC only at war
+        # #45/B-6 EMBARK: the ONLY walker whose passability changes v1 — a land
+        # unit may take WATER steps (embark) when `_embark_live`. INERT by
+        # default (mirrors TS embarkState.live) so the gates are byte-identical.
+        emb0 = self.v_emb[:, v]
+        if self._embark_live:
+            # embarked land units march on the flat EMBARK_MOVES pool.
+            full_mp = torch.where(emb0, torch.full_like(self._p_moves[vt0], self._embark_moves), self._p_moves[vt0])
+            bidx_e = torch.arange(B, device=dev)
+            civ_r = self.v_civ[:, v].clamp(min=0)
+            can_emb = (  # military embarks on SHIPBUILDING (tech of the unit's civ)
+                self.r_techs[bidx_e, civ_r, self._shipbuilding_tech]
+                if self._shipbuilding_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+            )
+            cart = (  # OCEAN needs CARTOGRAPHY; COAST/LAKE do not
+                self.r_techs[bidx_e, civ_r, self._cartography_tech]
+                if self._cartography_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+            )
+            is_naval = self.unit_naval[vt0]  # all-false current roster (N2 ships hulls)
+        else:
+            full_mp = self._p_moves[vt0]
         mp = full_mp.clone()
         cur = here.clone()
         d_cur = d_here.clone()
+        emb = emb0.clone()
         moving = march & has_tgt
         while bool(moving.any()):
             nb2 = self.neigh[cur.clamp(min=0)]
             nb2c = nb2.clamp(min=0)
-            step_ok = (nb2 >= 0) & self.passable.gather(1, nb2c) & ~self._blocked_for(nb2, "rmil", civ=self.v_civ[:, v].unsqueeze(1))
+            if self._embark_live:
+                land_ok = self.passable.gather(1, nb2c)
+                water_gate = self.wpass.gather(1, nb2c) & (~self.ocean_tile.gather(1, nb2c) | cart.unsqueeze(1))
+                # naval movers stand on water natively; land movers embark with SHIPBUILDING
+                terr = torch.where(is_naval.unsqueeze(1), water_gate, land_ok | (water_gate & can_emb.unsqueeze(1)))
+            else:
+                terr = self.passable.gather(1, nb2c)
+            step_ok = (nb2 >= 0) & terr & ~self._blocked_for(nb2, "rmil", civ=self.v_civ[:, v].unsqueeze(1))
             d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)
             skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
             best = skey.min(dim=1).values
             dir_i = (best % 8).clamp(max=5)
             dest = nb2.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-            cost = (
+            land_cost = (
                 1
                 + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
                 + 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
             )
+            if self._embark_live:
+                # embark/disembark (a LAND unit crossing land↔water) costs ALL
+                # remaining MP; a water→water step enters at 1 (no river charge).
+                to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
+                transition = (emb != to_water) & ~is_naval
+                cost = torch.where(transition, mp, torch.where(to_water, torch.ones_like(land_cost), land_cost))
+            else:
+                cost = land_cost
             # A-8: an improvement target is walked ONTO (pillage reads the
             # tile underfoot); a CITY target stops the march adjacent —
             # enemy centers can't be entered (real Civ 6), and a unit
@@ -7204,12 +7271,16 @@ class BatchSim:
             self.v_acted[rows, v] = True  # P4/D-2
             self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
             mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
+            if self._embark_live:
+                emb = torch.where(mv, to_water & ~is_naval, emb)  # embarked ⟺ on a water tile
             # B-3 ZOC: a march step ending adjacent to a hostile military unit
             # halts (movesLeft:=0 after paying the enter cost above).
             mp = torch.where(mv & self._in_enemy_zoc(dest, aw), torch.zeros_like(mp), mp)
             d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
+        if self._embark_live:
+            self.v_emb[:, v] = emb  # persist embark state across turns
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
@@ -9042,9 +9113,9 @@ class BatchSim:
         if prefix == "u":
             fields, counter, maps = ["u_acted", "u_type", "u_tile", "u_hp", "u_fortify"], "next_slot", ["barb_at"]
         elif prefix == "v":
-            fields, counter, maps = ["v_acted", "v_civ", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify"], "v_next", ["rv_at", "rvciv_at"]
+            fields, counter, maps = ["v_acted", "v_civ", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify", "v_emb"], "v_next", ["rv_at", "rvciv_at"]
         else:
-            fields, counter, maps = ["p_acted", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify"], "p_next", ["pmil_at", "pciv_at"]
+            fields, counter, maps = ["p_acted", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify", "p_emb"], "p_next", ["pmil_at", "pciv_at"]
         alive = getattr(self, f"{prefix}_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept

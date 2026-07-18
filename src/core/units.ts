@@ -10,7 +10,7 @@ import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
 import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
-import { GAME_SPEED } from '../data/constants';
+import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
@@ -26,13 +26,66 @@ export { nextRandom } from './rand';
 // Movement
 // ---------------------------------------------------------------------------
 
-/** Can a land unit ever stand on this tile? */
-export function unitPassable(tile: Tile): boolean {
-  return !isWater(tile) && !isImpassable(tile);
+/**
+ * #45/B-6: the unit-aware TERRAIN passability plane. A NAVAL unit stands on
+ * water; a LAND unit (or a legacy no-unit call) stands on land; impassable
+ * (mountains, ice, impassable wonders) blocks everyone. This is only the
+ * terrain layer — tech gating (a land unit EMBARKING onto water, and OCEAN
+ * needing CARTOGRAPHY) is composed by the caller through `tileFreeForUnit`
+ * (it needs the owner's research), mirroring the GPU where `passable`/`wpass`
+ * are terrain planes and the gate is applied at the gather site.
+ */
+export function unitPassable(tile: Tile, unit?: { type: string }): boolean {
+  if (isImpassable(tile)) return false;
+  const naval = unit ? !!UNITS[unit.type]?.naval : false;
+  return naval ? isWater(tile) : !isWater(tile);
 }
 
-/** Civ 6-ish movement cost to ENTER a tile (river handled separately). */
+/** The owner's completed techs for a unit (player → state.research; rival →
+ * its own ResearchState; barbarians have none). */
+function ownerTechs(state: GameState, unit: { owner: Unit['owner']; civId?: number }): string[] {
+  if (unit.owner === 'player') return state.research.techs;
+  if (unit.owner === 'rival') return state.rivals.find((r) => r.id === unit.civId)?.research.techs ?? [];
+  return [];
+}
+
+/** #45/B-6: does a unit's OWNER have a tech (the embark/ocean gate reads this). */
+export function ownerHasTech(
+  state: GameState,
+  unit: { owner: Unit['owner']; civId?: number },
+  tech: string,
+): boolean {
+  return ownerTechs(state, unit).includes(tech);
+}
+
+/** #45/B-6: can this LAND unit embark? Its OWNER needs SAILING (civilians) or
+ * SHIPBUILDING (all land units incl. military). Naval units never "embark". */
+export function canEmbark(
+  state: GameState,
+  unit: { type: string; owner: Unit['owner']; civId?: number },
+): boolean {
+  if (UNITS[unit.type]?.naval) return false;
+  const tech = unitDomain(unit.type) === 'civilian' ? 'SAILING' : 'SHIPBUILDING';
+  return ownerHasTech(state, unit, tech);
+}
+
+/** #45/B-6: may a mover (naval or embarking land unit) ENTER this water tile
+ * given its owner's tech? OCEAN needs CARTOGRAPHY; COAST/LAKE do not. Assumes
+ * the tile is water and not impassable (the terrain plane already checked). */
+export function waterEnterable(
+  state: GameState,
+  tile: Tile,
+  unit: { owner: Unit['owner']; civId?: number },
+): boolean {
+  if (tile.terrain === 'OCEAN') return ownerHasTech(state, unit, 'CARTOGRAPHY');
+  return true;
+}
+
+/** Civ 6-ish movement cost to ENTER a tile (river handled separately).
+ * #45/B-6: water tiles enter at a flat 1 (embarked/naval movement — no
+ * hills/features on water). Land tiles keep the terrain schedule. */
 export function moveCostInto(tile: Tile): number {
+  if (isWater(tile)) return 1;
   let cost = 1;
   if (tile.elevation === 'HILLS') cost += 1;
   if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST' || tile.feature === 'MARSH') cost += 1;
@@ -99,7 +152,10 @@ export function inEnemyZoc(
   const tile = state.map.tiles[tileIndex];
   for (const n of neighbors(state.map, tile)) {
     for (const u of unitsAt(state, n.index)) {
-      if (unitDomain(u.type) === 'military' && unitsHostile(state, u, mover)) return true;
+      // #45/B-6: EMBARKED units do NOT exert a zone of control (they still
+      // OBEY — the mover's halt rule below is unchanged). Naval military exert
+      // normally (no naval units yet, so that half is inert).
+      if (unitDomain(u.type) === 'military' && !u.embarked && unitsHostile(state, u, mover)) return true;
     }
   }
   return false;
@@ -111,14 +167,32 @@ export function fortifyBonus(unit: { fortifyTurns?: number }): number {
   return Math.min(2, unit.fortifyTurns ?? 0) * 3;
 }
 
-/** Stacking: 1 military + 1 civilian per side; other sides block entirely. */
+/** Stacking: 1 military + 1 civilian per side; other sides block entirely.
+ * #45/B-6: passability is composed here (it needs the owner's tech). A NAVAL
+ * unit needs an enterable water tile; a LAND unit needs land, OR — when
+ * `allowEmbark` (the war-march v1 surface) and its owner can embark — an
+ * enterable water tile. Every non-war-march caller leaves `allowEmbark` false,
+ * so land units stay land-only there (inert). */
 export function tileFreeForUnit(
   state: GameState,
   tileIndex: number,
   unit?: Unit | { type: string; owner: Unit['owner']; civId?: number; id?: number },
+  allowEmbark = false,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
-  if (!unitPassable(tile)) return false;
+  if (isImpassable(tile)) return false;
+  const naval = unit ? !!UNITS[unit.type]?.naval : false;
+  if (isWater(tile)) {
+    // Water tile: a naval unit (native) or an embark-capable land unit only.
+    if (naval) {
+      if (!unit || !waterEnterable(state, tile, unit)) return false;
+    } else {
+      if (!allowEmbark || !unit || !canEmbark(state, unit) || !waterEnterable(state, tile, unit)) return false;
+    }
+  } else {
+    // Land tile: naval units cannot stand ashore; land units use the land plane.
+    if (naval) return false;
+  }
   const side = unit ? unitSide(unit) : 'player';
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
@@ -184,25 +258,40 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   return null;
 }
 
-/** Walk a unit along its stored path while its MP cover each step. */
+/** Walk a unit along its stored path while its MP cover each step.
+ * #45/B-6: embark/disembark (a land unit stepping between land and water) sets/
+ * clears `unit.embarked` and costs ALL remaining MP; embarked movement uses the
+ * flat EMBARK_MOVES pool. In N1 findPath never routes a LAND unit through water
+ * (unitPassable is land-only for them) so this is inert here and exercised only
+ * by the war-march; it is left correct for naval/embark movers that N2 adds. */
 export function walkPath(state: GameState, unit: Unit): void {
-  const full = UNITS[unit.type]?.moves ?? 2;
   while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
     const nextIndex = unit.path[0];
     const from = state.map.tiles[unit.tileIndex];
     const to = state.map.tiles[nextIndex];
+    const naval = !!UNITS[unit.type]?.naval;
+    // The MP pool the "always take one step at full MP" rule compares against:
+    // an embarked land unit uses EMBARK_MOVES (naval units keep their own moves).
+    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     // Enemy-occupied tiles block; the final step also needs a free slot.
     const blockedByEnemy = unitsAt(state, nextIndex).some((u) => u.owner !== unit.owner);
     if (blockedByEnemy || (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit))) {
       unit.path = null;
       return;
     }
+    // Embark/disembark = a land unit crossing the land/water boundary. It costs
+    // ALL remaining MP (real Civ 6). Naval units never transition.
+    const transition = !naval && isWater(from) !== isWater(to);
     // P4/D-3+D-4 (real Civ 6): entering costs the tile's full cost, +3 for
     // a river crossing, and needs that much MP left — except a unit at full
     // MP may always take one step (paying everything it has). No more
-    // Civ-5-style "enter on fumes", no river-zeroing.
-    const cost = moveCostInto(to) + (crossesRiver(from, to) ? 3 : 0);
+    // Civ-5-style "enter on fumes", no river-zeroing. A transition consumes
+    // everything (cost = movesLeft); water steps never pay river.
+    const cost = transition
+      ? unit.movesLeft
+      : moveCostInto(to) + (isWater(to) ? 0 : crossesRiver(from, to) ? 3 : 0);
     if (unit.movesLeft < cost && unit.movesLeft < full) return; // path resumes next turn
+    if (transition) unit.embarked = isWater(to);
     unit.tileIndex = nextIndex;
     unit.path.shift();
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
@@ -355,7 +444,11 @@ export function unitMaintenance(state: GameState): number {
 export function refreshUnits(state: GameState): void {
   for (const unit of state.units) {
     const tile = state.map.tiles[unit.tileIndex];
-    const full = UNITS[unit.type]?.moves ?? 2;
+    // #45/B-6: an EMBARKED land unit refreshes to the flat EMBARK_MOVES pool
+    // (naval units keep their own moves). The heal/fortify "spent no MP" gate
+    // below reads this same `full`.
+    const naval = !!UNITS[unit.type]?.naval;
+    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     // P4/D-2 (real Civ 6, unifies AUDIT C-7/C-8): a unit heals only if it
     // spent NO movement since its last refresh (the heal runs before the
     // reset below, so any move/attack/build blocks it) — +20 in a friendly
@@ -383,7 +476,10 @@ export function refreshUnits(state: GameState): void {
     // no MP since the last refresh). A military unit that stayed put digs in
     // (+1, cap 2); any move/attack (movesLeft < full) resets it. Symmetric
     // across owners; read movesLeft BEFORE the reset below.
-    if (unitDomain(unit.type) === 'military') {
+    // #45/B-6: NAVAL units never fortify (real Civ 6) — inert until N2 adds
+    // ships. (Embarked land units are still military but march every turn, so
+    // their fortify gate resets to 0 in practice.)
+    if (unitDomain(unit.type) === 'military' && !naval) {
       unit.fortifyTurns = unit.movesLeft >= full ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
     }
     unit.movesLeft = full;

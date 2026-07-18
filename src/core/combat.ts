@@ -18,7 +18,6 @@ import {
   nextRandom,
   unitsAt,
   unitDomain,
-  unitPassable,
   tileFreeForUnit,
   spawnUnit,
   disbandUnit,
@@ -29,6 +28,7 @@ import {
   moveCostInto,
   crossesRiver,
 } from './units';
+import { EMBARK_MOVES, embarkState } from '../data/constants';
 import { revealAround } from './fog';
 import { transferCityToRival } from './rivals';
 import type { RuleResult } from './rules';
@@ -108,6 +108,7 @@ function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defe
     for (const u of unitsAt(state, t.index)) {
       if (u.id === attacker.id) continue;
       if (unitDomain(u.type) !== 'military') continue;
+      if (u.embarked) continue; // #45/B-6: embarked units flank for nobody
       if (unitsHostile(state, u, defender)) n++;
     }
   }
@@ -122,6 +123,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
   for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
     for (const u of unitsAt(state, t.index)) {
       if (unitDomain(u.type) !== 'military') continue;
+      if (u.embarked) continue; // #45/B-6: embarked units support nobody
       if (u.owner === defender.owner && u.civId === defender.civId) n++;
     }
   }
@@ -839,11 +841,22 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // target, moves only if strictly closer, and pays walkPath's exact charge
   // (tile cost + 3 per river crossing; a full-MP unit always affords its first
   // step). Any step spends MP (movesLeft < full → the D-2 heal is blocked).
-  const full = UNITS[unit.type]?.moves ?? 2;
+  // #45/B-6 EMBARK: the war-march is the ONLY v1 surface where a scripted mover
+  // may take WATER steps. tileFreeForUnit(..., allowEmbark) composes the embark
+  // gate (an at-war rival MILITARY unit whose owner has SHIPBUILDING — canEmbark)
+  // and the ocean gate (CARTOGRAPHY). Barbarians own no tech, so canEmbark is
+  // false for them and the shared walker stays land-only. `embarkState.live` is
+  // the N1 master switch (default false → land-only, gates byte-identical); N2
+  // flips it true with the embarked-combat + peace-act package.
+  const allowEmbark = embarkState.live;
   for (;;) {
     const at = tile();
+    // Embarked land units march on the flat EMBARK_MOVES pool; naval movers (N2)
+    // keep their own moves.
+    const naval = !!UNITS[unit.type]?.naval;
+    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     const step = neighbors(map, at)
-      .filter((n) => unitPassable(n) && tileFreeForUnit(state, n.index, unit))
+      .filter((n) => tileFreeForUnit(state, n.index, unit, allowEmbark))
       .sort(
         (a, b) =>
           hexDistance(a.col, a.row, target!.col, target!.row) -
@@ -853,8 +866,14 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     if (!step || stepD >= hexDistance(at.col, at.row, target.col, target.row) || (!marchOnto && stepD < 1)) {
       return;
     }
-    const cost = moveCostInto(step) + (crossesRiver(at, step) ? 3 : 0);
+    // Embark/disembark (a LAND unit crossing land↔water) costs ALL remaining MP;
+    // water steps enter at 1 and never pay a river charge.
+    const transition = !naval && isWater(at) !== isWater(step);
+    const cost = transition
+      ? unit.movesLeft
+      : moveCostInto(step) + (isWater(step) ? 0 : crossesRiver(at, step) ? 3 : 0);
     if (unit.movesLeft < cost && unit.movesLeft < full) return;
+    if (transition) unit.embarked = isWater(step);
     unit.tileIndex = step.index;
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3): rivals clear camps (barb no-op)
