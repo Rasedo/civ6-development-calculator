@@ -1,5 +1,7 @@
 # ROUND B3 — four small parallel slices (U/V/W/X)
 
+> _Archived 2026-07-18 — completed round brief (shipped fe601f0). Landing detail lives in the still-live `gpu/ROUND_B3_LOG.md`; remaining open items tracked in `gpu/AUDIT.md`._
+
 2026-07-18. Owner direction: "continue with smaller changes in parallel
 of 3-4". Fourth proven parallel-worktree round (after combat e7ba22a,
 ROUND B2 33199dc, A-5r+#47r 77c7831). Base sha: the commit that adds

@@ -1,5 +1,7 @@
 # Round B2 — economy/policies + religion/GP + trees/victories/meta (#46/#47/#48)
 
+> _Archived 2026-07-18 — completed round brief (shipped 33199dc). Degradation ledger lives in the still-live `gpu/ROUND_B2_LOG.md`; superseded by later rounds tracked in `gpu/AUDIT.md`._
+
 Owner-ordered 2026-07-17. Three parallel worktree agents (Opus), disjoint
 slices, merged into one gate-serialized stage (the e7ba22a pattern).
 Owner rulings baked in:

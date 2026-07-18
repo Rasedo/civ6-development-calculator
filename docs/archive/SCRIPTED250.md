@@ -1,5 +1,7 @@
 # #56 scripted-250t — survival heuristics + horizon flip (design note)
 
+> _Archived 2026-07-18 — design note for #56, shipped 609e311. Kept for the reasoning record; live status in `gpu/BUILD_PLAN.md` / `gpu/AUDIT.md`._
+
 Owner-decided 2026-07-17 (heuristics, NOT a net-driven export — see task
 #56). Goal: all 24 scripted seeds alive and non-degenerate at t250, so
 the late-game content Round B2 landed (space race, late GP rungs, war
