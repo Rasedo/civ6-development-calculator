@@ -13,6 +13,8 @@ import {
   cityNavalCapable,
   trainableUnits,
   queueUnit,
+  orderMove,
+  walkPath,
 } from '../src/core/units';
 import { hostileUnitAct, meleeAttack, defenderCS } from '../src/core/combat';
 import { neighbors } from '../src/core/hex';
@@ -342,5 +344,59 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const res = meleeAttack(state, galley.id, rcCenter.index);
     expect(res.ok).toBe(true);
     expect(rc.hp).toBeLessThan(before); // the ship battered the coastal city
+  });
+
+  it('a PLAYER galley MOVES across water (findPath naval) then attacks a coastal city', () => {
+    // The GPU RL/controlled head cannot order a ship's water move yet (that is
+    // the #50 residual — its move-apply reads the land plane); TS findPath/
+    // walkPath ARE naval-aware, so the player-naval MOVE end-to-end lives here.
+    const state = makeState(makeMap(14, 12, 'COAST')); // all-water map
+    state.unitsMode = true;
+    const rival = bareRival(state);
+    const rcCenter = tileAtCoords(state.map, 9, 5);
+    rcCenter.terrain = 'GRASSLAND';
+    rcCenter.rivalId = rival.id;
+    const rc: RivalCity = {
+      id: 0,
+      name: 'Kart-Hadasht',
+      civId: 1,
+      centerIndex: rcCenter.index,
+      population: 5,
+      foodBox: 0,
+      cultureBox: 0,
+      tilesAcquired: 0,
+      lockedTiles: [],
+      focus: 'balanced',
+      queue: [],
+      isCapital: true,
+      buildings: [],
+      districts: [{ type: 'CITY_CENTER', tileIndex: rcCenter.index }],
+      wonders: [],
+      specialists: {},
+      hp: 200,
+      foundedTurn: 1,
+    };
+    rival.cities.push(rc);
+    // spawn the galley on OPEN WATER several tiles from the city
+    const galley = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 4, 5).index, 'player')!;
+    expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true);
+    const startIdx = galley.tileIndex;
+    const waterAdj = neighbors(state.map, rcCenter).find((n) => isWater(n))!;
+    // order the sea move; walk it home over a few turns' MP (naval routing)
+    const mv = orderMove(state, galley.id, waterAdj.index);
+    expect(mv.ok).toBe(true);
+    expect(galley.tileIndex).not.toBe(startIdx); // the ship actually sailed
+    for (let t = 0; t < 8 && galley.tileIndex !== waterAdj.index; t++) {
+      galley.movesLeft = 3; // GALLEY moves
+      walkPath(state, galley);
+    }
+    expect(galley.tileIndex).toBe(waterAdj.index);
+    expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true); // arrived, still afloat
+    expect(galley.embarked).toBeFalsy(); // a naval unit is never embarked
+    // and it batters the coastal city from the sea it just crossed
+    const before = rc.hp;
+    const atk = meleeAttack(state, galley.id, rcCenter.index);
+    expect(atk.ok).toBe(true);
+    expect(rc.hp).toBeLessThan(before);
   });
 });
