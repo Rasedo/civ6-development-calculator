@@ -12,7 +12,7 @@ import {
 import { canFoundCity } from '../src/core/rules';
 import { tilesWithin, hexDistance } from '../src/core/hex';
 import { rivalPhase, declareWar, sueForPeace, rivalUnits, rivalCityYields } from '../src/core/rivals';
-import { meleeAttack, attackTargets, captureCityState } from '../src/core/combat';
+import { meleeAttack, attackTargets, captureCityState, captureRivalCity } from '../src/core/combat';
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeRaidedAt } from '../src/core/trade';
 import { spawnUnit, unitsHostile } from '../src/core/units';
 import { gpCost } from '../src/data/greatPeople';
@@ -224,6 +224,104 @@ describe('war and peace', () => {
     const r = meleeAttack(state, attacker.id, rc.centerIndex);
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/peace/i);
+  });
+});
+
+describe('AUDIT B-30: conquest keeps infrastructure', () => {
+  it('captureRivalCity carries districts + buildings + wonders MINUS PALACE, walls at outerHp 0', () => {
+    const state = makeState();
+    state.unitsMode = true;
+    const rival = addRival(state, 8, 8, { atWar: true, warTurns: 10 });
+    const rc = rival.cities[0];
+    const center = state.map.tiles[rc.centerIndex];
+    const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);
+    // A completed CAMPUS on one ring tile, a completed wonder on another.
+    const campusTile = ring[0];
+    campusTile.district = 'CAMPUS';
+    campusTile.districtComplete = true;
+    campusTile.rivalId = rival.id;
+    campusTile.rivalCityId = rc.id;
+    rc.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
+    const wonderTile = ring[1];
+    wonderTile.builtWonder = 'PYRAMIDS';
+    wonderTile.builtWonderComplete = true;
+    wonderTile.rivalId = rival.id;
+    wonderTile.rivalCityId = rc.id;
+    rc.wonders.push({ id: 'PYRAMIDS', tileIndex: wonderTile.index });
+    // An INCOMPLETE district must NOT carry (stays paved-but-dead): a carried
+    // incomplete Holy Site would let availableBuildings offer a Shrine the GPU
+    // (district-complete gated) never could — seed 9235.
+    const holyTile = ring[2];
+    holyTile.district = 'HOLY_SITE';
+    holyTile.districtComplete = false;
+    holyTile.rivalId = rival.id;
+    holyTile.rivalCityId = rc.id;
+    rc.districts.push({ type: 'HOLY_SITE', tileIndex: holyTile.index });
+    // PALACE must never transfer; MARKET + ANCIENT_WALLS are kept.
+    rc.buildings.push('PALACE', 'MARKET', 'ANCIENT_WALLS');
+
+    captureRivalCity(state, rival, rc, true);
+
+    const taken = state.cities.find((c) => c.centerIndex === center.index)!;
+    expect(taken).toBeDefined();
+    // districts kept (live, re-owned): CITY_CENTER + CAMPUS. The incomplete
+    // HOLY_SITE is dropped (paved-but-dead), not carried.
+    expect(taken.districts.map((d) => d.type).sort()).toEqual(['CAMPUS', 'CITY_CENTER']);
+    expect(taken.districts.map((d) => d.type)).not.toContain('HOLY_SITE');
+    // buildings kept minus PALACE.
+    expect(taken.buildings).not.toContain('PALACE');
+    expect(taken.buildings).toContain('MARKET');
+    expect(taken.buildings).toContain('ANCIENT_WALLS');
+    // wonders kept.
+    expect(taken.wonders.map((w) => w.id)).toContain('PYRAMIDS');
+    // ANCIENT_WALLS kept but outer pool reset to 0 (heals via B-1).
+    expect(taken.outerHp).toBe(0);
+    // the district/wonder tiles re-own to the new city and stay paved.
+    expect(state.map.tiles[campusTile.index].cityId).toBe(taken.id);
+    expect(state.map.tiles[campusTile.index].district).toBe('CAMPUS');
+    expect(state.map.tiles[wonderTile.index].builtWonderComplete).toBe(true);
+  });
+
+  it('a full empire RAZES instead of keeping infrastructure (scorched earth unchanged)', () => {
+    const state = makeState();
+    state.unitsMode = true;
+    // Six player cities → the capture slot cap razes (captureRivalCity early-return).
+    for (let i = 0; i < 6; i++) {
+      state.cities.push({
+        id: state.nextCityId++,
+        name: `P${i}`,
+        centerIndex: 20 + i,
+        population: 1,
+        foodBox: 0,
+        cultureBox: 0,
+        tilesAcquired: 0,
+        lockedTiles: [],
+        focus: 'balanced',
+        queue: [],
+        isCapital: i === 0,
+        buildings: [],
+        districts: [{ type: 'CITY_CENTER', tileIndex: 20 + i }],
+        wonders: [],
+        specialists: {},
+      });
+    }
+    const rival = addRival(state, 8, 8, { atWar: true, warTurns: 10 });
+    const rc = rival.cities[0];
+    const center = state.map.tiles[rc.centerIndex];
+    const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);
+    ring[0].district = 'CAMPUS';
+    ring[0].districtComplete = true;
+    ring[0].rivalId = rival.id;
+    ring[0].rivalCityId = rc.id;
+    rc.districts.push({ type: 'CAMPUS', tileIndex: ring[0].index });
+    rc.buildings.push('MARKET');
+
+    const before = state.cities.length;
+    captureRivalCity(state, rival, rc, true);
+    // razed: no new city added, center unpaved (scorched earth).
+    expect(state.cities.length).toBe(before);
+    expect(state.map.tiles[center.index].district).toBeNull();
+    expect(state.map.tiles[center.index].cityId).toBe(-1);
   });
 });
 

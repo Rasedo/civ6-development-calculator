@@ -7,7 +7,7 @@
  * captured. All randomness flows through the in-state RNG.
  */
 
-import type { City, CityState, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit } from './types';
+import type { City, CityState, DistrictId, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
@@ -663,7 +663,28 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     }
   }
   center.cityId = id;
-  state.cities.push({
+  // AUDIT B-30: conquest keeps infrastructure. The captured city carries its
+  // districts (live, re-owned) and its buildings MINUS PALACE (never transfers)
+  // and wonders. ANCIENT_WALLS is kept but its outer pool resets to 0 (it heals
+  // back via B-1, and the new owner gains the B-2 walls strike once it stands).
+  // The captured city's districts are DERIVED from the tiles that re-owned to
+  // it (complete districts only), NOT copied from the rival's districts array —
+  // a rival's .districts/tile registries can be inconsistent (rcId4 held
+  // HOLY_SITE@891 while tile 891's registry pointed at rcId3; a re-owned tile's
+  // complete district may be absent from the captured city's own array). This
+  // mirrors the GPU twin exactly, which derives player districts from re-owned
+  // tile ownership + district_complete liveness. INCOMPLETE captured districts
+  // stay paved-but-dead (as pre-B-30): TS availableBuildings keys on a district
+  // merely being PRESENT, so a carried incomplete Holy Site would let TS queue a
+  // Shrine the GPU (district-complete gated) never could (seed 9235).
+  const keptDistricts: { type: DistrictId; tileIndex: number }[] = [];
+  for (const t of state.map.tiles) {
+    if (t.cityId === id && t.district !== null && t.districtComplete) {
+      keptDistricts.push({ type: t.district, tileIndex: t.index });
+    }
+  }
+  const keptBuildings = city.buildings.filter((b) => b !== 'PALACE');
+  const captured: City = {
     id,
     name: city.name,
     centerIndex: city.centerIndex,
@@ -675,11 +696,13 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     focus: 'balanced',
     queue: [],
     isCapital: false,
-    buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: city.centerIndex }],
-    wonders: [],
+    buildings: keptBuildings,
+    districts: keptDistricts,
+    wonders: city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === id).map((w) => ({ ...w })),
     specialists: {},
-  });
+  };
+  if (keptBuildings.includes('ANCIENT_WALLS')) captured.outerHp = 0; // B-30: walls kept, outer pool 0
+  state.cities.push(captured);
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, city.centerIndex, 3);
   if (plunder) {

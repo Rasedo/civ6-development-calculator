@@ -3879,6 +3879,11 @@ class BatchSim:
         for i in range(len(rows)):
             b = int(rows[i]); r = int(civ[i]); j = int(slot[i]); c_t = int(ctr[i])
             pop = max(1, (int(self.rc_pop[b, r, j]) * 3) // 4)
+            # AUDIT B-30: conquest keeps infrastructure — snapshot the rival
+            # city's buildings BEFORE the rc-slot hygiene wipes them, so the
+            # new PLAYER city can inherit them (minus PALACE, which is not in
+            # this catalog — it is the is_cap/city-0 implicit building).
+            kept_bldg = self.rc_bldg[b, r, j, :].clone()
             # the rival city dies either way — and its registries die with
             # it (TS removes the City object; a stale rc_dist_tile otherwise
             # leaks into rNDist and the D-8 counts: seed 9131 t196, 9 vs 7)
@@ -3934,11 +3939,16 @@ class BatchSim:
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
             self.owner[b, c_t] = c_new
-            # P5/S1 gate-catch (seed 9131 rng 2026006110 t196): captured
-            # districts are DEAD — TS's new city registers only CITY_CENTER,
-            # so their adjacency yields/upkeep must not follow the territory.
-            dead_ring = ring & (self.district[b] >= 0)
-            dead_ring[c_t] = False  # the center IS the new city's live CITY_CENTER
+            # AUDIT B-30: conquest KEEPS the captured city's COMPLETE districts
+            # (the tiles are re-owned to c_new above and their district/complete
+            # planes are untouched, so completed districts become LIVE player
+            # districts; captured wonders ride the shared built_wonder planes).
+            # INCOMPLETE captured districts stay paved-but-dead (the P5/S1
+            # district_dead marking, now scoped to ~district_complete): TS drops
+            # them from the new city's districts array, and the GPU must exclude
+            # them from one-per-type/yields/availability the same way (seed 9235).
+            dead_ring = ring & (self.district[b] >= 0) & ~self.district_complete[b]
+            dead_ring[c_t] = False  # the center is the new city's live CITY_CENTER
             self.district_dead[b] = self.district_dead[b] | dead_ring
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
@@ -3952,8 +3962,13 @@ class BatchSim:
             self.cur_cost[b, c_new] = 0.0
             self.q_dtile[b, c_new] = -1
             self.warrior_trained[b, c_new] = False
-            self.buildings[b, c_new] = False
-            self.outer_hp[b, c_new] = 0  # AUDIT B-1: captured city starts with no walls (buildings wiped)
+            # AUDIT B-30: inherit the rival city's buildings (index spaces
+            # match — rc_bldg and buildings both key on the b_cost catalog,
+            # PALACE excluded from it). ANCIENT_WALLS rides along; its outer
+            # pool stays 0 (walls kept at outerHp 0, heal back via B-1 since
+            # the B-1 heal gate reads the walls bit in this plane).
+            self.buildings[b, c_new] = kept_bldg
+            self.outer_hp[b, c_new] = 0  # AUDIT B-30: walls (if any) kept at outer pool 0
             self.water_housing[b, c_new] = float(self.tile_wh[b, c_t])
             self.river_center[b, c_new] = bool(self.tile_river[b, c_t])
             self.dist[b, c_new] = self.pair_dist[c_t].to(self.dist.dtype)
@@ -6432,6 +6447,13 @@ class BatchSim:
         c_t = int(self.rc_center[b, r_from, j])
         old_pop = int(self.rc_pop[b, r_from, j])
         old_acq = int(self.rc_acquired[b, r_from, j])
+        # AUDIT B-30: conquest keeps infrastructure — snapshot the flipping
+        # city's district/wonder/building registries BEFORE the loser-slot
+        # hygiene wipes them; the tiles do not move, so the registry indices
+        # stay valid for the receiving slot.
+        b30_dist = self.rc_dist_tile[b, r_from, j, :].clone()
+        b30_wond = self.rc_wonder[b, r_from, j, :].clone()
+        b30_bldg = self.rc_bldg[b, r_from, j, :].clone()
         self.rc_alive[b, r_from, j] = False
         self.rc_is_cap[b, r_from, j] = False  # P7-FULL: identity dies with the slot
         self.rc_dist_tile[b, r_from, j, :] = -1
@@ -6471,10 +6493,14 @@ class BatchSim:
         self.rc_progress[b, r_to, slot] = 0
         self.rc_cost[b, r_to, slot] = 0
         self.rc_qtile[b, r_to, slot] = -1
-        self.rc_dist_tile[b, r_to, slot, :] = -1
-        self.rc_wonder[b, r_to, slot, :] = -1
-        self.rc_bldg[b, r_to, slot, :] = False
-        self.rc_outer_hp[b, r_to, slot] = 0  # AUDIT B-1: transferred city starts wall-less
+        # AUDIT B-30: adopt the flipping city's districts, wonders and
+        # buildings (registry indices carried verbatim — the tiles stay put).
+        # ANCIENT_WALLS rides along; the outer pool resets to 0 (walls kept at
+        # outerHp 0, heal back via B-1 — the heal gate reads rc_bldg's walls bit).
+        self.rc_dist_tile[b, r_to, slot, :] = b30_dist
+        self.rc_wonder[b, r_to, slot, :] = b30_wond
+        self.rc_bldg[b, r_to, slot, :] = b30_bldg
+        self.rc_outer_hp[b, r_to, slot] = 0  # AUDIT B-30: walls (if any) kept at outer pool 0
         self.rc_id[b, r_to, slot] = int(self.r_next_city_id[b, r_to])
         self.r_next_city_id[b, r_to] += 1
         self.rvcity_at[b, c_t] = r_to
@@ -8838,6 +8864,15 @@ class BatchSim:
         self.pop[b, c] = 0
         self.current[b, c] = -1
         owned = self.owner[b] == c
+        # AUDIT B-30: snapshot the transferring city's COMPLETE placeable-district
+        # and wonder tiles from the LIVE owner mask (CITY_CENTER is never in the
+        # district plane, so it is excluded) plus its buildings row, BEFORE the
+        # owner mask is cleared below. Conquest keeps this infrastructure; only
+        # COMPLETE districts carry (incomplete = paved-but-dead), matching the TS
+        # twin's district_complete filter.
+        b30_dist_t = (owned & (self.district[b] >= 0) & self.district_complete[b]).nonzero(as_tuple=True)[0]
+        b30_wond_t = (owned & (self.built_wonder[b] >= 0)).nonzero(as_tuple=True)[0]
+        b30_bldg = self.buildings[b, c, :].clone()
         if conquest and int(self.rc_alive[b, w_].sum()) >= int(self.rules.rivals.get("maxCities", 6)):
             s_t = int(self.site[b, c])
             self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
@@ -8872,9 +8907,21 @@ class BatchSim:
         self.rc_progress[b, w_, slot] = 0.0
         self.rc_cost[b, w_, slot] = 0.0
         self.rc_qtile[b, w_, slot] = -1
-        self.rc_dist_tile[b, w_, slot, :] = -1  # flipped districts are NOT adopted (paved-but-dead)
-        self.rc_wonder[b, w_, slot, :] = -1  # A-4: nor wonders (the tile keeps builtWonderComplete, orphaned)
-        self.rc_bldg[b, w_, slot, :] = False  # nor buildings
+        # AUDIT B-30: conquest keeps infrastructure. Adopt the transferring
+        # city's districts (registry keyed by placeable-district type -> tile),
+        # wonders (keyed by wonder index -> tile), and buildings (index space
+        # matches — buildings and rc_bldg both key on the b_cost catalog, which
+        # excludes PALACE). ANCIENT_WALLS rides along; the outer pool stays 0
+        # (walls kept at outerHp 0, heal back via B-1 — the rival heal gate
+        # reads the walls bit in rc_bldg).
+        self.rc_dist_tile[b, w_, slot, :] = -1
+        for _t in b30_dist_t.tolist():
+            self.rc_dist_tile[b, w_, slot, int(self.district[b, _t])] = _t
+        self.rc_wonder[b, w_, slot, :] = -1
+        for _t in b30_wond_t.tolist():
+            self.rc_wonder[b, w_, slot, int(self.built_wonder[b, _t])] = _t
+        self.rc_bldg[b, w_, slot, :] = b30_bldg
+        self.rc_outer_hp[b, w_, slot] = 0  # AUDIT B-30: walls (if any) kept at outer pool 0
         self.r_next_city_id[b, w_] += 1
         self.rvcity_at[b, self.site[b, c]] = w_
         return True
