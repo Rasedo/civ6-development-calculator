@@ -227,3 +227,30 @@ Verification bar for every one of these: the battery IS the gate (never chain a
 green gate then the battery). P1/P3/P4 need gate-equivalence only (values
 identical); P2/P5 additionally need the ±2 milli-unit drift re-checked because
 they change batch shape / association.
+
+---
+
+## Stage-0 baselines (2026-07-18, quiet box — gpu/PERF_PLAN.md execution)
+
+Committed drivers: `gpu/profile_step.py` (both parts, OMP/MKL=4, cProfile) and
+`scripts/perf-rivals.ts` (TS headless, 3 seeds × 250t). These reproduce the
+throwaway-driver numbers above almost exactly (70.1 vs 71.3s; 104.7 vs 104.5s),
+so per-stage before/after deltas are attributable.
+
+- **parity part**: 70.1s / 250t (3.6 t/s). `step` 63.3s cum (90.3%),
+  `_rival_phase` 48.3s (68.9%), `_rival_city_yields` 18.1s,
+  `_belief_feat_plane` 3.1s, `_rival_route_income` 2.5s, `_gov_policy_mods`
+  2.4s, `_bel_add` 1.7s (28.7k calls). Guard storm: `Tensor.any` 449,421
+  calls / 2.62s.
+- **rollout part**: 104.7s / 250t (2.4 t/s). `step` 94.3s cum (90.1%),
+  `_rival_phase` 56.5s (53.9%), `_rival_city_yields` 20.5s,
+  `_apply_unit_actions` 18.3s cum / **12.5s tottime**. `Tensor.any` 721,448
+  calls / 4.25s.
+- **TS `perf-rivals.ts`**: 286 t/s total (232 / 316 / 334 on seeds
+  9001/9014/9029; one-city passive player, rivals grow to 5–9 cities). The
+  plan's ~840 t/s guess is superseded by this measured baseline.
+- **Measurement (d) RESOLVED**: `mcts_test.py --part search` under cProfile
+  (166s tottime): `step()` = **96.8%** of the run cum, `_rival_phase` 61.4%,
+  `search_production` glue ~0, `snapshot/restore` ~0. Tree overhead is
+  negligible — engine cuts propagate ~1:1 to the mcts lanes; no
+  mcts-specific perf work is warranted.
