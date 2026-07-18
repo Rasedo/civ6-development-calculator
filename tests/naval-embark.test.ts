@@ -43,7 +43,7 @@ function addWarRival(state: GameState, col: number, row: number, techs: string[]
   // the PLAYER city, so no rival city geometry is needed here.
   state.rivals.push(rival);
   const tile = tileAtCoords(state.map, col, row);
-  const unit = spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id)!;
+  spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id)!;
   return rival;
 }
 
@@ -97,7 +97,7 @@ describe('#45/B-6 movement primitives', () => {
   it('embarked units do NOT exert ZOC (they still obey)', () => {
     const state = makeState(makeMap(12, 12));
     state.unitsMode = true;
-    const rival = addWarRival(state, 5, 5, []);
+    addWarRival(state, 5, 5, []);
     const exerter = state.units.find((u) => u.owner === 'rival')!;
     const player: Unit = { id: 999, type: 'WARRIOR', owner: 'player', tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2, hp: 100, charges: null, path: null };
     // the mover is the player; a hostile rival military adjacent exerts ZOC
@@ -132,7 +132,7 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
     const cityTile = tileAtCoords(state.map, 10, 5);
     cityTile.terrain = 'GRASSLAND';
     foundCity(state, cityTile.index);
-    const rival = addWarRival(state, 3, 5, techs);
+    addWarRival(state, 3, 5, techs);
     const unit = state.units.find((u) => u.owner === 'rival')!;
     return { state, unit };
   }
