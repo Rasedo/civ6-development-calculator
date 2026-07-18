@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 39 | 17.5 | **45%** |
-| B fidelity | 88 | 47.8 | **54%** |
+| B fidelity | 88 | 55.8 | **63%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **182** | **122.3** | **67%** |
-| Open chapters only (A+B) | 127 | 65.3 | **51%** |
+| **Overall (incl. closed)** | **182** | **130.3** | **72%** |
+| Open chapters only (A+B) | 127 | 73.3 | **58%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -48,7 +48,9 @@ Stage 3a: A-12 → 50% — per-civ envoys/influence/greedy assignment,
 rival envoy bonuses, strict suzerain contest; CS verbs = stage 3b.
 2026-07-18 ROUND B4 Y/AA/Z/AB (brief gpu/ROUND_B4.md): B-7, B-30,
 B-31, B-32 all RESOLVED; new A-24 w2 = rival district/tile registry
-consistency latent, split from slice AB's hunt.)
+consistency latent, split from slice AB's hunt. 2026-07-18 #45
+NAVAL: B-6 RESOLVED — serial N1/N2/N3 off gpu/NAVAL_DESIGN.md, ONE
+end-of-task battery incl. the new `naval` poke lane.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -59,10 +61,10 @@ Per-item weights (done% in parens where partial):
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan), A-24 2 (new — split from B-30: rival
   district/tile registry consistency).
-- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-7 2 / B-28 1 / B-29 2 /
-  B-30 2 / B-31 1 / B-32 2 (done);
+- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-6 8 / B-7 2 / B-28 1 /
+  B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
   B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%); B-4 3,
-  B-6 8, B-8 2, B-9 3, B-10 3 (open).
+  B-8 2, B-9 3, B-10 3 (open).
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
@@ -299,10 +301,25 @@ gap; likewise GS disasters are modeled minus sea-level rise
   accrues on the no-MP-spent gate, reset by move/attack, +3/+6 CS to
   the defender at every roll site both engines; symmetric, snapshot-
   and `_reclaim_pool`-safe.
-- B-6. No embarkation/naval anything: `unitPassable` (core/units.ts) is
-  `!isWater && !isImpassable` — water is a wall; `UNITS` has zero naval
-  entries. Island starts are unreachable, Harbor cities can't be
-  threatened from sea.
+- B-6. RESOLVED (2026-07-18, task #45, serial N1→N2→N3 off
+  gpu/NAVAL_DESIGN.md): embarkation + naval units both engines.
+  `unitPassable` is unit-aware (naval on water; embarked land units on
+  water — SAILING civilians / SHIPBUILDING all, CARTOGRAPHY oceans;
+  embark/disembark cost all MP, `EMBARK_MOVES` 2); GALLEY + QUADRIREME
+  (`UnitDef.naval`), coastal-or-Harbor production gate on all three
+  surfaces, scripted rival galley policy + war-march/patrol water
+  steps (in-gate: galleys 7/24 seeds, embark 7/24), embarked defense
+  flat `EMBARKED_DEFENSE_CS` 10 (no attack/fortify/flank/support),
+  embarked civilians captured per B-31 pool-end. GPU: `wpass`/
+  `p_emb`/`v_emb` planes, `_embark_live` mirrored switch. Poke suite
+  `gpu/naval_test.py` (battery `naval` lane) covers the
+  gate-unreachable: player naval, city/CS capture from sea,
+  quadrireme, ocean gate, walls-vs-ships. N2's hunt fixed a TS
+  embarked-MP-reset bug and a GPU `r_routes` capacity latent.
+  RESIDUALS: player scripted/RL naval + controlled-head water moves
+  (#50 — the GPU RL move verb still reads the land plane); scripted
+  settler/builder embark (own gated stage); naval barbs (B-26);
+  Frigate+ hulls (B-10); Great Admiral (B-8); naval trade (B-23).
 - B-7. RESOLVED (2026-07-18, ROUND B4 slice Y): `FLANKING_CS`/
   `SUPPORT_CS` (+2 per adjacent ally) at unit-vs-unit rolls — flanking
   on melee (`meleeAttack`), support on melee + ranged defense
