@@ -5901,6 +5901,8 @@ class BatchSim:
         type, -1 = none), return [..., NB] bool = building b is dark because its
         district is COMPLETE-but-PILLAGED. CITY_CENTER buildings (_b_req_district
         == -1) never gate. Mirrors TS pillagedDistrictTypes over rc.buildings."""
+        if not self.districts_on or dt_reg.shape[-1] == 0:
+            return torch.zeros(*dt_reg.shape[:-1], self.NB, dtype=torch.bool, device=self.device)
         B0 = dt_reg.shape[0]
         flat = dt_reg.clamp(min=0).reshape(B0, -1)
         comp = self.district_complete.gather(1, flat).reshape_as(dt_reg)

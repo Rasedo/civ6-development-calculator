@@ -24,6 +24,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         builtWonder: null,
         builtWonderComplete: false,
         pillaged: false,
+        districtPillaged: false,
         goodyHut: false,
         volcano: false,
         fertility: 0,
