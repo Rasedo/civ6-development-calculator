@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeState, tileAtCoords } from './helpers';
+import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
   createGame,
   foundCity,
@@ -429,5 +429,55 @@ describe('rival CS trade routes (A-12b)', () => {
     expect(rc.population).toBe(2); // 3 × 0.75 floored
     expect(state.map.tiles[cs.centerIndex].rivalId).toBe(rival.id);
     expect(state.map.tiles[cs.centerIndex].rivalCityId).toBe(rc.id);
+  });
+});
+
+describe('B-31 civilian capture', () => {
+  it('a player melee captures a lone at-war rival civilian (charges kept, no advance)', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    foundCity(state, tileAtCoords(state.map, 9, 9).index);
+    const rival = addRival(state, 16, 16, { atWar: true });
+    const atkTile = tileAtCoords(state.map, 11, 9);
+    const defTile = tileAtCoords(state.map, 12, 9);
+    const atk = spawnUnit(state, 'WARRIOR', atkTile.index)!;
+    atk.tileIndex = atkTile.index;
+    const builder = spawnUnit(state, 'BUILDER', defTile.index, 'rival', rival.id)!;
+    builder.tileIndex = defTile.index;
+    const charges = builder.charges;
+    expect(charges).toBeGreaterThan(0);
+
+    expect(meleeAttack(state, atk.id, defTile.index).ok).toBe(true);
+
+    // Captured: SAME unit id, now player-owned, still on its tile, charges kept.
+    const cap = state.units.find((u) => u.id === builder.id);
+    expect(cap).toBeDefined();
+    expect(cap!.owner).toBe('player');
+    expect(cap!.civId).toBeUndefined();
+    expect(cap!.tileIndex).toBe(defTile.index);
+    expect(cap!.charges).toBe(charges);
+    expect(cap!.movesLeft).toBe(0);
+    // The attacker spent its attack and did NOT advance (single-occupancy).
+    expect(atk.tileIndex).toBe(atkTile.index);
+    expect(atk.movesLeft).toBe(0);
+  });
+
+  it('a barbarian still KILLS a lone civilian (no prisoner system)', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    foundCity(state, tileAtCoords(state.map, 9, 9).index);
+    const atkTile = tileAtCoords(state.map, 11, 9);
+    const defTile = tileAtCoords(state.map, 12, 9);
+    const barb = spawnUnit(state, 'WARRIOR', atkTile.index, 'barbarian')!;
+    barb.tileIndex = atkTile.index;
+    const builder = spawnUnit(state, 'BUILDER', defTile.index)!; // a player civilian
+    builder.tileIndex = defTile.index;
+
+    expect(meleeAttack(state, barb.id, defTile.index).ok).toBe(true);
+
+    // Killed, not captured — and the barbarian advances into the emptied tile.
+    expect(state.units.some((u) => u.id === builder.id)).toBe(false);
+    expect(barb.tileIndex).toBe(defTile.index);
+    expect(barb.owner).toBe('barbarian');
   });
 });

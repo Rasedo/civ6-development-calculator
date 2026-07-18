@@ -4166,18 +4166,33 @@ class BatchSim:
             # besieged the city (2 extra draws + the city's counter).
             civk = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & rvc_ok & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
             if bool(civk.any()):
+                # AUDIT B-31: a player melee on a lone rival civilian CAPTURES
+                # it — roll-free (draw-count neutral), the attacker spends its
+                # attack but does NOT advance (single-occupancy model). Pool
+                # TRANSFER: despawn from the rival v_* pool, append to the
+                # player p_* pool in spawn order (last-alive+1) with hp and
+                # charges carried; movesLeft=0 -> p_acted so the D-2 heal skips
+                # it this turn, exactly like TS's defender.movesLeft = 0.
                 kr = civk.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[kr]
+                ct = tc[kr]
+                cap_type = self.v_type[kr, ks]
+                cap_hp = self.v_hp[kr, ks]
+                cap_ch = self.v_charges[kr, ks]
                 self.v_alive[kr, ks] = False
-                self.rvciv_at[kr, tc[kr]] = -1
+                self.rvciv_at[kr, ct] = -1
+                nslot = self.p_next[kr]
+                assert int(nslot.max()) < P_MAX, "player slot pool exhausted — raise P_MAX"
+                self.p_alive[kr, nslot] = True
+                self.p_type[kr, nslot] = cap_type
+                self.p_tile[kr, nslot] = ct
+                self.p_hp[kr, nslot] = cap_hp
+                self.p_charges[kr, nslot] = cap_ch
+                self.p_fortify[kr, nslot] = 0  # B-5: a civilian never fortifies
+                self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
+                self.pciv_at[kr, ct] = nslot
+                self.p_next[kr] += 1
                 self.p_acted[:, p] = self.p_acted[:, p] | civk  # P4/D-2: TS meleeAttack spends MP
-                adv = civk & ~self._blocked_for(tgt.unsqueeze(1), "pmil").squeeze(1)
-                if bool(adv.any()):
-                    vr = adv.nonzero(as_tuple=True)[0]
-                    self.pmil_at[vr, here[vr]] = -1
-                    self.p_tile[vr, p] = tgt[vr]
-                    self.pmil_at[vr, tgt[vr]] = p
-                    self._clear_camp_at(adv, tgt)
             siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
@@ -6642,15 +6657,46 @@ class BatchSim:
         if bool(civ_att.any()):
             rows = civ_att.nonzero(as_tuple=True)[0]
             ds = dc_[rows]
-            self.pciv_at[rows, ttc[rows]] = -1
-            self.p_alive[rows, ds] = False
+            if atk_kind == "rival":
+                # AUDIT B-31: an at-war rival melee on a lone player civilian
+                # CAPTURES it — roll-free (draw-count neutral), no advance
+                # (single-occupancy). Pool TRANSFER p_* -> v_* in spawn order
+                # (last-alive+1), keyed to the attacker's civ, hp and charges
+                # carried; movesLeft=0 -> v_acted so the D-2 heal skips it,
+                # exactly like TS's defender.movesLeft = 0.
+                ct = ttc[rows]
+                cap_type = self.p_type[rows, ds]
+                cap_hp = self.p_hp[rows, ds]
+                cap_ch = self.p_charges[rows, ds]
+                self.pciv_at[rows, ct] = -1
+                self.p_alive[rows, ds] = False
+                nslot = self.v_next[rows]
+                assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
+                self.v_alive[rows, nslot] = True
+                self.v_civ[rows, nslot] = self.v_civ[rows, u]
+                self.v_type[rows, nslot] = cap_type
+                self.v_tile[rows, nslot] = ct
+                self.v_hp[rows, nslot] = cap_hp
+                self.v_charges[rows, nslot] = cap_ch
+                self.v_fortify[rows, nslot] = 0  # B-5: a civilian never fortifies
+                self.v_acted[rows, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
+                self.rvciv_at[rows, ct] = nslot
+                self.v_next[rows] += 1
+            else:
+                self.pciv_at[rows, ttc[rows]] = -1
+                self.p_alive[rows, ds] = False
         if bool(rvciv_att.any()):
-            # C1-B5b: a lone rival civilian dies the same roll-free death
+            # C1-B5b: a barbarian kills a lone rival civilian roll-free — no
+            # prisoner/camp system (B-31 capture is player/rival attackers
+            # only; rvciv_att is barb-only, dvc is -1 for a rival attacker).
             rows = rvciv_att.nonzero(as_tuple=True)[0]
             ds = dvc[rows]
             self.rvciv_at[rows, ttc[rows]] = -1
             self.v_alive[rows, ds] = False
-        kill_adv = civ_att | rvciv_att
+        # B-31: a captured civilian is NOT killed — its captor does NOT advance
+        # onto it. Only a barbarian kill (barb attacker) frees the tile for the
+        # advance; a rival captor (civ_att under atk_kind=="rival") stays put.
+        kill_adv = (civ_att | rvciv_att) if atk_kind == "barb" else torch.zeros_like(civ_att)
         if bool(kill_adv.any()):
             adv = kill_adv & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1)
             if bool(adv.any()):

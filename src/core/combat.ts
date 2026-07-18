@@ -252,8 +252,22 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
-    // Civilians are simply killed (Civ 6 captures; we don't model capture).
-    killUnit(state, defender);
+    // AUDIT B-31: a melee attack on a lone civilian CAPTURES it — no combat
+    // roll (draw-count neutral). Player and rival attackers flip the
+    // defender to their side in place (movesLeft=0, hp and charges kept,
+    // unit stays on its tile); the attacker spends its attack but does NOT
+    // advance (single-occupancy model). Barbarians still merely kill — no
+    // prisoner/camp system is modeled (recorded simplification).
+    if (attacker.owner === 'barbarian') {
+      killUnit(state, defender);
+    } else {
+      defender.owner = attacker.owner;
+      if (attacker.owner === 'rival') defender.civId = attacker.civId;
+      else delete defender.civId;
+      defender.movesLeft = 0;
+      attacker.movesLeft = 0;
+      return ok;
+    }
   } else {
     defender.hp -= damageRoll(state, atkCS - defCS, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCS - atkCS, 'melc', targetIndex);
