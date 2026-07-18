@@ -266,6 +266,16 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
       else delete defender.civId;
       defender.movesLeft = 0;
       attacker.movesLeft = 0;
+      // GPU parity: the batch engine transfers the captured unit to the END
+      // of the winning pool (append at next_slot). Mirror that here — splice
+      // it out of state.units and push it back — so both engines iterate the
+      // captured unit LAST in every array-order loop (rivalBuilderActions,
+      // the war loop, the builder walker). Flipping owner in place would keep
+      // the unit at its original PLAYER-spawn index, which the pooled GPU has
+      // no way to reproduce; the resulting order desync surfaces (dormant)
+      // when two same-civ builders contend for a job the same turn.
+      state.units = state.units.filter((u) => u.id !== defender.id);
+      state.units.push(defender);
       return ok;
     }
   } else {
