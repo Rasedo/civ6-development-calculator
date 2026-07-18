@@ -228,6 +228,14 @@ U_MAX = 256  # barbarian/rival unit slots per game (append-only; runtime-asserte
              # parity-core risk: unit-order-is-spec).
 P_MAX = 256  # player unit slots per game (append-only; runtime-asserted)
 
+# AUDIT B-7 flanking & support (mirrors combat.ts). A melee attacker gains +2 CS
+# per OTHER unit adjacent to the defender that is hostile to the defender
+# (flanking); a defender gains +2 CS per friendly MILITARY unit adjacent to it
+# (support), against melee AND ranged. Integer CS adds → the B-29 diff
+# quantization survives. Cities/CS/rc-cities are not units — no flanking there.
+FLANKING_CS = 2
+SUPPORT_CS = 2
+
 # --- one civ-id space (C1-A3, mirrors src/core/civs.ts) -----------------------
 # The player is civ 0; rival r (fixture array index == TS rival.id, asserted
 # at export) is civ r+1. City-states and barbarians stay outside the
@@ -3221,6 +3229,59 @@ class BatchSim:
         bits = (rm.unsqueeze(1) >> arange6) & 1  # [B, 6]
         return (bits * match.long()).sum(dim=1)  # 0 or 1
 
+    def _flank_support(
+        self,
+        def_tile: torch.Tensor,
+        def_side: torch.Tensor,
+        def_civ: torch.Tensor,
+        attacker_tile: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """B-7 (mirrors combat.ts flankCount/supportCount). For a UNIT defender
+        on def_tile [B], count the MILITARY units on the 6 adjacent tiles that
+        are hostile to (flanking) or friendly to (support) the defender.
+
+        def_side [B] long: 0 = player, 1 = barbarian, 2 = rival (civ index in
+        def_civ [B]). attacker_tile [B]: the tile of the melee attacker to
+        EXCLUDE from flanking (u != attacker); pass all -1 for a ranged/city
+        attacker (support-only sites — the returned flank is then unused).
+
+        Stacking blocks foreign units, so each tile holds at most ONE military
+        unit — each of the 6 neighbours contributes 0 or 1. Returns
+        (flank [B] long, support [B] long)."""
+        rcap = max(self.R - 1, 0)
+        nb = self.neigh[def_tile.clamp(min=0)]  # [B, 6]
+        nbc = nb.clamp(min=0)
+        on = nb >= 0
+        has_barb = (self.barb_at.gather(1, nbc) >= 0) & on
+        has_pmil = (self.pmil_at.gather(1, nbc) >= 0) & on
+        rvn = self.rv_at.gather(1, nbc)
+        has_rv = (rvn >= 0) & on
+        rv_civ_n = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=rcap)  # [B, 6]
+        # a rival military neighbour whose civ is at war with the player
+        rv_war_n = has_rv & self.r_atwar.gather(1, rv_civ_n)
+        dside = def_side.unsqueeze(1)  # [B, 1]
+        dciv = def_civ.clamp(min=0).clamp(max=rcap).unsqueeze(1)  # [B, 1]
+        is_pl = dside == 0
+        is_bb = dside == 1
+        is_rv = dside == 2
+        atwar_dc = self.r_atwar.gather(1, dciv)  # [B, 1] — the defender's rival civ at war
+        # hostile-to-defender military per neighbour (unitsHostile, u military)
+        hostile = (
+            (is_pl & (has_barb | rv_war_n))
+            | (is_bb & (has_pmil | has_rv))
+            | (is_rv & (has_barb | (has_pmil & atwar_dc)))
+        )
+        # exclude the attacker's own unit (the military at attacker_tile)
+        is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
+        hostile = hostile & ~is_atk
+        # friendly-to-defender military (same owner AND civId), u military
+        friendly = (
+            (is_pl & has_pmil)
+            | (is_bb & has_barb)
+            | (is_rv & has_rv & (rv_civ_n == dciv))
+        )
+        return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
+
     def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
         """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
         foreign unit blocks entirely; an own unit of the same domain blocks;
@@ -4201,6 +4262,13 @@ class BatchSim:
                 v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt)  # B-29 river
                 def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
+                # B-7: flanking helps the player attacker, support helps the
+                # defender (barb or at-war rival). Applied once so both paired
+                # rolls see the same adjusted CS.
+                _dside = torch.where(is_b, torch.ones_like(v_civ), torch.full_like(v_civ, 2))
+                _fl, _sp = self._flank_support(tgt, _dside, v_civ, here)
+                atk_e = atk_e + FLANKING_CS * _fl
+                def_e = def_e + SUPPORT_CS * _sp
                 d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
@@ -4253,6 +4321,10 @@ class BatchSim:
                 v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 atk_e = atk_rs - self._wound(self.p_hp[:, p])
                 def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
+                # B-7 support (no flanking: a ranged attacker takes no retaliation).
+                _dside = torch.where(is_b, torch.ones_like(v_civ), torch.full_like(v_civ, 2))
+                _, _sp = self._flank_support(tgt, _dside, v_civ, torch.full_like(tgt, -1))
+                def_e = def_e + SUPPORT_CS * _sp
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
@@ -4284,6 +4356,10 @@ class BatchSim:
                 civ_hp = self.v_hp.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
                 atk_e = atk_rs - self._wound(self.p_hp[:, p])
                 def_e = def_cs - self._wound(civ_hp)
+                # B-7 support: the lone rival civilian is aided by adjacent
+                # same-civ rival military (no flanking on a ranged strike).
+                _, _sp = self._flank_support(tgt, torch.full_like(tgt, 2), rvc_civ_t, torch.full_like(tgt, -1))
+                def_e = def_e + SUPPORT_CS * _sp
                 d_def = self._damage_roll(r_civ, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
@@ -4825,6 +4901,13 @@ class BatchSim:
                 # B-29: the defending unit is wounded (the attacker is the city).
                 def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_rmil, self.v_hp[bidx, m_slot.clamp(min=0)], self.v_hp[bidx, c_slot.clamp(min=0)]))
                 def_e = def_cs - self._wound(def_hp)
+                # B-7 support: the struck unit (barb, or an at-war rival
+                # military/civilian) gains support from adjacent same-side
+                # military; the attacker is the city (not a unit) — no flanking.
+                _dside = torch.where(is_barb, torch.ones(Bn, dtype=torch.long, device=dev2), torch.full((Bn,), 2, dtype=torch.long, device=dev2))
+                _dciv = torch.where(is_rmil, self.v_civ[bidx, m_slot.clamp(min=0)], self.v_civ[bidx, c_slot.clamp(min=0)])
+                _, _sp = self._flank_support(tt, _dside, _dciv, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
+                def_e = def_e + SUPPORT_CS * _sp
                 d = self._damage_roll(strike, atk_cs - def_e, k="pcstk", tile=tt)
                 rows = strike.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
@@ -6604,6 +6687,13 @@ class BatchSim:
             def_hp = torch.where(def_is_barb, d_hp_b, torch.where(def_is_rv, d_hp_v, d_hp_p))
             atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt)  # B-29 river
             def_e = def_cs - self._wound(def_hp)
+            # B-7: flanking helps the hostile attacker (barb/rival at `here`),
+            # support helps the defender (player, barb or rival).
+            _dside = torch.where(def_is_barb, torch.ones_like(dm), torch.where(def_is_rv, torch.full_like(dm, 2), torch.zeros_like(dm)))
+            _dciv = self.v_civ.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
+            _fl, _sp = self._flank_support(tgt, _dside, _dciv, here)
+            atk_e = atk_e + FLANKING_CS * _fl
+            def_e = def_e + SUPPORT_CS * _sp
             d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
@@ -7053,6 +7143,12 @@ class BatchSim:
             def_hp = torch.where(def_is_b, d_hp_b, torch.where(def_is_c, d_hp_c, d_hp_p))
             atk_e = atk_rs - self._wound(self.v_hp[:, v])
             def_e = def_cs - self._wound(def_hp)
+            # B-7 support: the defender (player military, barb, or the lone
+            # player civilian — all player-side units are aided by adjacent
+            # player military) gains support; no flanking (ranged, no retaliation).
+            _dside = torch.where(def_is_b, torch.ones_like(dm), torch.zeros_like(dm))
+            _, _sp = self._flank_support(tgt, _dside, torch.zeros_like(dm), torch.full_like(tgt, -1))
+            def_e = def_e + SUPPORT_CS * _sp
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             rows = unit_att.nonzero(as_tuple=True)[0]
             for grp, at_map, hp_t, alive_t, slot_t in (

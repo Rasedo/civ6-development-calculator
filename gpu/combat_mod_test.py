@@ -28,7 +28,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
-from civ6gpu.engine import P_MAX, js_round
+from civ6gpu.engine import P_MAX, js_round, FLANKING_CS, SUPPORT_CS
 
 HOLD = 12
 
@@ -168,11 +168,44 @@ def test_integrated(sim, p, code, name) -> None:
         sim.restore(snap)
         return ev
 
-    # reference (TS assembly): atk_e = combat - wound(64) - 5*river;
-    #                          def_e = combat + terrain + fortify - wound(88)
+    # B-7 flanking & support — an INDEPENDENT neighbour scan (mirrors combat.ts
+    # flankCount/supportCount): military units adjacent to the defender's tile
+    # that are hostile to (flank, +atk, attacker at `here` excluded) or friendly
+    # to (support, +def) the defender. Positions are static across the runs
+    # below (only HP and the river bit change), so count once.
+    def flank_support_ref():
+        rival_def = not is_barb
+        dciv = int(sim.v_civ[0, dslot]) if rival_def else -1
+        flank = support = 0
+        for dd in range(6):
+            nt = int(sim.neigh[tgt, dd])
+            if nt < 0:
+                continue
+            has_b = int(sim.barb_at[0, nt]) >= 0
+            has_pm = int(sim.pmil_at[0, nt]) >= 0
+            rvs = int(sim.rv_at[0, nt])
+            has_rv = rvs >= 0
+            rvc = int(sim.v_civ[0, rvs]) if has_rv else -1
+            if rival_def:
+                atwar = bool(sim.r_atwar[0, dciv])
+                hostile = has_b or (has_pm and atwar)
+                friendly = has_rv and rvc == dciv
+            else:  # barbarian defender: any non-barb military is hostile
+                hostile = has_pm or has_rv
+                friendly = has_b
+            if hostile and nt != here:  # exclude the attacker (player mil at here)
+                flank += 1
+            if friendly:
+                support += 1
+        return flank, support
+
+    b7_flank, b7_support = flank_support_ref()
+
+    # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank;
+    #                    def_e = combat + terrain + fortify - wound(88) + 2*support
     def ref_q(river):
-        atk_e = atk_combat - 10.0 * ((100.0 - ATK_HP) / 100.0) - (5.0 if river else 0.0)
-        def_e = def_combat + tdef + 3 * def_fort - 10.0 * ((100.0 - DEF_HP) / 100.0)
+        atk_e = atk_combat - 10.0 * ((100.0 - ATK_HP) / 100.0) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank
+        def_e = def_combat + tdef + 3 * def_fort - 10.0 * ((100.0 - DEF_HP) / 100.0) + SUPPORT_CS * b7_support
         return round((atk_e - def_e) * 10), round((def_e - atk_e) * 10)
 
     ev0 = run(False)
