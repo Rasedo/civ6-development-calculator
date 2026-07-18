@@ -29,10 +29,10 @@ stage that moves an item.
 | B fidelity | 88 | 40.8 | **46%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
-| E docs (E-16 with owner) | 6 | 5 | 83% |
+| E docs (closed) | 6 | 6 | 100% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **180** | **112.3** | **62%** |
-| Open chapters only (A+B+E) | 131 | 63.3 | **48%** |
+| **Overall (incl. closed)** | **180** | **113.3** | **63%** |
+| Open chapters only (A+B) | 125 | 58.3 | **47%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -64,7 +64,8 @@ Per-item weights (done% in parens where partial):
   B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
 - B meta: B-25 3 (70% — GPU sim poke-covered; player project path +
   other victories open); B-22 3, B-24 3, B-33 3 (open).
-- E: E-16 1 (open); the landed E-sweep counted as 5 done.
+- E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
+  archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G: G-1, G-2, G-3, G-4 — all done (chapter EMPTY).
 
 ---
@@ -469,7 +470,9 @@ coverage cells corrected (chops/harvests are the only TS-only
 remainder; player build heads stop at FARM/MINE/LUMBER_MILL), and a
 RETRO note re-scopes BUILD_PLAN VP-G1/G2's never-spend premise
 against shipped A-5/A-4/A-14. tsc clean. E-16 (AGENT_PROMPT.md
-refresh) stays with the owner. Original items kept for reference:
+refresh) RESOLVED 2026-07-18: the owner archived the file to
+docs/archive/ instead of refreshing it. Original items kept for
+reference:
 
 - E-19. RESOLVED (2026-07-13, task #51): `improvements.ts` header
   rewritten to current reality (9-improvement roster, real charges,

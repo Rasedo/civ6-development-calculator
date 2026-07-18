@@ -14,3 +14,4 @@ Archived 2026-07-18.
 | `ROUND_B3.md` | Brief for parallel round B3 (four small U/V/W/X slices) | Round shipped (fe601f0); brief is done. Live detail: `gpu/ROUND_B3_LOG.md`. |
 | `SCRIPTED250.md` | Design note for #56 scripted-250t survival heuristics + horizon flip | Shipped (609e311); design note superseded by `gpu/BUILD_PLAN.md`/`gpu/AUDIT.md`. |
 | `GV_DESIGN.md` | Design for victory conditions & the 250-turn horizon (GV arc) | GV arc complete and horizon flip shipped; file self-declares DONE. |
+| `AGENT_PROMPT.md` | Root operating/onboarding brief for engine-development sessions | Owner decision 2026-07-18 (closes AUDIT E-16): stale since 2026-07-11; the live process docs are `gpu/BUILD_PLAN.md` + `gpu/AUDIT.md` + the session skills. |
