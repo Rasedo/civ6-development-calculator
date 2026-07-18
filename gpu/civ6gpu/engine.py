@@ -4013,7 +4013,20 @@ class BatchSim:
         # per-slot any() check would run — a slot that dies in ALL games
         # mid-loop no-ops through the body (every mutation and every
         # _damage_roll sits under a mask ⊆ alive with its own any() guard).
-        p_live = self.p_alive[:, :p_high].any(dim=0).nonzero(as_tuple=True)[0].tolist() if p_high else []
+        # G2: additionally require a non-HOLD (12), valid (>=0) order in some
+        # game. A slot HOLD/invalid in EVERY game runs a fully masked no-op:
+        # every mutation mask (civk/siege/att/r_att/r_civ/cs_hit/r_sieg/r_cs/
+        # ok_c/bld/mv/ok) carries (a in 6..11)/(a==16)/(a in 13..15)/(a in 0..5)
+        # and is all-False; the single unconditional write (p_acted |= att|r_att)
+        # is |False; and every _damage_roll sits inside an if-any block keyed on
+        # one of those masks, so a HOLD unit draws no RNG — the skip is exact and
+        # draw-count-neutral.
+        if p_high:
+            live_any = self.p_alive[:, :p_high].any(dim=0)
+            ord_any = ((actions[:, :p_high] != 12) & (actions[:, :p_high] >= 0)).any(dim=0)
+            p_live = (live_any & ord_any).nonzero(as_tuple=True)[0].tolist()
+        else:
+            p_live = []
         for p in p_live:
             a = actions[:, p].to(torch.long)
             alive = self.p_alive[:, p]
