@@ -7,7 +7,7 @@
 import { addYields, emptyYields, type City, type GameState, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from './query';
-import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities } from './yields';
+import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
 import { cityTradeYields } from './trade';
@@ -133,7 +133,8 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
   const out = new Map<number, number>();
   for (const d of city.districts) {
     if (!SPECIALIST_YIELDS[d.type]) continue;
-    if (!state.map.tiles[d.tileIndex].districtComplete) continue;
+    const dt = state.map.tiles[d.tileIndex];
+    if (!dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged district has no working specialists
     const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type).length;
     if (slots > 0) out.set(d.tileIndex, slots);
   }
@@ -227,23 +228,29 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
       ? HOUSING_COASTAL
       : HOUSING_NO_WATER;
   const hasAqueduct = city.districts.some(
-    (d) => d.type === 'AQUEDUCT' && map.tiles[d.tileIndex].districtComplete,
+    (d) =>
+      d.type === 'AQUEDUCT' &&
+      map.tiles[d.tileIndex].districtComplete &&
+      !map.tiles[d.tileIndex].districtPillaged, // B-32: a pillaged Aqueduct gives no housing
   );
   if (hasAqueduct) {
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
   }
 
+  const pillaged = pillagedDistrictTypes(map, city.districts); // B-32
   let total = water;
   for (const d of city.districts) {
-    if (!map.tiles[d.tileIndex].districtComplete) continue;
+    const dt = map.tiles[d.tileIndex];
+    if (!dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged district's housing is dark
     if (d.type === 'NEIGHBORHOOD') {
-      total += appealTier(tileAppeal(map, map.tiles[d.tileIndex])).housing;
+      total += appealTier(tileAppeal(map, dt)).housing;
     } else {
       total += DISTRICTS[d.type].housing;
     }
   }
   for (const id of city.buildings) {
     const def = BUILDINGS[id];
+    if (def && pillaged.has(def.district)) continue; // B-32: buildings in a pillaged district are dark
     if (def?.housing) total += def.housing;
     const beliefHousing = m.buildingHousingAdd[id];
     if (beliefHousing) total += beliefHousing;
@@ -282,7 +289,7 @@ export function luxuryAmenities(state: GameState): Map<number, number> {
   // Need = amenities required minus what buildings already provide.
   const baseHave = new Map<number, number>();
   for (const c of state.cities) {
-    baseHave.set(c.id, localBuildingAmenities(c) + regionalEffects(state, c).amenities);
+    baseHave.set(c.id, localBuildingAmenities(state, c) + regionalEffects(state, c).amenities);
   }
 
   for (let i = 0; i < luxuries.size; i++) {
@@ -455,7 +462,7 @@ export function computeCityStats(
   // --- housing & amenities -----------------------------------------------------
   const housing = computeHousing(state, city, m);
   let have =
-    localBuildingAmenities(city) +
+    localBuildingAmenities(state, city) +
     regional.amenities +
     wonderRegionalAmenities(state, city) +
     m.amenitiesAll +

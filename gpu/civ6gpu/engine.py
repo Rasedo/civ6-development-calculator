@@ -356,6 +356,7 @@ _MUTABLE = [
     "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
+    "district_pillaged",  # B-32: raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
 ]
 
@@ -904,6 +905,12 @@ class BatchSim:
         # Paving/eligibility/cap consumers deliberately stay placement-based
         # (TS paves and caps on tile.district regardless of completeness).
         self.district_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
+        # AUDIT B-32: a COMPLETE, non-CITY_CENTER district raided into darkness —
+        # its adjacency/buildings/housing/amenities/GPP/CS-envoy channels stop
+        # until a builder repairs it (static counts stay: still owned). t0 world
+        # has none (inits zero). A tile plane (not slot-keyed), so snapshot/
+        # restore covers it and _reclaim_rc/_reclaim_pool leave it intact.
+        self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
         self.d_static_adj = torch.tensor(
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
@@ -2062,7 +2069,7 @@ class BatchSim:
             d = int(self._gp_class_district[cls])
             if d < 0:
                 continue
-            has_d = (((self.district == d) & self.district_complete & ~self.district_dead).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE district d
+            has_d = (((self.district == d) & self.district_complete & ~self.district_dead & ~self.district_pillaged).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE district d (B-32: pillaged earns no GPP)
             in_d = self._b_req_district == d  # [NB] buildings of district d
             bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
             self.player_gp_points[:, cls] = self.player_gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
@@ -2166,6 +2173,31 @@ class BatchSim:
         self._fadjf_cache = (self._eff_version, out)
         return out
 
+    def _pillaged_bf_live(self, bf: torch.Tensor, tcf: torch.Tensor, tiles: torch.Tensor, slot_ids: torch.Tensor, M: int) -> torch.Tensor:
+        """B-32: bf ([B,C,NB] building presence) with every building in a
+        COMPLETE-but-PILLAGED district zeroed (its yields/housing/amenities go
+        dark). CITY_CENTER buildings (_b_req_district == -1) never gate — the
+        city center is unpillageable. Mirrors TS pillagedDistrictTypes +
+        cityBuildingYields/computeHousing/localBuildingAmenities."""
+        if not self.districts_on:
+            return bf
+        B, C, dev = self.B, self.C, self.device
+        nD = len(self.districts_cat)
+        dt_win = self.district.gather(1, tcf).reshape(B, C, M)
+        pil_win = (
+            (tiles >= 0)
+            & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
+            & self.district_complete.gather(1, tcf).reshape(B, C, M)
+            & ~self.district_dead.gather(1, tcf).reshape(B, C, M)
+            & self.district_pillaged.gather(1, tcf).reshape(B, C, M)
+            & (dt_win >= 0)
+        )  # [B, C, M] owned completed pillaged districts
+        dt_oh = torch.nn.functional.one_hot(dt_win.clamp(min=0), nD).bool() & pil_win.unsqueeze(3)  # [B,C,M,nD]
+        pil_dtype = dt_oh.any(dim=2)  # [B, C, nD] this city holds a pillaged district of type di
+        breq = self._b_req_district  # [NB] building's district idx (-1 = CITY_CENTER)
+        bdark = pil_dtype.gather(2, breq.clamp(min=0).view(1, 1, -1).expand(B, C, -1)) & (breq >= 0).view(1, 1, -1)  # [B,C,NB]
+        return bf * (~bdark).to(self.dtype)
+
     def _city_totals(self, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Per-city yields/housing/growth-factor from the current state:
         (total [B, C, 6] alive-masked, housing [B, C], growth_f [B, C]).
@@ -2240,9 +2272,16 @@ class BatchSim:
             cc = self._ct_cache[1]
         if cc is not None:
             b_y = cc["b_y"]
+            bf_live = cc["bf_live"]  # B-32
         else:
             bf = self.buildings.to(self.dtype)
-            b_y = torch.einsum("bcn,nk->bck", bf, rd.b_yields)
+            # B-32: buildings in a COMPLETE-but-PILLAGED district go dark
+            # (yields/housing/amenities). Keyed on _eff_version (pillage/repair
+            # bumps it), so caching bf_live is safe — the follower terms below
+            # read it on every call (city religion can change without a bump,
+            # but the pillage mask cannot).
+            bf_live = self._pillaged_bf_live(bf, tcf, tiles, slot_ids, M)
+            b_y = torch.einsum("bcn,nk->bck", bf_live, rd.b_yields)
         center_y = self.center_yields
         if self.disasters:
             # fertility/drought hit the center's RAW food before the min-clamp
@@ -2263,7 +2302,7 @@ class BatchSim:
             # (.to(self.dtype): the fol tables are f64 for the rival paths; the
             # player walk runs in self.dtype — f32 under gumbel/training, where
             # the raw f64 table would break the einsum. No-op under parity f64.)
-            _fol_by = torch.einsum("bcn,bcnk->bck", self.buildings.to(self.dtype), self._fol_tab("bldgY", _pcfol).to(self.dtype))
+            _fol_by = torch.einsum("bcn,bcnk->bck", bf_live, self._fol_tab("bldgY", _pcfol).to(self.dtype))  # B-32: dark buildings
             total = total + _fol_by
         if self.districts_on:
             if cc is not None:
@@ -2288,6 +2327,11 @@ class BatchSim:
                 # yields/maintenance/Aqueduct housing all count COMPLETED districts
                 owned_d = owned_d & self.district_complete.gather(1, tcf).reshape(B, C, M)
                 owned_d = owned_d & ~self.district_dead.gather(1, tcf).reshape(B, C, M)  # P5/S1: captured = dead
+                # B-32: FUNCTIONAL districts (contribute adjacency / CS-envoy /
+                # Aqueduct-housing / Shipyard) exclude the PILLAGED ones; the
+                # COUNT-based static consumers below (dcount_all / spec_count /
+                # d_maint) keep the un-gated owned_d — "pillaged is still owned".
+                owned_d_live = owned_d & ~self.district_pillaged.gather(1, tcf).reshape(B, C, M)
                 # #46r: per-city COMPLETED live district count (ALL types —
                 # computeHousing's completedDistrictCount(state, city, false))
                 dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
@@ -2320,8 +2364,8 @@ class BatchSim:
                         continue
                     di = int(d["idx"])
                     adjv = self._district_adj_floor(di)  # [B, T] full districtAdjacency (G5 memo)
-                    mask = owned_d & (dt == di)
-                    dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
+                    mask = owned_d_live & (dt == di)  # B-32: pillaged = dark (adjacency + CS-envoy)
+                    dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed LIVE type-di districts (0/1)
                     _adj_sum = (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2)  # [B, C]
                     d_addends.append((yc, _adj_sum, cs_dbonus[:, di].unsqueeze(1) * dcount))
                     if di == self._hs_idx:
@@ -2331,7 +2375,7 @@ class BatchSim:
                 # gold above, re-read here as production, pre-amenity-factor like every district yield.
                 ship_add = None
                 if self._harbor_idx >= 0 and self._shipyard_bidx >= 0:
-                    _hm = (owned_d & (dt == self._harbor_idx)).to(self.dtype)  # [B, C, M] this city's Harbor tiles
+                    _hm = (owned_d_live & (dt == self._harbor_idx)).to(self.dtype)  # [B, C, M] this city's LIVE Harbor tiles (B-32)
                     _hadj = self._district_adj_floor(self._harbor_idx)  # [B, T] (G5 memo)
                     _hadj_c = (_hadj.gather(1, tcf).reshape(B, C, M) * _hm).sum(dim=2)  # [B, C]
                     ship_add = _hadj_c * self.buildings[:, :, self._shipyard_bidx].to(self.dtype)
@@ -2340,7 +2384,7 @@ class BatchSim:
                 d_maint = (self._d_maint[dt.clamp(min=0)] * (owned_d & (dt >= 0)).to(self.dtype)).sum(dim=2)
                 # Aqueduct ownership feeds computeHousing below (D-10: hoisted
                 # into the cacheable block — owned_d/dt live only on this path)
-                has_aq = (owned_d & (dt == self._aqueduct_idx)).any(dim=2) if self._aqueduct_idx >= 0 else None
+                has_aq = (owned_d_live & (dt == self._aqueduct_idx)).any(dim=2) if self._aqueduct_idx >= 0 else None  # B-32: pillaged Aqueduct gives no housing
             for yc_a, adj_add, cs_add in d_addends:
                 total[:, :, yc_a] = total[:, :, yc_a] + adj_add + cs_add
             # B-18: follower Work Ethic — Holy Site floored adjacency ALSO yields
@@ -2372,7 +2416,7 @@ class BatchSim:
         else:
             gpc_hous = gpc_ymult = gpc_slotted = None
 
-        amen_b = cc["amen_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_amenities)  # D-10
+        amen_b = cc["amen_b"] if cc is not None else torch.einsum("bcn,n->bc", bf_live, rd.b_amenities)  # D-10 (B-32: bf_live)
         amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + amen_b
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
@@ -2418,12 +2462,12 @@ class BatchSim:
                 torch.maximum(self.water_housing, torch.full_like(self.water_housing, self._aq_no_fresh_total)),
             )
             water_h = torch.where(has_aq, aq_h, self.water_housing)
-        house_b = cc["house_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_housing)  # D-10
+        house_b = cc["house_b"] if cc is not None else torch.einsum("bcn,n->bc", bf_live, rd.b_housing)  # D-10 (B-32: bf_live)
         housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + house_b
         # B-18: follower Religious Community — +housing on Shrines/Temples
         # (computeHousing beliefHousing), keyed per-city on the followed religion.
         if _pcfol is not None:
-            housing = housing + torch.einsum("bcn,bcn->bc", self.buildings.to(self.dtype), self._fol_tab("bldgH", _pcfol).to(self.dtype))
+            housing = housing + torch.einsum("bcn,bcn->bc", bf_live, self._fol_tab("bldgH", _pcfol).to(self.dtype))  # B-32: dark buildings
         if self.improvements_on:
             # +catalog housing per owned improvement within the work radius
             # (pillaged or not — computeHousing does not gate on pillaged,
@@ -2454,7 +2498,7 @@ class BatchSim:
         # D-10: refresh the store on every miss (lux=None callers always land
         # here, so a fresh walk always starts from a same-version store).
         if cc is None:
-            store = {"b_y": b_y, "amen_b": amen_b, "maint_b": maint_b, "house_b": house_b}
+            store = {"b_y": b_y, "amen_b": amen_b, "maint_b": maint_b, "house_b": house_b, "bf_live": bf_live}  # B-32
             if self.districts_on:
                 store["d_addends"] = d_addends
                 store["ship_add"] = ship_add
@@ -2705,6 +2749,7 @@ class BatchSim:
                     if not bool(has.any()):
                         continue
                     has = has & self.district_complete.gather(1, tile_d.clamp(min=0))
+                    has = has & ~self.district_pillaged.gather(1, tile_d.clamp(min=0))  # B-32: pillaged = dark
                     if not bool(has.any()):
                         continue
                     adjf = self._district_adj_floor(di).gather(1, tile_d.clamp(min=0)).double()  # (G5 memo)
@@ -2725,7 +2770,7 @@ class BatchSim:
                         faith = faith + add  # GV-1a
         # C1-B4b-2: building yields (int-valued matmul: exact in any order)
         if self.districts_on:
-            selb = self.rc_bldg[:, r]  # [B, RC, NB]
+            selb = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r])  # [B, RC, NB] (B-32: dark buildings)
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, RC, 6]
                 food = food + add6[:, :, 0]
@@ -2801,7 +2846,9 @@ class BatchSim:
             csd_r = torch.zeros(B, len(self.districts_cat), dtype=torch.float64, device=self.device)
             csd_r.scatter_add_(1, self._cs_didx.clamp(min=0), perD_r)
             dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
-            comp_all = ((dt_all >= 0) & self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)).double() * alive.double().unsqueeze(2)
+            _dc_all = self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)
+            _dp_all = self.district_pillaged.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)  # B-32
+            comp_all = ((dt_all >= 0) & _dc_all & ~_dp_all).double() * alive.double().unsqueeze(2)  # B-32: pillaged CS channel dark
             _cols = [torch.zeros(B, self.RC, dtype=torch.float64, device=self.device) for _ in range(6)]
             for _d in self.districts_cat:
                 _yc = int(_d.get("adjYield", -1))
@@ -4794,16 +4841,38 @@ class BatchSim:
                         heal_r, (self.u_hp[rows, u] + 25).clamp(max=hp_cap), self.u_hp[rows, u]
                     )
 
-            # March target: the nearest unpillaged owned improvement within
-            # dist < 13 (ties → lowest tile index), else the nearest alive
-            # city (ties → founding order) — mirrors hostileUnitAct's target
-            # scan (raiders head for your farms to pillage them).
-            march = act & ~attack & ~pillage
+            # AUDIT B-32: else pillage the DISTRICT underfoot — a COMPLETE,
+            # non-CITY_CENTER (self.district excludes centers by construction),
+            # unpillaged enemy district. No heal, no loot (v1). Barbs raid
+            # RIVAL districts too (C-4a), the hostileUnitAct district branch.
+            dist_pillage = torch.zeros_like(act)
+            if self.districts_on:
+                h_dist = self.district.gather(1, here.unsqueeze(1)).squeeze(1)
+                h_dcomp = self.district_complete.gather(1, here.unsqueeze(1)).squeeze(1)
+                h_dunpil = ~self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
+                h_downed = (self.owner.gather(1, here.unsqueeze(1)).squeeze(1) >= 0) | (
+                    self.rival_at.gather(1, here.unsqueeze(1)).squeeze(1) >= 0
+                )
+                dist_pillage = act & ~attack & ~pillage & (h_dist >= 0) & h_dcomp & h_dunpil & h_downed
+                if bool(dist_pillage.any()):
+                    rows = dist_pillage.nonzero(as_tuple=True)[0]
+                    self.district_pillaged[rows, here[rows]] = True
+                    self.u_acted[rows, u] = True  # P4/D-2
+                    self._eff_version += 1  # CACHE: rival/player district yields just dropped
+
+            # March target: the nearest unpillaged owned improvement OR district
+            # (the B-32 union) within dist < 13 (ties → lowest tile index), else
+            # the nearest alive city (ties → founding order) — hostileUnitAct's
+            # widened target scan (raiders head for your farms AND districts).
+            march = act & ~attack & ~pillage & ~dist_pillage
             if not bool(march.any()):
                 continue
             arangeT = torch.arange(T, device=dev)
-            if self.improvements_on:
-                imp_job = (self.improvement >= 0) & ~self.pillaged & ((self.owner >= 0) | (self.rival_at >= 0))  # [B, T] (C-4a: rival farms tempt barbs too)
+            if self.improvements_on or self.districts_on:
+                _owned = (self.owner >= 0) | (self.rival_at >= 0)  # [B, T] (C-4a: rival tiles tempt barbs too)
+                imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
+                if self.districts_on:  # B-32: pillageable districts join the union
+                    imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
                 d_imp = self.pair_dist[here.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
                 ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
                 imp_min, imp_tgt = ikey.min(dim=1)
@@ -5457,7 +5526,7 @@ class BatchSim:
             & (self.built_wonder < 0)  # A-8 gate-catch: an in-flight wonder pave refuses jobs (validImprovementsIn twin)
             & (self.rvcity_at < 0)
             & ok
-        ) | (owned & self.pillaged)
+        ) | (owned & self.pillaged) | (owned & self.district_pillaged)  # B-32: pillaged district = repair job
 
     def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int) -> torch.Tensor:
         """C1-B5b: spawn a rival BUILDER — the civilian twin of _spawn_rival
@@ -5521,6 +5590,19 @@ class BatchSim:
                 self.v_acted[rows, u] = True
                 self._eff_version += 1
                 act = act & ~rep
+                if not bool(act.any()):
+                    continue
+            # AUDIT B-32: a pillaged DISTRICT underfoot repairs next (the
+            # builderRepair twin — TS checks bt.pillaged first, then
+            # bt.districtPillaged); no charge, the turn is spent, version bumps.
+            distpill_h = self.district_pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
+            rep_d = act & own_h & distpill_h
+            if bool(rep_d.any()):
+                rows = rep_d.nonzero(as_tuple=True)[0]
+                self.district_pillaged[rows, here[rows]] = False
+                self.v_acted[rows, u] = True
+                self._eff_version += 1
+                act = act & ~rep_d
                 if not bool(act.any()):
                     continue
             here_ok = jobm.gather(1, here.unsqueeze(1)).squeeze(1)
@@ -5912,6 +5994,21 @@ class BatchSim:
         self._rival_route_cache = (key, inc)
         return inc
 
+    def _rc_bdark(self, dt_reg: torch.Tensor) -> torch.Tensor:
+        """B-32: given an rc district-tile registry [..., nD] (tile per district
+        type, -1 = none), return [..., NB] bool = building b is dark because its
+        district is COMPLETE-but-PILLAGED. CITY_CENTER buildings (_b_req_district
+        == -1) never gate. Mirrors TS pillagedDistrictTypes over rc.buildings."""
+        if not self.districts_on or dt_reg.shape[-1] == 0:
+            return torch.zeros(*dt_reg.shape[:-1], self.NB, dtype=torch.bool, device=self.device)
+        B0 = dt_reg.shape[0]
+        flat = dt_reg.clamp(min=0).reshape(B0, -1)
+        comp = self.district_complete.gather(1, flat).reshape_as(dt_reg)
+        pilf = self.district_pillaged.gather(1, flat).reshape_as(dt_reg)
+        pil = (dt_reg >= 0) & comp & pilf  # [..., nD]
+        breq = self._b_req_district  # [NB]
+        return pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
+
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
         defaultModifiers). Candidates = owned, citizen-workable (water yes,
@@ -6090,6 +6187,7 @@ class BatchSim:
                     if not bool(has.any()):
                         continue
                     has = has & self.district_complete.gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    has = has & ~self.district_pillaged.gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1)  # B-32: pillaged = dark
                     if not bool(has.any()):
                         continue
                     adjf = self._district_adj_floor(di).gather(1, tile_d.clamp(min=0).unsqueeze(1)).squeeze(1).double()  # (G5 memo)
@@ -6113,7 +6211,7 @@ class BatchSim:
         # C1-B4b-2: building yields under empty modifiers (worship never
         # queues, so the plain def.yields sum matches cityBuildingYields).
         if self.districts_on:
-            selb = self.rc_bldg[:, r, j]
+            selb = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j])  # B-32: buildings in a pillaged district go dark
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, 6] (int-valued: dtype roundtrip is exact)
                 food = food + add6[:, 0]
@@ -6203,7 +6301,7 @@ class BatchSim:
             csd_r = torch.zeros(self.B, len(self.districts_cat), dtype=torch.float64, device=self.device)
             csd_r.scatter_add_(1, self._cs_didx.clamp(min=0), perD_r)
             dtj = self.rc_dist_tile[:, r, j]  # [B, nD] — one tile per district type
-            compj = ((dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0))).double() * mask.double().unsqueeze(1)
+            compj = ((dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0)) & ~self.district_pillaged.gather(1, dtj.clamp(min=0))).double() * mask.double().unsqueeze(1)  # B-32: pillaged CS channel dark
             _cols = [torch.zeros(self.B, dtype=torch.float64, device=self.device) for _ in range(6)]
             for _d in self.districts_cat:
                 _yc = int(_d.get("adjYield", -1))
@@ -6278,7 +6376,8 @@ class BatchSim:
         (tier_idx, growth_f, yield_f), each [B, RC]."""
         B, RC = self.B, self.RC
         rd = self.rules_dev
-        have = torch.einsum("bjn,n->bj", self.rc_bldg[:, r].to(torch.float64), rd.b_amenities.double())
+        selb_a = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r])  # B-32: buildings in a pillaged district give no amenities
+        have = torch.einsum("bjn,n->bj", selb_a.to(torch.float64), rd.b_amenities.double())
         need = torch.ceil((self.rc_pop[:, r].double() - 2) / 2).clamp(min=0)
         out = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
         alive = self.rc_alive[:, r]
@@ -6989,15 +7088,33 @@ class BatchSim:
                     heal_r, (self.v_hp[rows, v] + 25).clamp(max=hp_cap), self.v_hp[rows, v]
                 )
 
-        # March target: nearest unpillaged owned improvement within dist < 13
-        # (ties -> lowest tile index), else nearest player city — mirrors
-        # hostileUnitAct's target scan (rivals raid your farms too).
-        march = act & ~attack & ~pillage
+        # AUDIT B-32: else pillage the DISTRICT underfoot — a COMPLETE, non-
+        # CITY_CENTER, unpillaged PLAYER district (rival raiders hit the player
+        # only; never other rivals). No heal, no loot (v1).
+        dist_pillage = torch.zeros_like(act)
+        if self.districts_on:
+            h_dist = self.district.gather(1, hc.unsqueeze(1)).squeeze(1)
+            h_dcomp = self.district_complete.gather(1, hc.unsqueeze(1)).squeeze(1)
+            h_dunpil = ~self.district_pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
+            h_downed = self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
+            dist_pillage = act & ~attack & ~pillage & (h_dist >= 0) & h_dcomp & h_dunpil & h_downed
+            if bool(dist_pillage.any()):
+                rows = dist_pillage.nonzero(as_tuple=True)[0]
+                self.district_pillaged[rows, hc[rows]] = True
+                self.v_acted[rows, v] = True  # P4/D-2
+                self._eff_version += 1  # CACHE: player district yields just dropped
+
+        # March target: nearest unpillaged owned improvement OR district (the
+        # B-32 union) within dist < 13 (ties -> lowest tile index), else nearest
+        # player city — hostileUnitAct's widened target scan.
+        march = act & ~attack & ~pillage & ~dist_pillage
         if not bool(march.any()):
             return
         arangeT = torch.arange(T, device=dev)
-        if self.improvements_on:
+        if self.improvements_on or self.districts_on:
             imp_job = (self.improvement >= 0) & ~self.pillaged & (self.owner >= 0)
+            if self.districts_on:  # B-32: pillageable player districts join the union
+                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.owner >= 0))
             d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
             ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
             imp_min, imp_tgt = ikey.min(dim=1)
@@ -7991,7 +8108,7 @@ class BatchSim:
                 fresh = wh == float(self._h_fresh)
                 if self._aqueduct_idx >= 0:
                     aq_t = self.rc_dist_tile[:, r, :, self._aqueduct_idx]  # [B, RC]
-                    has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_t.clamp(min=0))
+                    has_aq = (aq_t >= 0) & self.district_complete.gather(1, aq_t.clamp(min=0)) & ~self.district_pillaged.gather(1, aq_t.clamp(min=0))  # B-32
                 else:
                     has_aq = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
                 water = torch.where(
@@ -7999,7 +8116,8 @@ class BatchSim:
                     torch.where(fresh, wh + self._aq_fresh_bonus, torch.maximum(wh, torch.full_like(wh, self._aq_no_fresh_total))),
                     wh,
                 )
-                bh = self.rc_bldg[:, r].double() @ self.rules.b_housing.to(dev).double()  # [B, RC]
+                selb_h = self.rc_bldg[:, r] & ~self._rc_bdark(dt_all)  # B-32: buildings in a pillaged district give no housing
+                bh = selb_h.double() @ self.rules.b_housing.to(dev).double()  # [B, RC]
                 win3a = tiles_from_offsets(_ctr_r.reshape(-1), self._off3, self.W, self.H).reshape(B, self.RC, -1)
                 w3f = win3a.clamp(min=0).reshape(B, -1)
                 imp_w3 = self.improvement.gather(1, w3f).reshape_as(win3a)
@@ -8007,7 +8125,7 @@ class BatchSim:
                 farm = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own.double()).sum(dim=2)
                 housing = water + bh + farm
                 if _rcy_bel:
-                    housing = housing + torch.einsum("bjn,bjn->bj", self.rc_bldg[:, r].double(), self._fol_tab("bldgH", _fol_h_rc))
+                    housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", _fol_h_rc))
                     housing = housing + _riv_h.unsqueeze(1) * self.tile_river.gather(1, _ctr_r).double()
                 p64a = self.rc_pop[:, r].double()
                 need = torch.floor(15 + 8 * (p64a - 1) + (p64a - 1).clamp(min=0) ** 1.5)
@@ -8445,7 +8563,7 @@ class BatchSim:
                 d_cls = int(self._gp_class_district[cls]) if cls < self._gp_nc else -1
                 if d_cls >= 0 and self.districts_on:
                     reg_c = self.rc_dist_tile[:, r, :, d_cls]  # [B, RC]
-                    comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0))
+                    comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))  # B-32: pillaged earns no GPP
                     bmask_c = (self.rules_dev.b_req_district == d_cls).view(1, 1, -1)
                     nb_of = (self.rc_bldg[:, r] & bmask_c).sum(dim=2)  # [B, RC]
                     # A-7 Divine Spark: the belief's flat GPP joins the

@@ -761,13 +761,36 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     unit.movesLeft = 0;
     return;
   }
+  // AUDIT B-32: else pillage the district underfoot — a COMPLETE, non-
+  // CITY_CENTER, unpillaged enemy district (player districts for any raider,
+  // rival districts for barbarians too, the C-4a convention). No heal, no loot
+  // (v1 — matches D-20: yield-type pillages bank nothing).
+  if (
+    here.district !== null &&
+    here.district !== 'CITY_CENTER' &&
+    here.districtComplete &&
+    !here.districtPillaged &&
+    hereOwned
+  ) {
+    here.districtPillaged = true;
+    unit.movesLeft = 0;
+    return;
+  }
 
-  // 3. March toward the nearest unpillaged improvement, else nearest city.
+  // 3. March toward the nearest unpillaged improvement OR district (the B-32
+  // union), else nearest city.
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
     const tOwned = t.cityId !== -1 || (unit.owner === 'barbarian' && t.rivalId !== undefined);
-    if (!t.improvement || t.pillaged || !tOwned) continue;
+    if (!tOwned) continue;
+    const impJob = t.improvement !== null && !t.pillaged;
+    const distJob =
+      t.district !== null &&
+      t.district !== 'CITY_CENTER' &&
+      t.districtComplete &&
+      !t.districtPillaged; // B-32
+    if (!impJob && !distJob) continue;
     const d = hexDistance(here.col, here.row, t.col, t.row);
     if (d < bestDist) {
       bestDist = d;

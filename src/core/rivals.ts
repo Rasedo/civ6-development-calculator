@@ -60,7 +60,7 @@ import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query'
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit } from './units';
 import { districtCostIn, goldAffordable } from './game';
-import { districtAdjacency } from './yields';
+import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
   RIVAL_LEADERS,
@@ -548,7 +548,15 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
     const gppFlat = getRivalModifiers(state, rival).gppFlat[cls] ?? 0;
     let accrue = 0;
     for (const rc of rival.cities) {
-      if (!rc.districts.some((d) => d.type === gpDist && state.map.tiles[d.tileIndex].districtComplete)) continue;
+      if (
+        !rc.districts.some(
+          (d) =>
+            d.type === gpDist &&
+            state.map.tiles[d.tileIndex].districtComplete &&
+            !state.map.tiles[d.tileIndex].districtPillaged, // B-32: pillaged district earns no GPP
+        )
+      )
+        continue;
       accrue += 1 + gppFlat + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
     }
     if (accrue > 0) rival.gpp[cls] = (rival.gpp[cls] ?? 0) + accrue;
@@ -890,7 +898,9 @@ function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boole
     (t) =>
       owns(t) &&
       !isWater(t) &&
-      (t.pillaged || (!t.improvement && validImprovementsIn(t, { unlocks, ownsTile: owns }).length > 0)),
+      (t.pillaged ||
+        t.districtPillaged || // B-32: a pillaged district is a repair job too
+        (!t.improvement && validImprovementsIn(t, { unlocks, ownsTile: owns }).length > 0)),
   );
 }
 
@@ -923,6 +933,13 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // spent). Barbarian raids on rival farmland finally get answered.
     if (bt.pillaged && owns(bt)) {
       bt.pillaged = false;
+      u.movesLeft = 0;
+      continue;
+    }
+    // AUDIT B-32: a pillaged DISTRICT underfoot repairs the same way (builderRepair
+    // twin — no charge, the turn is spent). Barb raids on rival districts get answered.
+    if (bt.districtPillaged && owns(bt)) {
+      bt.districtPillaged = false;
       u.movesLeft = 0;
       continue;
     }
@@ -961,7 +978,7 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     let bestKey = Infinity;
     for (const t of state.map.tiles) {
       if (!owns(t) || isWater(t)) continue;
-      const isJob = t.pillaged || (!t.improvement && validImprovementsIn(t, vopts).length > 0);
+      const isJob = t.pillaged || t.districtPillaged || (!t.improvement && validImprovementsIn(t, vopts).length > 0); // B-32
       if (!isJob) continue;
       const key = hexDistance(bt.col, bt.row, t.col, t.row) * (nTiles + 1) + t.index;
       if (key < bestKey) {
@@ -1021,11 +1038,15 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
   const fresh = hasFreshWater(map, center);
   let water = fresh ? HOUSING_FRESH_WATER : isCoastalLand(map, center) ? HOUSING_COASTAL : HOUSING_NO_WATER;
   const hasAqueduct = rc.districts.some(
-    (d) => d.type === 'AQUEDUCT' && map.tiles[d.tileIndex].districtComplete,
+    (d) =>
+      d.type === 'AQUEDUCT' &&
+      map.tiles[d.tileIndex].districtComplete &&
+      !map.tiles[d.tileIndex].districtPillaged, // B-32: pillaged Aqueduct gives no housing
   );
   if (hasAqueduct) {
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
   }
+  const pillaged = pillagedDistrictTypes(map, rc.districts); // B-32
   let total = water;
   // A-7 / B-18: belief building housing (Religious Community) keys per-city on
   // the city's followed religion; River Goddess (pantheon) stays per-civ. The
@@ -1033,7 +1054,9 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
   const ownerRel = state.rivals.indexOf(rival) + 1;
   const m = withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel));
   for (const id of rc.buildings) {
-    total += BUILDINGS[id]?.housing ?? 0;
+    const bd = BUILDINGS[id];
+    if (bd && pillaged.has(bd.district)) continue; // B-32: dark buildings
+    total += bd?.housing ?? 0;
     total += m.buildingHousingAdd[id] ?? 0;
   }
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
@@ -1062,10 +1085,11 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   }
   const baseHave = new Map<number, number>();
   for (const rc of rival.cities) {
+    const pillaged = pillagedDistrictTypes(state.map, rc.districts); // B-32
     let n = 0;
     for (const id of rc.buildings) {
       const bd = BUILDINGS[id];
-      if (bd && !bd.regional && bd.amenities) n += bd.amenities;
+      if (bd && !bd.regional && bd.amenities && !pillaged.has(bd.district)) n += bd.amenities;
     }
     baseHave.set(rc.id, n);
   }
@@ -1175,10 +1199,11 @@ export function rivalCityYields(
   // in columns no rival consumer reads yet (BUILD_PLAN: rival stocks are
   // a later stage); added after the research multiplier so production
   // semantics stay worked-tiles-only.
+  const pillaged = pillagedDistrictTypes(state.map, rc.districts); // B-32
   for (const d of rc.districts) {
     if (d.type === 'CITY_CENTER') continue;
     const dt = state.map.tiles[d.tileIndex];
-    if (!dt.districtComplete) continue;
+    if (!dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged = dark
     const col = DISTRICTS[d.type].adjacencyYield;
     if (!col) continue;
     const adj = Math.floor(districtAdjacency(state.map, dt, d.type));
@@ -1194,6 +1219,7 @@ export function rivalCityYields(
   // floor(adjacency), the rival twin of yields.ts:171.
   for (const id of rc.buildings) {
     const bd = BUILDINGS[id];
+    if (bd && pillaged.has(bd.district)) continue; // B-32: buildings in a pillaged district are dark
     if (bd?.yields) {
       for (const [k, v] of Object.entries(bd.yields)) total[k as keyof Yields] += v ?? 0;
     }
@@ -1241,7 +1267,8 @@ export function rivalCityYields(
     }
     for (const d of rc.districts) {
       const add = csb.districtAdd[d.type];
-      if (!add || !state.map.tiles[d.tileIndex].districtComplete) continue;
+      const dt = state.map.tiles[d.tileIndex];
+      if (!add || !dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged CS channel is dark
       for (const [k, v] of Object.entries(add)) total[k as keyof Yields] += v ?? 0;
     }
   }
