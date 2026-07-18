@@ -9,9 +9,13 @@ import {
   terrainDefense,
   barbarianPhase,
   getCityHp,
+  FLANKING_CS,
+  SUPPORT_CS,
 } from '../src/core/combat';
 import { routeRaided } from '../src/core/trade';
 import { CITY_MAX_HP } from '../src/data/units';
+import { neighbors } from '../src/core/hex';
+import { unitPassable } from '../src/core/units';
 
 function battlefield() {
   const state = makeState(makeMap(20, 20));
@@ -148,5 +152,112 @@ describe('barbarians', () => {
     foundCity(calm, tileAtCoords(calm.map, 8, 8).index);
     for (let i = 0; i < 5; i++) endTurn(calm);
     expect(calm.units.length).toBe(0); // units mode off => no barbarians
+  });
+});
+
+// AUDIT B-7 flanking & support. The CB-log `diff` (q = round(Δstrength·10)) is
+// the parity acceptance value, and it is independent of the RNG draw — so a
+// clean way to test the CS terms is to read `diff` off the combat log with and
+// without an adjacent unit. FLANKING_CS·1 = +2 attacker CS = +20 on the mel
+// diff; SUPPORT_CS·1 = +2 defender CS = −20 on the mel/rng diff.
+describe('B-7 flanking & support', () => {
+  const rollDiff = (tag: string, fn: () => void): number => {
+    const log: string[] = [];
+    (globalThis as any).__cbLog = log;
+    try {
+      fn();
+    } finally {
+      delete (globalThis as any).__cbLog;
+    }
+    const line = log.find((l) => l.startsWith(`k:${tag} `));
+    expect(line, `expected a ${tag} roll in ${JSON.stringify(log)}`).toBeDefined();
+    return Number(line!.match(/diff(-?\d+)/)![1]);
+  };
+
+  // a passable neighbour of `at` other than the excluded tile
+  const freeNeighbor = (state: ReturnType<typeof battlefield>['state'], atIdx: number, excludeIdx: number) => {
+    const n = neighbors(state.map, state.map.tiles[atIdx]).find((t) => unitPassable(t) && t.index !== excludeIdx);
+    expect(n).toBeDefined();
+    return n!;
+  };
+
+  it('exports the +2 CS constants', () => {
+    expect(FLANKING_CS).toBe(2);
+    expect(SUPPORT_CS).toBe(2);
+  });
+
+  it('a melee attacker gains +2 CS per flanker adjacent to the defender', () => {
+    const base = battlefield();
+    const atkTile = tileAtCoords(base.state.map, 11, 9).index;
+    const defTile = tileAtCoords(base.state.map, 12, 9).index;
+    const setup = () => {
+      const { state } = battlefield();
+      const atk = spawnUnit(state, 'WARRIOR', atkTile)!;
+      atk.tileIndex = atkTile;
+      const def = spawnUnit(state, 'WARRIOR', defTile, 'barbarian')!;
+      def.tileIndex = defTile;
+      return { state, atk };
+    };
+
+    const plain = setup();
+    const d0 = rollDiff('mel', () => meleeAttack(plain.state, plain.atk.id, defTile));
+
+    const flanked = setup();
+    const fn = freeNeighbor(flanked.state, defTile, atkTile); // a SECOND player unit next to the defender
+    const flanker = spawnUnit(flanked.state, 'WARRIOR', fn.index)!;
+    flanker.tileIndex = fn.index;
+    const d1 = rollDiff('mel', () => meleeAttack(flanked.state, flanked.atk.id, defTile));
+
+    expect(d1).toBe(d0 + SUPPORT_CS * 0 + FLANKING_CS * 10); // +2 CS -> +20 in diff·10
+  });
+
+  it('a melee defender gains +2 CS per adjacent friendly military (support)', () => {
+    const atkC = { col: 11, row: 9 };
+    const defC = { col: 12, row: 9 };
+    const setup = () => {
+      const { state } = battlefield();
+      const atkTile = tileAtCoords(state.map, atkC.col, atkC.row).index;
+      const defTile = tileAtCoords(state.map, defC.col, defC.row).index;
+      const atk = spawnUnit(state, 'WARRIOR', atkTile)!;
+      atk.tileIndex = atkTile;
+      const def = spawnUnit(state, 'WARRIOR', defTile, 'barbarian')!;
+      def.tileIndex = defTile;
+      return { state, atk, atkTile, defTile };
+    };
+
+    const plain = setup();
+    const d0 = rollDiff('mel', () => meleeAttack(plain.state, plain.atk.id, plain.defTile));
+
+    const supported = setup();
+    const sn = freeNeighbor(supported.state, supported.defTile, supported.atkTile);
+    const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, 'barbarian')!; // same side as the defender
+    helper.tileIndex = sn.index;
+    const d1 = rollDiff('mel', () => meleeAttack(supported.state, supported.atk.id, supported.defTile));
+
+    expect(d1).toBe(d0 - SUPPORT_CS * 10); // defender +2 CS -> −20 in diff·10
+  });
+
+  it('support also aids the defender against a ranged attack (no flanking there)', () => {
+    const setup = () => {
+      const { state } = battlefield();
+      const atkTile = tileAtCoords(state.map, 11, 9).index;
+      const defTile = tileAtCoords(state.map, 13, 9).index; // range 2
+      const archer = spawnUnit(state, 'ARCHER', atkTile)!;
+      archer.tileIndex = atkTile;
+      const def = spawnUnit(state, 'WARRIOR', defTile, 'barbarian')!;
+      def.tileIndex = defTile;
+      return { state, archer, atkTile, defTile };
+    };
+
+    const plain = setup();
+    const d0 = rollDiff('rng', () => rangedAttack(plain.state, plain.archer.id, plain.defTile));
+
+    const supported = setup();
+    const sn = freeNeighbor(supported.state, supported.defTile, supported.atkTile);
+    const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, 'barbarian')!;
+    helper.tileIndex = sn.index;
+    const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile));
+
+    expect(d1).toBe(d0 - SUPPORT_CS * 10);
   });
 });

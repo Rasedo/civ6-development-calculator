@@ -91,6 +91,42 @@ export function woundPenalty(unit: { hp: number }): number {
   return 10 * ((UNIT_HP - unit.hp) / 100);
 }
 
+// AUDIT B-7 flanking & support. Real Civ 6: a melee attacker gains +2 CS per
+// OTHER unit adjacent to the defender that is hostile to the defender
+// (flanking); a defender gains +2 CS per friendly MILITARY unit adjacent to it
+// (support), against melee AND ranged. Cities / city-states / rc-city targets
+// are not units — no flanking against them (recorded simplification). Integer
+// CS adds, so the B-29 diff quantization (q = round(Δ·10)) is preserved.
+export const FLANKING_CS = 2;
+export const SUPPORT_CS = 2;
+
+/** B-7 flanking count: MILITARY units u ≠ attacker, adjacent to the defender's
+ * tile, that are hostile to the defender. */
+function flankCount(state: GameState, defTileIndex: number, attacker: Unit, defender: Unit): number {
+  let n = 0;
+  for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
+    for (const u of unitsAt(state, t.index)) {
+      if (u.id === attacker.id) continue;
+      if (unitDomain(u.type) !== 'military') continue;
+      if (unitsHostile(state, u, defender)) n++;
+    }
+  }
+  return n;
+}
+
+/** B-7 support count: MILITARY units friendly to the defender (same owner AND
+ * civId), adjacent to the defender's tile. */
+function supportCount(state: GameState, defTileIndex: number, defender: Unit): number {
+  let n = 0;
+  for (const t of neighbors(state.map, state.map.tiles[defTileIndex])) {
+    for (const u of unitsAt(state, t.index)) {
+      if (unitDomain(u.type) !== 'military') continue;
+      if (u.owner === defender.owner && u.civId === defender.civId) n++;
+    }
+  }
+  return n;
+}
+
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
   // P4/D-1: the real Civ 6 random factor is 0.8–1.2 (equal-strength hits
   // land "reliably 24–36"), not the old 0.75–1.25.
@@ -255,8 +291,12 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // Civilians are simply killed (Civ 6 captures; we don't model capture).
     killUnit(state, defender);
   } else {
-    defender.hp -= damageRoll(state, atkCS - defCS, 'mel', targetIndex);
-    attacker.hp -= damageRoll(state, defCS - atkCS, 'melc', targetIndex);
+    // B-7: flanking helps the attacker, support helps the defender. Applied
+    // ONCE so both paired rolls see the same adjusted CS.
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender);
+    const defCSf = defCS + SUPPORT_CS * supportCount(state, targetIndex, defender);
+    defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
+    attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
     if (defender.hp <= 0) {
       killUnit(state, defender);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
@@ -312,7 +352,8 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     return no('Nothing to attack there.');
   }
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender); // B-5 + B-29
+  // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no retaliation).
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, targetIndex, defender);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
@@ -349,7 +390,8 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender); // B-5 + B-29
+  // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no retaliation).
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, targetIndex, defender);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'vrng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
@@ -841,7 +883,8 @@ export function barbarianPhase(state: GameState): void {
     const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { owner: 'player' }));
     const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
     const tt = map.tiles[bestTile];
-    const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender); // B-29 (attacker is the city — not a unit)
+    // B-29 + B-7 support (attacker is the city — not a unit, so no flanking).
+    const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
     if (defender.hp <= 0) killUnit(state, defender);
