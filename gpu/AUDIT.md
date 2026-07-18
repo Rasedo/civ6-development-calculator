@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 37 | 17.5 | **47%** |
-| B fidelity | 88 | 40.8 | **46%** |
+| A symmetry | 39 | 17.5 | **45%** |
+| B fidelity | 88 | 47.8 | **54%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **180** | **115.3** | **64%** |
-| Open chapters only (A+B) | 125 | 60.3 | **48%** |
+| **Overall (incl. closed)** | **182** | **122.3** | **67%** |
+| Open chapters only (A+B) | 127 | 65.3 | **51%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -45,7 +45,10 @@ sets; residual worked-tile civ-level scan split out as new A-23 w2.
 Stage 2: A-11 → 90% — rival domestic trade routes live both engines
 + symmetric route interdiction; rival→CS routes wait on A-12.
 Stage 3a: A-12 → 50% — per-civ envoys/influence/greedy assignment,
-rival envoy bonuses, strict suzerain contest; CS verbs = stage 3b.)
+rival envoy bonuses, strict suzerain contest; CS verbs = stage 3b.
+2026-07-18 ROUND B4 Y/AA/Z/AB (brief gpu/ROUND_B4.md): B-7, B-30,
+B-31, B-32 all RESOLVED; new A-24 w2 = rival district/tile registry
+consistency latent, split from slice AB's hunt.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -54,10 +57,12 @@ Per-item weights (done% in parens where partial):
   A-12 4 (90% — 3b-2 landed attack/capture; levy + quests are recorded
   deferrals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
-  worked-tile scan).
-- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 / B-29 2 (done);
+  worked-tile scan), A-24 2 (new — split from B-30: rival
+  district/tile registry consistency).
+- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-7 2 / B-28 1 / B-29 2 /
+  B-30 2 / B-31 1 / B-32 2 (done);
   B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%); B-4 3,
-  B-6 8, B-7 2, B-8 2, B-9 3, B-10 3, B-30 2, B-31 1, B-32 2 (open).
+  B-6 8, B-8 2, B-9 3, B-10 3 (open).
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
@@ -233,6 +238,13 @@ untagged halves of tagged items stay Fable/main-session work.
   do). A-17's `rivalCityId`/`rc_tile_id` registry now makes the
   per-city convergence implementable; it reshuffles every rival yield
   every turn, so it needs its own gated stage.
+- A-24 (new, split from B-30's hunt). Rival district/tile registries
+  can disagree: an rc's `.districts` array may reference a tile whose
+  `rivalCityId` registers to a SIBLING rc (seed 9118: rcId 4 held a
+  HOLY_SITE whose tile was registered to rcId 3). B-30 sidesteps it
+  (capture derives kept districts from re-owned tiles, not the array),
+  but the placement/registration pair in `tryQueueRivalDistrict` and
+  the A-17 registry should be hardened to stay mutually consistent.
 
 ## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 
@@ -291,8 +303,13 @@ gap; likewise GS disasters are modeled minus sea-level rise
   `!isWater && !isImpassable` — water is a wall; `UNITS` has zero naval
   entries. Island starts are unreachable, Harbor cities can't be
   threatened from sea.
-- B-7. No flanking/support bonuses: `damageRoll` inputs are raw CS +
-  `terrainDefense` only (combat.ts); no per-adjacent-ally modifiers.
+- B-7. RESOLVED (2026-07-18, ROUND B4 slice Y): `FLANKING_CS`/
+  `SUPPORT_CS` (+2 per adjacent ally) at unit-vs-unit rolls — flanking
+  on melee (`meleeAttack`), support on melee + ranged defense
+  (`rangedAttack`, `hostileRangedStrike`, both walls strikes incl. the
+  `rcstk` mirror); GPU `_flank_support` (batched, stacking gives ≤1
+  military/tile). No flanking vs cities/CS/rc-cities (not units —
+  recorded simplification).
 - B-8. Great Generals/Admirals are economy lumps:
   `GREAT_PEOPLE.GENERAL` is +production-to-capital, `.ADMIRAL` is +gold
   "prize money" (data/greatPeople.ts); `GreatPersonDef['effect']`
@@ -335,20 +352,35 @@ gap; likewise GS disasters are modeled minus sea-level rise
   −1 CS/10 HP lost and melee across a river (`crossesRiver`) −5
   attacker CS at all `damageRoll` sites; float association eliminated
   by a shared quantization `q = round(diff·10)` (exp table 1201).
-- B-30 (new). Conquest razes all infrastructure: `captureRivalCity`
-  and `transferCityToRival` (combat.ts / core/rivals.ts) rebuild the
-  city with `buildings: []` and only the CITY_CENTER district;
-  `captureCityState` likewise. Real Civ 6 keeps districts and most
-  buildings on capture. Conquered cities here are worth far less than
-  real ones.
-- B-31 (new). Civilians are killed, not captured: `meleeAttack`
-  (combat.ts) — "Civilians are simply killed (Civ 6 captures; we don't
-  model capture)". Real: settlers/builders change hands, a major
-  raiding incentive.
-- B-32 (new). Districts and buildings can't be pillaged:
-  `hostileUnitAct` (combat.ts) pillages tile improvements only
-  (`Tile.pillaged`); district tiles have no pillage state. Real
-  raiders pillage district buildings for heavy yields/heals.
+- B-30. RESOLVED (2026-07-18, ROUND B4 slice AB): the three
+  capture/transfer paths (`captureRivalCity`, `transferCityToRival`,
+  `transferRivalCityToRival` + GPU twins) carry buildings (minus
+  PALACE), wonders, and COMPLETE districts — derived from re-owned
+  tiles (`districtComplete`, the GPU's liveness rule; incomplete stays
+  paved-but-dead); `ANCIENT_WALLS` kept at `outerHp = 0` (heals via
+  B-1, new owner gains the B-2 strike); razes stay scorched-earth; CS
+  capture paths verified no-op (CS have no infra in-model). The
+  worktree hunt exposed a pre-existing rival registry latent → A-24.
+- B-31. RESOLVED (2026-07-18, ROUND B4 slice AA): player/rival melee
+  CAPTURES a lone civilian (`meleeAttack` civilian branch — owner/civId
+  flip, hp/charges kept, no roll, no advance; draw-count neutral).
+  INVARIANT the slice established: the captured unit moves to the END
+  of `state.units` / GPU pool-end append — an in-place flip broke slot
+  order (dormant desync, seed 9261); ANY future ownership-transfer
+  site must send the unit to the pool end on both engines. Residual:
+  barbarians still kill (no prisoner/camp system); rival-vs-rival
+  unreachable until A-19.
+- B-32. RESOLVED (2026-07-18, ROUND B4 slice Z): `Tile.districtPillaged`
+  / GPU `district_pillaged` [B,T] — raiders pillage COMPLETE non-center
+  enemy districts (`hostileUnitAct` step 2 + step-3 march union; player
+  districts for all raiders, rival districts for barbs per C-4a). While
+  pillaged the district's adjacency, buildings (yields/housing/
+  amenities/GPP), intrinsic housing and CS envoy channels go dark;
+  static counts stay; repair via `builderRepair` + the rival builder
+  twin; every rc pillage/repair bumps `_eff_version`. In-gate on both
+  seats (5/24 player, 8/24 rival seeds). Residuals: no loot lumps (v1,
+  D-20 convention); the scripted player never repairs districts (the
+  repair verb rides A-18/#50) — symmetric, not a divergence.
 
 **Progression breadth:**
 - B-11. RESOLVED (2026-07-17, Round B2): `TECHS` is the full GS tree
