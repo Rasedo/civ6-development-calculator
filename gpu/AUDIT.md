@@ -25,33 +25,35 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 35 | 7.5 | **21%** |
-| B fidelity | 88 | 37.0 | **42%** |
+| A symmetry | 35 | 7.9 | **23%** |
+| B fidelity | 88 | 40.8 | **46%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (E-16 with owner) | 6 | 5 | 83% |
 | G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **178** | **98.5** | **55%** |
-| Open chapters only (A+B+E) | 129 | 49.5 | **38%** |
+| **Overall (incl. closed)** | **178** | **102.7** | **58%** |
+| Open chapters only (A+B+E) | 129 | 53.7 | **42%** |
 
-(2026-07-17 #46r: A-7r →90% LIVE; G-3 refuted, G-4 on-catch. Later
-same day A-5r+#47r: A-5r 95% — tile purchase folds into #50; B-18
-35%→60% — spread landed, yields-coupling open; G-2 done → chapter G
-EMPTY.)
+(2026-07-17 #46r: A-7r LIVE; A-5r+#47r: A-5 resolved-minus-tile-
+purchase, B-18 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
+B-18 60%→75% — pressure→yields coupling LIVE; B-13 → 100% — full
+unlockPolicy wiring; A-7r → 100% — the residual card wiring was
+B-13's; B-25 50%→70% — GPU space-race sim poke-covered; B-29 done.)
 
 Per-item weights (done% in parens where partial):
-- A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (90% — LIVE, residual
-  wiring), A-9 4, A-11 4, A-12 4, A-17 4, A-18 3, A-19 4, A-20 2
-  (done), A-21 2, A-22 2.
-- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 (done); B-15 2
-  (85% — magnitude waits on #56); B-26 3 (50%); B-4 3, B-6 8, B-7 2,
-  B-8 2, B-9 3, B-10 3, B-29 2, B-30 2, B-31 1, B-32 2 (open).
-- B progression: B-11 4 / B-12 3 / B-14 1 (done); B-13 3 (80%);
+- A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
+  closed the card wiring), A-9 4, A-11 4, A-12 4, A-17 4, A-18 3,
+  A-19 4, A-20 2 (done), A-21 2, A-22 2.
+- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-28 1 / B-29 2 (done);
+  B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%); B-4 3,
+  B-6 8, B-7 2, B-8 2, B-9 3, B-10 3, B-30 2, B-31 1, B-32 2 (open).
+- B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
-  (60% — spread landed, yields-coupling open); B-20 3 (30%); B-21 2
-  (40%); B-23 3 (open).
-- B meta: B-25 3 (50%); B-22 3, B-24 3, B-33 3 (open).
+  (75% — coupling live; enhancer effects/missionaries/victory open);
+  B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
+- B meta: B-25 3 (70% — GPU sim poke-covered; player project path +
+  other victories open); B-22 3, B-24 3, B-33 3 (open).
 - E: E-16 1 (open); the landed E-sweep counted as 5 done.
 - G: G-1, G-2, G-3, G-4 — all done (chapter EMPTY).
 
@@ -109,8 +111,11 @@ untagged halves of tagged items stay Fable/main-session work.
   (LAND_SURVEYORS, slotted) is gate-inert: `buyTile` has no GPU verb
   on any seat (A-5). These become due if the card table order, W
   counts, or adoption rule ever change — the exporter already ships
-  every channel. STILL OPEN otherwise: new-card `unlockPolicy` civic
-  wiring (the ~30 inert B-13 cards).
+  every channel. **CLOSED (2026-07-18, ROUND B3 slice V)**: the
+  new-card `unlockPolicy` wiring landed (see B-13); the reachability
+  proof was re-derived post-wiring and the unreachable-channel set is
+  UNCHANGED (append-only cards cannot displace earlier slotted ones
+  under the greedy fill — gpu/ROUND_B3_LOG.md §V). A-7 remainder done.
 - A-9. Rival-unreachable catalog: `tryQueueRivalDistrict` (rivals.ts) /
   `_place_district_rival`+`rival_masks` (engine.py) iterate only
   `SCAFFOLD_DISTRICTS` (data/districts.ts: CAMPUS, HOLY_SITE,
@@ -324,12 +329,17 @@ gap; likewise GS disasters are modeled minus sea-level rise
   cost reads `tmove//3`, defense reads `tdef`) so marsh stays slow to
   enter while its defense flips — movement cost proven unchanged
   (0/27,456 tiles). Exporter emits `tmove`.
-- B-29 (new). No wounded-strength penalty and no river-crossing attack
-  penalty: `meleeAttack`/`damageRoll` (combat.ts) use full
-  `UNITS[type].combat` regardless of HP, and `crossesRiver`
-  (core/units.ts) is consulted only for movement cost, never combat.
-  Real: damaged units fight at reduced CS (up to −10), melee attacking
-  across a river takes −5. Attrition and river lines don't exist.
+- B-29. **RESOLVED (2026-07-18, ROUND B3 slice X)**: wounded units
+  fight at −1 CS per 10 HP lost (linear, to −10 at 0 HP) and melee
+  attacks across a river (`crossesRiver`) take −5 attacker CS — all
+  18 `damageRoll`/`_damage_roll` sites, every seat, ranged and wall
+  strikes river-immune; cities/CS centers/walls are not units and
+  keep full strength. Fractional diffs forced a quantization both
+  engines share: `q = round(diff·10)`, exp table 121→1201 entries at
+  0.1 granularity (float association made irrelevant by
+  construction); the CB statelog diff column now logs q. GPU river
+  lookup reuses the exported `riverMask` bit the movement walkers
+  read. Poke `gpu/combat_mod_test.py` (battery lane).
 - B-30 (new). Conquest razes all infrastructure: `captureRivalCity`
   and `transferCityToRival` (combat.ts / core/rivals.ts) rebuild the
   city with `buildings: []` and only the CITY_CENTER district;
@@ -354,11 +364,16 @@ gap; likewise GS disasters are modeled minus sea-level rise
   gpu/ROUND_B2_LOG.md §R).
 - B-12. **RESOLVED (2026-07-17, Round B2)**: `CIVICS` 31 → 51, same
   append-only treatment, inspirations likewise.
-- B-13. **RESOLVED breadth (2026-07-17, Round B2)**: `POLICIES` 19 →
-  58 incl. 6 diplomatic cards; `GOVERNMENTS` layouts verified.
-  Residuals (gpu/ROUND_B2_LOG.md §P): ~30 new cards are inert (effects
-  need absent systems), and the new cards' `unlockPolicy` civic wiring
-  is deferred — cards exist but no civic grants them yet.
+- B-13. **RESOLVED (2026-07-18, ROUND B3 slice V; breadth Round B2)**:
+  `POLICIES` 19 → 58 incl. 6 diplomatic cards; all 37 Round-B2 cards
+  now carry `unlockPolicy` on their real granting civic (7 recorded
+  substitutions for civics real Civ 6 grants elsewhere —
+  gpu/ROUND_B3_LOG.md §V) — zero unreachable cards. The wiring
+  activated the dormant MEDIEVAL_FAIRES "run 4 policy cards"
+  inspiration, which the exporter dropped and `_detect_boosts` never
+  detected — both fixed, player-only (TS `rivalCheckSatisfied` is
+  false for it). ~30 cards remain effect-inert (their real effects
+  need absent systems) — that is catalog-faithful, not a gap.
 - B-14. **RESOLVED (2026-07-17, Round B2, owner-ruled)**:
   `CITIZEN_SCIENCE` 0.7 → 0.5 (real Civ 6). Reshuffled every
   trajectory (fixture regen; rlenv coverage-test horizon 60→100; seed
@@ -393,12 +408,16 @@ gap; likewise GS disasters are modeled minus sea-level rise
   pressure/turn within 10 tiles of a founded religion's frozen holy
   center, `followedReligion` = argmax ties-to-lowest-id, KILL hygiene
   + `_reclaim_rc` permutation, proven by a new compared trace
-  column — first in-gate flip ~t65). STILL OPEN: the
-  pressure→YIELDS coupling (`followedReligion` is computed and
-  trace-proven but follower-belief yields still apply uniformly
-  per-civ — own gate-stage, exact next steps in ROUND_B2_LOG §T),
-  enhancer EFFECTS (all 7 inert), Missionaries/Apostles, theological
-  combat, religious victory.
+  column — first in-gate flip ~t65). **Coupling LIVE (2026-07-18,
+  ROUND B3 slice U)**: follower-belief yields (workEthic,
+  buildingYields, buildingHousing, amenitiesIfSpecialty,
+  faithPerWonder) key per-city on `followedReligion` in BOTH yield
+  pipelines — the player walk gained a follower application it never
+  had; landed inert-first (owner-keyed, byte-identical) then flipped;
+  16/24 scripted seeds reshuffled turn-exact
+  (gpu/ROUND_B3_LOG.md §U). Pantheon/founder/enhancer stay per-civ.
+  STILL OPEN: enhancer EFFECTS (all 7 inert), Missionaries/Apostles,
+  theological combat, religious victory.
 - B-19. **RESOLVED (2026-07-17, Round B2)**: era-anchored GP cost
   ladder `[60,120,200,290,390,500,620,750]` (`gpCost`), global race
   kept; WRITER/MUSICIAN classes added (n_gp=9, both → THEATER_SQUARE,
@@ -435,9 +454,16 @@ gap; likewise GS disasters are modeled minus sea-level rise
   6-step space-race project chain gated on late techs, `victoryType` 3
   (player win) / 4 (rival completion = defeat) in `endTurn`; Campus is
   the Spaceport proxy; TS-complete + vitest (`space-victory.test.ts`).
-  STILL OPEN: the GPU space-race SIMULATION (deferred as
-  gate-unreachable at 100t — the chain is filtered from the GPU
-  projects table; wire it with #56's 250t horizon), and
+  **GPU sim LANDED (2026-07-18, ROUND B3 slice W)**: the chain ships
+  to the GPU (exporter unfiltered with sp/vic/rt/rp fields,
+  `space_done` per-civ state, rival completion → victoryType 4 +
+  game_over via the A-14 projects path, endTurn recompute mirrored) —
+  landed byte-identical and PROVEN GATE-UNREACHABLE even at 250t
+  (rival greedy resolves a Campus to RESEARCH_GRANTS first; the
+  player has no GPU project subsystem), so parity rests on
+  `gpu/space_race_test.py` (gpu/ROUND_B3_LOG.md §W). STILL OPEN: a
+  player project-production path (victoryType 3 can only be
+  preserved, not produced, on the GPU), and
   Culture/Religious/Diplomatic victories (systems absent).
 - B-33 (new; the fidelity face of A-19). Rivals never interact with
   each other: rival `atWar` is only vs the player (`declareWar`,

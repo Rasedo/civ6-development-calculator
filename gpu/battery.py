@@ -106,6 +106,7 @@ def main() -> int:
                 ("rival_purchase", [py, "gpu/rival_purchase_test.py"], 4),
                 ("war", [py, "gpu/war_test.py"], 4),
                 ("ranged", [py, "gpu/ranged_test.py"], 4),
+                ("combat_mod", [py, "gpu/combat_mod_test.py"], 4),  # B-29 wounded + river
                 ("occupancy", [py, "gpu/occupancy_test.py"], 4),
                 ("builder_gain", [py, "gpu/builder_gain_test.py"], 4),
                 ("domination", [py, "gpu/domination_test.py"], 4),
@@ -117,6 +118,7 @@ def main() -> int:
                 ("gumbel", [py, "gpu/gumbel_test.py"], 4),
                 ("religion_gp", [py, "gpu/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "gpu/war_weariness_test.py"], 4),
+                ("space_race", [py, "gpu/space_race_test.py"], 4),
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

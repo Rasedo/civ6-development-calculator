@@ -192,7 +192,54 @@ def main() -> None:
     assert int(sim.holy_tile[0, 0]) == 42 and int(sim.city_pressure[0, 0, 0]) == 5 and int(sim.city_followed[0, 0]) == 0, \
         "pressure-spread state not preserved across snapshot"
 
+    # --- B-18 (slice U): per-city FOLLOWER-belief coupling ------------------
+    # A city draws the follower belief of the religion it FOLLOWS, not its
+    # owner's — proven bit-exactly via the coupling mechanism (_follower_by_rel
+    # / _follower_id_for / _fol_tab) plus the flag routing.
+    if sim.R >= 2:
+        import json as _json
+        _braw = _json.loads((FIXTURES / "rules.json").read_text())["buildings"]
+        _bid = [b["id"] for b in _braw]
+        sh, te = _bid.index("SHRINE"), _bid.index("TEMPLE")
+        # follower belief ids (data order): WORK_ETHIC 0, FEED_THE_WORLD 1.
+        sim.r_follower[:, 0] = 0  # rival 0 -> WORK_ETHIC
+        sim.r_follower[:, 1] = 1  # rival 1 -> FEED_THE_WORLD
+        fbr = sim._follower_by_rel()
+        assert bool((fbr[:, 0] == -1).all()), "player religion (col 0) never founds in-gate -> no follower"
+        assert bool((fbr[:, 1] == 0).all()) and bool((fbr[:, 2] == 1).all()), "religion id -> founding civ's follower"
+        # A city following religion 2 (rival 1) draws rival 1's follower (1); a
+        # city following religion 1 (rival 0) draws rival 0's follower (0); a
+        # city following none draws nothing — the FOREIGN-draw claim.
+        rel = torch.full((sim.B, 3), -1, dtype=torch.long)
+        rel[:, 0] = 2
+        rel[:, 1] = 1
+        fid = sim._follower_id_for(rel)
+        assert bool((fid[:, 0] == 1).all()), "following religion 2 -> rival 1's follower (FEED_THE_WORLD)"
+        assert bool((fid[:, 1] == 0).all()), "following religion 1 -> rival 0's follower (WORK_ETHIC)"
+        assert bool((fid[:, 2] == -1).all()), "following no religion -> no follower (pad)"
+        we = sim._fol_tab("we", fid)  # [B, 3]
+        assert bool((we[:, 0] == 0).all()), "FEED_THE_WORLD carries no Work Ethic"
+        assert bool((we[:, 1] == 1.0).all()), "WORK_ETHIC follower -> we = 1"
+        assert bool((we[:, 2] == 0).all()), "no follower -> pad row we = 0"
+        by = sim._fol_tab("bldgY", fid)  # [B, 3, NB, 6]
+        assert bool((by[:, 0, sh, 0] == 1.0).all()), "FEED_THE_WORLD SHRINE +1 food"
+        assert bool((by[:, 0, te, 0] == 2.0).all()), "FEED_THE_WORLD TEMPLE +2 food"
+        assert float(by[:, 1].abs().sum()) == 0.0, "WORK_ETHIC carries no building yields"
+        # founder (Stewardship) stays per-civ: _bel_add_pf excludes the follower.
+        pf = sim._bel_add_pf("bldgY", 0)  # [B, NB, 6]
+        full = sim._bel_add("bldgY", 0)
+        folrow = sim._bel["fol"]["bldgY"][sim.r_follower[:, 0] + 1]
+        assert bool(((pf + folrow - full).abs().sum() == 0)), "pan+founder + follower must reconstruct the full bldgY"
+        # flag routing: LIVE -> followedReligion; INERT -> owner religion.
+        if sim._b18_couple:
+            assert bool((sim._city_rel_player() == sim.city_followed).all()), "LIVE: player draws followedReligion"
+            assert bool((sim._rc_rel(1) == sim.rc_followed[:, 1]).all()), "LIVE: rival draws rc_followed"
+        else:
+            assert bool((sim._city_rel_player() == 0).all()), "INERT: player draws religion 0"
+            assert bool((sim._rc_rel(1) == 2).all()), "INERT: rival 1 draws owner religion 2"
+
     print("SLICE-Q RELIGION+GP OK")
+    print("SLICE-U FOLLOWER-COUPLING OK")
 
 
 if __name__ == "__main__":

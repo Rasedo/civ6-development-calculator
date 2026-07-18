@@ -8,7 +8,7 @@ import { addYields, emptyYields, type City, type GameState, type Tile, type Yiel
 import { tilesWithin, hexDistance } from './hex';
 import { hasFreshWater, isCoastalLand, isImpassable } from './query';
 import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities } from './yields';
-import { getModifiers, makeYieldCtx, type Modifiers, type YieldCtx } from './effects';
+import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
 import { cityTradeYields } from './trade';
 import { hasRiver } from './query';
@@ -394,7 +394,12 @@ export function computeCityStats(
   luxMap?: Map<number, number>,
   mods?: Modifiers,
 ): CityStats {
-  const m = mods ?? getModifiers(state);
+  // B-18: layer this city's followed religion's FOLLOWER belief onto the base
+  // per-civ modifiers. The player owner religion id is PLAYER_CIV (0); when the
+  // coupling switch is inert this reproduces the old (empty, player-never-
+  // founds) follower application byte-for-byte.
+  const base = mods ?? getModifiers(state);
+  const m = withFollowerBelief(state, base, followerReligionForCity(city.followedReligion, PLAYER_CIV));
   const ctx: YieldCtx = { map: state.map, mods: m };
   const map = state.map;
   const center = map.tiles[city.centerIndex];

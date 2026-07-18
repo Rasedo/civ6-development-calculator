@@ -215,3 +215,17 @@ export const RELIGION_PRESSURE_RANGE = 10;
 /** B-18: integer pressure added per in-range turn (integer keeps the flip
  * comparison exact — no float association across the batch). */
 export const RELIGION_PRESSURE_PER_TURN = 1;
+
+/**
+ * B-18 pressure→yields coupling master switch (Round B3, slice U). When false
+ * (INERT), a city's FOLLOWER-belief yields key on the OWNER civ's religion —
+ * byte-identical to the pre-coupling per-civ application. When true (LIVE),
+ * they key on the CITY's `followedReligion`, so a player city following a rival
+ * religion draws that religion's follower belief and a city following none gets
+ * no follower-belief yields. PANTHEON + FOUNDER + ENHANCER beliefs stay per-civ
+ * either way. Mirrored to the GPU via rules.followerCoupling. The restructure
+ * (follower belief moved out of getModifiers/getRivalModifiers into the per-city
+ * withFollowerBelief lookup) lands inert first; this flag flips the behavior in
+ * its own commit alongside a fixture regen.
+ */
+export const B18_FOLLOWER_COUPLING_LIVE = true;

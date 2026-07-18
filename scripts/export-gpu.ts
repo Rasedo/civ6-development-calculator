@@ -48,7 +48,7 @@ import {
   CS_MAX_HP,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TERRAINS } from '../src/data/terrains';
@@ -296,6 +296,13 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     const cls = c.class ? GP_CLASSES.indexOf(c.class) : -1;
     if (!c.class) row = { kind: 'greatPeople', cls: -1, count: c.count };
     else if (cls >= 0 && cls < 5) row = { kind: 'greatPeople', cls, count: c.count };
+  } else if (c.kind === 'policies') {
+    // B-13 (Slice V): the "run N policy cards" inspiration (MEDIEVAL_FAIRES,
+    // count 4). Dormant until the new-card unlockPolicy wiring let the scripted
+    // player fill 4+ slots in-gate; the GPU counts the PLAYER's slotted-policy
+    // mask (`_gov_policy_mods`). Player-only — rivalCheckSatisfied returns false
+    // for policies, and the rival boost loop skips this kind (no rival case).
+    row = { kind: 'policies', count: c.count };
   }
   if (row) boostRows.push({ target, idx, ...row });
 }
@@ -523,6 +530,10 @@ const rules = {
     enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
     // B-18: religious pressure spread radius (holy city -> cities within N tiles).
     pressureRange: RELIGION_PRESSURE_RANGE,
+    // B-18 (slice U): pressure->yields coupling master switch. When true a
+    // city's FOLLOWER-belief yields key on its followedReligion; when false the
+    // owner civ's religion (byte-identical to the pre-coupling per-civ apply).
+    followerCoupling: B18_FOLLOWER_COUPLING_LIVE,
   },
   // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
   // beliefs now APPLY to rival civs. Row order = the data-file key order;
@@ -580,22 +591,32 @@ const rules = {
   // y = YIELD_KEYS idx or -1, g = GP_CLASSES idx or -1). Out-of-scaffold
   // districts export d=-1 and never fire — table-driven for A-9's future.
   projects: {
-    // B-25: space-race projects are TS-only (the GPU space-race SIMULATION is
-    // deferred — see ROUND_B2_LOG). They are gated on Information/Future techs
-    // no civ reaches in the 100-turn gate AND sit last so the rival greedy
-    // `.find` never selects them, so filtering them here keeps the GPU project
-    // table (and every project index) byte-identical — both engines inert.
-    rows: Object.values(PROJECTS).filter((p) => !p.space).map((p) => ({
+    // B-25 (Round B3, Slice W): the space-race chain now SHIPS to the GPU.
+    // Every row carries sp (space flag) / vic (victory step) plus the tech
+    // gate (rt = techs-table idx) and previous-step link (rp = projects-table
+    // idx) so the GPU mirrors the sequence + the science victoryType 3/4.
+    // Space rows sit LAST (chain order): the rival greedy pick resolves to a
+    // base project first, and the scripted player never queues projects, so
+    // the chain is inert in-gate (gate-unreachable at 250t) — proven by the
+    // parity gate + gpu/space_race_test.py.
+    rows: Object.values(PROJECTS).map((p, _i, all) => ({
       d: PLACEABLE_DISTRICTS.indexOf(p.district),
       y: p.yield ? YIELD_KEYS.indexOf(p.yield) : -1,
       g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
+      sp: p.space ? 1 : 0,
+      vic: p.victory ? 1 : 0,
+      rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
+      rp: p.requiresProject ? all.findIndex((q) => q.id === p.requiresProject) : -1,
     })),
     yieldFraction: PROJECT_YIELD_FRACTION,
     gppFraction: PROJECT_GPP_FRACTION,
   },
-  // Barbarian rules (mirrors combat.ts). dmgBase[d+60] = 30·e^(0.04·d) is
-  // computed HERE so both engines share the exact same doubles — libm exp()
-  // may differ by an ulp between runtimes, and damage rounds to integers.
+  // Barbarian rules (mirrors combat.ts). B-29: strengthDiff is now a multiple
+  // of 0.1 (wounded units subtract hp/10, a river melee subtracts 5), so the
+  // table is indexed by q = round(diff·10) at 0.1 granularity — entry i holds
+  // 30·e^(0.04·(i−600)/10), the EXACT expression damageRoll evaluates for
+  // q = i−600. Computed HERE so both engines share the same doubles: libm
+  // exp() may differ by an ulp between runtimes, and damage rounds to integers.
   combat: {
     unitHp: UNIT_HP,
     cityMaxHp: CITY_MAX_HP,
@@ -608,7 +629,7 @@ const rules = {
     unitHealPerTurn: 10,
     unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
     campClearReward: 50,
-    dmgBase: Array.from({ length: 121 }, (_, i) => 30 * Math.exp(0.04 * (i - 60))),
+    dmgBase: Array.from({ length: 1201 }, (_, i) => 30 * Math.exp((0.04 * (i - 600)) / 10)),
   },
   // The trainable roster (mirrors trainableUnits + UNITS data). `civilian`
   // marks builder-type units (charges) — they hold the civilian stacking
@@ -843,7 +864,9 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // covering collapse trajectories, so no coverage is lost. Diagnose a dying
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
-  2: 9028, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
+  2: 9029, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
+  // 9028 died in ROUND B3's merged reshuffle (U yields + V civics + X combat
+  // compound): structural collapse by t250 — rerolled again.
   // #56: NOT an army-fixable death — Egypt war t21, Brightwater defects by
   // LOYALTY t54 (settled into Egypt's pressure blob), capital conquered t61.
   // Structural for a passive script with fixed t0 settle sites (the 9027

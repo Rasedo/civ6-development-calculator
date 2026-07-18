@@ -78,6 +78,10 @@ describe('founding a religion', () => {
       }).ok,
     ).toBe(true);
 
+    // B-18: FOLLOWER beliefs act per-city on the religion the CITY follows. The
+    // holy city follows the player's religion (id 0) once pressure spreads from
+    // its own holy tile; assert on a following city.
+    city.followedReligion = 0;
     const after = computeCityStats(state, city);
     // Choral Music: shrine +2c, temple +4c
     expect(after.breakdown.buildings.culture - before.breakdown.buildings.culture).toBe(6);
@@ -100,6 +104,9 @@ describe('founding a religion', () => {
       founder: 'CHURCH_PROPERTY',
       worship: 'MEETING_HOUSE',
     });
+    // B-18: Work Ethic is a FOLLOWER belief — it applies to the city that
+    // follows the religion (the holy city, id 0, once pressure spreads).
+    city.followedReligion = 0;
     const stats = computeCityStats(state, city);
     expect(stats.breakdown.districts.production).toBeGreaterThanOrEqual(1);
     expect(stats.breakdown.districts.production).toBe(stats.breakdown.districts.faith);

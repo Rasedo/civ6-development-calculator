@@ -11,10 +11,10 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
-import { getRivalModifiers } from './effects';
+import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
 import { isSuzerain } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
@@ -1019,9 +1019,11 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
     water = fresh ? water + AQUEDUCT_FRESH_BONUS : Math.max(water, AQUEDUCT_NO_FRESH_TOTAL);
   }
   let total = water;
-  // A-7: belief building housing (Religious Community) + River Goddess —
-  // the computeHousing beliefs (city.ts:247-250).
-  const m = getRivalModifiers(state, rival);
+  // A-7 / B-18: belief building housing (Religious Community) keys per-city on
+  // the city's followed religion; River Goddess (pantheon) stays per-civ. The
+  // owner religion id is this rival's index + 1 (used when coupling is inert).
+  const ownerRel = state.rivals.indexOf(rival) + 1;
+  const m = withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel));
   for (const id of rc.buildings) {
     total += BUILDINGS[id]?.housing ?? 0;
     total += m.buildingHousingAdd[id] ?? 0;
@@ -1067,15 +1069,18 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
     });
     for (const rc of ranked.slice(0, LUXURY_AMENITY_CITIES)) grants.set(rc.id, grants.get(rc.id)! + 1);
   }
-  // A-7: River Goddess + Zen Meditation join the tier balance exactly like
+  // A-7: River Goddess (pantheon, per-civ) + B-18 Zen Meditation (follower,
+  // per-CITY on the followed religion) join the tier balance exactly like
   // computeCityStats' have (city.ts:456-461); the luxury-grant RANKING
   // stays building-amenities-only, mirroring the player's luxuryAmenities.
-  const m = getRivalModifiers(state, rival);
+  const base = getRivalModifiers(state, rival);
+  const ownerRel = state.rivals.indexOf(rival) + 1;
   // B-15: this rival's flat war-weariness amenity penalty (symmetric with the
   // player's), applied to the tier balance after the luxury grants.
   const wwPenalty = warWearinessPenalty(rival.warWeariness ?? 0);
   const tiers = new Map<number, AmenityTier>();
   for (const rc of rival.cities) {
+    const m = withFollowerBelief(state, base, followerReligionForCity(rc.followedReligion, ownerRel));
     let extra = 0;
     if (m.riverCity && hasRiver(state.map.tiles[rc.centerIndex])) extra += m.riverCity.amenities;
     if (m.amenitiesIfSpecialty.length > 0) {
@@ -1109,9 +1114,13 @@ export function rivalCityYields(
   // player (Civ 6): improvement yields (mine +production), farm-adjacency, hill
   // farms — all from the rival's own techs/civics. NOT the player's boosts.
   // A-7: plus its OWN claimed pantheon/beliefs (getRivalModifiers) — feature/
-  // improvement yields flow through tileYields; building adds, Work Ethic and
-  // the founder's capital incomes apply below. Government/CS stay player-only.
-  const ctx = { map: state.map, mods: getRivalModifiers(state, rival) };
+  // improvement yields flow through tileYields; the founder's capital incomes
+  // and pantheon channels apply below. B-18: the FOLLOWER belief (Work Ethic,
+  // Feed the World / Choral Music building adds, faithPerWonder) keys per-city
+  // on this city's followed religion (owner religion = rival index + 1 when the
+  // coupling is inert). Government/CS stay player-only.
+  const ownerRel = state.rivals.indexOf(rival) + 1;
+  const ctx = { map: state.map, mods: withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel)) };
   const ranked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
       (t) =>
@@ -1693,7 +1702,7 @@ export function rivalPhase(state: GameState): void {
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
-          const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt);
+          const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender); // B-29 (attacker is the city)
           const atkCS = rivalCityDefense(state, rival, rc);
           defender.hp -= damageRoll(state, atkCS - defCS, 'rcstk', bestTile);
           if (defender.hp <= 0) disbandUnit(state, defender.id);

@@ -122,7 +122,64 @@ def main() -> None:
     cy, cpy, ch, cym, _s2 = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
     assert float(cy.abs().sum()) == 0.0 and float(cpy.abs().sum()) == 0.0 and float(ch.abs().sum()) == 0.0, "switch off => no mods"
 
-    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, live-by-default")
+    # 6) B-13 (Slice V) — a newly-wired card slots at its civic boundary.
+    #    CODE_OF_LAWS now also grants DISCIPLINE + SURVEY. CHIEFDOM has ONE
+    #    military slot; DISCIPLINE (earlier in POLICIES table order than SURVEY)
+    #    takes it, SURVEY is dropped, URBAN_PLANNING keeps the economic slot.
+    pol_i = {p["id"]: i for i, p in enumerate(rj["policies"])}
+    _, _, _, _, sl6 = sim._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
+    assert bool(sl6[0, pol_i["DISCIPLINE"]]), "DISCIPLINE fills CHIEFDOM's military slot once CODE_OF_LAWS grants it"
+    assert not bool(sl6[0, pol_i["SURVEY"]]), "SURVEY is dropped — CHIEFDOM has only one military slot"
+    assert bool(sl6[0, pol_i["URBAN_PLANNING"]]), "URBAN_PLANNING keeps the economic slot"
+
+    # 7) B-13: every newly-wired card is INERT — no gov/policy CHANNEL becomes
+    #    reachable through the wiring (the re-derived A-7 reachability proof).
+    #    All 37 new cards are wired (unlockCivic >= 0) and carry zero yields /
+    #    neutral multipliers, so slotting one never changes a traced quantity.
+    NEW_CARDS = {
+        "DISCIPLINE", "SURVEY", "MANEUVER", "AGOGE", "CHIVALRY", "BASTIONS", "FEUDAL_CONTRACT",
+        "CONSCRIPTION", "LEVEE_EN_MASSE", "ELITE_FORCES", "MILITARY_FIRST", "REDOUBT", "TOTAL_WAR",
+        "GOD_OF_THE_OPEN_SKY", "COLONIZATION", "ILKUM", "CARAVANSARIES", "MARITIME_INDUSTRIES",
+        "CORVEE", "SERFDOM", "PUBLIC_WORKS", "GOTHIC_ARCHITECTURE", "SKYSCRAPERS", "ECONOMIC_UNION",
+        "GRAND_MASTERS_CHAPEL", "FREE_TRADE", "DIPLOMATIC_LEAGUE", "CHARISMATIC_LEADER", "CONTAINMENT",
+        "COLLECTIVE_ACTIVISM", "ONLINE_COMMUNITIES", "MARTYRDOM", "STRATEGOS", "INSPIRATION",
+        "REVELATION", "LITERARY_TRADITION", "MONUMENTALITY",
+    }
+    seen_new = 0
+    for p in rj["policies"]:
+        if p["id"] not in NEW_CARDS:
+            continue
+        seen_new += 1
+        assert p["unlockCivic"] >= 0, f"{p['id']} must be wired to a granting civic"
+        assert all(v == 0 for v in p["cityYields"]) and all(v == 0 for v in p["capitalYields"]), f"{p['id']} carries flat yields (not inert)"
+        assert p["housingAll"] == 0 and p["amenitiesAll"] == 0, f"{p['id']} carries housing/amenity (not inert)"
+        assert all(v == 1 for v in p["yieldMult"]), f"{p['id']} carries yieldMult (not inert)"
+        assert all(v == 1 for v in p["adjacencyMult"]) and all(v == 1 for v in p["buildingYieldMult"]), f"{p['id']} carries a mult (not inert)"
+        assert p["tilePurchaseMult"] == 1, f"{p['id']} carries tilePurchaseMult (not inert)"
+        assert p["housingIfDistricts"][0] == -1 and p["amenitiesIfSpecialty"][0] == -1 and p["newDeal"][0] == -1, f"{p['id']} carries a conditional (not inert)"
+    assert seen_new == 37, f"expected all 37 Round-B2 cards present, saw {seen_new}"
+
+    # 8) B-13: the MEDIEVAL_FAIRES "run 4 policy cards" inspiration — dormant until
+    #    the wiring let the scripted player fill 4+ slots in-gate. Drive
+    #    _detect_boosts and assert it fires at >=4 slotted policies, not below.
+    #    Player-only (rivalCheckSatisfied returns false for 'policies').
+    mf_idx = civ_idx["MEDIEVAL_FAIRES"]
+    simp = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    simp.civics = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"])
+    _, _, _, _, slp = simp._gov_policy_mods(simp.civics)
+    assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
+    simp.civic_boosted[:] = False
+    simp._detect_boosts()
+    assert bool(simp.civic_boosted[0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
+    simn = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    simn.civics = civics_with(["CODE_OF_LAWS"])
+    _, _, _, _, sln = simn._gov_policy_mods(simn.civics)
+    assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
+    simn.civic_boosted[:] = False
+    simn._detect_boosts()
+    assert not bool(simn.civic_boosted[0, mf_idx]), "MEDIEVAL_FAIRES does NOT fire below 4 slotted policies"
+
+    print("government_test OK — adoption, slot fill incl. wildcard overflow, housingAll, influence tier, B-13 new-card slotting + inert-channel proof + MEDIEVAL_FAIRES policies inspiration")
 
 
 if __name__ == "__main__":

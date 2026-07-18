@@ -81,19 +81,35 @@ export function terrainDefense(tile: Tile): number {
   return d;
 }
 
+// AUDIT B-29 (real Civ 6): a damaged unit fights at reduced combat strength —
+// −1 CS per 10 HP lost, LINEAR, up to −10 at 0 HP. Kept in float (no rounding);
+// the strengthDiff it feeds into is quantized to 0.1 inside damageRoll so the
+// GPU's exp table can reproduce the exact JS double. Cities / city-states /
+// walls are NOT units — they never call this.
+export const RIVER_ATTACK_PENALTY = 5; // B-29: melee across a river, attacker CS −5
+export function woundPenalty(unit: { hp: number }): number {
+  return 10 * ((UNIT_HP - unit.hp) / 100);
+}
+
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
   // P4/D-1: the real Civ 6 random factor is 0.8–1.2 (equal-strength hits
   // land "reliably 24–36"), not the old 0.75–1.25.
-  const base = 30 * Math.exp(0.04 * strengthDiff);
+  // B-29: strengthDiff is now a multiple of 0.1 (wounded units subtract
+  // hp/10; a river melee subtracts 5). Quantize it to 0.1 granularity so the
+  // GPU's exp table — indexed by round(diff·10) — reproduces this exact JS
+  // double; one ulp in `base` can flip the rounded damage.
+  const q = Math.round(strengthDiff * 10);
+  const base = 30 * Math.exp((0.04 * q) / 10);
   // Phase-1 combat log (P5/S4 tooling; §F enrichment): every roll of the
   // CIV6_LOG game — the GPU _damage_roll twin. k = call-site tag, t =
   // target tile, c = the rng counter BEFORE the draw (absolute stream
-  // position). statelog drains into keyed CB lines.
+  // position). statelog drains into keyed CB lines. `diff` logs the
+  // quantized q (10·strengthDiff) so both engines print an identical int.
   const c0 = state.rngState >>> 0;
   const r = nextRandom(state);
   const dmg = Math.max(1, Math.round(base * (0.8 + 0.4 * r)));
   const cb = (globalThis as any).__cbLog;
-  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${strengthDiff} r${Math.round(r * 1e6)} dmg${dmg}`);
+  if (cb) cb.push(`k:${k} t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} dmg${dmg}`);
   return dmg;
 }
 
@@ -129,7 +145,12 @@ function sackCity(state: GameState, city: City): void {
 }
 
 function attackCity(state: GameState, attacker: Unit, city: City): void {
-  const atkCS = UNITS[attacker.type]?.combat ?? 0;
+  // B-29: the attacker's wound penalty reduces its CS; a river-crossing melee
+  // takes −5. The city center is not a unit (cityDefenseStrength unchanged).
+  const atkCS =
+    (UNITS[attacker.type]?.combat ?? 0) -
+    woundPenalty(attacker) -
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0);
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'pctyc', city.centerIndex);
@@ -219,8 +240,11 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const defender =
     enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   const defDef = UNITS[defender.type];
-  const defCS = (defDef?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender); // B-5
-  const atkCS = def.combat;
+  // B-5 fortify + B-29 wounded: both attacker and defender fight at their
+  // HP-reduced strength (up to −10 at 0 HP). B-29 river: a melee attacker
+  // crossing a river edge into the defender's tile takes −5.
+  const defCS = (defDef?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender);
+  const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
     // Civilians are simply killed (Civ 6 captures; we don't model capture).
@@ -268,14 +292,14 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
         const defCS = rivalCityDefense(state, rc.rival, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, def.ranged.strength - defCS, 'rngrc', targetIndex));
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rngrc', targetIndex));
         attacker.movesLeft = 0;
         return ok;
       }
       const cs = cityStateAt(state, targetIndex);
       if (cs && cs.centerIndex === targetIndex) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, def.ranged.strength - defCS, 'rngcs', targetIndex));
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rngcs', targetIndex));
         attacker.movesLeft = 0;
         return ok;
       }
@@ -283,8 +307,8 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     return no('Nothing to attack there.');
   }
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender); // B-5
-  defender.hp -= damageRoll(state, def.ranged.strength - defCS, 'rng', targetIndex);
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender); // B-5 + B-29
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
   return ok;
@@ -312,7 +336,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     const defCS = cityDefenseStrength(state, enemyCity);
     state.cityHp[String(enemyCity.id)] = Math.max(
       1,
-      getCityHp(state, enemyCity.id) - damageRoll(state, def.ranged.strength - defCS, 'vrngc', targetIndex),
+      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'vrngc', targetIndex),
     );
     attacker.movesLeft = 0;
     return;
@@ -320,8 +344,8 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender); // B-5
-  defender.hp -= damageRoll(state, def.ranged.strength - defCS, 'vrng', targetIndex);
+  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender); // B-5 + B-29
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'vrng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
 }
@@ -367,7 +391,10 @@ export function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalC
 }
 
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
-  const atkCS = UNITS[attacker.type]?.combat ?? 0;
+  const atkCS =
+    (UNITS[attacker.type]?.combat ?? 0) -
+    woundPenalty(attacker) -
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0); // B-29 wound + river (city not a unit)
   const defCS = rivalCityDefense(state, rival, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
   const dmgToCity = damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
@@ -400,7 +427,10 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
 
 /** Player siege of a city-state (attacking it IS the declaration of war). */
 function attackCityState(state: GameState, attacker: Unit, cs: CityState): void {
-  const atkCS = UNITS[attacker.type]?.combat ?? 0;
+  const atkCS =
+    (UNITS[attacker.type]?.combat ?? 0) -
+    woundPenalty(attacker) -
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0); // B-29 wound + river (CS center not a unit)
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
@@ -726,7 +756,7 @@ export function barbarianPhase(state: GameState): void {
     const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { owner: 'player' }));
     const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
     const tt = map.tiles[bestTile];
-    const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt);
+    const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender); // B-29 (attacker is the city — not a unit)
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
     if (defender.hp <= 0) killUnit(state, defender);

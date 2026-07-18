@@ -320,7 +320,7 @@ _MUTABLE = [
     "p_acted", "u_acted", "v_acted",
     "p_fortify", "u_fortify", "v_fortify",  # B-5 FORTIFY (military; cap 2)
     "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
-    "victory_type", "winner",
+    "victory_type", "winner", "space_done",  # B-25 (Round B3): space-race chain progress
     "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
     "builders_trained", "r_builders_trained",  # P4/D-10 cost escalators
     "best_melee", "r_best_melee",  # P4/D-22 city-defense trackers
@@ -650,6 +650,10 @@ class BatchSim:
         # mirroring the TS fresh-object reset on founding/flip).
         self._O = self.O  # 1 + R
         self._pressure_range = int(rr.get("pressureRange", 10))  # B-18: holy-city spread radius
+        # B-18 (slice U): pressure->yields coupling. LIVE => a city's FOLLOWER-
+        # belief yields key on its followedReligion (city_followed / rc_followed);
+        # INERT => the OWNER civ's religion (byte-identical to the per-civ apply).
+        self._b18_couple = bool(rr.get("followerCoupling", False))
         self.holy_tile = torch.full((B, self._O), -1, dtype=torch.long, device=device)
         self.city_pressure = torch.zeros(B, C, self._O, dtype=torch.long, device=device)
         self.city_followed = torch.full((B, C), -1, dtype=torch.long, device=device)
@@ -689,6 +693,18 @@ class BatchSim:
         self._proj_rows = list(_pj.get("rows", []))
         self._proj_yf = float(_pj.get("yieldFraction", 0.75))
         self._proj_gf = float(_pj.get("gppFraction", 0.3))
+        # B-25 (Round B3, Slice W): the space-race chain. Space rows carry
+        # sp/vic flags (+ rt tech gate, rp previous-step link) and sit LAST in
+        # the projects table (chain order). The rival greedy pick resolves to a
+        # base project first and the scripted player never queues projects, so
+        # the chain is inert in-gate (gate-unreachable at 250t). space_proj_idx
+        # = projects-table rows that are space steps; space_step maps a row idx
+        # to its 0-based position in the chain; space_victory_idx = the winning
+        # step(s). Mirrors data/projects.ts SPACE_PROJECTS + completeProject.
+        self._space_proj_idx = [i for i, row in enumerate(self._proj_rows) if int(row.get("sp", 0))]
+        self._n_space = len(self._space_proj_idx)
+        self._space_step = {pi: k for k, pi in enumerate(self._space_proj_idx)}
+        self._space_victory_idx = {i for i in self._space_proj_idx if int(self._proj_rows[i].get("vic", 0))}
         # A-4: rival world wonders — the tile planes (built_wonder id at a
         # paved tile, its completion flag), the per-rc registry, the static
         # placement bitmask + rid/des planes, and the effect tables.
@@ -1118,6 +1134,14 @@ class BatchSim:
         self.game_over = torch.zeros(B, dtype=torch.bool, device=device)  # GV-2
         self.victory_type = torch.zeros(B, dtype=torch.long, device=device)  # GV-4/GV-3
         self.winner = torch.full((B,), -1, dtype=torch.long, device=device)  # GV-3
+        # B-25 (Round B3): per-civ space-race chain progress in the unified civ
+        # space (index 0 = player, 1..R = rival i). Bool [B, 1+R, n_space].
+        # WRITE-tracked bookkeeping (the science victory fires on the victory
+        # STEP directly, like TS state/rival.spaceProjects — nothing reads it
+        # for behavior); _MUTABLE-registered for snapshot/restore. Per-CIV (not
+        # a city slot) so it is NOT slot-coupled: _reclaim_rc leaves it intact,
+        # and a dead rival cannot write it (no kill hygiene needed).
+        self.space_done = torch.zeros(B, 1 + self.R, max(self._n_space, 1), dtype=torch.bool, device=device)  # B-25
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         # Player units (phase 4b): trained via the production head, ordered
@@ -1141,7 +1165,7 @@ class BatchSim:
         self.tmove = torch.tensor([[t.get("tmove", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # Damage table stays float64 regardless of sim dtype: the RNG factor
         # is float64 and damage rounds to integers the TS engine must match.
-        self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 121), dtype=torch.float64, device=device)
+        self._dmg_base = torch.tensor(cb.get("dmgBase", [30.0] * 1201), dtype=torch.float64, device=device)  # B-29: 0.1-granular exp table
         self._unit_combat = torch.tensor(cb.get("unitCombat", [20, 25]), dtype=torch.long, device=device)
         # Trainable roster tables (index = position in rules.units).
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
@@ -2120,6 +2144,19 @@ class BatchSim:
             center_y = self.center_yields.clone()
             center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
         total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.view(1, 1, 6) + b_y
+        # B-18: per-PLAYER-city FOLLOWER-belief id (from followedReligion when
+        # LIVE, else player religion 0 = -1 follower = no add; INERT byte-exact).
+        # Its building-yield adds (Feed the World / Choral Music) land at the
+        # buildings position (pre-amenity), like cityBuildingYields' beliefAdd.
+        # Computed fresh (not cached): the term is pop-free but city_followed can
+        # change between turns without an _eff_version bump.
+        _pcfol = self._follower_id_for(self._city_rel_player()) if self._bel_any else None
+        if _pcfol is not None:
+            # (.to(self.dtype): the fol tables are f64 for the rival paths; the
+            # player walk runs in self.dtype — f32 under gumbel/training, where
+            # the raw f64 table would break the einsum. No-op under parity f64.)
+            _fol_by = torch.einsum("bcn,bcnk->bck", self.buildings.to(self.dtype), self._fol_tab("bldgY", _pcfol).to(self.dtype))
+            total = total + _fol_by
         if self.districts_on:
             if cc is not None:
                 # D-10: the whole block is pop-free — replay the cached per-
@@ -2130,6 +2167,8 @@ class BatchSim:
                 d_maint = cc["d_maint"]
                 has_aq = cc["has_aq"]
                 dcount_all = cc["dcount_all"]  # #46r: INSULAE's housingIfDistricts
+                spec_count = cc["spec_count"]  # B-18: Zen Meditation specialty count
+                hs_adj = cc["hs_adj"]  # B-18: Holy Site adjacency (follower Work Ethic)
             else:
                 # District adjacency yields (D2b: Campus science only, placed where no
                 # dynamic source is live so the value is purely floor(static);
@@ -2144,6 +2183,8 @@ class BatchSim:
                 # #46r: per-city COMPLETED live district count (ALL types —
                 # computeHousing's completedDistrictCount(state, city, false))
                 dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
+                # B-18: per-city COMPLETED specialty district count (Zen Meditation min).
+                spec_count = (owned_d & self._is_specialty[dt.clamp(min=0)]).to(torch.long).sum(dim=2)  # [B, C]
                 adjc = self._adj_district_count().to(self.dtype)  # [B, T] DISTRICT source count
                 # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
                 # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
@@ -2165,6 +2206,7 @@ class BatchSim:
                 # applied below — total + adjSum + csTerm, the original
                 # left-to-right association, cache hit or miss.
                 d_addends = []
+                hs_adj = None  # B-18: Holy Site floored adjacency (follower Work Ethic)
                 for d in self.districts_cat:
                     yc = int(d.get("adjYield", -1))
                     if yc < 0:
@@ -2173,7 +2215,10 @@ class BatchSim:
                     adjv = torch.floor(self._district_adj_raw(di, adjc))  # [B, T] full districtAdjacency
                     mask = owned_d & (dt == di)
                     dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed type-di districts (0/1)
-                    d_addends.append((yc, (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2), cs_dbonus[:, di].unsqueeze(1) * dcount))
+                    _adj_sum = (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2)  # [B, C]
+                    d_addends.append((yc, _adj_sum, cs_dbonus[:, di].unsqueeze(1) * dcount))
+                    if di == self._hs_idx:
+                        hs_adj = _adj_sum
                 # SHIPYARD special (yields.ts:171): a city holding a Shipyard adds its completed
                 # Harbor's full districtAdjacency as PRODUCTION — the SAME value that fed the Harbor's
                 # gold above, re-read here as production, pre-amenity-factor like every district yield.
@@ -2191,6 +2236,10 @@ class BatchSim:
                 has_aq = (owned_d & (dt == self._aqueduct_idx)).any(dim=2) if self._aqueduct_idx >= 0 else None
             for yc_a, adj_add, cs_add in d_addends:
                 total[:, :, yc_a] = total[:, :, yc_a] + adj_add + cs_add
+            # B-18: follower Work Ethic — Holy Site floored adjacency ALSO yields
+            # production (yields.ts:154), keyed on each city's followed religion.
+            if _pcfol is not None and hs_adj is not None:
+                total[:, :, 1] = total[:, :, 1] + hs_adj * self._fol_tab("we", _pcfol).to(self.dtype)
             if ship_add is not None:
                 total[:, :, 1] = total[:, :, 1] + ship_add
         popf = self.pop.to(self.dtype)
@@ -2222,6 +2271,12 @@ class BatchSim:
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
         self._last_lux = lux_add  # the walk freezes this (TS: one luxMap per turn)
         amen_have = amen_have + lux_add
+        # B-18: follower Zen Meditation — +amenities where the city's completed
+        # specialty count meets the belief's min (city.ts:464), keyed per-city on
+        # the followed religion. Integer terms => the balance sum stays exact.
+        if _pcfol is not None and self.districts_on:
+            _zen = self._fol_tab("zen", _pcfol).to(self.dtype)  # [B, C, 2] = min, amenities
+            amen_have = amen_have + torch.where(spec_count.to(self.dtype) >= _zen[:, :, 0], _zen[:, :, 1], torch.zeros_like(_zen[:, :, 1]))
         # B-15: flat empire-wide war-weariness drag, applied after the luxury
         # grant (mirrors city.ts `have -= warWearinessPenalty(...)`).
         balance = amen_have - amen_need - self._ww_penalty_player().unsqueeze(1)
@@ -2258,6 +2313,10 @@ class BatchSim:
             water_h = torch.where(has_aq, aq_h, self.water_housing)
         house_b = cc["house_b"] if cc is not None else torch.einsum("bcn,n->bc", bf, rd.b_housing)  # D-10
         housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + house_b
+        # B-18: follower Religious Community — +housing on Shrines/Temples
+        # (computeHousing beliefHousing), keyed per-city on the followed religion.
+        if _pcfol is not None:
+            housing = housing + torch.einsum("bcn,bcn->bc", self.buildings.to(self.dtype), self._fol_tab("bldgH", _pcfol).to(self.dtype))
         if self.improvements_on:
             # +catalog housing per owned improvement within the work radius
             # (pillaged or not — computeHousing does not gate on pillaged,
@@ -2295,6 +2354,8 @@ class BatchSim:
                 store["d_maint"] = d_maint
                 store["has_aq"] = has_aq
                 store["dcount_all"] = dcount_all  # #46r
+                store["spec_count"] = spec_count  # B-18 Zen Meditation
+                store["hs_adj"] = hs_adj  # B-18 follower Work Ethic
             if self.improvements_on:
                 store["imp_add"] = imp_add
             self._ct_cache = (self._eff_version, store)
@@ -2433,6 +2494,9 @@ class BatchSim:
         ty_oth = g["ty_oth"]
         oth_sc = g["oth_score"]
         _has_bel = self._r_has_beliefs(r)
+        # B-18: per-rc FOLLOWER-belief id [B, RC] (followed religion when LIVE,
+        # else owner r+1). Bit-identical to _bel_add's fol term when inert.
+        _fol_rc = self._follower_id_for(self._rc_rel(r)) if _has_bel else None
         featP = None
         if _has_bel:
             featP = self._belief_feat_plane(r)
@@ -2539,8 +2603,8 @@ class BatchSim:
                         continue
                     adjf = torch.floor(self._district_adj_raw(di, adjc_b4)).gather(1, tile_d.clamp(min=0)).double()
                     add = torch.where(has, adjf, torch.zeros_like(adjf))
-                    if di == self._hs_idx and _has_bel:  # A-7 Work Ethic
-                        prod = prod + add * self._bel_add("we", r).unsqueeze(1)
+                    if di == self._hs_idx and _has_bel:  # A-7/B-18 Work Ethic (per-city)
+                        prod = prod + add * self._fol_tab("we", _fol_rc)
                     if yc == 3:
                         sci = sci + add
                     elif yc == 4:
@@ -2564,8 +2628,11 @@ class BatchSim:
                 faith = faith + add6[:, :, 5]  # GV-1a
                 sci = sci + add6[:, :, 3]
                 cul = cul + add6[:, :, 4]
-                if _has_bel:  # A-7 belief building adds (int rows)
-                    badd = torch.einsum("bjn,bnk->bjk", selb.double(), self._bel_add("bldgY", r))
+                if _has_bel:  # A-7/B-18 belief building adds (int rows)
+                    # founder (Stewardship) per-civ + follower (Feed the World /
+                    # Choral Music) per-city; disjoint int keys => split is exact.
+                    badd = torch.einsum("bjn,bnk->bjk", selb.double(), self._bel_add_pf("bldgY", r))
+                    badd = badd + torch.einsum("bjn,bjnk->bjk", selb.double(), self._fol_tab("bldgY", _fol_rc))
                     food = food + badd[:, :, 0]
                     prod = prod + badd[:, :, 1]
                     gold = gold + badd[:, :, 2]
@@ -2591,7 +2658,7 @@ class BatchSim:
             cul = cul + wcy[:, :, 4]
             faith = faith + wcy[:, :, 5]
             if _has_bel:
-                faith = faith + self._bel_add("fpw", r).unsqueeze(1) * compw.sum(dim=2).double()
+                faith = faith + self._fol_tab("fpw", _fol_rc) * compw.sum(dim=2).double()  # B-18 per-city Divine Inspiration
         # A-7: founder capital incomes (per-civ values, applied at the capital)
         if _has_bel:
             perF = self._bel_add("perF", r)  # [B, 7]
@@ -2854,6 +2921,16 @@ class BatchSim:
                     dsel = self.district == dtype
                 on = dsel & self.district_complete & (self.owner >= 0) & ~self.district_dead  # player eurekas count PLAYER (live) districts
                 pred = on.sum(dim=1) >= row["count"]
+            elif kind == "policies":
+                # B-13 (Slice V): "run N policy cards" (MEDIEVAL_FAIRES, count 4).
+                # checkSatisfied counts state.government.policies non-null entries
+                # = the player's slotted-policy count. Gated on _gov_has_effects
+                # (matches TS: no adoption => empty government.policies => 0).
+                if self._gov_has_effects and self._npol:
+                    slotted = self._gov_policy_mods(self.civics)[4]
+                    pred = slotted.sum(dim=1) >= row["count"]
+                else:
+                    pred = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             else:
                 continue
             if row["target"] == "tech":
@@ -2949,14 +3026,40 @@ class BatchSim:
         log_hit = b is not None and bool(mask[b])
         c0 = int(self.rng_state[b]) if log_hit else 0
         r = self._next_random(mask)
-        base = self._dmg_base[(diff + 60).clamp(0, 120)]
+        # B-29: diff may be fractional now (wounded units subtract hp/10, a
+        # river melee subtracts 5). Quantize to 0.1 (q = round(diff·10)) and
+        # look up 30·e^(0.04·q/10) — the fixture table (indexed i = q+600) is
+        # the EXACT JS double damageRoll computes, so parity survives the ulp.
+        q = js_round(diff * 10).to(torch.long)
+        base = self._dmg_base[(q + 600).clamp(0, 1200)]
         dmg = js_round(base * (0.8 + 0.4 * r)).clamp(min=1).to(torch.long)
         if log_hit:
             t_ = int(tile[b]) if tile is not None else -1
             self._combat_events.append(
-                f"k:{k} t:{t_} c:{c0} diff{int(diff[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}"
+                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(js_round(r[b] * 1e6))} dmg{int(dmg[b])}"
             )
         return dmg
+
+    def _wound(self, hp: torch.Tensor) -> torch.Tensor:
+        """B-29 (real Civ 6): a damaged unit's combat-strength penalty —
+        −1 CS per 10 HP lost, linear, up to −10 at 0 HP. Float64, no rounding
+        (damageRoll quantizes the final diff). hp is a unit-HP tensor; cities /
+        city-states / walls are NOT units and never pass through here."""
+        return 10.0 * ((100.0 - hp.double()) / 100.0)
+
+    def _river_cross(self, frm: torch.Tensor, to: torch.Tensor) -> torch.Tensor:
+        """B-29 (mirrors crossesRiver): returns 1 where the melee edge
+        frm->to (an adjacent tile pair) crosses a river, else 0. neigh column
+        d IS riverMask bit d — the movement walkers read the same bit for the
+        +3 crossing charge — so find the neighbour direction of frm that lands
+        on `to` and return that river bit (at most one direction matches; a
+        non-adjacent or off-map `to` yields 0, exactly like crossesRiver)."""
+        arange6 = torch.arange(6, device=self.device)
+        nb = self.neigh[frm.clamp(min=0)]  # [B, 6]
+        match = (nb == to.unsqueeze(1)) & (to.unsqueeze(1) >= 0) & (frm.unsqueeze(1) >= 0)
+        rm = self.river_mask.gather(1, frm.clamp(min=0).unsqueeze(1)).squeeze(1)  # [B]
+        bits = (rm.unsqueeze(1) >> arange6) & 1  # [B, 6]
+        return (bits * match.long()).sum(dim=1)  # 0 or 1
 
     def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
         """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
@@ -3692,8 +3795,9 @@ class BatchSim:
         gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.p_type[:, p]]
-        d_city = self._damage_roll(att, atk_cs - def_cs, k="rcty", tile=tgt)
-        d_atk = self._damage_roll(att, def_cs - atk_cs, k="rctyc", tile=tgt)
+        atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(self.p_tile[:, p], tgt)  # B-29 wound + river (city not a unit)
+        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
         # AUDIT B-1: the outer wall pool soaks the hit first, spillover to HP.
         outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
@@ -3860,8 +3964,13 @@ class BatchSim:
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3  # B-5
-                d_def = self._damage_roll(att, atk_cs - def_cs, k="mel", tile=tgt)
-                d_atk = self._damage_roll(att, def_cs - atk_cs, k="melc", tile=tgt)
+                # B-29: attacker AND defender fight at HP-reduced strength.
+                b_hp = self.u_hp.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt)  # B-29 river
+                def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
+                d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
+                d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
                 def_dead = torch.zeros_like(att)
                 for grp, at_map, hp_t, alive_t, slot_t in (
@@ -3907,7 +4016,12 @@ class BatchSim:
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3  # B-5
-                d_def = self._damage_roll(r_att, atk_rs - def_cs, k="rng", tile=tgt)
+                # B-29: ranged attacker + defender wounded (no river for ranged).
+                b_hp = self.u_hp.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                v_hpd = self.v_hp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
+                atk_e = atk_rs - self._wound(self.p_hp[:, p])
+                def_e = def_cs - self._wound(torch.where(is_b, b_hp, v_hpd))
+                d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
                     (is_b, self.barb_at, self.u_hp, self.u_alive, bslot),
@@ -3934,7 +4048,11 @@ class BatchSim:
             if bool(r_civ.any()):
                 atk_rs = self._p_rng_str[self.p_type[:, p]]
                 def_cs = self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1).to(atk_rs.dtype)  # civilian combat 0 + terrain
-                d_def = self._damage_roll(r_civ, atk_rs - def_cs, k="rng", tile=tgt)
+                # B-29: attacker + the lone rival civilian defender both wounded.
+                civ_hp = self.v_hp.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
+                atk_e = atk_rs - self._wound(self.p_hp[:, p])
+                def_e = def_cs - self._wound(civ_hp)
+                d_def = self._damage_roll(r_civ, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
                 self.v_hp[rows, ks] -= d_def[rows]
@@ -3967,8 +4085,9 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
                 )
-                d_cs = self._damage_roll(cs_hit, atk_cs - def_cs, k="csty", tile=tgt)
-                d_atk = self._damage_roll(cs_hit, def_cs - atk_cs, k="cstyc", tile=tgt)
+                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt)  # B-29 wound + river (CS center not a unit)
+                d_cs = self._damage_roll(cs_hit, atk_e - def_cs, k="csty", tile=tgt)
+                d_atk = self._damage_roll(cs_hit, def_cs - atk_e, k="cstyc", tile=tgt)
                 rows = cs_hit.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
                 self.p_hp[:, p] = torch.where(cs_hit, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
@@ -3997,7 +4116,8 @@ class BatchSim:
                 gslot2 = self.rv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                 gar2 = ((gslot2 >= 0) & (self.v_civ[bidx2, gslot2.clamp(min=0)] == civ2)).long()
                 def_cs2 = torch.maximum(best_r2, torch.full_like(best_r2, 15)) + gar2 * 5
-                d_city2 = self._damage_roll(r_sieg, self._p_rng_str[self.p_type[:, p]] - def_cs2, k="rngrc", tile=tgt)
+                atk_e2 = self._p_rng_str[self.p_type[:, p]] - self._wound(self.p_hp[:, p])  # B-29 (city not a unit)
+                d_city2 = self._damage_roll(r_sieg, atk_e2 - def_cs2, k="rngrc", tile=tgt)
                 rows2 = r_sieg.nonzero(as_tuple=True)[0]
                 self.rc_hp[rows2, civ2[rows2], slot2[rows2]] = torch.maximum(
                     self.rc_hp[rows2, civ2[rows2], slot2[rows2]] - d_city2[rows2],
@@ -4018,7 +4138,8 @@ class BatchSim:
                     15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
                     + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx2).long() * 6
                 )
-                d_cs3 = self._damage_roll(r_cs, self._p_rng_str[self.p_type[:, p]] - def_cs3, k="rngcs", tile=tgt)
+                atk_e3 = self._p_rng_str[self.p_type[:, p]] - self._wound(self.p_hp[:, p])  # B-29 (CS center not a unit)
+                d_cs3 = self._damage_roll(r_cs, atk_e3 - def_cs3, k="rngcs", tile=tgt)
                 rows3 = r_cs.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows3, cs_sc[rows3]] = torch.maximum(
                     self.cs_hp[rows3, cs_sc[rows3]] - d_cs3[rows3],
@@ -4469,7 +4590,10 @@ class BatchSim:
                 def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt]
                 gar = (self.pmil_at[bidx, ctr] >= 0).long()  # cityDefenseStrength garrison +5
                 atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
-                d = self._damage_roll(strike, atk_cs - def_cs, k="pcstk", tile=tt)
+                # B-29: the defending unit is wounded (the attacker is the city).
+                def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_rmil, self.v_hp[bidx, m_slot.clamp(min=0)], self.v_hp[bidx, c_slot.clamp(min=0)]))
+                def_e = def_cs - self._wound(def_hp)
+                d = self._damage_roll(strike, atk_cs - def_e, k="pcstk", tile=tt)
                 rows = strike.nonzero(as_tuple=True)[0]
                 for grp, at_map, hp_t, alive_t, slot_t in (
                     (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
@@ -5267,6 +5391,53 @@ class BatchSim:
             * self._bel["fou"][key][self.r_founder[:, r] + 1]
         )
 
+    def _bel_add_pf(self, key: str, r: int) -> torch.Tensor:
+        """B-18: the pantheon + FOUNDER additive rows ONLY (NO follower) — the
+        per-civ remainder after the follower channel moves to the per-city
+        followed-religion lookup. Used for bldgY (founder Stewardship keeps its
+        Library/University/Market/Bank adds per-civ)."""
+        return (
+            self._bel["pan"][key][self.r_pantheon[:, r] + 1]
+            + self._bel["fou"][key][self.r_founder[:, r] + 1]
+        )
+
+    def _follower_by_rel(self) -> torch.Tensor:
+        """B-18: [B, O] follower-belief id per religion id (0 = player, always
+        -1 as the player never founds in-gate; i+1 = rival i's r_follower). Pad
+        id -1 gathers the neutral row 0 in the follower tables."""
+        fbr = torch.full((self.B, self._O), -1, dtype=torch.long, device=self.device)
+        if self.R > 0:
+            fbr[:, 1:1 + self.R] = self.r_follower[:, :self.R]
+        return fbr
+
+    def _follower_id_for(self, rel: torch.Tensor) -> torch.Tensor:
+        """B-18: map religion ids `rel` (any shape [B, ...], -1 = none) to the
+        follower-belief id of that religion's founding civ (-1 = none/pad)."""
+        fbr = self._follower_by_rel()  # [B, O]
+        flat = rel.reshape(self.B, -1)
+        fid = fbr.gather(1, flat.clamp(min=0)).reshape_as(rel)
+        return torch.where(rel >= 0, fid, torch.full_like(fid, -1))
+
+    def _fol_tab(self, key: str, fol_id: torch.Tensor) -> torch.Tensor:
+        """B-18: gather the FOLLOWER-belief effect table `key` per element of
+        `fol_id` (-1 pad -> neutral row 0). Result shape = fol_id.shape + the
+        table's trailing dims."""
+        return self._bel["fol"][key][fol_id + 1]
+
+    def _city_rel_player(self) -> torch.Tensor:
+        """B-18: the religion id each PLAYER city draws its follower belief from
+        — followedReligion when LIVE, else the player religion id 0 (INERT)."""
+        if self._b18_couple:
+            return self.city_followed
+        return torch.zeros(self.B, self.C, dtype=torch.long, device=self.device)
+
+    def _rc_rel(self, r: int) -> torch.Tensor:
+        """B-18: the religion id each rival-r city [B, RC] draws its follower
+        belief from — rc_followed when LIVE, else the owner religion id r+1."""
+        if self._b18_couple:
+            return self.rc_followed[:, r]
+        return torch.full((self.B, self.RC), r + 1, dtype=torch.long, device=self.device)
+
     def _belief_feat_plane(self, r: int) -> torch.Tensor:
         """A-7: [B, T, 6] belief TILE adds — featureYields at tiles with a
         LIVE feature (fid >= 0 and not stripped) plus improvementOnResource
@@ -5340,6 +5511,10 @@ class BatchSim:
         # adds them inside tileYields) — worked picks, scores and yields all
         # see them; the score adds stay exact (dyadic ints, f64).
         _has_bel = self._r_has_beliefs(r)
+        # B-18: this city's FOLLOWER-belief id (from its followed religion when
+        # LIVE, else the owner religion r+1 = byte-identical to _bel_add's fol
+        # term). pan/founder stay per-civ via _bel_add / _bel_add_pf.
+        _fol_j = self._follower_id_for(self._rc_rel(r)[:, j]) if _has_bel else None
         if _has_bel:
             featP = self._belief_feat_plane(r)
             f_plane = f_plane + featP[:, :, 0]
@@ -5477,7 +5652,7 @@ class BatchSim:
                     # A-7 Work Ethic: Holy Site adjacency ALSO yields
                     # production (the rivals.ts floored-adjacency twin)
                     if di == self._hs_idx and _has_bel:
-                        prod = prod + add * self._bel_add("we", r)
+                        prod = prod + add * self._fol_tab("we", _fol_j)  # B-18: per-city follower Work Ethic
                     if yc == 3:
                         sci = sci + add
                     elif yc == 4:
@@ -5505,7 +5680,12 @@ class BatchSim:
                 # A-7: belief building adds (Feed the World / Choral Music —
                 # the beliefAdd twin, unscaled, pre-tier like TS)
                 if _has_bel:
-                    badd = torch.einsum("bn,bnk->bk", selb.double(), self._bel_add("bldgY", r))
+                    # B-18: founder (Stewardship) bldgY stays per-civ; the
+                    # follower part (Feed the World / Choral Music) keys per-city.
+                    # Disjoint building keys + integer rows => the split sum is
+                    # bit-identical to the old combined _bel_add einsum.
+                    badd = torch.einsum("bn,bnk->bk", selb.double(), self._bel_add_pf("bldgY", r))
+                    badd = badd + torch.einsum("bn,bnk->bk", selb.double(), self._fol_tab("bldgY", _fol_j))
                     food = food + badd[:, 0]
                     prod = prod + badd[:, 1]
                     gold = gold + badd[:, 2]
@@ -5540,7 +5720,7 @@ class BatchSim:
                 cul = cul + wcy[:, 4]
                 faith = faith + wcy[:, 5]
                 if _has_bel:
-                    faith = faith + self._bel_add("fpw", r) * compw.sum(dim=1).double()
+                    faith = faith + self._fol_tab("fpw", _fol_j) * compw.sum(dim=1).double()  # B-18: per-city follower Divine Inspiration
         # A-7: the founder's capital incomes (perFollowers on the civ's LIVE
         # total pop + perCity) land on the capital BEFORE the tier scaling —
         # the rivalCityYields capitalYields position.
@@ -5641,12 +5821,15 @@ class BatchSim:
             # mirroring rivalAmenityTiers.
             ctr = self.rc_center[:, r].clamp(min=0)
             extra = self._bel_add("river", r)[:, 0].unsqueeze(1) * self.tile_river.gather(1, ctr).double()
-            zen = self._bel_add("zen", r)  # [B, 2] = min, amenities
-            if bool((zen[:, 1] != 0).any()):
+            # B-18: Zen Meditation keys per-city on the followed religion's
+            # follower belief (owner religion when inert = byte-identical).
+            zen_rc = self._fol_tab("zen", self._follower_id_for(self._rc_rel(r)))  # [B, RC, 2] = min, amenities
+            zmin, zamt = zen_rc[:, :, 0], zen_rc[:, :, 1]  # each [B, RC]
+            if bool((zamt != 0).any()):
                 dt_ = self.rc_dist_tile[:, r]
                 comp_ = (dt_ >= 0) & self.district_complete.gather(1, dt_.clamp(min=0).reshape(B, -1)).reshape_as(dt_)
                 spec_ = (comp_ & self._is_specialty.view(1, 1, -1)).sum(dim=2).double()
-                extra = extra + torch.where(spec_ >= zen[:, 0].unsqueeze(1), zen[:, 1].unsqueeze(1).expand_as(spec_), torch.zeros_like(spec_))
+                extra = extra + torch.where(spec_ >= zmin, zamt, torch.zeros_like(spec_))
             balance = have + out + extra - need
         else:
             balance = have + out - need
@@ -5997,8 +6180,15 @@ class BatchSim:
             f_v = self.v_fortify.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
             def_fort = torch.where(def_is_barb, f_b, torch.where(def_is_rv, f_v, f_p)) * 3  # B-5
             def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort
-            d_def = self._damage_roll(mil_att, atk_cs_all - def_cs, k="mel", tile=tgt)
-            d_atk = self._damage_roll(mil_att, def_cs - atk_cs_all, k="melc", tile=tgt)
+            # B-29: attacker AND defender fight at HP-reduced strength.
+            d_hp_p = self.p_hp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
+            d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
+            d_hp_v = self.v_hp.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
+            def_hp = torch.where(def_is_barb, d_hp_b, torch.where(def_is_rv, d_hp_v, d_hp_p))
+            atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt)  # B-29 river
+            def_e = def_cs - self._wound(def_hp)
+            d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
+            d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
             def_dead = torch.zeros_like(mil_att)
             for grp, at_map, hp_t, alive_t in (
@@ -6076,8 +6266,9 @@ class BatchSim:
         gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._unit_combat[self.u_type[:, u]]
-        d_city = self._damage_roll(att, atk_cs - def_cs, k="rcty", tile=tgt)
-        d_atk = self._damage_roll(att, def_cs - atk_cs, k="rctyc", tile=tgt)
+        atk_e = atk_cs - self._wound(self.u_hp[:, u]) - 5.0 * self._river_cross(self.u_tile[:, u], tgt)  # B-29 wound + river (city not a unit)
+        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         rows = att.nonzero(as_tuple=True)[0]
         # AUDIT B-1: the outer wall pool soaks the hit first, spillover to HP.
         outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
@@ -6287,8 +6478,9 @@ class BatchSim:
         gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
         def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
         _ct = self.site.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
-        d_city = self._damage_roll(att, atk_cs - def_cs, k="pcty", tile=_ct)
-        d_self = self._damage_roll(att, def_cs - atk_cs, k="pctyc", tile=_ct)
+        atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], _ct)  # B-29 wound + river (city not a unit)
+        d_city = self._damage_roll(att, atk_e - def_cs, k="pcty", tile=_ct)
+        d_self = self._damage_roll(att, def_cs - atk_e, k="pctyc", tile=_ct)
         rows = att.nonzero(as_tuple=True)[0]
         cs = slot[rows]
         # AUDIT B-1: the ANCIENT_WALLS outer pool soaks the hit first, only
@@ -6360,7 +6552,8 @@ class BatchSim:
             gm = self.pmil_at.gather(1, self.site.clamp(min=0))
             gar = (gm.gather(1, tgt_city.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
             def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
-            d_city = self._damage_roll(city_att, atk_rs - def_cs, k="vrngc", tile=tgt)
+            atk_e = atk_rs - self._wound(self.v_hp[:, v])  # B-29 (city not a unit)
+            d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             rows = city_att.nonzero(as_tuple=True)[0]
             cs_ = tgt_city[rows]
             self.city_hp[rows, cs_] = (self.city_hp[rows, cs_] - d_city[rows]).clamp(min=1)
@@ -6381,7 +6574,14 @@ class BatchSim:
             f_c = self.p_fortify.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1)  # player civilian: never fortifies (0)
             def_fort = torch.where(def_is_b, f_b, torch.where(def_is_c, f_c, f_p)) * 3  # B-5
             def_cs = torch.where(def_is_b, d_cs_b, torch.where(def_is_c, d_cs_c, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort
-            d_def = self._damage_roll(unit_att, atk_rs - def_cs, k="vrng", tile=tgt)
+            # B-29: ranged attacker + defender wounded (no river for ranged).
+            d_hp_p = self.p_hp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
+            d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
+            d_hp_c = self.p_hp.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1)
+            def_hp = torch.where(def_is_b, d_hp_b, torch.where(def_is_c, d_hp_c, d_hp_p))
+            atk_e = atk_rs - self._wound(self.v_hp[:, v])
+            def_e = def_cs - self._wound(def_hp)
+            d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             rows = unit_att.nonzero(as_tuple=True)[0]
             for grp, at_map, hp_t, alive_t, slot_t in (
                 (dm >= 0, self.pmil_at, self.p_hp, self.p_alive, dm),
@@ -7024,9 +7224,11 @@ class BatchSim:
                 farm_j = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own_j.double()).sum(dim=1)
                 housing_j = water_j + bh_j + farm_j
                 if self._r_has_beliefs(r):
-                    # A-7: Religious Community building housing + River
-                    # Goddess housing (rivalHousing's belief terms)
-                    housing_j = housing_j + torch.einsum("bn,bn->b", self.rc_bldg[:, r, j].double(), self._bel_add("bldgH", r))
+                    # A-7/B-18: Religious Community building housing keys per-city
+                    # on the followed religion (owner when inert); River Goddess
+                    # housing (pantheon) stays per-civ.
+                    _fol_h = self._follower_id_for(self._rc_rel(r)[:, j])  # [B]
+                    housing_j = housing_j + torch.einsum("bn,bn->b", self.rc_bldg[:, r, j].double(), self._fol_tab("bldgH", _fol_h))
                     housing_j = housing_j + self._bel_add("river", r)[:, 1] * self.tile_river.gather(1, ctr_j.unsqueeze(1)).squeeze(1).double()
                 head_j = housing_j - self.rc_pop[:, r, j].double()
                 hfac = torch.where(head_j >= 2, torch.ones_like(head_j), torch.where(head_j >= 1, torch.full_like(head_j, 0.5), torch.full_like(head_j, 0.25)))
@@ -7134,6 +7336,20 @@ class BatchSim:
                                     g_i = int(prow.get("g", -1))
                                     if 0 <= g_i < self.r_gpp.shape[2]:
                                         self.r_gpp[:, r, g_i] = torch.where(hitp, self.r_gpp[:, r, g_i] + amt_g, self.r_gpp[:, r, g_i])
+                                    # B-25: a rival completing a space-race step
+                                    # records chain progress (space_done, civ
+                                    # r+1); completing the VICTORY step ends the
+                                    # game as a player DEFEAT — victory_type 4,
+                                    # the domination-defeat mirror (rivals.ts
+                                    # completeProject twin). Space rows carry
+                                    # y=g=-1 so the yield/GPP blocks above are
+                                    # no-ops for them. Inert in-gate (the greedy
+                                    # pick never selects a space row).
+                                    if int(prow.get("sp", 0)):
+                                        self.space_done[hitp, r + 1, self._space_step[pi_]] = True
+                                        if pi_ in self._space_victory_idx:
+                                            self.victory_type = torch.where(hitp, torch.full_like(self.victory_type, 4), self.victory_type)
+                                            self.game_over = self.game_over | hitp
                 self._rival_border_growth(r, j, cact, cul_c)  # P5/S4: the timer died
                 # AUDIT B-2: the rival mirror of the player city strike — a
                 # rival city with ANCIENT_WALLS fires once/turn at the nearest
@@ -7174,7 +7390,10 @@ class BatchSim:
                             gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
                             gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
                             atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
-                            d = self._damage_roll(strike, atk_cs - def_cs, k="rcstk", tile=tt)
+                            # B-29: the defending unit is wounded (attacker is the city).
+                            def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_pmil, self.p_hp[bidx, pm_slot.clamp(min=0)], self.p_hp[bidx, pc_slot.clamp(min=0)]))
+                            def_e = def_cs - self._wound(def_hp)
+                            d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
                             for grp, at_map, hp_t, alive_t, slot_t in (
                                 (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
@@ -8665,8 +8884,15 @@ class BatchSim:
 
         self.turn += 1
         dom = self._domination()  # GV-3
-        self.game_over = (dom >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3
-        self.victory_type = torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))  # GV-4/GV-3
+        # B-25 (Round B3): a science victory (3, player) / defeat (4, a rival)
+        # set during THIS turn's project completions takes precedence over the
+        # domination/score recompute and is preserved — the TS endTurn mirror
+        # (game.ts: spaceWon = victoryType∈{3,4} → keep it). In-gate space_won
+        # is always False (chain gate-unreachable), so this is byte-identical to
+        # the prior recompute.
+        space_won = (self.victory_type == 3) | (self.victory_type == 4)  # B-25
+        self.game_over = space_won | (dom >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25
+        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))  # GV-4/GV-3 + B-25
         # D-1: leader() (a full empire+rival score pass) only matters where a
         # game just ENDED — torch.where evaluated it eagerly every turn and
         # threw it away. Winner stays -1 for running games either way.

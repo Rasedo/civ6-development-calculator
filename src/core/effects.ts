@@ -7,7 +7,8 @@ import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchSt
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, type BeliefEffects } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
+import { PLAYER_CIV } from './civs';
 import { csEnvoyBonuses } from './cityStates';
 
 // ---------------------------------------------------------------------------
@@ -254,10 +255,12 @@ export function getModifiers(state: GameState): Modifiers {
     }
   }
 
-  // Religion: pantheon always; follower/founder beliefs once founded.
+  // Religion: pantheon always; founder belief once founded. B-18: the FOLLOWER
+  // belief is NO LONGER applied per-civ here — it applies per-CITY keyed on that
+  // city's followedReligion (withFollowerBelief in computeCityStats /
+  // rivalCityYields). Pantheons + founder + enhancer stay per-civ.
   applyBeliefEffects(state, mods, state.religion?.pantheon ? PANTHEONS[state.religion.pantheon] : undefined);
   if (state.religion?.founded) {
-    applyBeliefEffects(state, mods, state.religion.follower ? FOLLOWER_BELIEFS[state.religion.follower] : undefined);
     applyBeliefEffects(state, mods, state.religion.founder ? FOUNDER_BELIEFS[state.religion.founder] : undefined);
     // B-18: Enhancer belief (inert effects this round; wired for symmetry).
     applyBeliefEffects(state, mods, state.religion.enhancer ? ENHANCER_BELIEFS[state.religion.enhancer] : undefined);
@@ -393,7 +396,9 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
   };
   applyBeliefEffects(state, mods, rival.pantheon ? PANTHEONS[rival.pantheon] : undefined, seat);
   if (rival.religionFounded) {
-    applyBeliefEffects(state, mods, rival.followerBelief ? FOLLOWER_BELIEFS[rival.followerBelief] : undefined, seat);
+    // B-18: the FOLLOWER belief moved to the per-CITY followed-religion lookup
+    // (withFollowerBelief in rivalCityYields/rivalHousing/rivalAmenityTiers) —
+    // it is NO LONGER applied per-civ here. Founder + enhancer stay per-civ.
     applyBeliefEffects(state, mods, rival.founderBelief ? FOUNDER_BELIEFS[rival.founderBelief] : undefined, seat);
     // B-18: symmetric with the player (state.religion.enhancer above). Every
     // enhancer effect is currently inert ({}), so this is byte-identical — the
@@ -402,6 +407,74 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
   }
   if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, rival.research);
   return mods;
+}
+
+// ---------------------------------------------------------------------------
+// B-18: per-city FOLLOWER-belief coupling
+// ---------------------------------------------------------------------------
+
+/**
+ * B-18: the FOLLOWER belief of religion `g` — the unified civ id (0 = the
+ * player's religion, i+1 = rival i's). Returns undefined for an unfounded /
+ * absent religion (g < 0, or the founding civ has not founded / claimed no
+ * follower). Follower beliefs carry ONLY the per-city channels workEthic,
+ * buildingYields, buildingHousing, amenitiesIfSpecialty and faithPerWonder
+ * (verified over FOLLOWER_BELIEFS), so they can be layered onto a base
+ * Modifiers per city without disturbing pantheon/founder/government channels.
+ */
+export function followerBeliefForReligion(state: GameState, g: number): BeliefDef | undefined {
+  if (g < 0) return undefined;
+  if (g === PLAYER_CIV) {
+    return state.religion?.founded && state.religion.follower
+      ? FOLLOWER_BELIEFS[state.religion.follower]
+      : undefined;
+  }
+  const rv = state.rivals[g - 1];
+  if (!rv || !rv.religionFounded || !rv.followerBelief) return undefined;
+  return FOLLOWER_BELIEFS[rv.followerBelief];
+}
+
+/**
+ * B-18: layer a city's followed religion's FOLLOWER belief onto a base
+ * (per-civ) Modifiers, returning a per-city Modifiers. `followed` is the
+ * religion id the city follows (null/-1 = none → base returned unchanged).
+ * Only the follower-belief channels are cloned+mutated (buildingYieldAdd,
+ * buildingHousingAdd, amenitiesIfSpecialty, workEthic, faithPerWonder); every
+ * other channel is shared with `base` by reference, so the numeric result is
+ * bit-identical to having applied that belief through the per-civ path. When
+ * the coupling switch is INERT the caller passes the OWNER civ's religion id,
+ * which reproduces the pre-coupling per-civ application exactly.
+ */
+export function withFollowerBelief(
+  state: GameState,
+  base: Modifiers,
+  followed: number | null | undefined,
+): Modifiers {
+  const belief = followed == null ? undefined : followerBeliefForReligion(state, followed);
+  if (!belief) return base;
+  const m: Modifiers = {
+    ...base,
+    buildingYieldAdd: { ...base.buildingYieldAdd },
+    buildingHousingAdd: { ...base.buildingHousingAdd },
+    amenitiesIfSpecialty: [...base.amenitiesIfSpecialty],
+  };
+  // Follower beliefs touch only the channels cloned above (+ workEthic/
+  // faithPerWonder scalars, copied by the spread) — applyBeliefEffects' other
+  // branches are no-ops for a follower belief, so `base` is never mutated.
+  applyBeliefEffects(state, m, belief);
+  return m;
+}
+
+/** B-18: the religion id a city draws its FOLLOWER belief from, honoring the
+ * coupling switch: LIVE → the city's followedReligion; INERT → the owner civ's
+ * religion id (0 = player, rivalIndex+1 = a rival), reproducing the old
+ * per-civ application. */
+export function followerReligionForCity(
+  followedReligion: number | null | undefined,
+  ownerReligionId: number,
+): number {
+  if (B18_FOLLOWER_COUPLING_LIVE) return followedReligion ?? -1;
+  return ownerReligionId;
 }
 
 /** Convenience bundle used by yield computations. */
