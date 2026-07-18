@@ -1058,10 +1058,24 @@ class BatchSim:
         self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
 
         self._eff_version = 0
+        # G1: two extra invalidation counters the _eff_version epoch misses.
+        #  _bel_version   — bumped at the three belief-claim sites (+restore/reset);
+        #                   r_pantheon/r_follower/r_founder change there only, with
+        #                   no eff bump, yet the same-turn trace re-reads that civ.
+        #  _rp_kill_version — bumped at the economy-loop strike-kill (7714-7717),
+        #                   the only unit-death site inside the loop; it flips
+        #                   u_alive/p_alive (route raided-mask) with no eff bump.
+        self._bel_version = 0
+        self._rp_kill_version = 0
         self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._score_cache: tuple[int, torch.Tensor] | None = None
         self._nprod_cache: tuple[int, torch.Tensor] | None = None
+        # G1: rival-phase caches, same single-slot-by-key shape as _rcy_globals.
+        self._rival_route_cache = None   # ((turn,r,_eff_version,_rp_kill_version), [B,RC]|None)
+        self._belief_feat_cache = None   # ((r,_eff_version,_bel_version), [B,T,6])
+        self._bel_add_memo = None        # (_bel_version, {(fn,key,r): tensor})
+        self._gov_pol_cache = None       # (_eff_version, {seat_tag: 5-tuple})
         # Static candidate lists for _pick_static: the k-th candidate in
         # tile order, so a pick is one gather instead of a [B, T] cumsum.
         def cand_list(cand: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1270,6 +1284,12 @@ class BatchSim:
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
         self._ct_cache = None  # D-10
+        # G1: beliefs/units reset to pristine — bump the counters and drop the
+        # rival-phase caches (bel_add memo is keyed on _bel_version alone).
+        self._bel_version += 1
+        self._rp_kill_version += 1
+        self._rival_route_cache = self._belief_feat_cache = None
+        self._bel_add_memo = self._gov_pol_cache = None
 
     def snapshot(self) -> dict:
         """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
@@ -1292,6 +1312,12 @@ class BatchSim:
         self._adjd_cache = self._adjc_cache = self._adjh_cache = None
         self._fadjq_cache = self._fadjf_cache = self._rcy_cache = self._bld_cache = None
         self._ct_cache = None  # D-10
+        # G1: the restored snapshot may carry different beliefs/units — bump the
+        # counters (mcts self-test covers this) and drop the rival-phase caches.
+        self._bel_version += 1
+        self._rp_kill_version += 1
+        self._rival_route_cache = self._belief_feat_cache = None
+        self._bel_add_memo = self._gov_pol_cache = None
 
     @staticmethod
     def _prereq_matrix(prereqs: list, n: int) -> torch.Tensor:
@@ -1848,6 +1874,23 @@ class BatchSim:
             hous_all = hous_all + sd @ self._pol_housing
         return city_y, cap_y, hous_all, ymult, slotted
 
+    def _gov_policy_mods_cached(self, seat_tag, civics2: torch.Tensor):
+        """G1: (seat_tag, _eff_version)-keyed wrapper over _gov_policy_mods. The
+        only mutable input is civics2 (a seat's researched civics); every civic
+        completion bumps _eff_version (player engine.py:9021, rival 7852), so the
+        eff epoch is a complete key. seat_tag is 'p' (player) or the rival index —
+        we key on the tag, never hash the tensor. Consumers only READ the returned
+        tuple (verified at 2293/2324/2367/2372/2711/2993/5855), so sharing one
+        object across the per-city loop is safe."""
+        if self._gov_pol_cache is None or self._gov_pol_cache[0] != self._eff_version:
+            self._gov_pol_cache = (self._eff_version, {})
+        d = self._gov_pol_cache[1]
+        v = d.get(seat_tag)
+        if v is None:
+            v = self._gov_policy_mods(civics2)
+            d[seat_tag] = v
+        return v
+
     def _district_adj_raw(self, di: int, adjc: torch.Tensor) -> torch.Tensor:
         """[B, T] UNFLOORED districtAdjacency for district di: static (d_static_adj)
         + 0.5·adjacent-districts + CITY_CENTER·adjacent-centers + HARBOR_DISTRICT·
@@ -2289,7 +2332,7 @@ class BatchSim:
         # `bonuses`, city.ts:445-447), summed pre-amenity-factor. Food (col 0)
         # is left unscaled by the amenity factor below, matching TS.
         if self._gov_has_effects:
-            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted = self._gov_policy_mods(self.civics)
+            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted = self._gov_policy_mods_cached("p", self.civics)
             total += gpc_city.unsqueeze(1)
             total += gpc_cap.unsqueeze(1) * self.is_cap.to(self.dtype).unsqueeze(2)
         else:
@@ -2708,7 +2751,7 @@ class BatchSim:
         # rivalCityYields `bonuses` position (rivals.ts). Same channels as the
         # player path (getRivalModifiers layers gov+policy into these mods).
         if self._gov_has_effects:
-            gcity, gcap, *_ = self._gov_policy_mods(self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
+            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
             acell = alive.double()  # [B, RC]
             gisc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
             food = food + gcity[:, 0].unsqueeze(1) * acell + gcap[:, 0].unsqueeze(1) * gisc
@@ -2990,7 +3033,7 @@ class BatchSim:
                 # = the player's slotted-policy count. Gated on _gov_has_effects
                 # (matches TS: no adoption => empty government.policies => 0).
                 if self._gov_has_effects and self._npol:
-                    slotted = self._gov_policy_mods(self.civics)[4]
+                    slotted = self._gov_policy_mods_cached("p", self.civics)[4]
                     pred = slotted.sum(dim=1) >= row["count"]
                 else:
                     pred = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -5446,12 +5489,23 @@ class BatchSim:
 
     def _bel_add(self, key: str, r: int) -> torch.Tensor:
         """A-7: rival r's summed ADDITIVE effect rows (pantheon + follower +
-        founder; unclaimed ids land on the zero pad row)."""
-        return (
-            self._bel["pan"][key][self.r_pantheon[:, r] + 1]
-            + self._bel["fol"][key][self.r_follower[:, r] + 1]
-            + self._bel["fou"][key][self.r_founder[:, r] + 1]
-        )
+        founder; unclaimed ids land on the zero pad row). G1: memoised on
+        _bel_version — the only mutable inputs are r_pantheon/r_follower/
+        r_founder[:,r], which change solely at the belief-claim sites (each bumps
+        _bel_version) and restore/reset (ditto). All consumers read-only."""
+        if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
+            self._bel_add_memo = (self._bel_version, {})
+        d = self._bel_add_memo[1]
+        mk = ("add", key, r)
+        v = d.get(mk)
+        if v is None:
+            v = (
+                self._bel["pan"][key][self.r_pantheon[:, r] + 1]
+                + self._bel["fol"][key][self.r_follower[:, r] + 1]
+                + self._bel["fou"][key][self.r_founder[:, r] + 1]
+            )
+            d[mk] = v
+        return v
 
     def _bel_mul(self, key: str, r: int) -> torch.Tensor:
         """A-7: the MULTIPLICATIVE twin (pad row = 1.0) — border/growth."""
@@ -5465,11 +5519,20 @@ class BatchSim:
         """B-18: the pantheon + FOUNDER additive rows ONLY (NO follower) — the
         per-civ remainder after the follower channel moves to the per-city
         followed-religion lookup. Used for bldgY (founder Stewardship keeps its
-        Library/University/Market/Bank adds per-civ)."""
-        return (
-            self._bel["pan"][key][self.r_pantheon[:, r] + 1]
-            + self._bel["fou"][key][self.r_founder[:, r] + 1]
-        )
+        Library/University/Market/Bank adds per-civ). G1: memoised on
+        _bel_version, same shared memo as _bel_add (disjoint fn tag)."""
+        if self._bel_add_memo is None or self._bel_add_memo[0] != self._bel_version:
+            self._bel_add_memo = (self._bel_version, {})
+        d = self._bel_add_memo[1]
+        mk = ("pf", key, r)
+        v = d.get(mk)
+        if v is None:
+            v = (
+                self._bel["pan"][key][self.r_pantheon[:, r] + 1]
+                + self._bel["fou"][key][self.r_founder[:, r] + 1]
+            )
+            d[mk] = v
+        return v
 
     def _follower_by_rel(self) -> torch.Tensor:
         """B-18: [B, O] follower-belief id per religion id (0 = player, always
@@ -5516,7 +5579,14 @@ class BatchSim:
         plus, since A-13, improvementYields at unpillaged improvements
         (yields.ts:49-53 — God of the Open Sky pastures etc. are buildable
         now). TS adds all three inside tileYields, so they ride every
-        consumer: worked-tile picks and yields, scores, the border ySum."""
+        consumer: worked-tile picks and yields, scores, the border ySum.
+        G1: cached single-slot on (r, _eff_version, _bel_version). Belief inputs
+        bump _bel_version (claims/restore); tile inputs (feat_id/feat_stripped/
+        improvement/pillaged/res_stripped/res_priority) bump _eff_version at their
+        mutation sites. All consumers read-only (2532/5631/6097)."""
+        key = (r, self._eff_version, self._bel_version)
+        if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
+            return self._belief_feat_cache[1]
         featA = self._bel_add("featY", r)  # [B, nFeat, 6]
         plane = featA.gather(1, self.feat_id.clamp(min=0).unsqueeze(2).expand(-1, -1, 6))
         live = ((self.feat_id >= 0) & ~self.feat_stripped).unsqueeze(2).to(plane.dtype)
@@ -5534,6 +5604,7 @@ class BatchSim:
         impY = self._bel_add("impY", r)  # [B, nImp, 6]
         imp_live = ((self.improvement >= 0) & ~self.pillaged).unsqueeze(2).to(plane.dtype)
         plane = plane + impY.gather(1, self.improvement.clamp(min=0).unsqueeze(2).expand(-1, -1, 6)) * imp_live
+        self._belief_feat_cache = (key, plane)
         return plane
 
     def _rival_route_income(self, r: int) -> torch.Tensor | None:
@@ -5543,12 +5614,25 @@ class BatchSim:
         when the civ holds no routes batch-wide. Mirrors the rivalCityYields
         route loop: dest resolved by rc id among LIVING cities, a route is
         suspended while a barbarian (always) or player unit (at war) sits
-        within 3 of either endpoint. NOT cacheable across the city loop —
-        a district completing mid-loop raises a later origin's dest bonus,
-        exactly like TS's sequential rivalCityYields calls."""
+        within 3 of either endpoint.
+        G1: cached single-slot on (turn, r, _eff_version, _rp_kill_version). Reads
+        r_routes/rc_id/rc_alive/rc_center/rc_dist_tile/r_atwar[:,r] (all constant
+        through the economy loop for this r — trade/war run outside it), plus
+        district_complete (its mid-loop completions bump _eff_version, so a later
+        origin's raised dest bonus recomputes — the old 'NOT cacheable' note) and
+        u_alive/p_alive (the strike-kill at 7714-7717 bumps _rp_kill_version). All
+        other route(r) callers (rival_empire_score/rival_score via leader/domination/
+        trace) run after the full rival phase and iterate r strictly sequentially,
+        so with R>=2 the single slot is always overwritten by a different r before
+        the same r is re-requested -> recompute against current state (gates R=3).
+        Consumer reads only column j, read-only."""
+        key = (self.turn, r, self._eff_version, self._rp_kill_version)
+        if self._rival_route_cache is not None and self._rival_route_cache[0] == key:
+            return self._rival_route_cache[1]
         rr = self.r_routes[:, r]  # [B, K, 2]
         act = rr[:, :, 0] >= 0
         if not bool(act.any()):
+            self._rival_route_cache = (key, None)
             return None
         B, RC = self.B, self.RC
         ids = self.rc_id[:, r]  # [B, RC]
@@ -5576,6 +5660,7 @@ class BatchSim:
         pays = act & has_from & has_dest & ~raided
         inc = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
         inc.scatter_add_(1, from_j, per.gather(1, dest_j) * pays.double())
+        self._rival_route_cache = (key, inc)
         return inc
 
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
@@ -5852,7 +5937,7 @@ class BatchSim:
         # A-7r: government + slotted-policy flat yields (cityYields all cities,
         # capitalYields the capital) — pre-tier, the batched twin's addition.
         if self._gov_has_effects:
-            gcity, gcap, *_ = self._gov_policy_mods(self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
+            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
             mcell = mask.double()  # [B]
             gisc = (self.rc_is_cap[:, r, j] & mask).double()  # [B]
             food = food + gcity[:, 0] * mcell + gcap[:, 0] * gisc
@@ -7715,6 +7800,8 @@ class BatchSim:
                                 dead = hp_t[g, ds] <= 0
                                 at_map[g[dead], tt[g[dead]]] = -1
                                 alive_t[g[dead], ds[dead]] = False
+                                if bool(dead.any()):
+                                    self._rp_kill_version += 1  # G1: u_alive/p_alive death -> _rival_route_income raided-mask changes for city j+1
                 # AUDIT A-10: a siege pins the HP, exactly like the player's
                 # heal — any adjacent unit hostile to THIS civ (the player's
                 # at-war units, CIVILIANS included per unitsHostile — the
@@ -7944,6 +8031,7 @@ class BatchSim:
                 prow = popen.nonzero(as_tuple=True)[0]
                 self.pan_claimed[prow, pid[prow]] = True
                 self.r_pantheon[prow, r] = pid[prow]
+                self._bel_version += 1  # G1: belief change -> _bel_add / _belief_feat_plane invalidate
             self.r_faith[:, r] = torch.where(popen, self.r_faith[:, r] - pfc, self.r_faith[:, r])
             self.pantheon_claimed_n = self.pantheon_claimed_n + popen.long()
             self.r_pantheon_done[:, r] = self.r_pantheon_done[:, r] | popen
@@ -7967,6 +8055,7 @@ class BatchSim:
                     bid = sel.long().argmax(dim=1)
                     claimed_m[rrow, bid[rrow]] = True
                     ids_t[rrow, r] = bid[rrow]
+                self._bel_version += 1  # G1: follower/founder change -> _bel_add / _belief_feat_plane invalidate
             self.claimed_f_n = self.claimed_f_n + ropen.long()
             self.claimed_o_n = self.claimed_o_n + ropen.long()
             self.r_religion_done[:, r] = self.r_religion_done[:, r] | ropen
@@ -7995,6 +8084,7 @@ class BatchSim:
                 eid = sel.long().argmax(dim=1)
                 self.enh_claimed[erow, eid[erow]] = True
                 self.r_enhancer[erow, r] = eid[erow]
+                self._bel_version += 1  # G1: enhancer claim (inert today, but keep the belief epoch honest)
             self.claimed_e_n = self.claimed_e_n + eopen.long()
             self.r_enhancer_done[:, r] = self.r_enhancer_done[:, r] | eopen
 
