@@ -92,6 +92,21 @@ combat overrides here.
     unit-slots over 120 turns (4 on water at end) with no crash — the war-march
     water composition, embark transitions and EMBARK_MOVES pool all execute.
 
+## SCOPING: GPU passability composition confined to the war-march
+- The brief listed composing passability at EVERY `self.passable` gather site
+  (player move, builder walk, barb walk, rival civ walk, patrol, spawn/target
+  probes) "inert for land movers". Given the whole feature is behind the inert
+  flag AND no naval units exist, that composition would be a strict no-op there:
+  `passable | (wpass & unit_naval & …)` with unit_naval all-false ≡ passable. It
+  is dead code for N1 and pure parity risk (broadcast-shape slips), and N2 must
+  rewrite each of those sites substantially anyway to make naval movers actually
+  MOVE (embark transitions, EMBARK_MOVES, combat) — a bare legality term buys it
+  little. So N1 composes ONLY at the rmil war-march (the one site the brief says
+  changes behaviour) and defers the other-site composition to N2 with the naval
+  mechanics. `wpass`, `ocean_tile`, `unit_naval` and the tech-index helpers are
+  all in place for N2 to wire those sites. (TS mirrors this: unitPassable is the
+  terrain plane; only tileFreeForUnit+war-march compose the gate.)
+
 ## GATE RESULTS (all foreground)
 - npx tsc --noEmit: clean
 - npx vitest run (naval-embark + units + combat + rivals): 54 passed (9 new)
