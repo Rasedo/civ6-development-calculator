@@ -359,6 +359,7 @@ describe('rival CS trade routes (A-12b)', () => {
       questIssuedTurn: 0,
       ...opts,
     };
+    for (const t of tilesWithin(state.map, col, row, 1)) t.csId = cs.id; // placement's territory tags (cityStateAt resolves by tile csId)
     state.cityStates.push(cs);
     return cs;
   }
@@ -402,5 +403,31 @@ describe('rival CS trade routes (A-12b)', () => {
     rival.tradeRoutes = [{ from: rival.cities[0].id, toCs: cs.id }];
     captureCityState(state, cs);
     expect(rival.tradeRoutes.length).toBe(0);
+  });
+
+  it("join-the-suzerain's-war: an at-war rival melee sieges a player-suzerain CS; conquest lands it as a rival city", () => {
+    const state = makeState();
+    state.unitsMode = true;
+    const rival = addRival(state, 4, 4);
+    const cs = addCs(state, 9, 9);
+    cs.envoys = 3; // the player is suzerain, uncontested
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 8).index, 'rival', rival.id);
+    const u = state.units[state.units.length - 1];
+    expect(attackTargets(state, u)).not.toContain(cs.centerIndex); // at peace: no join-the-war
+    rival.atWar = true;
+    expect(attackTargets(state, u)).toContain(cs.centerIndex);
+    cs.envoys = 0; // not suzerain: the gate closes again
+    expect(attackTargets(state, u)).not.toContain(cs.centerIndex);
+    cs.envoys = 3;
+    cs.hp = 1;
+    const before = rival.cities.length;
+    meleeAttack(state, u.id, cs.centerIndex);
+    expect(state.cityStates.find((c) => c.id === cs.id)).toBeUndefined();
+    expect(rival.cities.length).toBe(before + 1);
+    const rc = rival.cities[rival.cities.length - 1];
+    expect(rc.centerIndex).toBe(cs.centerIndex);
+    expect(rc.population).toBe(2); // 3 × 0.75 floored
+    expect(state.map.tiles[cs.centerIndex].rivalId).toBe(rival.id);
+    expect(state.map.tiles[cs.centerIndex].rivalCityId).toBe(rc.id);
   });
 });

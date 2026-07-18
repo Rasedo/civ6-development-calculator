@@ -3927,6 +3927,54 @@ class BatchSim:
             self._init_center_live(b, c_new, c_t)
         self._eff_version += 1
 
+    def _capture_city_state_rival(self, rows: torch.Tensor, cs_of: torch.Tensor, v: int) -> None:
+        """A-12b: captureCityStateForRival — the CS joins the CONQUERING
+        rival's empire (join-the-suzerain's-war): pop x0.75 floor 1, the
+        ring-2 csId territory re-tags to the new rc (A-17 registry), envoys
+        die with the CS (cs_alive gates every consumer), the maxCities raze
+        rule, routes pruned with the endpoint. Append bookkeeping mirrors
+        _transfer_city_to_rival: last-alive+1 slot (rc slot order == TS
+        array order), full slot hygiene, id from r_next_city_id."""
+        for i in range(len(rows)):
+            b = int(rows[i]); s = int(cs_of[rows[i]])
+            r = int(self.v_civ[b, v])
+            c_t = int(self.cs_center[b, s])
+            pop = max(1, (int(self.cs_pop[b, s]) * 3) // 4)
+            self.cs_alive[b, s] = False
+            # routes die with the city-state (every civ; dest encoded -(2+s))
+            dead_cs = self.r_routes[b, :, :, 1] == -(2 + s)
+            self.r_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.r_routes[b], -1), self.r_routes[b])
+            ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
+            self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
+            if int(self.rc_alive[b, r].sum()) >= int(self.rules.rivals.get("maxCities", 6)):
+                continue  # razed: the CS dies, its ring frees, NO city (TS early-return)
+            alive_w = self.rc_alive[b, r].nonzero(as_tuple=True)[0]
+            slot = int(alive_w.max()) + 1 if len(alive_w) else 0
+            assert slot < self.RC, "rival city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
+            new_id = int(self.r_next_city_id[b, r])
+            self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], r), self.rival_at[b])
+            self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], new_id), self.rc_tile_id[b])
+            self.rc_alive[b, r, slot] = True
+            self.rc_is_cap[b, r, slot] = False
+            self.rc_center[b, r, slot] = c_t
+            self.rc_pop[b, r, slot] = pop
+            self.rc_growth[b, r, slot] = 0
+            self.rc_cbox[b, r, slot] = 0
+            self.rc_loyalty[b, r, slot] = 100.0
+            self.rc_acquired[b, r, slot] = 0  # TS tilesAcquired: 0
+            self.rc_hp[b, r, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
+            self.rc_id[b, r, slot] = new_id
+            self.rc_current[b, r, slot] = -1
+            self.rc_progress[b, r, slot] = 0.0
+            self.rc_cost[b, r, slot] = 0.0
+            self.rc_qtile[b, r, slot] = -1
+            self.rc_dist_tile[b, r, slot, :] = -1
+            self.rc_wonder[b, r, slot, :] = -1
+            self.rc_bldg[b, r, slot, :] = False
+            self.r_next_city_id[b, r] += 1
+            self.rvcity_at[b, c_t] = r
+        self._eff_version += 1
+
     def _init_center_live(self, b: int, c_new: int, c_t: int) -> None:
         """P5/S1 gate-catch (seed 9131 rng 2026006110 t196): a CAPTURED
         city's center yields must come from the LIVE tile — TS
@@ -6700,11 +6748,30 @@ class BatchSim:
         rng_u = torch.where(rngd, self._p_rng_rng[vt0], torch.ones_like(vt0))
         d_all = self.pair_dist[hc0].to(torch.long)  # [B, T]
         units_pl = (self.pmil_at >= 0) | (self.pciv_at >= 0) | (self.barb_at >= 0)
+        # A-12b join-the-suzerain's-war: adjacent CS centers whose suzerain
+        # is THE PLAYER (strict contest) are MELEE targets for an at-war
+        # rival — attackTargets' csWar predicate (d==1, !ranged).
+        cs_suz_t = None
+        S = self.S
+        if S > 0 and self.R > 0:
+            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+            suz_p = (
+                (self.cs_envoys[:, :S] >= suz_min)
+                & (self.cs_envoys[:, :S] > self.cs_r_envoys[:, :, :S].max(dim=1).values)
+                & self.cs_alive[:, :S]
+            )  # [B, S] the player's strict isSuzerain
+            if bool(suz_p.any()):
+                cs_suz_t = torch.zeros(B, T, dtype=torch.bool, device=dev)
+                cs_suz_t.scatter_(1, self.cs_center[:, :S].clamp(min=0), suz_p)
+            else:
+                cs_suz_t = None
         valid = (
             (d_all >= 1)
             & (d_all <= rng_u.unsqueeze(1))
             & ((self.center_at >= 0) | units_pl | (self.rvcity_at >= 0))
         )
+        if cs_suz_t is not None:
+            valid = valid | (cs_suz_t & (d_all == 1) & ~rngd.unsqueeze(1))
         tkey = torch.where(valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
         target_tile = tkey.min(dim=1).values
         attack = act & (target_tile <= T)
@@ -6726,6 +6793,42 @@ class BatchSim:
         r_att = attack & rngd
         if bool(r_att.any()):
             acted_att = acted_att | self._hostile_ranged_strike(r_att, ttc, v)
+        # A-12b: melee vs a player-suzerain CS CENTER — attackCityState with
+        # the rival attacker: defCS = 15 + pop (+6 militaristic), the
+        # csty/cstyc draw pair (the player block's exact order), attacker
+        # consumed, NO advance; capture at 0 HP lands the CS as an rc.
+        if cs_suz_t is not None:
+            cs_s = self.cs_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            cs_sc = cs_s.clamp(min=0)
+            cs_att = (
+                attack & ~rngd & (tgt_city < 0) & ~has_u
+                & (self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) < 0)
+                & (cs_s >= 0)
+                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == ttc)
+                & cs_suz_t.gather(1, ttc.unsqueeze(1)).squeeze(1)
+                & (self._p_combat[vt0] > 0)
+            )
+            if bool(cs_att.any()):
+                mil_idx = int(self.rules.cs.get("militaristicIdx", -1))
+                def_cs = (
+                    15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                    + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+                )
+                atk_e = self._p_combat[vt0] - self._wound(self.v_hp[:, v]) - 5.0 * self._river_cross(hc0, ttc)  # B-29 wound + river (CS center not a unit)
+                d_cs = self._damage_roll(cs_att, atk_e - def_cs, k="csty", tile=ttc)
+                d_atk = self._damage_roll(cs_att, def_cs - atk_e, k="cstyc", tile=ttc)
+                rows = cs_att.nonzero(as_tuple=True)[0]
+                self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
+                self.v_hp[:, v] = torch.where(cs_att, self.v_hp[:, v] - d_atk, self.v_hp[:, v])
+                atk_dead = cs_att & (self.v_hp[:, v] <= 0)
+                if bool(atk_dead.any()):
+                    ar = atk_dead.nonzero(as_tuple=True)[0]
+                    self.v_alive[ar, v] = False
+                    self.rv_at[ar, hc0[ar]] = -1
+                cap = cs_att & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
+                if bool(cap.any()):
+                    self._capture_city_state_rival(cap.nonzero(as_tuple=True)[0], cs_sc, v)
+                acted_att = acted_att | cs_att
         self.v_acted[:, v] = self.v_acted[:, v] | acted_att  # P4/D-2
 
         # Pillage: a war unit that did not attack, standing on an owned

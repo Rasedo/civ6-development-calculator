@@ -910,6 +910,16 @@ for (let s = 0; s < N_SEEDS; s++) {
     rivals: R_MAX,
   });
   state.disasters = true; // phase 4d: weather rolls join the RNG stream
+  // A-12b: snapshot the t0 city-state roster BEFORE the reference run — a
+  // rival can now CONQUER a CS mid-run (captureCityStateForRival removes it
+  // from state.cityStates), and the fixture must carry the t0 world; the
+  // trace's id-keyed CS columns zero out after a capture on both engines.
+  const csAtStart = state.cityStates.map((cs) => ({
+    id: cs.id,
+    type: CITY_STATE_TYPES.indexOf(cs.type),
+    center: cs.centerIndex,
+    pop: 3,
+  }));
   const site = scoreSettleSites(state, 1)[0];
   foundCity(state, site.tileIndex);
   const capital = state.cities[0];
@@ -1452,12 +1462,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     rngInit,
     csMax: CS_MAX,
     rMax: R_MAX,
-    cityStates: state.cityStates.map((cs) => ({
-      id: cs.id,
-      type: CITY_STATE_TYPES.indexOf(cs.type),
-      center: cs.centerIndex,
-      pop: 3,
-    })),
+    cityStates: csAtStart,
     rivals: state.rivals.map((r, i) => {
       // C1-A3: the GPU maps rival ARRAY INDEX r to civ r+1 (src/core/civs.ts
       // numbering), which is only sound while ids stay contiguous 0..R-1.

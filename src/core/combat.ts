@@ -12,7 +12,8 @@ import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { CS_MAX_HP } from '../data/cityStates';
-import { cityStateAt } from './cityStates';
+import { cityStateAt, isSuzerain } from './cityStates';
+import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP } from '../data/rivals';
 import {
   nextRandom,
   unitsAt,
@@ -206,13 +207,18 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     attacker.owner === 'player' || attacker.owner === 'barbarian'
       ? rivalCityAt(state, targetIndex)
       : undefined;
-  const csTarget =
-    attacker.owner === 'player'
-      ? (() => {
-          const cs = cityStateAt(state, targetIndex);
-          return cs && cs.centerIndex === targetIndex ? cs : undefined;
-        })()
-      : undefined;
+  const csTarget = (() => {
+    const cs = cityStateAt(state, targetIndex);
+    if (!cs || cs.centerIndex !== targetIndex) return undefined;
+    if (attacker.owner === 'player') return cs;
+    // A-12b join-the-suzerain's-war: an AT-WAR rival may siege a CS whose
+    // suzerain is the player (attackTargets applies the same gate).
+    if (attacker.owner === 'rival') {
+      const rv = state.rivals.find((r) => r.id === attacker.civId);
+      if (rv?.atWar && isSuzerain(cs)) return cs;
+    }
+    return undefined;
+  })();
 
   if (enemies.length === 0 && !enemyCity && !rivalTarget && !csTarget) {
     return no('Nothing to attack there.');
@@ -370,7 +376,16 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
       d <= cityRange &&
       ((unit.owner === 'player' && (rivalCityAt(state, t.index)?.rival.atWar ?? false)) ||
         (unit.owner === 'barbarian' && d === 1 && rivalCityAt(state, t.index) !== undefined));
-    if (hasEnemy || playerCity || rivalCity) out.push(t.index);
+    // A-12b join-the-suzerain's-war: an AT-WAR rival MELEE unit may attack
+    // an adjacent CS center whose suzerain is THE PLAYER (strict contest).
+    // Ranged-vs-CS stays out of scope (melee finishes, like capture).
+    const csWar =
+      unit.owner === 'rival' &&
+      hostileToPlayer &&
+      d === 1 &&
+      !def.ranged &&
+      state.cityStates.some((c) => c.centerIndex === t.index && isSuzerain(c));
+    if (hasEnemy || playerCity || rivalCity || csWar) out.push(t.index);
   }
   return out;
 }
@@ -435,7 +450,15 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
-  if ((cs.hp ?? 0) <= 0) captureCityState(state, cs);
+  if ((cs.hp ?? 0) <= 0) {
+    // A-12b: a rival conqueror lands the CS as its own city.
+    if (attacker.owner === 'rival') {
+      const rv = state.rivals.find((r) => r.id === attacker.civId);
+      if (rv) captureCityStateForRival(state, rv, cs);
+    } else {
+      captureCityState(state, cs);
+    }
+  }
 }
 
 /** Conquest of a city-state: it joins your empire; its envoys die with it. */
@@ -487,6 +510,55 @@ export function captureCityState(state: GameState, cs: CityState): void {
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, cs.centerIndex, 3);
   state.eventLog.push(`${cs.name} conquered — the city-state joins your empire.`);
+}
+
+/** A-12b: rival conquest of a city-state — the captureCityState twin on the
+ * rival seat (join-the-suzerain's-war). Pop ×0.75 floor 1, the ring-2 csId
+ * territory re-tags to the new rc, envoys die with the CS, the
+ * RIVAL_MAX_CITIES raze rule, routes pruned with the endpoint. */
+export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: CityState): void {
+  state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
+  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
+  for (const rv of state.rivals) {
+    rv.tradeRoutes = rv.tradeRoutes?.filter((x) => x.toCs !== cs.id);
+  }
+  const center = state.map.tiles[cs.centerIndex];
+  if (rival.cities.length >= RIVAL_MAX_CITIES) {
+    for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
+      if ((t.csId ?? -1) === cs.id) t.csId = undefined;
+    }
+    state.eventLog.push(`${cs.name} razed — ${rival.name} cannot govern more cities.`);
+    return;
+  }
+  const id = rival.nextCityId++;
+  for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
+    if ((t.csId ?? -1) === cs.id) {
+      t.csId = undefined;
+      t.rivalId = rival.id;
+      t.rivalCityId = id; // A-17: the conquered claim registers to the new rc
+    }
+  }
+  rival.cities.push({
+    id,
+    name: cs.name,
+    civId: civOfRival(rival.id),
+    centerIndex: cs.centerIndex,
+    population: Math.max(1, Math.floor(cs.population * 0.75)),
+    foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: 0,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: false,
+    buildings: [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: cs.centerIndex }],
+    wonders: [],
+    specialists: {},
+    hp: Math.round(RIVAL_CITY_MAX_HP / 2),
+    foundedTurn: state.turn,
+  });
+  state.eventLog.push(`${cs.name} has been conquered by ${rival.name}!`);
 }
 
 /** Conquest: the rival city joins your empire (pop hit, no districts kept).
