@@ -22,6 +22,10 @@ export interface UnitDef {
   /** Builder charges (improvements/chops); undefined for non-builders. */
   charges?: number;
   requiresTech?: string;
+  /** #45/B-6: a NAVAL unit lives on water natively (never `embarked`). No naval
+   * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
+   * passability/spawn/combat can branch on it. Default false. */
+  naval?: boolean;
   description: string;
 }
 

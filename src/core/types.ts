@@ -330,6 +330,10 @@ export interface Unit {
   path: number[] | null;
   /** Standing order ('explore' keeps picking new frontier targets). */
   mission?: 'explore' | null;
+  /** #45/B-6 EMBARK: a LAND unit currently on a water tile (embarked). Moves
+   * at EMBARK_MOVES, cannot fortify/exert ZOC, and (N2) defends at a flat CS.
+   * Naval units are never `embarked` — they belong on water natively. */
+  embarked?: boolean;
 }
 
 /**

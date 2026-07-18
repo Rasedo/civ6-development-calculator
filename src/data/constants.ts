@@ -44,6 +44,27 @@ export const FAITH_PURCHASE_MULT = 2;
 
 export const FOOD_PER_CITIZEN = 2;
 
+/** #45/B-6 EMBARK: flat movement points a land unit has while EMBARKED (on
+ * water). Tech upgrades to embarked movement are unmodeled. Water tiles enter
+ * at cost 1; embark/disembark transitions cost ALL remaining MP (real Civ 6). */
+export const EMBARK_MOVES = 2;
+
+/** #45/B-6: master switch for the LIVE scripted WATER movement (the rival
+ * war-march taking water steps). N1 lands the full embark/movement MODEL and
+ * plumbing but keeps the scripted water-stepping INERT (false): turning it on
+ * needs the N2 embarked/naval COMBAT overrides AND embark-aware peace-act /
+ * patrol — an embarked unit surviving into a peace turn is otherwise an
+ * incoherent intermediate state that cannot be mirrored TS↔GPU cleanly. With
+ * `live=false` every walker stays land-only and the gates are byte-identical to
+ * the pre-N1 base. N2 flips it true alongside the rest of the naval package.
+ * The exporter ships it as rules.embarkLive so the GPU mirror stays in lockstep;
+ * tests poke both engines (setEmbarkLive / sim._embark_live) to exercise the
+ * water-step path. */
+export const embarkState = { live: false };
+export function setEmbarkLive(v: boolean): void {
+  embarkState.live = v;
+}
+
 /** Each citizen contributes these yields directly (Civ 6). */
 export const CITIZEN_SCIENCE = 0.5;
 export const CITIZEN_CULTURE = 0.3;
