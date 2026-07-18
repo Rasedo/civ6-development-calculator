@@ -446,13 +446,15 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
   return ok;
 }
 
-/** Repair a pillaged improvement (no charge, ends the builder's turn). */
+/** Repair a pillaged improvement or district (no charge, ends the builder's
+ * turn). B-32: districts join the same repair, mirroring improvement repair. */
 export function builderRepair(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;
   const tile = state.map.tiles[unit!.tileIndex];
-  if (!tile.pillaged) return no('Nothing pillaged here.');
-  tile.pillaged = false;
+  if (tile.pillaged) tile.pillaged = false;
+  else if (tile.districtPillaged) tile.districtPillaged = false; // B-32
+  else return no('Nothing pillaged here.');
   unit!.movesLeft = 0;
   return ok;
 }

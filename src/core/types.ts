@@ -86,6 +86,10 @@ export interface Tile {
   builtWonderComplete: boolean;
   /** Pillaged improvement (yields nothing until a builder repairs it). */
   pillaged: boolean;
+  /** AUDIT B-32: pillaged district (a complete, non-CITY_CENTER district whose
+   * yields/buildings/housing/amenities/GPP go dark until a builder repairs it;
+   * static counts — cost/limit/maintenance — stay, since it is still owned). */
+  districtPillaged?: boolean;
   /** Tribal village (goody hut) waiting for a unit to claim it. */
   goodyHut: boolean;
   /** Volcano (a mountain that occasionally erupts when disasters are on). */

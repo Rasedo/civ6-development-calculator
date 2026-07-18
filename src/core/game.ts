@@ -924,7 +924,10 @@ export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonCl
     for (const cls of GP_CLASSES) {
       const district = GP_CLASS_DISTRICT[cls];
       const inst = city.districts.find(
-        (d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete,
+        (d) =>
+          d.type === district &&
+          state.map.tiles[d.tileIndex].districtComplete &&
+          !state.map.tiles[d.tileIndex].districtPillaged, // B-32: pillaged district earns no GPP
       );
       if (!inst) continue;
       let pts = 1 + (gppFlat[cls] ?? 0);
@@ -1127,6 +1130,7 @@ export function deserialize(json: string): GameState {
   }
   for (const t of state.map.tiles) {
     (t as Tile).pillaged ??= false;
+    (t as Tile).districtPillaged ??= false;
     (t as Tile).goodyHut ??= false;
     (t as Tile).volcano ??= false;
     (t as Tile).fertility ??= 0;

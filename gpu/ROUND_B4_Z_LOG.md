@@ -19,6 +19,33 @@ Round base: 18dff6d570830da4d8b6136a8a8e9a2df6076e3e
 
 ## Decisions / deviations
 
+### Gating line (the key design decision)
+A district that is COMPLETE but PILLAGED:
+- GATED (contributes nothing to its city — brief's list): its own adjacency
+  yield (+ the CS-envoy 3/6 district add that rides it in cityDistrictYields,
+  + follower Work-Ethic Holy-Site production); its INTRINSIC district housing
+  (Aqueduct water bonus, Neighborhood/other district housing); its buildings'
+  yields, housing, amenities, GPP, specialist slots/yields; the SHIPYARD
+  Harbor-adjacency production when the Harbor is pillaged.
+- STAYS ("static counts stay — pillaged is still owned"): completedDistrictCount
+  (district cost scaling / one-per-type / maxSpecialtyDistricts); district
+  maintenance (a COST, not a contribution — real Civ 6 keeps charging it);
+  count-based policy/belief housing+amenity rules that read
+  completedDistrictCount / specialtyCount (INSULAE housingIfDistricts, New Deal,
+  Zen Meditation amenitiesIfSpecialty); eureka/inspiration boost conditions;
+  CS quest "build a district" conditions; canFoundReligion Holy-Site condition
+  (religion left untouched per brief).
+- Deviation note: the brief's literal channel list says "its BUILDINGS'
+  housing"; I also gate the district's OWN intrinsic housing (Aqueduct/
+  Neighborhood) because real Civ 6 disables ALL of a pillaged district's
+  function ("contributes NOTHING to its city"). matchesAdjacency (the district
+  as an adjacency SOURCE for OTHER districts) is left ungated — the brief scopes
+  gating to the district's own contributions, and this keeps both engines'
+  _district_adj memo untouched.
+- Building→district key: GPU uses `_b_req_district` (== TS BuildingDef.district
+  mapped to the catalog idx, CITY_CENTER→-1; verified in export-gpu.ts).
+
+
 ## Gate results
 
 ## Residuals
