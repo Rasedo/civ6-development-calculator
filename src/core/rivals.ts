@@ -1378,6 +1378,12 @@ export function rivalPhase(state: GameState): void {
     // then the player's influence→envoy accrual (cityStatePhase mirror:
     // flat rate + the adopted government's tier), then the scripted
     // greedy assignment (neediest met CS by OWN envoys, ties lowest id).
+    // T1 PERF: this rival's units are invariant from here through the
+    // composition count below — no unit spawns/disbands occur in the CS-meet
+    // block or the pre-turn count loop (the buy/war/peace loops that DO mutate
+    // the list come later), so one filtered list is shared across the three
+    // uses (CS-meet proximity, unitCount, melee/ranged tally).
+    const rivalUnitList = rivalUnits(state, rival.id);
     {
       for (const cs of state.cityStates) {
         const met = (cs.rivalMet ??= []);
@@ -1388,7 +1394,7 @@ export function rivalPhase(state: GameState): void {
             const t = state.map.tiles[rc.centerIndex];
             return hexDistance(t.col, t.row, ct.col, ct.row) <= CS_MEET_RANGE;
           }) ||
-          rivalUnits(state, rival.id).some((u) => {
+          rivalUnitList.some((u) => {
             const t = state.map.tiles[u.tileIndex];
             return hexDistance(t.col, t.row, ct.col, ct.row) <= CS_MEET_RANGE;
           });
@@ -1430,14 +1436,14 @@ export function rivalPhase(state: GameState): void {
     // happen for the PRE-TURN city set, in founding order, before any
     // same-turn completion can found a new city.
     const unitCap = rival.cities.length * 2 + (rival.atWar ? 3 : 1);
-    let unitCount = rivalUnits(state, rival.id).length;
+    let unitCount = rivalUnitList.length;
     let settlerQueued = false;
     // AUDIT A-6: army composition (military only — builders don't count),
     // live + queued, updated through this pick loop so same-turn picks see
     // each other — the ranged share targets 1 ranged per 2 melee.
     let meleeCount = 0;
     let rangedCount = 0;
-    for (const u of rivalUnits(state, rival.id)) {
+    for (const u of rivalUnitList) {
       const d = UNITS[u.type];
       if (!d || d.combat <= 0) continue;
       if (d.ranged) rangedCount += 1;

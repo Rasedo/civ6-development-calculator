@@ -388,10 +388,36 @@ function applyGovernment(mods: Modifiers, research: ResearchState): void {
  * government block, computed from the rival's research). CS blocks stay
  * player machinery. The follower counts are the RIVAL's population/cities
  * (the seat), not the player's. */
+// T1 PERF: self-validating value-key cache for getRivalModifiers. The key
+// projects every input the returned Modifiers depends on, so a call-site-free
+// invalidation (combat captures/transfers, tech/civic completion, growth) is
+// captured automatically:
+//   - research.techs.length / research.civics.length: the research arrays are
+//     APPEND-ONLY (only .push at game.ts / rivals.ts:1872/1901; no
+//     splice/pop/shift/filter/reassign on any RivalCiv research across the
+//     repo), so per-rival the length is a monotonic version counter that
+//     uniquely identifies the completed-effects set feeding both
+//     modifiersFromResearch and computeAdoption (government + slotted policies).
+//   - pantheon / religionFounded / founderBelief / enhancerBelief: belief ids
+//     fully determine the static belief-effect tables applied.
+//   - Σpop + cities.length: the ONLY rival fields the belief seat reads
+//     (perFollowers = floor(Σpop/per); perCity = cities.length).
+// `state` is NOT an input: getRivalModifiers always passes an explicit seat, so
+// applyBeliefEffects never falls back to reading state.cities. The government
+// path (computeAdoption) reads only research. WeakMap keys on the rival object
+// identity, which is stable within a state and fresh across deserialize/clone.
+const rivalModCache = new WeakMap<RivalCiv, { key: string; mods: Modifiers }>();
+
 export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers {
+  let pop = 0;
+  for (const c of rival.cities) pop += c.population;
+  const key = `${rival.research.techs.length}:${rival.research.civics.length}:${rival.pantheon ?? ''}:${rival.religionFounded ? 1 : 0}:${rival.founderBelief ?? ''}:${rival.enhancerBelief ?? ''}:${pop}:${rival.cities.length}`;
+  const cached = rivalModCache.get(rival);
+  if (cached && cached.key === key) return cached.mods;
+
   const mods = modifiersFromResearch(rival.research);
   const seat = {
-    followers: rival.cities.reduce((s, c) => s + c.population, 0),
+    followers: pop,
     cities: rival.cities.length,
   };
   applyBeliefEffects(state, mods, rival.pantheon ? PANTHEONS[rival.pantheon] : undefined, seat);
@@ -406,6 +432,7 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
     applyBeliefEffects(state, mods, rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief] : undefined, seat);
   }
   if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, rival.research);
+  rivalModCache.set(rival, { key, mods });
   return mods;
 }
 

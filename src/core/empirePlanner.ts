@@ -9,7 +9,7 @@
 import type { GameState, Yields, YieldKey, RivalCiv } from './types';
 import { serialize, deserialize, endTurn, queueDistrict, queueBuilding, queueWonder, queueSettler, cancelQueueItem } from './game';
 import { computeCityStats } from './city';
-import { rivalCityYields } from './rivals';
+import { rivalCityYields, rivalAmenityTiers } from './rivals';
 import { compareCandidates, choiceLabel, scoreSettleSites, type BuildChoice } from './advisor';
 import type { Objective } from './planner';
 
@@ -72,9 +72,15 @@ export function empireScore(state: GameState, objective: Objective): number {
  * incl. worked+building gold/faith). Used for the winner/leader. */
 export function rivalEmpireScore(state: GameState, rival: RivalCiv): number {
   let score = 0;
+  // T1 PERF: hoist the full-map luxury/amenity sweep out of the per-city loop.
+  // rivalAmenityTiers is pure w.r.t. state and rivalEmpireScore never mutates
+  // state between cities, so one call before the loop yields the same per-city
+  // tiers rivalCityYields would recompute inline (rivals.ts tier ?? fallback) —
+  // value-identical, N× fewer full-map scans.
+  const tiers = rivalAmenityTiers(state, rival);
   for (const rc of rival.cities) {
     score += rc.population * 3;
-    const y = rivalCityYields(state, rival, rc);
+    const y = rivalCityYields(state, rival, rc, tiers.get(rc.id));
     for (const [k, w] of Object.entries(BALANCED_WEIGHTS)) {
       score += y[k as YieldKey] * (w ?? 0);
     }
