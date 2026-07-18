@@ -530,7 +530,7 @@ export function renderCityPanel(
       <button data-act="plan">Plan build order…</button>
       ${state.sandbox ? '' : `<button data-act="settler" title="Needed to found further cities">Train settler (${settlerCost(state)}⚙)</button>
       <button data-act="buy-settler" title="Buy a settler outright" ${state.treasury >= settlerCost(state) * 4 ? '' : 'disabled'}>Buy settler (${settlerCost(state) * 4}g)</button>`}
-      ${trainableUnits(state)
+      ${trainableUnits(state, city)
         .map((u) => `<button data-act="train-unit" data-id="${u.id}" title="${u.description}">Train ${u.name} (${u.cost}⚙)</button>
           ${state.sandbox ? '' : `<button data-act="buy-unit" data-id="${u.id}" title="Buy with gold" ${state.treasury >= unitPurchaseCost(state, u.id) ? '' : 'disabled'}>Buy (${unitPurchaseCost(state, u.id)}g)</button>`}`)
         .join('')}

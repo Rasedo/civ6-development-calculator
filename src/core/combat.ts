@@ -28,7 +28,7 @@ import {
   moveCostInto,
   crossesRiver,
 } from './units';
-import { EMBARK_MOVES, embarkState } from '../data/constants';
+import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { revealAround } from './fog';
 import { transferCityToRival } from './rivals';
 import type { RuleResult } from './rules';
@@ -128,6 +128,24 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
     }
   }
   return n;
+}
+
+/** #45/B-6: the defender's total combat strength for a hit on `defTileIndex`,
+ * including B-7 support (which always accompanies the defender). An EMBARKED
+ * defender overrides EVERYTHING: a flat EMBARKED_DEFENSE_CS − woundPenalty,
+ * with NO terrain / fortify / support terms (real Civ 6 — ships-in-transit are
+ * soft targets). Used by every melee/ranged/walls site so the override is
+ * applied identically. Flanking (the attacker's term) is added separately. */
+export function defenderCS(state: GameState, defender: Unit, defTileIndex: number): number {
+  if (defender.embarked) return EMBARKED_DEFENSE_CS - woundPenalty(defender);
+  const tile = state.map.tiles[defTileIndex];
+  return (
+    (UNITS[defender.type]?.combat ?? 0) +
+    terrainDefense(tile) +
+    fortifyBonus(defender) -
+    woundPenalty(defender) +
+    SUPPORT_CS * supportCount(state, defTileIndex, defender)
+  );
 }
 
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
@@ -230,6 +248,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const def = UNITS[attacker.type];
   if (!def || def.combat <= 0) return no('Civilians cannot attack.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
+  if (attacker.embarked) return no('Embarked units cannot attack.'); // #45/B-6
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   if (hexDistance(from.col, from.row, target.col, target.row) !== 1) {
@@ -287,7 +306,6 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   // B-5 fortify + B-29 wounded: both attacker and defender fight at their
   // HP-reduced strength (up to −10 at 0 HP). B-29 river: a melee attacker
   // crossing a river edge into the defender's tile takes −5.
-  const defCS = (defDef?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender);
   const atkCS = def.combat - woundPenalty(attacker) - (crossesRiver(from, target) ? RIVER_ATTACK_PENALTY : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
@@ -319,9 +337,10 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     }
   } else {
     // B-7: flanking helps the attacker, support helps the defender. Applied
-    // ONCE so both paired rolls see the same adjusted CS.
+    // ONCE so both paired rolls see the same adjusted CS. #45/B-6: defenderCS
+    // folds in support AND the embarked-defender override (flat CS, no terms).
     const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender);
-    const defCSf = defCS + SUPPORT_CS * supportCount(state, targetIndex, defender);
+    const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
     if (defender.hp <= 0) {
@@ -349,6 +368,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   const def = UNITS[attacker.type];
   if (!def?.ranged) return no('Not a ranged unit.');
   if (attacker.movesLeft <= 0) return no('No movement left.');
+  if (attacker.embarked) return no('Embarked units cannot attack.'); // #45/B-6
   const from = state.map.tiles[attacker.tileIndex];
   const target = state.map.tiles[targetIndex];
   if (hexDistance(from.col, from.row, target.col, target.row) > def.ranged.range) {
@@ -379,8 +399,9 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     return no('Nothing to attack there.');
   }
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no retaliation).
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, targetIndex, defender);
+  // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no
+  // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
+  const defCS = defenderCS(state, defender, targetIndex);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'rng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
@@ -417,8 +438,9 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
-  // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no retaliation).
-  const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(target) + fortifyBonus(defender) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, targetIndex, defender);
+  // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no
+  // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
+  const defCS = defenderCS(state, defender, targetIndex);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker)) - defCS, 'vrng', targetIndex);
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
@@ -428,6 +450,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
 export function attackTargets(state: GameState, unit: Unit): number[] {
   const def = UNITS[unit.type];
   if (!def || def.combat <= 0 || unit.movesLeft <= 0) return [];
+  if (unit.embarked) return []; // #45/B-6: embarked units cannot attack
   const from = state.map.tiles[unit.tileIndex];
   const range = def.ranged?.range ?? 1;
   const hostileToPlayer = unit.owner !== 'player' && unitsHostile(state, unit, { owner: 'player' });
@@ -974,7 +997,10 @@ export function barbarianPhase(state: GameState): void {
     const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
     const tt = map.tiles[bestTile];
     // B-29 + B-7 support (attacker is the city — not a unit, so no flanking).
-    const defCS = (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
+    // #45/B-6: an embarked target defends at the flat EMBARKED_DEFENSE_CS.
+    const defCS = defender.embarked
+      ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
+      : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender);
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
     if (defender.hp <= 0) killUnit(state, defender);
