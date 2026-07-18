@@ -597,10 +597,18 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   }
   center.cityId = id;
   // AUDIT B-30: conquest keeps infrastructure. The captured city carries its
-  // districts (live, re-owned — the tiles above already re-tag to the new
-  // owner) and its buildings MINUS PALACE (never transfers) and wonders.
-  // ANCIENT_WALLS is kept but its outer pool resets to 0 (it heals back via
-  // B-1, and the new owner gains the B-2 walls strike once it stands again).
+  // districts (live, re-owned) and its buildings MINUS PALACE (never transfers)
+  // and wonders. ANCIENT_WALLS is kept but its outer pool resets to 0 (it heals
+  // back via B-1, and the new owner gains the B-2 walls strike once it stands).
+  // Only COMPLETE districts on tiles that ACTUALLY re-owned to the new city carry
+  // (tile.cityId === id && districtComplete). The A-17 registry re-tags exactly
+  // this city's tiles, and a rival's district/tile registries can be inconsistent
+  // (rcId4 held HOLY_SITE@891 while tile 891 belonged to rcId3 — seed 9118), so
+  // the cityId gate drops phantom references. The completeness gate keeps parity
+  // with the GPU twin's `district_complete` liveness (an INCOMPLETE captured
+  // district stays paved-but-dead, as pre-B-30): TS availableBuildings keys on a
+  // district merely being PRESENT, so a carried incomplete Holy Site would let TS
+  // queue a Shrine the GPU (district-complete gated) would not — seed 9235.
   const keptBuildings = city.buildings.filter((b) => b !== 'PALACE');
   const captured: City = {
     id,
@@ -615,8 +623,8 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     queue: [],
     isCapital: false,
     buildings: keptBuildings,
-    districts: city.districts.map((d) => ({ ...d })),
-    wonders: city.wonders.map((w) => ({ ...w })),
+    districts: city.districts.filter((d) => state.map.tiles[d.tileIndex].cityId === id && state.map.tiles[d.tileIndex].districtComplete).map((d) => ({ ...d })),
+    wonders: city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === id).map((w) => ({ ...w })),
     specialists: {},
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) captured.outerHp = 0; // B-30: walls kept, outer pool 0

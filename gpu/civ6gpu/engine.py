@@ -3831,12 +3831,17 @@ class BatchSim:
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
             self.owner[b, c_t] = c_new
-            # AUDIT B-30: conquest KEEPS the captured districts (was P5/S1's
-            # district_dead marking, now removed for capture — kept only for
-            # the raze path, which never reaches here). The district tiles are
-            # already re-owned to c_new above, and their district/complete
-            # planes are untouched, so they become LIVE player districts;
-            # captured wonders ride on the shared built_wonder tile planes.
+            # AUDIT B-30: conquest KEEPS the captured city's COMPLETE districts
+            # (the tiles are re-owned to c_new above and their district/complete
+            # planes are untouched, so completed districts become LIVE player
+            # districts; captured wonders ride the shared built_wonder planes).
+            # INCOMPLETE captured districts stay paved-but-dead (the P5/S1
+            # district_dead marking, now scoped to ~district_complete): TS drops
+            # them from the new city's districts array, and the GPU must exclude
+            # them from one-per-type/yields/availability the same way (seed 9235).
+            dead_ring = ring & (self.district[b] >= 0) & ~self.district_complete[b]
+            dead_ring[c_t] = False  # the center is the new city's live CITY_CENTER
+            self.district_dead[b] = self.district_dead[b] | dead_ring
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
@@ -8593,11 +8598,13 @@ class BatchSim:
         self.pop[b, c] = 0
         self.current[b, c] = -1
         owned = self.owner[b] == c
-        # AUDIT B-30: snapshot the transferring city's placeable-district and
-        # wonder tiles from the LIVE owner mask (CITY_CENTER is never in the
-        # district plane, so it is excluded) plus its buildings row, BEFORE
-        # the owner mask is cleared below. Conquest keeps this infrastructure.
-        b30_dist_t = (owned & (self.district[b] >= 0)).nonzero(as_tuple=True)[0]
+        # AUDIT B-30: snapshot the transferring city's COMPLETE placeable-district
+        # and wonder tiles from the LIVE owner mask (CITY_CENTER is never in the
+        # district plane, so it is excluded) plus its buildings row, BEFORE the
+        # owner mask is cleared below. Conquest keeps this infrastructure; only
+        # COMPLETE districts carry (incomplete = paved-but-dead), matching the TS
+        # twin's district_complete filter.
+        b30_dist_t = (owned & (self.district[b] >= 0) & self.district_complete[b]).nonzero(as_tuple=True)[0]
         b30_wond_t = (owned & (self.built_wonder[b] >= 0)).nonzero(as_tuple=True)[0]
         b30_bldg = self.buildings[b, c, :].clone()
         if conquest and int(self.rc_alive[b, w_].sum()) >= int(self.rules.rivals.get("maxCities", 6)):

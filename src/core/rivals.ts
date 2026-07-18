@@ -431,6 +431,14 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     state.eventLog.push(`${city.name} razed — ${winner.name} cannot govern more cities.`);
     return false;
   }
+  // AUDIT B-30: carry only COMPLETE districts on tiles this city ACTUALLY owns
+  // (snapshot before the re-tag loop clears cityId) — mirrors the GPU twin's
+  // owned-tile, district_complete gather and the A-17 registry, dropping phantom
+  // references to another city's tile and incomplete (paved-but-dead) districts.
+  const keptDistricts = city.districts.filter(
+    (d) => state.map.tiles[d.tileIndex].cityId === city.id && state.map.tiles[d.tileIndex].districtComplete,
+  );
+  const keptWonders = city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === city.id);
   for (const t of state.map.tiles) {
     if (t.cityId === city.id) {
       t.cityId = -1;
@@ -456,8 +464,8 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     queue: [],
     isCapital: false,
     buildings: keptBuildings,
-    districts: city.districts.map((d) => ({ ...d })),
-    wonders: city.wonders.map((w) => ({ ...w })),
+    districts: keptDistricts.map((d) => ({ ...d })),
+    wonders: keptWonders.map((w) => ({ ...w })),
     specialists: {},
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
