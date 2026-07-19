@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 39 | 21.1 | **54%** |
-| B fidelity | 88 | 64.8 | **74%** |
+| B fidelity | 88 | 65.9 | **75%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents | 5 | 4 | **80%** |
-| **Overall (incl. closed)** | **183** | **142.9** | **78%** |
-| Open chapters only (A+B) | 127 | 85.9 | **68%** |
+| **Overall (incl. closed)** | **183** | **144.0** | **79%** |
+| Open chapters only (A+B) | 127 | 87.0 | **69%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -61,7 +61,16 @@ ROUND B9 R1-R3 serial (brief gpu/ROUND_B9.md): A-9 → 90% — scaffold
 EIGHT newly-reachable latents (f7b13d3), R2's gates caught the G4
 buildings-are-own-column cache break + the player ww-vs-unit-orders
 ordering latent (faf08cc), R3 hunt-free (73b9e32); G-5 second
-sighting on a war capture → reroll 9301→9302.)
+sighting on a war capture → reroll 9301→9302. 2026-07-19 ROUND B6
+S1-S4 serial (brief gpu/ROUND_B6.md): B-18 75%→95% — all 7 enhancer
+EFFECTS live (S1 5e6ab7b, hunt-free) + the rival MISSIONARY chassis
+(S2 512abe4: faith-buy 60/42 after worship, cap 2, real-MP walk +
+spread lump 10/15, SCRIPTURE/HOLY_ORDER; in-gate 24/24 seeds, 264
+buys/220 spreads; the rollout replay caught the missing faithOnly
+production-mask term — the round's one gate catch); B-25 70%→80% —
+religious victory (S3 79a056f: predominance >half in EVERY alive
+civ, victoryType 5/6 at endTurn, poke-pinned — gate-unreachable at
+250t).)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -80,10 +89,12 @@ Per-item weights (done% in parens where partial):
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
-  (75% — coupling live; enhancer effects/missionaries/victory open);
-  B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
-- B meta: B-25 3 (70% — GPU sim poke-covered; player project path +
-  other victories open); B-22 3, B-24 3, B-33 3 (open).
+  (95% — ROUND B6: enhancer effects + missionary chassis + religious
+  victory; apostles/theological combat + player missionaries (#50)
+  remain); B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
+- B meta: B-25 3 (80% — religious victory landed; player project
+  path + Culture/Diplomatic victories open); B-22 3, B-24 3,
+  B-33 3 (open).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G: G-1, G-2, G-3, G-4 — all done (chapter EMPTY).
@@ -481,8 +492,18 @@ gap; likewise GS disasters are modeled minus sea-level rise
   had; landed inert-first (owner-keyed, byte-identical) then flipped;
   16/24 scripted seeds reshuffled turn-exact
   (gpu/ROUND_B3_LOG.md §U). Pantheon/founder/enhancer stay per-civ.
-  STILL OPEN: enhancer EFFECTS (all 7 inert), Missionaries/Apostles,
-  theological combat, religious victory.
+  **ROUND B6 (2026-07-19, #62)**: all 7 enhancer EFFECTS live
+  (per-religion pressure range, `tradeReligionYields` route term, the
+  three combat CS adders via `religionAttackCS`/`religionDefenseCS` /
+  `_rel_atk_cs`/`_rel_def_cs` over `_rel_combat_planes`); the rival
+  MISSIONARY chassis (`rivalMissionaryActions` /
+  `_rival_missionary_actions` + the faith buy after the worship
+  branch: 60/42 faith, cap `MISSIONARY_CAP`=2, SHRINE + complete
+  Holy Site gate, real-MP walk to the nearest differently-followed
+  city, `SPREAD_PRESSURE` lump 10/15, charge death); religious
+  victory (see B-25). STILL OPEN (recorded residuals): Apostles +
+  theological combat (abilities on top of this chassis); PLAYER
+  missionaries (no faith-buy verb — rides #50/A-18).
 - B-19. RESOLVED (2026-07-17, Round B2): era-anchored GP cost ladder
   (`gpCost`), global race kept, WRITER/MUSICIAN added (n_gp=9,
   appended). Building-GPP differentiation beyond +1/building absent.
@@ -524,10 +545,16 @@ gap; likewise GS disasters are modeled minus sea-level rise
   landed byte-identical and PROVEN GATE-UNREACHABLE even at 250t
   (rival greedy resolves a Campus to RESEARCH_GRANTS first; the
   player has no GPU project subsystem), so parity rests on
-  `gpu/space_race_test.py` (gpu/ROUND_B3_LOG.md §W). STILL OPEN: a
-  player project-production path (victoryType 3 can only be
-  preserved, not produced, on the GPU), and
-  Culture/Religious/Diplomatic victories (systems absent).
+  `gpu/space_race_test.py` (gpu/ROUND_B3_LOG.md §W). **RELIGIOUS
+  victory LANDED (2026-07-19, ROUND B6 S3)**: `religiousVictor` /
+  `_religious_victor` — predominance (>half of each civ's cities)
+  in EVERY alive civ, checked at endTurn on the just-flipped follow
+  set, victoryType 5 (player religion) / 6 (rival religion, defeat),
+  precedence space > domination > religion > score; gate-unreachable
+  at 250t, poke-pinned (`tests/religious-victory.test.ts` + the
+  `religion2` battery lane). STILL OPEN: a player project-production
+  path (victoryType 3 can only be preserved, not produced, on the
+  GPU), and Culture/Diplomatic victories (systems absent).
 - B-33 (new; the fidelity face of A-19). Rivals never interact with
   each other: rival `atWar` is only vs the player (`declareWar`,
   core/rivals.ts; `hostileUnitAct` comment "they never war other
