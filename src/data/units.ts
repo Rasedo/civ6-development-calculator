@@ -34,6 +34,11 @@ export interface UnitDef {
   /** B6-S2: faith-purchase-only (MISSIONARY) — never offered by trainableUnits,
    * so it can't be queued or gold-purchased by either seat. */
   faithOnly?: boolean;
+  /** B7-G (B-8): spawn-ONLY chassis (GENERAL/ADMIRAL) — never trainable,
+   * gold-purchasable, or faith-buyable; the only birth path is the
+   * Great-General/Admiral claim (applyGreatPersonEffect + the rival mirror).
+   * trainableUnits filters it out on every seat, exactly like faithOnly. */
+  spawnOnly?: boolean;
   description: string;
 }
 
@@ -220,6 +225,41 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 3,
       faithOnly: true,
       description: 'Spreads its religion to nearby cities (3 charges, faith purchase only).',
+    }),
+    // B7-G (B-8): the Great General / Great Admiral support chassis (appended
+    // LAST — roster indices are the GPU's unit type ids; MISSIONARY stays put).
+    // CIVILIAN (charges=1 → unitDomain 'civilian' AND GPU _p_charges>0 civilian,
+    // so both engines exclude it from the military march/patrol loops, from
+    // garrison/flank/support counts, and — via the BUILDER/MISSIONARY type
+    // gates — from the charge-driven walkers). Combat 0 → B-31 capturable.
+    // spawnOnly → never trained/purchased/faith-bought. 4 MP so the rival
+    // general keeps pace with the war march. No maintenance. The aura
+    // (+5 CS within 2, combat.ts) is pure geometry; the retire ability is the
+    // roster's instant effect (kept). The +1 MP half of the real aura is
+    // DESCOPED (movement coupling — recorded on B-8).
+    U({
+      id: 'GENERAL',
+      name: 'Great General',
+      code: 'L',
+      cost: 0,
+      maintenance: 0,
+      moves: 4,
+      combat: 0,
+      charges: 1,
+      spawnOnly: true,
+      description: 'Great General — +5 CS to own land military within 2 tiles (spawned on claim).',
+    }),
+    U({
+      id: 'ADMIRAL',
+      name: 'Great Admiral',
+      code: 'V',
+      cost: 0,
+      maintenance: 0,
+      moves: 4,
+      combat: 0,
+      charges: 1,
+      spawnOnly: true,
+      description: 'Great Admiral — +5 CS to own naval/embarked units within 2 tiles (spawned on claim).',
     }),
   ].map((u) => [u.id, u]),
 );

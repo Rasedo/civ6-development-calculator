@@ -385,6 +385,9 @@ export function trainableUnits(
     // B6-S2: faith-purchase-only chassis (MISSIONARY) — never trainable or
     // gold-purchasable (purchaseUnit funnels through here), sandbox included.
     if (d.faithOnly) return false;
+    // B7-G (B-8): spawn-only chassis (GENERAL/ADMIRAL) — birthed only by the
+    // Great-Person claim, never trained/purchased on any seat (sandbox too).
+    if (d.spawnOnly) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech)) return false;
     // AUDIT B-9: strategic-resource access gates build AND purchase (purchaseUnit
     // funnels through here). Data-driven off UnitDef.requiresResource; the player

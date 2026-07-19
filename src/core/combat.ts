@@ -186,6 +186,32 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
   return n;
 }
 
+// B7-G (B-8): Great General / Great Admiral aura. Real Civ 6 grants nearby own
+// units +5 CS (and +1 MP — the movement half is DESCOPED, recorded on B-8). An
+// own LAND military unit within GENERAL_AURA_RANGE of an own live GENERAL — or
+// an own NAVAL/EMBARKED unit within range of an own live ADMIRAL — gains
+// +GENERAL_AURA_CS at every damage-roll site (attack AND defense), an INTEGER
+// add joining the B-29 quantized assembly (q=round(Δ·10) preserved) exactly
+// like the JUST_WAR/CRUSADE religion adders. "Own" = same owner AND civId.
+// Scope: the unit-vs-unit rolls only — the same sites as religionAttackCS /
+// religionDefenseCS; city/CS strikes (slice E's B-2 zone) are out of scope
+// (recorded on B-8). The GENERAL/ADMIRAL units themselves are combat-0
+// civilians and never trigger this on their own account.
+export const GENERAL_AURA_CS = 5;
+export const GENERAL_AURA_RANGE = 2;
+
+export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): number {
+  if ((UNITS[unit.type]?.combat ?? 0) <= 0) return 0; // civilians never fight these rolls
+  const auraType = unit.embarked || UNITS[unit.type]?.naval ? 'ADMIRAL' : 'GENERAL';
+  const tile = state.map.tiles[tileIndex];
+  for (const g of state.units) {
+    if (g.type !== auraType || g.owner !== unit.owner || g.civId !== unit.civId) continue;
+    const gt = state.map.tiles[g.tileIndex];
+    if (hexDistance(tile.col, tile.row, gt.col, gt.row) <= GENERAL_AURA_RANGE) return GENERAL_AURA_CS;
+  }
+  return 0;
+}
+
 /** B6-S1: the enhancer belief of a UNIT's civ religion (religion id = unified
  * civ id: 0 = the player's, i+1 = rival i's). Undefined for barbarians, for
  * unfounded religions, and for unenhanced ones. */
@@ -277,7 +303,9 @@ export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex
  * soft targets). Used by every melee/ranged/walls site so the override is
  * applied identically. Flanking (the attacker's term) is added separately. */
 export function defenderCS(state: GameState, defender: Unit, defTileIndex: number): number {
-  if (defender.embarked) return EMBARKED_DEFENSE_CS - woundPenalty(defender);
+  // B7-G (B-8): the general/admiral aura joins the defender's assembly at every
+  // unit-vs-unit defenderCS caller (embarked → ADMIRAL branch of generalAuraCS).
+  if (defender.embarked) return EMBARKED_DEFENSE_CS - woundPenalty(defender) + generalAuraCS(state, defender, defTileIndex);
   const tile = state.map.tiles[defTileIndex];
   return (
     (UNITS[defender.type]?.combat ?? 0) +
@@ -286,7 +314,8 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     woundPenalty(defender) +
     SUPPORT_CS * supportCount(state, defTileIndex, defender) +
     xpLevelBonus(defender) + // B-4: veterancy — an embarked defender got the flat override above (no xp)
-    religionDefenseCS(state, defender, defTileIndex) // B6-S1: enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
+    religionDefenseCS(state, defender, defTileIndex) + // B6-S1: enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
+    generalAuraCS(state, defender, defTileIndex) // B7-G (B-8): Great General/Admiral aura
   );
 }
 
@@ -485,7 +514,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // folds in support AND the embarked-defender override (flat CS, no terms).
     // B-4: attacker veterancy joins the flank term; defenderCS folds in the
     // defender's own level bonus. Applied once so both paired rolls agree.
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex); // B6-S1
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
@@ -552,7 +581,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex)) - defCS, 'rng', targetIndex); // B6-S1
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rng', targetIndex); // B6-S1 + B7-G (B-8)
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged attack executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender (civilians excluded)
   if (defender.hp <= 0) killUnit(state, defender);
@@ -594,7 +623,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex)) - defCS, 'vrng', targetIndex); // B6-S1
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrng', targetIndex); // B6-S1 + B7-G (B-8)
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged strike executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender
   if (defender.hp <= 0) killUnit(state, defender);
