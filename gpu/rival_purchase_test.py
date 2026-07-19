@@ -208,6 +208,20 @@ def main() -> None:
             sim.r_techs[0, R, ar_t] = True
         if ho_t >= 0:
             sim.r_techs[0, R, ho_t] = True
+        # AUDIT B-9: resource-gated picks need strategic ACCESS — plant the
+        # required resource + matching completed improvement on an owned tile
+        # (restore() wipes it each iteration, so grant per-case).
+        pairs = dict(sim._res_unit_pairs)
+        if want_idx in pairs:
+            res_idx = pairs[want_idx]
+            src = (sim.res_id[0] == res_idx).nonzero(as_tuple=True)[0]
+            own = (sim.rival_at[0] == R).nonzero(as_tuple=True)[0]
+            assert len(src) > 0 and len(own) > 0, f"{label}: no resource/territory tile to grant access"
+            t = own[0]
+            sim.res_id[0, t] = res_idx
+            sim.res_imp[0, t] = sim.res_imp[0, src[0]]
+            sim.improvement[0, t] = sim.res_imp[0, src[0]]
+            sim.pillaged[0, t] = False
         assert tre < settler_price(sim), f"{label} price {tre} not below the settler price — scenario invalid"
         assert mil_count(sim) < 2 * n_rc(sim), "military already at quota — pick an earlier turn"
         sim.r_treasury[0, R] = tre

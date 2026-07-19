@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 39 | 17.5 | **45%** |
-| B fidelity | 88 | 55.8 | **63%** |
+| B fidelity | 88 | 64.8 | **74%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
-| G parity latents (EMPTY) | 4 | 4 | 100% |
-| **Overall (incl. closed)** | **182** | **130.3** | **72%** |
-| Open chapters only (A+B) | 127 | 73.3 | **58%** |
+| G parity latents | 5 | 4 | **80%** |
+| **Overall (incl. closed)** | **183** | **139.3** | **76%** |
+| Open chapters only (A+B) | 127 | 82.3 | **65%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -50,7 +50,12 @@ rival envoy bonuses, strict suzerain contest; CS verbs = stage 3b.
 B-31, B-32 all RESOLVED; new A-24 w2 = rival district/tile registry
 consistency latent, split from slice AB's hunt. 2026-07-18 #45
 NAVAL: B-6 RESOLVED — serial N1/N2/N3 off gpu/NAVAL_DESIGN.md, ONE
-end-of-task battery incl. the new `naval` poke lane.)
+end-of-task battery incl. the new `naval` poke lane. 2026-07-19
+ROUND B5 M1/M2/M3 (brief gpu/ROUND_B5.md): B-4, B-9, B-10 RESOLVED;
+M1's hunt FIXED the GPU advance-after-kill terrain omission (land
+units advancing onto water after killing an embarked defender — both
+red rollout games, one class); new G-5 = the surviving 1-gold
+rival-economy rounding latent M2 dodged by seed reroll.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -61,10 +66,10 @@ Per-item weights (done% in parens where partial):
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan), A-24 2 (new — split from B-30: rival
   district/tile registry consistency).
-- B combat: B-1 3 / B-2 2 / B-3 2 / B-5 2 / B-6 8 / B-7 2 / B-28 1 /
-  B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
-  B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%); B-4 3,
-  B-8 2, B-9 3, B-10 3 (open).
+- B combat: B-1 3 / B-2 2 / B-3 2 / B-4 3 / B-5 2 / B-6 8 / B-7 2 /
+  B-9 3 / B-10 3 / B-28 1 / B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
+  B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%);
+  B-8 2 (open).
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
@@ -295,8 +300,15 @@ gap; likewise GS disasters are modeled minus sea-level rise
   gave them the full-MP walk but the ZOC check is rival-gated so both
   engines stay symmetric (the GPU barb walk mirrors the pre-ZOC
   march). City-center ZOC also deferred.
-- B-4. No unit XP/promotions: `Unit` (core/types.ts) has no
-  xp/promotion fields, `UnitDef` (data/units.ts) has no promotion tree.
+- B-4. RESOLVED (2026-07-19, ROUND B5 slice M2): `Unit.xp` on
+  player+rival units — +5 per attack executed, +2 per attack survived
+  as a military defender (walls strikes included); `XP_LEVELS`
+  [15,45,90] → flat +5 CS/level at every roll (the B-7 assembly
+  pattern; dropped by the embarked override), GPU `p_xp`/`v_xp` with
+  full snapshot/reclaim discipline, exp table widened 1201→4001.
+  In-gate: level ≥1 in 15/24 seeds, ≥3 in 5. `bestMeleeCS` stays
+  base-CS. Residuals: real promotion TREES/abilities, barb XP,
+  heal-on-promote.
 - B-5. RESOLVED (2026-07-13, task #43): `fortifyTurns` (military, cap 2)
   accrues on the no-MP-spent gate, reset by move/attack, +3/+6 CS to
   the defender at every roll site both engines; symmetric, snapshot-
@@ -331,18 +343,24 @@ gap; likewise GS disasters are modeled minus sea-level rise
   `GREAT_PEOPLE.GENERAL` is +production-to-capital, `.ADMIRAL` is +gold
   "prize money" (data/greatPeople.ts); `GreatPersonDef['effect']`
   cannot express a +5 CS/+1 MP aura at all.
-- B-9. No strategic-resource requirements/stockpiles: `RESOURCES`
-  (data/resources.ts) has the 'strategic' category on the map, but
-  `UnitDef` has no resource field — the Horseman's own description says
-  "resource requirement not modeled". Horses/Iron are just tile yields.
-- B-10. Military roster still ends at Horseman (CS 36): `UNITS` is 7
-  entries (Builder/Scout/Warrior/Slinger/Archer/Spearman/Horseman). No
-  Swordsman/Knight/siege/gunpowder line; their unlock techs are absent
-  by design — `TECHS` header: "Pure-military techs are omitted".
-  Late-game combat power is frozen at Classical levels while science
-  runs to Modern. [opus-ok: the UNITS/TECHS catalog rows + exporter
-  tables off a settled roster list; combat integration and draw-count
-  stay Fable.]
+- B-9. RESOLVED (2026-07-19, ROUND B5 slice M1): strategic-resource
+  ACCESS model — `UnitDef.requiresResource` + `civHasStrategic`
+  (owned territory tile + resource + completed unpillaged matching
+  improvement) / GPU `_res_avail_mask` gate build AND purchase on all
+  three surfaces; HORSEMAN retro-gated on HORSES (early-game
+  reshuffles proven in-gate). Residuals: GS stockpiles/accumulation/
+  per-unit costs; niter and later strategics absent from maps.
+- B-10. RESOLVED (2026-07-19, ROUND B5 slices M1+M3): roster extended
+  through the gunpowder line — SWORDSMAN/PIKEMAN/CROSSBOWMAN/KNIGHT/
+  MUSKETMAN (real-ish stats, tech + B-9 resource gates, data-driven
+  everywhere) — and the scripted rival production ladder + A-5r buy
+  roster are BEST-OF-ROSTER (strict `>` scan in UNITS-table order,
+  GPU argmax mirror). In-gate: rivals field PIKEMAN 16/24 seeds,
+  CROSSBOWMAN 19/24, MUSKETMAN 20/24 (SWORDSMAN/KNIGHT
+  resource-starved in fixtures, vitest-covered). Residuals: siege
+  line, Frigate+ naval hulls (with B-6), gold unit-upgrades, and the
+  CONTROLLED rival_masks `ok_u` still hardcodes the old 5-unit roster
+  (RL-surface decision — batch with A-18/#50).
 - B-15. **RESOLVED (2026-07-17, Round B2)**: war weariness — integer
   accumulator (`warWeariness`, +1/turn at war, −4/turn decay at
   peace) → flat amenity penalty via `computeCityStats`, symmetric
@@ -545,9 +563,18 @@ reference:
   BUILD_PLAN VP-G1/G2's never-spend premise against shipped
   A-5/A-4/A-14.
 
-## G. Known parity latents (dormant) — CHAPTER EMPTY
+## G. Known parity latents (dormant)
 
-All four latents resolved (detail in git history / the cited logs):
+G-1..G-4 resolved (detail in git history / the cited logs); G-5 open:
+
+- G-5 (new, 2026-07-19, ROUND B5 — M2's dodge, pre-reroll seed 9222).
+  A 1-gold rival-economy rounding divergence on a LOYALTY-TRANSFERRED
+  city: combat rolls and xp bit-identical, divergence in unmodified
+  economy code around the transfer. Dodged by seed reroll (SEED_
+  OVERRIDES), so currently outside every gate — dormant, not dead.
+  Hunt entry: M2's log (gpu/ROUND_B5_M2_LOG.md) has the repro seed;
+  suspect the milli-rounding order in the transferred city's first
+  economy turn vs the GPU's batched twin.
 - G-1. RESOLVED: `_rival_builder_actions` gain terms read current
   `r_techs`/`r_civics` (validity keeps the snapshot); poke
   `gpu/builder_gain_test.py`.
