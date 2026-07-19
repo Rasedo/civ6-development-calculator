@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit, unitDomain, trainableUnits } from '../src/core/units';
+import { isImpassable } from '../src/core/query';
 import { generalAuraCS, GENERAL_AURA_CS, meleeAttack } from '../src/core/combat';
 import { neighbors, hexDistance } from '../src/core/hex';
 import { UNITS } from '../src/data/units';
@@ -104,7 +105,7 @@ describe('B7-G (B-8) aura', () => {
       const cap = state.cities[0].centerIndex;
       const at = tileAt(state, cap, 3);
       const nb = neighbors(state.map, state.map.tiles[at]).find(
-        (n) => n.cityId === -1 && !n.impassable,
+        (n) => n.cityId === -1 && !isImpassable(n),
       )!;
       const atk = spawnUnit(state, 'WARRIOR', at, 'player')!;
       atk.tileIndex = at;
