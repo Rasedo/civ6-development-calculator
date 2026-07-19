@@ -134,6 +134,7 @@ class Rules:
     b_unlock_civic: torch.Tensor  # civic index or -1 (Temple/Amphitheater/… gate on a civic, not a tech)
     b_req_district: torch.Tensor  # required district idx (-1 = City Center / none)
     b_req_buildings: list  # per building: list of prerequisite building indices (requiresAny)
+    b_excl_buildings: list  # B9-R1: per building: exclusive-sibling indices (exclusiveWith — Barracks/Stable)
     t_cost: torch.Tensor  # [NT]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
@@ -200,6 +201,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_unlock_civic=torch.tensor([b.get("unlockCivic", -1) for b in B], dtype=torch.long),
         b_req_district=torch.tensor([b.get("reqDistrict", -1) for b in B], dtype=torch.long),
         b_req_buildings=[b.get("reqBuildings", []) for b in B],
+        b_excl_buildings=[b.get("exclBuildings", []) for b in B],
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
@@ -969,8 +971,13 @@ class BatchSim:
         sc = rules.district_scaffold or {}
         self.CAMPUS = int(sc.get("campusIdx", 0))
         self.campus_unlock_tech = int(sc.get("campusUnlockTech", -1))  # WRITING
-        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("placement", 0))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, placement: 0 land / 1 aqueduct)
+        self._scaffold = [(int(p["idx"]), int(p["unlockTech"]), int(p.get("unlockCivic", -1)), int(p.get("placement", 0))) for p in sc.get("place", [])]  # (district idx, unlock tech idx, unlock CIVIC idx — B9-R1: at most one of the two >= 0, placement: 0 land / 1 aqueduct / 2 coastal / 3 encampment)
         self.dscaffold_placed = torch.zeros(B, max(len(self._scaffold), 1), dtype=torch.bool, device=device)  # per-scaffold-district placed flag
+        # B9-R1: VETERANCY's encampmentProdMult needs the EN district idx and
+        # its scaffold slot (the player queue-head codes for the district and
+        # its buildings — game.ts isEncampmentItem).
+        self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENCAMPMENT"), -1)
+        self._encamp_si = next((si for si, (di, _ut, _uc, _plc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
         self._rl_any_city = True  # D5c: True lets non-capital cities place districts too
@@ -1011,6 +1018,13 @@ class BatchSim:
         # is handled by 0.5·adjc; the static sources live in d_static_adj.
         def _src_amt(d, src):
             return float(next((a["amount"] for a in d.get("adjacency", []) if int(a["src"]) == src), 0.0))
+        # B9-R1: the DISTRICT source (src 7) is CATALOG-DRIVEN now — the old
+        # hardwired 0.5·adjc was equivalent while every placeable district
+        # carried {DISTRICT, 0.5}, but ENTERTAINMENT_COMPLEX (empty adjacency)
+        # exposed it: the GPU ranked a district-adjacent tile above the TS
+        # lowest-index tie-break (seed 9235 t70, EC@293 vs EC@247).
+        self._dyn_district = torch.tensor([_src_amt(d, 7) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent completed district
+        self._dyn_bwonder = torch.tensor([_src_amt(d, 5) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent COMPLETED world wonder (B9-R1: Theater Square — matchesAdjacency BUILT_WONDER)
         self._dyn_center = torch.tensor([_src_amt(d, 8) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent center
         self._dyn_harbor = torch.tensor([_src_amt(d, 9) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent Harbor
         self._dyn_searesource = torch.tensor([_src_amt(d, 10) for d in self.districts_cat], dtype=dtype, device=device)  # [nD] +per adjacent live SEA resource (withdrawn on strip)
@@ -1051,6 +1065,7 @@ class BatchSim:
             # THEOCRACY faith, DEMOCRACY culture, COMMUNISM production).
             # PLAYER totals only: TS rivalCityYields never applies yieldMult.
             self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
+            self._gov_encamp = torch.tensor([float(g.get("encampmentProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] B9-R1 (no gov carries it today; channel-complete)
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)  # [nPol]
@@ -1064,6 +1079,10 @@ class BatchSim:
             _hid = [p.get("housingIfDistricts", [-1, 0]) for p in _pols]
             self._pol_hid_min = torch.tensor([int(x[0]) for x in _hid], dtype=torch.long, device=device)  # [nPol] (-1 = none)
             self._pol_hid_house = torch.tensor([float(x[1]) for x in _hid], dtype=dtype, device=device)  # [nPol]
+            # B9-R1: VETERANCY +30% production toward the Encampment district
+            # and its buildings — PLAYER queue-head mult (game.ts
+            # isEncampmentItem); TS rival accrual is mods-free.
+            self._pol_encamp = torch.tensor([float(p.get("encampmentProdMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol]
         # A-7r master switch (rules.governmentsLive), mirrored from the TS
         # GOVERNMENTS_ADOPTION_LIVE. Landed inert; gates every gov/policy
         # application + the influence-tier addition so the two engines flip in
@@ -1071,8 +1090,8 @@ class BatchSim:
         # are inert plumbing until the rival-march latent is fixed).
         self._gov_live = bool(getattr(rules, "governments_live", False))
         self._gov_has_effects = self._gov_live and bool(
-            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum()) > 0)
-            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum()) > 0)
+            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_encamp - 1).abs().sum()) > 0)
+            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_encamp - 1).abs().sum()) > 0)
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
@@ -1179,7 +1198,8 @@ class BatchSim:
         self.buildings = torch.zeros(B, C, NB, dtype=torch.bool, device=device)
         self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
-        self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings)
+        self._b_excl_buildings = rules.b_excl_buildings  # B9-R1: exclusive-sibling index lists
+        self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings) or any(len(r) > 0 for r in self._b_excl_buildings)
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
         self.q_dtile = torch.full((B, C), -1, dtype=torch.long, device=device)  # P2: the queued district's target tile
@@ -1817,6 +1837,9 @@ class BatchSim:
             for nb, reqs in enumerate(self._b_req_buildings):
                 if reqs:
                     prereq_ok[:, :, nb] = self.buildings[:, :, reqs].any(dim=2)
+            for nb, excl in enumerate(self._b_excl_buildings):  # B9-R1: exclusiveWith
+                if excl:
+                    prereq_ok[:, :, nb] &= ~self.buildings[:, :, excl].any(dim=2)
             base = base & district_ok & prereq_ok
         self._bld_cache = (self._eff_version, base)
         return base
@@ -1931,14 +1954,16 @@ class BatchSim:
         hous_all = torch.zeros(B, dtype=dt, device=dev)
         ymult = torch.ones(B, 6, dtype=dt, device=dev)
         slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
+        emult = torch.ones(B, dtype=dt, device=dev)  # B9-R1: encampmentProdMult product (VETERANCY)
         if not self._gov_has_effects or not self._ngov:
-            return city_y, cap_y, hous_all, ymult, slotted
+            return city_y, cap_y, hous_all, ymult, slotted, emult
         adopted, has_gov = self._adopted_gov(civics2)
         gmask = has_gov.to(dt).unsqueeze(1)
         city_y = city_y + self._gov_city_y[adopted] * gmask
         cap_y = cap_y + self._gov_cap_y[adopted] * gmask
         hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
+        emult = torch.where(has_gov, self._gov_encamp[adopted], emult)
         if self._npol:
             nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
             puc = self._pol_unlock_civic  # [nPol]
@@ -1960,7 +1985,10 @@ class BatchSim:
             city_y = city_y + sd @ self._pol_city_y
             cap_y = cap_y + sd @ self._pol_cap_y
             hous_all = hous_all + sd @ self._pol_housing
-        return city_y, cap_y, hous_all, ymult, slotted
+            # B9-R1: multiplicative product over slotted cards (TS applyPolicy
+            # mods.encampmentProdMult *= fx — only VETERANCY carries it).
+            emult = emult * torch.where(slotted, self._pol_encamp.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
+        return city_y, cap_y, hous_all, ymult, slotted, emult
 
     def _gov_policy_mods_cached(self, seat_tag, civics2: torch.Tensor):
         """G1: (seat_tag, _eff_version)-keyed wrapper over _gov_policy_mods. The
@@ -1984,7 +2012,13 @@ class BatchSim:
         + 0.5·adjacent-districts + CITY_CENTER·adjacent-centers + HARBOR_DISTRICT·
         adjacent-harbors. Callers floor it. The center is counted BOTH by the
         DISTRICT source (in adjc) and by CITY_CENTER — e.g. Harbor gets +2.5/center."""
-        raw = self.d_static_adj[:, :, di] + 0.5 * adjc
+        raw = self.d_static_adj[:, :, di] + self._dyn_district[di] * adjc  # B9-R1: catalog-driven (was hardwired 0.5)
+        if float(self._dyn_bwonder[di]) != 0:
+            # B9-R1 (Theater Square): +per adjacent COMPLETED world wonder.
+            nbw = self.neigh
+            nbwc = nbw.clamp(min=0)
+            cntw = ((self.built_wonder[:, nbwc] >= 0) & self.built_wonder_complete[:, nbwc] & (nbw >= 0).unsqueeze(0)).sum(dim=2)
+            raw = raw + self._dyn_bwonder[di] * cntw.to(self.dtype)
         if float(self._dyn_center[di]) != 0:
             raw = raw + self._dyn_center[di] * self._adj_center_count().to(self.dtype)
         if float(self._dyn_harbor[di]) != 0:
@@ -2371,6 +2405,7 @@ class BatchSim:
                 # district addends in catalog order (same adds, same
                 # association as the miss path below).
                 d_addends = cc["d_addends"]
+                cs_city6 = cc["cs_city6"]  # B9-R1
                 ship_add = cc["ship_add"]
                 d_maint = cc["d_maint"]
                 has_aq = cc["has_aq"]
@@ -2398,18 +2433,21 @@ class BatchSim:
                 dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
                 # B-18: per-city COMPLETED specialty district count (Zen Meditation min).
                 spec_count = (owned_d & self._is_specialty[dt.clamp(min=0)]).to(torch.long).sum(dim=2)  # [B, C]
-                # City-state district bonus (csEnvoyBonuses): a scientific/religious/…
-                # CS at >=3 envoys grants +districtBonus (again at >=6) to each owned
-                # completed district of its type. Sum per district idx here; the CS
-                # yield equals that district's adjYield for every CS-associated type
-                # (Campus→science, Holy Site→faith, Commercial Hub→gold, …), so it
-                # lands in the same column as the adjacency below, pre-amenity-factor.
+                # City-state district bonus (csEnvoyBonuses): a CS at >=3 envoys
+                # grants +districtBonus (again at >=6) to each owned completed
+                # district of its type. B9-R1: the bonus lands in the CS's TYPE
+                # CHANNEL column (CS_TYPE_YIELD) and applies to EVERY completed
+                # live district instance — INDEPENDENT of adjacencyYield. The
+                # old adjYield-column shortcut broke when the militaristic CS's
+                # ENCAMPMENT became scaffold-placeable (no adjYield, production
+                # channel). Scatter per (district, channel), pre-amenity-factor.
                 nD = len(self.districts_cat)
-                cs_dbonus = torch.zeros(B, nD, dtype=self.dtype, device=dev)
+                cs_dbonus6 = torch.zeros(B, nD * 6, dtype=self.dtype, device=dev)
                 if self.S > 0:
                     perD = ((self.cs_envoys >= 3).to(self.dtype) + (self.cs_envoys >= 6).to(self.dtype)) * self._cs_district_bonus
                     perD = perD * self.cs_alive.to(self.dtype)  # [B, S]
-                    cs_dbonus.scatter_add_(1, self._cs_didx.clamp(min=0), perD)
+                    cs_dbonus6.scatter_add_(1, self._cs_didx.clamp(min=0) * 6 + self._cs_yidx, perD)
+                cs_dbonus6 = cs_dbonus6.view(B, nD, 6)
                 # For each PLACED district with an adjacencyYield: floor(static +
                 # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
                 # sources (mine/quarry for IZ, city-center for Harbor, built-wonder
@@ -2419,16 +2457,18 @@ class BatchSim:
                 # left-to-right association, cache hit or miss.
                 d_addends = []
                 hs_adj = None  # B-18: Holy Site floored adjacency (follower Work Ethic)
+                cs_city6 = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)  # B9-R1: CS envoy adds, channel-correct, ALL district types
                 for d in self.districts_cat:
+                    di = int(d["idx"])
+                    mask = owned_d_live & (dt == di)  # B-32: pillaged = dark (adjacency + CS-envoy)
+                    dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed LIVE type-di districts (0/1)
+                    cs_city6 = cs_city6 + cs_dbonus6[:, di].unsqueeze(1) * dcount.unsqueeze(2)
                     yc = int(d.get("adjYield", -1))
                     if yc < 0:
                         continue
-                    di = int(d["idx"])
                     adjv = self._district_adj_floor(di)  # [B, T] full districtAdjacency (G5 memo)
-                    mask = owned_d_live & (dt == di)  # B-32: pillaged = dark (adjacency + CS-envoy)
-                    dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed LIVE type-di districts (0/1)
                     _adj_sum = (adjv.gather(1, tcf).reshape(B, C, M) * mask.to(self.dtype)).sum(dim=2)  # [B, C]
-                    d_addends.append((yc, _adj_sum, cs_dbonus[:, di].unsqueeze(1) * dcount))
+                    d_addends.append((yc, _adj_sum))
                     if di == self._hs_idx:
                         hs_adj = _adj_sum
                 # SHIPYARD special (yields.ts:171): a city holding a Shipyard adds its completed
@@ -2446,8 +2486,9 @@ class BatchSim:
                 # Aqueduct ownership feeds computeHousing below (D-10: hoisted
                 # into the cacheable block — owned_d/dt live only on this path)
                 has_aq = (owned_d_live & (dt == self._aqueduct_idx)).any(dim=2) if self._aqueduct_idx >= 0 else None  # B-32: pillaged Aqueduct gives no housing
-            for yc_a, adj_add, cs_add in d_addends:
-                total[:, :, yc_a] = total[:, :, yc_a] + adj_add + cs_add
+            for yc_a, adj_add in d_addends:
+                total[:, :, yc_a] = total[:, :, yc_a] + adj_add
+            total = total + cs_city6  # B9-R1: CS envoy district adds (channel columns, all types)
             # B-18: follower Work Ethic — Holy Site floored adjacency ALSO yields
             # production (yields.ts:154), keyed on each city's followed religion.
             if _pcfol is not None and hs_adj is not None:
@@ -2471,7 +2512,7 @@ class BatchSim:
         # `bonuses`, city.ts:445-447), summed pre-amenity-factor. Food (col 0)
         # is left unscaled by the amenity factor below, matching TS.
         if self._gov_has_effects:
-            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted = self._gov_policy_mods_cached("p", self.civics)
+            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult = self._gov_policy_mods_cached("p", self.civics)
             total += gpc_city.unsqueeze(1)
             total += gpc_cap.unsqueeze(1) * self.is_cap.to(self.dtype).unsqueeze(2)
         else:
@@ -2562,6 +2603,7 @@ class BatchSim:
             store = {"b_y": b_y, "amen_b": amen_b, "maint_b": maint_b, "house_b": house_b, "bf_live": bf_live}  # B-32
             if self.districts_on:
                 store["d_addends"] = d_addends
+                store["cs_city6"] = cs_city6  # B9-R1
                 store["ship_add"] = ship_add
                 store["d_maint"] = d_maint
                 store["has_aq"] = has_aq
@@ -2904,19 +2946,20 @@ class BatchSim:
         if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
             _acs = self.cs_alive.double()
             perD_r = ((self.cs_r_envoys[:, r] >= 3).double() + (self.cs_r_envoys[:, r] >= 6).double()) * self._cs_district_bonus * _acs
-            csd_r = torch.zeros(B, len(self.districts_cat), dtype=torch.float64, device=self.device)
-            csd_r.scatter_add_(1, self._cs_didx.clamp(min=0), perD_r)
+            # B9-R1: channel-correct — the bonus lands in the CS's TYPE channel
+            # column for EVERY completed live district, independent of adjYield
+            # (militaristic → ENCAMPMENT production; the old adjYield-column
+            # shortcut broke when EN became scaffold-placeable).
+            _nDc = len(self.districts_cat)
+            csd_r6 = torch.zeros(B, _nDc * 6, dtype=torch.float64, device=self.device)
+            csd_r6.scatter_add_(1, self._cs_didx.clamp(min=0) * 6 + self._cs_yidx, perD_r)
+            csd_r6 = csd_r6.view(B, _nDc, 6)
             dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
             _dc_all = self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)
             _dp_all = self.district_pillaged.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)  # B-32
             comp_all = ((dt_all >= 0) & _dc_all & ~_dp_all).double() * alive.double().unsqueeze(2)  # B-32: pillaged CS channel dark
-            _cols = [torch.zeros(B, self.RC, dtype=torch.float64, device=self.device) for _ in range(6)]
-            for _d in self.districts_cat:
-                _yc = int(_d.get("adjYield", -1))
-                if _yc < 0:
-                    continue
-                _di = int(_d["idx"])
-                _cols[_yc] = _cols[_yc] + csd_r[:, _di].unsqueeze(1) * comp_all[:, :, _di]
+            _cs6_all = (csd_r6.unsqueeze(1) * comp_all.unsqueeze(3)).sum(dim=2)  # [B, RC, 6] — integer-valued f64, order-exact
+            _cols = [_cs6_all[:, :, _k] for _k in range(6)]
             tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
             capb_r = torch.zeros(B, 6, dtype=torch.float64, device=self.device)
             capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
@@ -3086,8 +3129,8 @@ class BatchSim:
                     has_aq = (base & (cc >= 1) & self.aqsrc).any(dim=1)  # [B] adjacent center + water source
                     has_coastal = cbase.any(dim=1)  # [B] a coastal-water tile (Harbor)
                     has_enc = (base & (cc == 0)).any(dim=1)  # [B] a land tile NOT adjacent to any center (Encampment)
-                    for si, (di, utech, plc) in enumerate(self._scaffold):
-                        has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                    for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
+                        has_tech = self.techs[:, utech] if utech >= 0 else (self.civics[:, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # B9-R1: kind-aware
                         not_owned = ~((self.district == di) & (self.owner == c) & ~self.district_dead).any(dim=1)  # one-per-type (LIVE)
                         if plc == 1:  # Aqueduct: non-specialty (no cap), aqueduct-eligible tile
                             dcols[:, c, si] = has_tech & has_aq & not_owned
@@ -3224,7 +3267,13 @@ class BatchSim:
                 else:
                     dsel = self.district == dtype
                 on = dsel & self.district_complete & (self.owner >= 0) & ~self.district_dead  # player eurekas count PLAYER (live) districts
-                pred = on.sum(dim=1) >= row["count"]
+                if row.get("distinct"):
+                    # B9-R1 (CIVIL_ENGINEERING): count DISTINCT types, not instances.
+                    _cntt = torch.zeros(self.B, len(self.districts_cat), dtype=torch.long, device=self.device)
+                    _cntt.scatter_add_(1, self.district.clamp(min=0), on.long())
+                    pred = (_cntt > 0).sum(dim=1) >= row["count"]
+                else:
+                    pred = on.sum(dim=1) >= row["count"]
             elif kind == "policies":
                 # B-13 (Slice V): "run N policy cards" (MEDIEVAL_FAIRES, count 4).
                 # checkSatisfied counts state.government.policies non-null entries
@@ -3287,7 +3336,11 @@ class BatchSim:
                 comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(self.B, -1)).reshape_as(dt)
                 on = (dt >= 0) & comp & alive.unsqueeze(2)
                 if dtype < 0:
-                    pred = (on & self._is_specialty.view(1, 1, -1)).sum(dim=(1, 2)) >= row["count"]
+                    if row.get("distinct"):
+                        # B9-R1 (CIVIL_ENGINEERING): distinct specialty TYPES across cities.
+                        pred = (on.any(dim=1) & self._is_specialty.view(1, -1)).sum(dim=1) >= row["count"]
+                    else:
+                        pred = (on & self._is_specialty.view(1, 1, -1)).sum(dim=(1, 2)) >= row["count"]
                 else:
                     pred = on[:, :, dtype].sum(dim=1) >= row["count"]
             else:
@@ -4075,6 +4128,15 @@ class BatchSim:
             dead_ring = ring & (self.district[b] >= 0) & ~self.district_complete[b]
             dead_ring[c_t] = False  # the center is the new city's live CITY_CENTER
             self.district_dead[b] = self.district_dead[b] | dead_ring
+            # B9-R1 hunt catch (rng 2026006118 t109): CLEAR stale dead marks on
+            # re-owned COMPLETE district tiles. TS derives the captured city's
+            # districts from tiles (complete = listed = live), so a tile marked
+            # dead at an EARLIER capture-while-incomplete that completed later
+            # (orphan pave finished under a subsequent owner) must return to
+            # life with the new owner — TS charges its maintenance/yields, and
+            # a sticky dead bit here silently drops them.
+            live_ring = ring & (self.district[b] >= 0) & self.district_complete[b]
+            self.district_dead[b] = self.district_dead[b] & ~live_ring
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
@@ -5076,7 +5138,11 @@ class BatchSim:
                 has_imp = torch.zeros_like(act)
                 imp_tgt = here.clamp(min=0)
             dc = self.pair_dist[here.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)  # [B, C]
-            ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
+            # B9-R1 hunt catch (rng 2026006104 t78): distance ties break by TS
+            # ARRAY order = FOUNDING sequence (stable sort over state.cities),
+            # which diverges from the slot index once a capture reuses a hole
+            # (P5/S2). city_seq is the founding sequence — rank on it.
+            ckey = torch.where(self.alive, dc * 4096 + self.city_seq, 10**9)
             city_min = ckey.min(dim=1).values
             city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
             tgt = torch.where(has_imp, imp_tgt, city_tgt)
@@ -5434,6 +5500,9 @@ class BatchSim:
             for bi2, reqs in enumerate(self.rules.b_req_buildings):
                 if reqs:
                     ok_b[:, bi2] &= have_b[:, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=1)
+            for bi2, excl in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
+                if excl:
+                    ok_b[:, bi2] &= ~have_b[:, torch.tensor(excl, device=dev, dtype=torch.long)].any(dim=1)
             # settler: the CAPITAL only (rc_is_cap — the rivals.ts:1077
             # rc.isCapital gate; P7-FULL: no longer necessarily slot 0
             # once compaction runs), under the picker's own gate
@@ -5471,8 +5540,8 @@ class BatchSim:
             if self.districts_on and self._scaffold:
                 cap_max = torch.div(self.rc_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
                 spec_cnt = ((self.rc_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
-                for si, (di, utech, plc) in enumerate(self._scaffold):
-                    has_tech = self.r_techs[:, r, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
+                    has_tech = self.r_techs[:, r, utech] if utech >= 0 else (self.r_civics[:, r, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # B9-R1: kind-aware
                     not_owned = self.rc_dist_tile[:, r, j, di] < 0
                     under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
                     # tile existence probed lazily at apply time (the scan
@@ -5622,6 +5691,12 @@ class BatchSim:
                             if bool(m2.any()):
                                 have2 = self.rc_bldg[:, r, j][:, torch.tensor(reqs, device=self.device, dtype=torch.long)].any(dim=1)
                                 rb_ok = rb_ok & (~m2 | have2)
+                    for bi2, excl in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
+                        if excl:
+                            m2 = bi == bi2
+                            if bool(m2.any()):
+                                havex = self.rc_bldg[:, r, j][:, torch.tensor(excl, device=self.device, dtype=torch.long)].any(dim=1)
+                                rb_ok = rb_ok & (~m2 | ~havex)
                     ok_now = ok_now & d_ok & rb_ok
                     if bool(ok_now.any()):
                         rows_ = ok_now.nonzero(as_tuple=True)[0]
@@ -5695,7 +5770,7 @@ class BatchSim:
                 t_pct_r = self.r_techs[:, r].sum(dim=1).double() / float(rdv.t_cost.shape[0])
                 c_pct_r = self.r_civics[:, r].sum(dim=1).double() / float(rdv.c_cost.shape[0])
                 d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct_r, c_pct_r)))
-                for si, (di, utech, plc) in enumerate(self._scaffold):
+                for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
                     want_d = is_d & (a == NBn + 2 + self.NU + si)
                     if not bool(want_d.any()):
                         continue
@@ -6512,22 +6587,21 @@ class BatchSim:
             faith = faith + gcity[:, 5] * mcell + gcap[:, 5] * gisc
         # A-12: this civ's CS envoy bonuses — per-completed-district adds at
         # 3/6 envoys + the capital yield at 1+ (count-based, the
-        # csRivalEnvoyBonuses twin; the CS yield column equals its district's
-        # adjYield, the player-block invariant). Pre-tier, before A-11 trade.
+        # csRivalEnvoyBonuses twin; B9-R1: channel-correct, any district
+        # type). Pre-tier, before A-11 trade.
         if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
             _acs = self.cs_alive.double()
             perD_r = ((self.cs_r_envoys[:, r] >= 3).double() + (self.cs_r_envoys[:, r] >= 6).double()) * self._cs_district_bonus * _acs
-            csd_r = torch.zeros(self.B, len(self.districts_cat), dtype=torch.float64, device=self.device)
-            csd_r.scatter_add_(1, self._cs_didx.clamp(min=0), perD_r)
+            # B9-R1: channel-correct (see the batched twin) — CS TYPE channel
+            # column, EVERY completed live district, independent of adjYield.
+            _nDc = len(self.districts_cat)
+            csd_r6 = torch.zeros(self.B, _nDc * 6, dtype=torch.float64, device=self.device)
+            csd_r6.scatter_add_(1, self._cs_didx.clamp(min=0) * 6 + self._cs_yidx, perD_r)
+            csd_r6 = csd_r6.view(self.B, _nDc, 6)
             dtj = self.rc_dist_tile[:, r, j]  # [B, nD] — one tile per district type
             compj = ((dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0)) & ~self.district_pillaged.gather(1, dtj.clamp(min=0))).double() * mask.double().unsqueeze(1)  # B-32: pillaged CS channel dark
-            _cols = [torch.zeros(self.B, dtype=torch.float64, device=self.device) for _ in range(6)]
-            for _d in self.districts_cat:
-                _yc = int(_d.get("adjYield", -1))
-                if _yc < 0:
-                    continue
-                _di = int(_d["idx"])
-                _cols[_yc] = _cols[_yc] + csd_r[:, _di] * compj[:, _di]
+            _cs6_j = (csd_r6 * compj.unsqueeze(2)).sum(dim=1)  # [B, 6] — integer-valued f64, order-exact
+            _cols = [_cs6_j[:, _k] for _k in range(6)]
             tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
             capb_r = torch.zeros(self.B, 6, dtype=torch.float64, device=self.device)
             capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
@@ -7413,7 +7487,9 @@ class BatchSim:
             has_imp = torch.zeros_like(act)
             imp_tgt = hc
         dc = self.pair_dist[hc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
-        ckey = torch.where(self.alive, dc * 16 + torch.arange(self.C, device=dev), 10**9)
+        # B9-R1: distance ties break by the FOUNDING sequence (TS array order),
+        # not the slot index — see the barb twin (rng 2026006104 t78).
+        ckey = torch.where(self.alive, dc * 4096 + self.city_seq, 10**9)
         city_min = ckey.min(dim=1).values
         city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
         tgt = torch.where(has_imp, imp_tgt, city_tgt)
@@ -8110,6 +8186,9 @@ class BatchSim:
                 for bi2, reqs in enumerate(self.rules.b_req_buildings):
                     if reqs:
                         ok_bA[:, :, bi2] &= have_bA[:, :, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=2)
+                for bi2, excl in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
+                    if excl:
+                        ok_bA[:, :, bi2] &= ~have_bA[:, :, torch.tensor(excl, device=dev, dtype=torch.long)].any(dim=2)
                 arNB = torch.arange(NBn, device=dev, dtype=rdv3.b_cost.dtype)
                 inf_bA = torch.full((B, self.RC, NBn), float("inf"), dtype=rdv3.b_cost.dtype, device=dev)
                 key_bA = torch.where(ok_bA, rdv3.b_cost.view(1, 1, -1) * 1024 + arNB, inf_bA)  # the *1024+arNB tie-break key, verbatim
@@ -8136,10 +8215,10 @@ class BatchSim:
                 if self.districts_on and self._scaffold and rem_any:
                     cap_max = torch.div(self.rc_pop[:, r, j] - 1, 3, rounding_mode="floor") + 1
                     spec_cnt = ((self.rc_dist_tile[:, r, j] >= 0) & self._is_specialty).sum(dim=1)
-                    for si, (di, utech, plc) in enumerate(self._scaffold):
+                    for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
                         if not rem_any:
                             break
-                        has_tech = self.r_techs[:, r, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                        has_tech = self.r_techs[:, r, utech] if utech >= 0 else (self.r_civics[:, r, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # B9-R1: kind-aware
                         not_owned = self.rc_dist_tile[:, r, j, di] < 0
                         under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
                         want_d = rem & has_tech & not_owned & under_cap
@@ -8373,6 +8452,9 @@ class BatchSim:
                     for bi6, reqs6 in enumerate(self.rules.b_req_buildings):
                         if reqs6:
                             ok6[:, bi6] &= have6[:, torch.tensor(reqs6, device=dev, dtype=torch.long)].any(dim=1)
+                    for bi6, excl6 in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
+                        if excl6:
+                            ok6[:, bi6] &= ~have6[:, torch.tensor(excl6, device=dev, dtype=torch.long)].any(dim=1)
                     qb6 = self.rc_current[:, r, j6] - (1 + self.NU + len(self._scaffold))
                     is_qb = (qb6 >= 0) & (qb6 < NB6)
                     if bool(is_qb.any()):
@@ -9091,10 +9173,18 @@ class BatchSim:
             self.claimed_f_n = self.claimed_f_n + ropen.long()
             self.claimed_o_n = self.claimed_o_n + ropen.long()
             self.r_religion_done[:, r] = self.r_religion_done[:, r] | ropen
-            # B-18: freeze this religion's holy tile (the rival's capital center)
-            # at founding — the pressure source. r_religion_done latches, so
-            # ropen fires once and the tile never re-writes.
-            self.holy_tile[:, r + 1] = torch.where(ropen, self.cap_tile_rival[:, r], self.holy_tile[:, r + 1])
+            # B-18: freeze this religion's holy tile at founding — the pressure
+            # source. r_religion_done latches, so ropen fires once and the tile
+            # never re-writes. B9-R1 hunt catch (rng 2026006104 t119): TS picks
+            # the LIVE capital at founding time, else the FIRST LIVE CITY
+            # (rivals.ts `cities.find(isCapital) ?? cities[0]`) — the static
+            # cap_tile_rival goes stale when the capital fell before founding.
+            _rc_alv = self.rc_alive[:, r]
+            _rc_cap = self.rc_is_cap[:, r] & _rc_alv
+            _h_slot = torch.where(_rc_cap.any(dim=1), _rc_cap.long().argmax(dim=1), _rc_alv.long().argmax(dim=1))
+            _holy = self.rc_center[:, r].gather(1, _h_slot.unsqueeze(1)).squeeze(1)
+            _holy = torch.where(_rc_alv.any(dim=1), _holy, torch.full_like(_holy, -1))  # ?? null
+            self.holy_tile[:, r + 1] = torch.where(ropen, _holy, self.holy_tile[:, r + 1])
 
             # B-18: enhance the founded religion — a SECOND earned Prophet
             # claims an enhancer belief, denying it from the shared pool
@@ -9674,8 +9764,8 @@ class BatchSim:
                 d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct))).to(self.dtype)
                 cap_max = torch.div(self.pop[:, 0] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(capital pop)
                 dtaken = torch.zeros(B, dtype=torch.bool, device=dev)  # at most one queue per turn
-                for si, (di, utech, plc) in enumerate(self._scaffold):
-                    has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
+                    has_tech = self.techs[:, utech] if utech >= 0 else (self.civics[:, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # B9-R1: kind-aware
                     spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == 0) & ~self.district_dead).sum(dim=1)  # LIVE specialty only
                     under_cap = (plc == 1) | (spec_count < cap_max)  # Aqueduct is non-specialty → no cap
                     want = (self.current[:, 0] == -1) & ~dtaken & has_tech & ~self.dscaffold_placed[:, si] & self.alive[:, 0] & under_cap
@@ -9813,8 +9903,8 @@ class BatchSim:
                 for c in range(C if self._rl_any_city else 1):
                     ac = act[:, c]  # city c's chosen action (-1 where not idle/alive)
                     cap_c = torch.div(self.pop[:, c] - 1, 3, rounding_mode="floor") + 1  # maxSpecialtyDistricts(pop_c)
-                    for si, (di, utech, plc) in enumerate(self._scaffold):
-                        has_tech = self.techs[:, utech] if utech >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                    for si, (di, utech, uciv, plc) in enumerate(self._scaffold):
+                        has_tech = self.techs[:, utech] if utech >= 0 else (self.civics[:, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # B9-R1: kind-aware
                         spec_count = ((self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & (self.owner == c) & ~self.district_dead).sum(dim=1)  # LIVE specialty only (recomputed)
                         not_owned = ~((self.district == di) & (self.owner == c) & ~self.district_dead).any(dim=1)  # one-per-type (LIVE)
                         under_cap = (plc == 1) | (spec_count < cap_c)  # Aqueduct is non-specialty → no cap
@@ -9982,7 +10072,17 @@ class BatchSim:
             has_item = cur_c >= 0
             # V-H1: banked chop production pays into the head the moment a build
             # exists (game.ts consumes productionBank inside the production add).
-            self.progress[bidx, col] = torch.where(has_item, self.progress[bidx, col] + t_c[:, 1] + self.prod_bank[bidx, col], self.progress[bidx, col])
+            # B9-R1: VETERANCY — production toward an ENCAMPMENT item (the
+            # district or its buildings) is multiplied FIRST, then the bank
+            # adds unmultiplied (game.ts:788-793 order).
+            prod_add = t_c[:, 1]
+            if self._gov_has_effects and self._encamp_didx >= 0:
+                emult_p = self._gov_policy_mods_cached("p", self.civics)[5]
+                en_item = (cur_c >= 0) & (cur_c < self.NB) & (self._b_req_district[cur_c.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
+                if self._encamp_si >= 0:
+                    en_item = en_item | (cur_c == self.UNIT_BASE + self.NU + self._encamp_si)
+                prod_add = torch.where(en_item, t_c[:, 1] * emult_p, t_c[:, 1])
+            self.progress[bidx, col] = torch.where(has_item, self.progress[bidx, col] + prod_add + self.prod_bank[bidx, col], self.progress[bidx, col])
             self.prod_bank[bidx, col] = torch.where(has_item, torch.zeros_like(self.prod_bank[bidx, col]), self.prod_bank[bidx, col])
             done = has_item & (self.progress[bidx, col] >= self.cur_cost[bidx, col])
             made_settler = done & (cur_c == self.SETTLER)

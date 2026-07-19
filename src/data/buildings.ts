@@ -106,3 +106,13 @@ export const BUILDINGS: Record<string, BuildingDef> = Object.fromEntries(list.ma
 export function buildingsForDistrict(district: DistrictId): BuildingDef[] {
   return list.filter((b) => b.district === district && !b.autoCapital);
 }
+
+/**
+ * ROUND B9 R1 hold (A-9): regional buildings stay out of every SCRIPTED
+ * pick (rival queue, rival gold purchase, exporter building table → the
+ * scripted player and the GPU) until the regional-effects channel exists on
+ * both engines — shipping them without it is an instant parity break the
+ * moment one completes. R2 implements the channel and empties this set.
+ * The player UI path (availableBuildings) is intentionally NOT gated.
+ */
+export const SCRIPTED_HELD_BUILDINGS: ReadonlySet<string> = new Set(['FACTORY', 'POWER_PLANT', 'ZOO', 'STADIUM']);

@@ -86,7 +86,7 @@ import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
-import { BUILDINGS } from '../src/data/buildings';
+import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
@@ -169,7 +169,7 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 // excluded below. (Harbor stage: pairs with the _city_totals player-yield mirror.)
 const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', ...SCAFFOLD_DISTRICTS.map((d) => d.id)]);
 const centerBuildings = Object.values(BUILDINGS)
-  .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !b.worship)
+  .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !b.worship && !SCRIPTED_HELD_BUILDINGS.has(b.id)) // B9-R1: regional held until R2
   .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
 const buildingUnlockTech = new Map<string, number>();
@@ -251,9 +251,9 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
 });
 
 // Boost conditions the covered scope can actually trigger. Still skipped
-// (structurally unreachable for BOTH engines, so parity holds): policy
-// rows, distinctTypes district rows (7 different districts — D3), and
+// (structurally unreachable for BOTH engines, so parity holds):
 // FISHING_BOATS improvement rows (out of roster, water-unreachable).
+// B9-R1: distinctTypes district rows export now (see the district branch).
 const boostRows: object[] = [];
 for (const [id, def] of Object.entries(BOOSTS)) {
   if (!def.check) continue;
@@ -289,12 +289,15 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     // structurally-unreachable before) — both civs' detection reads the
     // same global builtWonderComplete scan.
     row = { kind: 'anyWonderBuilt' };
-  } else if (c.kind === 'district' && !c.distinctTypes) {
+  } else if (c.kind === 'district') {
     // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
-    // MATHEMATICS: 3; per-type ones). distinctTypes conditions (7 different
-    // districts) wait for D3, when more than one district type can exist.
+    // MATHEMATICS: 3; per-type ones). B9-R1: distinctTypes conditions
+    // (CIVIL_ENGINEERING: 7 different specialty districts) export now — the
+    // full specialty catalog is scaffold-placeable, so both civs can satisfy
+    // them (the old "wait for D3" skip made the GPU miss a live inspiration:
+    // rng 2026006131 t248).
     const dtype = c.type ? PLACEABLE_DISTRICTS.indexOf(c.type) : -1;
-    row = { kind: 'district', dtype, count: c.count };
+    row = { kind: 'district', dtype, count: c.count, distinct: c.distinctTypes ? 1 : 0 };
   } else if (c.kind === 'greatPeople') {
     // Great-person eurekas (EDUCATION: a Scientist; HUMANISM: an Artist;
     // ENLIGHTENMENT: any 3). cls -1 = any class (sum); else the GP_CLASSES
@@ -781,10 +784,13 @@ const rules = {
     active: SCRIPTED_CAMPUS ? 1 : 0,
     // Districts the scripted policy places, IN ORDER (engine mirrors this list).
     // placement 0=land (best floor(static+0.5·adj) tile), 1=aqueduct (adjacent to
-    // center + water source, lowest tile, non-specialty + housing).
-    place: SCAFFOLD_DISTRICTS.map(({ id, unlockId, placement }) => ({
+    // center + water source, lowest tile, non-specialty + housing), 2=coastal,
+    // 3=encampment (NOT adjacent-center). B9-R1: civic-unlocked entries ship
+    // unlockCivic instead of unlockTech (exactly one of the two is >= 0).
+    place: SCAFFOLD_DISTRICTS.map(({ id, unlockId, unlockKind, placement }) => ({
       idx: PLACEABLE_DISTRICTS.indexOf(id),
-      unlockTech: techIdx.get(unlockId) ?? -1,
+      unlockTech: unlockKind === 'civic' ? -1 : techIdx.get(unlockId) ?? -1,
+      unlockCivic: unlockKind === 'civic' ? civicIdx.get(unlockId) ?? -1 : -1,
       placement: placement ? PLACEMENT_CODE[placement] : 0,
     })),
     // CS buildDistrict askable list → engine district-type indices, so the
@@ -815,6 +821,9 @@ const rules = {
     // owning a completed district of this type and having a prerequisite.
     reqDistrict: b.district === 'CITY_CENTER' ? -1 : PLACEABLE_DISTRICTS.indexOf(b.district),
     reqBuildings: (b.requiresAny ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
+    // B9-R1: exclusiveWith (Barracks/Stable) — pickers refuse a building whose
+    // exclusive sibling is already owned (availableBuildings' rule).
+    exclBuildings: (b.exclusiveWith ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
   })),
   techs: techList.map((t) => ({
     id: t.id,
@@ -861,6 +870,7 @@ const rules = {
     adjacencyMult: PLACEABLE_DISTRICTS.map((d) => g.effects.adjacencyMult?.[d] ?? 1),
     buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => g.effects.buildingYieldMult?.[d] ?? 1),
     tilePurchaseMult: g.effects.tilePurchaseMult ?? 1,
+    encampmentProdMult: g.effects.encampmentProdMult ?? 1, // B9-R1: VETERANCY went live with the Encampment scaffold
     housingIfDistricts: g.effects.housingIfDistricts ? [g.effects.housingIfDistricts.min, g.effects.housingIfDistricts.housing] : [-1, 0],
     amenitiesIfSpecialty: g.effects.amenitiesIfSpecialty ? [g.effects.amenitiesIfSpecialty.min, g.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
     newDeal: g.effects.newDeal ? [g.effects.newDeal.min, g.effects.newDeal.housing, g.effects.newDeal.amenities] : [-1, 0, 0],
@@ -879,6 +889,7 @@ const rules = {
     adjacencyMult: PLACEABLE_DISTRICTS.map((d) => p.effects.adjacencyMult?.[d] ?? 1),
     buildingYieldMult: PLACEABLE_DISTRICTS.map((d) => p.effects.buildingYieldMult?.[d] ?? 1),
     tilePurchaseMult: p.effects.tilePurchaseMult ?? 1,
+    encampmentProdMult: p.effects.encampmentProdMult ?? 1, // B9-R1: VETERANCY went live with the Encampment scaffold
     housingIfDistricts: p.effects.housingIfDistricts ? [p.effects.housingIfDistricts.min, p.effects.housingIfDistricts.housing] : [-1, 0],
     amenitiesIfSpecialty: p.effects.amenitiesIfSpecialty ? [p.effects.amenitiesIfSpecialty.min, p.effects.amenitiesIfSpecialty.amenities] : [-1, 0],
     newDeal: p.effects.newDeal ? [p.effects.newDeal.min, p.effects.newDeal.housing, p.effects.newDeal.amenities] : [-1, 0, 0],
@@ -1334,7 +1345,9 @@ for (let s = 0; s < N_SEEDS; s++) {
   const queueNextDistrict = (cap: City): boolean => {
     for (const spec of SCAFFOLD_DISTRICTS) {
       const di = PLACEABLE_DISTRICTS.indexOf(spec.id);
-      if (placedDistricts.has(di) || !state.research.techs.includes(spec.unlockId)) continue;
+      // B9-R1: civic-unlocked scaffold entries gate on the civic tree.
+      const unlocked = (spec.unlockKind === 'civic' ? state.research.civics : state.research.techs).includes(spec.unlockId);
+      if (placedDistricts.has(di) || !unlocked) continue;
       let best = -1;
       let bestAdj = -1;
       for (const tile of state.map.tiles) {

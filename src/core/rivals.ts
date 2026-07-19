@@ -24,7 +24,7 @@ import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
@@ -842,7 +842,7 @@ function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks
   );
   let best: (typeof BUILDINGS)[string] | null = null;
   for (const def of Object.values(BUILDINGS)) {
-    if (have.has(def.id) || def.worship) continue;
+    if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue; // B9-R1: regional held until R2
     if (!done.has(def.district)) continue;
     if (!unlocks.buildings.has(def.id)) continue;
     if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
@@ -1679,7 +1679,7 @@ export function rivalPhase(state: GameState): void {
         );
         const center = state.map.tiles[rc.centerIndex];
         for (const def of Object.values(BUILDINGS)) {
-          if (have.has(def.id) || def.worship) continue;
+          if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue; // B9-R1: regional held until R2
           if (!done.has(def.district)) continue;
           if (!rivalUnlocks.buildings.has(def.id)) continue;
           if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;

@@ -249,13 +249,21 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
 /**
  * The districts scripted policies place, in priority order — shared by the
  * GPU fixture exporter's scaffold, the GPU engine, and the rival district
- * picker (C1-B4). Encampment is wired but held out (no-yield specialty that
- * competes for the scarce cap; see BUILD_PLAN D6).
+ * picker (C1-B4). A-9 (ROUND B9): the full specialty catalog is scaffolded
+ * now — the original five keep their order (first-placeable-wins semantics),
+ * the append runs yields-first with Encampment last (its BUILD_PLAN D6
+ * hold-out is lifted; cap competition is intended, real AIs build early
+ * Encampments). `unlockKind: 'civic'` marks civic-tree unlocks (the default
+ * is a tech id); NEIGHBORHOOD stays out pending the appeal-housing stage.
  */
-export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
+export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
   { id: 'HOLY_SITE', unlockId: 'ASTROLOGY' },
   { id: 'COMMERCIAL_HUB', unlockId: 'CURRENCY' },
   { id: 'AQUEDUCT', unlockId: 'ENGINEERING', placement: 'aqueduct' },
   { id: 'HARBOR', unlockId: 'CELESTIAL_NAVIGATION', placement: 'coastal' },
+  { id: 'INDUSTRIAL_ZONE', unlockId: 'APPRENTICESHIP' },
+  { id: 'THEATER_SQUARE', unlockId: 'DRAMA_AND_POETRY', unlockKind: 'civic' },
+  { id: 'ENTERTAINMENT_COMPLEX', unlockId: 'GAMES_AND_RECREATION', unlockKind: 'civic' },
+  { id: 'ENCAMPMENT', unlockId: 'BRONZE_WORKING', placement: 'encampment' },
 ];
