@@ -762,7 +762,13 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
  * districtCostIn(rival.research).
  */
 function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity, unlocks: Unlocks): boolean {
-  const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
+  // A-24: a district sits on a tile owned by THIS city (the player's
+  // canPlaceDistrict uses `t.cityId === city.id`). Restrict the picker AND the
+  // ownsTile validity check to this rc's A-17 registry (rivalCityId === rc.id) —
+  // a sibling's registered tile is NOT a valid site, keeping .districts and the
+  // registry mutually consistent (was civ-level, so overlapping frontiers could
+  // pave a sibling's tile — seed 9118).
+  const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === rc.id;
   for (const { id } of SCAFFOLD_DISTRICTS) {
     let best = -1;
     let bestAdj = -1;
@@ -880,7 +886,10 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
     const p = def.placement;
     const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
       .filter((t) => {
-        if (!tileOwnedByCiv(t, civ) || t.index === rc.centerIndex) return false;
+        // A-24: per-city ownership, mirroring canPlaceWonder's `tile.cityId ===
+        // city.id` — the wonder tile registers to THIS rc (rivalCityId), not
+        // merely the civ. Same coherence fix as tryQueueRivalDistrict.
+        if (!tileOwnedByCiv(t, civ) || t.rivalCityId !== rc.id || t.index === rc.centerIndex) return false;
         if (t.district || t.builtWonder || t.wonder) return false;
         if (isImpassable(t)) return false;
         if (t.resource && RESOURCES[t.resource].category !== 'bonus') return false;
@@ -1574,6 +1583,34 @@ function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv
   if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // B-30: walls kept, outer pool 0
   to.cities.push(flipped);
   state.eventLog.push(`${rc.name} defected from ${from.name} to ${to.name}!`);
+}
+
+/**
+ * A-24 machine-check (env-gated by CIV6_RC_REGISTRY_CHECK; the TS twin of the
+ * GPU engine's _check_rc_registry_invariant). Every district tile and wonder
+ * tile an rc lists must register BACK to that rc — its `rivalCityId` equals
+ * `rc.id` (a district sits on a tile owned by THAT city, the placement rule
+ * tryQueueRivalDistrict/tryQueueRivalWonder now enforce) — and that tile must
+ * be owned by this rival's civ. A tile registered to a SIBLING rc (the seed
+ * 9118 latent) throws. NO always-on cost: only called when the env flag is set.
+ */
+export function assertRivalRegistryCoherent(state: GameState): void {
+  for (const rival of state.rivals) {
+    const civ = civOfRival(rival.id);
+    for (const rc of rival.cities) {
+      const check = (kind: string, tileIndex: number, type: string) => {
+        const t = state.map.tiles[tileIndex];
+        if (t.rivalCityId !== rc.id || !tileOwnedByCiv(t, civ)) {
+          throw new Error(
+            `A-24 registry incoherence: rival=${rival.id} rc.id=${rc.id} ${kind}=${type} ` +
+              `tile=${tileIndex} rivalCityId=${t.rivalCityId} rivalId=${t.rivalId} turn=${state.turn}`,
+          );
+        }
+      };
+      for (const d of rc.districts) check('district', d.tileIndex, d.type);
+      for (const w of rc.wonders ?? []) check('wonder', w.tileIndex, w.id);
+    }
+  }
 }
 
 export function rivalPhase(state: GameState): void {
@@ -2309,5 +2346,13 @@ export function rivalPhase(state: GameState): void {
         state.eventLog.push(`${rival.name} declares war on you!`);
       }
     }
+  }
+
+  // A-24: env-gated registry coherence check at the phase tail (after every
+  // founding/placement/capture this turn). Off by default → zero cost + no
+  // trajectory change; the GPU forced-compaction gate exercises the twin.
+  // globalThis avoids a @types/node dependency (the src tsconfig has none).
+  if ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CIV6_RC_REGISTRY_CHECK) {
+    assertRivalRegistryCoherent(state);
   }
 }
