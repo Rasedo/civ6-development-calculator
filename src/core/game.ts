@@ -996,6 +996,13 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
       capital.queue[0].progress += fx.productionToCapital;
     }
   }
+  // B7-G (B-8): a GENERAL/ADMIRAL claim ALSO spawns its support unit (civilian,
+  // 4 MP) at the capital, on top of the roster's instant effect (which models
+  // the retire ability). Spawn-at-claim is production-free — zero RNG draws.
+  if (cls === 'GENERAL' || cls === 'ADMIRAL') {
+    const capital = state.cities.find((c) => c.isCapital);
+    if (capital) spawnUnit(state, cls, capital.centerIndex, 'player');
+  }
   state.greatPeople.earned.push(person.id);
 }
 

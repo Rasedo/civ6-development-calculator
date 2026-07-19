@@ -1178,6 +1178,13 @@ class BatchSim:
         # city's worked-tile window (rival_at is the valid-mask input the eff
         # epoch misses); claims elsewhere leave the yields cache intact.
         self._claim_version = 0
+        # B7-G (B-8): the Great General/Admiral aura plane cache is keyed on
+        # general POSITIONS, which move mid-turn (the rival general walk) and
+        # change on spawn/kill/capture — none of which bump _eff_version. This
+        # counter bumps at every such site (+restore), so the (turn,_gen_ver)
+        # keyed plane cache stays exact within and across turns.
+        self._gen_ver = 0
+        self._gen_aura_cache = None  # ((turn,_gen_ver), (land [B,O,T], sea [B,O,T]) | None)
         self._eff_cache: tuple[int, torch.Tensor] | None = None
         self._food_cache: tuple[int, torch.Tensor] | None = None
         self._score_cache: tuple[int, torch.Tensor] | None = None
@@ -1381,6 +1388,10 @@ class BatchSim:
         # trainableUnits filter's mirror; masks the type out of the player
         # purchase path (no actor emits it, the guard is exactness).
         self._p_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
+        # B7-G (B-8): spawn-only roster flag (GENERAL/ADMIRAL) — the
+        # trainableUnits filter's mirror; masks the type out of production_mask
+        # AND the purchase path. Birthed only by the Great-Person claim.
+        self._p_spawn_only = torch.tensor([bool(u.get("so", 0)) for u in ru], dtype=torch.bool, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
         # B-10: SCOUT is a military explorer (combat 10) but NEVER in the rival
         # roster (RIVAL_BUY_UNITS / the ladder exclude it). In the production
@@ -1391,6 +1402,17 @@ class BatchSim:
         # #45/B-6: the scripted galley-policy build target (the naval MELEE unit,
         # requiresTech SAILING). -1 if the roster has no galley.
         self._galley_idx = next((i for i, u in enumerate(ru) if u["id"] == "GALLEY"), -1)
+        # B7-G (B-8): the Great General / Great Admiral chassis. unit_idx = the
+        # roster (UNITS) index of the spawned combat-0 civilian; cls = the GP
+        # class index whose claim spawns it (-1 = absent). The +5 aura and its
+        # 2-tile range are data-driven off the exporter.
+        self._general_unit_idx = int(rr.get("generalUnitIdx", -1))
+        self._admiral_unit_idx = int(rr.get("admiralUnitIdx", -1))
+        self._general_cls = int(rr.get("generalClassIdx", -1))
+        self._admiral_cls = int(rr.get("admiralClassIdx", -1))
+        self._gen_aura_cs_val = float(rr.get("generalAuraCs", 5))
+        self._gen_aura_range = int(rr.get("generalAuraRange", 2))
+        self._gen_off = tiles_within_offsets(self._gen_aura_range).to(device)  # aura disk (hexDistance ≤ range)
 
         # Precomputed static prereq masks would race with completion inside a
         # turn; availability is recomputed per loop (cheap: NT ≤ 32).
@@ -1485,6 +1507,7 @@ class BatchSim:
         # G1: the restored snapshot may carry different beliefs/units — bump the
         # counters (mcts self-test covers this) and drop the rival-phase caches.
         self._bel_version += 1
+        self._gen_ver += 1  # B7-G (B-8): restored unit pools may hold different generals
         self._rp_kill_version += 1
         self._claim_version += 1
         self._rival_route_cache = self._belief_feat_cache = None
@@ -2253,6 +2276,15 @@ class BatchSim:
                 self.progress[:, 0] = self.progress[:, 0] + torch.where(has_build, prod, torch.zeros_like(prod))
             self.player_gp_points = self.player_gp_points - cost * cf
             self.gp_earned[:, :nCls] = earned + can.long()
+            # B7-G (B-8): a GENERAL/ADMIRAL claim spawns its support unit
+            # (civilian, 4 MP) at the player capital (city slot 0), on top of
+            # the instant effect — the applyGreatPersonEffect mirror. Zero RNG.
+            for guidx, gcls in ((self._general_unit_idx, self._general_cls), (self._admiral_unit_idx, self._admiral_cls)):
+                if guidx >= 0 and 0 <= gcls < nCls:
+                    sm = can[:, gcls] & self.alive[:, 0]  # TS: spawn only if a capital exists (city slot 0)
+                    if bool(sm.any()):
+                        self._spawn_player(sm, self.site[:, 0], torch.full((B,), guidx, dtype=torch.long, device=dev))
+                        self._gen_ver += 1
 
     def _spread_religious_pressure(self) -> None:
         """B-18 (mirror of TS spreadReligiousPressure): each founded religion's
@@ -2384,6 +2416,95 @@ class BatchSim:
         tr = terr.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
         add = self._enh["cnear"][eidx] * nr.double() + self._enh["cdef"][eidx] * tr.double()
         return torch.where(has & (def_tile >= 0), add, torch.zeros_like(add))
+
+    def _gen_aura_planes(self):
+        """B7-G (B-8): per (batch, unified-civ g, tile) booleans —
+        land[b, g, t] = tile t is within gen_aura_range of a LIVE own GENERAL
+        of civ g (g=0 player, g=r+1 rival r); sea[b, g, t] the same for
+        ADMIRALs. General positions move mid-turn (the rival general walk) and
+        change on spawn/kill/capture, none of which bump _eff_version — so the
+        keys on (turn, _gen_ver, a general POSITION fingerprint). The fingerprint
+        is load-bearing: a general is moved not only by the _gen_ver-bumped
+        sites (spawn/rival-walk/kill/capture/restore) but ALSO by the RL/scripted
+        MOVE verb in _apply_unit_actions (a random-rollout player steps its own
+        general), which does NOT bump _gen_ver — so keying on _gen_ver alone
+        went stale mid-apply and mis-placed the aura (rollout hunt, seed 9132
+        t155: a player general stepped, the next slot's ranged roll read the
+        pre-step plane). The weighted tile/pool/type sum changes on ANY general
+        move, kill, capture or spawn, so the cache is exact regardless of the
+        mover. Returns None when no General/Admiral is alive anywhere (the common
+        case → structural 0; call sites skip the gather). Dilation mirrors
+        _rel_combat_planes.near3 (scatter_add of longs then >0)."""
+        B, T, O, dev = self.B, self.T, self._O, self.device
+        gi, ai = self._general_unit_idx, self._admiral_unit_idx
+        p_g = self.p_alive & (self.p_type == gi) if gi >= 0 else torch.zeros(B, P_MAX, dtype=torch.bool, device=dev)
+        p_a = self.p_alive & (self.p_type == ai) if ai >= 0 else torch.zeros(B, P_MAX, dtype=torch.bool, device=dev)
+        v_g = self.v_alive & (self.v_type == gi) if gi >= 0 else torch.zeros(B, U_MAX, dtype=torch.bool, device=dev)
+        v_a = self.v_alive & (self.v_type == ai) if ai >= 0 else torch.zeros(B, U_MAX, dtype=torch.bool, device=dev)
+        present = bool(p_g.any()) or bool(p_a.any()) or bool(v_g.any()) or bool(v_a.any())
+        if present:
+            arp = torch.arange(1, p_g.shape[1] + 1, device=dev)
+            arv = torch.arange(1, v_g.shape[1] + 1, device=dev)
+            # tile (+1 so tile 0 counts), pool (p vs v via distinct base mults),
+            # type (general vs admiral via ×3) and slot — a swap or a same-tile
+            # pool transfer (capture) still changes the sum.
+            p_fp = int((((self.p_tile + 1) * (1 + 2 * p_a.long()) * arp) * (p_g | p_a).long()).sum())
+            v_fp = int((((self.v_tile + 1) * (1 + 2 * v_a.long()) * arv) * (v_g | v_a).long()).sum())
+            fp = p_fp * 100003 + v_fp + int((p_g | p_a).sum()) * 31 + int((v_g | v_a).sum())
+        else:
+            fp = 0
+        key = (self.turn, self._gen_ver, fp)
+        if self._gen_aura_cache is not None and self._gen_aura_cache[0] == key:
+            return self._gen_aura_cache[1]
+        if not present:
+            self._gen_aura_cache = (key, None)
+            return None
+        off = self._gen_off
+        land = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
+        sea = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
+        pwin = tiles_from_offsets(self.p_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, P_MAX, -1)
+        vwin = tiles_from_offsets(self.v_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, U_MAX, -1) if self.R > 0 else None
+
+        def dilate(mask: torch.Tensor, win: torch.Tensor) -> torch.Tensor:
+            src = torch.zeros(B, T, dtype=torch.long, device=dev)
+            w = torch.where(mask.unsqueeze(2), win, torch.full_like(win, -1)).reshape(B, -1)
+            src.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
+            return src > 0
+
+        if bool(p_g.any()):
+            land[:, 0] = dilate(p_g, pwin)
+        if bool(p_a.any()):
+            sea[:, 0] = dilate(p_a, pwin)
+        if self.R > 0:
+            for r in range(self.R):
+                rg = v_g & (self.v_civ == r)
+                ra = v_a & (self.v_civ == r)
+                if bool(rg.any()):
+                    land[:, r + 1] = dilate(rg, vwin)
+                if bool(ra.any()):
+                    sea[:, r + 1] = dilate(ra, vwin)
+        out = (land, sea)
+        self._gen_aura_cache = (key, out)
+        return out
+
+    def _gen_aura_cs(self, civ_unified: torch.Tensor, tile: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
+        """B7-G (B-8): the +generalAuraCs adder [B] (dtype) for own military
+        near an own GENERAL (land) / ADMIRAL (naval|embarked). civ_unified: 0
+        player, r+1 rival r, -1 none/barb. An INTEGER add joining the B-29
+        quantized assembly (the JUST_WAR/CRUSADE pattern) — mirrors
+        combat.generalAuraCS. Scoped to the unit-vs-unit rolls only (the same
+        sites as the religion adders); city/CS strikes are out of scope."""
+        planes = self._gen_aura_planes()
+        if planes is None:
+            return torch.zeros(self.B, dtype=self.dtype, device=self.device)
+        land, sea = planes
+        valid = (civ_unified >= 0) & (tile >= 0)
+        g = civ_unified.clamp(min=0, max=self._O - 1)
+        idx = (g * self.T + tile.clamp(min=0)).unsqueeze(1)
+        land_hit = land.reshape(self.B, -1).gather(1, idx).squeeze(1)
+        sea_hit = sea.reshape(self.B, -1).gather(1, idx).squeeze(1)
+        hit = torch.where(naval, sea_hit, land_hit) & valid
+        return hit.to(self.dtype) * self._gen_aura_cs_val
 
     def _farmadj_qual(self) -> torch.Tensor:
         """[B, T] bool: a non-pillaged FARM with >=2 neighboring FARM tiles
@@ -3327,6 +3448,7 @@ class BatchSim:
             )
             unit_ok = unit_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate
             unit_ok = unit_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: trainableUnits' faithOnly filter (MISSIONARY never queues)
+            unit_ok = unit_ok & ~self._p_spawn_only.view(1, -1)  # B7-G (B-8): spawn-only filter (GENERAL/ADMIRAL never queue)
             unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1)
             if bool(self.unit_naval.any()):
                 # #45/B-6: the controlled/RL player builds NO naval (mirrors the
@@ -3394,6 +3516,7 @@ class BatchSim:
                 )
                 u_ok = u_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate (purchase)
                 u_ok = u_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: faith-only never gold-buys (trainableUnits mirror)
+                u_ok = u_ok & ~self._p_spawn_only.view(1, -1)  # B7-G (B-8): spawn-only never gold-buys (trainableUnits mirror)
                 u_cost = self._p_cost.unsqueeze(0).expand(B, -1)
                 if self._builder_idx >= 0:
                     # P4/D-10: the builder column prices off the live escalator
@@ -4738,6 +4861,7 @@ class BatchSim:
                 self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.pciv_at[kr, ct] = nslot
                 self.p_next[kr] += 1
+                self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
                 self.p_acted[:, p] = self.p_acted[:, p] | civk  # P4/D-2: TS meleeAttack spends MP
             siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
             if bool(siege.any()):
@@ -4782,6 +4906,16 @@ class BatchSim:
                 # carry none; embarked = flat override, no term; the PLAYER
                 # attacker term is structurally 0 — no GPU player religion).
                 def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(v_civ, -1), v_civ), tgt).to(def_e.dtype))
+                # B7-G (B-8): Great General/Admiral aura. Player attacker (civ 0)
+                # keyed on `here`; rival defender (v_civ+1) keyed on `tgt` (barb →
+                # no aura). Embarked/naval → the ADMIRAL plane (added on top of the
+                # embarked defender's flat CS, mirroring combat.generalAuraCS).
+                atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
+                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(v_civ), here, atk_naval).to(atk_e.dtype)
+                _v_def_nav = self.unit_naval[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
+                def_naval = v_embd | torch.where(is_b, torch.zeros_like(v_embd), _v_def_nav)
+                def_civ_u = torch.where(is_b, torch.full_like(v_civ, -1), v_civ + 1)
+                def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
                 d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
@@ -4858,6 +4992,13 @@ class BatchSim:
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
                 # B6-S1: rival-defender enhancer adders (embarked = flat, none).
                 def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(v_civ, -1), v_civ), tgt).to(def_e.dtype))
+                # B7-G (B-8): aura — player attacker (civ 0) keyed on its own tile;
+                # rival defender (v_civ+1) keyed on `tgt` (barb → none). Naval/embarked → ADMIRAL plane.
+                atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
+                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(v_civ), self.p_tile[:, p], atk_naval).to(atk_e.dtype)
+                _v_def_nav = self.unit_naval[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
+                def_naval = v_embd | torch.where(is_b, torch.zeros_like(v_embd), _v_def_nav)
+                def_e = def_e + self._gen_aura_cs(torch.where(is_b, torch.full_like(v_civ, -1), v_civ + 1), tgt, def_naval).to(def_e.dtype)
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 r_def_dead = torch.zeros_like(r_att)
@@ -4909,6 +5050,11 @@ class BatchSim:
                 # B6-S1: the lone rival CIVILIAN defender gets the enhancer
                 # defender adders too (TS defenderCS applies to any unit).
                 def_e = def_e + torch.where(civ_embd, torch.zeros_like(def_e), self._rel_def_cs(rvc_civ_t, tgt).to(def_e.dtype))
+                # B7-G (B-8): attacker aura only — the defender is a CIVILIAN
+                # (combat 0), and combat.generalAuraCS returns 0 for civilians,
+                # so no defender term joins here.
+                atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
+                atk_e = atk_e + self._gen_aura_cs(torch.zeros(self.B, dtype=torch.long, device=self.device), self.p_tile[:, p], atk_naval).to(atk_e.dtype)
                 d_def = self._damage_roll(r_civ, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
@@ -4916,6 +5062,8 @@ class BatchSim:
                 dead = self.v_hp[rows, ks] <= 0
                 self.v_alive[rows[dead], ks[dead]] = False
                 self.rvciv_at[rows[dead], tc[rows[dead]]] = -1
+                if bool(dead.any()):
+                    self._gen_ver += 1  # B7-G (B-8): the killed civilian may be a general → invalidate the aura plane
                 self.p_acted[:, p] = self.p_acted[:, p] | r_civ
 
             # --- V-CS: melee vs a CITY-STATE CENTER — meleeAttack's csTarget
@@ -6405,6 +6553,82 @@ class BatchSim:
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > 1)
 
+    def _rival_general_actions(self, r: int, active: torch.Tensor) -> None:
+        """B7-G (B-8): mirrors rivalGeneralActions — a live GENERAL of rival r
+        walks with the war effort toward the civ's CURRENT war-march target (the
+        NEAREST player city center, dist·(T+1)+centerIndex key), on real MP,
+        stopping within gen_aura_range so its +5 aura covers the front. Gated on
+        r_atwar (peace → hold; ADMIRALs and the scripted player general are
+        absent from this rival-only walker). The _rival_missionary_actions step
+        loop verbatim, with the ≤range stop and no spread. Zero RNG."""
+        if self._general_unit_idx < 0:
+            return
+        B, T, dev = self.B, self.T, self.device
+        atw = active & self.r_atwar[:, r]
+        cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._general_unit_idx)
+        if not (bool(atw.any()) and bool(cand.any())):
+            return
+        # war-march target mask [B, T]: alive PLAYER city centers (scatter_add
+        # of longs then >0 — a bool scatter clobbers tile 0; the S1 near3 lesson).
+        acc = torch.zeros(B, T, dtype=torch.long, device=dev)
+        acc.scatter_add_(1, self.site.clamp(min=0), self.alive.long())
+        tm = acc > 0
+        has_t = tm.any(dim=1)
+        if not bool(has_t.any()):
+            return
+        rng = self._gen_aura_range
+        arT = torch.arange(T, device=dev, dtype=torch.float64)
+        arange6 = torch.arange(6, device=dev)
+        for u in cand.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            act = cand[:, u] & atw & has_t
+            if not bool(act.any()):
+                continue
+            here = self.v_tile[:, u].clamp(min=0)
+            tkey = torch.where(tm, self.pair_dist[here].double() * (T + 1) + arT, torch.full((B, T), float("inf"), dtype=torch.float64, device=dev))
+            tgt = tkey.argmin(dim=1)
+            d0 = self.pair_dist[here, tgt].to(torch.long)
+            full_mp = self._p_moves[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
+            mp = full_mp.clone()
+            cur = here.clone()
+            d_cur = d0.clone()
+            moving = act & (d_cur > rng)
+            while bool(moving.any()):
+                curc = cur.clamp(min=0)
+                nb = self.neigh[curc]  # [B, 6]
+                nbc = nb.clamp(min=0)
+                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rciv", civ=r)
+                d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
+                skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
+                best = skey.min(dim=1).values
+                dir_i = (best % 8).clamp(max=5)
+                dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
+                cost = (
+                    1
+                    + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
+                    + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+                )
+                mv = (
+                    moving
+                    & (best < 10**9)
+                    & (torch.div(best, 8, rounding_mode="floor") < d_cur)
+                    & ((mp >= cost) | (mp >= full_mp))
+                )
+                if not bool(mv.any()):
+                    break
+                rows = mv.nonzero(as_tuple=True)[0]
+                self.rvciv_at[rows, cur[rows]] = -1
+                self.rvciv_at[rows, dest[rows]] = u
+                self.v_tile[rows, u] = dest[rows]
+                self.v_acted[rows, u] = True  # P4/D-2
+                self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
+                mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
+                # B-3 ZOC: a civilian mover halts adjacent to a hostile military unit.
+                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r]), torch.zeros_like(mp), mp)
+                d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
+                cur = torch.where(mv, dest, cur)
+                moving = mv & (mp > 0) & (d_cur > rng)
+        self._gen_ver += 1  # general positions may have changed → invalidate the aura plane
+
     def _religious_victor(self) -> torch.Tensor:
         """B6-S3 (mirror of TS religiousVictor): [B] the lowest religion id g
         such that EVERY alive civ (player if ≥1 city, each rival with ≥1 city)
@@ -7613,6 +7837,20 @@ class BatchSim:
             if atk_kind == "rival":
                 atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_rv, _dciv, torch.full_like(_dciv, -1)), tgt).to(def_e.dtype))
+            # B7-G (B-8): Great General / Admiral aura. Attacker keyed on its own
+            # tile `here` (a RIVAL attacker gets its civ's aura; a BARB has none);
+            # defender keyed on `tgt` — player (civ 0), rival (_dciv+1) or barb
+            # (-1). Embarked/naval → the ADMIRAL (sea) plane; NOT zeroed for
+            # embarked (mirrors combat.generalAuraCS: embarked defender gets the
+            # admiral aura on top of its flat CS).
+            if atk_kind == "rival":
+                atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
+                atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, here, atk_naval).to(atk_e.dtype)
+            _p_def_nav = self.unit_naval[self.p_type.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
+            _v_def_nav = self.unit_naval[self.v_type.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
+            def_naval = d_emb | torch.where(def_is_barb, torch.zeros_like(d_emb), torch.where(def_is_rv, _v_def_nav, _p_def_nav))
+            def_civ_u = torch.where(def_is_barb, torch.full_like(dm, -1), torch.where(def_is_rv, _dciv + 1, torch.zeros_like(dm)))
+            def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
@@ -7716,6 +7954,7 @@ class BatchSim:
             else:
                 self.pciv_at[rows, ttc[rows]] = -1
                 self.p_alive[rows, ds] = False
+            self._gen_ver += 1  # B7-G (B-8): a captured/killed civilian may be a general → invalidate the aura plane
         if bool(rvciv_att.any()):
             # C1-B5b: a barbarian kills a lone rival civilian roll-free — no
             # prisoner/camp system (B-31 capture is player/rival attackers
@@ -7724,6 +7963,7 @@ class BatchSim:
             ds = dvc[rows]
             self.rvciv_at[rows, ttc[rows]] = -1
             self.v_alive[rows, ds] = False
+            self._gen_ver += 1  # B7-G (B-8): the killed civilian may be a general → invalidate the aura plane
         # B-31: a captured civilian is NOT killed — its captor does NOT advance
         # onto it. Only a barbarian kill (barb attacker) frees the tile for the
         # advance; a rival captor (civ_att under atk_kind=="rival") stays put.
@@ -8230,6 +8470,15 @@ class BatchSim:
             # B6-S1: the RIVAL ranged attacker's enhancer adders (defenders
             # here are player/barb units — no religion, no defender term).
             atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, v], tgt).to(atk_e.dtype)
+            # B7-G (B-8): rival ranged attacker aura (civ v_civ+1, own tile); the
+            # player MILITARY defender (civ 0) aura keyed on tgt — a barb or lone
+            # player CIVILIAN defender gets none (barb has no general; civilians
+            # return 0 in combat.generalAuraCS). Naval/embarked → ADMIRAL plane.
+            atk_naval = self.unit_naval[self.v_type[:, v].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, v]
+            atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, v] + 1, self.v_tile[:, v], atk_naval).to(atk_e.dtype)
+            def_civ_u = torch.where(def_is_b | def_is_c, torch.full_like(dm, -1), torch.zeros_like(dm))
+            def_naval = self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) | self.unit_naval[self.p_type.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
+            def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             rows = unit_att.nonzero(as_tuple=True)[0]
             for grp, at_map, hp_t, alive_t, slot_t in (
@@ -8245,6 +8494,8 @@ class BatchSim:
                 dead = hp_t[g, ds] <= 0
                 at_map[g[dead], ttc[g[dead]]] = -1
                 alive_t[g[dead], ds[dead]] = False
+            if bool((unit_att & def_is_c).any()):
+                self._gen_ver += 1  # B7-G (B-8): a struck lone player civilian may be a general → invalidate the aura plane
             # B-4: a surviving player MILITARY defender (dm>=0) earns +2 (barb /
             # lone civilian defenders never accrue).
             surv_pm = (unit_att & (dm >= 0)).nonzero(as_tuple=True)[0]
@@ -9682,6 +9933,16 @@ class BatchSim:
                         self.r_prophets[:, r] = self.r_prophets[:, r] + hit.long()
                     self.r_gpp[:, r, cls] = torch.where(hit, self.r_gpp[:, r, cls] - gcost, self.r_gpp[:, r, cls])
                     self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+                    # B7-G (B-8): a GENERAL/ADMIRAL claim spawns its support
+                    # unit (civilian, 4 MP) at the rival's capital (rc_is_cap
+                    # center), on top of the instant effect — the rivals.ts
+                    # spawn-at-claim mirror. Production-free (zero RNG).
+                    if (cls == self._general_cls and self._general_unit_idx >= 0) or (cls == self._admiral_cls and self._admiral_unit_idx >= 0):
+                        guidx = self._general_unit_idx if cls == self._general_cls else self._admiral_unit_idx
+                        if bool(hit.any()):
+                            cap_t = torch.where(self.rc_is_cap[:, r] & self.rc_alive[:, r], self.rc_center[:, r], torch.full_like(self.rc_center[:, r], -1)).max(dim=1).values
+                            self._spawn_rival_civ(hit & (cap_t >= 0), cap_t, r, type_idx=guidx)
+                            self._gen_ver += 1
 
             # Pantheon / religion claims — A-7: the picks' IDENTITIES matter
             # now (effects apply to this civ). The draw picks the k-th OPEN
@@ -9770,6 +10031,12 @@ class BatchSim:
                 self._bel_version += 1  # G1: enhancer claim (inert today, but keep the belief epoch honest)
             self.claimed_e_n = self.claimed_e_n + eopen.long()
             self.r_enhancer_done[:, r] = self.r_enhancer_done[:, r] | eopen
+
+            # B7-G (B-8): the Great General marches with the war effort (spawned
+            # above in the GP claim — a fresh one walks this turn on full MP).
+            # Runs BEFORE the war loop so the aura reflects the advanced
+            # position — the rivals.ts call order (after claimBeliefs).
+            self._rival_general_actions(r, active & ~self.controlled[:, r])
 
             # War or peace (branch on the value at entry; a peace made this
             # turn still ran the war branch, exactly like the TS if/else).

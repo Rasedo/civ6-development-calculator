@@ -33,7 +33,7 @@ import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSett
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
-import { terrainDefense } from '../src/core/combat';
+import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import {
   CITY_STATE_TYPES,
@@ -572,6 +572,15 @@ const rules = {
       // player's GPU faith stays unmodeled (no consumer — worship is TS-only).
       GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0, p.effect.faith ?? 0]),
     ),
+    // B7-G (B-8): Great General / Great Admiral spawn-at-claim + aura anchors.
+    // classIdx = the GP_CLASSES index whose claim spawns the unit; unitIdx =
+    // the roster (UNITS) index of the spawned combat-0 civilian (-1 = absent).
+    generalClassIdx: GP_CLASSES.indexOf('GENERAL'),
+    admiralClassIdx: GP_CLASSES.indexOf('ADMIRAL'),
+    generalUnitIdx: Object.values(UNITS).findIndex((u) => u.id === 'GENERAL'),
+    admiralUnitIdx: Object.values(UNITS).findIndex((u) => u.id === 'ADMIRAL'),
+    generalAuraCs: GENERAL_AURA_CS,
+    generalAuraRange: GENERAL_AURA_RANGE,
     pantheonPool: Object.keys(PANTHEONS).length,
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,
     founderPool: Object.keys(FOUNDER_BELIEFS).length,
@@ -735,6 +744,9 @@ const rules = {
     // B6-S2: faith-purchase-only (MISSIONARY) — the trainableUnits filter's
     // mirror; masks the type out of the GPU purchase path.
     fo: u.faithOnly ? 1 : 0,
+    // B7-G (B-8): spawn-only (GENERAL/ADMIRAL) — the trainableUnits filter's
+    // mirror; masks the type out of production_mask AND the purchase path.
+    so: u.spawnOnly ? 1 : 0,
   })),
   // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
   // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a

@@ -123,6 +123,7 @@ def main() -> int:
                 ("districts", [py, "gpu/district_breadth_test.py"], 4),  # B9/A-9 catalog-breadth surfaces
                 ("rc_registry", [py, "gpu/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency
                 ("religion2", [py, "gpu/religion2_test.py"], 4),  # B6 missionary/enhancer/religious-victory surfaces
+                ("gp_aura", [py, "gpu/gp_aura_test.py"], 4),  # B7-G/B-8 Great General/Admiral spawn/walk/aura/capture (gate-unreachable GENERAL)
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

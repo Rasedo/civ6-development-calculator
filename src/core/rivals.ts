@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, GENERAL_AURA_RANGE } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
@@ -621,6 +621,13 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
         if (cap && cap.queue.length > 0) cap.queue[0].progress += fx.productionToCapital;
       }
       if (cls === 'PROPHET') rival.prophets = (rival.prophets ?? 0) + 1;
+      // B7-G (B-8): a GENERAL/ADMIRAL claim spawns its support unit (civilian,
+      // 4 MP) at the rival's capital — same instant-effect-plus-spawn as the
+      // player's applyGreatPersonEffect. Zero RNG.
+      if (cls === 'GENERAL' || cls === 'ADMIRAL') {
+        const cap = rival.cities.find((c) => c.isCapital);
+        if (cap) spawnUnit(state, cls, cap.centerIndex, 'rival', rival.id);
+      }
       state.greatPeople.earned.push(person.id); // gone from the shared pool
       state.eventLog.push(`${rival.name} claimed ${person.name}.`);
       earned++;
@@ -1151,6 +1158,69 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
       const at = state.map.tiles[u.tileIndex];
       const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
       if (dHere <= 1) break;
+      let dest = -1;
+      let destD = dHere;
+      for (const n of neighbors(state.map, at)) {
+        if (!tileFreeForUnit(state, n.index, u)) continue;
+        const d = hexDistance(n.col, n.row, tt.col, tt.row);
+        if (d < destD) {
+          destD = d;
+          dest = n.index;
+        }
+      }
+      if (dest < 0) break;
+      const dt = state.map.tiles[dest];
+      const cost = moveCostInto(dt) + (crossesRiver(at, dt) ? 3 : 0);
+      if (u.movesLeft < cost && u.movesLeft < fullM) break;
+      u.tileIndex = dest;
+      u.movesLeft = Math.max(0, u.movesLeft - cost);
+      clearCampFor(state, u, dest); // any-unit camp clear, the walkPath mirror
+      if (inEnemyZoc(state, u.tileIndex, u)) {
+        u.movesLeft = 0;
+        break;
+      }
+      if (u.movesLeft <= 0) break;
+    }
+  }
+}
+
+/**
+ * B7-G (B-8): rival GREAT GENERAL march. A live GENERAL walks with the war
+ * effort toward the civ's CURRENT war-march target — the NEAREST player city
+ * center (dist·(T+1)+centerIndex key, the missionary/builder total-order
+ * convention) — stopping within GENERAL_AURA_RANGE (2) so its +5 CS aura
+ * covers the front. Real-MP walk (the missionary chassis verbatim: passable
+ * free neighbor strictly closer, walkPath's exact charge, ZOC halt, camp
+ * clear). At peace it holds (guarded below). ADMIRALs always hold at the
+ * capital (naval war-march targeting is a residual) and the scripted PLAYER
+ * general holds too — both are absent from this rival-only walker. Zero RNG.
+ */
+function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
+  if (!rival.atWar || state.cities.length === 0) return;
+  const nTiles = state.map.tiles.length;
+  for (const u of [...state.units]) {
+    if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'GENERAL') continue;
+    const ut = state.map.tiles[u.tileIndex];
+    // war-march target: the nearest player city center (total-order key —
+    // centerIndex is unique, so the min is deterministic).
+    let target: City | null = null;
+    let bestKey = Infinity;
+    for (const c of state.cities) {
+      const ct = state.map.tiles[c.centerIndex];
+      const key = hexDistance(ut.col, ut.row, ct.col, ct.row) * (nTiles + 1) + c.centerIndex;
+      if (key < bestKey) {
+        bestKey = key;
+        target = c;
+      }
+    }
+    if (!target) continue;
+    const tt = state.map.tiles[target.centerIndex];
+    // the rivalMissionaryActions step loop verbatim, with the ≤2 stop.
+    const fullM = UNITS[u.type]?.moves ?? 2;
+    for (;;) {
+      const at = state.map.tiles[u.tileIndex];
+      const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
+      if (dHere <= GENERAL_AURA_RANGE) break;
       let dest = -1;
       let destD = dHere;
       for (const n of neighbors(state.map, at)) {
@@ -2309,6 +2379,11 @@ export function rivalPhase(state: GameState): void {
     // Races: great people, pantheons, beliefs.
     claimGreatPeople(state, rival);
     claimBeliefs(state, rival);
+
+    // B7-G (B-8): the Great General marches with the war effort (spawned above
+    // in claimGreatPeople — a fresh one walks this turn on its full MP). Runs
+    // BEFORE the war loop so the aura reflects the general's advanced position.
+    rivalGeneralActions(state, rival);
 
     // War and peace.
     if (rival.atWar) {
