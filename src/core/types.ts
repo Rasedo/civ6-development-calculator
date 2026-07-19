@@ -326,6 +326,11 @@ export interface Unit {
   /** B-5 FORTIFY (military units only): consecutive turns ended without a
    * move or attack, capped at 2. +3 CS defending at >=1, +6 at >=2. */
   fortifyTurns?: number;
+  /** AUDIT B-4 XP: combat experience (player & rival units; barbs accrue none).
+   * +5 per attack executed, +2 per attack survived as defender. XP_LEVELS
+   * [15,45,90] grant +5 CS/level at every roll the unit fights. Civilians never
+   * fight, so theirs stays 0. */
+  xp?: number;
   /** Remaining multi-turn movement path (tile indexes), or null. */
   path: number[] | null;
   /** Standing order ('explore' keeps picking new frontier targets). */

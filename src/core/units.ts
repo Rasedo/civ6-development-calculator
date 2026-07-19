@@ -435,6 +435,8 @@ export function spawnUnit(
   };
   // B-5 FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
+  // AUDIT B-4 XP: player & rival units start at 0 experience (barbs never accrue).
+  if (owner !== 'barbarian') unit.xp = 0;
   if (civId !== undefined) unit.civId = civId;
   state.units.push(unit);
   if (owner === 'player') revealAround(state, unit.tileIndex);

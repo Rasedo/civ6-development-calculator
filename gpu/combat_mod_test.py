@@ -115,7 +115,7 @@ def test_damage_roll_table(sim) -> None:
         sim.rng_state = rng0.clone()
         r = sim._next_random(mask)
         q = int(js_round(diff * 10)[0])
-        base = float(dmgbase[(q + 600)])
+        base = float(dmgbase[(q + 2000)])  # B-4: table widened (offset 600 -> 2000)
         want = max(1, int(js_round(base * (0.8 + 0.4 * r))[0]))
         assert got == want, f"damage_roll(diff={dv}) = {got}, reference = {want}"
         sim.rng_state = rng0.clone()  # leave the stream untouched for the next diff
@@ -153,10 +153,23 @@ def test_integrated(sim, p, code, name) -> None:
     ua = torch.full((1, P_MAX), HOLD, dtype=torch.long)
     ua[0, p] = code
 
+    # B-4 XP: force known experience so the level term is exercised. Attacker
+    # 50 xp -> level 2 (+10 CS); rival defender 20 xp -> level 1 (+5 CS); a
+    # barbarian defender never accrues (no bonus). The bonus enters the CS
+    # assembly like the B-7 terms (integer add, once, before the paired rolls).
+    ATK_XP, DEF_XP = 50, 20
+    def xp_bonus(xp):
+        return 5 * sum(1 for t in (15, 45, 90) if xp >= t)
+    atk_xp_cs = xp_bonus(ATK_XP)  # +10
+    def_xp_cs = 0 if is_barb else xp_bonus(DEF_XP)  # +5 for a rival defender
+
     def run(river_bit):
         snap = sim.snapshot()
         sim.p_hp[0, p] = ATK_HP
         set_def_hp(DEF_HP)
+        sim.p_xp[0, p] = ATK_XP  # B-4: attacker veterancy
+        if not is_barb:
+            sim.v_xp[0, dslot] = DEF_XP  # B-4: rival defender veterancy
         # force the river edge on/off explicitly (river_mask is static; set it
         # each run so restore can't leak the previous state)
         rm = int(sim.river_mask[0, here])
@@ -201,11 +214,11 @@ def test_integrated(sim, p, code, name) -> None:
 
     b7_flank, b7_support = flank_support_ref()
 
-    # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank;
-    #                    def_e = combat + terrain + fortify - wound(88) + 2*support
+    # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank + xp;
+    #                    def_e = combat + terrain + fortify - wound(88) + 2*support + xp
     def ref_q(river):
-        atk_e = atk_combat - 10.0 * ((100.0 - ATK_HP) / 100.0) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank
-        def_e = def_combat + tdef + 3 * def_fort - 10.0 * ((100.0 - DEF_HP) / 100.0) + SUPPORT_CS * b7_support
+        atk_e = atk_combat - 10.0 * ((100.0 - ATK_HP) / 100.0) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank + atk_xp_cs
+        def_e = def_combat + tdef + 3 * def_fort - 10.0 * ((100.0 - DEF_HP) / 100.0) + SUPPORT_CS * b7_support + def_xp_cs
         return round((atk_e - def_e) * 10), round((def_e - atk_e) * 10)
 
     ev0 = run(False)
@@ -222,7 +235,8 @@ def test_integrated(sim, p, code, name) -> None:
     assert _diff_of(ev1, "mel") == _diff_of(ev0, "mel") - 50, "river did not cut the melee diff by 50"
     assert _diff_of(ev1, "melc") == _diff_of(ev0, "melc") + 50, "river did not lift the counter diff by 50"
     print(
-        f"  D. melee on {name} slot {p}: wounded assembly exact; "
+        f"  D. melee on {name} slot {p}: wounded+B-4 xp assembly exact "
+        f"(atk +{atk_xp_cs}, def +{def_xp_cs} CS); "
         f"river mel {q_mel0}->{q_mel1} (-50), melc {q_melc0}->{q_melc1} (+50)"
     )
 

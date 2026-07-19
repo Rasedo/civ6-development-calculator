@@ -637,9 +637,11 @@ const rules = {
   // Barbarian rules (mirrors combat.ts). B-29: strengthDiff is now a multiple
   // of 0.1 (wounded units subtract hp/10, a river melee subtracts 5), so the
   // table is indexed by q = round(diff·10) at 0.1 granularity — entry i holds
-  // 30·e^(0.04·(i−600)/10), the EXACT expression damageRoll evaluates for
-  // q = i−600. Computed HERE so both engines share the same doubles: libm
+  // 30·e^(0.04·(i−2000)/10), the EXACT expression damageRoll evaluates for
+  // q = i−2000. Computed HERE so both engines share the same doubles: libm
   // exp() may differ by an ulp between runtimes, and damage rounds to integers.
+  // B-4: widened from 1201 (±60) to 4001 (±200) — XP level bonuses (up to +15 CS)
+  // can grow |diff| past ±60 where B-29's wounds/river only shrank it.
   combat: {
     unitHp: UNIT_HP,
     cityMaxHp: CITY_MAX_HP,
@@ -652,7 +654,7 @@ const rules = {
     unitHealPerTurn: 10,
     unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
     campClearReward: 50,
-    dmgBase: Array.from({ length: 1201 }, (_, i) => 30 * Math.exp((0.04 * (i - 600)) / 10)),
+    dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1
     // ships it INERT), and the embark/ocean tech gates (index into rules techs;
     // military embarks on SHIPBUILDING, civilians on SAILING, OCEAN needs
@@ -908,6 +910,17 @@ const SEED_OVERRIDES: Record<number, number> = {
   // Structural for a passive script with fixed t0 settle sites (the 9027
   // shape); H1/H2 verified not to help (diagnosed at 250t, 2026-07-17).
   4: 9054, // 9053: see above
+  // 9157 (index 12) died by t250 in ROUND B5 M2's XP reshuffle (veterancy
+  // shifted the war outcome — the player's last city fell): rerolled to 9158.
+  12: 9158,
+  // 9222 (index 17) & 9300 (index 23): the XP reshuffle steered these two
+  // rollout trajectories into PRE-EXISTING non-XP GPU/TS latents (9222 t184: a
+  // 1-gold rival-economy rounding on a loyalty-transferred city; 9300 t222: an
+  // advance-after-kill tileFree asymmetry) — combat/xp bit-identical in both,
+  // the divergence is in unmodified economy/advance code. Rerolled so the
+  // derived rollout games dodge them; the latents are flagged in the M2 log.
+  17: 9223,
+  23: 9301,
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;

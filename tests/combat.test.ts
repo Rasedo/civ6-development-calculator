@@ -11,6 +11,12 @@ import {
   getCityHp,
   FLANKING_CS,
   SUPPORT_CS,
+  XP_ATTACK,
+  XP_DEFEND,
+  XP_LEVELS,
+  xpLevelBonus,
+  unitLevel,
+  awardDefenseXp,
 } from '../src/core/combat';
 import { routeRaided } from '../src/core/trade';
 import { CITY_MAX_HP } from '../src/data/units';
@@ -259,5 +265,144 @@ describe('B-7 flanking & support', () => {
     const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile));
 
     expect(d1).toBe(d0 - SUPPORT_CS * 10);
+  });
+});
+
+describe('B-4 XP & levels', () => {
+  const rollDiff = (tag: string, fn: () => void): number => {
+    const log: string[] = [];
+    (globalThis as any).__cbLog = log;
+    try {
+      fn();
+    } finally {
+      delete (globalThis as any).__cbLog;
+    }
+    const line = log.find((l) => l.startsWith(`k:${tag} `));
+    expect(line, `expected a ${tag} roll in ${JSON.stringify(log)}`).toBeDefined();
+    return Number(line!.match(/diff(-?\d+)/)![1]);
+  };
+
+  const atkTile = (s: ReturnType<typeof battlefield>['state']) => tileAtCoords(s.map, 11, 9).index;
+  const defTile = (s: ReturnType<typeof battlefield>['state']) => tileAtCoords(s.map, 12, 9).index;
+
+  it('exports the XP constants and level helper', () => {
+    expect(XP_ATTACK).toBe(5);
+    expect(XP_DEFEND).toBe(2);
+    expect(XP_LEVELS).toEqual([15, 45, 90]);
+    expect(unitLevel({ xp: 0 })).toBe(0);
+    expect(unitLevel({ xp: 14 })).toBe(0);
+    expect(unitLevel({ xp: 15 })).toBe(1);
+    expect(unitLevel({ xp: 44 })).toBe(1);
+    expect(unitLevel({ xp: 45 })).toBe(2);
+    expect(unitLevel({ xp: 89 })).toBe(2);
+    expect(unitLevel({ xp: 90 })).toBe(3);
+    expect(xpLevelBonus({ xp: 0 })).toBe(0);
+    expect(xpLevelBonus({ xp: 15 })).toBe(5);
+    expect(xpLevelBonus({ xp: 45 })).toBe(10);
+    expect(xpLevelBonus({ xp: 90 })).toBe(15);
+    expect(xpLevelBonus({})).toBe(0); // undefined xp reads as 0
+  });
+
+  it('a fresh player/rival unit starts at 0 xp; a barbarian carries none', () => {
+    const { state } = battlefield();
+    const p = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index)!;
+    expect(p.xp).toBe(0);
+    const b = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 15).index, 'barbarian')!;
+    expect(b.xp).toBeUndefined();
+  });
+
+  it('an attacker gains +5 per attack; a barbarian attacker accrues nothing', () => {
+    const { state } = battlefield();
+    const atk = spawnUnit(state, 'WARRIOR', atkTile(state))!;
+    atk.tileIndex = atkTile(state);
+    const def = spawnUnit(state, 'WARRIOR', defTile(state), 'barbarian')!;
+    def.tileIndex = defTile(state);
+    def.hp = 100; // survives the single hit
+    meleeAttack(state, atk.id, def.tileIndex);
+    expect(atk.xp).toBe(5);
+    expect(def.xp).toBeUndefined(); // barbarians never accrue
+
+    // a second attack stacks (the D-2 heal / MP aside — force another strike)
+    atk.movesLeft = 2;
+    meleeAttack(state, atk.id, def.tileIndex);
+    expect(atk.xp).toBe(10);
+  });
+
+  it('a surviving military defender gains +2; a barbarian defender does not', () => {
+    const { state } = battlefield();
+    const barb = spawnUnit(state, 'WARRIOR', atkTile(state), 'barbarian')!;
+    barb.tileIndex = atkTile(state);
+    barb.movesLeft = 2;
+    const def = spawnUnit(state, 'WARRIOR', defTile(state))!;
+    def.tileIndex = defTile(state);
+    def.hp = 100; // survives
+    meleeAttack(state, barb.id, def.tileIndex);
+    expect(def.xp).toBe(2); // survived the defense
+    expect(barb.xp).toBeUndefined();
+  });
+
+  it('awardDefenseXp: military survivor +2, civilian and killed unit none', () => {
+    const { state } = battlefield();
+    const mil = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index)!;
+    mil.hp = 100;
+    awardDefenseXp(mil);
+    expect(mil.xp).toBe(2);
+    const civ = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 4, 4).index)!;
+    civ.hp = 100;
+    awardDefenseXp(civ);
+    expect(civ.xp).toBe(0); // civilians never fight
+    const dead = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index)!;
+    dead.hp = 0;
+    awardDefenseXp(dead);
+    expect(dead.xp).toBe(0); // no XP for a killed defender
+  });
+
+  it('each level adds +5 CS at ATTACK (mel diff rises 5 CS per level)', () => {
+    const run = (atkXp: number): number => {
+      const { state } = battlefield();
+      const atk = spawnUnit(state, 'WARRIOR', atkTile(state))!;
+      atk.tileIndex = atkTile(state);
+      atk.xp = atkXp;
+      const def = spawnUnit(state, 'WARRIOR', defTile(state), 'barbarian')!;
+      def.tileIndex = defTile(state);
+      def.hp = 100;
+      return rollDiff('mel', () => meleeAttack(state, atk.id, def.tileIndex));
+    };
+    const base = run(0);
+    expect(run(15)).toBe(base + 5 * 10); // level 1 → +5 CS → +50 in diff·10
+    expect(run(45)).toBe(base + 10 * 10); // level 2 → +10 CS
+    expect(run(90)).toBe(base + 15 * 10); // level 3 → +15 CS
+  });
+
+  it('each level adds +5 CS at DEFENSE (mel diff drops 5 CS per defender level)', () => {
+    const run = (defXp: number): number => {
+      const { state } = battlefield();
+      const barb = spawnUnit(state, 'WARRIOR', atkTile(state), 'barbarian')!;
+      barb.tileIndex = atkTile(state);
+      barb.movesLeft = 2;
+      const def = spawnUnit(state, 'WARRIOR', defTile(state))!;
+      def.tileIndex = defTile(state);
+      def.hp = 100;
+      def.xp = defXp;
+      return rollDiff('mel', () => meleeAttack(state, barb.id, def.tileIndex));
+    };
+    const base = run(0);
+    expect(run(15)).toBe(base - 5 * 10); // defender level 1 → def_e +5 → atk-def diff −50
+    expect(run(90)).toBe(base - 15 * 10); // defender level 3 → −15 CS
+  });
+
+  it('a city walls strike grants a surviving rival defender +2', () => {
+    const { state, city } = battlefield();
+    city.buildings.push('ANCIENT_WALLS');
+    state.rivals.push({ id: 0, atWar: true, cities: [] } as any);
+    const center = state.map.tiles[city.centerIndex];
+    const near = tileAtCoords(state.map, center.col + 1, center.row); // adjacent → in range 1..2
+    const rv = spawnUnit(state, 'SPEARMAN', near.index, 'rival', 0)!;
+    rv.tileIndex = near.index;
+    rv.hp = 100; // survives the strike (defense 25 vs city ~15)
+    expect(rv.xp).toBe(0);
+    barbarianPhase(state);
+    expect(rv.hp).toBeLessThan(100); // the walls strike landed
+    expect(rv.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
   });
 });
