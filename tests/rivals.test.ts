@@ -16,6 +16,7 @@ import { meleeAttack, attackTargets, captureCityState, captureRivalCity } from '
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeRaidedAt } from '../src/core/trade';
 import { spawnUnit, unitsHostile } from '../src/core/units';
 import { gpCost } from '../src/data/greatPeople';
+import { BUILDINGS } from '../src/data/buildings';
 import type { CityState, GameState, RivalCity, RivalCiv } from '../src/core/types';
 
 function addRival(
@@ -345,6 +346,68 @@ describe('determinism', () => {
       endTurn(b);
     }
     expect(serialize(a)).toBe(serialize(b));
+  });
+});
+
+describe('B-10 best-of-roster scripted rival production ladder', () => {
+  // Force the unit branch of the pick loop: improve every owned tile (no
+  // district placement, no builder job), pre-own every building (no building
+  // pick), non-capital city (no settler / wonder). Then rc.queue[0] is the
+  // ladder's unit pick. treasury 0 → no A-5r gold buys interfere.
+  function ladderPick(techs: string[], opts: { iron?: boolean; horses?: boolean; premelee?: boolean } = {}): string | undefined {
+    const state = makeState();
+    const rival = addRival(state, 6, 6);
+    rival.research.techs.push(...techs);
+    const rc = rival.cities[0];
+    // improve all owned non-center tiles
+    for (const t of state.map.tiles) {
+      if (t.rivalId === rival.id && t.index !== rc.centerIndex && !t.improvement) t.improvement = 'FARM';
+    }
+    // strategic access via improved resource tiles inside the borders
+    const owned = state.map.tiles.filter((t) => t.rivalId === rival.id && t.index !== rc.centerIndex);
+    if (opts.iron) {
+      owned[0].resource = 'IRON';
+      owned[0].elevation = 'HILLS';
+      owned[0].improvement = 'MINE';
+    }
+    if (opts.horses) {
+      owned[1].resource = 'HORSES';
+      owned[1].improvement = 'PASTURE';
+    }
+    rc.buildings = Object.keys(BUILDINGS); // pre-own everything → no building pick
+    if (opts.premelee) {
+      // one live melee unit → wantRanged (rangedCount*2 < meleeCount) trips
+      spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 2, 2).index, 'rival', rival.id);
+    }
+    rivalPhase(state);
+    const q = rc.queue[0];
+    return q?.kind === 'unit' ? q.unit : undefined;
+  }
+
+  it('IRON_WORKING + iron access picks SWORDSMAN over SPEARMAN', () => {
+    expect(ladderPick(['BRONZE_WORKING', 'IRON_WORKING'], { iron: true })).toBe('SWORDSMAN');
+  });
+
+  it('without iron the melee lane falls to PIKEMAN once MILITARY_TACTICS lands', () => {
+    // SWORDSMAN/KNIGHT gated out (no iron); PIKEMAN (41) beats SPEARMAN (25)/WARRIOR (20).
+    expect(ladderPick(['BRONZE_WORKING', 'IRON_WORKING', 'MILITARY_TACTICS'], {})).toBe('PIKEMAN');
+  });
+
+  it('the ranged lane picks CROSSBOWMAN at MACHINERY', () => {
+    // premelee flips wantRanged; ranged strengths SLINGER 15 < ARCHER 25 < CROSSBOWMAN 40.
+    expect(ladderPick(['ARCHERY', 'MACHINERY'], { premelee: true })).toBe('CROSSBOWMAN');
+  });
+
+  it('the 36-combat HORSEMAN/SWORDSMAN tie keeps HORSEMAN (lower UNITS index)', () => {
+    expect(
+      ladderPick(['HORSEBACK_RIDING', 'IRON_WORKING'], { iron: true, horses: true }),
+    ).toBe('HORSEMAN');
+  });
+
+  it('MUSKETMAN wins the melee lane once GUNPOWDER lands (no resource gate)', () => {
+    expect(
+      ladderPick(['BRONZE_WORKING', 'IRON_WORKING', 'MILITARY_TACTICS', 'GUNPOWDER'], {}),
+    ).toBe('MUSKETMAN');
   });
 });
 

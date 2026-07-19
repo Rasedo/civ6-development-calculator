@@ -90,17 +90,24 @@ const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 const RIVAL_SPACING = 10;
 
-/** AUDIT A-5r: the military units a scripted rival may gold-buy — the same
- * roster the production picker trains (WARRIOR/SLINGER ungated; the rest on
- * the rival's real techs), in UNITS-table order so strict `>` on combat
- * breaks ties to the lowest-index type (the GPU argmax mirror). BUILDER/
- * SCOUT are excluded — never in the rival roster. */
+/** AUDIT A-5r (+B-10): the military units a scripted rival may gold-buy — the
+ * same roster the production picker trains (WARRIOR/SLINGER ungated; the rest
+ * on the rival's real techs), in UNITS-table order so strict `>` on combat
+ * breaks ties to the lowest-index type (the GPU argmax mirror; HORSEMAN
+ * precedes SWORDSMAN so the 36-combat tie keeps HORSEMAN). BUILDER/SCOUT are
+ * excluded — never in the rival roster. requiresResource is gated in the buy
+ * loop (data-driven off the catalog, verified there). */
 const RIVAL_BUY_UNITS: { id: string; tech?: string }[] = [
   { id: 'WARRIOR' },
   { id: 'SLINGER' },
   { id: 'ARCHER', tech: 'ARCHERY' },
   { id: 'SPEARMAN', tech: 'BRONZE_WORKING' },
   { id: 'HORSEMAN', tech: 'HORSEBACK_RIDING' },
+  { id: 'SWORDSMAN', tech: 'IRON_WORKING' },
+  { id: 'PIKEMAN', tech: 'MILITARY_TACTICS' },
+  { id: 'CROSSBOWMAN', tech: 'MACHINERY' },
+  { id: 'KNIGHT', tech: 'STIRRUPS' },
+  { id: 'MUSKETMAN', tech: 'GUNPOWDER' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1586,18 +1593,36 @@ export function rivalPhase(state: GameState): void {
         // fewer than 1 ranged per 2 melee; best types off the rival's OWN
         // techs (ARCHER once ARCHERY lands, SLINGER before — it is ungated,
         // exactly like the player's catalog; the melee ladder unchanged).
-        // AUDIT B-9: HORSEMAN needs HORSES access (data-driven off requiresResource);
-        // without it the ladder falls back to SPEARMAN/WARRIOR — the retroactive gate.
-        const horseReq = UNITS.HORSEMAN.requiresResource;
-        const canHorse =
-          rival.research.techs.includes('HORSEBACK_RIDING') &&
-          (!horseReq || civHasStrategic(state, civOfRival(rival.id), horseReq));
-        const meleeType = canHorse
-          ? 'HORSEMAN'
-          : rival.research.techs.includes('BRONZE_WORKING')
-            ? 'SPEARMAN'
-            : 'WARRIOR';
-        const rangedType = rival.research.techs.includes('ARCHERY') ? 'ARCHER' : 'SLINGER';
+        // AUDIT B-10: best-of-roster type pick — data-driven over UNITS, no
+        // hardcoded id ladder. Melee lane: the highest-combat non-ranged,
+        // non-naval military unit the rival has the tech + (B-9) strategic
+        // access for; ranged lane: the highest ranged-strength ranged unit
+        // likewise. Ties resolve to the LOWEST UNITS-table index via the
+        // strict `>` scan (the A-5r convention; HORSEMAN precedes SWORDSMAN so
+        // the 36-combat tie keeps HORSEMAN). BUILDER (combat 0) and SCOUT
+        // (combat 10, dominated by the ungated WARRIOR) never win; naval hulls
+        // are excluded. WARRIOR/SLINGER are ungated so each lane always fills.
+        const rivalCiv = civOfRival(rival.id);
+        let meleeType = 'WARRIOR';
+        let meleeStr = -Infinity;
+        let rangedType = 'SLINGER';
+        let rangedStr = -Infinity;
+        for (const def of Object.values(UNITS)) {
+          if (def.naval) continue;
+          if (def.requiresTech && !rival.research.techs.includes(def.requiresTech)) continue;
+          if (def.requiresResource && !civHasStrategic(state, rivalCiv, def.requiresResource)) continue;
+          if (def.ranged) {
+            if (def.ranged.strength > rangedStr) {
+              rangedStr = def.ranged.strength;
+              rangedType = def.id;
+            }
+          } else if (def.combat > 0) {
+            if (def.combat > meleeStr) {
+              meleeStr = def.combat;
+              meleeType = def.id;
+            }
+          }
+        }
         const wantRanged = rangedCount * 2 < meleeCount;
         const type = wantRanged ? rangedType : meleeType;
         rc.queue.push({ kind: 'unit', unit: type, progress: 0 });
