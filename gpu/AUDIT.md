@@ -316,15 +316,21 @@ gap; likewise GS disasters are modeled minus sea-level rise
   (range 2, nearest hostile, one `damageRoll` at `cityDefenseStrength`,
   no retaliation/capture); both seats, identical draw order, no CS
   strike.
-- B-3. **RESOLVED for player+rival movement (2026-07-13, task #43)**:
-  `inEnemyZoc` (units.ts) / `_in_enemy_zoc` (engine.py) — entering a
-  tile adjacent to a hostile MILITARY unit halts the mover (movesLeft
-  := 0) after the enter cost, tested live per step; wired into the
-  player `walkPath` and all three A-8 rival walkers (war march /
-  patrol / builder). DEFERRED: barbarians do NOT obey ZOC yet — B-26
-  gave them the full-MP walk but the ZOC check is rival-gated so both
-  engines stay symmetric (the GPU barb walk mirrors the pre-ZOC
-  march). City-center ZOC also deferred.
+- B-3. **RESOLVED for player+rival movement (2026-07-13, task #43);
+  BARBARIANS (2026-07-19, ROUND B10 slice B, task #66)**: `inEnemyZoc`
+  (units.ts) / `_in_enemy_zoc` + `_in_enemy_zoc_barb` (engine.py) —
+  entering a tile adjacent to a hostile MILITARY unit halts the mover
+  (movesLeft := 0) after the enter cost, tested live per step; wired
+  into the player `walkPath` and all three A-8 rival walkers (war march
+  / patrol / builder). B10: the rival-only gate in `hostileUnitAct` is
+  LIFTED so barbarians obey ZOC too — `unitsHostile` halts a barb at any
+  adjacent non-embarked PLAYER or RIVAL military (barbs are hostile to
+  every non-barb, so no at-war gate; barbs raid rivals too, C-4a), other
+  barbs exert nothing. GPU `_in_enemy_zoc_barb` (player+rival military
+  exert; barbs don't) is checked per step in the `_barbarian_phase`
+  raider multi-step loop. Zero new draws (pure geometry). In-gate: the
+  barb-ZOC path fired in 21/24 scripted seeds. City-center ZOC still
+  deferred.
 - B-4. RESOLVED (2026-07-19, ROUND B5 slice M2): `Unit.xp` on
   player+rival units — +5 per attack executed, +2 per attack survived
   as a military defender (walls strikes included); `XP_LEVELS`
@@ -395,16 +401,32 @@ gap; likewise GS disasters are modeled minus sea-level rise
   peace, so real magnitudes collapse the fixture. Raise toward real
   values with #56's survival heuristics.
 - B-26. Map/barbarian fidelity: no cliffs (no such concept in
-  data/terrains.ts or core/mapgen.ts). Barbarian era scaling is a
-  single step (`barbarianPhase` spawns SPEARMAN after turn 60, else
-  WARRIOR) — no scout-then-raid escalation, no ranged/naval barbs,
-  camps spawn WARRIOR garrisons directly. CONFIRMED still open: barb
-  raiders **RESOLVED (2026-07-13, task #44)**: barbs now run the same
-  A-8 real-MP walk as rival movers (`hostileUnitAct` fall-through both
-  engines; GPU `_barbarian_phase` raider block rewritten as the
-  vectorized multi-step loop mirroring `_rival_unit_war_act`; target
-  semantics unchanged). STILL OPEN in B-26: no cliffs, single-step era
-  scaling, no scout-then-raid escalation, no ranged/naval barbs.
+  data/terrains.ts or core/mapgen.ts). Barb raiders run the A-8 real-MP
+  walk (RESOLVED 2026-07-13 task #44; `hostileUnitAct` both engines, GPU
+  `_barbarian_phase` raider block = the vectorized multi-step loop
+  mirroring `_rival_unit_war_act`) and obey ZOC (B-3, ROUND B10).
+  **ERA LADDER RESOLVED (2026-07-19, ROUND B10 slice B, task #66)**: all
+  three `barbarianPhase` spawn sites (new-camp spawn, empty-camp
+  regarrison, the 0.1-roll raid) climb a shared MELEE ladder
+  `barbMeleeType` — WARRIOR → SPEARMAN (t>60) → PIKEMAN (t>120) →
+  MUSKETMAN (t>180); GPU `_barbarian_phase` `melee_type` mirror over the
+  widened `unitCombat` barb table (u_type 0/1/2/3), thresholds
+  `pikemanAfterTurn`/`musketmanAfterTurn`. Zero new draws (spawn-TYPE
+  only). The exp/quantization table (4001) already covers PIKEMAN(41)/
+  MUSKETMAN(55) — rival/player MUSKETMAN(55) use the same clamped
+  `_damage_roll` (verified, not widened). The A-12 CS levy ladder
+  (`state.turn > 60 ? SPEARMAN : WARRIOR` in rivals.ts) is untouched.
+  In-gate: PIKEMAN+ barbs in 20/24 scripted seeds, MUSKETMAN in 20/24.
+  **DESCOPED to residual — RANGED barbs**: the `campIdx%3==0` raid site
+  was to spawn ARCHER(t≤120)/CROSSBOWMAN(t>120). TS `hostileUnitAct`
+  dispatches ranged generically (`hostileRangedStrike`), but the GPU
+  `_barbarian_phase` raider block is a MELEE-ADJACENCY scanner with no
+  range-2 target scan and no ranged-strike dispatch for barb owners
+  (unlike `_rival_unit_war_act`, which has both); wiring it needs a new
+  GPU walker class (full-range scan + a barb `_hostile_ranged_strike`
+  variant), so per the brief's descope clause ranged barbs are recorded
+  here. STILL OPEN in B-26: no cliffs, ranged/naval barbs, scout-then-
+  raid escalation, camp-spawn escalation beyond the melee ladder.
 - B-28. RESOLVED (2026-07-13, task #44): `terrainDefense` gives −2 on
   MARSH/FLOODPLAINS (was +3); GPU split the dual-purpose plane into
   `tdef` (defense) + `tmove` (enter cost) so movement is unchanged.

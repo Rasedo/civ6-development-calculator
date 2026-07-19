@@ -686,10 +686,16 @@ const rules = {
     campSpawnChance: 0.08,
     garrisonGrowChance: 0.1,
     spearmanAfterTurn: 60,
+    // AUDIT B-26 (ROUND B10): the shared barb MELEE era ladder thresholds
+    // (WARRIOR → SPEARMAN t>60 → PIKEMAN t>120 → MUSKETMAN t>180). The GPU
+    // reads these; the TS barbMeleeType hard-codes the same thresholds.
+    pikemanAfterTurn: 120,
+    musketmanAfterTurn: 180,
     cityHealPerTurn: 20,
     wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
     unitHealPerTurn: 10,
-    unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat], // barb types 0/1
+    // B-26 era ladder: barb u_type 0/1/2/3 = WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN.
+    unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat, UNITS.PIKEMAN.combat, UNITS.MUSKETMAN.combat],
     campClearReward: 50,
     dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1

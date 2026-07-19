@@ -5166,6 +5166,17 @@ class BatchSim:
         else march) in unit order → city healing."""
         cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
         city_max_hp = int(cb.get("cityMaxHp", 200))
+        # AUDIT B-26 (ROUND B10): the shared barb MELEE era-ladder type index
+        # (u_type 0/1/2/3 = WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN), mirroring the
+        # TS barbMeleeType. self.turn is a batch scalar, so one index serves the
+        # whole batch. Used at ALL THREE spawn sites (new camp, empty-camp
+        # regarrison, the 0.1-roll raid). Ranged raiders are a recorded residual.
+        melee_type = (
+            3 if self.turn > cb.get("musketmanAfterTurn", 180)
+            else 2 if self.turn > cb.get("pikemanAfterTurn", 120)
+            else 1 if self.turn > cb.get("spearmanAfterTurn", 60)
+            else 0
+        )
 
         # New camp? One draw whenever below the cap AND any CIVILIZATION
         # still holds a city — A-15: the TS gate is anyCivCity now (player
@@ -5209,7 +5220,7 @@ class BatchSim:
                 rows = has.nonzero(as_tuple=True)[0]
                 self.camp_tile[rows, self.n_camps[rows]] = spot[rows]
                 self.n_camps[rows] += 1
-                self._spawn_barb(has, spot, 0)  # WARRIOR
+                self._spawn_barb(has, spot, melee_type)  # B-26 era ladder (was WARRIOR)
 
         # Garrisons + growth. The near-camp check uses the unit list as it
         # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
@@ -5217,7 +5228,7 @@ class BatchSim:
         # The camp↔unit distance matrix is hoisted (5b): camps don't move,
         # and units spawned mid-loop are invisible to the pre_alive mask.
         pre_alive = self.u_alive.clone()
-        grow_type = 1 if self.turn > cb.get("spearmanAfterTurn", 60) else 0
+        grow_type = melee_type  # B-26 era ladder (was SPEARMAN-after-60)
         any_camp = bool((self.camp_tile >= 0).any())
         if any_camp:
             du_all = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.u_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
@@ -5228,7 +5239,7 @@ class BatchSim:
             if not bool(active.any()):
                 continue
             near_any = near_any_all[:, k]
-            self._spawn_barb(active & ~near_any, camp, 0)  # empty camp regarrisons
+            self._spawn_barb(active & ~near_any, camp, melee_type)  # B-26 era ladder (empty camp regarrisons)
             can_grow = active & near_any & (self.u_alive.sum(dim=1) < self.n_camps * cb.get("maxBarbPerCamp", 3))
             r = self._next_random(can_grow)
             self._spawn_barb(can_grow & (r < cb.get("garrisonGrowChance", 0.1)), camp, grow_type)
@@ -5427,6 +5438,12 @@ class BatchSim:
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
+                # AUDIT B-26/B-3 ZOC (ROUND B10): a march step ending adjacent
+                # to a hostile (player OR rival) non-embarked military halts the
+                # barb (mp := 0), mirroring hostileUnitAct's per-step inEnemyZoc
+                # check now that barbs obey ZOC. No new draws (pure geometry).
+                zoc = mv & self._in_enemy_zoc_barb(cur)
+                mp = torch.where(zoc, torch.zeros_like(mp), mp)
                 moving = mv & (mp > 0)
 
         # AUDIT B-2: a PLAYER city with ANCIENT_WALLS fires once/turn at the
@@ -7783,6 +7800,19 @@ class BatchSim:
         # #45/B-6: EMBARKED player military exert NO ZOC (barbs never embark).
         pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
         hostmil = (self.barb_at >= 0) | (pmil_exert & atwar.unsqueeze(1))
+        dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
+        return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
+
+    def _in_enemy_zoc_barb(self, dest: torch.Tensor) -> torch.Tensor:
+        """AUDIT B-26/B-3 (ROUND B10) ZOC for a BARBARIAN mover — mirrors
+        inEnemyZoc via unitsHostile: a barb is hostile to every non-barb, so
+        any adjacent NON-EMBARKED PLAYER or RIVAL military halts it (player
+        always, rivals always — barbs raid rivals too, C-4a; no at-war gate).
+        Other barbs exert nothing. [B]->[B]."""
+        # #45/B-6: embarked military exert no ZOC (barbs never embark).
+        pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
+        rmil_exert = (self.rv_at >= 0) & ~self.v_emb.gather(1, self.rv_at.clamp(min=0))
+        hostmil = pmil_exert | rmil_exert
         dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
         return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
 
