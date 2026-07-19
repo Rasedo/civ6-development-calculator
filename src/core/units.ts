@@ -15,6 +15,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
+import { civHasStrategic, PLAYER_CIV } from './civs';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -382,6 +383,10 @@ export function trainableUnits(
   if (!state.unitsMode) return [];
   return Object.values(UNITS).filter((d) => {
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech)) return false;
+    // AUDIT B-9: strategic-resource access gates build AND purchase (purchaseUnit
+    // funnels through here). Data-driven off UnitDef.requiresResource; the player
+    // is civ 0. Sandbox ignores the gate, like the tech gate above.
+    if (d.requiresResource && !state.sandbox && !civHasStrategic(state, PLAYER_CIV, d.requiresResource)) return false;
     if (d.naval) return !!city && cityNavalCapable(state, city);
     return true;
   });

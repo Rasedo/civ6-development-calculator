@@ -22,6 +22,11 @@ export interface UnitDef {
   /** Builder charges (improvements/chops); undefined for non-builders. */
   charges?: number;
   requiresTech?: string;
+  /** AUDIT B-9: strategic-resource ACCESS gate — a resource id (data/resources)
+   * this unit needs to BUILD or PURCHASE. Access = an owned territory tile with
+   * the resource AND its completed, unpillaged matching improvement
+   * (civHasStrategic). No stockpile / per-unit count / maintenance draw. */
+  requiresResource?: string;
   /** #45/B-6: a NAVAL unit lives on water natively (never `embarked`). No naval
    * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
    * passability/spawn/combat can branch on it. Default false. */
@@ -107,7 +112,70 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 4,
       combat: 36, // P4/D-9: real Civ 6 Horseman
       requiresTech: 'HORSEBACK_RIDING',
-      description: 'Fast shock cavalry (resource requirement not modeled).',
+      requiresResource: 'HORSES', // AUDIT B-9: retroactive — its own description flagged this gap
+      description: 'Fast shock cavalry (needs Horses access).',
+    }),
+    // AUDIT B-10: the medieval/renaissance melee & ranged roster. Costs are
+    // pre-GAME_SPEED like the rest of UNITS; tech ids verified in data/techs.ts.
+    // SWORDSMAN/KNIGHT gate on IRON access (B-9). No naval hulls / upgrades this
+    // round (recorded residuals); MUSKETMAN's niter is unmodeled on maps.
+    U({
+      id: 'SWORDSMAN',
+      name: 'Swordsman',
+      code: 'D',
+      cost: 90,
+      maintenance: 2,
+      moves: 2,
+      combat: 36,
+      requiresTech: 'IRON_WORKING',
+      requiresResource: 'IRON',
+      description: 'Classical heavy melee (needs Iron access).',
+    }),
+    U({
+      id: 'PIKEMAN',
+      name: 'Pikeman',
+      code: 'K',
+      cost: 100,
+      maintenance: 2,
+      moves: 2,
+      combat: 41,
+      requiresTech: 'MILITARY_TACTICS',
+      description: 'Medieval anti-cavalry line unit.',
+    }),
+    U({
+      id: 'CROSSBOWMAN',
+      name: 'Crossbowman',
+      code: 'C',
+      cost: 180,
+      maintenance: 3,
+      moves: 2,
+      combat: 15,
+      ranged: { strength: 40, range: 2 },
+      requiresTech: 'MACHINERY',
+      description: 'Medieval ranged attacker, range 2.',
+    }),
+    U({
+      id: 'KNIGHT',
+      name: 'Knight',
+      code: 'N',
+      cost: 220,
+      maintenance: 4,
+      moves: 4,
+      combat: 48,
+      requiresTech: 'STIRRUPS',
+      requiresResource: 'IRON',
+      description: 'Heavy shock cavalry (needs Iron access).',
+    }),
+    U({
+      id: 'MUSKETMAN',
+      name: 'Musketman',
+      code: 'M',
+      cost: 240,
+      maintenance: 4,
+      moves: 2,
+      combat: 55,
+      requiresTech: 'GUNPOWDER',
+      description: 'Renaissance gunpowder infantry.',
     }),
     U({
       id: 'GALLEY',

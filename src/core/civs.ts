@@ -12,7 +12,8 @@
  * precedence), and the GPU exporter and all fixtures stay byte-identical.
  */
 
-import type { City, Tile, Unit } from './types';
+import type { City, GameState, Tile, Unit } from './types';
+import { RESOURCES } from '../data/resources';
 
 /** The human/agent seat in the unified civ space. */
 export const PLAYER_CIV = 0;
@@ -63,6 +64,25 @@ export function tileForeignTo(t: Tile, civ: number): boolean {
   if (civ === PLAYER_CIV) return (t.rivalId ?? -1) !== -1;
   const owner = tileOwnerCiv(t);
   return owner !== null && owner !== civ;
+}
+
+/**
+ * AUDIT B-9: does civ `civ` (unified space: PLAYER_CIV or civOfRival(r)) have
+ * ACCESS to a strategic resource? True iff some tile it OWNS carries that
+ * resource AND its completed, unpillaged matching improvement (PASTURE on
+ * horses, MINE on iron — read from the resource catalog). Improvements are
+ * instant in this engine, so `tile.improvement === imp` means built. No
+ * stockpile / count / maintenance draw — access is a pure boolean gate on
+ * build and purchase. Mirrors the GPU res_id/res_imp/improvement scan.
+ */
+export function civHasStrategic(state: GameState, civ: number, resourceId: string): boolean {
+  const imp = RESOURCES[resourceId]?.improvement;
+  if (!imp) return false;
+  for (const t of state.map.tiles) {
+    if (t.resource !== resourceId || t.pillaged || t.improvement !== imp) continue;
+    if (tileOwnedByCiv(t, civ)) return true;
+  }
+  return false;
 }
 
 /** Civ owning this unit: PLAYER_CIV, civOfRival(r), or null (barbarian). */
