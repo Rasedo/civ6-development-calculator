@@ -36,6 +36,20 @@ export interface BeliefEffects {
   perFollowers?: { per: number; yields: Partial<Yields> };
   /** Founder income per city. */
   perCity?: Partial<Yields>;
+  /** B6-S1: extra holy-center pressure range (Itinerant Preachers). */
+  pressureRangeBonus?: number;
+  /** B6-S1: extra yields on each trade route whose DESTINATION city follows
+   * this religion (Messenger of the Gods). */
+  tradeReligionYields?: Partial<Yields>;
+  /** B6-S1: +CS in unit-vs-unit combat within JUST_WAR_RANGE tiles of a city
+   * following this religion (Just War). Applies attacking and defending. */
+  combatNearFollowing?: number;
+  /** B6-S1: +CS DEFENDING (unit-vs-unit) on a tile owned by a city following
+   * this religion (Defender of the Faith). */
+  combatDefendFollowing?: number;
+  /** B6-S1: +CS ATTACKING a unit standing on a tile owned by a city following
+   * this religion (Crusade). */
+  combatVsUnitInFollowing?: number;
 }
 
 export interface BeliefDef {
@@ -189,13 +203,23 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
  */
 export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
-    B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads two tiles further.', {}),
-    B('SCRIPTURE', 'Scripture', 'Missionaries and Apostles gain +1 spread charge and stronger pressure.', {}),
-    B('JUST_WAR', 'Just War', '+10 combat strength near cities following your religion.', {}),
-    B('DEFENDER_OF_THE_FAITH', 'Defender of the Faith', '+5 combat strength when defending in friendly-religion territory.', {}),
-    B('CRUSADE', 'Crusade', '+10 combat strength against units in cities following your religion.', {}),
-    B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {}),
-    B('MESSENGER_OF_THE_GODS', 'Messenger of the Gods', '+2 gold and +2 faith from trade routes to cities of your religion.', {}),
+    B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads two tiles further.', {
+      pressureRangeBonus: 2, // B6-S1
+    }),
+    B('SCRIPTURE', 'Scripture', 'Missionaries and Apostles gain +1 spread charge and stronger pressure.', {}), // B6-S2: charge/lump wired with the missionary chassis
+    B('JUST_WAR', 'Just War', '+10 combat strength near cities following your religion.', {
+      combatNearFollowing: 10, // B6-S1: within JUST_WAR_RANGE, unit-vs-unit
+    }),
+    B('DEFENDER_OF_THE_FAITH', 'Defender of the Faith', '+5 combat strength when defending in friendly-religion territory.', {
+      combatDefendFollowing: 5, // B6-S1
+    }),
+    B('CRUSADE', 'Crusade', '+10 combat strength against units in cities following your religion.', {
+      combatVsUnitInFollowing: 10, // B6-S1
+    }),
+    B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {}), // B6-S2: cost wired with the missionary chassis
+    B('MESSENGER_OF_THE_GODS', 'Messenger of the Gods', '+2 gold and +2 faith from trade routes to cities of your religion.', {
+      tradeReligionYields: { gold: 2, faith: 2 }, // B6-S1
+    }),
   ].map((b) => [b.id, b]),
 );
 
@@ -210,8 +234,14 @@ export const RELIGION_NAMES = [
 export const PANTHEON_FAITH_COST = 25;
 
 /** B-18: a founded religion's holy city spreads pressure to every city within
- * this many tiles each turn (real Civ 6's base holy-city pressure radius). */
+ * this many tiles each turn (real Civ 6's base holy-city pressure radius).
+ * B6-S1: Itinerant Preachers adds its pressureRangeBonus to THIS religion's
+ * radius (per-religion range in spreadReligiousPressure). */
 export const RELIGION_PRESSURE_RANGE = 10;
+/** B6-S1: Just War's "near" radius — unit-vs-unit combat within this many
+ * tiles (hex distance from the BATTLE tile = the defender's tile) of a city
+ * following the participant's religion. */
+export const JUST_WAR_RANGE = 3;
 /** B-18: integer pressure added per in-range turn (integer keeps the flip
  * comparison exact — no float association across the batch). */
 export const RELIGION_PRESSURE_PER_TURN = 1;

@@ -761,6 +761,20 @@ class BatchSim:
                 ),
             }
         self._bel_any = any(len(_bl.get(k, [])) > 0 for k in ("pantheons", "followers", "founders"))
+        # B6-S1: enhancer effect channels (row 0 = the unclaimed pad; index =
+        # r_enhancer + 1). Only the five S1 channels are read — no enhancer
+        # carries the generic beliefRow fields.
+        _erows = _bl.get("enhancers", [])
+        self._enh = {
+            "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
+            "tradeRel": torch.tensor([[0.0] * 6] + [list(x.get("tradeRel", [0.0] * 6)) for x in _erows], dtype=torch.float64, device=device),
+            "cnear": torch.tensor([0.0] + [float(x.get("cnear", 0)) for x in _erows], dtype=torch.float64, device=device),
+            "cdef": torch.tensor([0.0] + [float(x.get("cdef", 0)) for x in _erows], dtype=torch.float64, device=device),
+            "cvs": torch.tensor([0.0] + [float(x.get("cvs", 0)) for x in _erows], dtype=torch.float64, device=device),
+        }
+        self._just_war_range = int(_bl.get("justWarRange", 3))
+        self._enh_combat_any = bool((self._enh["cnear"] != 0).any() or (self._enh["cdef"] != 0).any() or (self._enh["cvs"] != 0).any())
+        self._rel_planes_cache = None  # B6-S1: ((turn, _eff_version), (near3 [B,O,T], terr [B,O,T]))
         # A-14: rival projects — rows {d: district idx, y: yield col, g: GP class}
         _pj = rules.projects or {}
         self._proj_rows = list(_pj.get("rows", []))
@@ -2229,14 +2243,19 @@ class BatchSim:
         the fresh City object a founded/flipped city gets. rc_pressure/rc_followed
         permute with their city in _reclaim_rc, so pressure tracks the CITY, not
         the slot, through compaction."""
-        RANGE = self._pressure_range
         B, O = self.B, self._O
+        # B6-S1 (Itinerant Preachers): per-religion range — base + the
+        # religion's claimed enhancer's presR. Player religion 0 keeps base
+        # (no GPU player founding path; the TS scripted player never founds).
+        RANGE = torch.full((B, O), int(self._pressure_range), dtype=torch.long, device=self.device)
+        if self.R > 0 and self._enh_any:
+            RANGE[:, 1 : 1 + self.R] += self._enh["presR"][self.r_enhancer + 1].long()
         founded = self.holy_tile >= 0  # [B, O]
         ht = self.holy_tile.clamp(min=0)  # [B, O] valid tile idx (masked where unfounded)
         # --- player cities [B, C] ------------------------------------------
         pc = self.site.clamp(min=0)  # [B, C] center tile (dead slots -> 0, masked out)
         d_pc = self.pair_dist[pc.unsqueeze(2), ht.unsqueeze(1)].to(torch.long)  # [B, C, O]
-        add_pc = (d_pc <= RANGE) & founded.unsqueeze(1) & self.alive.unsqueeze(2)  # [B, C, O]
+        add_pc = (d_pc <= RANGE.unsqueeze(1)) & founded.unsqueeze(1) & self.alive.unsqueeze(2)  # [B, C, O]
         self.city_pressure = torch.where(self.alive.unsqueeze(2), self.city_pressure + add_pc.long(), torch.zeros_like(self.city_pressure))
         tot_pc = self.city_pressure.sum(dim=2)
         best_pc = self.city_pressure.argmax(dim=2)  # ties -> lowest id
@@ -2245,11 +2264,101 @@ class BatchSim:
         if self.R > 0:
             rcc = self.rc_center.clamp(min=0)  # [B, R, RC]
             d_rc = self.pair_dist[rcc.unsqueeze(3), ht.view(B, 1, 1, O)].to(torch.long)  # [B, R, RC, O]
-            add_rc = (d_rc <= RANGE) & founded.view(B, 1, 1, O) & self.rc_alive.unsqueeze(3)
+            add_rc = (d_rc <= RANGE.view(B, 1, 1, O)) & founded.view(B, 1, 1, O) & self.rc_alive.unsqueeze(3)
             self.rc_pressure = torch.where(self.rc_alive.unsqueeze(3), self.rc_pressure + add_rc.long(), torch.zeros_like(self.rc_pressure))
             tot_rc = self.rc_pressure.sum(dim=3)
             best_rc = self.rc_pressure.argmax(dim=3)
             self.rc_followed = torch.where(self.rc_alive & (tot_rc > 0), best_rc, torch.full_like(best_rc, -1))
+
+    def _rel_combat_planes(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """B6-S1: (near3, terr) — [B, O, T] bool planes for the enhancer combat
+        adders. terr[b, g, t] = tile t is OWNED by a city following religion g
+        (player tiles via the owner slot plane; rival tiles via the A-17
+        id-keyed registry). near3[b, g, t] = some city following g has its
+        CENTER within justWarRange of t. Keyed (turn, _eff_version):
+        followedReligion moves once per turn (_spread_religious_pressure) and
+        every city-set/ownership change (founding, capture, transfer, claim,
+        compaction) bumps _eff_version — so the keyed cache IS the TS live
+        read within a turn."""
+        key = (self.turn, self._eff_version)
+        if self._rel_planes_cache is not None and self._rel_planes_cache[0] == key:
+            return self._rel_planes_cache[1]
+        B, T, O = self.B, self.T, self._O
+        dev = self.device
+        # per-tile followed religion of the OWNING city (-1 none)
+        tfol = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        pf = self.city_followed.gather(1, self.owner.clamp(min=0))  # [B, T]
+        tfol = torch.where((self.owner >= 0) & self.alive.gather(1, self.owner.clamp(min=0)), pf, tfol)
+        if self.R > 0:
+            for r in range(self.R):
+                for j in range(self.RC):
+                    if not bool(self.rc_alive[:, r, j].any()):
+                        continue
+                    ring = (self.rival_at == r) & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1)) & self.rc_alive[:, r, j].unsqueeze(1)
+                    tfol = torch.where(ring, self.rc_followed[:, r, j].unsqueeze(1).expand(B, T), tfol)
+        terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).view(1, O, 1)  # [B, O, T]
+        # near3: dilate FOLLOWING city centers by justWarRange (scatter_add
+        # then >0 — a masked bool scatter would clobber tile 0 via the clamp)
+        near3 = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
+        off3 = tiles_within_offsets(self._just_war_range).to(dev)
+        pc_win = tiles_from_offsets(self.site.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.C, -1)  # [B, C, M]
+        rc_win = None
+        if self.R > 0:
+            rc_win = tiles_from_offsets(self.rc_center.clamp(min=0).reshape(-1), off3, self.W, self.H).reshape(B, self.R * self.RC, -1)
+        for g in range(O):
+            srci = torch.zeros(B, T, dtype=torch.long, device=dev)
+            fol_c = self.alive & (self.city_followed == g)  # [B, C]
+            if bool(fol_c.any()):
+                w = torch.where(fol_c.unsqueeze(2), pc_win, torch.full_like(pc_win, -1)).reshape(B, -1)
+                srci.scatter_add_(1, w.clamp(min=0), (w >= 0).long())
+            if self.R > 0:
+                fol_rc = self.rc_alive & (self.rc_followed == g)  # [B, R, RC]
+                if bool(fol_rc.any()):
+                    wr = torch.where(fol_rc.reshape(B, -1).unsqueeze(2), rc_win, torch.full_like(rc_win, -1)).reshape(B, -1)
+                    srci.scatter_add_(1, wr.clamp(min=0), (wr >= 0).long())
+            near3[:, g] = srci > 0
+        out = (near3, terr)
+        self._rel_planes_cache = (key, out)
+        return out
+
+    def _rel_atk_cs(self, civ_r: torch.Tensor, battle_tile: torch.Tensor) -> torch.Tensor:
+        """B6-S1: enhancer ATTACKER adders (Just War near + Crusade onto
+        following-city territory) for units of rival index civ_r ([B], -1 =
+        barb/none; GPU player units carry no religion — holy_tile[:, 0] is
+        never set in any gate mode, the TS scripted player never founds, so
+        the player-side term is structurally 0 and omitted at the call
+        sites). Returns f64 [B]."""
+        if not self._enh_combat_any or self.R == 0 or not bool((self.r_enhancer >= 0).any()):
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        cr = civ_r.clamp(min=0, max=self.R - 1)
+        has = (civ_r >= 0) & self.r_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
+        eidx = self.r_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1  # [B] 0 = pad
+        eidx = torch.where(has, eidx, torch.zeros_like(eidx))
+        g = (cr + 1).unsqueeze(1)  # religion id [B, 1]
+        near3, terr = self._rel_combat_planes()
+        bt = battle_tile.clamp(min=0).unsqueeze(1)
+        nr = near3.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
+        tr = terr.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
+        add = self._enh["cnear"][eidx] * nr.double() + self._enh["cvs"][eidx] * tr.double()
+        return torch.where(has & (battle_tile >= 0), add, torch.zeros_like(add))
+
+    def _rel_def_cs(self, civ_r: torch.Tensor, def_tile: torch.Tensor) -> torch.Tensor:
+        """B6-S1: enhancer DEFENDER adders (Just War near + Defender of the
+        Faith on following-city territory) for unit defenders of rival index
+        civ_r ([B], -1 = barb/player/none). f64 [B]."""
+        if not self._enh_combat_any or self.R == 0 or not bool((self.r_enhancer >= 0).any()):
+            return torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        cr = civ_r.clamp(min=0, max=self.R - 1)
+        has = (civ_r >= 0) & self.r_religion_done.gather(1, cr.unsqueeze(1)).squeeze(1)
+        eidx = self.r_enhancer.gather(1, cr.unsqueeze(1)).squeeze(1) + 1
+        eidx = torch.where(has, eidx, torch.zeros_like(eidx))
+        g = (cr + 1).unsqueeze(1)
+        near3, terr = self._rel_combat_planes()
+        bt = def_tile.clamp(min=0).unsqueeze(1)
+        nr = near3.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
+        tr = terr.gather(1, g.unsqueeze(2).expand(-1, -1, self.T)).squeeze(1).gather(1, bt).squeeze(1)
+        add = self._enh["cnear"][eidx] * nr.double() + self._enh["cdef"][eidx] * tr.double()
+        return torch.where(has & (def_tile >= 0), add, torch.zeros_like(add))
 
     def _farmadj_qual(self) -> torch.Tensor:
         """[B, T] bool: a non-pillaged FARM with >=2 neighboring FARM tiles
@@ -4642,6 +4751,10 @@ class BatchSim:
                 _fl, _sp = self._flank_support(tgt, _dside, v_civ, here)
                 atk_e = atk_e + FLANKING_CS * _fl
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
+                # B6-S1: enhancer defender adders for RIVAL defenders (barbs
+                # carry none; embarked = flat override, no term; the PLAYER
+                # attacker term is structurally 0 — no GPU player religion).
+                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(v_civ, -1), v_civ), tgt).to(def_e.dtype))
                 d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
@@ -4716,6 +4829,8 @@ class BatchSim:
                 _dside = torch.where(is_b, torch.ones_like(v_civ), torch.full_like(v_civ, 2))
                 _, _sp = self._flank_support(tgt, _dside, v_civ, torch.full_like(tgt, -1))
                 def_e = def_e + SUPPORT_CS * torch.where(v_embd, torch.zeros_like(_sp), _sp)
+                # B6-S1: rival-defender enhancer adders (embarked = flat, none).
+                def_e = def_e + torch.where(v_embd, torch.zeros_like(def_e), self._rel_def_cs(torch.where(is_b, torch.full_like(v_civ, -1), v_civ), tgt).to(def_e.dtype))
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 r_def_dead = torch.zeros_like(r_att)
@@ -4764,6 +4879,9 @@ class BatchSim:
                 # #45/B-6: an embarked civilian receives NO support.
                 _, _sp = self._flank_support(tgt, torch.full_like(tgt, 2), rvc_civ_t, torch.full_like(tgt, -1))
                 def_e = def_e + SUPPORT_CS * torch.where(civ_embd, torch.zeros_like(_sp), _sp)
+                # B6-S1: the lone rival CIVILIAN defender gets the enhancer
+                # defender adders too (TS defenderCS applies to any unit).
+                def_e = def_e + torch.where(civ_embd, torch.zeros_like(def_e), self._rel_def_cs(rvc_civ_t, tgt).to(def_e.dtype))
                 d_def = self._damage_roll(r_civ, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
@@ -6318,7 +6436,7 @@ class BatchSim:
         so with R>=2 the single slot is always overwritten by a different r before
         the same r is re-requested -> recompute against current state (gates R=3).
         Consumer reads only column j, read-only."""
-        key = (self.turn, r, self._eff_version, self._rp_kill_version)
+        key = (self.turn, r, self._eff_version, self._rp_kill_version, self._bel_version)  # B6-S1: + bel (enhancer claims move the Messenger term)
         if self._rival_route_cache is not None and self._rival_route_cache[0] == key:
             return self._rival_route_cache[1]
         rr = self.r_routes[:, r]  # [B, K, 2]
@@ -6357,6 +6475,18 @@ class BatchSim:
         pd = pays_d.double()
         inc.scatter_add_(1, from_j * 6 + 0, per.gather(1, dest_j) * pd)
         inc.scatter_add_(1, from_j * 6 + 1, per.gather(1, dest_j) * pd)
+        # B6-S1 (Messenger of the Gods): +tradeRel yields on each DOMESTIC
+        # route whose destination city follows this civ's religion (r+1) —
+        # the rivalCityYields route-loop position, pre-tier. CS destinations
+        # carry no religion.
+        if self._enh_any and bool((self.r_enhancer[:, r] >= 0).any()):
+            tr6 = self._enh["tradeRel"][self.r_enhancer[:, r] + 1]  # [B, 6]
+            if bool((tr6 != 0).any()):
+                dest_fol = self.rc_followed[:, r].gather(1, dest_j)  # [B, K]
+                rel_ok = (pays_d & (dest_fol == (r + 1)) & self.r_religion_done[:, r].unsqueeze(1)).double()
+                if bool((rel_ok != 0).any()):
+                    for _kc in range(6):
+                        inc.scatter_add_(1, from_j * 6 + _kc, tr6[:, _kc].unsqueeze(1) * rel_ok)
         # CS legs (A-12b)
         if self.S > 0 and bool(is_cs.any()):
             S = self.S
@@ -7292,6 +7422,13 @@ class BatchSim:
             _fl, _sp = self._flank_support(tgt, _dside, _dciv, here)
             atk_e = atk_e + FLANKING_CS * _fl
             def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
+            # B6-S1: enhancer adders — a RIVAL attacker gets the attack terms
+            # (Just War near + Crusade onto following territory); a RIVAL
+            # defender gets the defense terms (embarked = flat, none). Barbs
+            # and player units carry no religion (no GPU player founding).
+            if atk_kind == "rival":
+                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_rv, _dciv, torch.full_like(_dciv, -1)), tgt).to(def_e.dtype))
             d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
@@ -7893,6 +8030,9 @@ class BatchSim:
             _dside = torch.where(def_is_b, torch.ones_like(dm), torch.zeros_like(dm))
             _, _sp = self._flank_support(tgt, _dside, torch.zeros_like(dm), torch.full_like(tgt, -1))
             def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
+            # B6-S1: the RIVAL ranged attacker's enhancer adders (defenders
+            # here are player/barb units — no religion, no defender term).
+            atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, v], tgt).to(atk_e.dtype)
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             rows = unit_att.nonzero(as_tuple=True)[0]
             for grp, at_map, hp_t, alive_t, slot_t in (
@@ -9387,8 +9527,9 @@ class BatchSim:
             # draw AFTER the founder draw, gated on
             # religionFounded && !enhancerClaimed && prophets>=2 && pool-open.
             # The draw advances only where eopen (the peace-roll pattern), so it
-            # is RNG-neutral when it never fires. Effects stay unwired (all
-            # enhancers inert) — the identity is kept for when one is wired.
+            # is RNG-neutral when it never fires. B6-S1: effects are LIVE now —
+            # presR (pressure range), tradeRel (route income), cnear/cdef/cvs
+            # (combat CS) read r_enhancer through the _enh tables.
             edue = active & self.r_religion_done[:, r] & ~self.r_enhancer_done[:, r] & (self.r_prophets[:, r] >= 2)
             eopen = edue & (self.claimed_e_n < rr.get("enhancerPool", 0))
             re_ = self._next_random(eopen)  # third belief draw — after follower/founder

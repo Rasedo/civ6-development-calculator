@@ -10,6 +10,7 @@ import { isCivicComplete } from './effects';
 import { DISTRICTS } from '../data/districts';
 import { csTradeCapacityBonus, rivalIsSuzerain } from './cityStates';
 import { CS_TYPE_YIELD } from '../data/cityStates';
+import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
 
 export const TRADE_ROUTE_RANGE = 15;
@@ -134,7 +135,15 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       continue;
     }
     const dest = state.cities.find((c) => c.id === route.to);
-    if (dest && !routeRaided(state, city, dest)) addYields(out, routeYields(state, dest));
+    if (dest && !routeRaided(state, city, dest)) {
+      addYields(out, routeYields(state, dest));
+      // B6-S1 (Messenger of the Gods): extra yields when the destination city
+      // follows the player's religion (religion id 0) — the rival twin's rule.
+      if (state.religion?.founded && state.religion.enhancer && dest.followedReligion === 0) {
+        const tr = ENHANCER_BELIEFS[state.religion.enhancer]?.effects.tradeReligionYields;
+        if (tr) addYields(out, tr);
+      }
+    }
   }
   return out;
 }

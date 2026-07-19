@@ -49,7 +49,7 @@ import {
   CS_MEET_RANGE,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC } from '../src/core/trade';
@@ -232,6 +232,12 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
     : [0, 0, 0, 0, 0, 0, 0],
   perC: YIELD_KEYS.map((k) => def.effects.perCity?.[k] ?? 0),
   fpw: def.effects.faithPerWonder ?? 0,  // A-4 activates this (Divine Inspiration)
+  // B6-S1 enhancer channels (zeros on non-enhancer rows):
+  presR: def.effects.pressureRangeBonus ?? 0,  // Itinerant Preachers
+  tradeRel: YIELD_KEYS.map((k) => def.effects.tradeReligionYields?.[k] ?? 0),  // Messenger of the Gods [6]
+  cnear: def.effects.combatNearFollowing ?? 0,  // Just War (within justWarRange, unit-vs-unit)
+  cdef: def.effects.combatDefendFollowing ?? 0,  // Defender of the Faith
+  cvs: def.effects.combatVsUnitInFollowing ?? 0,  // Crusade
   // A-13 activates improvementYields (omitted while the targets were
   // unbuildable): extra yields per improvement instance, [nImp, 6] in
   // IMPROVEMENT_IDS order. The FISHING_BOATS row (God of the Sea) simply
@@ -568,6 +574,8 @@ const rules = {
     enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
     // B-18: religious pressure spread radius (holy city -> cities within N tiles).
     pressureRange: RELIGION_PRESSURE_RANGE,
+    // B6-S1: Just War's "near a following city" radius (unit-vs-unit combat).
+    justWarRange: JUST_WAR_RANGE,
     // B-18 (slice U): pressure->yields coupling master switch. When true a
     // city's FOLLOWER-belief yields key on its followedReligion; when false the
     // owner civ's religion (byte-identical to the pre-coupling per-civ apply).

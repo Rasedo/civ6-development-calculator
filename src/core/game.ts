@@ -995,6 +995,16 @@ function spreadReligiousPressure(state: GameState): void {
     if (rv.religionFounded && rv.holyTile != null && rv.holyTile >= 0) holy[i + 1] = rv.holyTile;
   }
   if (!holy.some((h) => h >= 0)) return; // no religion exists yet — nothing to spread
+  // B6-S1 (Itinerant Preachers): per-religion range — the base radius plus the
+  // religion's enhancer pressureRangeBonus (0 when unenhanced).
+  const range: number[] = new Array(nRel).fill(RELIGION_PRESSURE_RANGE);
+  if (state.religion.enhancer) {
+    range[0] += ENHANCER_BELIEFS[state.religion.enhancer]?.effects.pressureRangeBonus ?? 0;
+  }
+  for (let i = 0; i < R; i++) {
+    const eb = state.rivals[i].enhancerBelief;
+    if (eb) range[i + 1] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
+  }
   const tiles = state.map.tiles;
   const allCities: City[] = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
   for (const city of allCities) {
@@ -1007,7 +1017,7 @@ function spreadReligiousPressure(state: GameState): void {
     for (let g = 0; g < nRel; g++) {
       if (holy[g] < 0) continue;
       const h = tiles[holy[g]];
-      if (hexDistance(cc.col, cc.row, h.col, h.row) <= RELIGION_PRESSURE_RANGE) {
+      if (hexDistance(cc.col, cc.row, h.col, h.row) <= range[g]) {
         pres[g] += RELIGION_PRESSURE_PER_TURN;
       }
     }

@@ -1387,6 +1387,14 @@ export function rivalCityYields(
     const ry = routeYields(state, dest);
     total.food += ry.food;
     total.production += ry.production;
+    // B6-S1 (Messenger of the Gods): extra yields when the DESTINATION city
+    // follows this civ's religion — the route-income position, pre-tier.
+    if (rival.enhancerBelief && dest.followedReligion === ownerRel) {
+      const tr = ENHANCER_BELIEFS[rival.enhancerBelief]?.effects.tradeReligionYields;
+      if (tr) {
+        for (const [k, v] of Object.entries(tr)) total[k as keyof Yields] += v ?? 0;
+      }
+    }
   }
   // P5/S6 (C-20): the amenity tier scales non-food yields, exactly like
   // computeCityStats. External callers (score/statelog) re-rank FRESH;

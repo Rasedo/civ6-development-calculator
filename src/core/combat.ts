@@ -29,6 +29,7 @@ import {
   crossesRiver,
 } from './units';
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
+import { ENHANCER_BELIEFS, JUST_WAR_RANGE, type BeliefEffects } from '../data/religion';
 import { revealAround } from './fog';
 import { transferCityToRival } from './rivals';
 import type { RuleResult } from './rules';
@@ -169,6 +170,90 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
   return n;
 }
 
+/** B6-S1: the enhancer belief of a UNIT's civ religion (religion id = unified
+ * civ id: 0 = the player's, i+1 = rival i's). Undefined for barbarians, for
+ * unfounded religions, and for unenhanced ones. */
+function unitEnhancer(state: GameState, unit: Unit): BeliefEffects | undefined {
+  if (unit.owner === 'player') {
+    return state.religion.founded && state.religion.enhancer ? ENHANCER_BELIEFS[state.religion.enhancer]?.effects : undefined;
+  }
+  if (unit.owner !== 'rival' || unit.civId == null) return undefined; // barbarians have no faith
+  const rival = state.rivals.find((rv) => rv.id === unit.civId); // unit.civId = rival.id for rival units
+  return rival?.religionFounded && rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
+}
+
+/** B6-S1: the religion id of a unit's civ (-1 when none founded). Religion
+ * ids are the unified civ space: 0 player, rival.id + 1 for rival units. */
+function unitReligion(state: GameState, unit: Unit): number {
+  if (unit.owner === 'player') return state.religion.founded ? 0 : -1;
+  if (unit.owner !== 'rival' || unit.civId == null) return -1;
+  const rival = state.rivals.find((rv) => rv.id === unit.civId);
+  return rival?.religionFounded ? unit.civId! + 1 : -1;
+}
+
+/** B6-S1: the followed religion of the city OWNING this tile (-1 = unowned or
+ * following nothing). Player tiles via tile.cityId; rival tiles via the A-17
+ * per-city registry (tile.rivalCityId). */
+function tileFollowedReligion(state: GameState, tile: Tile): number {
+  if (tile.cityId >= 0) {
+    return state.cities.find((c) => c.id === tile.cityId)?.followedReligion ?? -1;
+  }
+  if (tile.rivalId != null && tile.rivalId >= 0 && tile.rivalCityId != null) {
+    const rv = state.rivals.find((r) => r.id === tile.rivalId);
+    return rv?.cities.find((rc) => rc.id === tile.rivalCityId)?.followedReligion ?? -1;
+  }
+  return -1;
+}
+
+/** B6-S1: is any city (player or rival) following religion g within
+ * JUST_WAR_RANGE of this tile? */
+function nearFollowingCity(state: GameState, tile: Tile, g: number): boolean {
+  for (const c of state.cities) {
+    if (c.followedReligion !== g) continue;
+    const t = state.map.tiles[c.centerIndex];
+    if (hexDistance(tile.col, tile.row, t.col, t.row) <= JUST_WAR_RANGE) return true;
+  }
+  for (const rv of state.rivals) {
+    for (const rc of rv.cities) {
+      if (rc.followedReligion !== g) continue;
+      const t = state.map.tiles[rc.centerIndex];
+      if (hexDistance(tile.col, tile.row, t.col, t.row) <= JUST_WAR_RANGE) return true;
+    }
+  }
+  return false;
+}
+
+/** B6-S1: enhancer combat adders for the ATTACKER in a unit-vs-unit roll
+ * (Just War near a following city + Crusade attacking onto following-city
+ * territory). The battle tile is the DEFENDER's tile. City/CS targets get
+ * nothing (unit-vs-unit scope). */
+export function religionAttackCS(state: GameState, attacker: Unit, battleTileIndex: number): number {
+  const g = unitReligion(state, attacker);
+  if (g < 0) return 0;
+  const fx = unitEnhancer(state, attacker);
+  if (!fx || (!fx.combatNearFollowing && !fx.combatVsUnitInFollowing)) return 0;
+  const tile = state.map.tiles[battleTileIndex];
+  let cs = 0;
+  if (fx.combatNearFollowing && nearFollowingCity(state, tile, g)) cs += fx.combatNearFollowing;
+  if (fx.combatVsUnitInFollowing && tileFollowedReligion(state, tile) === g) cs += fx.combatVsUnitInFollowing;
+  return cs;
+}
+
+/** B6-S1: enhancer combat adders for a UNIT DEFENDER (Just War near a
+ * following city + Defender of the Faith on following-city territory). The
+ * battle tile is the defender's own tile. */
+export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex: number): number {
+  const g = unitReligion(state, defender);
+  if (g < 0) return 0;
+  const fx = unitEnhancer(state, defender);
+  if (!fx || (!fx.combatNearFollowing && !fx.combatDefendFollowing)) return 0;
+  const tile = state.map.tiles[defTileIndex];
+  let cs = 0;
+  if (fx.combatNearFollowing && nearFollowingCity(state, tile, g)) cs += fx.combatNearFollowing;
+  if (fx.combatDefendFollowing && tileFollowedReligion(state, tile) === g) cs += fx.combatDefendFollowing;
+  return cs;
+}
+
 /** #45/B-6: the defender's total combat strength for a hit on `defTileIndex`,
  * including B-7 support (which always accompanies the defender). An EMBARKED
  * defender overrides EVERYTHING: a flat EMBARKED_DEFENSE_CS − woundPenalty,
@@ -184,7 +269,8 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     fortifyBonus(defender) -
     woundPenalty(defender) +
     SUPPORT_CS * supportCount(state, defTileIndex, defender) +
-    xpLevelBonus(defender) // B-4: veterancy — an embarked defender got the flat override above (no xp)
+    xpLevelBonus(defender) + // B-4: veterancy — an embarked defender got the flat override above (no xp)
+    religionDefenseCS(state, defender, defTileIndex) // B6-S1: enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
   );
 }
 
@@ -383,7 +469,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // folds in support AND the embarked-defender override (flat CS, no terms).
     // B-4: attacker veterancy joins the flank term; defenderCS folds in the
     // defender's own level bonus. Applied once so both paired rolls agree.
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker);
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex); // B6-S1
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
@@ -450,7 +536,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'rng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex)) - defCS, 'rng', targetIndex); // B6-S1
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged attack executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender (civilians excluded)
   if (defender.hp <= 0) killUnit(state, defender);
@@ -492,7 +578,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
-  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'vrng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex)) - defCS, 'vrng', targetIndex); // B6-S1
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged strike executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender
   if (defender.hp <= 0) killUnit(state, defender);
