@@ -11,7 +11,7 @@ import {
 } from '../src/core/game';
 import { canFoundCity } from '../src/core/rules';
 import { tilesWithin, hexDistance } from '../src/core/hex';
-import { rivalPhase, declareWar, sueForPeace, rivalUnits, rivalCityYields } from '../src/core/rivals';
+import { rivalPhase, declareWar, sueForPeace, rivalUnits, rivalCityYields, assertRivalRegistryCoherent } from '../src/core/rivals';
 import { meleeAttack, attackTargets, captureCityState, captureRivalCity } from '../src/core/combat';
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeRaidedAt } from '../src/core/trade';
 import { spawnUnit, unitsHostile } from '../src/core/units';
@@ -118,6 +118,41 @@ describe('rival placement and expansion', () => {
     expect(canFoundCity(state, rival.cities[0].centerIndex).ok).toBe(false);
     const ring1 = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== rival.cities[0].centerIndex)!;
     expect(canFoundCity(state, ring1.index).ok).toBe(false);
+  });
+});
+
+describe('A-24 rival district/tile registry coherence', () => {
+  it('stays coherent across a full game (every district/wonder tile registers to its rc)', () => {
+    const state = createGame({ width: 44, height: 26, seed: 7, withResources: true, withWonders: true, rivals: true });
+    // Run many turns; the scan (called from rivalPhase under the env flag)
+    // must never fire — placements/captures keep .districts and rivalCityId
+    // mutually consistent. Also assert directly each turn for tight failure.
+    for (let i = 0; i < 80; i++) {
+      endTurn(state);
+      assertRivalRegistryCoherent(state);
+    }
+    // sanity: rivals actually placed some districts to make the check meaningful
+    const placed = state.rivals.reduce(
+      (n, r) => n + r.cities.reduce((m, c) => m + c.districts.length + (c.wonders?.length ?? 0), 0),
+      0,
+    );
+    expect(placed).toBeGreaterThan(state.rivals.length); // more than just the CITY_CENTERs
+  });
+
+  it('the scan catches a district tile registered to a SIBLING rc', () => {
+    const state = makeState();
+    const rival = addRival(state, 6, 6);
+    // a second city of the SAME civ; steal a ring tile from city 0's frontier
+    const sibling = rival.cities[0];
+    const stolen = tilesWithin(state.map, 6, 6, 1).find(
+      (t) => t.rivalCityId === sibling.id && t.index !== sibling.centerIndex,
+    )!;
+    // forge an incoherent district: city 0 lists a tile registered to itself is
+    // fine; re-register the tile to a phantom sibling id, then reference it.
+    sibling.districts.push({ type: 'HOLY_SITE', tileIndex: stolen.index });
+    expect(() => assertRivalRegistryCoherent(state)).not.toThrow(); // still coherent (tile registers to this rc)
+    stolen.rivalCityId = sibling.id + 999; // now it belongs to a sibling
+    expect(() => assertRivalRegistryCoherent(state)).toThrow(/A-24 registry incoherence/);
   });
 });
 

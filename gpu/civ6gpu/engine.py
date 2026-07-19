@@ -562,6 +562,11 @@ class BatchSim:
         # the step end once the high-water nears the cap (forced low for
         # validation gates via CIV6_RC_RECLAIM_AT).
         self._rc_reclaim_at = int(_os.environ.get("CIV6_RC_RECLAIM_AT", self.RC - 8))
+        # A-24: env-gated machine-checked registry invariant. Auto-ON whenever
+        # forced compaction runs (CIV6_RC_RECLAIM_AT set) so the forced gate in
+        # every round ladder exercises it; also standalone via
+        # CIV6_RC_REGISTRY_CHECK. NO always-on hot-path cost otherwise.
+        self._rc_reg_check = bool(_os.environ.get("CIV6_RC_REGISTRY_CHECK")) or ("CIV6_RC_RECLAIM_AT" in _os.environ)
         r_pad, rc_pad = max(self.R, 1), self.RC
         self.rival_at = torch.tensor([[t.get("rv", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # AUDIT A-17: per-rc tile registry — the owning rival CITY as its
@@ -2174,6 +2179,7 @@ class BatchSim:
         d_center = self.pair_dist[center]  # [B, T]
         elig = (
             (self.rival_at == r)
+            & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))  # A-24: THIS city's registry, not merely civ-owned (mirrors TS ownsTile === rc.id)
             & surface
             & (self.district < 0)
             & (self.built_wonder < 0)  # A-4
@@ -8726,6 +8732,7 @@ class BatchSim:
                     d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
                     base_ok = (
                         (self.rival_at == r)
+                        & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))  # A-24: THIS capital's registry (mirrors canPlaceWonder tile.cityId === city.id)
                         & (d_ctr <= 3)
                         & (self.district < 0)
                         & (self.built_wonder < 0)
@@ -10108,6 +10115,51 @@ class BatchSim:
             setattr(self, name, t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
         self._eff_version += 1  # no (r, j)-keyed cache may survive the permutation
 
+    def _check_rc_registry_invariant(self) -> None:
+        """A-24 machine-check (env-gated via self._rc_reg_check; NO hot-path
+        cost when off). Two-way district/wonder <-> tile-registry coherence for
+        every ALIVE rival city (the A-17 rc_tile_id contract; the TS twin is
+        assertRivalRegistryCoherent in rivals.ts):
+
+          (1) FORWARD: every district tile (rc_dist_tile) and wonder tile
+              (rc_wonder) an rc lists registers BACK to that rc — its
+              rc_tile_id equals rc_id (a district/wonder sits on a tile owned
+              by THAT city, the placement rule this stage enforces). A tile
+              registered to a SIBLING (the seed-9118 latent) fails here.
+          (2) BACKWARD: every populated registry cell points at a tile whose
+              rival_at is a live civ (no dangling index into re-owned/razed
+              land). The registry never lists a tile it does not own.
+
+        Raises AssertionError naming (game, civ, slot, kind, di/wi, tile,
+        expected id, actual rc_tile_id) on the first violation."""
+        if self.R == 0:
+            return
+        B, dev = self.B, self.device
+        for r in range(self.R):
+            expect = self.rc_id[:, r].unsqueeze(2)  # [B, RC, 1] this rc's id
+            alive = self.rc_alive[:, r].unsqueeze(2)  # [B, RC, 1]
+            for name in ("rc_dist_tile", "rc_wonder"):
+                reg = getattr(self, name)[:, r]  # [B, RC, K] tile per (city, type/slot)
+                has = (reg >= 0) & alive
+                if not bool(has.any()):
+                    continue
+                # rc_tile_id at the listed tile, per cell
+                rt = self.rc_tile_id.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)  # [B, RC, K]
+                ra = self.rival_at.gather(1, reg.clamp(min=0).reshape(B, -1)).reshape_as(reg)
+                bad_fwd = has & (rt != expect)  # (1) registers to a sibling / no one
+                bad_bwd = has & (ra < 0)        # (2) tile no longer civ-owned
+                bad = bad_fwd | bad_bwd
+                if bool(bad.any()):
+                    idx = bad.nonzero(as_tuple=False)[0]
+                    b, j, k = int(idx[0]), int(idx[1]), int(idx[2])
+                    tile = int(reg[b, j, k])
+                    raise AssertionError(
+                        f"A-24 registry incoherence: game={b} civ={r} slot={j} "
+                        f"{name}[{k}] tile={tile} expected_id={int(self.rc_id[b, r, j])} "
+                        f"actual_rc_tile_id={int(self.rc_tile_id[b, tile])} "
+                        f"rival_at={int(self.rival_at[b, tile])} turn={self.turn}"
+                    )
+
     def step(
         self,
         production: torch.Tensor | None = None,
@@ -10977,6 +11029,10 @@ class BatchSim:
             rc_hw = (self.rc_alive.long() * (torch.arange(self.RC, device=dev).view(1, 1, -1) + 1)).amax(dim=2)
             if int(rc_hw.max()) >= self._rc_reclaim_at:
                 self._reclaim_rc()
+            # A-24: after compaction (the riskiest registry reshuffle) and all
+            # of this step's placements/captures — env-gated, so free when off.
+            if self._rc_reg_check:
+                self._check_rc_registry_invariant()
 
         # B-18: religious pressure spread — after all foundings/settles/flips and
         # the rc compaction, mirroring TS endTurn's tail (spreadReligiousPressure
