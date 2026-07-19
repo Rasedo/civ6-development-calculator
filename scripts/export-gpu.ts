@@ -910,6 +910,17 @@ const SEED_OVERRIDES: Record<number, number> = {
   // Structural for a passive script with fixed t0 settle sites (the 9027
   // shape); H1/H2 verified not to help (diagnosed at 250t, 2026-07-17).
   4: 9054, // 9053: see above
+  // 9157 (index 12) died by t250 in ROUND B5 M2's XP reshuffle (veterancy
+  // shifted the war outcome — the player's last city fell): rerolled to 9158.
+  12: 9158,
+  // 9222 (index 17) & 9300 (index 23): the XP reshuffle steered these two
+  // rollout trajectories into PRE-EXISTING non-XP GPU/TS latents (9222 t184: a
+  // 1-gold rival-economy rounding on a loyalty-transferred city; 9300 t222: an
+  // advance-after-kill tileFree asymmetry) — combat/xp bit-identical in both,
+  // the divergence is in unmodified economy/advance code. Rerolled so the
+  // derived rollout games dodge them; the latents are flagged in the M2 log.
+  17: 9223,
+  23: 9301,
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;

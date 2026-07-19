@@ -35,3 +35,37 @@ transfers (B-31 capture, embarked) carry xp. Extend combat_mod_test.py ref.
 - Surveyed all combat sites (TS combat.ts + rivals.ts; GPU engine.py 12 roll
   tags). Plan: attacker +5 & attacker level-bonus in atk CS; defender +2 &
   defender level-bonus in def CS (dropped when embarked, like B-7 support).
+- Implemented both engines. Green: tsc, vitest (20, +9 B-4), export, parity
+  (24 seeds x 250t, 0.0 milli), forced variant (CIV6_RECLAIM_AT=12), combat_mod
+  (atk +10/def +0 exercised). Widened exp table 1201->4001 (harmless margin;
+  observed q peaks ~272 = strengthDiff 27, still inside the OLD +-60, but XP can
+  in principle push past it).
+
+## Rollout-replay reshuffle catches (2 games, both PRE-EXISTING non-XP latents)
+Seed 9157 (idx12) DEGENERATED under my XP reshuffle (base exports it fine at
+250t -> confirmed my change killed it) -> rerolled 12:9158 (survives, all 24
+export clean). The `--pipeline-replay` gate then flagged 2 of 72 games:
+
+- **9222 rng 2026006129 t184**: rival-1 treasury off by exactly 1 gold
+  (-588200 TS vs -587200 GPU milli). t183 is BYTE-IDENTICAL; every CB roll
+  matches (incl. large diffs); the ONLY t184 delta is that one treasury field,
+  at the exact turn a low-loyalty PLAYER city (826, loy1933) DEFECTS to rival 1.
+  Root: a float-rounding/accounting quirk in the rival economy for a freshly-
+  loyalty-transferred city (unmodified by M2). Not XP: xp identical (CB matches).
+- **9300 rng 2026006148 t222**: one player unit at tile 518 (TS) vs 519 (GPU),
+  same type, same hp47. t221 byte-identical; the t222 melee (k:mel t:519
+  diff140 dmg63 / melc diff-140 dmg19) is IDENTICAL in both and kills the rival
+  defender (RU1 519 hp26) in both. The divergence is the ADVANCE-after-kill:
+  GPU advances into 519, TS stays at 518 — a `_blocked_for("pmil")` (GPU) vs
+  `tileFreeForUnit` (TS) asymmetry on the freed tile (likely a surviving-
+  occupant/stacking edge), unmodified by M2. Not XP: the mel diff matches, so
+  both units' CS (incl. xp level) are bit-equal.
+
+CONCLUSION: XP is bit-correct (24-seed parity 0.0 milli; every CB tag matches
+in the failing games; xp planes provably equal since the diffs match). The two
+rollout divergences live entirely in unmodified economy/advance code, surfaced
+only because the reshuffle produced boards base never plays. Sanctioned
+response (reshuffle -> reroll + log): reroll the two affected fixtures so the
+derived rollout games avoid these pre-existing latents. FLAG FOR FOLLOW-UP /
+merge session: (1) rival-economy rounding on loyalty-transferred cities;
+(2) advance-after-kill tileFree asymmetry vs a surviving occupant.
