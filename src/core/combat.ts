@@ -11,6 +11,7 @@ import type { City, CityState, DistrictId, GameState, ImprovementId, RivalCity, 
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
+import { BUILDINGS } from '../data/buildings';
 import { CS_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
 import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP } from '../data/rivals';
@@ -125,6 +126,21 @@ export function unitLevel(unit: { xp?: number }): number {
 /** B-4: the flat CS bonus a unit's veterancy grants at every roll it fights. */
 export function xpLevelBonus(unit: { xp?: number }): number {
   return XP_LEVEL_CS * unitLevel(unit);
+}
+
+/** B-17 (ROUND B7): the flat XP a unit TRAINED or PURCHASED in a city starts
+ * with — the BEST tier over the city's Encampment military buildings (not the
+ * sum): BARRACKS/STABLE 5, ARMORY 10, MILITARY_ACADEMY 15 (data-driven off
+ * BuildingDef.trainXp). Keys purely off building presence — a military
+ * building cannot exist without a complete Encampment; district-pillage state
+ * is NOT consulted (recorded B-17 residual). Applies to military units only. */
+export function encampmentTrainXp(buildings: readonly string[]): number {
+  let best = 0;
+  for (const b of buildings) {
+    const xp = BUILDINGS[b]?.trainXp ?? 0;
+    if (xp > best) best = xp;
+  }
+  return best;
 }
 
 /** B-4: award XP to a unit (barbarians never accrue). */
@@ -1136,6 +1152,15 @@ export function barbarianPhase(state: GameState): void {
   // a single roll, no retaliation, civilians take the roll, never captures.
   // City order — a kill removes the target for later cities and advances the
   // shared RNG, so this runs immediately BEFORE the heal loop.
+  //
+  // B-17 (ROUND B7) DRAW ORDER: real Civ 6 Encampments strike SEPARATELY from
+  // walls, so a complete unpillaged Encampment fires the same once-per-turn
+  // ranged strike as an ADDITIONAL roll (the second loop below). A city with
+  // BOTH walls and an Encampment rolls twice — WALLS FIRST (this loop, over
+  // all cities), THEN Encampment (the next loop, over all cities). Both loops
+  // scan cities in identical order, so a walls kill in the first loop can
+  // remove a target the Encampment loop would have hit; the GPU mirror runs
+  // the two passes in the same order (k="pcstk" then k="pestk").
   for (const city of state.cities) {
     if (!city.buildings.includes('ANCIENT_WALLS')) continue;
     const center = map.tiles[city.centerIndex];
@@ -1162,6 +1187,46 @@ export function barbarianPhase(state: GameState): void {
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
     awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city — no attacker xp)
+    if (defender.hp <= 0) killUnit(state, defender);
+  }
+
+  // B-17 (ROUND B7): the ADDITIONAL Encampment strike (walls-first order
+  // documented above). A city with a COMPLETE unpillaged ENCAMPMENT fires the
+  // same pattern — range 2, nearest player-hostile unit, one roll at the
+  // city's defense strength, no retaliation, never captures — under k="pestk".
+  // No separate Encampment HP pool (recorded B-17 residual).
+  for (const city of state.cities) {
+    if (
+      !city.districts.some(
+        (dd) =>
+          dd.type === 'ENCAMPMENT' &&
+          map.tiles[dd.tileIndex].districtComplete &&
+          !map.tiles[dd.tileIndex].districtPillaged,
+      )
+    )
+      continue;
+    const center = map.tiles[city.centerIndex];
+    let bestTile = -1;
+    let bestDist = 99;
+    for (const t of map.tiles) {
+      const d = hexDistance(center.col, center.row, t.col, t.row);
+      if (d < 1 || d > 2) continue;
+      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'player' }))) continue;
+      if (d < bestDist) {
+        bestDist = d;
+        bestTile = t.index;
+      }
+    }
+    if (bestTile < 0) continue;
+    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { owner: 'player' }));
+    const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
+    const tt = map.tiles[bestTile];
+    const defCS = defender.embarked
+      ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
+      : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
+    const atkCS = cityDefenseStrength(state, city);
+    defender.hp -= damageRoll(state, atkCS - defCS, 'pestk', bestTile);
+    awardDefenseXp(defender);
     if (defender.hp <= 0) killUnit(state, defender);
   }
 

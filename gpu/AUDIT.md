@@ -104,7 +104,7 @@ Per-item weights (done% in parens where partial):
   remain); B-8 2 (open).
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
-- B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
+- B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (85%); B-18 4
   (95% — ROUND B6: enhancer effects + missionary chassis + religious
   victory; apostles/theological combat + player missionaries (#50)
   remain); B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
@@ -519,14 +519,35 @@ gap; likewise GS disasters are modeled minus sea-level rise
   INDUSTRIAL_ZONE +0.5/mine +1/quarry +2/adjacent-Aqueduct, HARBOR +1
   per CITY_CENTER (was +2); IZ channels LIVE since ROUND B9 R1 made
   IZ scaffold-reachable (2026-07-19).
-- B-17 (re-scoped). Encampment is no longer inert: it earns +1 General
-  GPP/turn plus +1 per building (`greatPersonPointsPerTurn`,
-  core/game.ts; `GP_CLASS_DISTRICT`), and Barracks/Stable/Armory/
-  Military Academy give production/housing (`BUILDINGS`); zero
-  adjacency matches real Civ 6. Remaining real gaps: no specialist
-  slots (`SPECIALIST_YIELDS` (data/greatPeople.ts) has no ENCAMPMENT
-  entry; `citySpecialistSlots` skips it), no district combat role (no
-  HP/ranged strike/movement block), no unit-XP function.
+- B-17 (~85%, ROUND B7 #63 slice E 2026-07-19). Encampment now carries
+  its three residual roles, both engines, player + rival, poke-covered
+  (gpu/encampment_test.py + tests/encampment.test.ts, battery lane
+  `encampment`): (1) SPECIALIST SLOT — `SPECIALIST_YIELDS.ENCAMPMENT` =
+  {production:1, gold:1} (real Civ 6 has NO citizen specialist for the
+  Encampment; this is the stylized-model yield), `citySpecialistSlots`
+  is data-driven off `SPECIALIST_YIELDS` so the row is the whole change
+  (TS-only — the GPU has no specialist-yield machinery and the scripted
+  gate never assigns specialists, so inert for parity). (2) DISTRICT
+  STRIKE — a city (player AND rival) owning a COMPLETE unpillaged
+  ENCAMPMENT fires the B-2 pattern as an ADDITIONAL once/turn ranged
+  strike (`damageRoll`/`_damage_roll` k="pestk"/"restk"; range 2,
+  nearest hostile, city defense strength, no retaliation, never
+  captures). Walls-first draw order documented at the `barbarianPhase`
+  B-2 site: the player runs the whole walls pass (pcstk) THEN the whole
+  Encampment pass (pestk); the rival runs walls-then-Encampment per rc.
+  No Encampment HP pool (recorded residual). (3) TRAINING XP — a
+  MILITARY unit trained/purchased inherits the city's best Encampment
+  military-building tier (`encampmentTrainXp` off `BuildingDef.trainXp`;
+  BARRACKS/STABLE 5, ARMORY 10, MILITARY_ACADEMY 15; best tier, not sum;
+  keys off building presence, NOT district-pillage state; player at
+  `purchaseUnit`/production, rival at the gold-buy + production; GPU
+  `_b_train_xp` + `_spawn_player`/`_spawn_rival` init_xp). GATE-
+  UNREACHABLE: the scripted 24-seed gate never builds an Encampment
+  (0/6 sampled seeds develop one), so all three add zero draws in-gate
+  and parity is trivially exact (0.0 milli scripted/forced/rollout,
+  hunt-free) — proven only via the forced-condition pokes, the B-25
+  pattern. Remaining residuals: no Encampment HP pool, no movement
+  block, no player-GP-unit tile activation.
 - B-18 (re-scoped again 2026-07-17, #47r). LANDED since Round B2:
   belief catalogs (25/9/8/7), Enhancer slot, the rival ENHANCER race
   (mirrored 3rd `_next_random` draw after the founder draw — 31

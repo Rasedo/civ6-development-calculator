@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
@@ -1925,6 +1925,12 @@ export function rivalPhase(state: GameState): void {
           if (u) {
             rival.treasury = (rival.treasury ?? 0) - price;
             bought = true;
+            // B-17 (ROUND B7): a purchased military unit inherits the spawn
+            // city's Encampment training XP (best military-building tier).
+            if ((UNITS[pickId]?.combat ?? 0) > 0) {
+              const xp = encampmentTrainXp(spawnCity.buildings);
+              if (xp > 0) u.xp = xp;
+            }
           }
         }
       }
@@ -2157,7 +2163,13 @@ export function rivalPhase(state: GameState): void {
               rival.gpp[def.gpClass] = (rival.gpp[def.gpClass] ?? 0) + pts;
             }
           } else {
-            spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
+            const trained = spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
+            // B-17 (ROUND B7): a trained military unit inherits this city's
+            // Encampment training XP (best military-building tier).
+            if (trained && (UNITS[q.unit]?.combat ?? 0) > 0) {
+              const xp = encampmentTrainXp(rc.buildings);
+              if (xp > 0) trained.xp = xp;
+            }
             if (q.unit === 'BUILDER') rival.buildersTrained = (rival.buildersTrained ?? 0) + 1; // P4/D-10
           }
         }
@@ -2217,6 +2229,44 @@ export function rivalPhase(state: GameState): void {
           const atkCS = rivalCityDefense(state, rival, rc);
           defender.hp -= damageRoll(state, atkCS - defCS, 'rcstk', bestTile);
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
+          if (defender.hp <= 0) disbandUnit(state, defender.id);
+        }
+      }
+      // B-17 (ROUND B7): the rival mirror of the ADDITIONAL Encampment strike
+      // (the pestk twin). A rival city with a COMPLETE unpillaged ENCAMPMENT
+      // fires the same once-per-turn ranged strike right AFTER its walls strike
+      // (walls first, then Encampment — per rc, before the heal), k="restk".
+      if (
+        rc.districts.some(
+          (dd) =>
+            dd.type === 'ENCAMPMENT' &&
+            state.map.tiles[dd.tileIndex].districtComplete &&
+            !state.map.tiles[dd.tileIndex].districtPillaged,
+        )
+      ) {
+        let bestTile = -1;
+        let bestDist = 99;
+        for (const t of state.map.tiles) {
+          const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
+          if (d < 1 || d > 2) continue;
+          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
+          if (d < bestDist) {
+            bestDist = d;
+            bestTile = t.index;
+          }
+        }
+        if (bestTile >= 0) {
+          const hostiles = unitsAt(state, bestTile).filter((u) =>
+            unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
+          );
+          const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
+          const tt = state.map.tiles[bestTile];
+          const defCS = defender.embarked
+            ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
+            : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
+          const atkCS = rivalCityDefense(state, rival, rc);
+          defender.hp -= damageRoll(state, atkCS - defCS, 'restk', bestTile);
+          awardDefenseXp(defender);
           if (defender.hp <= 0) disbandUnit(state, defender.id);
         }
       }

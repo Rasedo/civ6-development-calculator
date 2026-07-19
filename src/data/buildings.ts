@@ -37,6 +37,10 @@ export interface BuildingDef {
   /** P4/D-13: explicit gold upkeep (real Civ 6) — overrides the cost-tier
    * heuristic in buildingMaintenance where the wiki value is verified. */
   maintenance?: number;
+  /** B-17 (ROUND B7): flat combat XP a unit TRAINED or PURCHASED in this
+   * city starts with (best tier over the city's Encampment military buildings
+   * counts, not the sum — see MILITARY_TRAINING_XP / encampmentTrainXp). */
+  trainXp?: number;
 }
 
 const rawList: BuildingDef[] = [
@@ -88,10 +92,12 @@ const rawList: BuildingDef[] = [
   { id: 'POWER_PLANT', name: 'Power Plant', district: 'INDUSTRIAL_ZONE', cost: 525, requiresAny: ['FACTORY'], yields: { production: 4 }, regional: true, maintenance: 3 },
 
   // --- Encampment ------------------------------------------------------------------
-  { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 80, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1 },
-  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 105, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1 },
-  { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 175, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 2 }, maintenance: 2 },
-  { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 355, requiresAny: ['ARMORY'], yields: { production: 3 }, housing: 1, maintenance: 2 },
+  // B-17 (ROUND B7) trainXp: units trained/purchased here start with this XP
+  // (best tier counts, not sum — BARRACKS/STABLE 5, ARMORY 10, MIL_ACADEMY 15).
+  { id: 'BARRACKS', name: 'Barracks', district: 'ENCAMPMENT', cost: 80, exclusiveWith: ['STABLE'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
+  { id: 'STABLE', name: 'Stable', district: 'ENCAMPMENT', cost: 105, exclusiveWith: ['BARRACKS'], yields: { production: 1 }, housing: 1, maintenance: 1, trainXp: 5 },
+  { id: 'ARMORY', name: 'Armory', district: 'ENCAMPMENT', cost: 175, requiresAny: ['BARRACKS', 'STABLE'], yields: { production: 2 }, maintenance: 2, trainXp: 10 },
+  { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 355, requiresAny: ['ARMORY'], yields: { production: 3 }, housing: 1, maintenance: 2, trainXp: 15 },
 
   // --- Entertainment Complex ----------------------------------------------------------
   { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 135, amenities: 1, yields: { culture: 1 }, maintenance: 1 }, // P4/D-24: real Arena also gives +1 culture

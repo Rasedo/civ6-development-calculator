@@ -147,4 +147,11 @@ export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food'
   HARBOR: { gold: 2, food: 1 },
   THEATER_SQUARE: { culture: 2 },
   INDUSTRIAL_ZONE: { production: 2 },
+  // B-17 (ROUND B7): the Encampment takes specialists too (real Civ 6 has no
+  // citizen specialist for the Encampment — this is the model stylization, a
+  // production/gold garrison yield consistent with the district's character).
+  // Data-driven: citySpecialistSlots keys off SPECIALIST_YIELDS, so this row
+  // is the whole change. Specialists are never assigned in the scripted gate
+  // (setSpecialists is a manual/UI action), so this is inert for parity.
+  ENCAMPMENT: { production: 1, gold: 1 },
 };

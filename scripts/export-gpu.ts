@@ -872,6 +872,9 @@ const rules = {
     regional: b.regional ? 1 : 0,
     // B9-R3: worship = faith-purchase-only (never queued, never gold-bought).
     worship: b.worship ? 1 : 0,
+    // B-17 (ROUND B7): flat training XP granted to units trained/purchased in
+    // a city holding this Encampment military building (best tier counts).
+    trainXp: b.trainXp ?? 0,
   })),
   techs: techList.map((t) => ({
     id: t.id,
