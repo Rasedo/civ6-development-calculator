@@ -37,6 +37,12 @@ them to stress slot-layout invariants (four real catches to date).
   a resume run OVERWRITES rollout.json — for TS-side instrumentation
   of one off-script game, extract a one-game rollout file
   (`{...roll, games: [g]}`) and full-replay it (seconds, no resume).
+- A resume-check can VERIFY only fixes that leave the logged game's
+  action stream unchanged (pure-read / state-init bugs). A
+  BEHAVIOR-CHANGING fix (different pick, different walk) makes the
+  recorded actions stale — the resumed pair explodes into PHANTOM
+  mass-divergences that look like new bugs. For behavior-changing
+  fixes: full fresh gate (or battery) only, never a resume-check.
 
 Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
 `CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
