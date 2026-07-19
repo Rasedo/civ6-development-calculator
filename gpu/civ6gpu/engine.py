@@ -9977,6 +9977,7 @@ class BatchSim:
         self.rc_outer_hp[b, w_, slot] = 0  # AUDIT B-30: walls (if any) kept at outer pool 0
         self.r_next_city_id[b, w_] += 1
         self.rvcity_at[b, self.site[b, c]] = w_
+        self._eff_version += 1  # B9-R2 invariant: the receiver just gained rc_bldg/districts/tiles mid-phase
         return True
 
     def _apply_settlers_and_purchases(self, act: torch.Tensor, buildable: torch.Tensor) -> None:

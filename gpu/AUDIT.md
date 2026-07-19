@@ -25,14 +25,18 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 39 | 21.1 | **54%** |
-| B fidelity | 88 | 65.9 | **75%** |
+| A symmetry | 39 | 23.1 | **59%** |
+| B fidelity | 88 | 66.5 | **76%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
-| G parity latents | 5 | 4 | **80%** |
-| **Overall (incl. closed)** | **183** | **144.0** | **79%** |
-| Open chapters only (A+B) | 127 | 87.0 | **69%** |
+| G parity latents | 6 | 5 | **83%** |
+| **Overall (incl. closed)** | **184** | **145.6** | **79%** |
+| Open chapters only (A+B) | 127 | 89.6 | **71%** |
+
+(B10 close-out note: the rows are re-added sums — the prior overall
+row carried a +2.0 arithmetic slip (144.0 vs the true 142.0), so
+overall stays 79% despite the round's +3.6 of done weight.)
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -70,7 +74,18 @@ buys/220 spreads; the rollout replay caught the missing faithOnly
 production-mask term — the round's one gate catch); B-25 70%→80% —
 religious victory (S3 79a056f: predominance >half in EVERY alive
 civ, victoryType 5/6 at endTurn, poke-pinned — gate-unreachable at
-250t).)
+250t). 2026-07-19 ROUND B10 R/B/H parallel worktrees (brief
+gpu/ROUND_B10.md, task #66): A-24 RESOLVED (per-rc placement rule
+`rivalCityId === rc.id`/`rc_tile_id == rc_id`, env-gated invariant
+scan auto-ON under the forced gate, `rc_registry` lane); B-26 → 70%
+(barb era ladder to MUSKETMAN + barbs obey ZOC; ranged barbs
+DESCOPED — the GPU raider block lacks a ranged dispatch); G-5
+ROOT-CAUSED: TS `transferCityToRival` kept duplicate-type districts
+where the GPU type-keyed registry (and real Civ 6) hold one per
+type — TS fixed, seeds 9222/9301 RESTORED in-gate; the merge added
+the missing `_eff_version` bump on the transfer success path (the
+one unpaired rc_bldg write in the engine); new G-6 = dormant
+founding tie-break sighting (slice R, unverified).)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -80,12 +95,13 @@ Per-item weights (done% in parens where partial):
   A-12 4 (90% — 3b-2 landed attack/capture; levy + quests are recorded
   deferrals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
-  worked-tile scan), A-24 2 (new — split from B-30: rival
-  district/tile registry consistency).
+  worked-tile scan), A-24 2 (done — ROUND B10 slice R: per-rc
+  placement rule + env-gated registry invariant scan).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-4 3 / B-5 2 / B-6 8 / B-7 2 /
   B-9 3 / B-10 3 / B-28 1 / B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
-  B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (50%);
-  B-8 2 (open).
+  B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (70% —
+  ROUND B10: era ladder + barb ZOC; cliffs/ranged/naval/scout-raid
+  remain); B-8 2 (open).
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (40%); B-18 4
@@ -97,7 +113,8 @@ Per-item weights (done% in parens where partial):
   B-33 3 (open).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
-- G: G-1, G-2, G-3, G-4 — all done (chapter EMPTY).
+- G: G-1..G-5 done (G-5 root-caused ROUND B10 slice H); G-6 1 (open,
+  dormant — unverified founding tie-break sighting, slice R).
 
 ---
 
@@ -270,13 +287,24 @@ untagged halves of tagged items stay Fable/main-session work.
   do). A-17's `rivalCityId`/`rc_tile_id` registry now makes the
   per-city convergence implementable; it reshuffles every rival yield
   every turn, so it needs its own gated stage.
-- A-24 (new, split from B-30's hunt). Rival district/tile registries
-  can disagree: an rc's `.districts` array may reference a tile whose
-  `rivalCityId` registers to a SIBLING rc (seed 9118: rcId 4 held a
-  HOLY_SITE whose tile was registered to rcId 3). B-30 sidesteps it
-  (capture derives kept districts from re-owned tiles, not the array),
-  but the placement/registration pair in `tryQueueRivalDistrict` and
-  the A-17 registry should be hardened to stay mutually consistent.
+- A-24. RESOLVED (2026-07-19, ROUND B10 slice R, task #66). Rival
+  district/wonder placement now requires the target tile's A-17
+  registry entry to be THIS city: `tryQueueRivalDistrict`'s `owns` +
+  `tryQueueRivalWonder`'s filter gained `rivalCityId === rc.id`; GPU
+  `_place_district_rival` elig + `_rival_phase` wonder `base_ok`
+  gained `rc_tile_id == rc_id[:, r, j]` — mirroring the player's
+  `canPlaceDistrict`/`canPlaceWonder` (`tile.cityId === city.id`). A
+  sibling's registered tile is no longer a valid site (the seed-9118
+  incoherence: rcId 4's HOLY_SITE on a tile registered to rcId 3 —
+  B-30 had sidestepped it by deriving capture-kept districts from
+  re-owned tiles). Machine-checked: `_check_rc_registry_invariant`
+  (engine.py, forward tile↔rc + backward civ-ownership scan) /
+  `assertRivalRegistryCoherent` (rivals.ts), env-gated
+  `CIV6_RC_REGISTRY_CHECK` and auto-ON under `CIV6_RC_RECLAIM_AT` so
+  the forced-compaction gate exercises it every turn; poke lane
+  `rc_registry` (gpu/rc_registry_test.py). The site reshuffle
+  surfaced two pre-existing latents: the G-5 class (fixed by slice H
+  this round) and a founding tie-break sighting recorded as G-6.
 
 ## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 
@@ -628,7 +656,21 @@ reference:
 
 ## G. Known parity latents (dormant)
 
-G-1..G-5 resolved (detail in git history / the cited logs):
+G-1..G-5 resolved (detail in git history / the cited logs); G-6 open:
+
+- G-6 (new, 2026-07-19, ROUND B10 slice R — UNVERIFIED agent
+  diagnosis, re-verify before implementing any fix, the G-3 lesson).
+  Under slice R's site reshuffle (R-only worktree, pre-merge), rollout
+  game seed 9235 rng 2026006134 went red at t244 (trace col 41,
+  improved-tile count): the first divergence is a rival FOUNDING —
+  city 290's settler founds on tile 643 (GPU; tile had a FARM →
+  improvement stripped) vs 644 (TS). Replay trace exactly matched
+  through t242 (districts, buildings, yields, treasuries, scores), so
+  the class looks like a `_rival_try_found`/`siteQuality` tie-break or
+  live-read asymmetry (C-7 family), NOT R's placement rule. Dormant:
+  the compound R+B+H merge reshuffled the trajectory again and the
+  round battery ran green. Repro pointer: slice-R agent report,
+  ROUND B10 (task #66).
 
 - G-5. RESOLVED (2026-07-19, ROUND B10 slice-H, #66). The class: a
   rival's treasury off by EXACTLY 1 gold (± score, e.g. 5.4) on the

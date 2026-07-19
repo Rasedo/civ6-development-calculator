@@ -28,7 +28,7 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
@@ -1599,5 +1599,21 @@ for (let s = 0; s < N_SEEDS; s++) {
     `seed${seed}.json: ${N_TURNS} turns, ${state.cities.length}/${C_MAX} cities, pop ${pops}, ` +
       `${state.cityStates.length} CS (envoys ${envoys}), ${state.rivals.length} rivals (${wars} at war), ${boostSchedule.length} boosts`,
   );
+}
+// ROUND B10 lesson: a SEED_OVERRIDES change leaves the PREVIOUS seed's
+// fixture on disk (fixtures are gitignored, so a worktree agent's rm never
+// reaches the main checkout). Stale orphans poison BOTH downstream gates:
+// parity_test sweeps every seed*.json (old-engine fixture vs new engine =
+// guaranteed mismatch), and the rollout derives its game set from the
+// fixture list, so 24+k fixtures shift the shard batch shapes and BLAS
+// float association past the milli tolerances. Sweep them here — the
+// emit set is the single source of truth.
+const emitted = new Set<string>();
+for (let s = 0; s < N_SEEDS; s++) emitted.add(`seed${SEED_OVERRIDES[s] ?? 9001 + s * 13}.json`);
+for (const f of readdirSync(OUT)) {
+  if (/^seed\d+\.json$/.test(f) && !emitted.has(f)) {
+    rmSync(`${OUT}/${f}`);
+    console.log(`orphaned fixture removed: ${f} (not in the current SEED_OVERRIDES emit set)`);
+  }
 }
 console.log(`\nFixtures in ${OUT}/ — run gpu/parity_test.py against them.`);
