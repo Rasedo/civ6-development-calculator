@@ -4470,7 +4470,14 @@ class BatchSim:
                     self.pmil_at[ar, here[ar]] = -1
                     self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
                 # Advance into the freed tile (and clear any camp there).
-                adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), "pmil").squeeze(1)
+                # B5-M1 hunt fix: mirror TS tileFreeForUnit's TERRAIN check — a
+                # player LAND unit may not advance onto a WATER tile (e.g. where
+                # an embarked enemy was just killed). _blocked_for only checks
+                # occupancy; without this the attacker teleported onto water,
+                # desyncing from TS (which refuses the advance). Player builds no
+                # naval (production_mask excludes it), so the land plane is exact.
+                adv_terr = self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
+                adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), "pmil").squeeze(1) & adv_terr
                 if bool(adv.any()):
                     vr = adv.nonzero(as_tuple=True)[0]
                     self.pmil_at[vr, here[vr]] = -1
@@ -6982,7 +6989,29 @@ class BatchSim:
                 ar = atk_dead.nonzero(as_tuple=True)[0]
                 a_at[ar, here[ar]] = -1
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
-            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1)
+            # B5-M1 hunt fix: mirror TS tileFreeForUnit's TERRAIN check that
+            # _blocked_for (occupancy-only) omits. A LAND attacker (barb, or a
+            # land/embarked rival) may not advance onto WATER (allowEmbark is
+            # false in meleeAttack); a NAVAL rival advances onto enterable water
+            # (wpass, OCEAN needing its civ's CARTOGRAPHY) but never land. Without
+            # this the attacker teleported onto the water tile of a just-killed
+            # embarked enemy, desyncing from TS.
+            ttc_adv = tgt.clamp(min=0)
+            land_ok = self.passable.gather(1, ttc_adv.unsqueeze(1)).squeeze(1)
+            if atk_kind == "rival":
+                naval_att = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
+                civ_u = self.v_civ[:, u].clamp(min=0)
+                cart_u = (
+                    self.r_techs[torch.arange(self.B, device=self.device), civ_u, self._cartography_tech]
+                    if self._cartography_tech >= 0 else torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                )
+                water_ok = self.wpass.gather(1, ttc_adv.unsqueeze(1)).squeeze(1) & (
+                    ~self.ocean_tile.gather(1, ttc_adv.unsqueeze(1)).squeeze(1) | cart_u
+                )
+                adv_terr = torch.where(naval_att, water_ok, land_ok)
+            else:  # barbarians are never naval — land plane only
+                adv_terr = land_ok
+            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1) & adv_terr
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1

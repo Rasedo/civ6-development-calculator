@@ -73,10 +73,57 @@ Round base: 16d017bad62360452839830cf7d3686376de58ea
   unchanged.
 - python gpu/parity_test.py: PARITY OK 0.0 milli (24 seeds × 250t).
 - forced variant CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3: PARITY OK 0.0 milli.
-- python gpu/rollout.py --shards 4 --pipeline-replay: **RED — 2 of 72 random
-  games diverge** (see below). 70/72 turn-exact.
+- python gpu/rollout.py --shards 4 --pipeline-replay: **REPLAY PARITY OK — 72
+  games** (after the hunt fix below).
 
-## MERGE WATCH-ITEM — rollout latent (PRE-EXISTING, roster-reshuffle-exposed)
+## ROLLOUT LATENT — ROOT-CAUSED + FIXED (pre-existing GPU bug, B-10-reshuffle-exposed)
+
+The initial rollout failure (2/72 games) was hunted to root cause and fixed. It
+was NOT the B-9/B-10 gate logic (parity_test 0.0 + the inert-gate isolation test
+already proved that) — it was a pre-existing GPU melee bug on the N2 embark
+surface that the B-10 trajectory reshuffle surfaced.
+
+ROOT CAUSE (verified, seed 9300 / rng 2026006149, turn 203):
+- An at-war rival SPEARMAN, EMBARKED on a WATER tile (tile 508, verified wt=1 in
+  the fixture; rival has SHIPBUILDING → war-march embark is legal), is killed by
+  the player.
+- GPU melee ADVANCE-after-kill gated only on OCCUPANCY: `~_blocked_for(tgt,"pmil")`
+  (engine.py `_apply_unit_actions`) and `~_blocked_for(tgt, blocked_side)`
+  (`_hostile_vs_unit`). `_blocked_for` returns `barb|pmil|rv|rvc` — it does NOT
+  check TERRAIN. So the player LAND unit teleported onto water tile 508.
+- TS `meleeAttack` advances only if `tileFreeForUnit(state, targetIndex, attacker)`
+  — which for a land unit (allowEmbark=false) REFUSES water/impassable tiles. So
+  TS left the attacker on land (tile 509).
+- The player at 508 (GPU) vs 509 (TS) then cascaded: the recorded next order
+  referenced the unit at 508 → TS replay "no player unit at tile 508". A
+  downstream rival war-act also flipped (a rival kept tile 552 vs stepping to the
+  now-differently-occupied 508). Combat rolls matched throughout (the split is
+  pre-combat positional), confirming the advance as the origin.
+
+FIX (engine.py, GPU is the WRONG engine per source-of-truth — TS matches real
+Civ 6 single-occupancy + no-land-unit-on-water): both melee advance sites gain the
+terrain guard `_blocked_for` omitted, mirroring `tileFreeForUnit`:
+- player advance: `& self.passable[tgt]` (player builds no naval → land plane exact).
+- rival/barb advance (`_hostile_vs_unit`): naval-aware —
+  `where(unit_naval, wpass[tgt] & (~ocean[tgt] | civ-CARTOGRAPHY), passable[tgt])`,
+  so a rival GALLEY still advances onto enterable water while land/embarked
+  rivals and barbs (never naval) are land-only. Normal player MOVES already
+  carried `& passable[tgt]` (engine.py ~L4750) — the advance path was the sole omission.
+
+VERIFICATION (behavior-changing fix ⇒ full fresh rollout, not a resume-check):
+tsc clean; vitest 293/293; export clean; parity 0.0; forced-compaction 0.0;
+`rollout.py --shards 4 --pipeline-replay` REPLAY PARITY OK 72/72. The fix is a
+no-op wherever the advance target is land (the common case), so it changes only
+the buggy land-onto-water advances — parity fixtures (which never hit the path)
+stay 0.0.
+
+MERGE NOTE: this GPU fix is orthogonal to M2 (XP) and to the B-9/B-10 mechanic;
+it touches only the two melee advance conditions. The earlier inert-gate
+isolation showed a barbCamps symptom in a different game (seed 9274) — the full
+rollout is now green, so that symptom was the same land-onto-water advance class
+(barb advance path, also fixed) rather than a separate latent.
+
+## (historical) MERGE WATCH-ITEM — rollout latent (PRE-EXISTING, roster-reshuffle-exposed)
 
 The rollout replay fails on 2/72 random games. ISOLATION-PROVEN this is NOT the
 B-9/B-10 gate logic:
