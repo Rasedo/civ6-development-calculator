@@ -1298,6 +1298,12 @@ class BatchSim:
         self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
         self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
+        # B-10: SCOUT is a military explorer (combat 10) but NEVER in the rival
+        # roster (RIVAL_BUY_UNITS / the ladder exclude it). In the production
+        # ladder WARRIOR (combat 20) dominates it, but in the A-5r gold buy the
+        # affordability gate can leave SCOUT the only affordable candidate — so
+        # it must be masked out of the buy set to mirror TS exactly.
+        self._scout_idx = next((i for i, u in enumerate(ru) if u["id"] == "SCOUT"), -1)
         # #45/B-6: the scripted galley-policy build target (the naval MELEE unit,
         # requiresTech SAILING). -1 if the roster has no galley.
         self._galley_idx = next((i for i, u in enumerate(ru) if u["id"] == "GALLEY"), -1)
@@ -8019,29 +8025,37 @@ class BatchSim:
             unit_count = n_units + ((self.rc_current[:, r] >= 1) & (self.rc_current[:, r] <= self.NU)).sum(dim=1)  # units only — district codes sit above NU
             settler_q = (alive0 & (self.rc_current[:, r] == 0)).any(dim=1)
             cap = n_cities * 2 + torch.where(self.r_atwar[:, r], 3, 1)
-            # C1-B3b: unit type gates on the rival's REAL techs
-            rres = rr.get("research", {})
-            sp_t, ho_t = int(rres.get("spearTech", -1)), int(rres.get("horseTech", -1))
-            zb = torch.zeros(B, dtype=torch.bool, device=dev)
-            # B-9: this rival's per-unit strategic-resource access (reused by the
-            # A-5r buy block below). HORSEMAN needs HORSES — gate the ladder pick.
+            # AUDIT B-10: best-of-roster type pick — data-driven over the unit
+            # tables (no hardcoded warrior/spearman/horseman ladder). This
+            # rival's per-unit strategic access (res_ok_r, reused by the A-5r
+            # buy block) and trainable mask (requiresTech satisfied over the
+            # FULL tech tree r_techs, via _p_tech; -1 = ungated) gate both lanes.
             res_ok_r = self._res_avail_mask(self.rival_at == r)  # [B, NU]
-            has_h = self.r_techs[:, r, ho_t] if ho_t >= 0 else zb
-            if self._r_horseman >= 0:
-                has_h = has_h & res_ok_r[:, self._r_horseman]
-            has_s = self.r_techs[:, r, sp_t] if sp_t >= 0 else zb
-            ty = torch.where(
-                has_h,
-                torch.tensor(self._r_horseman, device=dev),
-                torch.where(has_s, torch.tensor(self._r_spearman, device=dev), torch.tensor(self._warrior_idx, device=dev)),
-            )
+            tr_u_r = (
+                (self._p_tech.unsqueeze(0) < 0)
+                | self.r_techs[:, r].gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+            ) & res_ok_r  # [B, NU]
+            rng_type = self._p_rng_str > 0  # [NU]
+            arNU = torch.arange(self.NU, device=dev)
+            fill = torch.full((B, self.NU), -(10**9), dtype=torch.long, device=dev)
+            # melee lane: highest combat among non-ranged non-naval military;
+            # ranged lane: highest ranged strength among ranged non-naval units.
+            # key = strength·NU − idx ⇒ argmax ties to the LOWEST unit index =
+            # the TS strict-`>` first-wins over UNITS-table order. WARRIOR /
+            # SLINGER are ungated so each lane always has a candidate; SCOUT
+            # (combat 10) is dominated by WARRIOR (20); BUILDER is combat 0.
+            melee_ok = tr_u_r & (self._p_combat.unsqueeze(0) > 0) & ~rng_type.unsqueeze(0) & ~self.unit_naval.unsqueeze(0)
+            key_m = torch.where(melee_ok, (self._p_combat.long() * self.NU - arNU).unsqueeze(0).expand(B, -1), fill)
+            ty = key_m.argmax(dim=1)  # [B]
+            rng_ok = tr_u_r & rng_type.unsqueeze(0) & ~self.unit_naval.unsqueeze(0)
+            key_r = torch.where(rng_ok, (self._p_rng_str.long() * self.NU - arNU).unsqueeze(0).expand(B, -1), fill)
+            ty_rng = key_r.argmax(dim=1)  # [B]
+            has_rng_type = rng_ok.any(dim=1)
             # AUDIT A-6: army composition — military only (builders excluded
             # via combat 0), live + queued, updated through the pick loop
             # exactly like TS's meleeCount/rangedCount; train ranged while
-            # the army holds fewer than 1 ranged per 2 melee. ARCHER once
-            # archerTech lands, SLINGER before (ungated, like the catalog).
+            # the army holds fewer than 1 ranged per 2 melee.
             vt_all = self.v_type.clamp(min=0, max=self.NU - 1)
-            rng_type = self._p_rng_str > 0  # [NU]
             mil_live = self.v_alive & (self.v_civ == r) & (self._p_combat[vt_all] > 0)
             n_ranged = (mil_live & rng_type[vt_all]).sum(dim=1)
             n_melee = (mil_live & ~rng_type[vt_all]).sum(dim=1)
@@ -8050,18 +8064,6 @@ class BatchSim:
             q_mil = (qcur >= 1) & (qcur <= self.NU) & (self._p_combat[q_ty] > 0)
             n_ranged = n_ranged + (q_mil & rng_type[q_ty]).sum(dim=1)
             n_melee = n_melee + (q_mil & ~rng_type[q_ty]).sum(dim=1)
-            ar_t = int(rres.get("archerTech", -1))
-            has_a = self.r_techs[:, r, ar_t] if (ar_t >= 0 and self._r_archer >= 0) else zb
-            if self._r_slinger >= 0:
-                ty_rng = torch.where(
-                    has_a,
-                    torch.tensor(max(self._r_archer, 0), device=dev),
-                    torch.tensor(self._r_slinger, device=dev),
-                )
-                has_rng_type = torch.ones(B, dtype=torch.bool, device=dev)
-            else:
-                ty_rng = ty
-                has_rng_type = torch.zeros(B, dtype=torch.bool, device=dev)
             settle_cost = rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities - 1).clamp(min=0).double()
             scripted_r = ~self.controlled[:, r]  # C2b: the picker only drives scripted rivals
             # G3-A: ONE guard sync for the whole pick loop instead of a per-j
@@ -8424,18 +8426,16 @@ class BatchSim:
             mil_count5 = n_melee + n_ranged
             want_u5 = active & ~bought_r5 & (mil_count5 < 2 * n_cities)
             if bool(want_u5.any()):
-                ok_u5 = torch.zeros(B, self.NU, dtype=torch.bool, device=dev)
-                ok_u5[:, self._warrior_idx] = True
-                if sp_t >= 0 and self._r_spearman >= 0:
-                    ok_u5[:, self._r_spearman] = self.r_techs[:, r, sp_t]
-                if ho_t >= 0 and self._r_horseman >= 0:
-                    ok_u5[:, self._r_horseman] = self.r_techs[:, r, ho_t]
-                if self._r_slinger >= 0:
-                    ok_u5[:, self._r_slinger] = True
-                if ar_t >= 0 and self._r_archer >= 0:
-                    ok_u5[:, self._r_archer] = self.r_techs[:, r, ar_t]
-                ok_u5 = ok_u5 & res_ok_r  # B-9: strategic-resource gate on the gold buy (HORSEMAN needs HORSES)
-                mil5 = ok_u5 & (self._p_combat.unsqueeze(0) > 0)  # military only (excludes the builder)
+                # AUDIT B-10: candidate = every non-naval military unit the rival
+                # has the tech + strategic access for (the extended RIVAL_BUY_UNITS
+                # roster, data-driven off tr_u_r — WARRIOR/SLINGER ungated, the
+                # rest on requiresTech; res_ok_r folded into tr_u_r). BUILDER is
+                # combat 0; SCOUT (combat 10) is dominated by WARRIOR in the
+                # combat argmax — exactly the RIVAL_BUY_UNITS set (SCOUT masked
+                # out: affordability can otherwise leave it the only candidate).
+                mil5 = tr_u_r & (self._p_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
+                if self._scout_idx >= 0:
+                    mil5[:, self._scout_idx] = False
                 afford_u5 = self._afford(self.r_treasury[:, r].unsqueeze(1), self._p_cost.double().unsqueeze(0) * mult_r5)
                 cand_u5 = mil5 & afford_u5
                 elig_u5 = want_u5 & cand_u5.any(dim=1)
