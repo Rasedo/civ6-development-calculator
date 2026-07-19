@@ -135,18 +135,21 @@ def main() -> None:
     costs = sim._gp_costs[probe.clamp(max=top)]
     assert bool((costs == 750.0).all()), "past-ladder cost must clamp to 750"
 
-    # --- B-19 behavior: a Writer (class 7) is earnable through the player
-    # advance loop (culture -> current civic), proving the widened tensors
-    # flow end to end. Fresh turn 1: no districts, so only the injected class
-    # can earn; civic_prog rises by exactly the Writer's first-era effect.
+    # --- B-19/B-20 behavior: a Writer (class 7) is earnable through the player
+    # advance loop, proving the widened tensors flow end to end. Fresh turn 1:
+    # no districts + no AMPHITHEATER, so both of the Writer's 2 Great Works
+    # OVERFLOW to the instant culture lump (gwWorksPerPerson × first-era effect
+    # = 2 × 45 = 90) and no slot is occupied (B-20 replaces the single lump).
     if sim.districts_on:
         civic0 = sim.civic_prog.clone()
         earned0 = sim.gp_earned[:, 7].clone()
+        gw0 = (sim.gw_writing + sim.gw_music).sum().item()
         sim.player_gp_points[:, 7] = 100.0  # >= gpCost(0) = 60
         sim._advance_player_great_people()
         assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
         d_civic = (sim.civic_prog - civic0)
-        assert bool((d_civic == 45.0).all()), f"Writer culture lump wrong: {d_civic.tolist()}"
+        assert bool((d_civic == 90.0).all()), f"Writer overflow lump wrong (want 2×45): {d_civic.tolist()}"
+        assert (sim.gw_writing + sim.gw_music).sum().item() == gw0, "no AMPHITHEATER -> no slotted work"
 
     # --- G-2: a player-earned PROPHET banks its faith-column effect ---------
     # Confucius (PROPHET class 3, roster idx 0) carries fx.faith = 100; TS

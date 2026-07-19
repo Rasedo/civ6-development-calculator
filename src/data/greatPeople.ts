@@ -139,6 +139,62 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
 
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
+/**
+ * B-20 (Round B7): Great Works. A claimed WRITER or MUSICIAN no longer applies
+ * an instant culture lump — each carries WORKS_PER_PERSON Great Works that seek
+ * an OPEN SLOT in the claiming civ's cities. AMPHITHEATER holds writing works;
+ * MUSEUM (the later Theater-line building — real Civ 6 splits music into the
+ * Broadcast Center, but that tier is unlocked far past the gate horizon, so the
+ * earlier Theater-line building carries music works here and the ARTIST-only Art
+ * Museum slots are repurposed since ARTIST stays instant-lump) holds music
+ * works. Each such building offers SLOTS_PER_BUILDING slots. A slotted work
+ * yields GREAT_WORK_CULTURE culture/turn as a building-tier city yield (writing
+ * and music both +2 culture — the music +1 culture/+1 gold split is a recorded
+ * residual, cheap to add since the counts are tracked separately). Charges with
+ * no open slot ANYWHERE degrade to the person's instant culture lump (the pre-B7
+ * behaviour), one lump per overflowing charge. ARTIST stays the instant class.
+ */
+export const GW_WRITING_BUILDING = 'AMPHITHEATER';
+export const GW_MUSIC_BUILDING = 'MUSEUM';
+export const WORKS_PER_PERSON = 2;
+export const SLOTS_PER_BUILDING = 2;
+export const GREAT_WORK_CULTURE = 2;
+/** Classes whose people carry Great Works (vs. the instant-lump classes). */
+export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'MUSICIAN']);
+
+/** Great works stored in a city (writing + music) — the +GREAT_WORK_CULTURE yield count. */
+export function cityGreatWorks(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
+  return (city.greatWorksWriting ?? 0) + (city.greatWorksMusic ?? 0);
+}
+
+/**
+ * B-20: place a Great Person's WORKS_PER_PERSON works into `cities` (visited in
+ * array order — state.cities for the player, rival.cities for a rival, the
+ * acquisition/slot order both engines share). Each work fills the LOWEST city
+ * with an open slot of the matching building (AMPHITHEATER for writing, MUSEUM
+ * for music), lowest slot first; the per-city count is bumped. Returns the count
+ * of works that found NO slot (the overflow charges that fall back to a lump).
+ */
+export function placeGreatWorks(
+  cities: { buildings: string[]; greatWorksWriting?: number; greatWorksMusic?: number }[],
+  writing: boolean,
+): number {
+  const building = writing ? GW_WRITING_BUILDING : GW_MUSIC_BUILDING;
+  let remaining = WORKS_PER_PERSON;
+  for (const c of cities) {
+    if (remaining <= 0) break;
+    if (!c.buildings.includes(building)) continue;
+    const used = (writing ? c.greatWorksWriting : c.greatWorksMusic) ?? 0;
+    const open = SLOTS_PER_BUILDING - used;
+    if (open <= 0) continue;
+    const take = Math.min(open, remaining);
+    if (writing) c.greatWorksWriting = used + take;
+    else c.greatWorksMusic = used + take;
+    remaining -= take;
+  }
+  return remaining;
+}
+
 /** Specialist yields per district type (Civ 6-ish; only these take specialists). */
 export const SPECIALIST_YIELDS: Partial<Record<DistrictId, Partial<Record<'food' | 'production' | 'gold' | 'science' | 'culture' | 'faith', number>>>> = {
   CAMPUS: { science: 2 },

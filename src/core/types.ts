@@ -200,6 +200,16 @@ export interface City {
    */
   religionPressure?: number[];
   followedReligion?: number | null;
+  /**
+   * B-20 (Round B7): Great Works stored in this city. `greatWorksWriting`
+   * occupies AMPHITHEATER slots (2 max), `greatWorksMusic` MUSEUM slots (2 max);
+   * each work yields GREAT_WORK_CULTURE culture/turn (building-tier). Absent = 0.
+   * Wiped on capture/transfer (the new owner constructs a fresh City — works,
+   * like outerHp, do not carry over). Yield-bearing state: the GPU mirror bumps
+   * _eff_version on every write.
+   */
+  greatWorksWriting?: number;
+  greatWorksMusic?: number;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */

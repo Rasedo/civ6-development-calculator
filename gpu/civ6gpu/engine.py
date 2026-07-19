@@ -383,6 +383,7 @@ _MUTABLE = [
     "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # A-7: belief identity
     "enh_claimed", "r_enhancer", "r_enhancer_done",  # B-18: enhancer race
     "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
+    "gw_writing", "gw_music", "rc_gw_writing", "rc_gw_music",  # B-20: Great Works per-city counts
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
     "district_pillaged",  # B-32: raided-dark districts (tile plane, reclaim-safe)
@@ -884,6 +885,24 @@ class BatchSim:
         # pure internal accumulator; the per-turn yield-faith side (game.ts:851)
         # remains unmodeled (the larger B-18 player religion-founding work).
         self.player_faith = torch.zeros(B, dtype=torch.float64, device=device)
+        # B-20 (Round B7): Great Works. A claimed WRITER/MUSICIAN slots
+        # gwWorksPerPerson works into its civ's cities — writing into the
+        # AMPHITHEATER column, music into the MUSEUM column (b_cost catalog
+        # order) — gwSlotsPerBuilding each; overflow charges fall back to the
+        # instant culture lump. Per-city work counts feed a +gwWorkCulture
+        # culture/turn building-tier yield (both engines, player + rival). Every
+        # write bumps _eff_version (yield-bearing state, the B9/B10 invariant).
+        self._writer_cls = int(rr.get("writerCls", -1))
+        self._musician_cls = int(rr.get("musicianCls", -1))
+        self._gw_writing_bidx = int(rr.get("gwWritingBidx", -1))
+        self._gw_music_bidx = int(rr.get("gwMusicBidx", -1))
+        self._gw_slots = int(rr.get("gwSlotsPerBuilding", 2))
+        self._gw_works = int(rr.get("gwWorksPerPerson", 2))
+        self._gw_culture = float(rr.get("gwWorkCulture", 2))
+        self.gw_writing = torch.zeros(B, C, dtype=torch.long, device=device)  # AMPHITHEATER slots used, per player city
+        self.gw_music = torch.zeros(B, C, dtype=torch.long, device=device)    # MUSEUM slots used, per player city
+        self.rc_gw_writing = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
+        self.rc_gw_music = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off5 = tiles_within_offsets(5).to(device)  # P5/S4: rival border growth radius (= player BORDER_MAX_RADIUS)
@@ -2213,6 +2232,58 @@ class BatchSim:
             self._eff_version += 1
         return place
 
+    def _place_player_works(self, can_col: torch.Tensor, culture_val: torch.Tensor, bcol: int, writing: bool) -> None:
+        """B-20 (mirror of placeGreatWorks for the player): distribute gwWorks
+        works per earning game across the player's cities in state.cities order
+        (city_seq rank), lowest slot first, into the AMPHITHEATER (writing) or
+        MUSEUM (music) column at gwSlots per building. Charges that find no open
+        slot anywhere overflow to the person's instant culture lump on the
+        current civic. Every slot write bumps _eff_version (yield-bearing)."""
+        if bcol < 0:  # building absent from the catalog: every charge overflows
+            self.civic_prog = self.civic_prog + can_col.to(self.dtype) * self._gw_works * culture_val
+            return
+        used = self.gw_writing if writing else self.gw_music  # [B, C]
+        cap = self.buildings[:, :, bcol].long() * self._gw_slots  # [B, C] (a city holds 1 such building max)
+        openc = (cap - used).clamp(min=0) * self.alive.long()  # [B, C] open slots per live city
+        W = self._gw_works * can_col.long()  # [B] works to place this earn
+        # state.cities array order = city_seq rank (acquisition order).
+        ordv = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+        open_ord = openc.gather(1, ordv)  # [B, C] open slots in visit order
+        prefix = open_ord.cumsum(dim=1) - open_ord  # exclusive: slots filled before this city
+        alloc_ord = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(open_ord)  # greedy lowest-first fill
+        alloc = torch.zeros_like(openc).scatter(1, ordv, alloc_ord)  # back to city index
+        overflow = (W - alloc_ord.sum(dim=1)).clamp(min=0)  # [B] charges with no slot
+        if writing:
+            self.gw_writing = self.gw_writing + alloc
+        else:
+            self.gw_music = self.gw_music + alloc
+        self.civic_prog = self.civic_prog + overflow.to(self.dtype) * culture_val
+        if bool((alloc != 0).any()):
+            self._eff_version += 1
+
+    def _place_rival_works(self, r: int, hit: torch.Tensor, culture_val: torch.Tensor, bcol: int, writing: bool) -> None:
+        """B-20 (mirror of placeGreatWorks for a rival): distribute gwWorks works
+        across rival r's cities in rc slot order (= TS rival.cities array order),
+        lowest slot first; overflow charges fall back to the instant culture lump
+        on this rival's civic progress. Every slot write bumps _eff_version."""
+        if bcol < 0:
+            self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + hit.double() * self._gw_works * culture_val
+            return
+        used = self.rc_gw_writing[:, r] if writing else self.rc_gw_music[:, r]  # [B, RC]
+        cap = self.rc_bldg[:, r, :, bcol].long() * self._gw_slots  # [B, RC]
+        openc = (cap - used).clamp(min=0) * self.rc_alive[:, r].long()  # [B, RC]
+        W = self._gw_works * hit.long()  # [B]
+        prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
+        alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)  # [B, RC]
+        overflow = (W - alloc.sum(dim=1)).clamp(min=0)  # [B]
+        if writing:
+            self.rc_gw_writing[:, r] = self.rc_gw_writing[:, r] + alloc
+        else:
+            self.rc_gw_music[:, r] = self.rc_gw_music[:, r] + alloc
+        self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + overflow.double() * culture_val
+        if bool((alloc != 0).any()):
+            self._eff_version += 1
+
     def _advance_player_great_people(self) -> None:
         """Mirrors advanceGreatPeople (runs after research, after rivalPhase has
         claimed): each class accrues 1 + (its district's built buildings) per
@@ -2242,8 +2313,17 @@ class BatchSim:
                 break
             eff = self._gp_effects[torch.arange(nCls, device=dev).view(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,5] (col 4 = faith)
             cf = can.to(self.dtype)
+            # B-20: WRITER/MUSICIAN culture is slotted as Great Works (deferred
+            # +2/turn), not applied instantly — mask those columns out of the
+            # standard civic add; _place_player_works handles their slot fill +
+            # overflow lump below.
+            cf_cult = cf.clone()
+            if self._writer_cls >= 0:
+                cf_cult[:, self._writer_cls] = 0
+            if self._musician_cls >= 0:
+                cf_cult[:, self._musician_cls] = 0
             self.tech_prog = self.tech_prog + (eff[:, :, 0] * cf).sum(dim=1)  # science → current tech (banks for next turn)
-            self.civic_prog = self.civic_prog + (eff[:, :, 1] * cf).sum(dim=1)  # culture → current civic
+            self.civic_prog = self.civic_prog + (eff[:, :, 1] * cf_cult).sum(dim=1)  # culture → current civic (W/M slotted)
             self.treasury = self.treasury + (eff[:, :, 2] * cf).sum(dim=1)  # gold → treasury
             if self._gp_effects.shape[2] > 4:  # G-2: faith → player's faith bank (mirrors the rival loop)
                 self.player_faith = self.player_faith + (eff[:, :, 4].double() * cf.double()).sum(dim=1)
@@ -2253,6 +2333,12 @@ class BatchSim:
                 self.progress[:, 0] = self.progress[:, 0] + torch.where(has_build, prod, torch.zeros_like(prod))
             self.player_gp_points = self.player_gp_points - cost * cf
             self.gp_earned[:, :nCls] = earned + can.long()
+            # B-20: slot the earned WRITER/MUSICIAN's Great Works into the
+            # player's cities (eff holds the pre-increment person's culture).
+            if self._writer_cls >= 0:
+                self._place_player_works(can[:, self._writer_cls], eff[:, self._writer_cls, 1], self._gw_writing_bidx, True)
+            if self._musician_cls >= 0:
+                self._place_player_works(can[:, self._musician_cls], eff[:, self._musician_cls, 1], self._gw_music_bidx, False)
 
     def _spread_religious_pressure(self) -> None:
         """B-18 (mirror of TS spreadReligiousPressure): each founded religion's
@@ -2694,6 +2780,12 @@ class BatchSim:
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
+        # B-20: slotted Great Works — +gwWorkCulture culture/turn each, a
+        # building-tier yield (pre-amenity-factor, so it rides yield_f and the
+        # government yieldMult below, the city.ts buildings-bucket position).
+        # Pop-free and version-keyed (every gw write bumps _eff_version), so an
+        # unconditional add each call reproduces exactly like the popf terms.
+        total[:, :, 4] += self._gw_culture * (self.gw_writing + self.gw_music).to(self.dtype)
 
         # City-state envoy bonuses land on the capital (mods.capitalYields),
         # summed before the amenity multiplier like every other bonus.
@@ -3205,6 +3297,10 @@ class BatchSim:
             sci = sci + _route_inc[:, :, 3] * a6
             cul = cul + _route_inc[:, :, 4] * a6
             faith = faith + _route_inc[:, :, 5] * a6
+        # B-20: slotted Great Works — +gwWorkCulture culture/turn each, the
+        # buildings-tier position (pre-tier, so it rides yf below like TS's
+        # total.culture in rivalCityYields). Gated by alive; dead slots reset.
+        cul = cul + self._gw_culture * (self.rc_gw_writing[:, r] + self.rc_gw_music[:, r]).double() * alive.double()
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
         # G4: the economy loop passes its loop-top FROZEN factors instead
@@ -4369,6 +4465,8 @@ class BatchSim:
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
+            self.gw_writing[b, c_new] = 0  # B-20: works wiped on capture (buildings kept, works are not)
+            self.gw_music[b, c_new] = 0
             self.tiles_acquired[b, c_new] = int(self.rc_acquired[b, r, j]) if hasattr(self, "rc_acquired") else 0
             self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
             self.current[b, c_new] = -1
@@ -4447,6 +4545,8 @@ class BatchSim:
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
+            self.gw_writing[b, c_new] = 0  # B-20: fresh captured CS holds no works
+            self.gw_music[b, c_new] = 0
             self.tiles_acquired[b, c_new] = 0
             self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
             self.current[b, c_new] = -1
@@ -4499,6 +4599,8 @@ class BatchSim:
             self.rc_pop[b, r, slot] = pop
             self.rc_growth[b, r, slot] = 0
             self.rc_cbox[b, r, slot] = 0
+            self.rc_gw_writing[b, r, slot] = 0  # B-20: fresh rival city holds no works
+            self.rc_gw_music[b, r, slot] = 0
             self.rc_loyalty[b, r, slot] = 100.0
             self.rc_acquired[b, r, slot] = 0  # TS tilesAcquired: 0
             self.rc_hp[b, r, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
@@ -7056,6 +7158,9 @@ class BatchSim:
             sci = sci + _route_inc[:, j, 3] * m6
             cul = cul + _route_inc[:, j, 4] * m6
             faith = faith + _route_inc[:, j, 5] * m6
+        # B-20: slotted Great Works for city j — +gwWorkCulture culture/turn
+        # each, pre-tier; gated by mask so column j matches the batched twin.
+        cul = cul + self._gw_culture * (self.rc_gw_writing[:, r, j] + self.rc_gw_music[:, r, j]).double() * mask.double()
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
@@ -7242,6 +7347,8 @@ class BatchSim:
         self.rc_pop[b, r_to, slot] = max(1, (old_pop * 3) // 4)
         self.rc_growth[b, r_to, slot] = 0
         self.rc_cbox[b, r_to, slot] = 0
+        self.rc_gw_writing[b, r_to, slot] = 0  # B-20: works wiped on rival→rival transfer
+        self.rc_gw_music[b, r_to, slot] = 0
         self.rc_loyalty[b, r_to, slot] = 100.0
         self.rc_acquired[b, r_to, slot] = old_acq
         self.rc_hp[b, r_to, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
@@ -7480,6 +7587,8 @@ class BatchSim:
         self.rc_pop[rows, r, slot] = 1
         self.rc_growth[rows, r, slot] = 0
         self.rc_cbox[rows, r, slot] = 0  # P5/S4
+        self.rc_gw_writing[rows, r, slot] = 0  # B-20: fresh rival city holds no works
+        self.rc_gw_music[rows, r, slot] = 0
         self.rc_loyalty[rows, r, slot] = 100.0  # P5/S6
         self.rc_acquired[rows, r, slot] = 0
         self.rc_hp[rows, r, slot] = rrr.get("cityMaxHp", 200)
@@ -9665,7 +9774,14 @@ class BatchSim:
                     hf = hit.to(torch.float64)
                     eff = self._gp_effects[cls, earned_c.clamp(max=maxN - 1)]  # [B, 5]
                     self.r_tech_prog[:, r] = self.r_tech_prog[:, r] + eff[:, 0].double() * hf
-                    self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + eff[:, 1].double() * hf
+                    # B-20: WRITER/MUSICIAN culture is slotted as Great Works into
+                    # this rival's cities (deferred +2/turn); overflow charges
+                    # fall back to the instant lump inside _place_rival_works.
+                    if cls == self._writer_cls or cls == self._musician_cls:
+                        _gw_bcol = self._gw_writing_bidx if cls == self._writer_cls else self._gw_music_bidx
+                        self._place_rival_works(r, hit, eff[:, 1].double(), _gw_bcol, cls == self._writer_cls)
+                    else:
+                        self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + eff[:, 1].double() * hf
                     self.r_treasury[:, r] = self.r_treasury[:, r] + eff[:, 2].double() * hf
                     prod_fx = eff[:, 3].double() * hf
                     if bool((prod_fx != 0).any()):
@@ -9952,6 +10068,8 @@ class BatchSim:
         self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
         self.rc_growth[b, w_, slot] = 0
         self.rc_cbox[b, w_, slot] = 0  # P5/S4 (TS transfer: cultureBox 0)
+        self.rc_gw_writing[b, w_, slot] = 0  # B-20: works wiped on player→rival transfer
+        self.rc_gw_music[b, w_, slot] = 0
         self.rc_loyalty[b, w_, slot] = 100.0  # P5/S6
         self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
         self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
@@ -10121,6 +10239,7 @@ class BatchSim:
         "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty",
         "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id", "rc_is_cap", "rc_current", "rc_progress",
         "rc_cost", "rc_qtile", "rc_followed",  # B-18: pressure spread (3D per-slot)
+        "rc_gw_writing", "rc_gw_music",  # B-20: Great Works per-city counts
     )
 
     def _reclaim_rc(self) -> None:
@@ -10957,6 +11076,8 @@ class BatchSim:
             self.pop[rows, c_new] = 1
             self.food_box[rows, c_new] = 0
             self.culture_box[rows, c_new] = 0
+            self.gw_writing[rows, c_new] = 0  # B-20: a freshly settled city holds no works
+            self.gw_music[rows, c_new] = 0
             self.tiles_acquired[rows, c_new] = 0
             self.current[rows, c_new] = -1
             self.progress[rows, c_new] = 0
