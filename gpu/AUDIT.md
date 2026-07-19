@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 39 | 23.1 | **59%** |
-| B fidelity | 88 | 66.5 | **76%** |
+| B fidelity | 88 | 70.4 | **80%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents | 6 | 5 | **83%** |
-| **Overall (incl. closed)** | **184** | **145.6** | **79%** |
-| Open chapters only (A+B) | 127 | 89.6 | **71%** |
+| **Overall (incl. closed)** | **184** | **149.5** | **81%** |
+| Open chapters only (A+B) | 127 | 93.5 | **74%** |
 
 (B10 close-out note: the rows are re-added sums — the prior overall
 row carried a +2.0 arithmetic slip (144.0 vs the true 142.0), so
@@ -85,7 +85,20 @@ where the GPU type-keyed registry (and real Civ 6) hold one per
 type — TS fixed, seeds 9222/9301 RESTORED in-gate; the merge added
 the missing `_eff_version` bump on the transfer success path (the
 one unpaired rc_bldg write in the engine); new G-6 = dormant
-founding tie-break sighting (slice R, unverified).)
+founding tie-break sighting (slice R, unverified). 2026-07-19/20
+ROUND B7 E/W/G parallel worktrees (brief gpu/ROUND_B7.md, task
+#63): B-17 → 85% (Encampment specialist row TS-only + the SECOND
+city strike k=pestk/restk walls-first + training XP 5/10/15 by best
+military building — ALL gate-unreachable, poke lane `encampment`;
+real Civ 6 has NO Encampment specialist, the row is a documented
+stylization); B-20 → 70% (slice W hunt-free: 2 works/person into
+AMPHITHEATER/MUSEUM slots, +2c/turn building-tier, overflow→lump,
+rival works in-gate 6 seeds/28 works, lane `great_works`); B-8 →
+90% (slice G: spawn-only civilian chassis at claim, +5 CS
+land/naval auras at the quantized sites, rival GENERAL war-walk;
+the slice's hunt: the aura-plane cache missed RL-verb general
+moves → position-fingerprint key; ADMIRAL in-gate 18/24, lane
+`gp_aura`).)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -101,13 +114,16 @@ Per-item weights (done% in parens where partial):
   B-9 3 / B-10 3 / B-28 1 / B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
   B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (70% —
   ROUND B10: era ladder + barb ZOC; cliffs/ranged/naval/scout-raid
-  remain); B-8 2 (open).
+  remain); B-8 2 (90% — ROUND B7 slice G: spawn-at-claim chassis +
+  +5 CS auras; +1 MP half residual).
 - B progression: B-11 4 / B-12 3 / B-13 3 / B-14 1 (done);
   B-27 4 (75%).
 - B economy/religion: B-16 2 / B-19 2 (done); B-17 2 (85%); B-18 4
   (95% — ROUND B6: enhancer effects + missionary chassis + religious
   victory; apostles/theological combat + player missionaries (#50)
-  remain); B-20 3 (30%); B-21 2 (40%); B-23 3 (open).
+  remain); B-20 3 (70% — ROUND B7: multi-charge + slotted works;
+  abilities/tile-activation/music-split remain); B-21 2 (40%);
+  B-23 3 (open).
 - B meta: B-25 3 (80% — religious victory landed; player project
   path + Culture/Diplomatic victories open); B-22 3, B-24 3,
   B-33 3 (open).
@@ -398,10 +414,29 @@ gap; likewise GS disasters are modeled minus sea-level rise
   `rcstk` mirror); GPU `_flank_support` (batched, stacking gives ≤1
   military/tile). No flanking vs cities/CS/rc-cities (not units —
   recorded simplification).
-- B-8. Great Generals/Admirals are economy lumps:
-  `GREAT_PEOPLE.GENERAL` is +production-to-capital, `.ADMIRAL` is +gold
-  "prize money" (data/greatPeople.ts); `GreatPersonDef['effect']`
-  cannot express a +5 CS/+1 MP aura at all.
+- B-8. RESOLVED-minus-MP (2026-07-19, ROUND B7 slice G, task #63):
+  GENERAL/ADMIRAL are a spawn-only combat-0 civilian chassis
+  (`UnitDef.spawnOnly`; charges=1 → civilian in BOTH engines'
+  conventions, excluded from every military/garrison/flank/support
+  loop). `applyGreatPersonEffect` + the rivals.ts claim loop (GPU
+  player GP loop + rival GP-claim loop) spawn the unit at the capital
+  on claim, on top of the instant effect. Aura = `generalAuraCS` /
+  GPU `_gen_aura_cs` (per-(civ,tile) dilated plane cached on a
+  general-POSITION FINGERPRINT — the slice's hunt: an RL move verb
+  relocated a general without bumping the old version counter and a
+  later roll read a stale plane) adding +5 CS to own land within 2 of
+  a GENERAL / own naval+embarked within 2 of an ADMIRAL at the
+  `damageRoll`/`_damage_roll` unit-vs-unit sites next to the B6
+  religion adders (quantized, table-safe). Rival GENERALs march the
+  war effort (`rivalGeneralActions`/`_rival_general_actions`,
+  missionary chassis, stop ≤2); player GENERALs + ADMIRALs hold at
+  the capital. Capture rides the B-31 POOL-END paths. In-gate:
+  ADMIRAL 18/24 seeds, 33 claims; GENERAL gate-unreachable (no
+  scripted Encampment GPP — poke `gpu/gp_aura_test.py` +
+  `tests/great-general.test.ts`). RESIDUALS: the +1 MP aura half
+  (movement coupling), naval war-march targeting, aura at city/CS
+  strike sites, controlled-rival RL mask predates the chassis
+  (A-18/#50).
 - B-9. RESOLVED (2026-07-19, ROUND B5 slice M1): strategic-resource
   ACCESS model — `UnitDef.requiresResource` + `civHasStrategic`
   (owned territory tile + resource + completed unpillaged matching
@@ -578,10 +613,24 @@ gap; likewise GS disasters are modeled minus sea-level rise
 - B-19. RESOLVED (2026-07-17, Round B2): era-anchored GP cost ladder
   (`gpCost`), global race kept, WRITER/MUSICIAN added (n_gp=9,
   appended). Building-GPP differentiation beyond +1/building absent.
-- B-20 (re-scoped 2026-07-17, Round B2). Writer/Musician output
-  degrades to instant culture lumps. STILL OPEN: multi-charge people,
-  Great Works as building-slotted stores (Amphitheater/Museum line),
-  tile activation, per-person abilities.
+- B-20. RESOLVED-minus-abilities (2026-07-19, ROUND B7 slice W, task
+  #63): WRITER/MUSICIAN carry 2 Great Works each (`WORKS_PER_PERSON`/
+  `placeGreatWorks`, GPU `_place_player_works`/`_place_rival_works`);
+  works fill open `GW_WRITING_BUILDING`=AMPHITHEATER /
+  `GW_MUSIC_BUILDING`=MUSEUM slots (`SLOTS_PER_BUILDING`=2; Broadcast
+  Center is past-horizon, Museum's slots repurposed since ARTIST
+  stays instant-lump), deterministic lowest-city (city_seq/rc order)
+  then lowest-slot. Each slotted work yields `GREAT_WORK_CULTURE`=+2
+  culture/turn as a building-tier city yield (`cityGreatWorks` in
+  city.ts/rivals.ts; GPU `gw_writing`/`gw_music`/`rc_gw_*` in
+  `_city_totals`/`_rival_city_yields`/`_rival_city_yields_all`,
+  `_eff_version`-bumped, reset-on-birth + `_RC_SLOT_FIELDS`).
+  Overflow charges degrade to the instant culture lump. In-gate: 6
+  seeds slot RIVAL works (28 works at t250); player slotting
+  gate-unreachable in 250t (all overflow). STILL OPEN: music +1c/+1g
+  split (uniform +2c shipped, counts tracked separately), Broadcast
+  Center as a further tier, tile activation, per-person abilities,
+  player GP units (ride #50/A-18).
 - B-21 (re-scoped 2026-07-17, Round B2). LANDED: `CS_TYPE_BUILDINGS`
   (building-tier keys) + `CS_SUZERAIN_BONUS` (per-CS unique bonus
   rows) data tables in data/cityStates.ts. STILL OPEN: the LIVE 3/6-
