@@ -970,24 +970,23 @@ const SEED_OVERRIDES: Record<number, number> = {
   // 9157 (index 12) died by t250 in ROUND B5 M2's XP reshuffle (veterancy
   // shifted the war outcome — the player's last city fell): rerolled to 9158.
   12: 9158,
-  // 9222 (index 17) & 9300 (index 23): the XP reshuffle steered these two
-  // rollout trajectories into PRE-EXISTING non-XP GPU/TS latents (9222 t184: a
-  // 1-gold rival-economy rounding on a loyalty-transferred city; 9300 t222: an
-  // advance-after-kill tileFree asymmetry) — combat/xp bit-identical in both,
-  // the divergence is in unmodified economy/advance code. Rerolled so the
-  // derived rollout games dodge them; the latents are flagged in the M2 log.
-  // 9301 (index 23, AGAIN): B9-R2's catalog/trajectory reshuffle steered its
-  // rollout game (rng 2026006147) into the SAME G-5 class 9222 hit — rival-0
-  // treasury off by EXACTLY 1 gold + rival score 5.4 at t223, the turn it
-  // captured player city 586 (hp120, rosters/per-city fields bit-identical,
-  // NO regional buildings in the game — verified via the t200/t225 ckpts).
-  // Second sighting recorded in AUDIT G-5; the hunt stays scoped in #66.
   // 9131 (index 10) died in B9-R3: the rival PALACE grant (+2p/+5g/+2s/+1c
   // per capital) and worship buys pushed its already 1-city scripted player
   // (pop 8 hanging on since B5) over the edge — structural collapse.
   10: 9132,
-  17: 9223,
-  23: 9302,
+  // 17:9222 and 23:9301 RESTORED for ROUND B10 slice-H (#66) — the G-5 hunt.
+  // These two were rerolled (17:9223, 23:9302) while G-5 was open: a rival's
+  // treasury off by EXACTLY 1 gold (+ score 5.4) on the turn it ACQUIRED a
+  // player city mid-phase (9222 t184 loyalty defect; 9301 t223 war capture of
+  // city 586). ROOT (fixed): transferCityToRival kept EVERY complete district
+  // tile, so a city with duplicate-type districts (two Campuses) handed the
+  // rival more district-adjacency yield than the type-keyed GPU rc_dist_tile
+  // registry — which overwrites to one tile per type — could hold. TS now
+  // dedupes kept districts by type (rivals.ts), matching the GPU registry and
+  // real Civ 6's one-district-per-type invariant. Restored so the class rides
+  // in-gate; both export clean at 250t and the full ladder is 0.0-milli green.
+  17: 9222,
+  23: 9301,
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;

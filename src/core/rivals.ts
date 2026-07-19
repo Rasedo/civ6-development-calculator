@@ -449,12 +449,21 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   // (complete only), snapshotting before the re-tag loop clears cityId — mirrors
   // the GPU twin's owned-tile, district_complete gather. Incomplete districts
   // stay paved-but-dead; phantom references to other cities' tiles never appear.
-  const keptDistricts: { type: DistrictId; tileIndex: number }[] = [];
+  // G-5 (#66): the rival city model holds ONE district per TYPE (the GPU
+  // rc_dist_tile registry is type-keyed; real Civ 6 allows one district of
+  // each type per city). A player city can carry duplicate-type districts
+  // (e.g. two Campuses) that the GPU twin's `rc_dist_tile[type] = tile` loop
+  // silently collapses to the LAST tile in ascending-index order. Dedupe by
+  // type here — last (highest tile index) wins — so the transferred rival
+  // city's districts (adjacency yields AND the trace count) match the GPU.
+  const keptByType = new Map<DistrictId, number>();
   for (const t of state.map.tiles) {
     if (t.cityId === city.id && t.district !== null && t.districtComplete) {
-      keptDistricts.push({ type: t.district, tileIndex: t.index });
+      keptByType.set(t.district, t.index); // ascending scan → last (highest) wins, mirroring the GPU registry overwrite
     }
   }
+  const keptDistricts: { type: DistrictId; tileIndex: number }[] = [];
+  for (const [type, tileIndex] of keptByType) keptDistricts.push({ type, tileIndex });
   const keptWonders = city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === city.id);
   for (const t of state.map.tiles) {
     if (t.cityId === city.id) {

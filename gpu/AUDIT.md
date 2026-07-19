@@ -606,26 +606,35 @@ reference:
 
 ## G. Known parity latents (dormant)
 
-G-1..G-4 resolved (detail in git history / the cited logs); G-5 open:
+G-1..G-5 resolved (detail in git history / the cited logs):
 
-- G-5 (new, 2026-07-19, ROUND B5 — M2's dodge, pre-reroll seed 9222).
-  A 1-gold rival-economy rounding divergence on a LOYALTY-TRANSFERRED
-  city: combat rolls and xp bit-identical, divergence in unmodified
-  economy code around the transfer. Dodged by seed reroll (SEED_
-  OVERRIDES), so currently outside every gate — dormant, not dead.
-  Hunt entry: M2's log (gpu/ROUND_B5_M2_LOG.md) has the repro seed;
-  suspect the milli-rounding order in the transferred city's first
-  economy turn vs the GPU's batched twin.
-  SECOND SIGHTING (2026-07-19, B9-R2): seed 9301's rollout game rng
-  2026006147 hit the same class on a WAR capture (not loyalty) — the
-  turn rival 0 captured player city 586, its treasury went off by
-  EXACTLY 1 gold and its empire score by 5.4, with rosters, per-city
-  RC fields and combat all bit-identical and NO regional buildings in
-  the game (t200/t225 ckpt-verified — not a B9 regression). So the
-  class covers ANY mid-phase city acquisition (transfer or capture);
-  suspect set narrows to `_transfer`/`_capture` first-economy-turn
-  interaction with the maintenance/score paths. Rerolled 9301→9302;
-  hunt scoped in #66.
+- G-5. RESOLVED (2026-07-19, ROUND B10 slice-H, #66). The class: a
+  rival's treasury off by EXACTLY 1 gold (± score, e.g. 5.4) on the
+  turn it ACQUIRED a player city mid-phase — seed 9222 t184 (loyalty
+  defect, ROUND B5) and seed 9301 rng 2026006147 t223 (rival 0 war-
+  captures player city 586, B9-R2), rosters/per-city RC fields/combat
+  all bit-identical. ROOT: `transferCityToRival` (rivals.ts) built the
+  new rival city's `districts` by pushing EVERY complete owned district
+  tile, so a player city holding duplicate-type districts (two CAMPUS
+  tiles, 499 + 543) handed the rival BOTH campuses' floored adjacency.
+  The GPU twin `_transfer_city_to_rival` writes the type-keyed registry
+  `rc_dist_tile[type] = tile` in ascending tile order, silently
+  OVERWRITING to one tile per type (kept 543, dropped 499) — and both
+  its yield path (`_rival_city_yields_all`) and trace district count
+  read that registry. Net: TS counted/yielded two campuses (raw science
+  13), GPU one (raw science 9 → ×0.9 amenity factor = the 3.6 gap ×1.5
+  science weight = 5.4 score; the treasury delta is the same missing
+  campus's economy). Wrong engine: TS (real Civ 6 = one district per
+  type per city; the GPU registry IS that model). FIX: `transferCityToRival`
+  dedupes kept districts by type via a Map, last (highest tile index)
+  wins — mirroring the GPU registry overwrite exactly. Verified: the
+  faf08cc repro (seed 9301 rng 2026006147) goes red→green; SEED_OVERRIDES
+  17:9222 + 23:9301 restored (the reshuffled current-engine trajectories
+  no longer hit an acquisition at those turns, so they ride in-gate green
+  rather than red — the fix closes the latent regardless). Only
+  `transferCityToRival` (player→rival) can carry duplicate-type
+  districts; captureRivalCity/`_transfer_rc_to_rc`/CS capture start from
+  one-per-type sources.
 - G-1. RESOLVED: `_rival_builder_actions` gain terms read current
   `r_techs`/`r_civics` (validity keeps the snapshot); poke
   `gpu/builder_gain_test.py`.
