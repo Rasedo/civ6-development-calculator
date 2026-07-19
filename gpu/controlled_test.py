@@ -52,8 +52,14 @@ def main() -> None:
     sim.step()
     assert int(sim.rc_current[0, r, j]) == -1, "picker must not queue for a controlled rival"
 
-    # 4. write a WARRIOR queue item; the completion machinery must run it
+    # 4. write a WARRIOR queue item; the completion machinery must run it.
+    #    Park the rival's OTHER cities idle first so the +1 isolates THIS
+    #    written item — a controlled city keeps COMPLETING items queued while
+    #    it was scripted, and the fixture holds near-done sibling unit queues
+    #    (a global +1 would over-constrain the trajectory).
     w = sim._warrior_idx
+    sim.rc_current[0, r, :] = -1
+    sim.r_treasury[0, r] = 0.0  # no A-5r gold unit/settler buy to inflate the count
     sim.rc_current[0, r, j] = w + 1
     sim.rc_cost[0, r, j] = float(sim._p_cost[w])
     sim.rc_progress[0, r, j] = float(sim._p_cost[w]) - 0.5  # one turn from done

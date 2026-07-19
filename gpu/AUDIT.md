@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 39 | 17.5 | **45%** |
+| A symmetry | 39 | 21.1 | **54%** |
 | B fidelity | 88 | 64.8 | **74%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents | 5 | 4 | **80%** |
-| **Overall (incl. closed)** | **183** | **139.3** | **76%** |
-| Open chapters only (A+B) | 127 | 82.3 | **65%** |
+| **Overall (incl. closed)** | **183** | **142.9** | **78%** |
+| Open chapters only (A+B) | 127 | 85.9 | **68%** |
 
 (2026-07-17: A-7r LIVE (#46r), A-5 resolved-minus-tile-purchase, B-18
 spread, chapter G EMPTY. 2026-07-18 ROUND B3 U/V/W/X:
@@ -55,11 +55,18 @@ ROUND B5 M1/M2/M3 (brief gpu/ROUND_B5.md): B-4, B-9, B-10 RESOLVED;
 M1's hunt FIXED the GPU advance-after-kill terrain omission (land
 units advancing onto water after killing an embarked defender — both
 red rollout games, one class); new G-5 = the surviving 1-gold
-rival-economy rounding latent M2 dodged by seed reroll.)
+rival-economy rounding latent M2 dodged by seed reroll. 2026-07-19
+ROUND B9 R1-R3 serial (brief gpu/ROUND_B9.md): A-9 → 90% — scaffold
+5→9, regional channel, worship faith-buy, rival PALACE; R1 fixed
+EIGHT newly-reachable latents (f7b13d3), R2's gates caught the G4
+buildings-are-own-column cache break + the player ww-vs-unit-orders
+ordering latent (faf08cc), R3 hunt-free (73b9e32); G-5 second
+sighting on a war capture → reroll 9301→9302.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
-  closed the card wiring), A-9 4, A-11 4 (done — A-12b closed the CS
+  closed the card wiring), A-9 4 (90% — ROUND B9; NEIGHBORHOOD +
+  palace-relocation residuals), A-11 4 (done — A-12b closed the CS
   residual; the GPU player-route note rides A-18/#50),
   A-12 4 (90% — 3b-2 landed attack/capture; levy + quests are recorded
   deferrals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
@@ -122,24 +129,31 @@ untagged halves of tagged items stay Fable/main-session work.
   turn-exact; remaining GPU channels proven unreachable under greedy
   adoption (exporter ships all), tilePurchaseMult gate-inert pending
   the A-5 tile-purchase verb.
-- A-9. Rival-unreachable catalog: `tryQueueRivalDistrict` (rivals.ts) /
-  `_place_district_rival`+`rival_masks` (engine.py) iterate only
-  `SCAFFOLD_DISTRICTS` (data/districts.ts: CAMPUS, HOLY_SITE,
-  COMMERCIAL_HUB, AQUEDUCT, HARBOR) — THEATER_SQUARE, INDUSTRIAL_ZONE,
-  ENCAMPMENT, ENTERTAINMENT_COMPLEX, NEIGHBORHOOD and all their
-  buildings are unreachable; worship buildings are skipped in both
-  `tryQueueRivalBuilding` and the A-5 purchase block (`def.worship`
-  guard); PALACE is granted only by `foundCity` (game.ts,
-  `state.cities.length === 0 ? ['PALACE'] : []`) — `foundRivalCity`
-  (rivals.ts) never grants it (the GPU's "+PALACE" term is hardwired to
-  c==0). Downstream: `GP_CLASS_DISTRICT` (data/greatPeople.ts) gates
-  ENGINEER on INDUSTRIAL_ZONE, GENERAL on ENCAMPMENT, ARTIST on
-  THEATER_SQUARE, so `claimGreatPeople` (rivals.ts) can never accrue
-  those three classes. [opus-ok: the catalog/exporter side — district
-  and building table rows, GP-class wiring, PALACE grant constant —
-  off a settled breadth list; the rival QUEUE/PICK logic
-  (tryQueueRivalDistrict order, purchase interplay, draw-count) stays
-  Fable.]
+- A-9 (90% — 2026-07-19, ROUND B9 R1-R3, gpu/ROUND_B9.md). RESOLVED
+  minus the NEIGHBORHOOD stretch. `SCAFFOLD_DISTRICTS` is 9-wide
+  (+INDUSTRIAL_ZONE, +THEATER_SQUARE/+ENTERTAINMENT_COMPLEX on CIVIC
+  unlocks via `unlockKind`, +ENCAMPMENT with GPU placement code 3 =
+  notAdjacentToCityCenter); the exporter table carries every district's
+  buildings incl. the four REGIONAL rows (regionalEffects semantics on
+  every seat of both engines: `rivalRegionalEffects` /
+  `_rival_regional` + the player-walk reg_y/reg_am terms;
+  `SCRIPTED_HELD_BUILDINGS` is EMPTY) and the five WORSHIP rows
+  (faith-purchase-only: `b_worship` masks all five pickers; rivals buy
+  at the A-5 position — `WORSHIP_BUILDINGS[(r+1)%5]`, flat
+  worshipFaithCost, Temple + complete Holy Site). `foundRivalCity`
+  grants the first-city PALACE (`rc_is_cap`-keyed GPU terms; B-30
+  strips on capture, nothing relocates). ENGINEER/GENERAL/ARTIST GPP
+  accrue via the generic `GP_CLASS_DISTRICT` machinery now that their
+  districts exist. In-gate at t250: 21/24 seeds with rival worship
+  buildings, 48 rival palaces, 66 rival regional buildings. Coverage:
+  vitest tests/district-breadth.test.ts + poke lane `districts`
+  (gpu/district_breadth_test.py). RESIDUALS: (1) NEIGHBORHOOD
+  (URBANIZATION civic, appeal-tier housing, GPU appeal plane) — the
+  R4 stretch, dropped by the brief's pre-authorized option; (2) no
+  palace RELOCATION on capital loss (real Civ 6 moves it; both
+  engines consistently grant-once-strip-forever); (3) player regional
+  coverage is thin in-gate (1 player regional building at t250) — the
+  scripted player rarely reaches Factories.
 - A-11 (90% — 2026-07-18, task #41 stage 2). Rivals RUN domestic trade
   routes now: `RivalCiv.tradeRoutes` (rc-id pairs) / GPU `r_routes`
   [B,R,K,2] (id-keyed like `rc_tile_id` — compaction-immune), capacity
@@ -442,8 +456,8 @@ gap; likewise GS disasters are modeled minus sea-level rise
 **Economy/districts/religion:**
 - B-16. RESOLVED (2026-07-17, Round B2, owner-ruled → GS):
   INDUSTRIAL_ZONE +0.5/mine +1/quarry +2/adjacent-Aqueduct, HARBOR +1
-  per CITY_CENTER (was +2); IZ channels inert until A-9 makes IZ
-  reachable.
+  per CITY_CENTER (was +2); IZ channels LIVE since ROUND B9 R1 made
+  IZ scaffold-reachable (2026-07-19).
 - B-17 (re-scoped). Encampment is no longer inert: it earns +1 General
   GPP/turn plus +1 per building (`greatPersonPointsPerTurn`,
   core/game.ts; `GP_CLASS_DISTRICT`), and Barracks/Stable/Armory/
