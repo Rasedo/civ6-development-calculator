@@ -124,6 +124,7 @@ def main() -> int:
                 ("rc_registry", [py, "gpu/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency
                 ("religion2", [py, "gpu/religion2_test.py"], 4),  # B6 missionary/enhancer/religious-victory surfaces
                 ("encampment", [py, "gpu/encampment_test.py"], 4),  # B7/B-17 Encampment strike + training XP + specialist surfaces
+                ("great_works", [py, "gpu/great_works_test.py"], 4),  # B7/B-20 Writer/Musician Great-Work slots + yield
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

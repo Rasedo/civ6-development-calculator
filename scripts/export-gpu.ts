@@ -48,7 +48,7 @@ import {
   CS_MAX_HP,
   CS_MEET_RANGE,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GREAT_WORK_CULTURE } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -526,6 +526,17 @@ const rules = {
     // gates on pantheon + Holy Site + an earned PROPHET-class person.
     pantheonFaithCost: PANTHEON_FAITH_COST,
     prophetCls: GP_CLASSES.indexOf('PROPHET'),
+    // B-20 (Round B7): Great Works. WRITER/MUSICIAN class indices, the building
+    // columns (b_cost catalog order) that hold writing/music works, the slots
+    // per building, the works per person and the per-work culture yield. The
+    // GPU slots works into these building columns and adds gwWorkCulture/turn.
+    writerCls: GP_CLASSES.indexOf('WRITER'),
+    musicianCls: GP_CLASSES.indexOf('MUSICIAN'),
+    gwWritingBidx: buildingIdx.get(GW_WRITING_BUILDING) ?? -1,
+    gwMusicBidx: buildingIdx.get(GW_MUSIC_BUILDING) ?? -1,
+    gwSlotsPerBuilding: SLOTS_PER_BUILDING,
+    gwWorksPerPerson: WORKS_PER_PERSON,
+    gwWorkCulture: GREAT_WORK_CULTURE,
     warMinTurns: RIVAL_WAR_MIN_TURNS,
     // Player diplomacy (V-W1): sueForPeace gates on warTurns >= peaceMinWarTurns
     // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.

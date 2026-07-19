@@ -24,7 +24,7 @@ import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
+import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks } from '../data/greatPeople';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
@@ -999,7 +999,15 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
   if (!person) return; // class exhausted
   const fx = person.effect;
   if (fx.science) state.research.techProgress += fx.science;
-  if (fx.culture) state.research.civicProgress += fx.culture;
+  // B-20: WRITER/MUSICIAN slot Great Works (+2 culture/turn each, deferred
+  // yield); charges with no open slot fall back to the instant culture lump
+  // (one lump per overflow charge). Other classes apply culture instantly.
+  if (GW_WORK_CLASSES.has(cls)) {
+    const overflow = placeGreatWorks(state.cities, cls === 'WRITER');
+    if (fx.culture) state.research.civicProgress += fx.culture * overflow;
+  } else if (fx.culture) {
+    state.research.civicProgress += fx.culture;
+  }
   if (fx.faith) state.faithTotal += fx.faith;
   if (fx.gold) state.treasury += fx.gold;
   if (fx.productionToCapital) {
