@@ -1044,16 +1044,31 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
     clearCampFor(state, unit, step.index); // P5/S7 (C-3): rivals clear camps (barb no-op)
     // B-3 ZOC: a march step ending adjacent to a hostile MILITARY unit halts
-    // (same per-step rule as walkPath / patrol / builder walk). Gated to
-    // rivals: B-26 gives barbarians the full-MP walk but they do NOT obey ZOC
-    // yet — the GPU barb walk mirrors the pre-ZOC march, so gating here keeps
-    // both engines symmetric. (barbs-obey-ZOC is a deferred refinement.)
-    if (unit.owner === 'rival' && inEnemyZoc(state, unit.tileIndex, unit)) {
+    // (same per-step rule as walkPath / patrol / builder walk). AUDIT B-26/B-3
+    // (ROUND B10): barbarians now OBEY ZOC exactly as rival movers do — the
+    // rival-only gate is lifted. unitsHostile makes a barb halt at any adjacent
+    // non-barb military (player always, at-war rivals always — barbs raid
+    // rivals too); other barbs exert nothing. The GPU barb walk mirrors this
+    // via _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
+    if (inEnemyZoc(state, unit.tileIndex, unit)) {
       unit.movesLeft = 0;
       return;
     }
     if (unit.movesLeft <= 0) return;
   }
+}
+
+/**
+ * AUDIT B-26 (ROUND B10): the shared barbarian MELEE era ladder. All three
+ * spawn sites in barbarianPhase (new camp, empty-camp regarrison, the 0.1-roll
+ * raid) climb it together — WARRIOR → SPEARMAN (t>60) → PIKEMAN (t>120) →
+ * MUSKETMAN (t>180). Sized to the model (real Civ 6 scales barbs by era). The
+ * CS levy ladder in rivals.ts is A-12 scope and untouched. Ranged barbs are a
+ * recorded residual (the GPU raider block is a melee-adjacency scanner with no
+ * range-2 / ranged-strike dispatch for barb owners — a new walker class).
+ */
+function barbMeleeType(turn: number): string {
+  return turn > 180 ? 'MUSKETMAN' : turn > 120 ? 'PIKEMAN' : turn > 60 ? 'SPEARMAN' : 'WARRIOR';
 }
 
 /** Camps spawn, garrison, raid; cities heal when unbothered. */
@@ -1074,7 +1089,7 @@ export function barbarianPhase(state: GameState): void {
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
       state.barbCamps.push(spot.index);
-      spawnUnit(state, 'WARRIOR', spot.index, 'barbarian');
+      spawnUnit(state, barbMeleeType(state.turn), spot.index, 'barbarian'); // B-26 era ladder
     }
   }
 
@@ -1087,12 +1102,12 @@ export function barbarianPhase(state: GameState): void {
         hexDistance(map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
     if (nearCamp.length === 0) {
-      spawnUnit(state, 'WARRIOR', campIdx, 'barbarian');
+      spawnUnit(state, barbMeleeType(state.turn), campIdx, 'barbarian'); // B-26 era ladder
     } else if (
       barbUnits(state).length < state.barbCamps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1
     ) {
-      const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
+      const type = barbMeleeType(state.turn); // B-26 era ladder (ranged raiders descoped — see barbMeleeType)
       spawnUnit(state, type, campIdx, 'barbarian');
     }
   }
