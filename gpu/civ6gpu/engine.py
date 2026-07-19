@@ -6382,6 +6382,29 @@ class BatchSim:
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > 1)
 
+    def _religious_victor(self) -> torch.Tensor:
+        """B6-S3 (mirror of TS religiousVictor): [B] the lowest religion id g
+        such that EVERY alive civ (player if ≥1 city, each rival with ≥1 city)
+        has MORE THAN HALF of its cities following g; -1 none. Requires g
+        founded (holy_tile set) and at least one alive civ. At most one g can
+        predominate within a civ, so the ascending scan needs no tie-break."""
+        B, O = self.B, self._O
+        npl = self.alive.sum(dim=1)  # [B] player cities
+        n_r = self.rc_alive.sum(dim=2) if self.R > 0 else None  # [B, R]
+        any_civ = npl > 0
+        if self.R > 0:
+            any_civ = any_civ | (n_r > 0).any(dim=1)
+        winner = torch.full((B,), -1, dtype=torch.long, device=self.device)
+        for g in range(O):
+            founded_g = self.holy_tile[:, g] >= 0
+            nf = (self.alive & (self.city_followed == g)).sum(dim=1)
+            ok = founded_g & any_civ & ((npl == 0) | (2 * nf > npl))
+            if self.R > 0:
+                nf_r = (self.rc_alive & (self.rc_followed == g)).sum(dim=2)  # [B, R]
+                ok = ok & ((n_r == 0) | (2 * nf_r > n_r)).all(dim=1)
+            winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
+        return winner
+
     def _rcy_globals(self) -> dict:
         """D-2: the r-independent planes that _rival_city_yields and
         _rival_border_growth used to rebuild per (r, j) call (~144×/turn
@@ -10969,8 +10992,11 @@ class BatchSim:
         # is always False (chain gate-unreachable), so this is byte-identical to
         # the prior recompute.
         space_won = (self.victory_type == 3) | (self.victory_type == 4)  # B-25
-        self.game_over = space_won | (dom >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25
-        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))  # GV-4/GV-3 + B-25
+        rel = self._religious_victor()  # B6-S3: on the follow set spread just flipped
+        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25 + B6-S3
+        # precedence space > domination > religion (5 player / 6 rival) > score
+        rel_vt = torch.where(rel == 0, torch.full_like(rel, 5), torch.full_like(rel, 6))
+        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))))  # GV-4/GV-3 + B-25 + B6-S3
         # D-1: leader() (a full empire+rival score pass) only matters where a
         # game just ENDED — torch.where evaluated it eagerly every turn and
         # threw it away. Winner stays -1 for running games either way.

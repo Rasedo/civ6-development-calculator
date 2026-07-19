@@ -907,8 +907,44 @@ export function endTurn(state: GameState): void {
   // B-25: a science victory/defeat (3/4) set during this turn's project
   // completions takes precedence over the domination/score recompute.
   const spaceWon = state.victoryType === 3 || state.victoryType === 4;
-  state.gameOver = spaceWon || dom >= 0 || state.turn > TURN_LIMIT;
-  state.victoryType = spaceWon ? state.victoryType : dom >= 0 ? 2 : state.gameOver ? 1 : 0;
+  // B6-S3: religious victory — checked on the follow set the spread above just
+  // flipped (real-time predominance, the domination pattern: live recompute,
+  // no freeze). Precedence space > domination > religion > score; 5 = the
+  // player's religion wins, 6 = a rival religion wins (defeat).
+  const rel = religiousVictor(state);
+  state.gameOver = spaceWon || dom >= 0 || rel >= 0 || state.turn > TURN_LIMIT;
+  state.victoryType = spaceWon ? state.victoryType : dom >= 0 ? 2 : rel >= 0 ? (rel === 0 ? 5 : 6) : state.gameOver ? 1 : 0;
+}
+
+/**
+ * B6-S3: religious victory (real Civ 6 predominance-in-every-civilization,
+ * sized to modeled scope) — religion g wins when EVERY alive civ (the player
+ * if they hold ≥1 city, each rival with ≥1 city) has MORE THAN HALF of its
+ * cities following g. At most one g can predominate in a given civ, so no
+ * tie-break is needed beyond the ascending scan (lowest id first). Requires
+ * g founded and at least one alive civ (no vacuous win over a dead world).
+ * The GPU mirror sits at the identical endTurn position.
+ */
+function religiousVictor(state: GameState): number {
+  const civs: City[][] = [];
+  if (state.cities.length > 0) civs.push(state.cities);
+  for (const rv of state.rivals) if (rv.cities.length > 0) civs.push(rv.cities);
+  if (civs.length === 0) return -1;
+  const nRel = 1 + state.rivals.length;
+  for (let g = 0; g < nRel; g++) {
+    const founded = g === 0 ? !!state.religion?.founded : !!state.rivals[g - 1]?.religionFounded;
+    if (!founded) continue;
+    let all = true;
+    for (const cs of civs) {
+      const n = cs.filter((c) => c.followedReligion === g).length;
+      if (n * 2 <= cs.length) {
+        all = false;
+        break;
+      }
+    }
+    if (all) return g;
+  }
+  return -1;
 }
 
 // ---------------------------------------------------------------------------
