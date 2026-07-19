@@ -138,6 +138,7 @@ class Rules:
     b_regional: torch.Tensor  # B9-R2: bool [NB] — regional building (leaves local sums; delivered by range)
     regional_range: int  # B9-R2: REGIONAL_RANGE (hex distance, source district tile -> receiver center)
     b_worship: torch.Tensor  # B9-R3: bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
+    b_train_xp: torch.Tensor  # B-17 (ROUND B7): long [NB] — flat training XP a unit trained/purchased in a city holding this Encampment military building starts with (best tier over present buildings; 0 for non-military buildings)
     worship_bidx: list  # B9-R3: the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # B9-R3: TEMPLE row (worship prerequisite), -1 if absent
     worship_faith_cost: float  # B9-R3: flat worship faith price (round(190·GAME_SPEED))
@@ -212,6 +213,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_regional=torch.tensor([bool(b.get("regional", 0)) for b in B], dtype=torch.bool),
         regional_range=int(r.get("regionalRange", 6)),
         b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
+        b_train_xp=torch.tensor([int(b.get("trainXp", 0)) for b in B], dtype=torch.long),
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),
@@ -1256,6 +1258,7 @@ class BatchSim:
         # gold picker masks them; only the rival A-5 worship faith-buy (and
         # nothing player-side in scripted mode) can set their rc_bldg bits.
         self._b_worship = rules.b_worship.to(device)  # [NB] bool
+        self._b_train_xp = rules.b_train_xp.to(device)  # B-17: [NB] long — per-building training XP (best tier over present buildings)
         self._worship_bidx = [int(x) for x in rules.worship_bidx]
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)
@@ -3810,8 +3813,10 @@ class BatchSim:
         self.barb_at[rows, spot[rows]] = slot
         self.next_slot[rows] += 1
 
-    def _spawn_player(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor) -> None:
-        """A trained unit appears at/near its city center (spawnUnit)."""
+    def _spawn_player(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, init_xp: torch.Tensor | None = None) -> None:
+        """A trained unit appears at/near its city center (spawnUnit). B-17:
+        init_xp (a [B] long tensor) seeds a MILITARY unit's starting XP from
+        its city's Encampment training buildings; civilians stay at 0."""
         if not bool(mask.any()):
             return
         civ = self._p_civ[type_idx.clamp(min=0)]
@@ -3832,7 +3837,11 @@ class BatchSim:
         self.p_tile[rows, slot] = spot[rows]
         self.p_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.p_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
-        self.p_xp[rows, slot] = 0  # B-4: a fresh (possibly reclaimed) slot starts at 0 xp
+        if init_xp is None:
+            self.p_xp[rows, slot] = 0  # B-4: a fresh (possibly reclaimed) slot starts at 0 xp
+        else:
+            # B-17: MILITARY rows inherit the training city's Encampment XP; civilians stay 0.
+            self.p_xp[rows, slot] = torch.where(civ[rows], torch.zeros_like(slot), init_xp[rows])
         self.p_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.p_charges[rows, slot] = self._p_charges[type_idx[rows]]
         civ_rows = civ[rows]
@@ -5538,6 +5547,85 @@ class BatchSim:
                     if len(sp) > 0:
                         self.v_xp[sp, m_slot[sp]] += XP_DEFEND
 
+        # B-17 (ROUND B7): the ADDITIONAL Encampment strike (the pestk twin of
+        # the pcstk walls strike above). A PLAYER city owning a COMPLETE LIVE
+        # unpillaged ENCAMPMENT fires the same once/turn ranged strike — range
+        # 2, nearest player-hostile unit, one roll at cityDefenseStrength, no
+        # retaliation, never captures — under k="pestk". DRAW ORDER: this pass
+        # runs AFTER the whole walls pass (walls first, then Encampment), both
+        # scanning cities in walk_ord order, so a city with both rolls twice
+        # (walls in the loop above, Encampment here). No Encampment HP pool.
+        if self._encamp_didx >= 0 and self.districts_on:
+            Bn, Tn, dev2 = self.B, self.T, self.device
+            bidx = torch.arange(Bn, device=dev2)
+            arangeT = torch.arange(Tn, device=dev2)
+            rcap = max(self.R - 1, 0)
+            walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
+            owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.C).bool() & (self.owner >= 0).unsqueeze(2)  # [B,T,C]
+            has_enc = (((self.district == self._encamp_didx) & self.district_complete & ~self.district_dead & ~self.district_pillaged).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE unpillaged Encampment
+            for s_rank in range(self.C):
+                col = walk_ord[:, s_rank]  # [B] — this game's s_rank-th city (TS array order)
+                enc_city = self.alive[bidx, col] & has_enc[bidx, col]
+                if not bool(enc_city.any()):
+                    continue
+                ctr = self.site[bidx, col].clamp(min=0)  # [B]
+                dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
+                barb_h = self.barb_at >= 0
+                rvn = self.rv_at
+                rmil_h = (rvn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=rcap))
+                rcvn = self.rvciv_at
+                rciv_h = (rcvn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rcvn.clamp(min=0)).clamp(max=rcap))
+                hostile = barb_h | rmil_h | rciv_h  # [B, T]
+                valid = enc_city.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
+                key = torch.where(valid, dist * (Tn + 1) + arangeT.view(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+                best_key = key.min(dim=1).values
+                tt = key.argmin(dim=1)  # [B] target tile (garbage where no target)
+                strike = enc_city & (best_key < 10**9)
+                if not bool(strike.any()):
+                    continue
+                b_slot = self.barb_at[bidx, tt]
+                m_slot = self.rv_at[bidx, tt]
+                c_slot = self.rvciv_at[bidx, tt]
+                is_barb = b_slot >= 0
+                is_rmil = ~is_barb & (m_slot >= 0)  # military first (barb > rival mil > rival civ)
+                is_rciv = ~is_barb & ~is_rmil & (c_slot >= 0)
+                d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
+                d_cs_rmil = self._p_combat[self.v_type[bidx, m_slot.clamp(min=0)]]
+                d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
+                def_xp = torch.where(is_rmil, self._xp_lvl_bonus(self.v_xp[bidx, m_slot.clamp(min=0)]), torch.zeros_like(tt))
+                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt] + def_xp
+                d_emb = (self.v_emb[bidx, m_slot.clamp(min=0)] & is_rmil) | (self.v_emb[bidx, c_slot.clamp(min=0)] & is_rciv)
+                def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+                gar = (self.pmil_at[bidx, ctr] >= 0).long()  # cityDefenseStrength garrison +5
+                atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
+                def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_rmil, self.v_hp[bidx, m_slot.clamp(min=0)], self.v_hp[bidx, c_slot.clamp(min=0)]))
+                def_e = def_cs - self._wound(def_hp)
+                _dside = torch.where(is_barb, torch.ones(Bn, dtype=torch.long, device=dev2), torch.full((Bn,), 2, dtype=torch.long, device=dev2))
+                _dciv = torch.where(is_rmil, self.v_civ[bidx, m_slot.clamp(min=0)], self.v_civ[bidx, c_slot.clamp(min=0)])
+                _, _sp = self._flank_support(tt, _dside, _dciv, torch.full((Bn,), -1, dtype=torch.long, device=dev2))
+                def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
+                d = self._damage_roll(strike, atk_cs - def_e, k="pestk", tile=tt)
+                rows = strike.nonzero(as_tuple=True)[0]
+                for grp, at_map, hp_t, alive_t, slot_t in (
+                    (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
+                    (is_rmil, self.rv_at, self.v_hp, self.v_alive, m_slot),
+                    (is_rciv, self.rvciv_at, self.v_hp, self.v_alive, c_slot),
+                ):
+                    g = rows[grp[rows]]
+                    if len(g) == 0:
+                        continue
+                    ds = slot_t[g]
+                    hp_t[g, ds] -= d[g]
+                    dead = hp_t[g, ds] <= 0
+                    at_map[g[dead], tt[g[dead]]] = -1
+                    alive_t[g[dead], ds[dead]] = False
+                surv_rm = (strike & is_rmil).nonzero(as_tuple=True)[0]
+                if len(surv_rm) > 0:
+                    alive_now = self.v_hp[surv_rm, m_slot[surv_rm]] > 0
+                    sp = surv_rm[alive_now]
+                    if len(sp) > 0:
+                        self.v_xp[sp, m_slot[sp]] += XP_DEFEND
+
         # Cities heal +20 when no hostile stands adjacent (barbarians, or
         # rival units whose civ is at war — TS unitsHostile counts rival
         # CIVILIANS too: an at-war builder besieges. P5/S2 hunt, seed 9131
@@ -5670,10 +5758,12 @@ class BatchSim:
 
     # --- rival civs (phase 4c) ------------------------------------------------------
 
-    def _spawn_rival(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, civ: int) -> torch.Tensor:
+    def _spawn_rival(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, civ: int, init_xp: torch.Tensor | None = None) -> torch.Tensor:
         """Rival units are military and share one append-only pool (per-civ
         order = state.units order filtered by civ, which per-civ loops use).
-        Returns the LANDED mask (P5/S8: purchases refund on no spawn spot)."""
+        Returns the LANDED mask (P5/S8: purchases refund on no spawn spot).
+        B-17: init_xp ([B] long) seeds the unit's starting XP from its spawn
+        city's Encampment training buildings (all spawns here are military)."""
         if not bool(mask.any()):
             return torch.zeros_like(mask)
         # #45/B-6: naval units probe over water (OCEAN gated on the civ's
@@ -5694,7 +5784,8 @@ class BatchSim:
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.v_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
-        self.v_xp[rows, slot] = 0  # B-4: a fresh (possibly reclaimed) slot starts at 0 xp
+        # B-4/B-17: a fresh slot starts at 0 xp unless the training city grants Encampment XP (all rival spawns here are military).
+        self.v_xp[rows, slot] = 0 if init_xp is None else init_xp[rows]
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
@@ -5995,7 +6086,9 @@ class BatchSim:
                         # branch above already refunds; units now match).
                         landed = torch.zeros_like(ok_now)
                         if bool(is_mil.any()):
-                            landed = landed | self._spawn_rival(is_mil, ctr, ui, r)
+                            # B-17: a purchased military unit inherits city j's Encampment training XP (best tier).
+                            xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                            landed = landed | self._spawn_rival(is_mil, ctr, ui, r, init_xp=xp_rj)
                         if bool(is_bldr.any()):
                             landed_civ = self._spawn_rival_civ(is_bldr, ctr, r)
                             landed = landed | landed_civ
@@ -9034,7 +9127,10 @@ class BatchSim:
                     has_cap5 = cap_is5.any(dim=1)
                     spawn_slot5 = torch.where(has_cap5, cap_is5.long().argmax(dim=1), self.rc_alive[:, r].long().argmax(dim=1))
                     ctr5 = self.rc_center[:, r].gather(1, spawn_slot5.unsqueeze(1)).squeeze(1).clamp(min=0)
-                    landed_u5 = self._spawn_rival(elig_u5, ctr5, pick_ty5, r)
+                    # B-17: a bought military unit inherits the SPAWN city's (capital, else first alive) Encampment training XP.
+                    bidx5 = torch.arange(self.B, device=self.device)
+                    xp_cap5 = (self.rc_bldg[bidx5, r, spawn_slot5].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                    landed_u5 = self._spawn_rival(elig_u5, ctr5, pick_ty5, r, init_xp=xp_cap5)
                     price_u5 = self._p_cost.gather(0, pick_ty5).double() * mult_r5
                     self.r_treasury[:, r] = torch.where(landed_u5, self.r_treasury[:, r] - price_u5, self.r_treasury[:, r])
                     bought_r5 = bought_r5 | landed_u5
@@ -9314,7 +9410,9 @@ class BatchSim:
                             self.r_builders_trained[:, r] = self.r_builders_trained[:, r] + is_bldr.long()  # P4/D-10
                         spawn_u = spawn_u & ~is_bldr
                         if bool(spawn_u.any()):
-                            self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r)
+                            # B-17: a trained military unit inherits city j's Encampment training XP (best tier).
+                            xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                            self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r, init_xp=xp_rj)
                         # C1-B4: a finished district completes its paved tile
                         nS_b4 = len(self._scaffold)
                         done_d = done_q & (cur > self.NU) & (cur <= self.NU + nS_b4)
@@ -9472,6 +9570,78 @@ class BatchSim:
                                 sp = surv_pm[alive_now]
                                 if len(sp) > 0:
                                     self.p_xp[sp, pm_slot[sp]] += XP_DEFEND
+                # B-17 (ROUND B7): the rival mirror of the ADDITIONAL Encampment
+                # strike (the restk twin of walls' rcstk). This rival city
+                # (r, j), if it owns a COMPLETE unpillaged ENCAMPMENT, fires the
+                # same once/turn ranged strike right AFTER its walls strike
+                # (walls first, then Encampment — per rc, before the heal),
+                # k="restk". rc_dist_tile is districts_cat-indexed (matches
+                # self._encamp_didx and the player self.district plane).
+                if self._encamp_didx >= 0 and self.districts_on:
+                    Bn, Tn, dev2 = self.B, self.T, self.device
+                    bidx = torch.arange(Bn, device=dev2)
+                    enc_reg = self.rc_dist_tile[:, r, j, self._encamp_didx]  # [B]
+                    enc_ok = (enc_reg >= 0) & self.district_complete.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) & ~self.district_pillaged.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    has_enc = cact & enc_ok
+                    if bool(has_enc.any()):
+                        ctr = self.rc_center[:, r, j].clamp(min=0)  # [B]
+                        dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
+                        war = self.r_atwar[:, r].unsqueeze(1)  # [B, 1]
+                        barb_h = self.barb_at >= 0
+                        pmil_h = (self.pmil_at >= 0) & war
+                        pciv_h = (self.pciv_at >= 0) & war
+                        hostile = barb_h | pmil_h | pciv_h  # [B, T]
+                        valid = has_enc.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
+                        arangeT = torch.arange(Tn, device=dev2)
+                        key = torch.where(valid, dist * (Tn + 1) + arangeT.view(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+                        best_key = key.min(dim=1).values
+                        tt = key.argmin(dim=1)  # [B]
+                        strike = has_enc & (best_key < 10**9)
+                        if bool(strike.any()):
+                            b_slot = self.barb_at[bidx, tt]
+                            pm_slot = self.pmil_at[bidx, tt]
+                            pc_slot = self.pciv_at[bidx, tt]
+                            is_barb = b_slot >= 0
+                            is_pmil = ~is_barb & (pm_slot >= 0)  # military first (barb > player mil > player civ)
+                            is_pciv = ~is_barb & ~is_pmil & (pc_slot >= 0)
+                            d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
+                            d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
+                            d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
+                            def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
+                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self.tdef[bidx, tt] + def_xp
+                            d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
+                            def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
+                            gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
+                            gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
+                            atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
+                            def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_pmil, self.p_hp[bidx, pm_slot.clamp(min=0)], self.p_hp[bidx, pc_slot.clamp(min=0)]))
+                            def_e = def_cs - self._wound(def_hp)
+                            _dside = torch.where(is_barb, torch.ones(Bn, dtype=torch.long, device=dev2), torch.zeros(Bn, dtype=torch.long, device=dev2))
+                            _, _sp = self._flank_support(tt, _dside, torch.zeros(Bn, dtype=torch.long, device=dev2), torch.full((Bn,), -1, dtype=torch.long, device=dev2))
+                            def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
+                            d = self._damage_roll(strike, atk_cs - def_e, k="restk", tile=tt)
+                            rows = strike.nonzero(as_tuple=True)[0]
+                            for grp, at_map, hp_t, alive_t, slot_t in (
+                                (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
+                                (is_pmil, self.pmil_at, self.p_hp, self.p_alive, pm_slot),
+                                (is_pciv, self.pciv_at, self.p_hp, self.p_alive, pc_slot),
+                            ):
+                                g = rows[grp[rows]]
+                                if len(g) == 0:
+                                    continue
+                                ds = slot_t[g]
+                                hp_t[g, ds] -= d[g]
+                                dead = hp_t[g, ds] <= 0
+                                at_map[g[dead], tt[g[dead]]] = -1
+                                alive_t[g[dead], ds[dead]] = False
+                                if bool(dead.any()):
+                                    self._rp_kill_version += 1  # G1: death -> raided-mask changes for city j+1
+                            surv_pm2 = (strike & is_pmil).nonzero(as_tuple=True)[0]
+                            if len(surv_pm2) > 0:
+                                alive_now2 = self.p_hp[surv_pm2, pm_slot[surv_pm2]] > 0
+                                sp2 = surv_pm2[alive_now2]
+                                if len(sp2) > 0:
+                                    self.p_xp[sp2, pm_slot[sp2]] += XP_DEFEND
                 # AUDIT A-10: a siege pins the HP, exactly like the player's
                 # heal — any adjacent unit hostile to THIS civ (the player's
                 # at-war units, CIVILIANS included per unitsHostile — the
@@ -10082,7 +10252,9 @@ class BatchSim:
                 can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
                 if bool(can.any()):
                     self.treasury = torch.where(can, self.treasury - cost, self.treasury)
-                    self._spawn_player(can, self.site[:, c], utp)
+                    # B-17: a purchased military unit inherits city c's Encampment training XP (best tier).
+                    xp_c = (self.buildings[:, c, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                    self._spawn_player(can, self.site[:, c], utp, init_xp=xp_c)
                     if self._builder_idx >= 0:
                         # …and move it for every later slot (TS purchaseUnit).
                         self.builders_trained = self.builders_trained + (can & (utp == self._builder_idx)).long()
@@ -10716,7 +10888,9 @@ class BatchSim:
             made_unit = done & (cur_c >= self.UNIT_BASE) & (cur_c < self.UNIT_BASE + self.NU)
             if bool(made_unit.any()):
                 # clamp max too: unmasked rows may hold P2 district codes
-                self._spawn_player(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1))
+                # B-17: a trained military unit inherits city `col`'s Encampment training XP (best tier).
+                xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                self._spawn_player(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
                 if self._builder_idx >= 0:
                     # P4/D-10: a completed builder moves the cost escalator
                     made_b = made_unit & (cur_c == self.UNIT_BASE + self._builder_idx)

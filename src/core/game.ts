@@ -12,7 +12,7 @@ import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canR
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost } from './units';
-import { barbarianPhase } from './combat';
+import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
@@ -508,6 +508,12 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string)
     if (!state.sandbox) state.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
+  // B-17 (ROUND B7): a purchased MILITARY unit starts with the city's
+  // Encampment training XP (best military-building tier; civilians never fight).
+  if ((UNITS[unitType]?.combat ?? 0) > 0) {
+    const xp = encampmentTrainXp(city.buildings);
+    if (xp > 0) unit.xp = xp;
+  }
   if (unitType === 'BUILDER') state.buildersTrained += 1; // P4/D-10
   return { ok: true };
 }
@@ -809,7 +815,13 @@ export function endTurn(state: GameState): void {
           // P4/D-6: real Civ 6 — a completed Settler costs the city 1 pop.
           city.population = Math.max(1, city.population - 1);
         } else if (item.kind === 'unit') {
-          spawnUnit(state, item.unit, city.centerIndex);
+          const trained = spawnUnit(state, item.unit, city.centerIndex);
+          // B-17 (ROUND B7): a trained MILITARY unit inherits the city's
+          // Encampment training XP (best military-building tier).
+          if (trained && (UNITS[item.unit]?.combat ?? 0) > 0) {
+            const xp = encampmentTrainXp(city.buildings);
+            if (xp > 0) trained.xp = xp;
+          }
           if (item.unit === 'BUILDER') state.buildersTrained += 1; // P4/D-10
         } else if (item.kind === 'project') {
           completeProject(state, city, item.project, itemCost(item));
