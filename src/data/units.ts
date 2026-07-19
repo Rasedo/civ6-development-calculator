@@ -31,6 +31,9 @@ export interface UnitDef {
    * units exist yet (N2 adds GALLEY/QUADRIREME) — the field is plumbed now so
    * passability/spawn/combat can branch on it. Default false. */
   naval?: boolean;
+  /** B6-S2: faith-purchase-only (MISSIONARY) — never offered by trainableUnits,
+   * so it can't be queued or gold-purchased by either seat. */
+  faithOnly?: boolean;
   description: string;
 }
 
@@ -201,6 +204,22 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresTech: 'SHIPBUILDING',
       naval: true,
       description: 'Classical naval ranged unit — bombards from adjacent water.',
+    }),
+    // B6-S2: the missionary chassis (appended LAST — roster indices are the
+    // GPU's unit type ids). Civilian, faith-purchase-only at its speed-scaled
+    // cost (the worship-cost pattern); 3 spread charges (vanilla), +1 with
+    // SCRIPTURE, 30% cheaper with HOLY_ORDER (rival buy path applies both).
+    U({
+      id: 'MISSIONARY',
+      name: 'Missionary',
+      code: 'I',
+      cost: 100, // ×GAME_SPEED → 60 faith (faith-only; never a production cost)
+      maintenance: 0,
+      moves: 4,
+      combat: 0,
+      charges: 3,
+      faithOnly: true,
+      description: 'Spreads its religion to nearby cities (3 charges, faith purchase only).',
     }),
   ].map((u) => [u.id, u]),
 );

@@ -382,6 +382,9 @@ export function trainableUnits(
 ): UnitDef[] {
   if (!state.unitsMode) return [];
   return Object.values(UNITS).filter((d) => {
+    // B6-S2: faith-purchase-only chassis (MISSIONARY) — never trainable or
+    // gold-purchasable (purchaseUnit funnels through here), sandbox included.
+    if (d.faithOnly) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech)) return false;
     // AUDIT B-9: strategic-resource access gates build AND purchase (purchaseUnit
     // funnels through here). Data-driven off UnitDef.requiresResource; the player

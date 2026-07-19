@@ -49,7 +49,7 @@ import {
   CS_MEET_RANGE,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC } from '../src/core/trade';
@@ -238,6 +238,11 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   cnear: def.effects.combatNearFollowing ?? 0,  // Just War (within justWarRange, unit-vs-unit)
   cdef: def.effects.combatDefendFollowing ?? 0,  // Defender of the Faith
   cvs: def.effects.combatVsUnitInFollowing ?? 0,  // Crusade
+  // B6-S2 missionary channels — pre-rounded INTEGERS so both engines read the
+  // identical value (the GPU indexes these by r_enhancer + a base-value pad):
+  mchg: def.effects.missionaryChargeBonus ?? 0,  // Scripture +1 charge
+  mlump: Math.round(SPREAD_PRESSURE * (def.effects.spreadPressureMult ?? 1)),  // Scripture 15, base 10
+  mcost: Math.round((UNITS.MISSIONARY?.cost ?? 0) * (def.effects.missionaryCostMult ?? 1)),  // Holy Order 42, base 60
   // A-13 activates improvementYields (omitted while the targets were
   // unbuildable): extra yields per improvement instance, [nImp, 6] in
   // IMPROVEMENT_IDS order. The FISHING_BOATS row (God of the Sea) simply
@@ -460,6 +465,8 @@ const rules = {
   worshipBidx: WORSHIP_BUILDINGS.map((id) => buildingIdx.get(id) ?? -1),
   templeBidx: buildingIdx.get('TEMPLE') ?? -1,
   worshipFaithCost: Math.round(190 * GAME_SPEED),
+  // B6-S2: the missionary buy's Shrine gate (rivals.ts missionary branch).
+  shrineBidx: buildingIdx.get('SHRINE') ?? -1,
   // AUDIT A-11: rival trade — id-anchored capacity sources + route constants
   // (the rivalTradeCapacity/routeYields mirror; no CS term until A-12).
   trade: {
@@ -590,6 +597,13 @@ const rules = {
   // engines). improvementOnResource shipped since A-7 (impRes): mines on
   // IRON/NITER/COAL exist today.
   beliefs: {
+    // B6-S2: the missionary chassis anchors (read via rules.beliefs, like the
+    // enhancer rows). Base values double as the GPU pad row (unenhanced civ):
+    // cost round(100·GAME_SPEED)=60 faith, lump SPREAD_PRESSURE=10, cap 2.
+    missionaryIdx: Object.values(UNITS).findIndex((u) => u.id === 'MISSIONARY'),
+    missionaryCost: UNITS.MISSIONARY.cost,
+    spreadPressure: SPREAD_PRESSURE,
+    missionaryCap: MISSIONARY_CAP,
     pantheons: Object.values(PANTHEONS).map(beliefRow),
     followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
     founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),
@@ -712,6 +726,9 @@ const rules = {
     // #45/B-6: NAVAL unit (lives on water, never embarks). All-false for the
     // current land-only roster — N2 adds GALLEY/QUADRIREME.
     naval: u.naval ? 1 : 0,
+    // B6-S2: faith-purchase-only (MISSIONARY) — the trainableUnits filter's
+    // mirror; masks the type out of the GPU purchase path.
+    fo: u.faithOnly ? 1 : 0,
   })),
   // Tile improvements (6a: FARM; 6b: MINE, LUMBER_MILL). `ids` are the
   // engine's improvement index (0 = FARM, 1 = MINE, 2 = LUMBER_MILL); a

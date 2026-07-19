@@ -50,6 +50,14 @@ export interface BeliefEffects {
   /** B6-S1: +CS ATTACKING a unit standing on a tile owned by a city following
    * this religion (Crusade). */
   combatVsUnitInFollowing?: number;
+  /** B6-S2: extra missionary spread charges (Scripture +1). */
+  missionaryChargeBonus?: number;
+  /** B6-S2: multiplier on the SPREAD_PRESSURE lump (Scripture ×1.5 → 15,
+   * integer-exact after Math.round). */
+  spreadPressureMult?: number;
+  /** B6-S2: multiplier on the missionary faith price (Holy Order ×0.7 →
+   * round(60·0.7) = 42). */
+  missionaryCostMult?: number;
 }
 
 export interface BeliefDef {
@@ -206,7 +214,10 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('ITINERANT_PREACHERS', 'Itinerant Preachers', 'Religious pressure spreads two tiles further.', {
       pressureRangeBonus: 2, // B6-S1
     }),
-    B('SCRIPTURE', 'Scripture', 'Missionaries and Apostles gain +1 spread charge and stronger pressure.', {}), // B6-S2: charge/lump wired with the missionary chassis
+    B('SCRIPTURE', 'Scripture', 'Missionaries and Apostles gain +1 spread charge and stronger pressure.', {
+      missionaryChargeBonus: 1, // B6-S2
+      spreadPressureMult: 1.5, // B6-S2: lump 10 → 15
+    }),
     B('JUST_WAR', 'Just War', '+10 combat strength near cities following your religion.', {
       combatNearFollowing: 10, // B6-S1: within JUST_WAR_RANGE, unit-vs-unit
     }),
@@ -216,7 +227,9 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     B('CRUSADE', 'Crusade', '+10 combat strength against units in cities following your religion.', {
       combatVsUnitInFollowing: 10, // B6-S1
     }),
-    B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {}), // B6-S2: cost wired with the missionary chassis
+    B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {
+      missionaryCostMult: 0.7, // B6-S2: 60 → 42 faith
+    }),
     B('MESSENGER_OF_THE_GODS', 'Messenger of the Gods', '+2 gold and +2 faith from trade routes to cities of your religion.', {
       tradeReligionYields: { gold: 2, faith: 2 }, // B6-S1
     }),
@@ -245,6 +258,13 @@ export const JUST_WAR_RANGE = 3;
 /** B-18: integer pressure added per in-range turn (integer keeps the flip
  * comparison exact — no float association across the batch). */
 export const RELIGION_PRESSURE_PER_TURN = 1;
+/** B6-S2: the lump a missionary SPREAD adds to the target city's accumulator
+ * for its owner religion — a decade of ambient (+1/turn), so a spread flips
+ * decisively but ambient can re-erode. Real Civ 6 spreads ~200 vs ~30/turn
+ * ambient; same ratio class. SCRIPTURE multiplies ×1.5 → 15 (integer). */
+export const SPREAD_PRESSURE = 10;
+/** B6-S2: max LIVE missionaries per civ (the rival buy gate). */
+export const MISSIONARY_CAP = 2;
 
 /**
  * B-18 pressure→yields coupling master switch (Round B3, slice U). When false

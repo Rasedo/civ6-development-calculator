@@ -141,6 +141,7 @@ class Rules:
     worship_bidx: list  # B9-R3: the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
     temple_bidx: int  # B9-R3: TEMPLE row (worship prerequisite), -1 if absent
     worship_faith_cost: float  # B9-R3: flat worship faith price (round(190·GAME_SPEED))
+    shrine_bidx: int  # B6-S2: SHRINE row (the missionary buy's gate), -1 if absent
     t_cost: torch.Tensor  # [NT]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
@@ -214,6 +215,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         worship_bidx=r.get("worshipBidx", []),
         temple_bidx=int(r.get("templeBidx", -1)),
         worship_faith_cost=float(r.get("worshipFaithCost", 114)),
+        shrine_bidx=int(r.get("shrineBidx", -1)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
@@ -765,12 +767,24 @@ class BatchSim:
         # r_enhancer + 1). Only the five S1 channels are read — no enhancer
         # carries the generic beliefRow fields.
         _erows = _bl.get("enhancers", [])
+        # B6-S2: the missionary chassis anchors + per-enhancer channels. The
+        # exporter pre-rounds mcost/mlump to INTEGERS (Math.round on the TS
+        # side), so both engines read the identical value; the pad row (index
+        # 0 = unenhanced civ) carries the BASE cost/lump, unlike the additive
+        # zero pads of the S1 channels.
+        _mcost0 = float(_bl.get("missionaryCost", 60))
+        _mlump0 = int(_bl.get("spreadPressure", 10))
+        self._missionary_idx = int(_bl.get("missionaryIdx", -1))
+        self._missionary_cap = int(_bl.get("missionaryCap", 2))
         self._enh = {
             "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
             "tradeRel": torch.tensor([[0.0] * 6] + [list(x.get("tradeRel", [0.0] * 6)) for x in _erows], dtype=torch.float64, device=device),
             "cnear": torch.tensor([0.0] + [float(x.get("cnear", 0)) for x in _erows], dtype=torch.float64, device=device),
             "cdef": torch.tensor([0.0] + [float(x.get("cdef", 0)) for x in _erows], dtype=torch.float64, device=device),
             "cvs": torch.tensor([0.0] + [float(x.get("cvs", 0)) for x in _erows], dtype=torch.float64, device=device),
+            "mchg": torch.tensor([0] + [int(x.get("mchg", 0)) for x in _erows], dtype=torch.long, device=device),
+            "mlump": torch.tensor([_mlump0] + [int(x.get("mlump", _mlump0)) for x in _erows], dtype=torch.long, device=device),
+            "mcost": torch.tensor([_mcost0] + [float(x.get("mcost", _mcost0)) for x in _erows], dtype=torch.float64, device=device),
         }
         self._just_war_range = int(_bl.get("justWarRange", 3))
         self._enh_combat_any = bool((self._enh["cnear"] != 0).any() or (self._enh["cdef"] != 0).any() or (self._enh["cvs"] != 0).any())
@@ -1240,6 +1254,7 @@ class BatchSim:
         self._worship_bidx = [int(x) for x in rules.worship_bidx]
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)
+        self._shrine_bidx = int(rules.shrine_bidx)  # B6-S2: missionary buy gate
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
         self.q_dtile = torch.full((B, C), -1, dtype=torch.long, device=device)  # P2: the queued district's target tile
@@ -1357,6 +1372,10 @@ class BatchSim:
         self._p_res = torch.tensor([int(u.get("requiresResource", -1)) for u in ru], dtype=torch.long, device=device)
         self._res_unit_pairs = [(i, int(u.get("requiresResource", -1))) for i, u in enumerate(ru) if int(u.get("requiresResource", -1)) >= 0]
         self._p_charges = torch.tensor([u.get("charges", 0) for u in ru], dtype=torch.long, device=device)
+        # B6-S2: faith-purchase-only roster flag (MISSIONARY) — the
+        # trainableUnits filter's mirror; masks the type out of the player
+        # purchase path (no actor emits it, the guard is exactness).
+        self._p_faith_only = torch.tensor([bool(u.get("fo", 0)) for u in ru], dtype=torch.bool, device=device)
         self._warrior_idx = next((i for i, u in enumerate(ru) if u["id"] == "WARRIOR"), 0)
         # B-10: SCOUT is a military explorer (combat 10) but NEVER in the rival
         # roster (RIVAL_BUY_UNITS / the ladder exclude it). In the production
@@ -3301,6 +3320,7 @@ class BatchSim:
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )
             unit_ok = unit_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate
+            unit_ok = unit_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: trainableUnits' faithOnly filter (MISSIONARY never queues)
             unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1)
             if bool(self.unit_naval.any()):
                 # #45/B-6: the controlled/RL player builds NO naval (mirrors the
@@ -3367,6 +3387,7 @@ class BatchSim:
                     1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
                 )
                 u_ok = u_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate (purchase)
+                u_ok = u_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: faith-only never gold-buys (trainableUnits mirror)
                 u_cost = self._p_cost.unsqueeze(0).expand(B, -1)
                 if self._builder_idx >= 0:
                     # P4/D-10: the builder column prices off the live escalator
@@ -6032,9 +6053,11 @@ class BatchSim:
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)  # B-32: pillaged district = repair job
 
-    def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int) -> torch.Tensor:
-        """C1-B5b: spawn a rival BUILDER — the civilian twin of _spawn_rival
-        (rciv blocking; charges seeded from the roster like the player's).
+    def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int, type_idx: int | None = None, charges: torch.Tensor | None = None) -> torch.Tensor:
+        """C1-B5b: spawn a rival CIVILIAN (default BUILDER) — the civilian twin
+        of _spawn_rival (rciv blocking; charges seeded from the roster like the
+        player's). B6-S2: type_idx/charges override for the MISSIONARY buy
+        (charges [B] carries the SCRIPTURE +1 per game).
         Returns the LANDED mask (P5/S8: purchases refund on no spawn spot)."""
         if not bool(mask.any()):
             return torch.zeros_like(mask)
@@ -6049,15 +6072,16 @@ class BatchSim:
         rows = can.nonzero(as_tuple=True)[0]
         slot = self.v_next[rows]
         assert int(slot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
+        ti = self._builder_idx if type_idx is None else type_idx
         self.v_alive[rows, slot] = True
         self.v_civ[rows, slot] = civ
-        self.v_type[rows, slot] = self._builder_idx
+        self.v_type[rows, slot] = ti
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.v_fortify[rows, slot] = 0  # B-5: civilian never fortifies; keep the (reclaimed) slot clean
         self.v_xp[rows, slot] = 0  # B-4: civilian never fights; keep the (reclaimed) slot at 0 xp
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
-        self.v_charges[rows, slot] = self._p_charges[self._builder_idx]
+        self.v_charges[rows, slot] = self._p_charges[ti] if charges is None else charges[rows]
         self.rvciv_at[rows, spot[rows]] = slot
         self.v_next[rows] += 1
         return can
@@ -6243,6 +6267,120 @@ class BatchSim:
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
+
+    def _rival_missionary_actions(self, r: int, active: torch.Tensor) -> None:
+        """B6-S2: mirrors rivalMissionaryActions — per missionary (slot order):
+        target the NEAREST city of ANY civ (player + every rival, own
+        included) whose followedReligion != this civ's religion g = r + 1
+        (dist·(T+1)+centerIndex key over city-center tiles — centers are
+        unique, so the key is total). Within 1 of the target center → SPREAD:
+        += mlump (pad 10, SCRIPTURE 15) to that city's accumulator for g,
+        charge −1, dies at 0, turn spent. Else the builder-class real-MP walk
+        (rciv blocking, ZOC halt, camp clear) stopping within 1.
+
+        Pressure writes feed NOTHING this turn: the accumulators are only
+        read by _spread_religious_pressure at endTurn (after every rival
+        phase), where the follow flip lands. city_followed/rc_followed do not
+        move mid-turn, so the #58-G4 economy key and the (turn, _eff_version)
+        _rel_combat_planes key both stay exact — no version bump. Zero RNG."""
+        B, T, dev = self.B, self.T, self.device
+        g = r + 1
+        cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._missionary_idx) & (self.v_charges > 0)
+        if not bool(cand.any()):
+            return
+        # target mask [B, T]: ALIVE city centers following != g. scatter_add_
+        # of longs then >0 — a bool scatter_ would clobber tile 0 with a dead
+        # slot's False (the S1 near3 lesson).
+        acc = torch.zeros(B, T, dtype=torch.long, device=dev)
+        acc.scatter_add_(1, self.site.clamp(min=0), (self.alive & (self.city_followed != g)).long())
+        if self.R > 0:
+            acc.scatter_add_(
+                1,
+                self.rc_center.clamp(min=0).reshape(B, -1),
+                (self.rc_alive & (self.rc_followed != g)).long().reshape(B, -1),
+            )
+        tm = acc > 0
+        has_t = tm.any(dim=1)
+        if not bool(has_t.any()):
+            return
+        lump = self._enh["mlump"][self.r_enhancer[:, r] + 1]  # [B] long
+        arT = torch.arange(T, device=dev, dtype=torch.float64)
+        arange6 = torch.arange(6, device=dev)
+        for u in cand.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            act = cand[:, u] & active & has_t
+            if not bool(act.any()):
+                continue
+            here = self.v_tile[:, u].clamp(min=0)
+            tkey = torch.where(tm, self.pair_dist[here].double() * (T + 1) + arT, torch.full((B, T), float("inf"), dtype=torch.float64, device=dev))
+            tgt = tkey.argmin(dim=1)
+            d0 = self.pair_dist[here, tgt].to(torch.long)
+            sp = act & (d0 <= 1)
+            if bool(sp.any()):
+                # lump for religion g at the target CITY — resolve the center
+                # tile back to the player slot / rc registry (live rows only;
+                # a center is unique across live cities).
+                pm = sp.unsqueeze(1) & self.alive & (self.site == tgt.unsqueeze(1))
+                prows, pj = pm.nonzero(as_tuple=True)
+                if len(prows):
+                    self.city_pressure[prows, pj, g] += lump[prows]
+                if self.R > 0:
+                    rm = sp.view(B, 1, 1) & self.rc_alive & (self.rc_center == tgt.view(B, 1, 1))
+                    rrows, rr_, rj = rm.nonzero(as_tuple=True)
+                    if len(rrows):
+                        self.rc_pressure[rrows, rr_, rj, g] += lump[rrows]
+                rows = sp.nonzero(as_tuple=True)[0]
+                self.v_charges[rows, u] -= 1
+                self.v_acted[rows, u] = True  # P4/D-2: the spread spends the turn
+                dead = sp & (self.v_charges[:, u] <= 0)
+                if bool(dead.any()):
+                    dr = dead.nonzero(as_tuple=True)[0]
+                    self.v_alive[dr, u] = False
+                    self.rvciv_at[dr, here[dr]] = -1
+            walk = act & ~sp
+            if not bool(walk.any()):
+                continue
+            # the rivalBuilderActions step loop verbatim, with the ≤1 stop
+            full_mp = self._p_moves[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
+            mp = full_mp.clone()
+            cur = here.clone()
+            d_cur = d0.clone()
+            moving = walk
+            while bool(moving.any()):
+                curc = cur.clamp(min=0)
+                nb = self.neigh[curc]  # [B, 6]
+                nbc = nb.clamp(min=0)
+                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rciv", civ=r)
+                d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
+                skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
+                best = skey.min(dim=1).values
+                dir_i = (best % 8).clamp(max=5)
+                dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
+                cost = (
+                    1
+                    + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
+                    + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+                )
+                mv = (
+                    moving
+                    & (best < 10**9)
+                    & (torch.div(best, 8, rounding_mode="floor") < d_cur)
+                    & ((mp >= cost) | (mp >= full_mp))
+                )
+                if not bool(mv.any()):
+                    break
+                rows = mv.nonzero(as_tuple=True)[0]
+                self.rvciv_at[rows, cur[rows]] = -1
+                self.rvciv_at[rows, dest[rows]] = u
+                self.v_tile[rows, u] = dest[rows]
+                self.v_acted[rows, u] = True  # P4/D-2
+                self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
+                mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
+                # B-3 ZOC: a civilian mover halts adjacent to a hostile
+                # military unit — only the EXERTER must be military.
+                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r]), torch.zeros_like(mp), mp)
+                d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
+                cur = torch.where(mv, dest, cur)
+                moving = mv & (mp > 0) & (d_cur > 1)
 
     def _rcy_globals(self) -> dict:
         """D-2: the r-independent planes that _rival_city_yields and
@@ -8862,6 +9000,29 @@ class BatchSim:
                             self.rc_bldg[rows_w5, r, js_w5, wb5] = True
                             self._eff_version += 1  # B9-R2 invariant: every rc_bldg write bumps
                             self.r_faith[:, r] = torch.where(buy_w5, self.r_faith[:, r] - self._worship_cost, self.r_faith[:, r])
+            # B6-S2: MISSIONARY — after the worship buy (the rivals.ts order;
+            # worship saturates first). ONE per civ per turn at the enhancer-
+            # adjusted price (mcost pad 60, HOLY_ORDER row 42 — exporter-
+            # rounded integers), cap missionaryCap LIVE per civ; gate = the
+            # FIRST alive city in slot order with the SHRINE and a COMPLETE
+            # unpillaged Holy Site. Spawns at that city center via the
+            # civilian spawner (POOL-END; no free spot = refund). SCRIPTURE
+            # ships mchg=+1 charge, applied at purchase.
+            if self._missionary_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
+                n_live_m5 = (self.v_alive & (self.v_civ == r) & (self.v_type == self._missionary_idx)).sum(dim=1)
+                mcost5 = self._enh["mcost"][self.r_enhancer[:, r] + 1]  # [B] f64
+                want_m5 = active & self.r_religion_done[:, r] & (n_live_m5 < self._missionary_cap) & self._afford(self.r_faith[:, r], mcost5)
+                if bool(want_m5.any()):
+                    hs_tm5 = self.rc_dist_tile[:, r, :, self._hs_idx]  # [B, RC]
+                    hs_okm5 = (hs_tm5 >= 0) & self.district_complete.gather(1, hs_tm5.clamp(min=0)) & ~self.district_pillaged.gather(1, hs_tm5.clamp(min=0))
+                    elig_m5 = self.rc_alive[:, r] & self.rc_bldg[:, r, :, self._shrine_bidx] & hs_okm5  # [B, RC]
+                    buy_m5 = want_m5 & elig_m5.any(dim=1)
+                    if bool(buy_m5.any()):
+                        first_m5 = elig_m5 & (elig_m5.long().cumsum(dim=1) == 1)
+                        at_m5 = (self.rc_center[:, r].clamp(min=0) * first_m5.long()).sum(dim=1)  # exactly one nonzero term per buying row
+                        chg_m5 = self._p_charges[self._missionary_idx] + self._enh["mchg"][self.r_enhancer[:, r] + 1]
+                        landed_m5 = self._spawn_rival_civ(buy_m5, at_m5, r, type_idx=self._missionary_idx, charges=chg_m5)
+                        self.r_faith[:, r] = torch.where(landed_m5, self.r_faith[:, r] - mcost5, self.r_faith[:, r])
             # AUDIT A-11: the trade creation block sits between the buy block
             # and the city-loop snapshot — the exact rivalPhase position.
             self._rival_trade_phase(r, active)
@@ -9398,6 +9559,10 @@ class BatchSim:
             # C3-prep: controlled rivals' builders answer to the units head.
             if self.improvements_on and self._builder_idx >= 0:
                 self._rival_builder_actions(r, active & ~self.controlled[:, r], techs0=r_techs0, civics0=r_civics0)
+            # B6-S2: missionary actions (spread on the adjacent target, else
+            # walk) — the rivals.ts call position, right after the builders.
+            if self._missionary_idx >= 0:
+                self._rival_missionary_actions(r, active & ~self.controlled[:, r])
 
             # Great-people race (no draws): accrue, claim from the shared pool.
             for cls in range(self._gp_nc):  # all GP classes (incl Admiral/General)
@@ -9846,7 +10011,7 @@ class BatchSim:
                 # B-9: strategic-resource access gates the purchase (mirrors TS
                 # purchaseUnit → trainableUnits), per this slot's chosen unit.
                 res_ok = self._res_avail_mask(self.owner >= 0).gather(1, utp.unsqueeze(1)).squeeze(1)
-                tech_ok = tech_ok & res_ok
+                tech_ok = tech_ok & res_ok & ~self._p_faith_only[utp]  # B6-S2: faith-only never gold-buys
                 cost = self._p_cost[utp] * mult
                 if self._builder_idx >= 0:
                     # P4/D-10: bought builders price off the live escalator…
@@ -10185,6 +10350,7 @@ class BatchSim:
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
             trainable = trainable & self._res_avail_mask(self.owner >= 0)  # B-9: RL apply re-validates strategic-resource access
+            trainable = trainable & ~self._p_faith_only.view(1, -1)  # B6-S2: faith-only never queues (trainableUnits mirror)
             valid_u = is_u & trainable.gather(1, ut)
             if self._rl_purchase_active and self._builder_idx >= 0:
                 # P4/D-10: with purchases live, builder queues are order-coupled

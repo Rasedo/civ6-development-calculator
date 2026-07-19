@@ -31,7 +31,7 @@ import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP } from '../data/religion';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -1078,6 +1078,88 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
 }
 
 /**
+ * B6-S2: rival missionary actions — per missionary (units order): target the
+ * NEAREST city of ANY civ (player + every rival, own included) whose
+ * followedReligion != this civ's religion g = rival index + 1
+ * (dist·(T+1)+centerIndex key, the builder-job convention — centerIndex is
+ * unique so the key is total). Within 1 of the target center → SPREAD: add
+ * the lump (SPREAD_PRESSURE, SCRIPTURE ×1.5 → 15) to that city's accumulator
+ * for g, spend the turn, charge −1, die at 0 charges. Otherwise the
+ * builder-class real-MP walk toward the center, stopping within 1. Pressure
+ * writes feed NOTHING this turn — the accumulators are only read by
+ * spreadReligiousPressure at endTurn (after rivalPhase), where the follow
+ * flip lands; yields/combat read followedReligion, which does not move
+ * mid-turn. Zero RNG.
+ */
+function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
+  const g = state.rivals.indexOf(rival) + 1;
+  const nRel = 1 + state.rivals.length;
+  const nTiles = state.map.tiles.length;
+  const eb = rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
+  const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
+  const allCities: City[] = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
+  for (const u of [...state.units]) {
+    if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'MISSIONARY' || (u.charges ?? 0) <= 0) continue;
+    const ut = state.map.tiles[u.tileIndex];
+    let target: City | null = null;
+    let bestKey = Infinity;
+    for (const c of allCities) {
+      if (c.followedReligion === g) continue;
+      const ct = state.map.tiles[c.centerIndex];
+      const key = hexDistance(ut.col, ut.row, ct.col, ct.row) * (nTiles + 1) + c.centerIndex;
+      if (key < bestKey) {
+        bestKey = key;
+        target = c;
+      }
+    }
+    if (!target) continue;
+    const tt = state.map.tiles[target.centerIndex];
+    if (hexDistance(ut.col, ut.row, tt.col, tt.row) <= 1) {
+      let pres = target.religionPressure;
+      if (!pres || pres.length !== nRel) {
+        pres = new Array(nRel).fill(0);
+        target.religionPressure = pres;
+      }
+      pres[g] += lump;
+      u.movesLeft = 0;
+      u.charges = (u.charges ?? 1) - 1;
+      if (u.charges <= 0) disbandUnit(state, u.id);
+      continue;
+    }
+    // walk toward the (fixed) target center on REAL MP — the rivalBuilderActions
+    // step loop verbatim, with the ≤1 stop instead of the on-tile stop.
+    const fullM = UNITS[u.type]?.moves ?? 2;
+    for (;;) {
+      const at = state.map.tiles[u.tileIndex];
+      const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
+      if (dHere <= 1) break;
+      let dest = -1;
+      let destD = dHere;
+      for (const n of neighbors(state.map, at)) {
+        if (!tileFreeForUnit(state, n.index, u)) continue;
+        const d = hexDistance(n.col, n.row, tt.col, tt.row);
+        if (d < destD) {
+          destD = d;
+          dest = n.index;
+        }
+      }
+      if (dest < 0) break;
+      const dt = state.map.tiles[dest];
+      const cost = moveCostInto(dt) + (crossesRiver(at, dt) ? 3 : 0);
+      if (u.movesLeft < cost && u.movesLeft < fullM) break;
+      u.tileIndex = dest;
+      u.movesLeft = Math.max(0, u.movesLeft - cost);
+      clearCampFor(state, u, dest); // any-unit camp clear, the walkPath mirror
+      if (inEnemyZoc(state, u.tileIndex, u)) {
+        u.movesLeft = 0;
+        break;
+      }
+      if (u.movesLeft <= 0) break;
+    }
+  }
+}
+
+/**
  * C1-B5b-iii: rival housing, mods-free — the computeHousing core: center
  * water (fresh/coastal/dry + the Aqueduct rule), building housing, and
  * improvement housing on civ-owned tiles within the work radius. Specialty
@@ -1822,6 +1904,35 @@ export function rivalPhase(state: GameState): void {
           }
         }
       }
+      // B6-S2: MISSIONARY — after the worship buy (worship saturates first;
+      // faith is a separate currency, independent of the gold slot). A civ
+      // with a founded religion faith-buys ONE missionary per turn at the
+      // enhancer-adjusted price (HOLY_ORDER ×0.7 → 42), cap MISSIONARY_CAP
+      // live per civ; gate = the FIRST city in array order with a SHRINE and
+      // a COMPLETE unpillaged Holy Site (real Civ 6's Shrine requirement).
+      // Spawns at that city center (no free spot = refund, the spawn-refund
+      // convention). SCRIPTURE adds +1 charge at purchase.
+      if (rival.religionFounded) {
+        const liveM = state.units.filter(
+          (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'MISSIONARY',
+        ).length;
+        const eb = rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
+        const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
+        if (liveM < MISSIONARY_CAP && goldAffordable(rival.faith ?? 0, mCost)) {
+          for (const rc of rival.cities) {
+            if (!rc.buildings.includes('SHRINE')) continue;
+            const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');
+            const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
+            if (!ht?.districtComplete || ht.districtPillaged) continue;
+            const u = spawnUnit(state, 'MISSIONARY', rc.centerIndex, 'rival', rival.id);
+            if (u) {
+              rival.faith = (rival.faith ?? 0) - mCost;
+              if (eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
+            }
+            break;
+          }
+        }
+      }
     }
 
     // AUDIT A-11/A-12b: trade — ONE new route per civ per turn while
@@ -2146,6 +2257,8 @@ export function rivalPhase(state: GameState): void {
 
     // C1-B5b: builder actions (build best-Δ improvement or walk to a job).
     rivalBuilderActions(state, rival, rivalUnlocks);
+    // B6-S2: missionary actions (spread on the adjacent target, else walk).
+    rivalMissionaryActions(state, rival);
 
     // Races: great people, pantheons, beliefs.
     claimGreatPeople(state, rival);
