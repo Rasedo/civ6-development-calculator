@@ -135,6 +135,8 @@ class Rules:
     b_req_district: torch.Tensor  # required district idx (-1 = City Center / none)
     b_req_buildings: list  # per building: list of prerequisite building indices (requiresAny)
     b_excl_buildings: list  # B9-R1: per building: exclusive-sibling indices (exclusiveWith — Barracks/Stable)
+    b_regional: torch.Tensor  # B9-R2: bool [NB] — regional building (leaves local sums; delivered by range)
+    regional_range: int  # B9-R2: REGIONAL_RANGE (hex distance, source district tile -> receiver center)
     t_cost: torch.Tensor  # [NT]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
@@ -202,6 +204,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_req_district=torch.tensor([b.get("reqDistrict", -1) for b in B], dtype=torch.long),
         b_req_buildings=[b.get("reqBuildings", []) for b in B],
         b_excl_buildings=[b.get("exclBuildings", []) for b in B],
+        b_regional=torch.tensor([bool(b.get("regional", 0)) for b in B], dtype=torch.bool),
+        regional_range=int(r.get("regionalRange", 6)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
@@ -1200,6 +1204,13 @@ class BatchSim:
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # B9-R1: exclusive-sibling index lists
         self._b_has_reqs = bool((self._b_req_district >= 0).any()) or any(len(r) > 0 for r in self._b_req_buildings) or any(len(r) > 0 for r in self._b_excl_buildings)
+        # B9-R2: regional buildings (Factory/Power Plant/Zoo/Stadium) leave every
+        # LOCAL yield/amenity sum; the regional channel delivers them to all
+        # same-civ city centers within regional_range of the source district.
+        self._b_regional = rules.b_regional.to(device)  # [NB] bool
+        self._reg_bidx = [i for i in range(NB) if bool(self._b_regional[i])]
+        self._regional_range = int(rules.regional_range)
+        self._b_local_f = (~self._b_regional).to(dtype)  # walk-dtype local-building mask
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
         self.q_dtile = torch.full((B, C), -1, dtype=torch.long, device=device)  # P2: the queued district's target tile
@@ -2376,6 +2387,13 @@ class BatchSim:
             # read it on every call (city religion can change without a bump,
             # but the pillage mask cannot).
             bf_live = self._pillaged_bf_live(bf, tcf, tiles, slot_ids, M)
+            # B9-R2: regional buildings leave every LOCAL sum fed by bf_live
+            # (yields/amenities; their housing is 0 and no belief row targets
+            # them, so the wholesale mask mirrors cityBuildingYields' /
+            # localBuildingAmenities' `if (def.regional) continue`). The
+            # regional channel below delivers them by range; maintenance
+            # stays on the unmasked bf (cityMaintenance has no regional skip).
+            bf_live = bf_live * self._b_local_f.view(1, 1, -1)
             b_y = torch.einsum("bcn,nk->bck", bf_live, rd.b_yields)
         center_y = self.center_yields
         if self.disasters:
@@ -2399,6 +2417,7 @@ class BatchSim:
             # the raw f64 table would break the einsum. No-op under parity f64.)
             _fol_by = torch.einsum("bcn,bcnk->bck", bf_live, self._fol_tab("bldgY", _pcfol).to(self.dtype))  # B-32: dark buildings
             total = total + _fol_by
+        reg_y = reg_am = None  # B9-R2 (set by the districts_on block; regional buildings need a district)
         if self.districts_on:
             if cc is not None:
                 # D-10: the whole block is pop-free — replay the cached per-
@@ -2412,6 +2431,8 @@ class BatchSim:
                 dcount_all = cc["dcount_all"]  # #46r: INSULAE's housingIfDistricts
                 spec_count = cc["spec_count"]  # B-18: Zen Meditation specialty count
                 hs_adj = cc["hs_adj"]  # B-18: Holy Site adjacency (follower Work Ethic)
+                reg_y = cc["reg_y"]  # B9-R2: regional-building yields [B, C, 6] | None
+                reg_am = cc["reg_am"]  # B9-R2: regional-building amenities [B, C] | None
             else:
                 # District adjacency yields (D2b: Campus science only, placed where no
                 # dynamic source is live so the value is purely floor(static);
@@ -2486,9 +2507,35 @@ class BatchSim:
                 # Aqueduct ownership feeds computeHousing below (D-10: hoisted
                 # into the cacheable block — owned_d/dt live only on this path)
                 has_aq = (owned_d_live & (dt == self._aqueduct_idx)).any(dim=2) if self._aqueduct_idx >= 0 else None  # B-32: pillaged Aqueduct gives no housing
+                # B9-R2: regional buildings (regionalEffects, yields.ts:215) —
+                # a regional building on a COMPLETE unpillaged (live) source
+                # district reaches EVERY player city center within
+                # regional_range; dedup by building id (any() over sources).
+                # Pop-free + every input bumps _eff_version => cacheable.
+                reg_y = reg_am = None
+                if self._reg_bidx:
+                    _sitec_r = self.site.clamp(min=0)  # [B, C] receiver centers
+                    for _n in self._reg_bidx:
+                        _own_n = self.buildings[:, :, _n] & self.alive  # [B, C] source cities (state.cities = live only)
+                        if not bool(_own_n.any()):
+                            continue
+                        _msrc = _own_n.unsqueeze(2) & owned_d_live & (dt == int(self._b_req_district[_n]))  # [B, C, M]
+                        _st = torch.where(_msrc, tiles, torch.full_like(tiles, -1)).max(dim=2).values  # [B, C] source tile (-1 none)
+                        if not bool((_st >= 0).any()):
+                            continue
+                        _ddp = self.pair_dist[_st.clamp(min=0).unsqueeze(2), _sitec_r.unsqueeze(1)]  # [B, Csrc, Crecv] int16
+                        _has = ((_st >= 0).unsqueeze(2) & (_ddp <= self._regional_range)).any(dim=1) & self.alive  # [B, C recv]
+                        _hf = _has.to(self.dtype)
+                        if reg_y is None:
+                            reg_y = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)
+                            reg_am = torch.zeros(B, C, dtype=self.dtype, device=dev)
+                        reg_y = reg_y + _hf.unsqueeze(2) * rd.b_yields[_n].view(1, 1, 6)
+                        reg_am = reg_am + _hf * rd.b_amenities[_n]
             for yc_a, adj_add in d_addends:
                 total[:, :, yc_a] = total[:, :, yc_a] + adj_add
             total = total + cs_city6  # B9-R1: CS envoy district adds (channel columns, all types)
+            if reg_y is not None:
+                total = total + reg_y  # B9-R2: regional-building yields (pre-tier, the buildings position)
             # B-18: follower Work Ethic — Holy Site floored adjacency ALSO yields
             # production (yields.ts:154), keyed on each city's followed religion.
             if _pcfol is not None and hs_adj is not None:
@@ -2520,6 +2567,10 @@ class BatchSim:
 
         amen_b = cc["amen_b"] if cc is not None else torch.einsum("bcn,n->bc", bf_live, rd.b_amenities)  # D-10 (B-32: bf_live)
         amen_have = self.is_cap.to(self.dtype) * self._palace_amenities + amen_b
+        # B9-R2: regional amenities join BEFORE the luxury ranking — the
+        # city.ts:292 baseHave (localBuildingAmenities + regional.amenities).
+        if reg_am is not None:
+            amen_have = amen_have + reg_am
         amen_need = torch.ceil((popf - 2) / 2).clamp(min=0)
         lux_add = self._luxury_amenities(amen_have, amen_need) if lux is None else lux  # C1-B1: improved luxuries
         self._last_lux = lux_add  # the walk freezes this (TS: one luxMap per turn)
@@ -2610,6 +2661,8 @@ class BatchSim:
                 store["dcount_all"] = dcount_all  # #46r
                 store["spec_count"] = spec_count  # B-18 Zen Meditation
                 store["hs_adj"] = hs_adj  # B-18 follower Work Ethic
+                store["reg_y"] = reg_y  # B9-R2 regional yields (None until one exists)
+                store["reg_am"] = reg_am  # B9-R2 regional amenities
             if self.improvements_on:
                 store["imp_add"] = imp_add
             self._ct_cache = (self._eff_version, store)
@@ -2873,7 +2926,7 @@ class BatchSim:
                         faith = faith + add  # GV-1a
         # C1-B4b-2: building yields (int-valued matmul: exact in any order)
         if self.districts_on:
-            selb = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r])  # [B, RC, NB] (B-32: dark buildings)
+            selb = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # [B, RC, NB] (B-32 dark; B9-R2 regional by range)
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, RC, 6]
                 food = food + add6[:, :, 0]
@@ -2901,6 +2954,18 @@ class BatchSim:
                     if bool(has_sy.any()):
                         hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0)).double()  # (G5 memo)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # B9-R2: regional-building yields, j-batched — state is frozen here
+        # (post-step), so ONE _rival_regional serves every receiver (the per-j
+        # calls return this same value each time). Integer f64: batching exact.
+        _regional_all = self._rival_regional(r)
+        if _regional_all is not None:
+            _ra = _regional_all[0]  # [B, RC, 6]
+            food = food + _ra[:, :, 0]
+            prod = prod + _ra[:, :, 1]
+            gold = gold + _ra[:, :, 2]
+            sci = sci + _ra[:, :, 3]
+            cul = cul + _ra[:, :, 4]
+            faith = faith + _ra[:, :, 5]
         # A-4: completed wonders — flat city yields + belief faithPerWonder
         if compw is not None and bool(compw.any()):
             wcy = compw.double() @ self._wond_cy  # [B, RC, 6] (int-valued)
@@ -3024,9 +3089,12 @@ class BatchSim:
         the route raided-mask), border claims landing inside a later
         same-civ window (_claim_version — rival_at is the valid-mask input;
         claims elsewhere, and any r0 claim seen by r1, cannot flip a valid
-        bit: a claimed tile goes -1 -> r0, never == r1). A city's own-column
-        inputs (pop, buildings) are written only AT its iteration, after its
-        yields are consumed. The one live read a snapshot cannot honor is
+        bit: a claimed tile goes -1 -> r0, never == r1). Pop is own-column
+        and written only AT its iteration, after its yields are consumed;
+        BUILDINGS stopped being own-column at B9-R2 (a regional building
+        completed/bought at j's iteration reaches LATER columns via
+        _rival_regional), so every rc_bldg write site now bumps
+        _eff_version. The one live read a snapshot cannot honor is
         capY's civ-total follower pop under beliefs — the economy loop keeps
         the per-j path for capital columns in that case (see the call site).
         Post-phase callers (trace/leader/rival_score) stay on the raw twin:
@@ -5701,6 +5769,7 @@ class BatchSim:
                     if bool(ok_now.any()):
                         rows_ = ok_now.nonzero(as_tuple=True)[0]
                         self.rc_bldg[rows_, r, j, bi[rows_]] = True
+                        self._eff_version += 1  # B9-R2: a bought regional building reaches other cities this phase
                         if self._walls_bidx >= 0:  # AUDIT B-1
                             wm = rows_[bi[rows_] == self._walls_bidx]
                             if len(wm) > 0:
@@ -6505,7 +6574,7 @@ class BatchSim:
         # C1-B4b-2: building yields under empty modifiers (worship never
         # queues, so the plain def.yields sum matches cityBuildingYields).
         if self.districts_on:
-            selb = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j])  # B-32: buildings in a pillaged district go dark
+            selb = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j]) & ~self._b_regional.view(1, -1)  # B-32 dark; B9-R2 regional delivered by range
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, 6] (int-valued: dtype roundtrip is exact)
                 food = food + add6[:, 0]
@@ -6540,6 +6609,18 @@ class BatchSim:
                     if bool(has_sy.any()):
                         hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()  # (G5 memo)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # B9-R2: regional-building yields — rivalRegionalEffects at the
+        # city.ts:445-446 position (after the local buildings, before the
+        # wonder flat yields), pre-tier. LIVE per-j compute like TS.
+        _regional_j = self._rival_regional(r)
+        if _regional_j is not None:
+            _rj = _regional_j[0][:, j] * mask.double().unsqueeze(1)  # [B, 6]
+            food = food + _rj[:, 0]
+            prod = prod + _rj[:, 1]
+            gold = gold + _rj[:, 2]
+            sci = sci + _rj[:, 3]
+            cul = cul + _rj[:, 4]
+            faith = faith + _rj[:, 5]
         # A-4: this city's completed wonders — flat city yields pre-tier
         # (computeCityStats' buildings position) + the belief faithPerWonder
         # (city.ts:437), now reachable.
@@ -6660,17 +6741,57 @@ class BatchSim:
             torch.where(mask, faith, z),
         )
 
+    def _rival_regional(self, r: int) -> tuple[torch.Tensor, torch.Tensor] | None:
+        """B9-R2: rivalRegionalEffects — each regional building owned by one of
+        this rival's cities whose source district (rc_dist_tile of the
+        building's type) is COMPLETE and unpillaged reaches every ALIVE
+        same-civ city center within regional_range of the source tile; the
+        same building id never stacks (any() over sources). Reads LIVE state
+        at call time (the per-j path sees mid-phase completions, like TS).
+        Returns ([B, RC, 6] yields, [B, RC] amenities) in f64, or None when
+        no city of this rival owns a regional building."""
+        if not self._reg_bidx or not self.districts_on:
+            return None
+        B, RC = self.B, self.RC
+        alive = self.rc_alive[:, r]
+        dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
+        ctrs = self.rc_center[:, r].clamp(min=0)  # [B, RC] receiver centers
+        y6 = am = None
+        for n in self._reg_bidx:
+            own_n = self.rc_bldg[:, r, :, n] & alive  # [B, RC] source cities
+            if not bool(own_n.any()):
+                continue
+            st = dt_all[:, :, int(self._b_req_district[n])]  # [B, RC] source district tile (-1 none)
+            stc = st.clamp(min=0)
+            ok = own_n & (st >= 0) & self.district_complete.gather(1, stc) & ~self.district_pillaged.gather(1, stc)  # B-32: pillaged source is dark
+            if not bool(ok.any()):
+                continue
+            dd = self.pair_dist[stc.unsqueeze(2), ctrs.unsqueeze(1)]  # [B, RCsrc, RCrecv] int16
+            has = (ok.unsqueeze(2) & (dd <= self._regional_range)).any(dim=1) & alive  # [B, RC recv]
+            hf = has.double()
+            if y6 is None:
+                y6 = torch.zeros(B, RC, 6, dtype=torch.float64, device=self.device)
+                am = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
+            y6 = y6 + hf.unsqueeze(2) * self.rules_dev.b_yields[n].double().view(1, 1, 6)
+            am = am + hf * float(self.rules.b_amenities[n])
+        return None if y6 is None else (y6, am)
+
     def _rival_amenity(self, r: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """P5/S6 (C-20): rivalAmenityTiers — each UNIQUE improved luxury on
         THIS civ's territory grants +1 to its luxAmenityCities neediest
         cities (need desc, slot asc = rc.id acquisition order); tier from
-        have − needed with have = local building amenities (no Palace, no
-        regional/policy sources — rivals can't build them). Returns
-        (tier_idx, growth_f, yield_f), each [B, RC]."""
+        have − needed with have = local building amenities + regional
+        (B9-R2, the city.ts:292 ranking mirror; no Palace, no policy
+        sources). Returns (tier_idx, growth_f, yield_f), each [B, RC]."""
         B, RC = self.B, self.RC
         rd = self.rules_dev
-        selb_a = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r])  # B-32: buildings in a pillaged district give no amenities
+        selb_a = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # B-32 dark; B9-R2 regional delivered by range
         have = torch.einsum("bjn,n->bj", selb_a.to(torch.float64), rd.b_amenities.double())
+        # B9-R2: regional amenities (Zoo/Stadium) join the base BEFORE the
+        # luxury ranking — the rivalAmenityTiers baseHave / city.ts:292 mirror.
+        _regional = self._rival_regional(r)
+        if _regional is not None:
+            have = have + _regional[1]
         need = torch.ceil((self.rc_pop[:, r].double() - 2) / 2).clamp(min=0)
         out = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
         alive = self.rc_alive[:, r]
@@ -8476,6 +8597,7 @@ class BatchSim:
                     if bool(can6.any()):
                         rows6 = can6.nonzero(as_tuple=True)[0]
                         self.rc_bldg[rows6, r, jj6[rows6], bb6[rows6]] = True
+                        self._eff_version += 1  # B9-R2: a bought regional building reaches other cities this phase
                         if self._walls_bidx >= 0:  # AUDIT B-1
                             wm6 = rows6[bb6[rows6] == self._walls_bidx]
                             if len(wm6) > 0:
@@ -8781,6 +8903,11 @@ class BatchSim:
                             br = done_b.nonzero(as_tuple=True)[0]
                             bi_done = (cur - 1 - self.NU - nS_b4).clamp(min=0)
                             self.rc_bldg[br, r, j, bi_done[br]] = True
+                            # B9-R2: a completed REGIONAL building reaches OTHER
+                            # cities' yields THIS phase (TS accrues later cities
+                            # live) — the first cross-city building channel, so
+                            # rc_bldg writes must invalidate the economy caches.
+                            self._eff_version += 1
                             if self._walls_bidx >= 0:  # AUDIT B-1
                                 wm = br[bi_done[br] == self._walls_bidx]
                                 if len(wm) > 0:
@@ -9640,20 +9767,6 @@ class BatchSim:
                     self.r_warturns = torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns)
                     self.r_peaceturns = torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns)
 
-        # --- war weariness: player accrual (B-15) --------------------------------
-        # Accrue once per turn while at war with any LIVE rival (state as left by
-        # last turn's rival phase — the war block above is inert in scripted mode);
-        # decay 4× in peace. Mirrors endTurn's top-of-turn update (game.ts).
-        rww = self.rules.war_weariness
-        if self.R > 0:
-            live = self.rc_alive[:, : self.R].any(dim=2)  # [B, R]
-            atwar_now = (self.r_atwar[:, : self.R] & live).any(dim=1)  # [B]
-        else:
-            atwar_now = torch.zeros(B, dtype=torch.bool, device=dev)
-        inc = (self.war_weariness + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
-        dec = (self.war_weariness - int(rww.get("decay", 4))).clamp(min=0)
-        self.war_weariness = torch.where(atwar_now, inc, dec)
-
         # --- player unit orders (before the turn advances) ----------------------
         # #56 phase-order: the EXPORTER's script runs envoys → production →
         # builder walker; the scripted walker call therefore moved BELOW the
@@ -9666,6 +9779,25 @@ class BatchSim:
         # unit actions stay here (their ordering contract is the recording).
         if units is not None and self.units_mode:
             self._apply_unit_actions(units)
+
+        # --- war weariness: player accrual (B-15) --------------------------------
+        # Accrue once per turn while at war with any LIVE rival; decay 4× in
+        # peace. Mirrors endTurn's top-of-turn update (game.ts:768-771), which
+        # runs AFTER the player's unit orders (the TS replay applies them
+        # before endTurn) — a capture that eliminates the last at-war rival
+        # must flip ww to DECAY the same turn (B9-R2 hunt, rng 2026006092
+        # t172: the pre-orders read held ww at the cap for one extra turn and
+        # dropped the whole economy walk a tier). The RL war verb and last
+        # turn's rival phase both precede this point, exactly like TS.
+        rww = self.rules.war_weariness
+        if self.R > 0:
+            live = self.rc_alive[:, : self.R].any(dim=2)  # [B, R]
+            atwar_now = (self.r_atwar[:, : self.R] & live).any(dim=1)  # [B]
+        else:
+            atwar_now = torch.zeros(B, dtype=torch.bool, device=dev)
+        inc = (self.war_weariness + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
+        dec = (self.war_weariness - int(rww.get("decay", 4))).clamp(min=0)
+        self.war_weariness = torch.where(atwar_now, inc, dec)
 
         # --- envoys --------------------------------------------------------------
         if self.S > 0:

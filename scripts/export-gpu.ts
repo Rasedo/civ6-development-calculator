@@ -109,6 +109,7 @@ import {
   GOLD_PURCHASE_MULT,
   LUXURY_AMENITY_CITIES,
   GAME_SPEED,
+  REGIONAL_RANGE,
   EMBARK_MOVES,
   EMBARKED_DEFENSE_CS,
   embarkState,
@@ -409,6 +410,7 @@ const rules = {
   centerMinFood: CITY_CENTER_MIN_FOOD,
   centerMinProduction: CITY_CENTER_MIN_PRODUCTION,
   housing: { fresh: HOUSING_FRESH_WATER, coastal: HOUSING_COASTAL, none: HOUSING_NO_WATER, aqFreshBonus: AQUEDUCT_FRESH_BONUS, aqNoFreshTotal: AQUEDUCT_NO_FRESH_TOTAL },
+  regionalRange: REGIONAL_RANGE, // B9-R2: regional-building reach (hex distance, city centers)
   boostFraction: BOOST_FRACTION,
   // amenityTier(balance) thresholds, highest first (see data/constants.ts).
   // P4/D-12: real Civ 6 bands — Content exactly 0, Displeased -1..-2.
@@ -824,6 +826,9 @@ const rules = {
     // B9-R1: exclusiveWith (Barracks/Stable) — pickers refuse a building whose
     // exclusive sibling is already owned (availableBuildings' rule).
     exclBuildings: (b.exclusiveWith ?? []).map((id) => buildingIdx.get(id) ?? -1).filter((i) => i >= 0),
+    // B9-R2: regional buildings leave the local yield/amenity sums — the
+    // regional channel (regionalEffects semantics) delivers them by range.
+    regional: b.regional ? 1 : 0,
   })),
   techs: techList.map((t) => ({
     id: t.id,
@@ -934,8 +939,14 @@ const SEED_OVERRIDES: Record<number, number> = {
   // advance-after-kill tileFree asymmetry) — combat/xp bit-identical in both,
   // the divergence is in unmodified economy/advance code. Rerolled so the
   // derived rollout games dodge them; the latents are flagged in the M2 log.
+  // 9301 (index 23, AGAIN): B9-R2's catalog/trajectory reshuffle steered its
+  // rollout game (rng 2026006147) into the SAME G-5 class 9222 hit — rival-0
+  // treasury off by EXACTLY 1 gold + rival score 5.4 at t223, the turn it
+  // captured player city 586 (hp120, rosters/per-city fields bit-identical,
+  // NO regional buildings in the game — verified via the t200/t225 ckpts).
+  // Second sighting recorded in AUDIT G-5; the hunt stays scoped in #66.
   17: 9223,
-  23: 9301,
+  23: 9302,
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;

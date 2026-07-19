@@ -575,6 +575,16 @@ G-1..G-4 resolved (detail in git history / the cited logs); G-5 open:
   Hunt entry: M2's log (gpu/ROUND_B5_M2_LOG.md) has the repro seed;
   suspect the milli-rounding order in the transferred city's first
   economy turn vs the GPU's batched twin.
+  SECOND SIGHTING (2026-07-19, B9-R2): seed 9301's rollout game rng
+  2026006147 hit the same class on a WAR capture (not loyalty) — the
+  turn rival 0 captured player city 586, its treasury went off by
+  EXACTLY 1 gold and its empire score by 5.4, with rosters, per-city
+  RC fields and combat all bit-identical and NO regional buildings in
+  the game (t200/t225 ckpt-verified — not a B9 regression). So the
+  class covers ANY mid-phase city acquisition (transfer or capture);
+  suspect set narrows to `_transfer`/`_capture` first-economy-turn
+  interaction with the maintenance/score paths. Rerolled 9301→9302;
+  hunt scoped in #66.
 - G-1. RESOLVED: `_rival_builder_actions` gain terms read current
   `r_techs`/`r_civics` (validity keeps the snapshot); poke
   `gpu/builder_gain_test.py`.

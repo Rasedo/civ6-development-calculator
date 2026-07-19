@@ -47,6 +47,7 @@ import {
   AQUEDUCT_NO_FRESH_TOTAL,
   GAME_SPEED,
   GOLD_PURCHASE_MULT,
+  REGIONAL_RANGE,
   borderGrowthCost,
   amenitiesNeeded,
   amenityTier,
@@ -1119,8 +1120,8 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
  * improved luxury on ITS territory grants +1 amenity to its
  * LUXURY_AMENITY_CITIES neediest cities (need desc, id asc = acquisition
  * order — the luxuryAmenities mirror); tier = amenityTier(have − needed)
- * with have = local building amenities + grants. Regional/policy amenity
- * sources are player machinery (rivals can't build them; no Palace). */
+ * with have = local building amenities + regional (B9-R2) + grants. Policy
+ * amenity sources stay player machinery (no Palace). */
 export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number, AmenityTier> {
   const grants = new Map<number, number>();
   for (const rc of rival.cities) grants.set(rc.id, 0);
@@ -1138,7 +1139,9 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
       const bd = BUILDINGS[id];
       if (bd && !bd.regional && bd.amenities && !pillaged.has(bd.district)) n += bd.amenities;
     }
-    baseHave.set(rc.id, n);
+    // B9-R2: regional amenities (Zoo/Stadium) join the base like the player's
+    // luxury ranking (city.ts:292 — localBuildingAmenities + regional).
+    baseHave.set(rc.id, n + rivalRegionalEffects(state, rival, rc).amenities);
   }
   for (let i = 0; i < luxuries.size; i++) {
     const ranked = [...rival.cities].sort((a, b) => {
@@ -1171,6 +1174,34 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
     tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! + extra - wwPenalty - amenitiesNeeded(rc.population)));
   }
   return tiers;
+}
+
+/** B9-R2: regionalEffects (yields.ts:215) for a rival city — regional
+ * buildings on this rival's OWN cities' complete unpillaged districts reach
+ * every same-civ city center within REGIONAL_RANGE; the same building type
+ * never stacks. */
+function rivalRegionalEffects(state: GameState, rival: RivalCiv, rc: RivalCity): { yields: Yields; amenities: number } {
+  const center = state.map.tiles[rc.centerIndex];
+  const seen = new Set<string>();
+  const out = { yields: { food: 0, production: 0, gold: 0, science: 0, culture: 0, faith: 0 } as Yields, amenities: 0 };
+  for (const other of rival.cities) {
+    for (const inst of other.districts) {
+      const tile = state.map.tiles[inst.tileIndex];
+      if (!tile.districtComplete || tile.districtPillaged) continue; // B-32: pillaged source is dark
+      for (const id of other.buildings) {
+        const def = BUILDINGS[id];
+        if (!def || !def.regional || def.district !== inst.type) continue;
+        if (seen.has(id)) continue;
+        if (hexDistance(tile.col, tile.row, center.col, center.row) > REGIONAL_RANGE) continue;
+        seen.add(id);
+        if (def.yields) {
+          for (const [k, v] of Object.entries(def.yields)) out.yields[k as keyof Yields] += v ?? 0;
+        }
+        if (def.amenities) out.amenities += def.amenities;
+      }
+    }
+  }
+  return out;
 }
 
 export function rivalCityYields(
@@ -1266,6 +1297,7 @@ export function rivalCityYields(
   // floor(adjacency), the rival twin of yields.ts:171.
   for (const id of rc.buildings) {
     const bd = BUILDINGS[id];
+    if (bd?.regional) continue; // B9-R2: handled by the regional scan (affects own city too)
     if (bd && pillaged.has(bd.district)) continue; // B-32: buildings in a pillaged district are dark
     if (bd?.yields) {
       for (const [k, v] of Object.entries(bd.yields)) total[k as keyof Yields] += v ?? 0;
@@ -1282,6 +1314,12 @@ export function rivalCityYields(
         total.production += Math.floor(districtAdjacency(state.map, state.map.tiles[harbor.tileIndex], 'HARBOR'));
       }
     }
+  }
+  // B9-R2: regional-building yields — the city.ts:445-446 position (after the
+  // local buildings, before the wonder flat yields), pre-tier.
+  {
+    const regional = rivalRegionalEffects(state, rival, rc);
+    for (const [k, v] of Object.entries(regional.yields)) total[k as keyof Yields] += v ?? 0;
   }
   // A-4: wonder flat city yields + the belief faithPerWonder (city.ts:435-437
   // positions — pre-tier, with the buildings).

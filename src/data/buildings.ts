@@ -108,11 +108,11 @@ export function buildingsForDistrict(district: DistrictId): BuildingDef[] {
 }
 
 /**
- * ROUND B9 R1 hold (A-9): regional buildings stay out of every SCRIPTED
- * pick (rival queue, rival gold purchase, exporter building table → the
- * scripted player and the GPU) until the regional-effects channel exists on
- * both engines — shipping them without it is an instant parity break the
- * moment one completes. R2 implements the channel and empties this set.
- * The player UI path (availableBuildings) is intentionally NOT gated.
+ * B9 (A-9): buildings held out of every SCRIPTED pick (rival queue, rival
+ * gold purchase, exporter building table → the scripted player and the GPU)
+ * while their support channel is still missing on one engine. The player UI
+ * path (availableBuildings) is intentionally NOT gated. EMPTY since B9-R2
+ * shipped the regional-effects channel; the plumbing stays for future
+ * inert-first stages.
  */
-export const SCRIPTED_HELD_BUILDINGS: ReadonlySet<string> = new Set(['FACTORY', 'POWER_PLANT', 'ZOO', 'STADIUM']);
+export const SCRIPTED_HELD_BUILDINGS: ReadonlySet<string> = new Set();
