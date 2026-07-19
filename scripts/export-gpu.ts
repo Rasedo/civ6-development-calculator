@@ -49,7 +49,7 @@ import {
   CS_MEET_RANGE,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC } from '../src/core/trade';
@@ -170,7 +170,10 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 // excluded below. (Harbor stage: pairs with the _city_totals player-yield mirror.)
 const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', ...SCAFFOLD_DISTRICTS.map((d) => d.id)]);
 const centerBuildings = Object.values(BUILDINGS)
-  .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !b.worship && !SCRIPTED_HELD_BUILDINGS.has(b.id)) // B9-R1: regional held until R2
+  // B9-R3: worship buildings JOIN the table (rivals faith-buy them; every
+  // production/gold picker masks them via the `worship` flag). PALACE stays
+  // out (both engines model it as a capital term, not a table row).
+  .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !SCRIPTED_HELD_BUILDINGS.has(b.id))
   .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
 const buildingUnlockTech = new Map<string, number>();
@@ -444,6 +447,13 @@ const rules = {
   // completion to fill the outer-defense pool, and B-2's city ranged strike
   // fires only from cities holding it. -1 if absent from the exported set.
   ancientWallsBidx: buildingIdx.get('ANCIENT_WALLS') ?? -1,
+  // B9-R3: worship faith-buy anchors — the 5 worship rows in WORSHIP_BUILDINGS
+  // order (the deterministic pick indexes THIS list by religion id % 5, not
+  // the cost-sorted table), the Temple prerequisite row, and the flat
+  // buildingFaithCost for worship (game.ts:443).
+  worshipBidx: WORSHIP_BUILDINGS.map((id) => buildingIdx.get(id) ?? -1),
+  templeBidx: buildingIdx.get('TEMPLE') ?? -1,
+  worshipFaithCost: Math.round(190 * GAME_SPEED),
   // AUDIT A-11: rival trade — id-anchored capacity sources + route constants
   // (the rivalTradeCapacity/routeYields mirror; no CS term until A-12).
   trade: {
@@ -829,6 +839,8 @@ const rules = {
     // B9-R2: regional buildings leave the local yield/amenity sums — the
     // regional channel (regionalEffects semantics) delivers them by range.
     regional: b.regional ? 1 : 0,
+    // B9-R3: worship = faith-purchase-only (never queued, never gold-bought).
+    worship: b.worship ? 1 : 0,
   })),
   techs: techList.map((t) => ({
     id: t.id,
@@ -945,6 +957,10 @@ const SEED_OVERRIDES: Record<number, number> = {
   // captured player city 586 (hp120, rosters/per-city fields bit-identical,
   // NO regional buildings in the game — verified via the t200/t225 ckpts).
   // Second sighting recorded in AUDIT G-5; the hunt stays scoped in #66.
+  // 9131 (index 10) died in B9-R3: the rival PALACE grant (+2p/+5g/+2s/+1c
+  // per capital) and worship buys pushed its already 1-city scripted player
+  // (pop 8 hanging on since B5) over the edge — structural collapse.
+  10: 9132,
   17: 9223,
   23: 9302,
 };

@@ -31,7 +31,7 @@ import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost } from '../data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS } from '../data/religion';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -63,7 +63,7 @@ import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from './units';
-import { districtCostIn, goldAffordable } from './game';
+import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import {
@@ -160,7 +160,10 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
     focus: 'balanced',
     queue: [],
     isCapital: rival.cities.length === 0,
-    buildings: [],
+    // B9-R3 (A-9): a civ's FIRST city gets the PALACE, the foundCity mirror.
+    // No relocation on capital loss — B-30 strips it on every capture/
+    // transfer path and nothing re-grants one (recorded residual).
+    buildings: rival.cities.length === 0 ? ['PALACE'] : [],
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
     specialists: {},
@@ -1786,6 +1789,28 @@ export function rivalPhase(state: GameState): void {
           if (u) {
             rival.treasury = (rival.treasury ?? 0) - price;
             bought = true;
+          }
+        }
+      }
+      // B9-R3 (A-9): WORSHIP — a civ that FOUNDED a religion faith-buys its
+      // worship building (worship is faith-purchase-only, like the player's
+      // purchaseBuilding). Deterministic no-draw pick keyed off the religion
+      // index (owner religion = rival index + 1, the B-18 convention); flat
+      // buildingFaithCost (190·GAME_SPEED); FIRST city in array order with a
+      // COMPLETE unpillaged Holy Site and the Temple. Faith is a separate
+      // currency, so this does not consume the one-gold-purchase slot.
+      if (rival.religionFounded) {
+        const wid = WORSHIP_BUILDINGS[(state.rivals.indexOf(rival) + 1) % WORSHIP_BUILDINGS.length];
+        const wCost = buildingFaithCost(wid);
+        if (goldAffordable(rival.faith ?? 0, wCost)) {
+          for (const rc of rival.cities) {
+            if (rc.buildings.includes(wid) || !rc.buildings.includes('TEMPLE')) continue;
+            const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');
+            const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
+            if (!ht?.districtComplete || ht.districtPillaged) continue;
+            rival.faith = (rival.faith ?? 0) - wCost;
+            rc.buildings.push(wid);
+            break;
           }
         }
       }

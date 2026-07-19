@@ -137,6 +137,10 @@ class Rules:
     b_excl_buildings: list  # B9-R1: per building: exclusive-sibling indices (exclusiveWith — Barracks/Stable)
     b_regional: torch.Tensor  # B9-R2: bool [NB] — regional building (leaves local sums; delivered by range)
     regional_range: int  # B9-R2: REGIONAL_RANGE (hex distance, source district tile -> receiver center)
+    b_worship: torch.Tensor  # B9-R3: bool [NB] — worship building (faith-purchase-only; every production/gold picker skips)
+    worship_bidx: list  # B9-R3: the 5 worship rows in WORSHIP_BUILDINGS order (religion id % 5 indexes THIS)
+    temple_bidx: int  # B9-R3: TEMPLE row (worship prerequisite), -1 if absent
+    worship_faith_cost: float  # B9-R3: flat worship faith price (round(190·GAME_SPEED))
     t_cost: torch.Tensor  # [NT]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
@@ -206,6 +210,10 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_excl_buildings=[b.get("exclBuildings", []) for b in B],
         b_regional=torch.tensor([bool(b.get("regional", 0)) for b in B], dtype=torch.bool),
         regional_range=int(r.get("regionalRange", 6)),
+        b_worship=torch.tensor([bool(b.get("worship", 0)) for b in B], dtype=torch.bool),
+        worship_bidx=r.get("worshipBidx", []),
+        temple_bidx=int(r.get("templeBidx", -1)),
+        worship_faith_cost=float(r.get("worshipFaithCost", 114)),
         t_cost=torch.tensor([t["cost"] for t in r["techs"]], dtype=torch.float64),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
@@ -1211,6 +1219,13 @@ class BatchSim:
         self._reg_bidx = [i for i in range(NB) if bool(self._b_regional[i])]
         self._regional_range = int(rules.regional_range)
         self._b_local_f = (~self._b_regional).to(dtype)  # walk-dtype local-building mask
+        # B9-R3: worship buildings are faith-purchase-only — every production/
+        # gold picker masks them; only the rival A-5 worship faith-buy (and
+        # nothing player-side in scripted mode) can set their rc_bldg bits.
+        self._b_worship = rules.b_worship.to(device)  # [NB] bool
+        self._worship_bidx = [int(x) for x in rules.worship_bidx]
+        self._temple_bidx = int(rules.temple_bidx)
+        self._worship_cost = float(rules.worship_faith_cost)
         self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.cur_cost = z(B, C)
         self.q_dtile = torch.full((B, C), -1, dtype=torch.long, device=device)  # P2: the queued district's target tile
@@ -1835,7 +1850,7 @@ class BatchSim:
             torch.ones(B, NB, dtype=torch.bool, device=dev),
         )  # Temple/Amphitheater/… gate on a civic (mirrors availableBuildings' unlocks.buildings)
         unlocked = unlocked & unlocked_civic
-        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2))
+        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2)) & ~self._b_worship.view(1, 1, -1)  # B9-R3: worship is faith-only
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
             valid = (self.district >= 0) & self.district_complete & (self.owner >= 0) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
@@ -2954,6 +2969,16 @@ class BatchSim:
                     if bool(has_sy.any()):
                         hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0)).double()  # (G5 memo)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # B9-R3: PALACE on the capital slot — the per-j twin's add, j-batched.
+        _isc_palA = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+        if bool((_isc_palA != 0).any()):
+            _pal6A = self._palace_y.double()
+            food = food + _pal6A[0] * _isc_palA
+            prod = prod + _pal6A[1] * _isc_palA
+            gold = gold + _pal6A[2] * _isc_palA
+            sci = sci + _pal6A[3] * _isc_palA
+            cul = cul + _pal6A[4] * _isc_palA
+            faith = faith + _pal6A[5] * _isc_palA
         # B9-R2: regional-building yields, j-batched — state is frozen here
         # (post-step), so ONE _rival_regional serves every receiver (the per-j
         # calls return this same value each time). Integer f64: batching exact.
@@ -5560,7 +5585,7 @@ class BatchSim:
             have_b = self.rc_bldg[:, r, j]
             ctile = self.rc_center[:, r, j].clamp(min=0)
             riv_c = self.tile_river.gather(1, ctile.unsqueeze(1)).squeeze(1)
-            ok_b = unl_b & ~have_b & (~rdv.b_river.view(1, -1) | riv_c.unsqueeze(1))
+            ok_b = unl_b & ~have_b & (~rdv.b_river.view(1, -1) | riv_c.unsqueeze(1)) & ~self._b_worship.view(1, -1)  # B9-R3: worship is faith-only
             reqd_b = rdv.b_req_district
             reg_t = self.rc_dist_tile[:, r, j].gather(1, reqd_b.clamp(min=0).unsqueeze(0).expand(B, -1))
             dcomp = (reg_t >= 0) & self.district_complete.gather(1, reg_t.clamp(min=0))
@@ -5765,7 +5790,7 @@ class BatchSim:
                             if bool(m2.any()):
                                 havex = self.rc_bldg[:, r, j][:, torch.tensor(excl, device=self.device, dtype=torch.long)].any(dim=1)
                                 rb_ok = rb_ok & (~m2 | ~havex)
-                    ok_now = ok_now & d_ok & rb_ok
+                    ok_now = ok_now & d_ok & rb_ok & ~self._b_worship.gather(0, bi)  # B9-R3: worship is faith-only
                     if bool(ok_now.any()):
                         rows_ = ok_now.nonzero(as_tuple=True)[0]
                         self.rc_bldg[rows_, r, j, bi[rows_]] = True
@@ -6609,6 +6634,19 @@ class BatchSim:
                     if bool(has_sy.any()):
                         hadj = self._district_adj_floor(self._harbor_idx).gather(1, hb_tile.clamp(min=0).unsqueeze(1)).squeeze(1).double()  # (G5 memo)
                         prod = prod + torch.where(has_sy, hadj, torch.zeros_like(hadj))
+        # B9-R3: PALACE — the civ's FIRST city holds it (rc_is_cap mirrors
+        # TS's founding grant exactly: B-30 strips on capture, nothing
+        # relocates or re-grants). Its yields sit in the rc.buildings loop
+        # position — integer f64, order-exact.
+        _isc_pal = (self.rc_is_cap[:, r, j] & mask).double()
+        if bool((_isc_pal != 0).any()):
+            _pal6 = self._palace_y.double()
+            food = food + _pal6[0] * _isc_pal
+            prod = prod + _pal6[1] * _isc_pal
+            gold = gold + _pal6[2] * _isc_pal
+            sci = sci + _pal6[3] * _isc_pal
+            cul = cul + _pal6[4] * _isc_pal
+            faith = faith + _pal6[5] * _isc_pal
         # B9-R2: regional-building yields — rivalRegionalEffects at the
         # city.ts:445-446 position (after the local buildings, before the
         # wonder flat yields), pre-tier. LIVE per-j compute like TS.
@@ -6781,12 +6819,17 @@ class BatchSim:
         THIS civ's territory grants +1 to its luxAmenityCities neediest
         cities (need desc, slot asc = rc.id acquisition order); tier from
         have − needed with have = local building amenities + regional
-        (B9-R2, the city.ts:292 ranking mirror; no Palace, no policy
-        sources). Returns (tier_idx, growth_f, yield_f), each [B, RC]."""
+        (B9-R2, the city.ts:292 ranking mirror) + the capital PALACE
+        (B9-R3; no policy sources). Returns (tier_idx, growth_f,
+        yield_f), each [B, RC]."""
         B, RC = self.B, self.RC
         rd = self.rules_dev
         selb_a = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # B-32 dark; B9-R2 regional delivered by range
         have = torch.einsum("bjn,n->bj", selb_a.to(torch.float64), rd.b_amenities.double())
+        # B9-R3: PALACE amenity on the capital slot — rivalAmenityTiers'
+        # baseHave sums rc.buildings (now holding the founding PALACE), so it
+        # joins BEFORE the luxury ranking. CITY_CENTER never pillages.
+        have = have + self._palace_amenities * (self.rc_is_cap[:, r] & self.rc_alive[:, r]).double()
         # B9-R2: regional amenities (Zoo/Stadium) join the base BEFORE the
         # luxury ranking — the rivalAmenityTiers baseHave / city.ts:292 mirror.
         _regional = self._rival_regional(r)
@@ -8299,7 +8342,7 @@ class BatchSim:
                     ones_nb,
                 )  # [B, NB] — j-invariant (previously rebuilt per j)
                 riv_cA = self.tile_river.gather(1, self.rc_center[:, r].clamp(min=0))  # [B, RC]
-                ok_bA = unl_b.unsqueeze(1) & ~have_bA & (~rdv3.b_river.view(1, 1, -1) | riv_cA.unsqueeze(2))
+                ok_bA = unl_b.unsqueeze(1) & ~have_bA & (~rdv3.b_river.view(1, 1, -1) | riv_cA.unsqueeze(2)) & ~self._b_worship.view(1, 1, -1)  # B9-R3: worship is faith-only
                 reqd_b = rdv3.b_req_district  # [NB]
                 reg_tA = self.rc_dist_tile[:, r].gather(2, reqd_b.clamp(min=0).view(1, 1, -1).expand(B, self.RC, -1))
                 dcompA = (reg_tA >= 0) & self.district_complete.gather(1, reg_tA.clamp(min=0).reshape(B, -1)).reshape_as(reg_tA)
@@ -8566,7 +8609,7 @@ class BatchSim:
                     have6 = self.rc_bldg[:, r, j6]
                     ctile6 = self.rc_center[:, r, j6].clamp(min=0)
                     riv6 = self.tile_river.gather(1, ctile6.unsqueeze(1)).squeeze(1)
-                    ok6 = unl6 & ~have6 & (~rdv6.b_river.view(1, -1) | riv6.unsqueeze(1))
+                    ok6 = unl6 & ~have6 & (~rdv6.b_river.view(1, -1) | riv6.unsqueeze(1)) & ~self._b_worship.view(1, -1)  # B9-R3: worship is faith-only
                     reg6 = self.rc_dist_tile[:, r, j6].gather(1, rdv6.b_req_district.clamp(min=0).unsqueeze(0).expand(B, -1))
                     dc6 = (reg6 >= 0) & self.district_complete.gather(1, reg6.clamp(min=0))
                     ok6 = ok6 & torch.where(rdv6.b_req_district.unsqueeze(0) >= 0, dc6, ones6)
@@ -8657,6 +8700,28 @@ class BatchSim:
                     price_u5 = self._p_cost.gather(0, pick_ty5).double() * mult_r5
                     self.r_treasury[:, r] = torch.where(landed_u5, self.r_treasury[:, r] - price_u5, self.r_treasury[:, r])
                     bought_r5 = bought_r5 | landed_u5
+            # B9-R3 (A-9): WORSHIP — a civ that FOUNDED a religion faith-buys
+            # its worship building (the rivals.ts A-5 worship branch twin):
+            # deterministic no-draw pick WORSHIP_BUILDINGS[(r+1) % 5] (owner
+            # religion = rival index + 1, the B-18 convention), flat
+            # worshipFaithCost, FIRST alive city in slot order with a COMPLETE
+            # unpillaged Holy Site and the Temple. Faith is a separate
+            # currency — independent of bought_r5.
+            if self._worship_bidx and self._temple_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
+                wb5 = self._worship_bidx[(r + 1) % len(self._worship_bidx)]
+                if wb5 >= 0:
+                    want_w5 = active & self.r_religion_done[:, r] & self._afford(self.r_faith[:, r], self._worship_cost)
+                    if bool(want_w5.any()):
+                        hs_t5 = self.rc_dist_tile[:, r, :, self._hs_idx]  # [B, RC]
+                        hs_ok5 = (hs_t5 >= 0) & self.district_complete.gather(1, hs_t5.clamp(min=0)) & ~self.district_pillaged.gather(1, hs_t5.clamp(min=0))
+                        elig_w5 = self.rc_alive[:, r] & ~self.rc_bldg[:, r, :, wb5] & self.rc_bldg[:, r, :, self._temple_bidx] & hs_ok5  # [B, RC]
+                        buy_w5 = want_w5 & elig_w5.any(dim=1)
+                        if bool(buy_w5.any()):
+                            first_w5 = elig_w5 & (elig_w5.long().cumsum(dim=1) == 1) & buy_w5.unsqueeze(1)
+                            rows_w5, js_w5 = first_w5.nonzero(as_tuple=True)
+                            self.rc_bldg[rows_w5, r, js_w5, wb5] = True
+                            self._eff_version += 1  # B9-R2 invariant: every rc_bldg write bumps
+                            self.r_faith[:, r] = torch.where(buy_w5, self.r_faith[:, r] - self._worship_cost, self.r_faith[:, r])
             # AUDIT A-11: the trade creation block sits between the buy block
             # and the city-loop snapshot — the exact rivalPhase position.
             self._rival_trade_phase(r, active)
@@ -8741,7 +8806,10 @@ class BatchSim:
                 imp_w3 = self.improvement.gather(1, w3f).reshape_as(win3a)
                 imp_own = (win3a >= 0) & (self.rival_at.gather(1, w3f).reshape_as(win3a) == r) & (imp_w3 >= 0)
                 farm = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own.double()).sum(dim=2)
-                housing = water + bh + farm
+                # B9-R3: PALACE housing on the capital slot (rivalHousing sums
+                # rc.buildings, which now hold the founding PALACE; CITY_CENTER
+                # never pillages so no darkness gate).
+                housing = water + bh + self._palace_housing * (self.rc_is_cap[:, r] & self.rc_alive[:, r]).double() + farm
                 if _rcy_bel:
                     housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", _fol_h_rc))
                     housing = housing + _riv_h.unsqueeze(1) * self.tile_river.gather(1, _ctr_r).double()
@@ -10664,7 +10732,7 @@ class BatchSim:
                     ).sum(dim=(1, 2)).to(self.dtype),
                     zero,
                 ),
-                torch.where(live, self.rc_bldg[:, r].sum(dim=(1, 2)).to(self.dtype), zero),
+                torch.where(live, (self.rc_bldg[:, r].sum(dim=(1, 2)) + (self.rc_is_cap[:, r] & self.rc_alive[:, r]).sum(dim=1)).to(self.dtype), zero),  # B9-R3: +PALACE (trace counts rc.buildings.length)
                 torch.where(live, js_round(self.r_treasury[:, r] * 1000).to(self.dtype), zero),  # VP-G1
                 torch.where(live, js_round(r_scores[r] * 1000).to(self.dtype), zero),  # GV-1
             ]
