@@ -82,11 +82,14 @@ import {
   WAR_WEARINESS_PER_TURN,
   WAR_WEARINESS_DECAY,
   WAR_WEARINESS_CAP,
+  WW_SURPRISE_MULT,
+  WW_FORMAL_MULT,
   warWearinessPenalty,
   RR_DOW_PROXIMITY,
   RR_DOW_STRENGTH_RATIO,
   RR_DOW_WW_MAX,
   RR_PEACE_WW,
+  RR_FORMAL_MIN_TURNS,
 } from '../data/rivals';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
@@ -240,6 +243,8 @@ export function placeRivals(state: GameState, count?: number): void {
       nextCityId: 0,
       atWar: false,
       atWarRivals: [], // A-19/B-33 (S1): per-pair war substrate, empty at t0
+      warKindFormal: [], // B-22 (S3): FORMAL-war partner ids, empty at t0
+      denouncedTurn: {}, // B-22 (S3): directed denouncement stamps, empty at t0
       warTurns: 0,
       peaceTurns: 0,
       warWeariness: 0, // B-15
@@ -381,6 +386,58 @@ function rivalRivalProximity(state: GameState, a: RivalCiv, b: RivalCiv): number
  * gate; anti-thrash is the aggressor's own war-weariness (RR_DOW_WW_MAX). No
  * nextRandom anywhere — the player pair's RNG draws are untouched.
  */
+/** Is THIS rival's current war with `otherRivalId` a FORMAL one (casus belli)? */
+export function isFormalWar(rival: RivalCiv, otherRivalId: number): boolean {
+  return rival.warKindFormal?.includes(otherRivalId) ?? false;
+}
+
+/** Set/clear the FORMAL flag on the (a,b) rival pair symmetrically. */
+function setWarKindFormal(state: GameState, a: number, b: number, formal: boolean): void {
+  const ra = state.rivals.find((r) => r.id === a - 1);
+  const rb = state.rivals.find((r) => r.id === b - 1);
+  if (!ra || !rb) return;
+  const mark = (r: RivalCiv, otherRivalId: number) => {
+    const list = (r.warKindFormal ??= []);
+    if (formal) {
+      if (!list.includes(otherRivalId)) list.push(otherRivalId);
+    } else {
+      r.warKindFormal = list.filter((x) => x !== otherRivalId);
+    }
+  };
+  mark(ra, b - 1);
+  mark(rb, a - 1);
+}
+
+/**
+ * B-22 (task #55 S3): the pairwise rival↔rival DENOUNCEMENT pass — ZERO-DRAW.
+ * Runs BEFORE the DoW pass. A civ denounces a nearer, weaker-scoring rival it is
+ * not yet at war with — the same threshold FAMILY as the DoW (proximity gate +
+ * a strength edge), but a WEAKER bar (mere `si > sj`, not the ×1.3 DoW ratio) so
+ * the denouncement reliably PRECEDES the war. The stamp is a persistent grudge
+ * (set once per directed pair, never reset). A later DoW ≥ RR_FORMAL_MIN_TURNS
+ * after the stamp is FORMAL (casus belli); otherwise SURPRISE. Deterministic
+ * scan (denouncer id asc, target id asc); no nextRandom.
+ */
+function rivalRivalDenounce(state: GameState): void {
+  for (let a = 0; a < state.rivals.length; a++) {
+    const ri = state.rivals[a];
+    if (ri.cities.length === 0) continue;
+    const si = rivalStrength(state, ri);
+    const stamps = (ri.denouncedTurn ??= {});
+    for (let b = 0; b < state.rivals.length; b++) {
+      if (a === b) continue;
+      const rj = state.rivals[b];
+      if (rj.cities.length === 0) continue;
+      if (stamps[rj.id] !== undefined) continue; // already denounced (grudge)
+      if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
+      if (rivalRivalProximity(state, ri, rj) > RR_DOW_PROXIMITY) continue;
+      if (!(si > rivalStrength(state, rj))) continue;
+      stamps[rj.id] = state.turn;
+      state.eventLog.push(`${ri.name} denounces ${rj.name}.`);
+    }
+  }
+}
+
 function rivalRivalDeclareWars(state: GameState): void {
   const used = new Set<number>();
   for (let a = 0; a < state.rivals.length; a++) {
@@ -396,8 +453,21 @@ function rivalRivalDeclareWars(state: GameState): void {
       if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if (rivalRivalProximity(state, ri, rj) > RR_DOW_PROXIMITY) continue;
       if (!(si > rivalStrength(state, rj) * RR_DOW_STRENGTH_RATIO)) continue;
+      // B-22 (S3) anti-thrash: never declare on a target already over the peace
+      // threshold — the peace pass (EITHER side's ww > RR_PEACE_WW) would sue it
+      // out the SAME turn, and the aggressor would re-declare next turn ad
+      // infinitum. A rival pinned war-weary by ITS player war (ww driven past
+      // RR_PEACE_WW) is thus off-limits until it recovers. This root-causes the
+      // S3 magnitude reshuffle's declare/peace thrash (surfaced a dormant S2
+      // war-act divergence — the pair matrix was inert in S1). Zero-draw.
+      if ((rj.warWeariness ?? 0) > RR_PEACE_WW) continue;
       setRivalWar(state, ri.id + 1, rj.id + 1, true);
-      state.eventLog.push(`${ri.name} declares war on ${rj.name}!`);
+      // B-22 (S3): FORMAL iff the aggressor denounced this target ≥ the min turns
+      // earlier; else SURPRISE (the default). Deterministic — no draws.
+      const dt = ri.denouncedTurn?.[rj.id];
+      const formal = dt !== undefined && state.turn - dt >= RR_FORMAL_MIN_TURNS;
+      setWarKindFormal(state, ri.id + 1, rj.id + 1, formal);
+      state.eventLog.push(`${ri.name} declares ${formal ? 'a formal' : 'a surprise'} war on ${rj.name}!`);
       used.add(ri.id);
       used.add(rj.id);
       break; // one new war per aggressor per turn
@@ -420,6 +490,7 @@ function rivalRivalMakePeace(state: GameState): void {
       if (!civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if ((ri.warWeariness ?? 0) > RR_PEACE_WW || (rj.warWeariness ?? 0) > RR_PEACE_WW) {
         setRivalWar(state, ri.id + 1, rj.id + 1, false);
+        setWarKindFormal(state, ri.id + 1, rj.id + 1, false); // B-22 (S3): war ended
         state.eventLog.push(`${ri.name} and ${rj.name} make peace.`);
       }
     }
@@ -1918,6 +1989,9 @@ export function rivalPhase(state: GameState): void {
 
   // A-19/B-33 (S2): pairwise rival↔rival auto-DoW — BEFORE the per-rival loop
   // so a declared war is live for both civs' war-acts this turn (ZERO-DRAW).
+  // B-22 (S3): denouncements first — a stamp ≥ RR_FORMAL_MIN_TURNS old makes the
+  // ensuing DoW FORMAL (halved war-weariness accrual).
+  rivalRivalDenounce(state);
   rivalRivalDeclareWars(state);
 
   for (const rival of state.rivals) {
@@ -1930,8 +2004,15 @@ export function rivalPhase(state: GameState): void {
     // is fixed for this turn by the phase-top DoW pass, so anyWar is stable
     // through this block (peace resolves after the loop).
     const anyWarTop = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
+    // B-22 (S3): casus-belli accrual multiplier — rival↔rival ONLY. A rival in a
+    // SURPRISE rival↔rival war (not marked FORMAL) accrues ×WW_SURPRISE_MULT;
+    // otherwise (a war ONLY with the player, or an all-FORMAL warmonger) it
+    // accrues ×WW_FORMAL_MULT (the S2 baseline). The player-war axis is thus
+    // unchanged — the casus-belli differential is a rival diplomacy feature.
+    const surpriseActive = (rival.atWarRivals ?? []).some((id) => !isFormalWar(rival, id));
+    const wwMult = surpriseActive ? WW_SURPRISE_MULT : WW_FORMAL_MULT;
     rival.warWeariness = anyWarTop
-      ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
+      ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN * wwMult)
       : Math.max(0, (rival.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
 
     // AUDIT A-3: eurekas/inspirations fire from the RIVAL's seat too — the

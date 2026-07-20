@@ -385,6 +385,16 @@ export interface RivalCiv {
    *  codebase's war-state convention: warWeariness?, spaceProjects?) — readers
    *  default to []. */
   atWarRivals?: number[];
+  /** B-22 (task #55 S3): rival-ids whose current rival↔rival war with THIS civ
+   *  is FORMAL (casus-belli: a denouncement ≥ RR_FORMAL_MIN_TURNS earlier).
+   *  Symmetric with `atWarRivals` (both sides written); a war NOT listed here is
+   *  SURPRISE (the default). Cleared when the pair makes peace. Empty at t0. */
+  warKindFormal?: number[];
+  /** B-22 (task #55 S3): directed denouncement stamps — `denouncedTurn[b] = t`
+   *  means THIS civ denounced rival b at turn t. Persistent grudge (never reset).
+   *  A war a→b is FORMAL iff `denouncedTurn[b]` exists and `turn - it >=
+   *  RR_FORMAL_MIN_TURNS` at declaration. Sparse object, empty at t0. */
+  denouncedTurn?: Record<number, number>;
   /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
    *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
   warWeariness?: number;

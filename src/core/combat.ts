@@ -626,7 +626,17 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
     return;
   }
-  const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
+  // A-19/B-33 (S2/S3): a rival's RANGED unit does NOT engage enemy rival units
+  // (the ranged-vs-rival scope-out — the SAME predicate attackTargets applies).
+  // Without this, a rival ranged unit selected via the loose city-center bombard
+  // path (playerCity keys on district===CITY_CENTER, not player ownership) would
+  // fall through to strike a rival unit STANDING ON an enemy rival's center —
+  // the GPU's `_hostile_ranged_strike` only hits player/barb units, so that
+  // strike is a TS-only draw. This restores the documented "any other civ's
+  // center is a no-op quirk" behavior when a hostile rival unit garrisons it.
+  const enemies = unitsAt(state, targetIndex).filter(
+    (u) => unitsHostile(state, attacker, u) && !(attacker.owner === 'rival' && u.owner === 'rival'),
+  );
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   // B-5 + B-29 + B-7 support (no flanking: a ranged strike takes no

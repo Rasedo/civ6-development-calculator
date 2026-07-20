@@ -82,6 +82,9 @@ import {
   RR_DOW_STRENGTH_RATIO,
   RR_DOW_WW_MAX,
   RR_PEACE_WW,
+  RR_FORMAL_MIN_TURNS,
+  WW_SURPRISE_MULT,
+  WW_FORMAL_MULT,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -502,6 +505,9 @@ const rules = {
     decay: WAR_WEARINESS_DECAY,
     perAmenity: WAR_WEARINESS_PER_AMENITY,
     cap: WAR_WEARINESS_CAP,
+    // B-22 (S3): casus-belli accrual multipliers (SURPRISE ×2, FORMAL ×1).
+    surpriseMult: WW_SURPRISE_MULT,
+    formalMult: WW_FORMAL_MULT,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
@@ -575,6 +581,7 @@ const rules = {
     rrDowStrengthRatio: RR_DOW_STRENGTH_RATIO,
     rrDowWwMax: RR_DOW_WW_MAX,
     rrPeaceWw: RR_PEACE_WW,
+    rrFormalMinTurns: RR_FORMAL_MIN_TURNS, // B-22 (S3)
     // Player diplomacy (V-W1): sueForPeace gates on warTurns >= peaceMinWarTurns
     // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
     // C1-B3b: research consumers — the production divisor, defense per

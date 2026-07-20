@@ -135,6 +135,7 @@ def gpu_state_lines(sim, b):
         L.append(
             f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} fai{_milli(sim.r_faith[b, r])} "
             f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))} "
+            f"ww{int(sim.r_war_weariness[b, r])} rrw{sum((1 << j) for j in range(sim.R) if bool(sim.rr_war[b, r, j]))} rrk{sum((1 << j) for j in range(sim.R) if bool(sim.rr_warkind[b, r, j]))} "
             f"terr:{int((sim.rival_at[b] == r).sum())} wterr:{int(((sim.rival_at[b] == r) & sim.water[b]).sum())} "
             f"tsum:{int(((sim.rival_at[b] == r) * torch.arange(sim.T, device=sim.device)).sum())} "
             f"rsc:{_milli(sim.rival_empire_score(r)[b])}"

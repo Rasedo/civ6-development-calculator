@@ -772,6 +772,10 @@ export function endTurn(state: GameState): void {
   // (rival war-state as left by last turn's rivalPhase), decays 4× in peace.
   // Read here, before the city loop, so this turn's amenities reflect it — the
   // GPU updates at the same relative point (top of step, after the war block).
+  // B-22 (task #55 S3): the player war accrues at the BASELINE rate (×1). The
+  // casus-belli ww differential (SURPRISE ×2 / FORMAL ×1) is rival↔rival only —
+  // the player has no denounce verb, and doubling the player path surfaced a
+  // dormant −3/−4-tier economic divergence (seed 9092). Unchanged from S2.
   const atWarNow = state.rivals.some((rv) => rv.atWar && rv.cities.length > 0);
   state.warWeariness = atWarNow
     ? Math.min(WAR_WEARINESS_CAP, (state.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)

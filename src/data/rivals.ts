@@ -76,14 +76,33 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 export const WAR_WEARINESS_PER_TURN = 1;
 /** Accumulator shed per turn at peace (4× the accrual rate). */
 export const WAR_WEARINESS_DECAY = 4;
-/** Accumulator points per −1 amenity. Deliberately gentle: the SCRIPTED player
- *  never sues for peace, so rival-initiated wars run their full RIVAL_WAR_MIN
- *  course — a steep penalty would collapse the passive player's loyalty and
- *  empty the scripted fixture. −1 amenity per 8 war-turns keeps the drag real
- *  without inducing collapse (off-script/RL agents that make peace shed it). */
+/** Accumulator points per −1 amenity. With the B-22 casus-belli accrual
+ *  multiplier a SURPRISE rival↔rival war accrues 2/turn → −1 amenity per 4
+ *  war-turns (per 8 for a FORMAL one). Kept at 8 (not lowered): the CAP + the
+ *  ×2 multiplier already deliver the B-15 magnitude raise for rival-rival wars
+ *  without a per-turn change that would also steepen the player war. */
 export const WAR_WEARINESS_PER_AMENITY = 8;
-/** Accumulator ceiling → caps the amenity penalty at CAP / PER_AMENITY (= −2). */
+/** Accumulator ceiling → caps the amenity penalty at CAP / PER_AMENITY (= −2).
+ *  DELIBERATELY kept at 16 (task #55 S3, B-15): the passive scripted player
+ *  never sues for peace, and raising the ceiling (tried 32 → −4) surfaced a
+ *  dormant TS/GPU economic-timing divergence at the −3/−4 amenity tier
+ *  (seed 9092, player-only war). The player-vs-rival war axis therefore stays
+ *  at the S2 magnitude; the casus-belli DIFFERENTIAL rides the rival↔rival
+ *  wars, where the ×2 SURPRISE accrual reaches −2 in 4 war-turns vs 8 for a
+ *  FORMAL one. Player-facing −4 raise recorded as a B-15 residual. */
 export const WAR_WEARINESS_CAP = 16;
+/** B-22 (task #55 S3): rival↔rival war-weariness accrual multipliers — the
+ *  modeled casus-belli benefit. A SURPRISE war (no prior denouncement) is TWICE
+ *  as wearying as a FORMAL one (denounced ≥ RR_FORMAL_MIN_TURNS earlier),
+ *  matching real Civ 6's reduced grievances/ww for justified wars. Applies to
+ *  the rival↔rival axis ONLY: a war WITH THE PLAYER (either seat) accrues at the
+ *  baseline (×1, the S2 rate) since the player has no denounce/grievance verb —
+ *  keeping the fixture-critical player path pristine. Integer, no float assoc. */
+export const WW_SURPRISE_MULT = 2;
+export const WW_FORMAL_MULT = 1;
+/** B-22 (task #55 S3): a rival↔rival war is FORMAL iff the aggressor denounced
+ *  the target at least this many turns before declaring; otherwise SURPRISE. */
+export const RR_FORMAL_MIN_TURNS = 5;
 /** Empire-wide amenity penalty (≥0) for a weariness accumulator value. */
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.min(weariness, WAR_WEARINESS_CAP) / WAR_WEARINESS_PER_AMENITY);

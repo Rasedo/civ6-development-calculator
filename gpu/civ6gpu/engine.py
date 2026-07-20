@@ -373,7 +373,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -618,6 +618,14 @@ class BatchSim:
         # vector BESIDE this. INERT in S1 (nothing reads it); _MUTABLE-registered
         # for snapshot/restore (civ-level — no slot compaction exposure).
         self.rr_war = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
+        # B-22 (task #55 S3): per-PAIR casus belli. rr_warkind[b, i, j] = the
+        # (i, j) rival↔rival war is FORMAL (denounced ≥ rrFormalMinTurns earlier);
+        # False = SURPRISE (default). Symmetric, only meaningful where rr_war.
+        # rr_denounced[b, i, j] = turn i denounced j (directed grudge, -1 = none;
+        # persistent — never reset). Both start empty at t0 (no rival↔rival war
+        # exists), so no exporter load. _MUTABLE for snapshot/restore.
+        self.rr_warkind = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
+        self.rr_denounced = torch.full((B, r_pad, r_pad), -1, dtype=torch.long, device=device)
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
         self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)
@@ -9494,12 +9502,47 @@ class BatchSim:
         pair_ok = self.rc_alive[:, a].unsqueeze(2) & self.rc_alive[:, b].unsqueeze(1)
         return torch.where(pair_ok, d_ab, 999).reshape(B, -1).min(dim=1).values
 
+    def _rival_rival_denounce(self) -> None:
+        """B-22 (S3): pairwise rival↔rival DENOUNCEMENT — ZERO-DRAW. Phase-top,
+        BEFORE the DoW pass. Mirror of rivalRivalDenounce: a civ denounces a
+        nearer, weaker-scoring rival it is not yet at war with — the DoW family
+        of gates (proximity + a strength edge) but the WEAKER bar (`si > sj`, no
+        ×ratio) so the stamp reliably PRECEDES the war. rr_denounced is a
+        persistent directed grudge (set once, never reset). No draws."""
+        if self.R < 2:
+            return
+        rr = self.rules.rivals
+        n_c = self.rc_alive.sum(dim=2)  # [B, R]
+        alive_civ = self.r_alive[:, : self.R] & (n_c > 0)  # [B, R]
+        rstr = self._rr_strengths()
+        prox_max = int(rr.get("rrDowProximity", 9))
+        for a in range(self.R):
+            if not bool(alive_civ[:, a].any()):
+                continue
+            for b in range(self.R):
+                if a == b:
+                    continue
+                prox = self._rr_proximity(a, b)
+                denounce = (
+                    alive_civ[:, a]
+                    & alive_civ[:, b]
+                    & (self.rr_denounced[:, a, b] < 0)
+                    & ~self.rr_war[:, a, b]
+                    & (prox <= prox_max)
+                    & (rstr[:, a] > rstr[:, b])
+                )
+                if bool(denounce.any()):
+                    self.rr_denounced[:, a, b] = torch.where(
+                        denounce, torch.full_like(self.rr_denounced[:, a, b], int(self.turn)), self.rr_denounced[:, a, b]
+                    )
+
     def _rival_rival_declare_wars(self) -> None:
         """A-19/B-33 (S2): pairwise rival↔rival auto-DoW — ZERO-DRAW. Phase-top
         mirror of rivalRivalDeclareWars: aggressor id asc, first eligible target
         id asc, one new war per civ per turn (both sides). Deterministic gates
         (proximity, strength ratio); the aggressor's war-weariness is the
-        anti-thrash. No draws — the player pair's RNG is untouched."""
+        anti-thrash. No draws — the player pair's RNG is untouched. B-22 (S3):
+        stamps the war's kind (FORMAL if denounced ≥ rrFormalMinTurns earlier)."""
         if self.R < 2:
             return
         B, dev, rr = self.B, self.device, self.rules.rivals
@@ -9510,6 +9553,8 @@ class BatchSim:
         prox_max = int(rr.get("rrDowProximity", 9))
         ratio = float(rr.get("rrDowStrengthRatio", 1.3))
         ww_max = int(rr.get("rrDowWwMax", 6))
+        formal_min = int(rr.get("rrFormalMinTurns", 5))
+        peace_ww = int(rr.get("rrPeaceWw", 10))
         used = torch.zeros(B, self.R, dtype=torch.bool, device=dev)
         for a in range(self.R):
             aggr_ok = alive_civ[:, a] & (ww[:, a] < ww_max) & ~used[:, a]
@@ -9526,10 +9571,19 @@ class BatchSim:
                     & ~self.rr_war[:, a, b]
                     & (prox <= prox_max)
                     & (rstr[:, a] > rstr[:, b] * ratio)
+                    # B-22 (S3) anti-thrash: skip a target already past the peace
+                    # threshold — it would sue out the SAME turn (mirror of the
+                    # TS `rj.warWeariness > RR_PEACE_WW` guard).
+                    & (ww[:, b] <= peace_ww)
                 )
                 if bool(declare.any()):
                     self.rr_war[:, a, b] = self.rr_war[:, a, b] | declare
                     self.rr_war[:, b, a] = self.rr_war[:, b, a] | declare
+                    # B-22 (S3): FORMAL iff a denounced b ≥ formal_min turns ago.
+                    dt = self.rr_denounced[:, a, b]
+                    formal = declare & (dt >= 0) & ((int(self.turn) - dt) >= formal_min)
+                    self.rr_warkind[:, a, b] = torch.where(declare, formal, self.rr_warkind[:, a, b])
+                    self.rr_warkind[:, b, a] = torch.where(declare, formal, self.rr_warkind[:, b, a])
                     used[:, a] = used[:, a] | declare
                     used[:, b] = used[:, b] | declare
                     aggr_ok = aggr_ok & ~declare  # one new war per aggressor per turn
@@ -9549,6 +9603,9 @@ class BatchSim:
                 if bool(peace.any()):
                     self.rr_war[:, a, b] = self.rr_war[:, a, b] & ~peace
                     self.rr_war[:, b, a] = self.rr_war[:, b, a] & ~peace
+                    # B-22 (S3): the ended war's kind flag clears (grudge stamp stays).
+                    self.rr_warkind[:, a, b] = self.rr_warkind[:, a, b] & ~peace
+                    self.rr_warkind[:, b, a] = self.rr_warkind[:, b, a] & ~peace
 
     def _rival_phase(self) -> None:
         """Mirrors rivalPhase, rival by rival in id order — queue picks for
@@ -9562,6 +9619,9 @@ class BatchSim:
         rr, B, dev = self.rules.rivals, self.B, self.device
         # A-19/B-33 (S2): pairwise rival↔rival auto-DoW BEFORE the per-rival
         # loop, so a declared war is live for both civs' war-acts this turn.
+        # B-22 (S3): denouncements first (a ≥ rrFormalMinTurns-old stamp makes
+        # the ensuing DoW FORMAL — halved war-weariness accrual).
+        self._rival_rival_denounce()
         self._rival_rival_declare_wars()
         for r in range(self.R):
             n_cities = self.rc_alive[:, r].sum(dim=1)
@@ -9576,7 +9636,15 @@ class BatchSim:
             # rival) accrues weariness; decays only at FULL peace. rr_war is
             # fixed for this turn by the phase-top DoW pass.
             atw_r = self.r_atwar[:, r] | self.rr_war[:, r, : self.R].any(dim=1)
-            inc_r = (self.r_war_weariness[:, r] + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
+            # B-22 (S3): casus-belli accrual multiplier — rival↔rival ONLY. A
+            # SURPRISE rival↔rival war (rr_war & ~rr_warkind) → ×surpriseMult;
+            # otherwise (only a player war, or all-FORMAL) → ×formalMult (the S2
+            # baseline). The player-war axis stays unchanged (mirror of TS).
+            rr_surprise = self.rr_war[:, r, : self.R] & ~self.rr_warkind[:, r, : self.R]
+            surprise_r = rr_surprise.any(dim=1)
+            per = int(rww.get("perTurn", 1))
+            mult_r = torch.where(surprise_r, per * int(rww.get("surpriseMult", 2)), per * int(rww.get("formalMult", 1)))
+            inc_r = (self.r_war_weariness[:, r] + mult_r).clamp(max=int(rww.get("cap", 24)))
             dec_r = (self.r_war_weariness[:, r] - int(rww.get("decay", 4))).clamp(min=0)
             self.r_war_weariness[:, r] = torch.where(active, torch.where(atw_r, inc_r, dec_r), self.r_war_weariness[:, r])
             # AUDIT A-3: eurekas/inspirations from this rival's seat — the
@@ -11441,6 +11509,8 @@ class BatchSim:
             atwar_now = (self.r_atwar[:, : self.R] & live).any(dim=1)  # [B]
         else:
             atwar_now = torch.zeros(B, dtype=torch.bool, device=dev)
+        # B-22 (S3): the player war accrues at the BASELINE rate (×1) — the
+        # casus-belli ww differential is rival↔rival only (mirror of game.ts).
         inc = (self.war_weariness + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
         dec = (self.war_weariness - int(rww.get("decay", 4))).clamp(min=0)
         self.war_weariness = torch.where(atwar_now, inc, dec)
