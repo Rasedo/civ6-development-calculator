@@ -126,6 +126,7 @@ def main() -> int:
                 ("encampment", [py, "gpu/encampment_test.py"], 4),  # B7/B-17 Encampment strike + training XP + specialist surfaces
                 ("great_works", [py, "gpu/great_works_test.py"], 4),  # B7/B-20 Writer/Musician Great-Work slots + yield
                 ("gp_aura", [py, "gpu/gp_aura_test.py"], 4),  # B7-G/B-8 Great General/Admiral spawn/walk/aura/capture (gate-unreachable GENERAL)
+                ("trade2", [py, "gpu/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

@@ -123,7 +123,9 @@ Per-item weights (done% in parens where partial):
   victory; apostles/theological combat + player missionaries (#50)
   remain); B-20 3 (70% — ROUND B7: multi-charge + slotted works;
   abilities/tile-activation/music-split remain); B-21 2 (40%);
-  B-23 3 (open).
+  B-23 3 (70% — ROUND B8: route duration both engines (gate-proven,
+  1122 expiries) + international routes (rival→player, TS player→rival;
+  intl leg gate-unreachable, poke-pinned); Trader unit/roads remain).
 - B meta: B-25 3 (80% — religious victory landed; player project
   path + Culture/Diplomatic victories open); B-22 3, B-24 3,
   B-33 3 (open).
@@ -638,11 +640,43 @@ gap; likewise GS disasters are modeled minus sea-level rise
   in-gate — no CS exceeds 1 envoy at 100t; re-key when a gate-reachable
   scenario exists, likely with #56's 250t horizon), and the suzerain
   perk stays type-generic in the live path.
-- B-23. Trade simplified: no Trader unit, no roads, no route duration
-  or completion (`TradeRoute` in core/types.ts has a `toCs` target and
-  nothing else), no international routes to rival civs —
-  `tradeCapacity`/`routeYields` (core/trade.ts) cover domestic +
-  city-state only, range flat 15 (`TRADE_ROUTE_RANGE`).
+- B-23 (~70% — 2026-07-20, ROUND B8 slice T, task #64). Route DURATION +
+  international routes landed both engines. DURATION: every route carries
+  `expiresTurn = turn + TRADE_ROUTE_DURATION` (20, `core/trade.ts`); at
+  expiry the route is removed and the owner re-picks NEXT turn via the
+  existing deterministic pickers (arithmetic, zero draws). TS stamps it in
+  `addTradeRoute`/`addCsTradeRoute`/`addIntlTradeRoute` + the rival pick
+  push (`rivals.ts`), and the filter runs UNCONDITIONALLY — player via
+  `expirePlayerRoutes` (game.ts endTurn, after rivalPhase), rivals via the
+  filter AFTER the rival pick block (outside the capacity gate) mirrored on
+  GPU by `_expire_rival_routes` (engine.py), called on EVERY exit path of
+  `_rival_trade_phase` including the at-capacity early returns (the parity
+  catch: an at-cap civ must still shed its expiring route). GPU carries
+  per-route `r_route_exp` [B,R,K] (_MUTABLE, long, slot-parallel to
+  `r_routes`; cleared at every capture/transfer/CS-death prune site).
+  Gate-proven: 1122 expiry events fire across the 24 seeds × 250 turns
+  (scripted + forced parity 0.0 milli, replay OK). INTERNATIONAL: a rival
+  routes to a MET player city (`toPlayer` / GPU `r_route_dest` = the dest
+  player-city CENTER TILE, >=0), income `routeYieldsInternational` =
+  `INTL_ROUTE_GOLD`(3) + dest completed specialty count, GOLD ONLY (domestic
+  keeps its food/prod), added pre-tier in `rivalCityYields` /
+  `_rival_route_income`; considered AFTER domestic+CS (only when neither has
+  a candidate) by NEAREST-city preference; suspended while at war with the
+  destination civ (r_atwar) or a barbarian prowls an endpoint; pruned when
+  the dest player center is gone (center_at<0, the TS `state.cities.find`
+  twin). PLAYER→rival routes are TS-API-complete (`canAddIntlTradeRoute`/
+  `addIntlTradeRoute` + `cityTradeYields` toRival branch, vitest-covered).
+  Poke-pinned in gpu/trade2_test.py (battery lane `trade2`) +
+  tests/trade-fidelity.test.ts. OPEN/DESCOPED: (1) the international leg is
+  gate-UNREACHABLE under the scripted policy (rivals never exhaust
+  domestic+CS destinations while holding spare capacity and an in-range
+  player city — 0 intl routes form across the 24 seeds; correct parity, both
+  engines agree), proven only by the poke — batch with #50/A-18 if a P8
+  surface ever selects one; (2) rival→other-rival routes DESCOPED (rivals
+  don't meet each other's cities until A-19); (3) no Trader unit, no roads
+  (recorded residuals); (4) the GPU still has no PLAYER route machinery in
+  the gated path (all player routes remain unreachable, per A-11/A-12b).
+  Range flat 15 (`TRADE_ROUTE_RANGE`).
 
 **Meta:**
 - B-22. No casus belli/grievances/alliances/World Congress: war is a

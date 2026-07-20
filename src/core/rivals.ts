@@ -16,7 +16,7 @@ import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlo
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
-import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from './trade';
+import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION } from './trade';
 import { isSuzerain, csRivalEnvoyBonuses } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE } from '../data/cityStates';
 import { computeAdoption } from './effects';
@@ -1562,6 +1562,19 @@ export function rivalCityYields(
       total.faith += cy.faith;
       continue;
     }
+    if (route.toPlayer !== undefined) {
+      // B-23 international: a rival route to a player city — gold only, keyed
+      // on the destination's completed specialty districts. Suspended while
+      // this rival is at war with the player (destination-civ interdiction)
+      // or while barbarians prowl either endpoint (rivalRouteRaidedAt).
+      if (rival.atWar) continue;
+      const pdest = state.cities.find((c) => c.id === route.toPlayer);
+      if (!pdest) continue;
+      if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, pdest.centerIndex])) continue;
+      const iy = routeYieldsInternational(state, pdest);
+      total.gold += iy.gold;
+      continue;
+    }
     const dest = rival.cities.find((c) => c.id === route.to);
     if (!dest) continue;
     if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, dest.centerIndex])) continue;
@@ -2079,7 +2092,7 @@ export function rivalPhase(state: GameState): void {
     {
       const routes = (rival.tradeRoutes ??= []);
       if (routes.length < rivalTradeCapacity(state, rival) && rival.cities.length >= 1) {
-        let best: { from: number; to?: number; toCs?: number; ySum: number } | null = null;
+        let best: { from: number; to?: number; toCs?: number; toPlayer?: number; ySum: number } | null = null;
         for (const from of rival.cities) {
           const ft = state.map.tiles[from.centerIndex];
           for (const to of rival.cities) {
@@ -2101,10 +2114,43 @@ export function rivalPhase(state: GameState): void {
             if (!best || ySum > best.ySum) best = { from: from.id, toCs: cs.id, ySum };
           }
         }
+        // B-23 international: considered AFTER domestic + CS (only when no
+        // domestic/CS candidate exists) — a route to a player city, gold-heavy
+        // and picked by NEAREST-city preference (min hex distance; ties keep
+        // the first in from-asc, player-city-asc order). Rivals always know
+        // the player (no fog); rival→rival routes stay descoped (rivals don't
+        // meet each other's cities until A-19).
+        if (!best) {
+          let bestIntl: { from: number; toPlayer: number; d: number } | null = null;
+          for (const from of rival.cities) {
+            const ft = state.map.tiles[from.centerIndex];
+            for (const pc of state.cities) {
+              if (routes.some((x) => x.from === from.id && x.toPlayer === pc.id)) continue;
+              const pt = state.map.tiles[pc.centerIndex];
+              const d = hexDistance(ft.col, ft.row, pt.col, pt.row);
+              if (d > TRADE_ROUTE_RANGE) continue;
+              if (!bestIntl || d < bestIntl.d) bestIntl = { from: from.id, toPlayer: pc.id, d };
+            }
+          }
+          if (bestIntl) best = { from: bestIntl.from, toPlayer: bestIntl.toPlayer, ySum: 0 };
+        }
         if (best) {
-          routes.push(best.toCs !== undefined ? { from: best.from, toCs: best.toCs } : { from: best.from, to: best.to! });
+          const route: { from: number; to?: number; toCs?: number; toPlayer?: number; expiresTurn: number } =
+            { from: best.from, expiresTurn: state.turn + TRADE_ROUTE_DURATION };
+          if (best.toCs !== undefined) route.toCs = best.toCs;
+          else if (best.toPlayer !== undefined) route.toPlayer = best.toPlayer;
+          else route.to = best.to!;
+          routes.push(route);
         }
       }
+      // B-23 duration: after the pick, drop routes whose expiresTurn has
+      // arrived — the freed capacity re-picks NEXT turn (zero draws). Also
+      // drop international routes whose player destination no longer exists.
+      rival.tradeRoutes = routes.filter(
+        (x) =>
+          (x.expiresTurn === undefined || x.expiresTurn > state.turn) &&
+          (x.toPlayer === undefined || state.cities.some((c) => c.id === x.toPlayer)),
+      );
     }
 
     // Cities: real tile yields drive growth and the production queues.

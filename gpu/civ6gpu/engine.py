@@ -376,6 +376,8 @@ _MUTABLE = [
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
+    "r_route_dest",  # B-23: international dest player-city CENTER TILE (>=0), else -1 (domestic/CS)
+    "r_route_exp",   # B-23: per-route expiry turn (start + trade.duration), -1 = free slot
     "cs_r_envoys", "cs_r_met", "r_influence", "r_envoys_avail",  # A-12: rival↔CS diplomacy
     "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
@@ -677,6 +679,13 @@ class BatchSim:
         # K to the real bound + slack. t0 fixtures carry no routes (single-city).
         k_routes = 1 + int(self.rules.rivals.get("maxCities", 6)) + 2 + max(int(self.S), 0) + 2
         self.r_routes = torch.full((B, r_pad, k_routes, 2), -1, dtype=torch.long, device=device)
+        # B-23: parallel per-route metadata (same [B, R, K] slot layout as
+        # r_routes[..., :]). r_route_dest holds an international route's
+        # destination player-city CENTER TILE (>=0); -1 marks domestic/CS
+        # (dest decoded from r_routes[..., 1]). r_route_exp is the route's
+        # expiry turn (start + trade.duration); -1 on a free slot.
+        self.r_route_dest = torch.full((B, r_pad, k_routes), -1, dtype=torch.long, device=device)
+        self.r_route_exp = torch.full((B, r_pad, k_routes), -1, dtype=torch.long, device=device)
         # AUDIT A-12: rival↔CS diplomacy — per-rival envoys/met planes plus
         # the influence/envoy-bank accumulators (the player twins). t0
         # fixtures carry none of it (rivals start unmet, zero everywhere).
@@ -1171,6 +1180,8 @@ class BatchSim:
         self._trade_ftc = int(_tr.get("foreignTradeCidx", -3))
         self._trade_wonders = [int(x) for x in _tr.get("capWonderWidx", [])]
         self._trade_range = int(_tr.get("range", 15))
+        self._trade_intl_gold = int(_tr.get("intlGold", 3))  # B-23 international base gold
+        self._trade_duration = int(_tr.get("duration", 20))  # B-23 route lifetime
         self._walls_hp = int(rules.combat.get("wallsHp", 100))
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
@@ -4545,6 +4556,8 @@ class BatchSim:
             # A-11: routes die with their endpoint (the TS filter twin).
             kill = (self.r_routes[b, r, :, 0] == cid) | (self.r_routes[b, r, :, 1] == cid)
             self.r_routes[b, r][kill] = -1
+            self.r_route_dest[b, r][kill] = -1  # B-23
+            self.r_route_exp[b, r][kill] = -1   # B-23
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
             self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], -1), self.rc_tile_id[b])  # A-17
             # P5/S2 gate-catch (seed 9235 t241): TS APPENDS the captured city
@@ -4649,6 +4662,8 @@ class BatchSim:
             # captureCityState prunes rv.tradeRoutes; dest encoding -(2+s)).
             dead_cs = self.r_routes[b, :, :, 1] == -(2 + s)  # [R, K]
             self.r_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.r_routes[b], -1), self.r_routes[b])
+            self.r_route_dest[b] = torch.where(dead_cs, torch.full_like(self.r_route_dest[b], -1), self.r_route_dest[b])  # B-23
+            self.r_route_exp[b] = torch.where(dead_cs, torch.full_like(self.r_route_exp[b], -1), self.r_route_exp[b])    # B-23
             ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
             self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
             # AUDIT A-16: raze at TS's count (state.cities.length >= 6) —
@@ -4715,6 +4730,8 @@ class BatchSim:
             # routes die with the city-state (every civ; dest encoded -(2+s))
             dead_cs = self.r_routes[b, :, :, 1] == -(2 + s)
             self.r_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.r_routes[b], -1), self.r_routes[b])
+            self.r_route_dest[b] = torch.where(dead_cs, torch.full_like(self.r_route_dest[b], -1), self.r_route_dest[b])  # B-23
+            self.r_route_exp[b] = torch.where(dead_cs, torch.full_like(self.r_route_exp[b], -1), self.r_route_exp[b])    # B-23
             ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
             self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
             if int(self.rc_alive[b, r].sum()) >= int(self.rules.rivals.get("maxCities", 6)):
@@ -7111,6 +7128,32 @@ class BatchSim:
             inc.scatter_add_(1, from_j * 6 + 2, cs_gold * pc)
             ycol = self._cs_yidx[:, :S].gather(1, cs_s)  # [B, K] specialty column per route
             inc.scatter_add_(1, from_j * 6 + ycol, cs_spec * pc)
+        # B-23 international legs: a route to a player city (r_route_dest = the
+        # dest CENTER TILE, >=0) pays intlGold + dest completed specialty count
+        # to GOLD only. Suspended while at war with the player (destination-civ
+        # interdiction) or while a barbarian prowls within 3 of either endpoint
+        # (the peace-time raid; player units are irrelevant here since we only
+        # pay in peace). Mirrors rivalCityYields' toPlayer branch.
+        rd_i = self.r_route_dest[:, r]  # [B, K] dest center tile (>=0 = intl)
+        intl = act & (rd_i >= 0)
+        if bool(intl.any()):
+            dest_tile = rd_i.clamp(min=0)  # [B, K]
+            dest_slot = self.center_at.gather(1, dest_tile)  # [B, K] player city slot (-1 = gone)
+            valid_dest = dest_slot >= 0
+            # per player-city completed specialty district count [B, C]
+            own_spec = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & self.district_complete
+            p_city_spec = torch.zeros(B, self.C, dtype=torch.long, device=self.device).scatter_add_(
+                1, self.owner.clamp(min=0), (own_spec & (self.owner >= 0)).long()
+            )  # [B, C]
+            spec_dest = p_city_spec.gather(1, dest_slot.clamp(min=0))  # [B, K]
+            gold_i = (self._trade_intl_gold + spec_dest).double()
+            near_dest = torch.zeros(B, self.r_routes.shape[2], dtype=torch.bool, device=self.device)
+            if self.u_tile.numel():
+                d_bi = self.pair_dist[dest_tile.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, K, U]
+                near_dest = near_dest | (d_bi & self.u_alive.unsqueeze(1)).any(dim=2)
+            raided_i = near.gather(1, from_j) | near_dest
+            pays_i = act & intl & has_from & valid_dest & ~self.r_atwar[:, r].view(B, 1) & ~raided_i
+            inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
         inc = inc.reshape(B, RC, 6)
         self._rival_route_cache = (key, inc)
         return inc
@@ -7651,6 +7694,8 @@ class BatchSim:
         # route-less — the TS from.tradeRoutes filter twin).
         kill = (self.r_routes[b, r_from, :, 0] == id_from) | (self.r_routes[b, r_from, :, 1] == id_from)
         self.r_routes[b, r_from][kill] = -1
+        self.r_route_dest[b, r_from][kill] = -1  # B-23
+        self.r_route_exp[b, r_from][kill] = -1   # B-23
         self.rival_at[b] = torch.where(own_t, torch.full_like(self.rival_at[b], r_to), self.rival_at[b])
         # A-17: re-tagged tiles register to the receiving rc (its id is
         # assigned below from r_next_city_id — same value, read here first)
@@ -8913,6 +8958,7 @@ class BatchSim:
         # the pair masks below.
         want = active & (alive.sum(dim=1) >= 1)
         if not bool(want.any()):
+            self._expire_rival_routes(r)  # B-23: expiry is unconditional
             return
         cap = torch.zeros(B, dtype=torch.long, device=dev)
         if self._trade_ftc >= 0:
@@ -8948,6 +8994,7 @@ class BatchSim:
         used = (self.r_routes[:, r, :, 0] >= 0).sum(dim=1)
         want = want & (used < cap)
         if not bool(want.any()):
+            self._expire_rival_routes(r)  # B-23: expiry runs even at capacity
             return
         # dest score (j-only): routeYields food+prod = 2 + 2*floor(spec/2)
         dt = self.rc_dist_tile[:, r]  # [B, RC, nD]
@@ -9000,20 +9047,93 @@ class BatchSim:
         kf = key.reshape(B, RC * W2)  # i-major flat order = the TS from-asc, dests-then-CS scan
         kmax, _ = kf.max(dim=1)
         first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).view(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
+        K = self.r_routes.shape[2]
+        exp_val = int(self.turn) + self._trade_duration
+
+        def _free_slot(rws: torch.Tensor) -> torch.Tensor:
+            free = self.r_routes[rws, r, :, 0] < 0  # [n, K]
+            s = torch.where(free, torch.arange(K, device=dev).view(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values
+            assert int(s.max()) < K, "r_routes columns exhausted — raise K above the capacity bound"
+            return s
+
         do = want & (kmax >= 0)
-        if not bool(do.any()):
-            return
-        rows = do.nonzero(as_tuple=True)[0]
-        i_pick = (first[rows] // W2)
-        jj_pick = (first[rows] % W2)
-        from_id = ids[rows, i_pick]
-        to_id = torch.where(jj_pick < RC, ids[rows, jj_pick.clamp(max=RC - 1)], -(2 + (jj_pick - RC)))
-        free = self.r_routes[rows, r, :, 0] < 0  # [n, K]
-        K = free.shape[1]
-        slot = torch.where(free, torch.arange(K, device=dev).view(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values
-        assert int(slot.max()) < K, "r_routes columns exhausted — raise K above the capacity bound"
-        self.r_routes[rows, r, slot, 0] = from_id
-        self.r_routes[rows, r, slot, 1] = to_id
+        if bool(do.any()):
+            rows = do.nonzero(as_tuple=True)[0]
+            i_pick = (first[rows] // W2)
+            jj_pick = (first[rows] % W2)
+            from_id = ids[rows, i_pick]
+            to_id = torch.where(jj_pick < RC, ids[rows, jj_pick.clamp(max=RC - 1)], -(2 + (jj_pick - RC)))
+            slot = _free_slot(rows)
+            self.r_routes[rows, r, slot, 0] = from_id
+            self.r_routes[rows, r, slot, 1] = to_id
+            self.r_route_dest[rows, r, slot] = -1  # domestic/CS
+            self.r_route_exp[rows, r, slot] = exp_val
+
+        # B-23 international: rows that WANT a route but found no domestic/CS
+        # candidate consider a player city — NEAREST-city preference (min hex
+        # distance; ties keep from-asc, player-city-asc order). Rivals always
+        # know the player (no fog); rival→rival routes stay descoped.
+        intl_want = want & (kmax < 0)
+        C = self.C
+        if bool(intl_want.any()) and C > 0:
+            psite = self.site.clamp(min=0)  # [B, C] player city center tiles
+            palive = self.alive  # [B, C]
+            centers = self.rc_center[:, r].clamp(min=0)  # [B, RC]
+            d_ip = self.pair_dist[centers.unsqueeze(2), psite.unsqueeze(1)]  # [B, RC, C]
+            rr2 = self.r_routes[:, r]  # [B, K, 2]
+            rd = self.r_route_dest[:, r]  # [B, K]
+            act2 = rr2[:, :, 0] >= 0  # [B, K]
+            # already-connected: an ACTIVE intl route from rc i to player tile c
+            exists_ip = (
+                (rr2[:, :, 0].view(B, 1, 1, -1) == ids.view(B, RC, 1, 1))
+                & (rd.view(B, 1, 1, -1) == psite.view(B, 1, C, 1))
+                & act2.view(B, 1, 1, -1)
+            ).any(dim=3)  # [B, RC, C] (rd is -1 for domestic/CS → never == psite>=0)
+            valid_ip = (
+                alive.unsqueeze(2)
+                & palive.unsqueeze(1)
+                & (d_ip <= self._trade_range)
+                & ~exists_ip
+                & intl_want.view(B, 1, 1)
+            )
+            BIG = 1 << 30
+            dkey = torch.where(valid_ip, d_ip.long(), torch.full((B, RC, C), BIG, dtype=torch.long, device=dev))
+            df = dkey.reshape(B, RC * C)  # i-major = from-asc, player-city-asc
+            dmin, _ = df.min(dim=1)
+            firsti = torch.where(df == dmin.unsqueeze(1), torch.arange(RC * C, device=dev).view(1, -1), torch.full((1, RC * C), RC * C, device=dev)).min(dim=1).values
+            doi = intl_want & (dmin < BIG)
+            if bool(doi.any()):
+                rows = doi.nonzero(as_tuple=True)[0]
+                i_pick = (firsti[rows] // C)
+                c_pick = (firsti[rows] % C)
+                from_id = ids[rows, i_pick]
+                dest_tile = psite[rows, c_pick]
+                slot = _free_slot(rows)
+                self.r_routes[rows, r, slot, 0] = from_id
+                self.r_routes[rows, r, slot, 1] = -1  # intl: dest carried in r_route_dest
+                self.r_route_dest[rows, r, slot] = dest_tile
+                self.r_route_exp[rows, r, slot] = exp_val
+
+        # B-23 duration: after the pick, expire due routes (freed capacity
+        # re-picks NEXT turn). ALWAYS runs — TS applies the expiry filter
+        # OUTSIDE the capacity-gated pick block, so an at-capacity civ still
+        # sheds its expiring route (the early returns above call this too).
+        self._expire_rival_routes(r)
+
+    def _expire_rival_routes(self, r: int) -> None:
+        """B-23: drop civ r's routes whose expiresTurn has arrived, plus any
+        international route whose player destination is no longer a live player
+        city center (the TS rival.tradeRoutes filter twin). Consumers gate on
+        active (r_routes[..., 0] >= 0), so this is idempotent per turn."""
+        act3 = self.r_routes[:, r, :, 0] >= 0
+        expired = act3 & (self.r_route_exp[:, r] >= 0) & (self.r_route_exp[:, r] <= int(self.turn))
+        rd3 = self.r_route_dest[:, r]
+        dest_gone = act3 & (rd3 >= 0) & (self.center_at.gather(1, rd3.clamp(min=0)) < 0)
+        drop = expired | dest_gone  # [B, K]
+        if bool(drop.any()):
+            self.r_routes[:, r][drop] = -1
+            self.r_route_dest[:, r][drop] = -1
+            self.r_route_exp[:, r][drop] = -1
 
     def _rival_phase(self) -> None:
         """Mirrors rivalPhase, rival by rival in id order — queue picks for
