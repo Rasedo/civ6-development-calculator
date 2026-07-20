@@ -19,7 +19,6 @@ import { tileYields } from './yields';
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION } from './trade';
 import { isSuzerain, rivalIsSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
->>>>>>> worktree-agent-a2a8cc839bafe1199
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
