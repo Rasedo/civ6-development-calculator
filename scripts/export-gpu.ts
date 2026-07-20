@@ -92,6 +92,9 @@ import {
   ERA_SCORE_PANTHEON,
   ERA_SCORE_RELIGION,
   ERA_SCORE_GP,
+  ERA_DARK_T,
+  ERA_GOLDEN_T,
+  AGE_PRESSURE,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -526,6 +529,10 @@ const rules = {
     pantheon: ERA_SCORE_PANTHEON,
     religion: ERA_SCORE_RELIGION,
     gp: ERA_SCORE_GP,
+    // S2: age thresholds (S1-evidence-pinned) + the source-civ pressure factors.
+    darkT: ERA_DARK_T,
+    goldenT: ERA_GOLDEN_T,
+    agePressure: AGE_PRESSURE,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the

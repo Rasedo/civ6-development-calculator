@@ -65,7 +65,7 @@ def gpu_state_lines(sim, b):
         f"nciv:{int(sim.civics[b].sum())} nset:{int(sim.settlers[b])} ncity:{ncity} nunit:{nunit} "
         f"umaint:{_milli((sim.p_alive[b] * sim._p_maint[sim.p_type[b]]).sum())} "
         f"gp:{','.join(str(int(x)) for x in sim.gp_earned[b].tolist())} "
-        f"ers:{int(sim.era_score[b, 0])} "  # B-24: player era score (esc is empire score)
+        f"ers:{int(sim.era_score[b, 0])} age:{int(sim.civ_age[b, 0])} "  # B-24: player era score + Age (esc is empire score)
         f"esc:{_milli(sim.empire_score()[b])}"
     )
     for pp in range(sim.p_alive.shape[1]):
@@ -136,7 +136,7 @@ def gpu_state_lines(sim, b):
         L.append(
             f"{p}RT{r} = ncity{nc} pop{pop} treas{_milli(sim.r_treasury[b, r])} fai{_milli(sim.r_faith[b, r])} "
             f"ntech{int(sim.r_techs[b, r].sum())} nciv{int(sim.r_civics[b, r].sum())} war{int(bool(sim.r_atwar[b, r]))} "
-            f"ww{int(sim.r_war_weariness[b, r])} rrw{sum((1 << j) for j in range(sim.R) if bool(sim.rr_war[b, r, j]))} rrk{sum((1 << j) for j in range(sim.R) if bool(sim.rr_warkind[b, r, j]))} ers{int(sim.era_score[b, r + 1])} "
+            f"ww{int(sim.r_war_weariness[b, r])} rrw{sum((1 << j) for j in range(sim.R) if bool(sim.rr_war[b, r, j]))} rrk{sum((1 << j) for j in range(sim.R) if bool(sim.rr_warkind[b, r, j]))} ers{int(sim.era_score[b, r + 1])} age{int(sim.civ_age[b, r + 1])} "
             f"terr:{int((sim.rival_at[b] == r).sum())} wterr:{int(((sim.rival_at[b] == r) & sim.water[b]).sum())} "
             f"tsum:{int(((sim.rival_at[b] == r) * torch.arange(sim.T, device=sim.device)).sum())} "
             f"rsc:{_milli(sim.rival_empire_score(r)[b])}"

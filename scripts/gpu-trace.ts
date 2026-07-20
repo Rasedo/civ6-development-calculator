@@ -63,6 +63,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.gameOver ? 1 : 0, // GV-2
     dom >= 0 ? dom : state.gameOver ? leader : -1, // GV-2/GV-3 winner
     state.victoryType ?? 0, // GV-4/GV-3 victoryType
+    state.civAges?.[0] ?? 1, // B-24 S2: the player's Age (compared)
   ];
   for (let s = 0; s < csMax; s++) {
     // Keyed by id (== the GPU's static slot), NOT array position: a captured
@@ -79,7 +80,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age (B-24 S2)
       continue;
     }
     row.push(
@@ -114,6 +115,8 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       // A-19/B-33 (S2): per-pair war bitmask over rival ids (bit i set = at war
       // with rival i). The (0, r+1) player pair rides the atWar column above.
       (rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0),
+      // B-24 S2: this rival's Age (0 Dark / 1 Normal / 2 Golden, compared).
+      state.civAges?.[rival.id + 1] ?? 1,
     );
   }
   for (let c = 0; c < cMax; c++) {
@@ -139,14 +142,14 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
-  // Must match traceRow's column order EXACTLY. HEAD is 22: the 18 base cols
-  // + GV leader/gameOver/winner/victoryType (all integer). Each rival is 15:
-  // the 12 base + treasury/rGScore (both float ×1000, tol 2) + rrWarMask (int,
-  // S2). A stale tol silently shifts every later column's tolerance — keep them
-  // in lockstep.
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  // Must match traceRow's column order EXACTLY. HEAD is 23: the 18 base cols
+  // + GV leader/gameOver/winner/victoryType + playerAge (all integer, B-24
+  // S2). Each rival is 16: the 12 base + treasury/rGScore (both float ×1000,
+  // tol 2) + rrWarMask + age (int). A stale tol silently shifts every later
+  // column's tolerance — keep them in lockstep.
+  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
   return tol;
 }

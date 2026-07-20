@@ -245,6 +245,10 @@ export interface GameState {
    *  (0 = player, r+1 = rival r). Lazy — absent entries read 0. Resets at
    *  every ERA_LENGTH boundary (`eraBoundary`, core/eras.ts). */
   eraScore?: number[];
+  /** B-24 S2: per-civ Age (0 Dark / 1 Normal / 2 Golden), UNIFIED civ ids;
+   *  assigned at each era boundary from the just-ended window's eraScore.
+   *  Absent entries read Normal (era 0, fresh saves). */
+  civAges?: number[];
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).

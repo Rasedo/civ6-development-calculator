@@ -97,7 +97,7 @@ import {
   ERA_SCORE_RELIGION,
   ERA_SCORE_GP,
 } from '../data/rivals';
-import { addEraScore } from './eras';
+import { addEraScore, agePressureFactor } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
 const ok: RuleResult = { ok: true };
@@ -565,7 +565,11 @@ export function levyUnits(state: GameState, csId: number): RuleResult {
 // Loyalty (only in motion while rival civs exist; capitals are immune)
 // ---------------------------------------------------------------------------
 
-/** Per-turn loyalty change for a player city under rival pressure. */
+/** Per-turn loyalty change for a player city under rival pressure.
+ *  B-24 S2: every pop-pressure contribution scales by the SOURCE civ's age
+ *  factor (Dark ×0.5 / Normal ×1 / Golden ×1.5) — factors are halves, so the
+ *  sums stay exact in both engines' dtypes. The flip-WINNER pick
+ *  (`flipCityToRival`) deliberately stays on RAW pressure (both engines). */
 export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
   const here = state.map.tiles[city.centerIndex];
   let own = 0;
@@ -575,12 +579,15 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
     const d = hexDistance(here.col, here.row, t.col, t.row);
     if (d <= LOYALTY_RANGE) own += c.population * (LOYALTY_RANGE + 1 - d);
   }
+  own *= agePressureFactor(state, 0);
   for (const rival of state.rivals) {
+    let sub = 0;
     for (const rc of rival.cities) {
       const t = state.map.tiles[rc.centerIndex];
       const d = hexDistance(here.col, here.row, t.col, t.row);
-      if (d <= LOYALTY_RANGE) foreign += rc.population * (LOYALTY_RANGE + 1 - d);
+      if (d <= LOYALTY_RANGE) sub += rc.population * (LOYALTY_RANGE + 1 - d);
     }
+    foreign += sub * agePressureFactor(state, civOfRival(rival.id));
   }
   const pressure =
     own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
@@ -2531,6 +2538,8 @@ export function rivalPhase(state: GameState): void {
         rc.loyalty = LOYALTY_MAX;
       } else if (state.cities.length > 0 || state.rivals.some((o) => o.id !== rival.id && o.cities.length > 0)) {
         const here = state.map.tiles[rc.centerIndex];
+        // B-24 S2: contributions scale by the SOURCE civ's age factor (the
+        // loyaltyDelta mirror — per-civ subtotal × factor, halves-exact).
         let own = 0;
         let foreign = 0;
         for (const c2 of rival.cities) {
@@ -2538,18 +2547,23 @@ export function rivalPhase(state: GameState): void {
           const d = hexDistance(here.col, here.row, t2.col, t2.row);
           if (d <= LOYALTY_RANGE) own += c2.population * (LOYALTY_RANGE + 1 - d);
         }
+        own *= agePressureFactor(state, civOfRival(rival.id));
+        let subP = 0;
         for (const c2 of state.cities) {
           const t2 = state.map.tiles[c2.centerIndex];
           const d = hexDistance(here.col, here.row, t2.col, t2.row);
-          if (d <= LOYALTY_RANGE) foreign += c2.population * (LOYALTY_RANGE + 1 - d);
+          if (d <= LOYALTY_RANGE) subP += c2.population * (LOYALTY_RANGE + 1 - d);
         }
+        foreign += subP * agePressureFactor(state, 0);
         for (const other of state.rivals) {
           if (other.id === rival.id) continue;
+          let subO = 0;
           for (const c2 of other.cities) {
             const t2 = state.map.tiles[c2.centerIndex];
             const d = hexDistance(here.col, here.row, t2.col, t2.row);
-            if (d <= LOYALTY_RANGE) foreign += c2.population * (LOYALTY_RANGE + 1 - d);
+            if (d <= LOYALTY_RANGE) subO += c2.population * (LOYALTY_RANGE + 1 - d);
           }
+          foreign += subO * agePressureFactor(state, civOfRival(other.id));
         }
         const pressure =
           own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);

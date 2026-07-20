@@ -113,6 +113,17 @@ export const ERA_SCORE_WONDER = 3; // completed a world wonder
 export const ERA_SCORE_PANTHEON = 1;
 export const ERA_SCORE_RELIGION = 2;
 export const ERA_SCORE_GP = 1; // earned a Great Person
+/** B-24 S2: age thresholds on the just-ended era window's score — Dark below
+ *  DARK_T, Golden at/above GOLDEN_T, Normal between. PINNED FROM S1 EVIDENCE
+ *  (24 scripted seeds × 5 eras × 3 civs, pooled q25 1 / med 6 / q75 9):
+ *  Dark 31% / Normal 47% / Golden 22% of in-gate windows — all three ages
+ *  occur robustly. Era 0 is Normal for everyone (createGame default). */
+export const ERA_DARK_T = 3;
+export const ERA_GOLDEN_T = 10;
+/** B-24 S2: loyalty-pressure factor by the SOURCE civ's age (Dark/Normal/
+ *  Golden). Halves are exact in f32 AND f64 (dyadic), so the modulated
+ *  pressure sums stay association-free like the integer sums they replace. */
+export const AGE_PRESSURE = [0.5, 1.0, 1.5];
 /** B-22 (task #55 S3): a rival↔rival war is FORMAL iff the aggressor denounced
  *  the target at least this many turns before declaring; otherwise SURPRISE. */
 export const RR_FORMAL_MIN_TURNS = 5;

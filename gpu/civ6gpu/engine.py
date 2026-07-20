@@ -375,7 +375,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -643,6 +643,15 @@ class BatchSim:
         _er = rules.eras
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
+        # B-24 S2: per-civ Age (0 Dark / 1 Normal / 2 Golden), assigned at each
+        # era boundary from the just-ended window's score; era 0 = all Normal
+        # (the TS civAges default — nothing exported at t0). _MUTABLE.
+        # _age_factor = the SOURCE civ's loyalty-pressure multiplier (halves —
+        # exact in f32 AND f64, so modulated sums stay association-free).
+        self.civ_age = torch.ones(B, 1 + r_pad, dtype=torch.long, device=device)
+        self._era_dark = int(_er.get("darkT", 3))
+        self._era_gold = int(_er.get("goldenT", 10))
+        self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
         self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)
@@ -10332,20 +10341,23 @@ class BatchSim:
                     lrng = int(rr.get("loyaltyRange", 9))
                     lscale = float(rr.get("loyaltyScale", 20))
                     here_j = self.rc_center[:, r, j].clamp(min=0)
+                    # B-24 S2: per-SOURCE-civ age factors (halves — exact f64;
+                    # the D-12 single-sum note survives: terms are multiples
+                    # of 0.5, still association-free).
+                    f_own = self._age_factor[self.civ_age[:, r + 1]]
                     d_own = self.pair_dist[here_j.unsqueeze(1), self.rc_center[:, r].clamp(min=0)].to(torch.float64)
-                    own_p = ((lrng + 1 - d_own).clamp(min=0) * self.rc_pop[:, r].double() * self.rc_alive[:, r].double()).sum(dim=1)
+                    own_p = ((lrng + 1 - d_own).clamp(min=0) * self.rc_pop[:, r].double() * self.rc_alive[:, r].double()).sum(dim=1) * f_own
                     d_pl = self.pair_dist[here_j.unsqueeze(1), self.site.clamp(min=0)].to(torch.float64)
-                    for_p = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1)
+                    for_p = ((lrng + 1 - d_pl).clamp(min=0) * self.pop.double() * self.alive.double()).sum(dim=1) * self._age_factor[self.civ_age[:, 0]]
                     others = self.alive.any(dim=1)
-                    # D-12: all foreign civs in ONE stacked op — every term is
-                    # (lrng+1−d)⁺ × pop × alive, integer-valued f64, so the
-                    # single sum is exact regardless of association.
                     oth = [r2 for r2 in range(self.R) if r2 != r]
                     if oth:
                         ctr_o = self.rc_center[:, oth].reshape(B, -1)
                         alive_o = self.rc_alive[:, oth].reshape(B, -1)
                         d_o = self.pair_dist[here_j.unsqueeze(1), ctr_o.clamp(min=0)].to(torch.float64)
-                        for_p = for_p + ((lrng + 1 - d_o).clamp(min=0) * self.rc_pop[:, oth].reshape(B, -1).double() * alive_o.double()).sum(dim=1)
+                        sub_o = ((lrng + 1 - d_o).clamp(min=0) * self.rc_pop[:, oth].reshape(B, -1).double() * alive_o.double()).reshape(B, len(oth), self.RC).sum(dim=2)
+                        f_oth = self._age_factor[self.civ_age[:, [r2 + 1 for r2 in oth]]]  # [B, len(oth)]
+                        for_p = for_p + (sub_o * f_oth).sum(dim=1)
                         others = others | alive_o.any(dim=1)
                     tot_p = own_p + for_p
                     press = torch.where(tot_p > 0, lscale * (own_p - for_p) / tot_p.clamp(min=1e-9), torch.zeros_like(tot_p))
@@ -11123,13 +11135,22 @@ class BatchSim:
         seq = self.city_seq
         earlier = seq.unsqueeze(1) < seq.unsqueeze(2)  # [B, c, c'] → seq[c'] < seq[c]
         pop_mix = torch.where(earlier, self.pop.unsqueeze(1).to(self.dtype), pop_before.unsqueeze(1).to(self.dtype))
-        own = (w * pop_mix * self.alive.unsqueeze(1).to(self.dtype)).sum(dim=2)
-        # foreign pressure from rival cities
+        # B-24 S2: contributions scale by the SOURCE civ's age factor (the
+        # loyaltyDelta mirror: per-civ subtotal × factor — halves-exact in
+        # this dtype, so grouping stays association-free).
+        f_age = self._age_factor[self.civ_age].to(self.dtype)  # [B, 1+R]
+        own = (w * pop_mix * self.alive.unsqueeze(1).to(self.dtype)).sum(dim=2) * f_age[:, 0].unsqueeze(1)
+        # foreign pressure from rival cities, per SOURCE rival × its factor
         rc_flat = self.rc_center.reshape(B, -1).clamp(min=0)
         rc_live = self.rc_alive.reshape(B, -1)
         d_cr = self.pair_dist[sitec.unsqueeze(2), rc_flat.unsqueeze(1)].to(self.dtype)
         wf = (rng + 1 - d_cr).clamp(min=0)
-        foreign = (wf * self.rc_pop.reshape(B, -1).unsqueeze(1).to(self.dtype) * rc_live.unsqueeze(1).to(self.dtype)).sum(dim=2)
+        foreign_r = (
+            wf.view(B, C, self.R, self.RC)
+            * self.rc_pop.view(B, 1, self.R, self.RC).to(self.dtype)
+            * self.rc_alive.view(B, 1, self.R, self.RC).to(self.dtype)
+        ).sum(dim=3)  # [B, C, R]
+        foreign = (foreign_r * f_age[:, 1 : 1 + self.R].unsqueeze(1)).sum(dim=2)
         tot = own + foreign
         pressure = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
         delta = pressure + self._loyalty_amenity[tier_idx.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)]
@@ -12340,10 +12361,19 @@ class BatchSim:
         self._spread_religious_pressure()
 
         self.turn += 1
-        # B-24 (task #68 S1): era boundary — the eraBoundary mirror (TS runs it
-        # right after `state.turn += 1`). The just-ended window's score resets;
-        # S2 will read it here first to assign each civ's Age.
+        # B-24 (task #68): era boundary — the eraBoundary mirror (TS runs it
+        # right after `state.turn += 1`). S2: every civ's Age for the NEW era
+        # comes from the just-ended window's score (Dark < darkT ≤ Normal <
+        # goldenT ≤ Golden), THEN the window resets. Padded/dead civs get Dark
+        # from score 0 — harmless: their factor only ever multiplies
+        # alive-masked zero contributions.
         if self._era_len > 0 and self.turn % self._era_len == 0:
+            sc = self.era_score
+            self.civ_age = torch.where(
+                sc < self._era_dark,
+                torch.zeros_like(self.civ_age),
+                torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
+            )
             self.era_score[:] = 0
         dom = self._domination()  # GV-3
         # B-25 (Round B3): a science victory (3, player) / defeat (4, a rival)
@@ -12396,6 +12426,7 @@ class BatchSim:
             self.game_over.to(self.dtype),  # GV-2
             self.winner.to(self.dtype),  # GV-2/GV-3 winner
             self.victory_type.to(self.dtype),  # GV-4/GV-3 victoryType
+            self.civ_age[:, 0].to(self.dtype),  # B-24 S2: the player's Age (compared)
         ]
         for s in range(self.S):
             cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)
@@ -12438,6 +12469,11 @@ class BatchSim:
                     sum((self.rr_war[:, r, j].to(self.dtype) * float(1 << j) for j in range(self.R)), zero),
                     zero,
                 ),
+                # B-24 S2: this rival's Age (compared). PADDED slots zero like
+                # the TS !rival zero-pad; real (even cityless) rivals trace
+                # their boundary-assigned age — both engines assign ages to
+                # EVERY civ at the boundary, dead ones included.
+                torch.where(live, self.civ_age[:, r + 1].to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):
