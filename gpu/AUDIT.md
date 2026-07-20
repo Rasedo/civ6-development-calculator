@@ -30,7 +30,7 @@ stage that moves an item.
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
-| G parity latents | 6 | 5 | **83%** |
+| G parity latents | 7 | 7 | **100%** |
 | **Overall (incl. closed)** | **186** | **153.0** | **82%** |
 | Open chapters only (A+B) | 129 | 97.0 | **75%** |
 
@@ -154,8 +154,11 @@ Per-item weights (done% in parens where partial):
   B-33 3 (open).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
-- G: G-1..G-5 done (G-5 root-caused ROUND B10 slice H); G-6 1 (open,
-  dormant — unverified founding tie-break sighting, slice R).
+- G: G-1..G-7 done. G-6 (task #55: exporter `st` plane froze the
+  dynamic `!t.district` → razed-city tiles unsettleable in GPU) and
+  G-7 (task #55: TS `withFollowerBelief` shallow-clone aliased the
+  frozen per-turn mods, leaking a follower belief across cities) both
+  RESOLVED, chapter G EMPTY again.
 
 ---
 
@@ -848,21 +851,55 @@ reference:
 
 ## G. Known parity latents (dormant)
 
-G-1..G-5 resolved (detail in git history / the cited logs); G-6 open:
+G-1..G-7 resolved (detail in git history / the cited logs):
 
-- G-6 (new, 2026-07-19, ROUND B10 slice R — UNVERIFIED agent
-  diagnosis, re-verify before implementing any fix, the G-3 lesson).
-  Under slice R's site reshuffle (R-only worktree, pre-merge), rollout
-  game seed 9235 rng 2026006134 went red at t244 (trace col 41,
-  improved-tile count): the first divergence is a rival FOUNDING —
-  city 290's settler founds on tile 643 (GPU; tile had a FARM →
-  improvement stripped) vs 644 (TS). Replay trace exactly matched
-  through t242 (districts, buildings, yields, treasuries, scores), so
-  the class looks like a `_rival_try_found`/`siteQuality` tie-break or
-  live-read asymmetry (C-7 family), NOT R's placement rule. Dormant:
-  the compound R+B+H merge reshuffled the trajectory again and the
-  round battery ran green. Repro pointer: slice-R agent report,
-  ROUND B10 (task #66).
+- G-6. RESOLVED (2026-07-20, task #55 GEO-H hunt, off the GEO-1
+  branch). The class re-fired on the GEO-1 base: rollout seed 9235
+  rng 2026006133 went red at t246 (rival production), first statelog
+  divergence a rival FOUNDING at t247 — RC1's settler founds on tile
+  687 (GPU) vs 644 (TS). ROOT (verified, NOT the C-7 tie-break the
+  slice-R note guessed): the exporter's `st` static-settleable plane
+  (`export-gpu.ts`, tile field `st`) baked `!t.district` — a DYNAMIC
+  property — into an otherwise-static plane (water/impassable/wonder/
+  OASIS). The engine's `_rival_try_found` candidate gate (`settle_ok`)
+  ANDs `st` with a LIVE `self.district < 0` check, so a tile that held
+  a district at export time (a scripted city's center, tile 644) but
+  LOST it during the rollout (the city razed — seed 9235 runs under the
+  A-19/B-33 rival-rival wars) stayed PERMANENTLY unsettleable in the
+  GPU (`st`=0 frozen) while TS's `siteQuality` reads `tile.district`
+  live and re-opened the freed tile. TS (live) is correct — real Civ 6
+  re-settles a razed city's tile. FIX: drop `!t.district` from the `st`
+  bake; the live `self.district < 0` gate already covers t0 AND
+  dynamically built/removed districts. Wrong engine: the GPU input
+  data (a static plane must not freeze a dynamic property). Seeds
+  9235 + 9144 both green, rollout 72/72; scripted + forced 0.0-milli.
+
+- G-7. RESOLVED (2026-07-20, task #55 GEO-H — the SECOND target game,
+  a DISTINCT root cause the GEO-1 brief mis-attributed to the G-6
+  settle class). Rollout seed 9144 rng 2026006111 went red at t182:
+  player city 412 foodBox off by 0.85 (food yield identical, so NOT a
+  worked-tile/territory divergence — a growth-FACTOR one). ROOT: a TS
+  shared-reference ALIASING bug in `withFollowerBelief` (`effects.ts`).
+  It shallow-cloned `buildingYieldAdd` (`{ ...base.buildingYieldAdd }`),
+  which copies the top-level keys but SHARES their `Partial<Yields>`
+  objects; `applyBeliefEffects` reuses an existing building's record
+  (`mods.buildingYieldAdd[b] ??= {}`) and `addPartial` MUTATES it in
+  place. When a follower belief adds to a building already in `base` —
+  Feed-the-World's SHRINE +1 food while a religious city-state's
+  3-envoy bonus had already put SHRINE (faith) in `base` — the mutation
+  corrupted the per-turn FROZEN `mods` that `endTurn` computes once
+  (game.ts:769) and reuses across the whole city loop. So a city
+  FOLLOWING a Feed-the-World religion (city 538, processed first)
+  leaked +1 Shrine food onto every LATER city's growth accrual (city
+  412, which follows no religion) — foodBox drift the GPU, which
+  computes each city's follower belief independently, never had. GPU
+  is correct (source-of-truth: pick real-Civ-6 behaviour — a follower
+  belief affects only its own city). FIX: DEEP-clone the nested
+  per-building records in `withFollowerBelief`. Both target games green,
+  rollout 72/72. NOTE: unreachable in the scripted gate (CS envoys
+  never pass 1 there, so `base` never carries a CS building key to
+  alias) — a rollout-only latent, dormant until an envoy-rich rival
+  religion met a following player city.
 
 - G-5. RESOLVED (2026-07-19, ROUND B10 slice-H, #66). The class: a
   rival's treasury off by EXACTLY 1 gold (± score, e.g. 5.4) on the

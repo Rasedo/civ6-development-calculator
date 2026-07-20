@@ -485,13 +485,24 @@ export function withFollowerBelief(
   if (!belief) return base;
   const m: Modifiers = {
     ...base,
-    buildingYieldAdd: { ...base.buildingYieldAdd },
-    buildingHousingAdd: { ...base.buildingHousingAdd },
-    amenitiesIfSpecialty: [...base.amenitiesIfSpecialty],
+    // GEO-H (#55): DEEP-clone buildingYieldAdd's nested per-building records.
+    // A shallow `{ ...base.buildingYieldAdd }` copies the top-level keys but
+    // SHARES their Partial<Yields> objects; applyBeliefEffects reuses an
+    // existing building's record (`mods.buildingYieldAdd[b] ??= {}`) and
+    // addPartial MUTATES it in place — so a follower belief that adds to a
+    // building already present in `base` (e.g. Feed-the-World's SHRINE food
+    // when a religious city-state's 3-envoy bonus already put SHRINE in base)
+    // corrupted the per-turn FROZEN `mods`, leaking that city's follower
+    // yield onto every later city in the endTurn loop (seed 9144 t182: a
+    // Feed-the-World-following city polluted a non-following city's Shrine
+    // food → foodBox drift the GPU, which computes each city independently,
+    // never had).
+    buildingYieldAdd: Object.fromEntries(
+      Object.entries(base.buildingYieldAdd).map(([k, v]) => [k, { ...v }]),
+    ),
+    buildingHousingAdd: { ...base.buildingHousingAdd }, // scalar values, reassigned not mutated
+    amenitiesIfSpecialty: [...base.amenitiesIfSpecialty], // array cloned; elements are pushed, not mutated
   };
-  // Follower beliefs touch only the channels cloned above (+ workEthic/
-  // faithPerWonder scalars, copied by the spread) — applyBeliefEffects' other
-  // branches are no-ops for a follower belief, so `base` is never mutated.
   applyBeliefEffects(state, m, belief);
   return m;
 }

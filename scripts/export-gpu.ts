@@ -1226,8 +1226,15 @@ for (let s = 0; s < N_SEEDS; s++) {
       fw: hasFreshWater(map, t) ? 1 : 0,
       nw: t.wonder ? 1 : 0,
       // statically settleable for rival expansion (mirrors siteQuality's -1s;
-      // ownership and dynamic districts are the engine's job)
-      st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' && !t.district ? 1 : 0,
+      // ownership and dynamic districts are the engine's job). GEO-H (#55):
+      // `st` must NOT bake `!t.district` — the district is a LIVE property
+      // (siteQuality reads tile.district each call), and the engine already
+      // gates on `self.district < 0` at the candidate site. Baking the t0
+      // district froze a tile that later loses its district (a razed city's
+      // freed center) as permanently unsettleable in the GPU while TS re-opens
+      // it live — the seed 9235/9144 founding-site divergence (G-6). Keep `st`
+      // purely static: water / impassable / natural wonder / OASIS.
+      st: !isWater(t) && !isImpassable(t) && !t.wonder && t.feature !== 'OASIS' ? 1 : 0,
       // district-usable land (static part of canPlaceDistrict for a non-coastal
       // land district): not water/impassable/wonder/builtWonder/oasis/floodplains,
       // no non-bonus resource, no district at t=0. Ownership, radius, the pop cap
