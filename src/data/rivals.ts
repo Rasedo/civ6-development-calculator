@@ -88,3 +88,20 @@ export const WAR_WEARINESS_CAP = 16;
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.min(weariness, WAR_WEARINESS_CAP) / WAR_WEARINESS_PER_AMENITY);
 }
+
+// --- A-19/B-33 rival↔rival war (task #55 S2) ----------------------------------
+// The pairwise auto-DoW re-derives the player auto-DoW's DETERMINISTIC gates
+// (proximity + strength ratio) and DROPS its RNG probability gate → ZERO-DRAW
+// (documented deviation; the player pair keeps its RNG). Anti-thrash is the
+// aggressor's own war-weariness: a war-weary civ (ww ≥ RR_DOW_WW_MAX) never
+// opens a NEW front, and a pair sues out once EITHER side's ww exceeds
+// RR_PEACE_WW — so after a ww-triggered peace the aggressor's ww (> RR_PEACE_WW
+// > RR_DOW_WW_MAX) blocks an immediate re-declaration until it decays at peace.
+/** Max distance (closest city pair) for a pairwise DoW — the player gate. */
+export const RR_DOW_PROXIMITY = 9;
+/** Aggressor strength must exceed target × this — the player gate (1.3). */
+export const RR_DOW_STRENGTH_RATIO = 1.3;
+/** An aggressor at or above this war-weariness will not open a new war. */
+export const RR_DOW_WW_MAX = 6;
+/** A warring pair sues out once EITHER side's war-weariness exceeds this. */
+export const RR_PEACE_WW = 10;

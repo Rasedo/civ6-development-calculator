@@ -134,7 +134,14 @@ export function unitsHostile(
 ): boolean {
   if (unitSide(a) === unitSide(b)) return false;
   if (a.owner === 'barbarian' || b.owner === 'barbarian') return true;
-  if (a.owner === 'rival' && b.owner === 'rival') return false;
+  if (a.owner === 'rival' && b.owner === 'rival') {
+    // A-19/B-33 (S2): rival↔rival hostility off the per-pair war state
+    // (atWarRivals stores 0-based rival ids = civId). Symmetric; same-civ /
+    // unknown-civ never hostile. Inlined (not `civsAtWar`) to avoid a
+    // units↔rivals import cycle.
+    if (a.civId === undefined || b.civId === undefined || a.civId === b.civId) return false;
+    return state.rivals.find((r) => r.id === a.civId)?.atWarRivals?.includes(b.civId as number) ?? false;
+  }
   const civId = a.owner === 'rival' ? a.civId : b.civId;
   return state.rivals.find((r) => r.id === civId)?.atWar ?? false;
 }

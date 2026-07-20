@@ -9,7 +9,8 @@
  *           nPlayerUnits, envoysAvailable, influence]
  *   per city-state slot (csMax) — [envoys, pop, questKind+1]
  *   per rival slot (rMax) — [nCities, popSum, nUnits, atWar, nTechs,
- *           nCivics, techProg·ms, civicProg·ms, ΣqueueProg·ms, ΣqueueCost·ms]
+ *           nCivics, techProg·ms, civicProg·ms, ΣqueueProg·ms, ΣqueueCost·ms,
+ *           nDistricts, nBuildings, treasury·ms, rGScore·ms, rrWarMask]
  *   per city slot (cMax) — [pop, ownedTiles, buildings, tilesAcquired,
  *           foodBox·ms, cultureBox·ms, cityHp, loyalty·ms, followedReligion]
  *
@@ -78,7 +79,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       continue;
     }
     row.push(
@@ -110,6 +111,9 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       rival.cities.reduce((s2, rc) => s2 + rc.buildings.length, 0),
       Math.round((rival.treasury ?? 0) * 1000), // VP-G1
       Math.round(rivalEmpireScore(state, rival) * 1000), // GV-1
+      // A-19/B-33 (S2): per-pair war bitmask over rival ids (bit i set = at war
+      // with rival i). The (0, r+1) player pair rides the atWar column above.
+      (rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0),
     );
   }
   for (let c = 0; c < cMax; c++) {
@@ -136,12 +140,13 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
   // Must match traceRow's column order EXACTLY. HEAD is 22: the 18 base cols
-  // + GV leader/gameOver/winner/victoryType (all integer). Each rival is 14:
-  // the 12 base + treasury/rGScore (both float ×1000, tol 2). A stale tol
-  // silently shifts every later column's tolerance — keep them in lockstep.
+  // + GV leader/gameOver/winner/victoryType (all integer). Each rival is 15:
+  // the 12 base + treasury/rGScore (both float ×1000, tol 2) + rrWarMask (int,
+  // S2). A stale tol silently shifts every later column's tolerance — keep them
+  // in lockstep.
   const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
   return tol;
 }

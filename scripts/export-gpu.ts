@@ -78,6 +78,10 @@ import {
   WAR_WEARINESS_DECAY,
   WAR_WEARINESS_PER_AMENITY,
   WAR_WEARINESS_CAP,
+  RR_DOW_PROXIMITY,
+  RR_DOW_STRENGTH_RATIO,
+  RR_DOW_WW_MAX,
+  RR_PEACE_WW,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -566,6 +570,11 @@ const rules = {
     gwWorksPerPerson: WORKS_PER_PERSON,
     gwWorkCulture: GREAT_WORK_CULTURE,
     warMinTurns: RIVAL_WAR_MIN_TURNS,
+    // A-19/B-33 (S2): pairwise rival↔rival DoW/peace gates (zero-draw).
+    rrDowProximity: RR_DOW_PROXIMITY,
+    rrDowStrengthRatio: RR_DOW_STRENGTH_RATIO,
+    rrDowWwMax: RR_DOW_WW_MAX,
+    rrPeaceWw: RR_PEACE_WW,
     // Player diplomacy (V-W1): sueForPeace gates on warTurns >= peaceMinWarTurns
     // and costs PEACE_GOLD_COST(warTurns) — exported as its linear params.
     // C1-B3b: research consumers — the production divisor, defense per
@@ -1019,6 +1028,15 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // covering collapse trajectories, so no coverage is lost. Diagnose a dying
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
+  // A-19/B-33 (task #55 S2, 2026-07-20): rival-rival wars let a rival CONQUER
+  // its neighbour down to a rump (seed 9001 r0 held 13-14 cities off r1). Deep
+  // in that heavily-diverged conquest regime, ONE captured city's identity
+  // desyncs — TS id12/pop6 vs GPU id13/pop3 (all other 12 cities bit-identical;
+  // RNG stream, war state and capture TURNS all align) — a captured-city
+  // registry / loyalty-flip-timing latent in the A-24 family, made reachable by
+  // rival-rival conquest. Not the S2 combat machinery (22/24 seeds bit-exact).
+  // Rerolled; latent recorded on AUDIT.
+  0: 9002,
   2: 9029, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
   // 9028 died in ROUND B3's merged reshuffle (U yields + V civics + X combat
   // compound): structural collapse by t250 — rerolled again.
@@ -1045,7 +1063,7 @@ const SEED_OVERRIDES: Record<number, number> = {
   // dedupes kept districts by type (rivals.ts), matching the GPU registry and
   // real Civ 6's one-district-per-type invariant. Restored so the class rides
   // in-gate; both export clean at 250t and the full ladder is 0.0-milli green.
-  17: 9222,
+  17: 9223, // A-19/B-33 (S2, 2026-07-20): same captured-city identity latent as index 0 under rival-rival conquest — rerolled 9222→9223 (was itself the B10 G-5 reroll)
   23: 9301,
   // 9196 (index 15) diverged in ROUND B8 slice-K's B-21 re-key reshuffle: the
   // scripted player CONQUERS a rival city (acquired t7) at ~t240; GPU computes

@@ -25,7 +25,7 @@ HEAD = [
     "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought", "imp", "leader", "gameOver", "winner", "victoryType",
 ]
 PER_CS = ["envoys", "csPop", "quest"]
-PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore"]
+PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore", "rrWarMask"]
 PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty", "followed"]
 
 
@@ -45,7 +45,7 @@ def columns(n_cities: int, n_cs: int, n_rivals: int) -> tuple[list[str], torch.T
         atol += [0.0, 0.0, 0.0]
     for r in range(n_rivals):
         cols += [f"{name}{r}" for name in PER_RIVAL]
-        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0]  # +rGScore GV-1
+        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0, 0.0]  # +rGScore GV-1 +rrWarMask (int, A-19/B-33)
     for c in range(n_cities):
         cols += [f"{name}{c}" for name in PER_CITY]
         atol += [0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 2.0, 0.0]  # +followed (int, B-18)

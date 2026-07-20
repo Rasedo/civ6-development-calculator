@@ -32,7 +32,7 @@ import {
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, type BeliefEffects } from '../data/religion';
 import { revealAround } from './fog';
-import { transferCityToRival } from './rivals';
+import { transferCityToRival, transferRivalCityToRival, civsAtWar } from './rivals';
 import type { RuleResult } from './rules';
 import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
 
@@ -437,6 +437,15 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const rivalTarget =
     attacker.owner === 'player' || attacker.owner === 'barbarian'
       ? rivalCityAt(state, targetIndex)
+      : attacker.owner === 'rival'
+      ? (() => {
+          // A-19/B-33 (S2): an at-war rival attacker targets an ENEMY rival's
+          // city (never its own); civsAtWar already gates the target scan.
+          const rc = rivalCityAt(state, targetIndex);
+          return rc && rc.rival.id !== attacker.civId && civsAtWar(state, (attacker.civId ?? -1) + 1, rc.rival.id + 1)
+            ? rc
+            : undefined;
+        })()
       : undefined;
   const csTarget = (() => {
     const cs = cityStateAt(state, targetIndex);
@@ -642,7 +651,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   for (const t of state.map.tiles) {
     const d = hexDistance(from.col, from.row, t.col, t.row);
     if (d < 1 || d > range) continue;
-    const hasEnemy = unitsAt(state, t.index).some((u) => unitsHostile(state, unit, u));
+    // A-19/B-33 (S2): a rival's RANGED unit does NOT engage enemy rival units
+    // (ranged-vs-rival scope-out — melee rivals fight rivals; player/barb
+    // targets unchanged). def.ranged marks a ranged attacker.
+    const hasEnemy = unitsAt(state, t.index).some(
+      (u) => unitsHostile(state, unit, u) && !(def.ranged && unit.owner === 'rival' && u.owner === 'rival'),
+    );
     // AUDIT A-6: ranged hostiles bombard city-center tiles at their full
     // range (the player's D-23 rule from the other seat); melee keeps d===1.
     const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range;
@@ -652,6 +666,21 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
       d <= cityRange &&
       ((unit.owner === 'player' && (rivalCityAt(state, t.index)?.rival.atWar ?? false)) ||
         (unit.owner === 'barbarian' && d === 1 && rivalCityAt(state, t.index) !== undefined));
+    // A-19/B-33 (S2): a MELEE at-war rival unit may attack an ADJACENT enemy
+    // rival's city center (capture via transferRivalCityToRival). Ranged-vs-
+    // rival-city stays out of scope (melee finishes, like the A-12b csWar).
+    const rivalVsRivalCity =
+      unit.owner === 'rival' &&
+      d === 1 &&
+      !def.ranged &&
+      (() => {
+        const rc = rivalCityAt(state, t.index);
+        return (
+          rc !== undefined &&
+          rc.rival.id !== unit.civId &&
+          civsAtWar(state, (unit.civId ?? -1) + 1, rc.rival.id + 1)
+        );
+      })();
     // A-12b join-the-suzerain's-war: an AT-WAR rival MELEE unit may attack
     // an adjacent CS center whose suzerain is THE PLAYER (strict contest).
     // Ranged-vs-CS stays out of scope (melee finishes, like capture).
@@ -661,7 +690,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
       d === 1 &&
       !def.ranged &&
       state.cityStates.some((c) => c.centerIndex === t.index && isSuzerain(c));
-    if (hasEnemy || playerCity || rivalCity || csWar) out.push(t.index);
+    if (hasEnemy || playerCity || rivalCity || rivalVsRivalCity || csWar) out.push(t.index);
   }
   return out;
 }
@@ -700,6 +729,13 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
   if (city.hp <= 0) {
     if (attacker.owner === 'player') {
       captureRivalCity(state, rival, city);
+    } else if (attacker.owner === 'rival') {
+      // A-19/B-33 (S2): a rival conqueror TAKES the enemy rival's city via the
+      // EXISTING loyalty-flip transfer (B-30 infra-carry + POOL-END already in
+      // place). No +40 plunder for the rival-vs-rival path (v1) and no raze cap
+      // (RC=24 slots absorb it, like the loyalty flips).
+      const toRival = state.rivals.find((r) => r.id === attacker.civId);
+      if (toRival) transferRivalCityToRival(state, rival, toRival, city);
     } else {
       // Barbarians sack, they don't govern. P5/S1 (C-10): a rival sack now
       // mirrors sackCity — gold loss (milli-rounded 20%, cap 100) and the
@@ -988,7 +1024,13 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // BARBARIANS raid rival improvements too; rival raiders keep pillaging
   // the player only (they never war other rivals).
   const here = tile();
-  const hereOwned = here.cityId !== -1 || (unit.owner === 'barbarian' && here.rivalId !== undefined);
+  // A-19/B-33 (S2): a rival pillages/raids PLAYER tiles only while at war with
+  // the player (barbarians always); a rival-only-war rival leaves the neutral
+  // player's improvements alone. Rival-rival improvement pillage is out of
+  // scope (residual) — enemy rival TILES are never a pillage/march target here.
+  const atWarWithPlayer =
+    unit.owner === 'barbarian' || (unit.owner === 'rival' && civsAtWar(state, (unit.civId ?? -1) + 1, 0));
+  const hereOwned = (here.cityId !== -1 && atWarWithPlayer) || (unit.owner === 'barbarian' && here.rivalId !== undefined);
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
     if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
@@ -1018,7 +1060,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
-    const tOwned = t.cityId !== -1 || (unit.owner === 'barbarian' && t.rivalId !== undefined);
+    const tOwned = (t.cityId !== -1 && atWarWithPlayer) || (unit.owner === 'barbarian' && t.rivalId !== undefined);
     if (!tOwned) continue;
     const impJob = t.improvement !== null && !t.pillaged;
     const distJob =
@@ -1037,14 +1079,50 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // a CITY target stops the march adjacent — enemy centers can't be entered
   // (real Civ 6), and a unit standing on one could never attack it (d>=1).
   const marchOnto = target !== null;
-  if (!target && state.cities.length > 0) {
-    target = state.cities
-      .map((c) => map.tiles[c.centerIndex])
-      .sort(
-        (a, b) =>
-          hexDistance(here.col, here.row, a.col, a.row) -
-          hexDistance(here.col, here.row, b.col, b.row),
-      )[0];
+  if (!target) {
+    // A-8: nearest PLAYER city (barbarians always; a rival only when at war
+    // with the player) — the EXISTING pick, byte-for-byte (stable sort =
+    // founding order tie-break). A-19/B-33 (S2): a rival ALSO considers its
+    // at-war enemy rivals' cities; the PLAYER wins any distance tie (lowest
+    // unified civ id — documented), then rival cities by rival id, then
+    // center tile index.
+    const attackPlayer =
+      unit.owner === 'barbarian' ||
+      (unit.owner === 'rival' && civsAtWar(state, (unit.civId ?? -1) + 1, 0));
+    let pcTarget: Tile | null = null;
+    let pcDist = Infinity;
+    if (attackPlayer && state.cities.length > 0) {
+      pcTarget = state.cities
+        .map((c) => map.tiles[c.centerIndex])
+        .sort(
+          (a, b) =>
+            hexDistance(here.col, here.row, a.col, a.row) -
+            hexDistance(here.col, here.row, b.col, b.row),
+        )[0];
+      pcDist = hexDistance(here.col, here.row, pcTarget.col, pcTarget.row);
+    }
+    let rcTarget: Tile | null = null;
+    let rcKey = Infinity;
+    if (unit.owner === 'rival') {
+      const ci = unit.civId ?? -1;
+      for (const other of state.rivals) {
+        if (other.id === ci) continue;
+        if (!civsAtWar(state, ci + 1, other.id + 1)) continue;
+        for (const rc of other.cities) {
+          const t = map.tiles[rc.centerIndex];
+          const d = hexDistance(here.col, here.row, t.col, t.row);
+          // distance-major; tie-break rival id asc, then center tile index asc
+          const key = d * (2048 * 8) + other.id * 2048 + rc.centerIndex;
+          if (key < rcKey) {
+            rcKey = key;
+            rcTarget = t;
+          }
+        }
+      }
+    }
+    // player wins ties (pcDist <= rival distance); else the nearest rival city
+    const rcDist = rcTarget ? hexDistance(here.col, here.row, rcTarget.col, rcTarget.row) : Infinity;
+    target = pcTarget && (rcTarget === null || pcDist <= rcDist) ? pcTarget : rcTarget;
   }
   if (!target) return;
   // AUDIT A-8 + B-26: RIVAL and BARBARIAN units both walk the march on REAL

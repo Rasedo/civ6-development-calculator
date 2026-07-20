@@ -3999,11 +3999,17 @@ class BatchSim:
         is_bb = dside == 1
         is_rv = dside == 2
         atwar_dc = self.r_atwar.gather(1, dciv)  # [B, 1] — the defender's rival civ at war
+        # A-19/B-33 (S2): an enemy AT-WAR rival military neighbour is hostile to
+        # a RIVAL defender (its own attacker's flankers included; excluded by
+        # is_atk below). rr_war[b, dciv[b], rv_civ_n[b,d]] — [B, 6].
+        bidx6 = torch.arange(self.B, device=self.device).unsqueeze(1)
+        rr_dc = self.rr_war[bidx6, dciv, rv_civ_n]  # [B, 6]
+        rv_enemy_dc = has_rv & (rv_civ_n != dciv) & rr_dc
         # hostile-to-defender military per neighbour (unitsHostile, u military)
         hostile = (
             (is_pl & (has_barb | rv_war_n))
             | (is_bb & (has_pmil | has_rv))
-            | (is_rv & (has_barb | (has_pmil & atwar_dc)))
+            | (is_rv & (has_barb | (has_pmil & atwar_dc) | rv_enemy_dc))
         )
         # exclude the attacker's own unit (the military at attacker_tile)
         is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
@@ -6712,7 +6718,7 @@ class BatchSim:
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: the builder (a civilian mover) halts adjacent to a
                 # hostile military unit too — only the EXERTER must be military.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r]), torch.zeros_like(mp), mp)
+                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r], torch.full((self.B,), r, dtype=torch.long, device=self.device)), torch.zeros_like(mp), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
@@ -6826,7 +6832,7 @@ class BatchSim:
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile
                 # military unit — only the EXERTER must be military.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r]), torch.zeros_like(mp), mp)
+                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r], torch.full((self.B,), r, dtype=torch.long, device=self.device)), torch.zeros_like(mp), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > 1)
@@ -6901,7 +6907,7 @@ class BatchSim:
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile military unit.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r]), torch.zeros_like(mp), mp)
+                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r], torch.full((self.B,), r, dtype=torch.long, device=self.device)), torch.zeros_like(mp), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > rng)
@@ -8115,8 +8121,23 @@ class BatchSim:
         dm = self.pmil_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         dc_ = self.pciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         db = self.barb_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "rival" else torch.full_like(dm, -1)
-        dv = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "barb" else torch.full_like(dm, -1)
-        dvc = self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "barb" else torch.full_like(dm, -1)
+        if atk_kind == "barb":
+            dv = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            dvc = self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        else:
+            # A-19/B-33 (S2): a RIVAL attacker's valid rival defenders are ENEMY
+            # AT-WAR rival units only (never its own civ) — the symmetric
+            # unitsHostile. Own-civ units at the tile stay -1 (not targets).
+            ac_h = self.v_civ[:, u].clamp(min=0)
+            bidx_h = torch.arange(self.B, device=self.device)
+            dv_raw = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            dvc_raw = self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            dv_civ = torch.where(dv_raw >= 0, self.v_civ.gather(1, dv_raw.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(dv_raw, -1))
+            dvc_civ = torch.where(dvc_raw >= 0, self.v_civ.gather(1, dvc_raw.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(dvc_raw, -1))
+            dv_war = (dv_raw >= 0) & (dv_civ != ac_h) & self.rr_war[bidx_h, ac_h, dv_civ.clamp(min=0)]
+            dvc_war = (dvc_raw >= 0) & (dvc_civ != ac_h) & self.rr_war[bidx_h, ac_h, dvc_civ.clamp(min=0)]
+            dv = torch.where(dv_war, dv_raw, torch.full_like(dv_raw, -1))
+            dvc = torch.where(dvc_war, dvc_raw, torch.full_like(dvc_raw, -1))
         mil_att = att & ((dm >= 0) | (db >= 0) | (dv >= 0))
         civ_att = att & (dm < 0) & (db < 0) & (dv < 0) & (dc_ >= 0)
         rvciv_att = att & (dm < 0) & (db < 0) & (dv < 0) & (dc_ < 0) & (dvc >= 0)  # C1-B5b: lone rival civilian
@@ -8287,14 +8308,39 @@ class BatchSim:
                 self.p_alive[rows, ds] = False
             self._gen_ver += 1  # B7-G (B-8): a captured/killed civilian may be a general → invalidate the aura plane
         if bool(rvciv_att.any()):
-            # C1-B5b: a barbarian kills a lone rival civilian roll-free — no
-            # prisoner/camp system (B-31 capture is player/rival attackers
-            # only; rvciv_att is barb-only, dvc is -1 for a rival attacker).
             rows = rvciv_att.nonzero(as_tuple=True)[0]
             ds = dvc[rows]
-            self.rvciv_at[rows, ttc[rows]] = -1
-            self.v_alive[rows, ds] = False
-            self._gen_ver += 1  # B7-G (B-8): the killed civilian may be a general → invalidate the aura plane
+            if atk_kind == "rival":
+                # A-19/B-33 (S2): a rival CAPTURES an enemy rival's lone civilian
+                # (B-31 symmetric) — despawn the old slot, respawn at POOL END
+                # under the attacker's civ; hp/charges/xp/embark kept, moves 0.
+                ct = ttc[rows]
+                cap_type = self.v_type[rows, ds]
+                cap_hp = self.v_hp[rows, ds]
+                cap_ch = self.v_charges[rows, ds]
+                cap_emb = self.v_emb[rows, ds]
+                cap_xp = self.v_xp[rows, ds]
+                self.rvciv_at[rows, ct] = -1
+                self.v_alive[rows, ds] = False
+                nslot = self.v_next[rows]
+                assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
+                self.v_alive[rows, nslot] = True
+                self.v_civ[rows, nslot] = self.v_civ[rows, u]
+                self.v_type[rows, nslot] = cap_type
+                self.v_tile[rows, nslot] = ct
+                self.v_hp[rows, nslot] = cap_hp
+                self.v_charges[rows, nslot] = cap_ch
+                self.v_fortify[rows, nslot] = 0
+                self.v_xp[rows, nslot] = cap_xp
+                self.v_emb[rows, nslot] = cap_emb
+                self.v_acted[rows, nslot] = True
+                self.rvciv_at[rows, ct] = nslot
+                self.v_next[rows] += 1
+            else:
+                # C1-B5b: a barbarian kills a lone rival civilian roll-free.
+                self.rvciv_at[rows, ttc[rows]] = -1
+                self.v_alive[rows, ds] = False
+            self._gen_ver += 1  # B7-G (B-8): the killed/captured civilian may be a general → invalidate the aura plane
         # B-31: a captured civilian is NOT killed — its captor does NOT advance
         # onto it. Only a barbarian kill (barb attacker) frees the tile for the
         # advance; a rival captor (civ_att under atk_kind=="rival") stays put.
@@ -8369,16 +8415,84 @@ class BatchSim:
                 self._eff_version += 1
             self.rc_hp[sacked, sc, sj] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
 
-    def _in_enemy_zoc(self, dest: torch.Tensor, atwar: torch.Tensor) -> torch.Tensor:
+    def _rival_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
+        """A-19/B-33 (S2): a rival battering an enemy AT-WAR rival's city
+        (mirrors attackRivalCity for a rival attacker): P4/D-22 defense, B-1
+        outer-pool absorb, rcty/rctyc rolls, +5 XP; at 0 HP the CONQUEROR TAKES
+        the city via _transfer_rc_to_rc (no +40 for the rival-vs-rival path)."""
+        if not bool(att.any()):
+            return
+        B, dev = self.B, self.device
+        bidx = torch.arange(B, device=dev)
+        ttc = tgt.clamp(min=0)
+        civ = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)  # defender civ
+        slot = torch.zeros_like(civ)
+        for j in range(self.RC):
+            hit = (self.rc_center[bidx, civ, j] == ttc) & self.rc_alive[bidx, civ, j]
+            slot = torch.where(att & hit, torch.full_like(slot, j), slot)
+        # P4/D-22 rivalCityDefense: max(15, defender civ's strongest melee ever)
+        # + 5 for its own military garrisoning the center (ungarrisoned here by
+        # construction — rc_att required ~has_u — but keep the term for parity).
+        best_r = self.r_best_melee[bidx, civ]
+        gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
+        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
+        atk_cs = self._p_combat[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
+        atk_e = atk_cs - self._wound(self.v_hp[:, u]) - 5.0 * self._river_cross(self.v_tile[:, u], tgt) + self._xp_lvl_bonus(self.v_xp[:, u])  # B-29 wound + river + B-4 veterancy
+        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
+        self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])  # B-4: +5 for the attack
+        rows = att.nonzero(as_tuple=True)[0]
+        # AUDIT B-1: the outer wall pool soaks the hit first, spillover to HP.
+        outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
+        absorbed = torch.minimum(outer, d_city[rows])
+        self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
+        self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
+        self.v_hp[:, u] = torch.where(att, self.v_hp[:, u] - d_atk, self.v_hp[:, u])
+        died = att & (self.v_hp[:, u] <= 0)
+        if bool(died.any()):
+            dr = died.nonzero(as_tuple=True)[0]
+            self.rv_at[dr, self.v_tile[dr, u]] = -1
+            self.v_alive[:, u] = self.v_alive[:, u] & ~died
+        captured = rows[self.rc_hp[rows, civ[rows], slot[rows]] <= 0]
+        if len(captured) > 0:
+            atk_civ = self.v_civ[:, u]
+            for b in captured.tolist():
+                # the conqueror is the attacker's civ; no +40 plunder (v1 rival-
+                # vs-rival). transfer runs per-row (loyalty-flip machinery reuse).
+                self._transfer_rc_to_rc(b, int(civ[b]), int(slot[b]), int(atk_civ[b]))
+
+    def _in_enemy_zoc(self, dest: torch.Tensor, atwar: torch.Tensor, mover_civ: torch.Tensor | None = None) -> torch.Tensor:
         """B-3 ZOC (mirrors units.inEnemyZoc for a RIVAL mover): does `dest`
         sit adjacent to a MILITARY unit hostile to the mover? Barbarians exert
-        it always; player military only while that mover's civ is at war
-        (rivals never war each other, so their military never exerts). [B]->[B]."""
+        it always; player military only while that mover's civ is at war.
+        A-19/B-33 (S2): when `mover_civ` [B] (the mover's rival civ) is given,
+        an enemy AT-WAR rival's military also exerts ZOC on this mover. [B]->[B]."""
         # #45/B-6: EMBARKED player military exert NO ZOC (barbs never embark).
         pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
         hostmil = (self.barb_at >= 0) | (pmil_exert & atwar.unsqueeze(1))
+        if mover_civ is not None:
+            rmil_exert = (self.rv_at >= 0) & ~self.v_emb.gather(1, self.rv_at.clamp(min=0))
+            rmil_civ = torch.where(self.rv_at >= 0, self.v_civ.gather(1, self.rv_at.clamp(min=0)), torch.full_like(self.rv_at, -1))  # [B, T]
+            mc = mover_civ.clamp(min=0).unsqueeze(1)  # [B, 1]
+            bidxT = torch.arange(self.B, device=self.device).unsqueeze(1)
+            war_t = self.rr_war[bidxT, mc, rmil_civ.clamp(min=0)]  # [B, T]
+            hostmil = hostmil | (rmil_exert & (rmil_civ != mover_civ.unsqueeze(1)) & war_t)
         dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
         return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
+
+    def _rr_hostile_units_at(self, v: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """A-19/B-33 (S2): per-tile masks [B, T] of ENEMY AT-WAR rival units
+        (military, civilian) relative to unit slot v's civ — the symmetric
+        unitsHostile for the rival-rival war-act target scan. Own-civ units are
+        never hostile."""
+        ac = self.v_civ[:, v].clamp(min=0)  # [B]
+        bidxT = torch.arange(self.B, device=self.device).unsqueeze(1)
+        rvm_civ = torch.where(self.rv_at >= 0, self.v_civ.gather(1, self.rv_at.clamp(min=0)), torch.full_like(self.rv_at, -1))  # [B, T]
+        rvc_civ = torch.where(self.rvciv_at >= 0, self.v_civ.gather(1, self.rvciv_at.clamp(min=0)), torch.full_like(self.rvciv_at, -1))
+        war_m = (self.rv_at >= 0) & (rvm_civ != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rvm_civ.clamp(min=0)]
+        war_c = (self.rvciv_at >= 0) & (rvc_civ != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rvc_civ.clamp(min=0)]
+        return war_m, war_c
 
     def _in_enemy_zoc_barb(self, dest: torch.Tensor) -> torch.Tensor:
         """AUDIT B-26/B-3 (ROUND B10) ZOC for a BARBARIAN mover — mirrors
@@ -8410,7 +8524,25 @@ class BatchSim:
         rngd = self._p_rng_str[vt0] > 0
         rng_u = torch.where(rngd, self._p_rng_rng[vt0], torch.ones_like(vt0))
         d_all = self.pair_dist[hc0].to(torch.long)  # [B, T]
-        units_pl = (self.pmil_at >= 0) | (self.pciv_at >= 0) | (self.barb_at >= 0)
+        # A-19/B-33 (S2): hostility is now civ-aware — a rival in the war-act may
+        # be at war with the player, an enemy rival, or both. hp = at war with
+        # the player (player units/cities + player-suzerain CS are targets only
+        # then); barbs always; enemy AT-WAR rival units/cities via rr_war.
+        ac = self.v_civ[:, v].clamp(min=0)  # [B] attacker civ
+        bidxT = torch.arange(B, device=dev).unsqueeze(1)
+        hp = self.r_atwar.gather(1, ac.unsqueeze(1)).squeeze(1)  # [B] hostile to player
+        war_m, war_c = self._rr_hostile_units_at(v)  # [B, T] enemy at-war rival units
+        # A-19/B-33 (S2): enemy rival units are MELEE-only targets (a rival's
+        # RANGED units do not bombard enemy rivals — the ranged-vs-rival-city /
+        # walls-strike scope-out family; melee rivals fight rivals via
+        # _hostile_vs_unit). Player/barb targets are unchanged for ranged.
+        rr_units = (war_m | war_c) & ~rngd.unsqueeze(1)
+        units_pl = (((self.pmil_at >= 0) | (self.pciv_at >= 0)) & hp.unsqueeze(1)) | (self.barb_at >= 0) | rr_units
+        # enemy AT-WAR rival city center (rvcity_at holds the owning civ) — a
+        # MELEE-only d==1 target (rivalVsRivalCity; ranged-vs-rival-city out of
+        # scope, like csWar). Own / non-at-war centers are NOT targets.
+        rc_civ_at = self.rvcity_at  # [B, T], -1 if not a rival center
+        enemy_rc = (rc_civ_at >= 0) & (rc_civ_at != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rc_civ_at.clamp(min=0)]  # [B, T]
         # A-12b join-the-suzerain's-war: adjacent CS centers whose suzerain
         # is THE PLAYER (strict contest) are MELEE targets for an at-war
         # rival — attackTargets' csWar predicate (d==1, !ranged).
@@ -8428,13 +8560,21 @@ class BatchSim:
                 cs_suz_t.scatter_(1, self.cs_center[:, :S].clamp(min=0), suz_p)
             else:
                 cs_suz_t = None
+        # TS attackTargets.playerCity keys on district==CITY_CENTER (NOT player
+        # ownership) — so while hostileToPlayer (hp) EVERY city center (player,
+        # own, or another rival) is a target at full range; a non-player center
+        # resolves to the no-op quirk (hostileRangedStrike / meleeAttack return
+        # early but hostileUnitAct still returns → the unit HOLDS, no march).
+        # Mirror that with rvcity_at gated on hp (the pre-S2 GPU included it
+        # ungated because war-act rivals were always hp).
         valid = (
             (d_all >= 1)
             & (d_all <= rng_u.unsqueeze(1))
-            & ((self.center_at >= 0) | units_pl | (self.rvcity_at >= 0))
+            & ((((self.center_at >= 0) | (self.rvcity_at >= 0)) & hp.unsqueeze(1)) | units_pl)
         )
+        valid = valid | (enemy_rc & (d_all == 1) & ~rngd.unsqueeze(1))  # A-19/B-33: enemy rival center, melee CAPTURE (vs the no-op quirk above)
         if cs_suz_t is not None:
-            valid = valid | (cs_suz_t & (d_all == 1) & ~rngd.unsqueeze(1))
+            valid = valid | (cs_suz_t & (d_all == 1) & ~rngd.unsqueeze(1) & hp.unsqueeze(1))  # csWar requires hostileToPlayer
         tkey = torch.where(valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
         target_tile = tkey.min(dim=1).values
         # #45/B-6: an EMBARKED unit cannot attack (attackTargets returns [] in
@@ -8444,15 +8584,21 @@ class BatchSim:
         ttc = target_tile.clamp(max=T - 1)
         tgt_city = self.center_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         has_u = units_pl.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        city_att = attack & (tgt_city >= 0) & ~rngd
-        unit_att = attack & (tgt_city < 0) & has_u & ~rngd
-        # rival-center tiles without units: acted, nothing happens (no draws)
+        tgt_enemy_rc = enemy_rc.gather(1, ttc.unsqueeze(1)).squeeze(1)  # A-19/B-33
+        city_att = attack & (tgt_city >= 0) & ~rngd  # player city: garrison ignored (enemyCity-first)
+        unit_att = attack & (tgt_city < 0) & has_u & ~rngd  # a garrisoned enemy rival center hits the garrison here (TS enemies.length>0)
+        # A-19/B-33 (S2): an UNGARRISONED enemy rival center is battered/captured
+        # (attackRivalCity via _transfer_rc_to_rc); own/other rival centers with
+        # no unit stay the no-op quirk (fall through to the march).
+        rc_att = attack & (tgt_city < 0) & ~has_u & tgt_enemy_rc & ~rngd
 
         if bool(city_att.any()):
             self._hostile_city_attack(city_att, tgt_city, "rival", v)
         if bool(unit_att.any()):
             self._hostile_vs_unit(unit_att, ttc, "rival", v)
-        acted_att = city_att | unit_att
+        if bool(rc_att.any()):
+            self._rival_attack_rival_city(rc_att, ttc, v)
+        acted_att = city_att | unit_att | rc_att
         # A-6: ranged rows strike instead — one roll, no retaliation; the
         # method returns the rows that actually rolled (quirk rows spend
         # nothing, mirroring hostileRangedStrike's early return).
@@ -8508,7 +8654,10 @@ class BatchSim:
         if self.improvements_on:
             h_imp = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
             h_unpil = ~self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
-            h_owned = self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
+            # A-19/B-33 (S2): a rival pillages PLAYER tiles only while at war
+            # with the player (a rival-only-war rival leaves the neutral player
+            # alone; rival-rival improvement pillage is out of scope — residual).
+            h_owned = (self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0) & hp
             pillage = act & ~attack & h_imp & h_unpil & h_owned
             if bool(pillage.any()):
                 rows = pillage.nonzero(as_tuple=True)[0]
@@ -8529,7 +8678,7 @@ class BatchSim:
             h_dist = self.district.gather(1, hc.unsqueeze(1)).squeeze(1)
             h_dcomp = self.district_complete.gather(1, hc.unsqueeze(1)).squeeze(1)
             h_dunpil = ~self.district_pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
-            h_downed = self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0
+            h_downed = (self.owner.gather(1, hc.unsqueeze(1)).squeeze(1) >= 0) & hp  # A-19/B-33 (S2): player districts only at war with the player
             dist_pillage = act & ~attack & ~pillage & (h_dist >= 0) & h_dcomp & h_dunpil & h_downed
             if bool(dist_pillage.any()):
                 rows = dist_pillage.nonzero(as_tuple=True)[0]
@@ -8544,10 +8693,14 @@ class BatchSim:
         if not bool(march.any()):
             return
         arangeT = torch.arange(T, device=dev)
+        # A-19/B-33 (S2): the improvement/district march targets PLAYER tiles
+        # only while at war with the player (hp) — a rival-only-war rival heads
+        # for the enemy rival's cities, not neutral player improvements.
+        hpT = hp.unsqueeze(1)
         if self.improvements_on or self.districts_on:
-            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.owner >= 0)
+            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.owner >= 0) & hpT
             if self.districts_on:  # B-32: pillageable player districts join the union
-                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.owner >= 0))
+                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.owner >= 0) & hpT)
             d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
             ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
             imp_min, imp_tgt = ikey.min(dim=1)
@@ -8558,11 +8711,34 @@ class BatchSim:
         dc = self.pair_dist[hc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
         # B9-R1: distance ties break by the FOUNDING sequence (TS array order),
         # not the slot index — see the barb twin (rng 2026006104 t78).
-        ckey = torch.where(self.alive, dc * 4096 + self.city_seq, 10**9)
+        # A-19/B-33 (S2): player cities are march targets only at war with the
+        # player (hp); a rival ALSO marches to its at-war ENEMY rivals' cities
+        # (key d*16384 + rivalId*2048 + centerTile), the PLAYER winning ties.
+        ckey = torch.where(self.alive & hpT, dc * 4096 + self.city_seq, 10**9)
         city_min = ckey.min(dim=1).values
+        pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # player-city distance (1e9//4096 stays huge)
         city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-        tgt = torch.where(has_imp, imp_tgt, city_tgt)
-        has_tgt = has_imp | (city_min < 10**9)
+        rc_key_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
+        rc_tgt = hc.clone()
+        for r2 in range(self.R):
+            war2 = self.rr_war[torch.arange(B, device=dev), ac, r2]  # [B]; diagonal false -> r2==ac safe
+            if not bool(war2.any()):
+                continue
+            for j in range(self.RC):
+                ct2 = self.rc_center[:, r2, j].clamp(min=0)
+                alive2 = self.rc_alive[:, r2, j] & war2
+                d2 = self.pair_dist[hc, ct2].to(torch.long)
+                key2 = torch.where(alive2, d2 * (2048 * 8) + r2 * 2048 + ct2, torch.full_like(d2, 10**18))
+                upd = key2 < rc_key_min
+                rc_key_min = torch.where(upd, key2, rc_key_min)
+                rc_tgt = torch.where(upd, ct2, rc_tgt)
+        has_pc = city_min < 10**9
+        has_rc = rc_key_min < 10**18
+        rc_dist = torch.div(rc_key_min, 2048 * 8, rounding_mode="floor")
+        # player wins ties (pc_dist <= rc_dist); else the nearest enemy rival city
+        city_target = torch.where(has_pc & (~has_rc | (pc_dist <= rc_dist)), city_tgt, rc_tgt)
+        tgt = torch.where(has_imp, imp_tgt, city_target)
+        has_tgt = has_imp | has_pc | has_rc
         d_here = self.pair_dist[hc, tgt].to(torch.long)
         # AUDIT A-8: the march walks REAL MP toward the (fixed) target — per
         # step: the passable free neighbor closest to it (ties to direction
@@ -8652,7 +8828,7 @@ class BatchSim:
                 emb = torch.where(mv, to_water & ~is_naval, emb)  # embarked ⟺ on a water tile
             # B-3 ZOC: a march step ending adjacent to a hostile military unit
             # halts (movesLeft:=0 after paying the enter cost above).
-            mp = torch.where(mv & self._in_enemy_zoc(dest, aw), torch.zeros_like(mp), mp)
+            mp = torch.where(mv & self._in_enemy_zoc(dest, aw, self.v_civ[:, v]), torch.zeros_like(mp), mp)
             d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
@@ -8959,7 +9135,7 @@ class BatchSim:
                 emb = torch.where(mv, to_water & ~is_naval_p, emb)  # embarked ⟺ on a water tile
             # B-3 ZOC: a patrol step adjacent to a hostile military unit halts
             # (at peace only barbarians exert it — aw is False here).
-            mp = torch.where(mv & self._in_enemy_zoc(dest, aw), torch.zeros_like(mp), mp)
+            mp = torch.where(mv & self._in_enemy_zoc(dest, aw, self.v_civ[:, v]), torch.zeros_like(mp), mp)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
         if self._embark_live:
@@ -9295,6 +9471,85 @@ class BatchSim:
             self.r_route_dest[:, r][drop] = -1
             self.r_route_exp[:, r][drop] = -1
 
+    def _rr_strengths(self) -> torch.Tensor:
+        """[B, R] rivalStrength = js_round(nCities*8 + Σ own-unit combat) for
+        every rival (civilians carry combat 0). The DoW/peace twin of the TS
+        rivalStrength; computed pre-phase (before this turn's spawns/combat)."""
+        B, dev = self.B, self.device
+        n_c = self.rc_alive.sum(dim=2)  # [B, R]
+        rstr = torch.zeros(B, self.R, dtype=torch.float64, device=dev)
+        vt = self.v_type.clamp(min=0, max=self.NU - 1)
+        for r in range(self.R):
+            combat = ((self.v_alive & (self.v_civ == r)).long() * self._p_combat[vt]).sum(dim=1)
+            rstr[:, r] = js_round(n_c[:, r].double() * 8 + combat.double())
+        return rstr
+
+    def _rr_proximity(self, a: int, b: int) -> torch.Tensor:
+        """[B] closest city-pair distance between rivals a and b (999 if either
+        cityless) — the rivalRivalProximity twin."""
+        B = self.B
+        d_ab = self.pair_dist[
+            self.rc_center[:, a].clamp(min=0).unsqueeze(2), self.rc_center[:, b].clamp(min=0).unsqueeze(1)
+        ].to(torch.long)  # [B, RC, RC]
+        pair_ok = self.rc_alive[:, a].unsqueeze(2) & self.rc_alive[:, b].unsqueeze(1)
+        return torch.where(pair_ok, d_ab, 999).reshape(B, -1).min(dim=1).values
+
+    def _rival_rival_declare_wars(self) -> None:
+        """A-19/B-33 (S2): pairwise rival↔rival auto-DoW — ZERO-DRAW. Phase-top
+        mirror of rivalRivalDeclareWars: aggressor id asc, first eligible target
+        id asc, one new war per civ per turn (both sides). Deterministic gates
+        (proximity, strength ratio); the aggressor's war-weariness is the
+        anti-thrash. No draws — the player pair's RNG is untouched."""
+        if self.R < 2:
+            return
+        B, dev, rr = self.B, self.device, self.rules.rivals
+        n_c = self.rc_alive.sum(dim=2)  # [B, R]
+        alive_civ = self.r_alive[:, : self.R] & (n_c > 0)  # [B, R]
+        rstr = self._rr_strengths()
+        ww = self.r_war_weariness[:, : self.R]
+        prox_max = int(rr.get("rrDowProximity", 9))
+        ratio = float(rr.get("rrDowStrengthRatio", 1.3))
+        ww_max = int(rr.get("rrDowWwMax", 6))
+        used = torch.zeros(B, self.R, dtype=torch.bool, device=dev)
+        for a in range(self.R):
+            aggr_ok = alive_civ[:, a] & (ww[:, a] < ww_max) & ~used[:, a]
+            if not bool(aggr_ok.any()):
+                continue
+            for b in range(self.R):
+                if a == b:
+                    continue
+                prox = self._rr_proximity(a, b)
+                declare = (
+                    aggr_ok
+                    & alive_civ[:, b]
+                    & ~used[:, b]
+                    & ~self.rr_war[:, a, b]
+                    & (prox <= prox_max)
+                    & (rstr[:, a] > rstr[:, b] * ratio)
+                )
+                if bool(declare.any()):
+                    self.rr_war[:, a, b] = self.rr_war[:, a, b] | declare
+                    self.rr_war[:, b, a] = self.rr_war[:, b, a] | declare
+                    used[:, a] = used[:, a] | declare
+                    used[:, b] = used[:, b] | declare
+                    aggr_ok = aggr_ok & ~declare  # one new war per aggressor per turn
+
+    def _rival_rival_make_peace(self) -> None:
+        """A-19/B-33 (S2): pairwise rival↔rival auto-peace — ZERO-DRAW. Phase-
+        tail mirror of rivalRivalMakePeace: an unordered pair (a<b) sues out
+        once EITHER side's war-weariness exceeds rrPeaceWw."""
+        if self.R < 2:
+            return
+        rr = self.rules.rivals
+        peace_ww = int(rr.get("rrPeaceWw", 10))
+        ww = self.r_war_weariness[:, : self.R]
+        for a in range(self.R):
+            for b in range(a + 1, self.R):
+                peace = self.rr_war[:, a, b] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
+                if bool(peace.any()):
+                    self.rr_war[:, a, b] = self.rr_war[:, a, b] & ~peace
+                    self.rr_war[:, b, a] = self.rr_war[:, b, a] & ~peace
+
     def _rival_phase(self) -> None:
         """Mirrors rivalPhase, rival by rival in id order — queue picks for
         the pre-turn city set, then per-city economy (yields, growth, queue
@@ -9305,6 +9560,9 @@ class BatchSim:
         if self.R == 0:
             return
         rr, B, dev = self.rules.rivals, self.B, self.device
+        # A-19/B-33 (S2): pairwise rival↔rival auto-DoW BEFORE the per-rival
+        # loop, so a declared war is live for both civs' war-acts this turn.
+        self._rival_rival_declare_wars()
         for r in range(self.R):
             n_cities = self.rc_alive[:, r].sum(dim=1)
             active = self.r_alive[:, r] & (n_cities > 0)
@@ -9314,7 +9572,10 @@ class BatchSim:
             # peace (war state as of last turn; declare/peace run later in this
             # phase). Symmetric with the player + the TS rival block top.
             rww = self.rules.war_weariness
-            atw_r = self.r_atwar[:, r]
+            # A-19/B-33 (S2): a rival at war with ANYONE (player or another
+            # rival) accrues weariness; decays only at FULL peace. rr_war is
+            # fixed for this turn by the phase-top DoW pass.
+            atw_r = self.r_atwar[:, r] | self.rr_war[:, r, : self.R].any(dim=1)
             inc_r = (self.r_war_weariness[:, r] + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
             dec_r = (self.r_war_weariness[:, r] - int(rww.get("decay", 4))).clamp(min=0)
             self.r_war_weariness[:, r] = torch.where(active, torch.where(atw_r, inc_r, dec_r), self.r_war_weariness[:, r])
@@ -10338,6 +10599,17 @@ class BatchSim:
                     ((self.pmil_at.gather(1, nbhc) >= 0) | (self.pciv_at.gather(1, nbhc) >= 0))
                     & self.r_atwar[:, r].unsqueeze(1)
                 )
+                # A-19/B-33 (S2): an adjacent enemy AT-WAR rival unit (mil or
+                # civilian) besieges this city too — the symmetric unitsHostile
+                # (the TS besiege scan). rr_war[:, r] gather by the neighbour's
+                # civ; own-civ units (== r) never besiege.
+                rvn = self.rv_at.gather(1, nbhc)
+                rvcn = self.rvciv_at.gather(1, nbhc)
+                rvn_civ = torch.where(rvn >= 0, self.v_civ.gather(1, rvn.clamp(min=0)), torch.full_like(rvn, -1))
+                rvcn_civ = torch.where(rvcn >= 0, self.v_civ.gather(1, rvcn.clamp(min=0)), torch.full_like(rvcn, -1))
+                war_rvn = (rvn >= 0) & (rvn_civ != r) & self.rr_war[:, r].gather(1, rvn_civ.clamp(min=0))
+                war_rvcn = (rvcn >= 0) & (rvcn_civ != r) & self.rr_war[:, r].gather(1, rvcn_civ.clamp(min=0))
+                hostile_adj = hostile_adj | war_rvn | war_rvcn
                 besieged_j = ((nbh >= 0) & hostile_adj).any(dim=1)
                 self.rc_hp[:, r, j] = torch.where(
                     cact & ~besieged_j, (self.rc_hp[:, r, j] + heal).clamp(max=rr.get("cityMaxHp", 200)), self.rc_hp[:, r, j]
@@ -10651,7 +10923,14 @@ class BatchSim:
 
             # War or peace (branch on the value at entry; a peace made this
             # turn still ran the war branch, exactly like the TS if/else).
+            # A-19/B-33 (S2): a rival at war with ANYONE (player or a rival)
+            # takes the WAR branch — its units run the war-act (which now scans
+            # at-war rivals' units/cities). r_warturns and the player-peace roll
+            # stay gated on the PLAYER war (atw); the player-DoW roll (below) is
+            # skipped for a rival already in ANY war via pea = ~atw_any (both
+            # engines drop the conditional draw in lockstep).
             atw = active & self.r_atwar[:, r]
+            atw_any = atw | (active & self.rr_war[:, r, : self.R].any(dim=1))
             self.r_warturns[:, r] = self.r_warturns[:, r] + atw.long()
             v_high = int(self.v_next.max().item())
             # D-4: this civ's live slots once (deaths only shrink mid-loop; no
@@ -10660,7 +10939,7 @@ class BatchSim:
             for v in v_mine:
                 # C1-B5b: civilians never act in the war loop (charges mark them)
                 # C3-prep: the units head drives controlled rivals now
-                a = atw & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
+                a = atw_any & ~self.controlled[:, r] & self.v_alive[:, v] & (self.v_civ[:, v] == r) & (self._p_charges[self.v_type[:, v]] == 0)
                 if bool(a.any()):
                     self._rival_unit_war_act(v, a)
             peace_roll = atw & ~self.controlled[:, r] & (self.r_warturns[:, r] >= rr.get("warMinTurns", 14))  # C3-sym: controlled rivals leave war via the head
@@ -10677,7 +10956,7 @@ class BatchSim:
                 self.r_warturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
 
-            pea = active & ~atw
+            pea = active & ~atw_any  # A-19/B-33 (S2): a rival at ANY war does not patrol / roll the player-DoW
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
             for v in v_mine:  # D-4: the same live-slot snapshot (superset)
                 # C1-B5b: builders neither snipe nor patrol
@@ -10719,6 +10998,10 @@ class BatchSim:
         # slot is overwritten before any same-r re-read (the G1 argument),
         # but that R-parity must not be load-bearing for R=1 configs.
         self._rival_route_cache = None
+
+        # A-19/B-33 (S2): pairwise rival↔rival auto-peace AFTER every rival
+        # acted (ww/cities updated) — the rivalRivalMakePeace twin (zero-draw).
+        self._rival_rival_make_peace()
 
     def _apply_loyalty_and_flips(self, tier_idx: torch.Tensor, pop_before: torch.Tensor) -> None:
         """Mirrors applyLoyalty inside the city loop + the deferred flips.
@@ -12042,6 +12325,15 @@ class BatchSim:
                 torch.where(live, (self.rc_bldg[:, r].sum(dim=(1, 2)) + (self.rc_is_cap[:, r] & self.rc_alive[:, r]).sum(dim=1)).to(self.dtype), zero),  # B9-R3: +PALACE (trace counts rc.buildings.length)
                 torch.where(live, js_round(self.r_treasury[:, r] * 1000).to(self.dtype), zero),  # VP-G1
                 torch.where(live, js_round(r_scores[r] * 1000).to(self.dtype), zero),  # GV-1
+                # A-19/B-33 (S2): per-pair war bitmask over rival ids (the TS
+                # atWarRivals.reduce(|1<<id) twin). rr_war diagonal is false, so
+                # the self bit never sets; the (0, r+1) player pair is the atWar
+                # column above.
+                torch.where(
+                    live,
+                    sum((self.rr_war[:, r, j].to(self.dtype) * float(1 << j) for j in range(self.R)), zero),
+                    zero,
+                ),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

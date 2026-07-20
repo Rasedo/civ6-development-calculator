@@ -83,6 +83,10 @@ import {
   WAR_WEARINESS_DECAY,
   WAR_WEARINESS_CAP,
   warWearinessPenalty,
+  RR_DOW_PROXIMITY,
+  RR_DOW_STRENGTH_RATIO,
+  RR_DOW_WW_MAX,
+  RR_PEACE_WW,
 } from '../data/rivals';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
@@ -350,6 +354,76 @@ export function setRivalWar(state: GameState, a: number, b: number, on: boolean)
   };
   add(ra, b - 1);
   add(rb, a - 1);
+}
+
+/** Closest city-pair distance between two rivals (Infinity if either is
+ *  cityless). The rival↔rival twin of `rivalProximity`. */
+function rivalRivalProximity(state: GameState, a: RivalCiv, b: RivalCiv): number {
+  if (a.cities.length === 0 || b.cities.length === 0) return Infinity;
+  let best = Infinity;
+  for (const ca of a.cities) {
+    const ta = state.map.tiles[ca.centerIndex];
+    for (const cb of b.cities) {
+      const tb = state.map.tiles[cb.centerIndex];
+      best = Math.min(best, hexDistance(ta.col, ta.row, tb.col, tb.row));
+    }
+  }
+  return best;
+}
+
+/**
+ * A-19/B-33 (task #55 S2): the pairwise rival↔rival auto-DoW — ZERO-DRAW.
+ * Runs at the TOP of rivalPhase (before the per-rival loop) so a declared war
+ * is live for both civs' war-acts this turn. Deterministic scan: aggressor id
+ * ascending, first eligible target id ascending, at most ONE new war per civ
+ * per turn (both participants). Conditions re-derive the player auto-DoW's
+ * DETERMINISTIC gates (proximity, strength ratio) and DROP its RNG probability
+ * gate; anti-thrash is the aggressor's own war-weariness (RR_DOW_WW_MAX). No
+ * nextRandom anywhere — the player pair's RNG draws are untouched.
+ */
+function rivalRivalDeclareWars(state: GameState): void {
+  const used = new Set<number>();
+  for (let a = 0; a < state.rivals.length; a++) {
+    const ri = state.rivals[a];
+    if (ri.cities.length === 0 || used.has(ri.id)) continue;
+    // anti-thrash: a war-weary civ never opens a new front (documented).
+    if ((ri.warWeariness ?? 0) >= RR_DOW_WW_MAX) continue;
+    const si = rivalStrength(state, ri);
+    for (let b = 0; b < state.rivals.length; b++) {
+      if (a === b) continue;
+      const rj = state.rivals[b];
+      if (rj.cities.length === 0 || used.has(rj.id)) continue;
+      if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
+      if (rivalRivalProximity(state, ri, rj) > RR_DOW_PROXIMITY) continue;
+      if (!(si > rivalStrength(state, rj) * RR_DOW_STRENGTH_RATIO)) continue;
+      setRivalWar(state, ri.id + 1, rj.id + 1, true);
+      state.eventLog.push(`${ri.name} declares war on ${rj.name}!`);
+      used.add(ri.id);
+      used.add(rj.id);
+      break; // one new war per aggressor per turn
+    }
+  }
+}
+
+/**
+ * A-19/B-33 (task #55 S2): the pairwise rival↔rival auto-peace — ZERO-DRAW.
+ * Runs at the END of rivalPhase (after every rival acted). A warring pair
+ * sues out once EITHER side's war-weariness exceeds RR_PEACE_WW. Deterministic
+ * unordered-pair scan (a < b). The (0, r+1) player pair keeps its own RNG
+ * peace path (untouched this stage).
+ */
+function rivalRivalMakePeace(state: GameState): void {
+  for (let a = 0; a < state.rivals.length; a++) {
+    const ri = state.rivals[a];
+    for (let b = a + 1; b < state.rivals.length; b++) {
+      const rj = state.rivals[b];
+      if (!civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
+      if ((ri.warWeariness ?? 0) > RR_PEACE_WW || (rj.warWeariness ?? 0) > RR_PEACE_WW) {
+        setRivalWar(state, ri.id + 1, rj.id + 1, false);
+        state.eventLog.push(`${ri.name} and ${rj.name} make peace.`);
+      }
+    }
+  }
 }
 
 export function declareWar(state: GameState, rivalId: number): RuleResult {
@@ -1700,7 +1774,7 @@ function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void
 /** The rc → rc transfer (loyalty flips between rivals): pop ×0.75 floor 1,
  * fresh boxes, CITY_CENTER-only registry, half HP, territory re-tags —
  * the transferCityToRival shape on the rival side. */
-function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
+export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
   from.cities = from.cities.filter((c) => c.id !== rc.id);
   // A-11: routes die with their endpoint (the receiver starts route-less).
   from.tradeRoutes = from.tradeRoutes?.filter((x) => x.from !== rc.id && x.to !== rc.id);
@@ -1842,12 +1916,21 @@ export function rivalPhase(state: GameState): void {
     u.movesLeft = u.embarked && !UNITS[u.type]?.naval ? EMBARK_MOVES : UNITS[u.type]?.moves ?? 2;
   }
 
+  // A-19/B-33 (S2): pairwise rival↔rival auto-DoW — BEFORE the per-rival loop
+  // so a declared war is live for both civs' war-acts this turn (ZERO-DRAW).
+  rivalRivalDeclareWars(state);
+
   for (const rival of state.rivals) {
     if (rival.cities.length === 0) continue; // eliminated
 
     // B-15: war weariness — symmetric with the player's endTurn-top update,
     // read at this rival's block top before rivalAmenityTiers uses it.
-    rival.warWeariness = rival.atWar
+    // A-19/B-33 (S2): a rival at war with ANYONE (the player OR another rival)
+    // accrues weariness; it decays only at FULL peace. The pairwise war state
+    // is fixed for this turn by the phase-top DoW pass, so anyWar is stable
+    // through this block (peace resolves after the loop).
+    const anyWarTop = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
+    rival.warWeariness = anyWarTop
       ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
       : Math.max(0, (rival.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
 
@@ -2514,15 +2597,20 @@ export function rivalPhase(state: GameState): void {
         for (const t of state.map.tiles) {
           const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
-          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
+          // A-19/B-33 (S2): the walls/Encampment ranged strike targets the
+          // player + barbarians only — a rival city does NOT counter-strike an
+          // enemy rival's units (v1 scope; the besiege heal-block below IS
+          // symmetric). Excluding rival attackers keeps the GPU strike (already
+          // player/barb-only) byte-exact without a strike-side rival port.
+          if (!unitsAt(state, t.index).some((u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
           }
         }
         if (bestTile >= 0) {
-          const hostiles = unitsAt(state, bestTile).filter((u) =>
-            unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
+          const hostiles = unitsAt(state, bestTile).filter(
+            (u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
@@ -2554,15 +2642,20 @@ export function rivalPhase(state: GameState): void {
         for (const t of state.map.tiles) {
           const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
-          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
+          // A-19/B-33 (S2): the walls/Encampment ranged strike targets the
+          // player + barbarians only — a rival city does NOT counter-strike an
+          // enemy rival's units (v1 scope; the besiege heal-block below IS
+          // symmetric). Excluding rival attackers keeps the GPU strike (already
+          // player/barb-only) byte-exact without a strike-side rival port.
+          if (!unitsAt(state, t.index).some((u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
           }
         }
         if (bestTile >= 0) {
-          const hostiles = unitsAt(state, bestTile).filter((u) =>
-            unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
+          const hostiles = unitsAt(state, bestTile).filter(
+            (u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
@@ -2670,14 +2763,21 @@ export function rivalPhase(state: GameState): void {
     // BEFORE the war loop so the aura reflects the general's advanced position.
     rivalGeneralActions(state, rival);
 
-    // War and peace.
-    if (rival.atWar) {
-      rival.warTurns += 1;
+    // War and peace. A-19/B-33 (S2): a rival at war with ANYONE (player or a
+    // rival) takes the WAR branch (its units run hostileUnitAct, which now
+    // scans at-war rivals' units/cities via the symmetric unitsHostile). The
+    // player-war counters and the player-peace RNG roll stay gated on
+    // rival.atWar; the player-DoW roll (else branch) is skipped for a rival
+    // already in ANY war — both engines gate on anyWar identically, so the
+    // conditional draw is dropped in lockstep (RNG-stream parity preserved).
+    const anyWar = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
+    if (anyWar) {
+      if (rival.atWar) rival.warTurns += 1;
       for (const unit of rivalUnits(state, rival.id)) {
         if (UNITS[unit.type]?.charges !== undefined) continue; // C1-B5b: civilians act in rivalBuilderActions, never march
         if (unit.movesLeft > 0) hostileUnitAct(state, unit);
       }
-      if (rival.warTurns >= RIVAL_WAR_MIN_TURNS && nextRandom(state) < 0.25) {
+      if (rival.atWar && rival.warTurns >= RIVAL_WAR_MIN_TURNS && nextRandom(state) < 0.25) {
         // P5/S2 (C-13): suing costs the rival what it costs the player —
         // PEACE_GOLD_COST(warTurns) from ITS treasury; a broke rival fights
         // on. The roll stays UNCONDITIONAL (draw-count parity with the GPU);
@@ -2716,6 +2816,10 @@ export function rivalPhase(state: GameState): void {
       }
     }
   }
+
+  // A-19/B-33 (S2): pairwise rival↔rival auto-peace — AFTER every rival acted
+  // (their war-acts updated ww/cities), before the tail check (ZERO-DRAW).
+  rivalRivalMakePeace(state);
 
   // A-24: env-gated registry coherence check at the phase tail (after every
   // founding/placement/capture this turn). Off by default → zero cost + no
