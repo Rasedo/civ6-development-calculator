@@ -130,6 +130,7 @@ def main() -> int:
                 ("cs_verbs", [py, "gpu/cs_verbs_test.py"], 4),  # B8/A-12 rival levy + rival CS quests (zero-draw)
                 ("trade2", [py, "gpu/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
                 ("geopolitics", [py, "gpu/geopolitics_test.py"], 4),  # #55 A-19/B-33/B-22 per-pair wars + casus belli + rc->rc transfer
+                ("governors", [py, "gpu/governors_test.py"], 4),  # #68/B-24 era-score hooks + Ages loyalty modulation + governor anchors
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).
