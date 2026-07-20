@@ -82,15 +82,16 @@ export const WAR_WEARINESS_DECAY = 4;
  *  ×2 multiplier already deliver the B-15 magnitude raise for rival-rival wars
  *  without a per-turn change that would also steepen the player war. */
 export const WAR_WEARINESS_PER_AMENITY = 8;
-/** Accumulator ceiling → caps the amenity penalty at CAP / PER_AMENITY (= −2).
- *  DELIBERATELY kept at 16 (task #55 S3, B-15): the passive scripted player
- *  never sues for peace, and raising the ceiling (tried 32 → −4) surfaced a
- *  dormant TS/GPU economic-timing divergence at the −3/−4 amenity tier
- *  (seed 9092, player-only war). The player-vs-rival war axis therefore stays
- *  at the S2 magnitude; the casus-belli DIFFERENTIAL rides the rival↔rival
- *  wars, where the ×2 SURPRISE accrual reaches −2 in 4 war-turns vs 8 for a
- *  FORMAL one. Player-facing −4 raise recorded as a B-15 residual. */
-export const WAR_WEARINESS_CAP = 16;
+/** Accumulator ceiling → caps the amenity penalty at CAP / PER_AMENITY (= −4).
+ *  RAISED 16→32 (#69, closes B-15): a long un-sued war now reaches the real
+ *  Civ-6-magnitude −4 empire penalty (−1 per 8 war-turns for the player and
+ *  FORMAL rival wars; −1 per 4 for a SURPRISE rival↔rival war via the ×2
+ *  accrual). The #55-S3 deferral (a −3/−4-tier divergence sighting on seed
+ *  9092 under cap 32 — AUDIT G-8) is re-verified/hunted with this change.
+ *  BOTH engines clamp the ACCUMULATOR at the cap (game.ts/rivals.ts accrual
+ *  Math.min; the GPU inc clamp) — warWearinessPenalty's Math.min is
+ *  belt-and-braces, never the live clamp. */
+export const WAR_WEARINESS_CAP = 32;
 /** B-22 (task #55 S3): rival↔rival war-weariness accrual multipliers — the
  *  modeled casus-belli benefit. A SURPRISE war (no prior denouncement) is TWICE
  *  as wearying as a FORMAL one (denounced ≥ RR_FORMAL_MIN_TURNS earlier),

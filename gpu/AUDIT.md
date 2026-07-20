@@ -25,19 +25,26 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 27.5 | **67%** |
-| B fidelity | 88 | 78.2 | **89%** |
+| A symmetry | 41 | 31.5 | **77%** |
+| B fidelity | 88 | 80.5 | **91%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
-| G parity latents | 9 | 7 | **78%** |
-| **Overall (incl. closed)** | **188** | **161.7** | **86%** |
-| Open chapters only (A+B) | 129 | 105.7 | **82%** |
+| G parity latents (closed) | 9 | 9 | 100% |
+| **Overall (incl. closed)** | **189** | **172.0** | **91%** |
+| Open chapters only (A+B) | 129 | 112.0 | **87%** |
 
-(#55 close-out note: chapter G's weight grew 7→9 — the new G-8
-dormant latent recorded by GEO-2's cap-32 experiment (UNVERIFIED,
-the G-3 re-verify rule applies) — so G drops below 100% despite no
-G regression; the denominator moved.)
+(#69 close-out note: A-25 + G-8 + B-15 all closed in one round —
+A-25 and G-8 resolved by RE-VERIFICATION (unreproducible sighting +
+refuted artifact), not by fixes; chapter G is empty and CLOSED
+again. TABLE RE-ADDED from the per-item weights (the B10 rule): the
+incrementally-maintained totals had drifted −4.5 low (158.9-claimed
+vs 163.4 true at the #69 open) and the weight total is 189, not 188
+— every row above is a fresh sum, not a delta. Remaining open
+items: chapter A = A-5r 5%, A-9 10%, A-18 (w3), A-21 (w2), A-22
+(w2), A-23 (w2); chapter B = B-8 10%, B-15 0, B-17 15%, B-18 5%,
+B-20 30%, B-22 50%, B-23 30%, B-24 (w3), B-25 20%, B-26 30%,
+B-27 25%.)
 
 (B8 note: chapter A's weight grew 39→41 — the new A-25 latent found
 by slice K's hunt — so A's % DROPS despite A-12 resolving; the
@@ -137,7 +144,18 @@ tests/geopolitics.test.ts (7); three poke lanes fixed TEST-side on
 the reshuffled trajectories — purchase (founding side-channel bound),
 cs_verbs (levy units war-march off the ring: count by pool+civ+type),
 district_breadth (Encampment placement probes fixtures in order) —
-the B5/B7 poke-lane lesson firing again.)
+the B5/B7 poke-lane lesson firing again. 2026-07-20 #69 A25_G8
+SERIAL main-session (brief gpu/A25_G8.md): A-25
+RESOLVED-AS-VERIFIED-CORRECT (S1: the 9196 repro dissolved under the
+#55 reshuffle — no capture on the current trajectory; the
+capture→luxury-pool path poke-verified via `rc_registry` lane poke
+d; 9196 RESTORED in-gate; FISHING_BOATS/luxreq-−9 note recorded on
+A-18); G-8 RESOLVED-AS-REFUTED (S2: cap 16→32 with a proper export
+runs the ENTIRE ladder green on the identical engine — the #55-S3
+sighting was an experiment artifact, likely a raised TS constant
+without re-export); B-15 CLOSED (the −4 ceiling live). No engine
+fix shipped the whole round — both closures were re-verification,
+the G-3 rule's biggest single payoff yet. Battery 36 lanes 516s.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -153,15 +171,14 @@ Per-item weights (done% in parens where partial):
   A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan), A-24 2 (done — ROUND B10 slice R: per-rc
-  placement rule + env-gated registry invariant scan), A-25 2 (new —
-  ROUND B8 slice K hunt: conquered-city luxury/amenity not fed to the
-  empire pool; dodged by the 9196→9197 reroll).
+  placement rule + env-gated registry invariant scan), A-25 2 (done —
+  #69 S1: the B8-K sighting unreproducible, capture→luxury-pool path
+  poke-verified correct (`rc_registry` lane poke d), 9196 restored
+  in-gate; FISHING_BOATS −9 note moved to A-18).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-4 3 / B-5 2 / B-6 8 / B-7 2 /
   B-9 3 / B-10 3 / B-28 1 / B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
-  B-15 2 (95% — task #55 S3: rival↔rival SURPRISE accrual ×2
-  (−1 amenity per 4 war-turns), FORMAL ×1, 38 in-gate peace firings
-  justify it; the player-facing −4 ceiling (cap 32) DEFERRED — it
-  surfaced the dormant G-8 divergence); B-26 3 (70% —
+  B-15 2 (done — #55 S3 differential + #69 S2 cap 16→32: the −4
+  ceiling live on every axis, G-8 refuted); B-26 3 (70% —
   ROUND B10: era ladder + barb ZOC; cliffs/ranged/naval/scout-raid
   remain); B-8 2 (90% — ROUND B7 slice G: spawn-at-claim chassis +
   +5 CS auras; +1 MP half residual).
@@ -184,16 +201,12 @@ Per-item weights (done% in parens where partial):
   B-24 3; B-33 3 (RESOLVED — task #55 S2, the fidelity face of A-19).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
-- G: G-1..G-7 done, G-8 2 (OPEN, UNVERIFIED). G-6 (task #55: exporter
-  `st` plane froze the dynamic `!t.district` → razed-city tiles
-  unsettleable in GPU) and G-7 (task #55: TS `withFollowerBelief`
-  shallow-clone aliased the frozen per-turn mods, leaking a follower
-  belief across cities) both RESOLVED. G-8 (task #55 S3, GEO-2's
-  cap-32 experiment): raising `WAR_WEARINESS_CAP` 16→32 surfaced a
-  dormant TS/GPU economic-timing divergence at the −3/−4 amenity tier
-  on the PLAYER war (seed 9092, score/treasury/building drift at
-  t216). Agent-diagnosed, NOT re-verified (the G-3 rule); dormant at
-  the shipped cap 16. Blocks the B-15 player-facing −4 ceiling.
+- G: G-1..G-8 ALL done — chapter G EMPTY again. G-6 (task #55:
+  exporter `st` plane froze the dynamic `!t.district`) and G-7 (task
+  #55: TS `withFollowerBelief` shallow-clone aliasing) RESOLVED;
+  G-8 2 (RESOLVED-AS-REFUTED — #69 S2: the cap-32 sighting was an
+  experiment artifact, most likely a raised TS constant without a
+  re-export; cap 32 ships green, see the body entry).
 
 ---
 
@@ -352,7 +365,12 @@ untagged halves of tagged items stay Fable/main-session work.
   (`builderRepair` (units.ts) exists; rivals repair via
   `_rival_builder_actions` since A-13), and no resource-improvement
   verbs (rivals place everything `validImprovementsIn` offers; the
-  scripted player policy farms only). [opus-ok: the mask-COLUMN
+  scripted player policy farms only). #69 NOTE: when improvement
+  verbs land, FISHING_BOATS must either join `IMPROVEMENT_IDS`
+  (export-gpu.ts — PEARLS/WHALES `luxreq` −9 currently means those
+  luxuries can never amenity-activate on the GPU) or the verb must
+  mask sea resources; today no path builds it in EITHER engine, so
+  the −9 bake is parity-safe. [opus-ok: the mask-COLUMN
   plumbing (unit_action_mask rows for CS-attack/repair/improvements/
   pillage/specialists incl. A-21/A-22) — new verbs are inert under the
   scripted player policy, so gates can't drift; the APPLY-path wiring
@@ -424,19 +442,23 @@ untagged halves of tagged items stay Fable/main-session work.
   `rc_registry` (gpu/rc_registry_test.py). The site reshuffle
   surfaced two pre-existing latents: the G-5 class (fixed by slice H
   this round) and a founding tie-break sighting recorded as G-6.
-- A-25 (new, ROUND B8 slice K hunt). A CONQUERED city's amenity
-  balance diverges: the B-21 re-key reshuffled seed 9196 so the
-  scripted player captures a rival city (acquired t7) at ~t240, and the
-  GPU computes that city's amenity balance as -4 (`amen_have`=0) vs
-  TS's -2 → growth factor 0.70 vs 0.90 → `foodBox`/pop drift, score by
-  t250 (integer state + `cultureBox` matched exactly — food-only). ROOT
-  (probed, not yet fixed): the captured city's tiles/luxury resources do
-  not feed the GPU empire luxury pool — `_luxury_amenities` shows 0
-  luxuries empire-wide while TS grants the captured luxuries; same
-  registry family as A-23 (civ-level worked/owned-tile scan). Dodged by
-  the 9196→9197 reroll (SEED_OVERRIDES[15], export-gpu.ts) so the class
-  rides only when the capture lands; fix when the captured-tile→empire
-  luxury/amenity path is unified (candidate for #66-style hardening).
+- A-25. **RESOLVED-AS-VERIFIED-CORRECT (2026-07-20, #69 S1 — brief
+  gpu/A25_G8.md)**. The B8-K sighting (seed 9196: scripted player
+  conquest ~t240, GPU `amen_have` 0 vs TS −2, growth 0.70 vs 0.90)
+  does NOT reproduce: 9196 RESTORED at `SEED_OVERRIDES[15]` runs
+  0.0-milli green at 250t — under the #55 geopolitics reshuffle its
+  trajectory no longer contains ANY capture (rivals grow to 13
+  cities), so the suspected path was re-verified by DIRECT POKE
+  instead: `_capture_rival_city` re-owns the A-17 ring to the new
+  player city and an improved in-roster luxury on a captured tile
+  feeds `_luxury_amenities` the same turn (`rc_registry` lane poke d,
+  grants 0→2, registry invariant green). No fix shipped — current
+  code is correct; the historical root is not archaeologically
+  pinned (nothing to prove against). REAL FIND from the re-verify:
+  `luxreq` −9 = PEARLS/WHALES, whose FISHING_BOATS improvement is
+  outside the GPU roster — inert in BOTH engines today (no scripted
+  builder builds it) but a LIVE asymmetry once #50's RL improvement
+  verbs land (recorded on A-18; exporter comment updated).
 
 ## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 
@@ -571,14 +593,19 @@ gap; likewise GS disasters are modeled minus sea-level rise
   line, Frigate+ naval hulls (with B-6), gold unit-upgrades, and the
   CONTROLLED rival_masks `ok_u` still hardcodes the old 5-unit roster
   (RL-surface decision — batch with A-18/#50).
-- B-15. **RESOLVED (2026-07-17, Round B2)**: war weariness — integer
-  accumulator (`warWeariness`, +1/turn at war, −4/turn decay at
-  peace) → flat amenity penalty via `computeCityStats`, symmetric
+- B-15. **RESOLVED (mechanism 2026-07-17 Round B2; magnitude closed
+  2026-07-20 #69)**: war weariness — integer accumulator
+  (`warWeariness`, +1/turn at war ×`WW_SURPRISE_MULT`/`WW_FORMAL_MULT`
+  on the rival↔rival axis since #55-S3, −4/turn decay at peace) →
+  flat amenity penalty via `computeCityStats`, symmetric
   player+rival, both engines (`_MUTABLE`-registered tensors; poke
-  `gpu/war_weariness_test.py`). Magnitude DELIBERATELY gentle (−1 per
-  8 war-turns, cap −2): the passive scripted player never sues for
-  peace, so real magnitudes collapse the fixture. Raise toward real
-  values with #56's survival heuristics.
+  `gpu/war_weariness_test.py`). MAGNITUDE: `WAR_WEARINESS_CAP` 16→32
+  (#69 S2) — the −4 empire ceiling is live (−1 per 8 war-turns
+  player/FORMAL, −1 per 4 for SURPRISE rival wars); both engines
+  clamp the ACCUMULATOR at the cap (accrual `Math.min` / GPU inc
+  clamp — the read-side `warWearinessPenalty` Math.min is
+  belt-and-braces). The #55-S3 deferral (G-8) did NOT reproduce at
+  cap 32 on a properly-exported tree — full ladder + battery green.
 - B-26. Map/barbarian fidelity: no cliffs (no such concept in
   data/terrains.ts or core/mapgen.ts). Barb raiders run the A-8 real-MP
   walk (RESOLVED 2026-07-13 task #44; `hostileUnitAct` both engines, GPU
@@ -996,17 +1023,21 @@ G-1..G-7 resolved (detail in git history / the cited logs):
 - G-4. RESOLVED-ON-CATCH (2026-07-17, #56): scripted builder walker
   moved AFTER production (TS order), fixing a one-turn phantom job.
 
-- G-8 (OPEN, UNVERIFIED — 2026-07-20, task #55 S3, GEO-2's cap-32
-  experiment; the G-3 re-verify rule applies before any fix).
-  SIGHTING: raising `WAR_WEARINESS_CAP` 16→32 (the B-15 player-facing
-  −4 ceiling) turned scripted seed 9092 red — a player-only-war seed
-  drifting in score/treasury/buildings at t216, i.e. a dormant TS/GPU
-  economic-TIMING divergence at the −3/−4 amenity tier on the PLAYER
-  war axis. Dormant at the shipped cap 16 (the −3/−4 tiers are
-  unreachable). Suspect zone: the amenity-tier → growth/production
-  factor path (`computeCityStats` vs the GPU city walk) at deep
-  penalty tiers. Re-verify from a fresh cap-32 run BEFORE trusting
-  the tier attribution; resolving it unblocks the B-15 residual.
+- G-8. **RESOLVED-AS-REFUTED (2026-07-20, #69 S2 — the G-3 re-verify
+  rule's third save, after G-3 itself and the A-24-family
+  re-verifies)**. The #55-S3 sighting (cap 16→32 → seed 9092
+  score/treasury/building drift at t216, attributed to a dormant
+  −3/−4-amenity-tier divergence) does NOT reproduce: the SAME engine
+  code (S4 shipped tests only) with `WAR_WEARINESS_CAP` = 32 and a
+  PROPER re-export runs the full ladder green — scripted 24/24
+  0.0-milli (9092 included), forced, rollout 72/72, battery 36
+  lanes. Most probable artifact mechanism: the experiment raised the
+  TS constant without re-exporting rules.json, leaving the GPU
+  accumulator clamped at 16 while TS climbed to 32 — which produces
+  EXACTLY the reported symptom the moment ww crosses 16 on a
+  player-war seed. Both engines clamp the accumulator at the cap
+  (verified at all four accrual sites); cap 32 is now SHIPPED
+  (B-15's −4 ceiling).
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 
