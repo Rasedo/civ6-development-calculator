@@ -19,13 +19,15 @@ import { RESOURCES } from '../data/resources';
 import {
   CITY_STATE_TYPES,
   CS_TYPE_YIELD,
-  CS_TYPE_DISTRICT,
+  CS_TYPE_BUILDINGS,
   CS_NAMES,
   CS_MAX_HP,
   ENVOY_COST,
   INFLUENCE_PER_TURN,
   CS_CAPITAL_BONUS,
   CS_DISTRICT_BONUS,
+  CS_SUZERAIN_LIVE,
+  CS_SUZERAIN_YIELD,
   SUZERAIN_ENVOYS,
   QUEST_COOLDOWN,
   QUEST_ENVOYS,
@@ -135,49 +137,90 @@ export function csTradeCapacityBonus(state: GameState): number {
 
 export interface CsBonuses {
   capital: Partial<Yields>;
-  districtAdd: Partial<Record<DistrictId, Partial<Yields>>>;
+  // B-21: re-keyed to BUILDINGS (real Civ 6: CS bonuses land on the district's
+  // BUILDINGS, not the bare district). The 3-envoy tier keys to the type's
+  // tier-1 building, the 6-envoy tier to the tier-2 building. Consumed via
+  // mods.buildingYieldAdd (cityBuildingYields), inheriting its pillaged-dark
+  // and regional-skip treatment for free.
+  buildingAdd: Partial<Record<string, Partial<Yields>>>;
+}
+
+/** B-21: the tier-1 (3-envoy) and tier-2 (6-envoy) building ids per CS type. */
+function csTierBuildings(type: GameState['cityStates'][number]['type']): {
+  tier1?: string;
+  tier2?: string;
+} {
+  const list = CS_TYPE_BUILDINGS[type];
+  return { tier1: list[0], tier2: list[1] };
 }
 
 /** Aggregate envoy bonuses across all city-states (folded into modifiers). */
 export function csEnvoyBonuses(state: GameState): CsBonuses {
   const capital: Partial<Yields> = {};
-  const districtAdd: CsBonuses['districtAdd'] = {};
+  const buildingAdd: CsBonuses['buildingAdd'] = {};
   for (const cs of state.cityStates) {
     const key = CS_TYPE_YIELD[cs.type];
     if (cs.envoys >= 1) {
       capital[key] = (capital[key] ?? 0) + CS_CAPITAL_BONUS;
     }
-    const district = CS_TYPE_DISTRICT[cs.type];
-    let perDistrict = 0;
-    if (cs.envoys >= 3) perDistrict += CS_DISTRICT_BONUS;
-    if (cs.envoys >= 6) perDistrict += CS_DISTRICT_BONUS;
-    if (perDistrict > 0) {
-      const cur = (districtAdd[district] ??= {});
-      cur[key] = (cur[key] ?? 0) + perDistrict;
+    const { tier1, tier2 } = csTierBuildings(cs.type);
+    if (cs.envoys >= 3 && tier1) {
+      const cur = (buildingAdd[tier1] ??= {});
+      cur[key] = (cur[key] ?? 0) + CS_DISTRICT_BONUS;
+    }
+    if (cs.envoys >= 6 && tier2) {
+      const cur = (buildingAdd[tier2] ??= {});
+      cur[key] = (cur[key] ?? 0) + CS_DISTRICT_BONUS;
     }
   }
-  return { capital, districtAdd };
+  return { capital, buildingAdd };
 }
 
 /** A-12: the rival twin of csEnvoyBonuses — the same 1/3/6 thresholds off
  * THAT RIVAL's envoy counts (bonuses are count-based, not suzerain-based). */
 export function csRivalEnvoyBonuses(state: GameState, rivalId: number): CsBonuses {
   const capital: Partial<Yields> = {};
-  const districtAdd: CsBonuses['districtAdd'] = {};
+  const buildingAdd: CsBonuses['buildingAdd'] = {};
   for (const cs of state.cityStates) {
     const mine = cs.rivalEnvoys?.[rivalId] ?? 0;
     const key = CS_TYPE_YIELD[cs.type];
     if (mine >= 1) capital[key] = (capital[key] ?? 0) + CS_CAPITAL_BONUS;
-    const district = CS_TYPE_DISTRICT[cs.type];
-    let perDistrict = 0;
-    if (mine >= 3) perDistrict += CS_DISTRICT_BONUS;
-    if (mine >= 6) perDistrict += CS_DISTRICT_BONUS;
-    if (perDistrict > 0) {
-      const cur = (districtAdd[district] ??= {});
-      cur[key] = (cur[key] ?? 0) + perDistrict;
+    const { tier1, tier2 } = csTierBuildings(cs.type);
+    if (mine >= 3 && tier1) {
+      const cur = (buildingAdd[tier1] ??= {});
+      cur[key] = (cur[key] ?? 0) + CS_DISTRICT_BONUS;
+    }
+    if (mine >= 6 && tier2) {
+      const cur = (buildingAdd[tier2] ??= {});
+      cur[key] = (cur[key] ?? 0) + CS_DISTRICT_BONUS;
     }
   }
-  return { capital, districtAdd };
+  return { capital, buildingAdd };
+}
+
+/** B-21: the suzerain's per-CS unique bonus (CS_SUZERAIN_LIVE), summed into a
+ * flat capital-yield add for whichever seat holds suzerainty. Player seat. */
+export function csSuzerainCapitalBonus(state: GameState): Partial<Yields> {
+  const out: Partial<Yields> = {};
+  for (const cs of state.cityStates) {
+    if (!isSuzerain(cs)) continue;
+    const key = CS_SUZERAIN_LIVE[cs.name];
+    if (!key) continue; // descoped row
+    out[key] = (out[key] ?? 0) + CS_SUZERAIN_YIELD;
+  }
+  return out;
+}
+
+/** B-21: the rival twin — suzerain bonus for a rival seat. */
+export function csRivalSuzerainCapitalBonus(state: GameState, rivalId: number): Partial<Yields> {
+  const out: Partial<Yields> = {};
+  for (const cs of state.cityStates) {
+    if (!rivalIsSuzerain(cs, rivalId)) continue;
+    const key = CS_SUZERAIN_LIVE[cs.name];
+    if (!key) continue; // descoped row
+    out[key] = (out[key] ?? 0) + CS_SUZERAIN_YIELD;
+  }
+  return out;
 }
 
 /** Per-turn yield gain of assigning one more envoy to `cs` (for advisors/RL). */
@@ -186,13 +229,14 @@ export function envoyBonusDelta(state: GameState, cs: CityState): Yields {
   const key = CS_TYPE_YIELD[cs.type];
   const next = cs.envoys + 1;
   if (next === 1) delta[key] += CS_CAPITAL_BONUS;
+  // B-21: the 3/6 tiers now land on cities holding the type's tier-1/tier-2
+  // BUILDING (not the bare district) — count matching held buildings.
   if (next === 3 || next === 6) {
-    const district = CS_TYPE_DISTRICT[cs.type];
+    const { tier1, tier2 } = csTierBuildings(cs.type);
+    const bld = next === 3 ? tier1 : tier2;
     let count = 0;
-    for (const c of state.cities) {
-      count += c.districts.filter(
-        (d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete,
-      ).length;
+    if (bld) {
+      for (const c of state.cities) if (c.buildings.includes(bld)) count += 1;
     }
     delta[key] += CS_DISTRICT_BONUS * count;
   }

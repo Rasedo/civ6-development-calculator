@@ -17,7 +17,7 @@ import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from './trade';
-import { isSuzerain, csRivalEnvoyBonuses } from './cityStates';
+import { isSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
@@ -1533,11 +1533,20 @@ export function rivalCityYields(
     const csb = csRivalEnvoyBonuses(state, rival.id);
     if (rc.isCapital) {
       for (const [k, v] of Object.entries(csb.capital)) total[k as keyof Yields] += v ?? 0;
+      // B-21: the suzerain's per-CS unique perk — a flat capital yield to
+      // whichever seat is suzerain (this rival here).
+      const suz = csRivalSuzerainCapitalBonus(state, rival.id);
+      for (const [k, v] of Object.entries(suz)) total[k as keyof Yields] += v ?? 0;
     }
-    for (const d of rc.districts) {
-      const add = csb.districtAdd[d.type];
-      const dt = state.map.tiles[d.tileIndex];
-      if (!add || !dt.districtComplete || dt.districtPillaged) continue; // B-32: pillaged CS channel is dark
+    // B-21: the 3/6 tiers land on BUILDINGS now — mirror cityBuildingYields'
+    // regional-skip + pillaged-dark (the rc.buildings loop above; `pillaged`
+    // is the same B-32 set computed there).
+    for (const id of rc.buildings) {
+      const add = csb.buildingAdd[id];
+      if (!add) continue;
+      const bd = BUILDINGS[id];
+      if (bd?.regional) continue; // B9-R2: regional buildings skip local adds
+      if (bd && pillaged.has(bd.district)) continue; // B-32: pillaged district = dark
       for (const [k, v] of Object.entries(add)) total[k as keyof Yields] += v ?? 0;
     }
   }

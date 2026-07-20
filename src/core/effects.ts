@@ -9,7 +9,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { PLAYER_CIV } from './civs';
-import { csEnvoyBonuses } from './cityStates';
+import { csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 
 // ---------------------------------------------------------------------------
 // Unlocks
@@ -270,10 +270,14 @@ export function getModifiers(state: GameState): Modifiers {
   if (state.cityStates?.length) {
     const cs = csEnvoyBonuses(state);
     addPartial(mods.capitalYields, cs.capital);
-    for (const [district, y] of Object.entries(cs.districtAdd)) {
-      const cur = (mods.districtYieldAdd[district as DistrictId] ??= {});
+    // B-21: the 3/6 tiers land on BUILDINGS now (buildingYieldAdd, applied in
+    // cityBuildingYields — inherits its pillaged-dark + regional-skip).
+    for (const [building, y] of Object.entries(cs.buildingAdd)) {
+      const cur = (mods.buildingYieldAdd[building] ??= {});
       addPartial(cur, y);
     }
+    // B-21: the suzerain's per-CS unique perk — a flat capital yield.
+    addPartial(mods.capitalYields, csSuzerainCapitalBonus(state));
   }
   return mods;
 }

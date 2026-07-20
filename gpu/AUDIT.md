@@ -109,7 +109,9 @@ Per-item weights (done% in parens where partial):
   deferrals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan), A-24 2 (done — ROUND B10 slice R: per-rc
-  placement rule + env-gated registry invariant scan).
+  placement rule + env-gated registry invariant scan), A-25 2 (new —
+  ROUND B8 slice K hunt: conquered-city luxury/amenity not fed to the
+  empire pool; dodged by the 9196→9197 reroll).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-4 3 / B-5 2 / B-6 8 / B-7 2 /
   B-9 3 / B-10 3 / B-28 1 / B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
   B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (70% —
@@ -122,8 +124,9 @@ Per-item weights (done% in parens where partial):
   (95% — ROUND B6: enhancer effects + missionary chassis + religious
   victory; apostles/theological combat + player missionaries (#50)
   remain); B-20 3 (70% — ROUND B7: multi-charge + slotted works;
-  abilities/tile-activation/music-split remain); B-21 2 (40%);
-  B-23 3 (open).
+  abilities/tile-activation/music-split remain); B-21 2 (RESOLVED
+  minus 10 descoped suzerain rows — ROUND B8 slice K: building re-key
+  + suzerain perk, both seats); B-23 3 (open).
 - B meta: B-25 3 (80% — religious victory landed; player project
   path + Culture/Diplomatic victories open); B-22 3, B-24 3,
   B-33 3 (open).
@@ -321,6 +324,19 @@ untagged halves of tagged items stay Fable/main-session work.
   `rc_registry` (gpu/rc_registry_test.py). The site reshuffle
   surfaced two pre-existing latents: the G-5 class (fixed by slice H
   this round) and a founding tie-break sighting recorded as G-6.
+- A-25 (new, ROUND B8 slice K hunt). A CONQUERED city's amenity
+  balance diverges: the B-21 re-key reshuffled seed 9196 so the
+  scripted player captures a rival city (acquired t7) at ~t240, and the
+  GPU computes that city's amenity balance as -4 (`amen_have`=0) vs
+  TS's -2 → growth factor 0.70 vs 0.90 → `foodBox`/pop drift, score by
+  t250 (integer state + `cultureBox` matched exactly — food-only). ROOT
+  (probed, not yet fixed): the captured city's tiles/luxury resources do
+  not feed the GPU empire luxury pool — `_luxury_amenities` shows 0
+  luxuries empire-wide while TS grants the captured luxuries; same
+  registry family as A-23 (civ-level worked/owned-tile scan). Dodged by
+  the 9196→9197 reroll (SEED_OVERRIDES[15], export-gpu.ts) so the class
+  rides only when the capture lands; fix when the captured-tile→empire
+  luxury/amenity path is unified (candidate for #66-style hardening).
 
 ## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
 
@@ -631,13 +647,34 @@ gap; likewise GS disasters are modeled minus sea-level rise
   split (uniform +2c shipped, counts tracked separately), Broadcast
   Center as a further tier, tile activation, per-person abilities,
   player GP units (ride #50/A-18).
-- B-21 (re-scoped 2026-07-17, Round B2). LANDED: `CS_TYPE_BUILDINGS`
-  (building-tier keys) + `CS_SUZERAIN_BONUS` (per-CS unique bonus
-  rows) data tables in data/cityStates.ts. STILL OPEN: the LIVE 3/6-
-  envoy channel still keys to districts via `CS_TYPE_DISTRICT` (inert
-  in-gate — no CS exceeds 1 envoy at 100t; re-key when a gate-reachable
-  scenario exists, likely with #56's 250t horizon), and the suzerain
-  perk stays type-generic in the live path.
+- B-21. RESOLVED-minus-descoped-rows (2026-07-20, ROUND B8 slice K).
+  The LIVE 3/6-envoy channel now keys to BUILDINGS: `csEnvoyBonuses` /
+  `csRivalEnvoyBonuses` return `buildingAdd` keyed on the type's tier-1
+  (`CS_TYPE_BUILDINGS[t][0]`, >=3 envoys) and tier-2 (`[t][1]`, >=6)
+  building, routed through `mods.buildingYieldAdd` (player, effects.ts)
+  and the `rc.buildings` loop (rival, rivals.ts) — inheriting
+  cityBuildingYields' pillaged-dark + `def.regional` skip on BOTH seats.
+  `envoyBonusDelta` re-keyed to match. GPU mirrors: player `cs_city6`
+  via `torch.einsum(bf_live, cs_bld6)` (`_cs_b1idx`/`_cs_b2idx`), both
+  rival yield paths (`_rival_city_yields_all` + `_rival_city_yields`)
+  via `selb_cs`. The SUZERAIN perk is LIVE: `CS_SUZERAIN_LIVE` grants a
+  flat +`CS_SUZERAIN_YIELD` (3) capital yield in the named channel to
+  whichever seat holds the strict contest (`csSuzerainCapitalBonus` /
+  `csRivalSuzerainCapitalBonus`; GPU `cs_suz_key`/`_cs_suz_amt` on the
+  capital of all three yield paths). In-gate (250t): player 3-tier fires
+  in most seeds (envoys reach 4-5), rival 6-tier + suzerain both fire
+  (A-12a: rival envoys reach 9); the 6-tier + contest edges are pinned
+  by `gpu/cs_bonus_test.py` (`cs_bonus` battery lane) + the suzerain
+  vitest pokes. DESCOPED suzerain rows (14 shipped / 10 descoped, each
+  documented in `CS_SUZERAIN_LIVE`): channel `none` (Kabul/Preslav/
+  Yerevan — unit XP/cavalry/apostles), trade-route rows (Antioch/
+  Kumasi/Amsterdam/Hunza — B-23), power rows (Toronto/Cardiff), and the
+  amenities-channel row (Buenos Aires — the capital-yield vehicle
+  carries the six yields only). RESIDUAL: the shipped rows degrade
+  %-scaling/conditionals (Geneva's not-at-war, Stockholm's per-tier,
+  Mexico City's project %) to a flat channel yield; industrial tier-2
+  (FACTORY) is regional → its 6-tier is inert in both engines (parity-
+  safe). Seed 9196 rerolled → 9197 (see A-25).
 - B-23. Trade simplified: no Trader unit, no roads, no route duration
   or completion (`TradeRoute` in core/types.ts has a `toCs` target and
   nothing else), no international routes to rival civs —

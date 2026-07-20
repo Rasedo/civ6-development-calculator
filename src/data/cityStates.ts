@@ -103,6 +103,37 @@ export const CS_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Builders can build a Monastery for faith/production.', channel: 'faith' },
 };
 
+// B-21 (Round B8 slice K): the LIVE per-CS suzerain effect — a flat
+// +CS_SUZERAIN_YIELD/turn to the suzerain's CAPITAL in the named yield channel
+// (whichever seat, player or rival, holds suzerainty). This is the machine-
+// readable subset of CS_SUZERAIN_BONUS above; the 14 rows here degrade their
+// real %-scaling/conditional bonus to a flat channel yield (documented per
+// row in CS_SUZERAIN_BONUS.bonus). Rows NOT listed are DESCOPED, each for a
+// modeled-system gap:
+//   - channel 'none': Kabul (combat XP), Preslav (cavalry combat/movement),
+//     Yerevan (apostle promotions) — no yield channel to degrade to.
+//   - trade routes (B-23 / slice T's zone): Antioch, Kumasi, Amsterdam, Hunza.
+//   - power system (not modeled): Toronto, Cardiff.
+//   - amenities channel: Buenos Aires — the capital-yield vehicle carries the
+//     six yields only, not the amenity tier.
+export const CS_SUZERAIN_YIELD = 3;
+export const CS_SUZERAIN_LIVE: Record<string, YieldKey> = {
+  Geneva: 'science',
+  Stockholm: 'science',
+  Seoul: 'science',
+  Anshan: 'science',
+  Vilnius: 'culture',
+  Caguana: 'culture',
+  Zanzibar: 'gold',
+  'Bandar Brunei': 'gold',
+  'Mexico City': 'production',
+  Carthage: 'production',
+  Valletta: 'production',
+  Jerusalem: 'faith',
+  'La Venta': 'faith',
+  Armagh: 'faith',
+};
+
 export const CS_TYPE_COLORS: Record<CityStateType, string> = {
   scientific: '#4a90d9',
   cultural: '#b05fb0',
