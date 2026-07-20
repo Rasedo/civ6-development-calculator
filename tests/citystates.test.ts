@@ -12,9 +12,11 @@ import {
   isSuzerain,
   rivalIsSuzerain,
   csRivalEnvoyBonuses,
+  csSuzerainCapitalBonus,
+  csRivalSuzerainCapitalBonus,
 } from '../src/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../src/core/trade';
-import { ENVOY_COST } from '../src/data/cityStates';
+import { ENVOY_COST, CS_SUZERAIN_YIELD } from '../src/data/cityStates';
 import type { CityState, CityStateType, GameState } from '../src/core/types';
 
 function addCs(
@@ -101,11 +103,14 @@ describe('envoys', () => {
     expect(withOne - before).toBeGreaterThanOrEqual(2);
     expect(withOne - before).toBeLessThan(2.5);
 
-    // A completed campus starts collecting the 3-envoy bonus.
+    // B-21: the 3/6 tiers now land on the CAMPUS BUILDINGS — a completed
+    // Campus holding a Library (tier-1) collects the 3-envoy bonus, a
+    // University (tier-2) the 6-envoy bonus.
     const campusTile = tileAtCoords(state.map, 6, 5);
     campusTile.district = 'CAMPUS';
     campusTile.districtComplete = true;
     city.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
+    city.buildings.push('LIBRARY', 'UNIVERSITY');
     const campusBase = computeCityStats(state, city).total.science;
     cs.envoys = 3;
     const withThree = computeCityStats(state, city).total.science;
@@ -130,7 +135,9 @@ describe('envoys', () => {
     theater.district = 'THEATER_SQUARE';
     theater.districtComplete = true;
     city.districts.push({ type: 'THEATER_SQUARE', tileIndex: theater.index });
-    expect(envoyBonusDelta(state, cs).culture).toBe(2); // crossing 3 with one theater
+    // B-21: the 3-envoy tier keys to the cultural tier-1 building (AMPHITHEATER).
+    city.buildings.push('AMPHITHEATER');
+    expect(envoyBonusDelta(state, cs).culture).toBe(2); // crossing 3 with one Amphitheater
   });
 
   it('suzerainty of a trade city-state adds route capacity', () => {
@@ -170,7 +177,8 @@ describe('envoys', () => {
     const bonuses = csEnvoyBonuses(state);
     expect(bonuses.capital.science).toBe(2);
     expect(bonuses.capital.faith).toBe(2);
-    expect(bonuses.districtAdd.HOLY_SITE?.faith).toBe(2);
+    // B-21: the 3-envoy tier lands on the religious tier-1 building (SHRINE).
+    expect(bonuses.buildingAdd.SHRINE?.faith).toBe(2);
   });
 });
 
@@ -250,9 +258,53 @@ describe('rival envoys and the suzerain contest (A-12)', () => {
     cs.rivalEnvoys = [6, 1];
     const b0 = csRivalEnvoyBonuses(state, 0);
     expect(b0.capital.science).toBe(2);
-    expect(b0.districtAdd.CAMPUS?.science).toBe(4); // both thresholds
+    // B-21: at 6 envoys the 3-tier lands on the tier-1 building (LIBRARY) and
+    // the 6-tier on the tier-2 building (UNIVERSITY) — +2 each, separate keys.
+    expect(b0.buildingAdd.LIBRARY?.science).toBe(2);
+    expect(b0.buildingAdd.UNIVERSITY?.science).toBe(2);
     const b1 = csRivalEnvoyBonuses(state, 1);
     expect(b1.capital.science).toBe(2);
-    expect(b1.districtAdd.CAMPUS).toBeUndefined(); // 1 envoy: capital only
+    expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
+  });
+});
+
+describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
+  it('grants the shipped channel yield to a strict player suzerain', () => {
+    const state = makeState();
+    // Geneva (scientific) is a SHIPPED row -> science channel.
+    const cs = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: 3 });
+    expect(isSuzerain(cs)).toBe(true);
+    expect(csSuzerainCapitalBonus(state).science).toBe(CS_SUZERAIN_YIELD);
+  });
+
+  it('pays nothing for a descoped row or a non-suzerain', () => {
+    const state = makeState();
+    // Antioch (cultural) is DESCOPED (trade-route bonus) -> no live channel.
+    const desc = addCs(state, 8, 8, { type: 'cultural', name: 'Antioch', envoys: 4 });
+    expect(isSuzerain(desc)).toBe(true);
+    expect(csSuzerainCapitalBonus(state)).toEqual({});
+    // A shipped row but only 2 envoys -> not suzerain -> no perk.
+    const weak = addCs(state, 4, 4, { type: 'scientific', name: 'Geneva', envoys: 2 });
+    expect(isSuzerain(weak)).toBe(false);
+    expect(csSuzerainCapitalBonus(state)).toEqual({});
+  });
+
+  it('loses the perk when a rival wins the strict contest', () => {
+    const state = makeState();
+    const cs = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: 3 });
+    cs.rivalEnvoys = [4]; // rival 0 out-envoys the player
+    expect(isSuzerain(cs)).toBe(false);
+    expect(csSuzerainCapitalBonus(state)).toEqual({});
+  });
+
+  it('grants the perk to a strict rival suzerain (the rival twin)', () => {
+    const state = makeState();
+    // Vilnius (cultural) is SHIPPED -> culture channel.
+    const cs = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: 0 });
+    cs.rivalEnvoys = [3];
+    expect(rivalIsSuzerain(cs, 0)).toBe(true);
+    expect(csRivalSuzerainCapitalBonus(state, 0).culture).toBe(CS_SUZERAIN_YIELD);
+    // no perk for a rival that is not the suzerain
+    expect(csRivalSuzerainCapitalBonus(state, 1)).toEqual({});
   });
 });

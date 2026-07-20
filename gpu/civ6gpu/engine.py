@@ -523,12 +523,16 @@ class BatchSim:
         self.cs_type = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.cs_center = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.cs_pop = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # B-21: per-CS-instance suzerain unique-perk yield column (-1 = descoped
+        # row). Name-keyed in the exporter, constant thereafter.
+        self.cs_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             for s, cs in enumerate(f.get("cityStates", [])):
                 self.cs_alive[b, s] = True
                 self.cs_type[b, s] = cs["type"]
                 self.cs_center[b, s] = cs["center"]
                 self.cs_pop[b, s] = cs["pop"]
+                self.cs_suz_key[b, s] = cs.get("suzKey", -1)
         self.cs_at = torch.tensor([[t.get("cs", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.cs_met = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         self.cs_envoys = torch.zeros(B, s_pad, dtype=torch.long, device=device)
@@ -545,6 +549,14 @@ class BatchSim:
         cs_didx = rules.cs.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._cs_didx = torch.tensor(cs_didx, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S] district each CS boosts at 3/6 envoys
         self._cs_district_bonus = float(rules.cs.get("districtBonus", 2))  # per-district amount at each of the 3-/6-envoy thresholds
+        # B-21: the 3/6-envoy bonus lands on the type's tier-1 (>=3) / tier-2
+        # (>=6) BUILDING catalog index (csEnvoyBonuses re-key). -1 = building
+        # absent from the roster (no bonus). Constant, derived from cs_type.
+        cs_b1 = rules.cs.get("typeB1Idx", [-1] * 6)
+        cs_b2 = rules.cs.get("typeB2Idx", [-1] * 6)
+        self._cs_b1idx = torch.tensor(cs_b1, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
+        self._cs_b2idx = torch.tensor(cs_b2, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
+        self._cs_suz_amt = float(rules.cs.get("suzerainYield", 3))  # B-21: flat suzerain capital-yield amount
         self.loyalty = torch.full((B, C), 100.0, dtype=dtype, device=device)
 
         # --- rival civs (phase 4c) ---------------------------------------------
@@ -2813,21 +2825,26 @@ class BatchSim:
                 dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
                 # B-18: per-city COMPLETED specialty district count (Zen Meditation min).
                 spec_count = (owned_d & self._is_specialty[dt.clamp(min=0)]).to(torch.long).sum(dim=2)  # [B, C]
-                # City-state district bonus (csEnvoyBonuses): a CS at >=3 envoys
-                # grants +districtBonus (again at >=6) to each owned completed
-                # district of its type. B9-R1: the bonus lands in the CS's TYPE
-                # CHANNEL column (CS_TYPE_YIELD) and applies to EVERY completed
-                # live district instance — INDEPENDENT of adjacencyYield. The
-                # old adjYield-column shortcut broke when the militaristic CS's
-                # ENCAMPMENT became scaffold-placeable (no adjYield, production
-                # channel). Scatter per (district, channel), pre-amenity-factor.
-                nD = len(self.districts_cat)
-                cs_dbonus6 = torch.zeros(B, nD * 6, dtype=self.dtype, device=dev)
+                # B-21: City-state envoy bonus re-keyed to BUILDINGS
+                # (csEnvoyBonuses): a CS at >=3 envoys grants +districtBonus in
+                # its TYPE channel (CS_TYPE_YIELD) to every city holding the
+                # type's TIER-1 building; at >=6, again on the TIER-2 building
+                # (real Civ 6: the bonus lands on the district's buildings, not
+                # the bare district). Routed through bf_live — the pillaged-dark
+                # + regional-masked building presence (the _fol_by/beliefAdd
+                # vehicle) — so pillage/regional-skip match TS cityBuildingYields
+                # exactly. Scatter per (building, channel), pre-amenity-factor.
+                nBc = self.buildings.shape[2]
+                cs_city6 = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)
                 if self.S > 0:
-                    perD = ((self.cs_envoys >= 3).to(self.dtype) + (self.cs_envoys >= 6).to(self.dtype)) * self._cs_district_bonus
-                    perD = perD * self.cs_alive.to(self.dtype)  # [B, S]
-                    cs_dbonus6.scatter_add_(1, self._cs_didx.clamp(min=0) * 6 + self._cs_yidx, perD)
-                cs_dbonus6 = cs_dbonus6.view(B, nD, 6)
+                    _acs = self.cs_alive.to(self.dtype)  # [B, S]
+                    per3 = (self.cs_envoys >= 3).to(self.dtype) * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).to(self.dtype)
+                    per6 = (self.cs_envoys >= 6).to(self.dtype) * self._cs_district_bonus * _acs * (self._cs_b2idx >= 0).to(self.dtype)
+                    cs_bld6f = torch.zeros(B, nBc * 6, dtype=self.dtype, device=dev)
+                    cs_bld6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
+                    cs_bld6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
+                    cs_bld6 = cs_bld6f.view(B, nBc, 6)
+                    cs_city6 = torch.einsum("bcn,bnk->bck", bf_live, cs_bld6)  # [B, C, 6] — pillaged/regional dark via bf_live
                 # For each PLACED district with an adjacencyYield: floor(static +
                 # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
                 # sources (mine/quarry for IZ, city-center for Harbor, built-wonder
@@ -2837,12 +2854,11 @@ class BatchSim:
                 # left-to-right association, cache hit or miss.
                 d_addends = []
                 hs_adj = None  # B-18: Holy Site floored adjacency (follower Work Ethic)
-                cs_city6 = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)  # B9-R1: CS envoy adds, channel-correct, ALL district types
+                # (B-21: cs_city6 is now BUILDING-keyed, computed above via
+                # bf_live — no longer accumulated per district here.)
                 for d in self.districts_cat:
                     di = int(d["idx"])
-                    mask = owned_d_live & (dt == di)  # B-32: pillaged = dark (adjacency + CS-envoy)
-                    dcount = mask.to(self.dtype).sum(dim=2)  # [B, C] owned completed LIVE type-di districts (0/1)
-                    cs_city6 = cs_city6 + cs_dbonus6[:, di].unsqueeze(1) * dcount.unsqueeze(2)
+                    mask = owned_d_live & (dt == di)  # B-32: pillaged = dark (adjacency)
                     yc = int(d.get("adjYield", -1))
                     if yc < 0:
                         continue
@@ -2918,6 +2934,18 @@ class BatchSim:
             cap_bonus = torch.zeros(B, 6, dtype=self.dtype, device=dev)
             cap_bonus.scatter_add_(1, self._cs_yidx, tier1)
             total[:, 0, :] += cap_bonus
+            # B-21: the suzerain's per-CS unique perk — a flat +suzerainYield in
+            # the CS's live channel (cs_suz_key, -1 = descoped) to whichever seat
+            # holds the STRICT suzerain contest (csSuzerainCapitalBonus). Player
+            # seat here — the isSuzerain twin (>= suz_min, strictly > every rival).
+            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+            p_suz = (self.cs_envoys >= suz_min) & self.cs_alive
+            if self.R > 0:
+                p_suz = p_suz & (self.cs_envoys > self.cs_r_envoys.max(dim=1).values)
+            suz_val = p_suz.to(self.dtype) * self._cs_suz_amt * (self.cs_suz_key >= 0).to(self.dtype)  # [B, S]
+            suz_bonus = torch.zeros(B, 6, dtype=self.dtype, device=dev)
+            suz_bonus.scatter_add_(1, self.cs_suz_key.clamp(min=0), suz_val)
+            total[:, 0, :] += suz_bonus
 
         # A-7r: the player's adopted government + slotted policies — cityYields
         # to every city, capitalYields to the capital (computeCityStats'
@@ -3380,36 +3408,53 @@ class BatchSim:
             sci = sci + gcity[:, 3].unsqueeze(1) * acell + gcap[:, 3].unsqueeze(1) * gisc
             cul = cul + gcity[:, 4].unsqueeze(1) * acell + gcap[:, 4].unsqueeze(1) * gisc
             faith = faith + gcity[:, 5].unsqueeze(1) * acell + gcap[:, 5].unsqueeze(1) * gisc
-        # A-12: CS envoy bonuses, j-batched (per-completed-district adds at
-        # 3/6 + capital yield at 1+) — the per-j twin's position and values
-        # (integer-valued adds in f64: batching is exact).
+        # A-12/B-21: CS envoy bonuses, j-batched — the 3/6 tiers now land on the
+        # rival's tier-1 (>=3) / tier-2 (>=6) BUILDINGS (csRivalEnvoyBonuses
+        # re-key), the capital yield at 1+ envoys, and (B-21) the suzerain's
+        # per-CS unique perk. Integer-valued adds in f64: batching is exact.
         if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
             _acs = self.cs_alive.double()
-            perD_r = ((self.cs_r_envoys[:, r] >= 3).double() + (self.cs_r_envoys[:, r] >= 6).double()) * self._cs_district_bonus * _acs
-            # B9-R1: channel-correct — the bonus lands in the CS's TYPE channel
-            # column for EVERY completed live district, independent of adjYield
-            # (militaristic → ENCAMPMENT production; the old adjYield-column
-            # shortcut broke when EN became scaffold-placeable).
-            _nDc = len(self.districts_cat)
-            csd_r6 = torch.zeros(B, _nDc * 6, dtype=torch.float64, device=self.device)
-            csd_r6.scatter_add_(1, self._cs_didx.clamp(min=0) * 6 + self._cs_yidx, perD_r)
-            csd_r6 = csd_r6.view(B, _nDc, 6)
-            dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
-            _dc_all = self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)
-            _dp_all = self.district_pillaged.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)  # B-32
-            comp_all = ((dt_all >= 0) & _dc_all & ~_dp_all).double() * alive.double().unsqueeze(2)  # B-32: pillaged CS channel dark
-            _cs6_all = (csd_r6.unsqueeze(1) * comp_all.unsqueeze(3)).sum(dim=2)  # [B, RC, 6] — integer-valued f64, order-exact
-            _cols = [_cs6_all[:, :, _k] for _k in range(6)]
+            _isc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
+            # B-21: 3/6-envoy BUILDING adds — selb is the rc_bldg presence with
+            # pillaged-dark + regional-skip (the b_yields twin at line ~3294), so
+            # pillage/regional match TS cityBuildingYields exactly.
+            _cols6 = None
+            if self.districts_on:
+                selb_cs = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # [B, RC, NB]
+                if bool(selb_cs.any()):
+                    _nBc = selb_cs.shape[2]
+                    per3 = (self.cs_r_envoys[:, r] >= 3).double() * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).double()
+                    per6 = (self.cs_r_envoys[:, r] >= 6).double() * self._cs_district_bonus * _acs * (self._cs_b2idx >= 0).double()
+                    csb6f = torch.zeros(B, _nBc * 6, dtype=torch.float64, device=self.device)
+                    csb6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
+                    csb6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
+                    csb6 = csb6f.view(B, _nBc, 6)
+                    _cs6_all = torch.einsum("bjn,bnk->bjk", selb_cs.double(), csb6)  # [B, RC, 6]
+                    _cols6 = [_cs6_all[:, :, _k] for _k in range(6)]
             tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
             capb_r = torch.zeros(B, 6, dtype=torch.float64, device=self.device)
             capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
-            _isc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
-            food = food + _cols[0] + capb_r[:, 0].unsqueeze(1) * _isc
-            prod = prod + _cols[1] + capb_r[:, 1].unsqueeze(1) * _isc
-            gold = gold + _cols[2] + capb_r[:, 2].unsqueeze(1) * _isc
-            sci = sci + _cols[3] + capb_r[:, 3].unsqueeze(1) * _isc
-            cul = cul + _cols[4] + capb_r[:, 4].unsqueeze(1) * _isc
-            faith = faith + _cols[5] + capb_r[:, 5].unsqueeze(1) * _isc
+            # B-21: suzerain unique perk — this rival's STRICT isSuzerain
+            # (rivalIsSuzerain: >= suz_min, > player, > every other rival).
+            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+            _oth = self.cs_r_envoys.clone()
+            _oth[:, r] = -1
+            r_suz = (self.cs_r_envoys[:, r] >= suz_min) & (self.cs_r_envoys[:, r] > self.cs_envoys) & (self.cs_r_envoys[:, r] > _oth.max(dim=1).values) & self.cs_alive
+            suz_valr = r_suz.double() * self._cs_suz_amt * (self.cs_suz_key >= 0).double()  # [B, S]
+            capb_r.scatter_add_(1, self.cs_suz_key.clamp(min=0), suz_valr)
+            if _cols6 is not None:
+                food = food + _cols6[0]
+                prod = prod + _cols6[1]
+                gold = gold + _cols6[2]
+                sci = sci + _cols6[3]
+                cul = cul + _cols6[4]
+                faith = faith + _cols6[5]
+            food = food + capb_r[:, 0].unsqueeze(1) * _isc
+            prod = prod + capb_r[:, 1].unsqueeze(1) * _isc
+            gold = gold + capb_r[:, 2].unsqueeze(1) * _isc
+            sci = sci + capb_r[:, 3].unsqueeze(1) * _isc
+            cul = cul + capb_r[:, 4].unsqueeze(1) * _isc
+            faith = faith + capb_r[:, 5].unsqueeze(1) * _isc
         # A-11/A-12b: outgoing unraided route income — pre-tier, the per-j
         # twin's position (integer-valued adds in f64: batching is exact).
         _route_inc = self._rival_route_income(r)
@@ -7437,33 +7482,51 @@ class BatchSim:
             sci = sci + gcity[:, 3] * mcell + gcap[:, 3] * gisc
             cul = cul + gcity[:, 4] * mcell + gcap[:, 4] * gisc
             faith = faith + gcity[:, 5] * mcell + gcap[:, 5] * gisc
-        # A-12: this civ's CS envoy bonuses — per-completed-district adds at
-        # 3/6 envoys + the capital yield at 1+ (count-based, the
-        # csRivalEnvoyBonuses twin; B9-R1: channel-correct, any district
-        # type). Pre-tier, before A-11 trade.
+        # A-12/B-21: this civ's CS envoy bonuses — the 3/6 tiers now land on the
+        # rival's tier-1 (>=3) / tier-2 (>=6) BUILDINGS (csRivalEnvoyBonuses
+        # re-key), the capital yield at 1+ envoys, and (B-21) the suzerain's
+        # per-CS unique perk. Pre-tier, before A-11 trade.
         if self.S > 0 and bool((self.cs_r_envoys[:, r] > 0).any()):
             _acs = self.cs_alive.double()
-            perD_r = ((self.cs_r_envoys[:, r] >= 3).double() + (self.cs_r_envoys[:, r] >= 6).double()) * self._cs_district_bonus * _acs
-            # B9-R1: channel-correct (see the batched twin) — CS TYPE channel
-            # column, EVERY completed live district, independent of adjYield.
-            _nDc = len(self.districts_cat)
-            csd_r6 = torch.zeros(self.B, _nDc * 6, dtype=torch.float64, device=self.device)
-            csd_r6.scatter_add_(1, self._cs_didx.clamp(min=0) * 6 + self._cs_yidx, perD_r)
-            csd_r6 = csd_r6.view(self.B, _nDc, 6)
-            dtj = self.rc_dist_tile[:, r, j]  # [B, nD] — one tile per district type
-            compj = ((dtj >= 0) & self.district_complete.gather(1, dtj.clamp(min=0)) & ~self.district_pillaged.gather(1, dtj.clamp(min=0))).double() * mask.double().unsqueeze(1)  # B-32: pillaged CS channel dark
-            _cs6_j = (csd_r6 * compj.unsqueeze(2)).sum(dim=1)  # [B, 6] — integer-valued f64, order-exact
-            _cols = [_cs6_j[:, _k] for _k in range(6)]
+            _isc = (self.rc_is_cap[:, r, j] & mask).double()  # [B]
+            # B-21: 3/6-envoy BUILDING adds — selb is the per-j rc_bldg presence
+            # with pillaged-dark + regional-skip (the b_yields twin at ~7335).
+            _cols6 = None
+            if self.districts_on:
+                selb_cs = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j]) & ~self._b_regional.view(1, -1)  # [B, NB]
+                if bool(selb_cs.any()):
+                    _nBc = selb_cs.shape[1]
+                    per3 = (self.cs_r_envoys[:, r] >= 3).double() * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).double()
+                    per6 = (self.cs_r_envoys[:, r] >= 6).double() * self._cs_district_bonus * _acs * (self._cs_b2idx >= 0).double()
+                    csb6f = torch.zeros(self.B, _nBc * 6, dtype=torch.float64, device=self.device)
+                    csb6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
+                    csb6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
+                    csb6 = csb6f.view(self.B, _nBc, 6)
+                    _cs6_j = torch.einsum("bn,bnk->bk", selb_cs.double(), csb6)  # [B, 6]
+                    _cols6 = [_cs6_j[:, _k] for _k in range(6)]
             tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
             capb_r = torch.zeros(self.B, 6, dtype=torch.float64, device=self.device)
             capb_r.scatter_add_(1, self._cs_yidx, tier1_r)
-            _isc = (self.rc_is_cap[:, r, j] & mask).double()
-            food = food + _cols[0] + capb_r[:, 0] * _isc
-            prod = prod + _cols[1] + capb_r[:, 1] * _isc
-            gold = gold + _cols[2] + capb_r[:, 2] * _isc
-            sci = sci + _cols[3] + capb_r[:, 3] * _isc
-            cul = cul + _cols[4] + capb_r[:, 4] * _isc
-            faith = faith + _cols[5] + capb_r[:, 5] * _isc
+            # B-21: suzerain unique perk — this rival's STRICT isSuzerain.
+            suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+            _oth = self.cs_r_envoys.clone()
+            _oth[:, r] = -1
+            r_suz = (self.cs_r_envoys[:, r] >= suz_min) & (self.cs_r_envoys[:, r] > self.cs_envoys) & (self.cs_r_envoys[:, r] > _oth.max(dim=1).values) & self.cs_alive
+            suz_valr = r_suz.double() * self._cs_suz_amt * (self.cs_suz_key >= 0).double()  # [B, S]
+            capb_r.scatter_add_(1, self.cs_suz_key.clamp(min=0), suz_valr)
+            if _cols6 is not None:
+                food = food + _cols6[0]
+                prod = prod + _cols6[1]
+                gold = gold + _cols6[2]
+                sci = sci + _cols6[3]
+                cul = cul + _cols6[4]
+                faith = faith + _cols6[5]
+            food = food + capb_r[:, 0] * _isc
+            prod = prod + capb_r[:, 1] * _isc
+            gold = gold + capb_r[:, 2] * _isc
+            sci = sci + capb_r[:, 3] * _isc
+            cul = cul + capb_r[:, 4] * _isc
+            faith = faith + capb_r[:, 5] * _isc
         # A-11: outgoing unraided route income — pre-tier, the trade position
         # in computeCityStats (production scales with the tier, food doesn't).
         _route_inc = self._rival_route_income(r)

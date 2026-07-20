@@ -44,7 +44,10 @@ import {
   QUEST_ENVOYS,
   CS_TYPE_YIELD,
   CS_TYPE_DISTRICT,
+  CS_TYPE_BUILDINGS,
   CS_DISTRICT_BONUS,
+  CS_SUZERAIN_LIVE,
+  CS_SUZERAIN_YIELD,
   CS_MAX_HP,
   CS_MEET_RANGE,
 } from '../src/data/cityStates';
@@ -512,6 +515,17 @@ const rules = {
     // at >=6, added to each owned completed district of that type).
     typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CS_TYPE_DISTRICT[t])),
     districtBonus: CS_DISTRICT_BONUS,
+    // B-21: the 3/6-envoy bonus now lands on the type's tier-1 (>=3) and
+    // tier-2 (>=6) BUILDING (CS_TYPE_BUILDINGS[t][0]/[1]) — the catalog index
+    // into centerBuildings, -1 if the building is absent from the roster.
+    // Regional tier-2 buildings (FACTORY/POWER_PLANT) are excluded by the
+    // building-yield loop in BOTH engines (parity-safe; industrial 6-tier inert).
+    typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CS_TYPE_BUILDINGS[t][0]) ?? -1),
+    typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CS_TYPE_BUILDINGS[t][1]) ?? -1),
+    // B-21: the suzerain's per-CS unique perk — a flat capital yield of this
+    // amount in the CS's live channel (CS_SUZERAIN_LIVE). The channel is
+    // shipped per-CS-instance on csAtStart (name-keyed), -1 = descoped.
+    suzerainYield: CS_SUZERAIN_YIELD,
   },
   // Rival-civ pacing (mirrors data/rivals.ts). loyaltyAmenity is keyed by
   // amenity-tier INDEX in the same order as amenityTiers above. The
@@ -1019,6 +1033,17 @@ const SEED_OVERRIDES: Record<number, number> = {
   // in-gate; both export clean at 250t and the full ladder is 0.0-milli green.
   17: 9222,
   23: 9301,
+  // 9196 (index 15) diverged in ROUND B8 slice-K's B-21 re-key reshuffle: the
+  // scripted player CONQUERS a rival city (acquired t7) at ~t240; GPU computes
+  // that captured city's amenity balance as -4 (amen_have 0) vs TS -2, so its
+  // growth factor is 0.70 vs 0.90 → foodBox/pop drift (score by t250). ROOT is
+  // a PRE-EXISTING captured-city amenity latent (the conquered city's
+  // tiles/luxury resources do not feed the GPU empire luxury pool — GPU shows 0
+  // luxuries empire-wide while TS grants the captured luxuries), in the
+  // A-23/A-24 registry family — ORTHOGONAL to B-21 (CS bonuses never touch
+  // food/amenities; this seed's CS channels are culture/faith and cultureBox
+  // matches exactly). Rerolled; latent recorded on AUDIT (new A-25).
+  15: 9197,
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;
@@ -1046,6 +1071,10 @@ for (let s = 0; s < N_SEEDS; s++) {
     type: CITY_STATE_TYPES.indexOf(cs.type),
     center: cs.centerIndex,
     pop: 3,
+    // B-21: the suzerain unique-perk yield column for THIS named CS (-1 =
+    // descoped row). Name-keyed off CS_SUZERAIN_LIVE — placement assigns names
+    // deterministically, so this is the same seat-agnostic per-CS channel.
+    suzKey: CS_SUZERAIN_LIVE[cs.name] ? YIELD_KEYS.indexOf(CS_SUZERAIN_LIVE[cs.name]) : -1,
   }));
   const site = scoreSettleSites(state, 1)[0];
   foundCity(state, site.tileIndex);
