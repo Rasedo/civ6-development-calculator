@@ -60,8 +60,15 @@ acquisition order — city_seq / city id), one per city; an assigned
 city adds `GOVERNOR_LOYALTY` +8 to its loyalty delta. Recomputed
 every turn from civics + loyalty (NO persistent assignment state —
 no new _MUTABLE surface beyond score/age, no churn bookkeeping).
-Player and rivals symmetric. RESIDUALS: establishment turns,
-promotions, non-loyalty governor abilities, dark-age policies.
+Player and rivals symmetric. RESIDUALS (owner-confirmed list,
+2026-07-20): governor establishment turns, promotions, non-loyalty
+governor abilities; the DEDICATION system entirely — Golden Age
+bonuses (Monumentality etc.), the Normal/Dark-age dedication that
+converts to extra era-score accrual instead of a bonus, and the
+HEROIC Age (a Dark→Golden transition grants THREE dedications —
+needs the PREVIOUS age, so its substrate is a second civ_age
+column/prevAge field when it lands); dark-age policies (special
+cards). Ages currently modulate LOYALTY only.
 
 ## Stages
 

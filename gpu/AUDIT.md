@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 31.5 | **77%** |
-| B fidelity | 88 | 80.5 | **91%** |
+| B fidelity | 88 | 82.6 | **94%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 9 | 9 | 100% |
-| **Overall (incl. closed)** | **189** | **172.0** | **91%** |
-| Open chapters only (A+B) | 129 | 112.0 | **87%** |
+| **Overall (incl. closed)** | **189** | **174.1** | **92%** |
+| Open chapters only (A+B) | 129 | 114.1 | **88%** |
 
 (#69 close-out note: A-25 + G-8 + B-15 all closed in one round —
 A-25 and G-8 resolved by RE-VERIFICATION (unreproducible sighting +
@@ -155,7 +155,22 @@ runs the ENTIRE ladder green on the identical engine — the #55-S3
 sighting was an experiment artifact, likely a raised TS constant
 without re-export); B-15 CLOSED (the −4 ceiling live). No engine
 fix shipped the whole round — both closures were re-verification,
-the G-3 rule's biggest single payoff yet. Battery 36 lanes 516s.)
+the G-3 rule's biggest single payoff yet. Battery 36 lanes 516s.
+2026-07-20 #68 B-24 GOVERNORS/ERAS (38f862c..78f4f52, brief
+gpu/GOVERNORS_DESIGN.md, serial S1-S3 main-session + S4 Opus
+coverage agent — ALL FOUR STAGES HUNT-FREE, the first fully
+hunt-free multi-stage behavior round): S1 era-score substrate inert
+(12 hook pairs, statelog-logdiff hook-parity proof, threshold
+evidence measured); S2 Ages live (evidence-pinned DARK 3/GOLDEN 10,
+source-civ pressure factors 0.5/1/1.5 halves-exact at all three
+loyalty sites, player+rival age COMPARED trace columns — HEAD 23,
+rival block 16); S3 governors (stateless greedy quantized-milli
++8 anchors; buoyed seed 9301 1→3 cities); S4 `governors` lane 7
+pokes + 7 vitest (player-Golden axis poke-pinned). B-24 → 70% —
+the DEDICATION system (Golden bonuses, Normal/Dark dedication,
+HEROIC Age w/ prevAge substrate), dark-age policies and governor
+establishment/promotions stay open (owner-confirmed enumeration).
+Battery 37 lanes 543s.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -198,7 +213,11 @@ Per-item weights (done% in parens where partial):
   path + Culture/Diplomatic victories open); B-22 3 (50% — task #55
   S3: denouncement grudge + FORMAL/SURPRISE warKind + ww ×2/×1
   differential; alliances/World Congress/warmonger/peace-terms open);
-  B-24 3; B-33 3 (RESOLVED — task #55 S2, the fidelity face of A-19).
+  B-24 3 (70% — #68: era score + Ages + loyalty modulation +
+  governor anchors ALL LIVE; the dedication system (Golden bonuses /
+  Normal-Dark dedication / Heroic Age), dark-age policies and
+  governor establishment/promotions remain);
+  B-33 3 (RESOLVED — task #55 S2, the fidelity face of A-19).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G: G-1..G-8 ALL done — chapter G EMPTY again. G-6 (task #55:
@@ -856,11 +875,32 @@ gap; likewise GS disasters are modeled minus sea-level rise
   peace firings; SURPRISE ×2 manifests off-script (rollout-proven).
   STILL OPEN: alliances, World Congress, warmonger cost, peace deals
   with terms, a player-side denounce/grievance verb.
-- B-24. No governors, no era score/Ages: nothing in core/ or data/;
-  the natural insertion points — `loyaltyDelta` (core/rivals.ts) for
-  the governor/age multipliers, `GameState` (core/types.ts) for era
-  tracking — carry none of it. Loyalty consequently runs un-modulated
-  (no 0.5×/1.5× age factors, no +8 governor anchor).
+- B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
+  serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
+  hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw
+  accumulators (`state.eraScore`/`era_score`, unified civ ids) fed by
+  12 hook pairs (founds, all five capture families, rival wonder
+  completion, pantheon/religion, GP claims both seats), 50-turn eras
+  (`ERA_LENGTH`), t0 snapshot exported (`eraScoreInit`); hook parity
+  proven by statelog logdiff (750 `ers` fields, zero divergence).
+  (2) AGES — Dark/Normal/Golden per civ at every boundary
+  (`eraBoundary` twin sites), thresholds EVIDENCE-PINNED
+  (`ERA_DARK_T` 3 / `ERA_GOLDEN_T` 10 from the measured in-gate
+  distribution); loyalty pressure scales by the SOURCE civ's factor
+  (`AGE_PRESSURE` 0.5/1.0/1.5 — halves-exact) at all three loyalty
+  sites; player + per-rival age are COMPARED trace columns; in-gate
+  rivals hit all three ages. (3) GOVERNORS — stateless greedy +8
+  anchors (`governorPicks`, quantized-milli ranking, acquisition-
+  order ties; titles = civics/10 cap 5) both engines. Coverage:
+  `governors` battery lane (7 pokes incl. the gate-unreachable
+  player-Golden axis) + tests/governors.test.ts. STILL OPEN
+  (owner-confirmed list): the DEDICATION system entirely — Golden
+  Age bonuses (Monumentality etc.), the Normal/Dark dedication that
+  converts to extra era-score accrual, and the HEROIC Age (Dark→
+  Golden grants THREE dedications; substrate = a prevAge column);
+  dark-age policies; governor establishment turns, promotions and
+  non-loyalty abilities; per-civ tech-era drift (eras are fixed
+  50-turn windows).
 - B-25 (re-scoped 2026-07-17, Round B2). LANDED: Science victory — a
   6-step space-race project chain gated on late techs, `victoryType` 3
   (player win) / 4 (rival completion = defeat) in `endTurn`; Campus is
