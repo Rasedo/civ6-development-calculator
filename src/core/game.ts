@@ -18,7 +18,8 @@ import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
 import { expirePlayerRoutes } from './trade';
-import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP } from '../data/rivals';
+import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP } from '../data/rivals';
+import { addEraScore, eraBoundary } from './eras';
 import { UNITS, WALLS_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -222,6 +223,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   revealAround(state, tileIndex, 3);
 
   state.cities.push(city);
+  addEraScore(state, 0, ERA_SCORE_FOUND); // B-24: founded a city (t0 capital included — exported with the fixture)
   // GV-3: the player's capital tile (civ 0), static once founded.
   if (city.isCapital) {
     if (!state.capitalTiles) state.capitalTiles = [];
@@ -815,6 +817,10 @@ export function endTurn(state: GameState): void {
           state.map.tiles[item.tileIndex].districtComplete = true;
         } else if (item.kind === 'wonder') {
           state.map.tiles[item.tileIndex].builtWonderComplete = true;
+          // B-24: player wonder moment. GATE-UNREACHABLE (queueWonder is a
+          // player verb no scripted/RL policy calls; the GPU has no player
+          // wonder path) — TS-only, symmetric with the rival hook below.
+          addEraScore(state, 0, ERA_SCORE_WONDER);
         } else if (item.kind === 'settler') {
           state.settlers += 1;
           // P4/D-6: real Civ 6 — a completed Settler costs the city 1 pop.
@@ -921,6 +927,7 @@ export function endTurn(state: GameState): void {
   spreadReligiousPressure(state);
 
   state.turn += 1;
+  eraBoundary(state); // B-24: era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   // GV-3/GV-4: domination ends the game the instant a civ holds every capital;
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // (GV-2 is indicator-only), so at the gate (dom == -1 by t100) this is inert.
@@ -1033,6 +1040,7 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
     if (capital) spawnUnit(state, cls, capital.centerIndex, 'player');
   }
   state.greatPeople.earned.push(person.id);
+  addEraScore(state, 0, ERA_SCORE_GP); // B-24: Great Person moment (per earn, the GPU claim-delta mirror)
 }
 
 /**
@@ -1252,6 +1260,7 @@ export function choosePantheon(state: GameState, beliefId: string): RuleResult {
   }
   if (!state.sandbox) state.faithTotal -= PANTHEON_FAITH_COST;
   state.religion.pantheon = beliefId;
+  addEraScore(state, 0, ERA_SCORE_PANTHEON); // B-24: player verb — gate-unreachable, TS-only (rival hook mirrors)
   return { ok: true };
 }
 
@@ -1281,6 +1290,7 @@ export function foundReligion(
     return { ok: false, reason: 'A rival religion already claimed that belief.' };
   }
   state.religion.founded = true;
+  addEraScore(state, 0, ERA_SCORE_RELIGION); // B-24: player verb — gate-unreachable, TS-only (rival hook mirrors)
   state.religion.name = choice.name || RELIGION_NAMES[0];
   state.religion.follower = choice.follower;
   state.religion.founder = choice.founder;

@@ -14,7 +14,8 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP } from '../da
 import { BUILDINGS } from '../data/buildings';
 import { CS_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
-import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP } from '../data/rivals';
+import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP, ERA_SCORE_CONQUER } from '../data/rivals';
+import { addEraScore } from './eras';
 import {
   nextRandom,
   unitsAt,
@@ -835,6 +836,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   });
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, cs.centerIndex, 3);
+  addEraScore(state, 0, ERA_SCORE_CONQUER); // B-24: gained a city (CS conquest)
   state.eventLog.push(`${cs.name} conquered — the city-state joins your empire.`);
 }
 
@@ -884,6 +886,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
+  addEraScore(state, civOfRival(rival.id), ERA_SCORE_CONQUER); // B-24: gained a city (rival CS conquest)
   state.eventLog.push(`${cs.name} has been conquered by ${rival.name}!`);
 }
 
@@ -962,6 +965,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) captured.outerHp = 0; // B-30: walls kept, outer pool 0
   state.cities.push(captured);
+  addEraScore(state, 0, ERA_SCORE_CONQUER); // B-24: gained a city (conquest; the raze branch returned above)
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, city.centerIndex, 3);
   if (plunder) {

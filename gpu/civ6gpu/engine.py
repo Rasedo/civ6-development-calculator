@@ -149,6 +149,7 @@ class Rules:
     c_prereqs: list
     war_weariness: dict  # B-15: {perTurn, decay, perAmenity, cap} — flat amenity drag at war
     trade: dict  # A-11: {marketBidx, lighthouseBidx, foreignTradeCidx, capWonderWidx, range} — rival trade capacity/route anchors
+    eras: dict  # B-24: {length, found, conquer, wonder, pantheon, religion, gp} — era-score events (S2 adds age thresholds)
 
 
 def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
@@ -224,6 +225,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         c_prereqs=[c["prereqs"] for c in r["civics"]],
         war_weariness=r.get("warWeariness", {"perTurn": 1, "decay": 4, "perAmenity": 4, "cap": 24}),
         trade=r.get("trade", {}),
+        eras=r.get("eras", {}),
     )
 
 
@@ -373,7 +375,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -626,6 +628,21 @@ class BatchSim:
         # exists), so no exporter load. _MUTABLE for snapshot/restore.
         self.rr_warkind = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
         self.rr_denounced = torch.full((B, r_pad, r_pad), -1, dtype=torch.long, device=device)
+        # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
+        # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
+        # Integer, zero-draw event hooks only; resets at every eraLength
+        # boundary (right after `self.turn += 1`, the endTurn eraBoundary
+        # mirror). Loaded from the fixture's t0 snapshot (createGame's capital
+        # foundings accrue pre-export). INERT in S1 (nothing reads it — Ages
+        # land S2). _MUTABLE for snapshot/restore.
+        self.era_score = torch.zeros(B, 1 + r_pad, dtype=torch.long, device=device)
+        for b, f in enumerate(fixtures):
+            esi = f.get("eraScoreInit", [])
+            for c, v in enumerate(esi[: 1 + r_pad]):
+                self.era_score[b, c] = int(v)
+        _er = rules.eras
+        self._era_len = int(_er.get("length", 50))
+        self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
         self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)
@@ -2411,6 +2428,7 @@ class BatchSim:
                 self.progress[:, 0] = self.progress[:, 0] + torch.where(has_build, prod, torch.zeros_like(prod))
             self.player_gp_points = self.player_gp_points - cost * cf
             self.gp_earned[:, :nCls] = earned + can.long()
+            self.era_score[:, 0] += can.long().sum(dim=1) * self._era_pts["gp"]  # B-24: per GP earned
             # B-20: slot the earned WRITER/MUSICIAN's Great Works into the
             # player's cities (eff holds the pre-increment person's culture).
             if self._writer_cls >= 0:
@@ -4660,6 +4678,7 @@ class BatchSim:
             else:
                 self.founded_n[b] += 1
             self.alive[b, c_new] = True
+            self.era_score[b, 0] += self._era_pts["conquer"]  # B-24: gained a city (raze paths continue/return above)
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
             self.is_cap[b, c_new] = False  # P7: captured cities are never capitals (TS isCapital: false)
@@ -4762,6 +4781,7 @@ class BatchSim:
             else:
                 self.founded_n[b] += 1
             self.alive[b, c_new] = True
+            self.era_score[b, 0] += self._era_pts["conquer"]  # B-24: gained a city (raze paths continue/return above)
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
             self.is_cap[b, c_new] = False  # P7: captured cities are never capitals (TS isCapital: false)
@@ -4823,6 +4843,7 @@ class BatchSim:
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], r), self.rival_at[b])
             self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], new_id), self.rc_tile_id[b])
             self.rc_alive[b, r, slot] = True
+            self.era_score[b, r + 1] += self._era_pts["conquer"]  # B-24: gained a city (rival CS conquest; raze continued above)
             self.rc_is_cap[b, r, slot] = False
             self.rc_center[b, r, slot] = c_t
             self.rc_pop[b, r, slot] = pop
@@ -7802,6 +7823,7 @@ class BatchSim:
         slot = int(occ.max()) + 1 if len(occ) else 0
         assert slot < self.RC, "rival city slots exhausted - raise RC (compaction already ran; this is true living capacity)"
         self.rc_alive[b, r_to, slot] = True
+        self.era_score[b, r_to + 1] += self._era_pts["conquer"]  # B-24: gained a city (rc→rc flip or #55 war capture)
         self.rc_is_cap[b, r_to, slot] = False  # TS transferRivalCityToRival: isCapital false
         self.rc_center[b, r_to, slot] = c_t
         self.rc_pop[b, r_to, slot] = max(1, (old_pop * 3) // 4)
@@ -8041,6 +8063,7 @@ class BatchSim:
         # (rivals.ts:149-151); every other settle founds a non-capital.
         new_cap = ~self.rc_alive[rows, r].any(dim=1)
         self.rc_alive[rows, r, slot] = True
+        self.era_score[rows, r + 1] += self._era_pts["found"]  # B-24: foundRivalCity moment
         self.rc_is_cap[rows, r, slot] = new_cap
         self.cap_tile_rival[rows, r] = torch.where(new_cap, s_idx, self.cap_tile_rival[rows, r])
         self.rc_center[rows, r, slot] = s_idx
@@ -10463,6 +10486,7 @@ class BatchSim:
                                 wr_ = done_w.nonzero(as_tuple=True)[0]
                                 wt_ = self.rc_wonder[wr_, r, j, wi_done[wr_]]
                                 self.built_wonder_complete[wr_, wt_.clamp(min=0)] = True
+                                self.era_score[wr_, r + 1] += self._era_pts["wonder"]  # B-24: wonder completed
                                 self._eff_version += 1
                                 gw_cache = None  # D-11: growth product changed under the hoist
                         # A-14: a finished project pays Math.round(cost×frac)
@@ -10884,6 +10908,7 @@ class BatchSim:
                         self.r_prophets[:, r] = self.r_prophets[:, r] + hit.long()
                     self.r_gpp[:, r, cls] = torch.where(hit, self.r_gpp[:, r, cls] - gcost, self.r_gpp[:, r, cls])
                     self.gp_earned[:, cls] = self.gp_earned[:, cls] + hit.long()
+                    self.era_score[:, r + 1] += hit.long() * self._era_pts["gp"]  # B-24: per GP earned
                     # B7-G (B-8): a GENERAL/ADMIRAL claim spawns its support
                     # unit (civilian, 4 MP) at the rival's capital (rc_is_cap
                     # center), on top of the instant effect — the rivals.ts
@@ -10921,6 +10946,7 @@ class BatchSim:
             self.r_faith[:, r] = torch.where(popen, self.r_faith[:, r] - pfc, self.r_faith[:, r])
             self.pantheon_claimed_n = self.pantheon_claimed_n + popen.long()
             self.r_pantheon_done[:, r] = self.r_pantheon_done[:, r] | popen
+            self.era_score[:, r + 1] += popen.long() * self._era_pts["pantheon"]  # B-24
             d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
             if d_hs >= 0 and self.districts_on:
                 reg_hs = self.rc_dist_tile[:, r, :, d_hs]  # [B, RC]
@@ -10945,6 +10971,7 @@ class BatchSim:
             self.claimed_f_n = self.claimed_f_n + ropen.long()
             self.claimed_o_n = self.claimed_o_n + ropen.long()
             self.r_religion_done[:, r] = self.r_religion_done[:, r] | ropen
+            self.era_score[:, r + 1] += ropen.long() * self._era_pts["religion"]  # B-24
             # B-18: freeze this religion's holy tile at founding — the pressure
             # source. r_religion_done latches, so ropen fires once and the tile
             # never re-writes. B9-R1 hunt catch (rng 2026006104 t119): TS picks
@@ -11176,6 +11203,7 @@ class BatchSim:
         slot = int(alive_w.max()) + 1 if len(alive_w) else 0
         assert slot < self.RC, "rival city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
         self.rc_alive[b, w_, slot] = True
+        self.era_score[b, w_ + 1] += self._era_pts["conquer"]  # B-24: gained a city (flip/conquest; the raze path returned above)
         self.rc_is_cap[b, w_, slot] = False  # TS defect: isCapital false (rivals.ts:420)
         self.rc_center[b, w_, slot] = self.site[b, c]
         self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
@@ -12217,6 +12245,7 @@ class BatchSim:
             # reuses a dead column (trace ids reuse it too: TS cityIds keep
             # dead columns only for cities that DIED; a reused id is new).
             self.founded_n[rows] += (c_new == self.founded_n[rows]).long()
+            self.era_score[rows, 0] += self._era_pts["found"]  # B-24: foundCity moment
             self.city_seq[rows, c_new] = self.city_seq_next[rows]
             self.city_seq_next[rows] += 1
             self.is_cap[rows, c_new] = new_cap
@@ -12311,6 +12340,11 @@ class BatchSim:
         self._spread_religious_pressure()
 
         self.turn += 1
+        # B-24 (task #68 S1): era boundary — the eraBoundary mirror (TS runs it
+        # right after `state.turn += 1`). The just-ended window's score resets;
+        # S2 will read it here first to assign each civ's Age.
+        if self._era_len > 0 and self.turn % self._era_len == 0:
+            self.era_score[:] = 0
         dom = self._domination()  # GV-3
         # B-25 (Round B3): a science victory (3, player) / defeat (4, a rival)
         # set during THIS turn's project completions takes precedence over the

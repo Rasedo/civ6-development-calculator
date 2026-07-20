@@ -46,6 +46,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
       `nciv:${state.research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length} ` +
       `umaint:${Math.round(unitMaintenance(state)*1000)} ` +
       `gp:${GP_CLASSES.map((cls) => greatPeopleEarned(state, cls)).join(',')} ` +
+      `ers:${state.eraScore?.[0] ?? 0} ` + // B-24: player era score (esc is empire score)
       `esc:${Math.round(empireScore(state, 'balanced') * 1000)}`,
   );
   for (const u of pu) L.push(`${p}PU ${u.tileIndex} = t${ti(u.type)} hp${u.hp}`);
@@ -112,7 +113,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     L.push(
       `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} fai${Math.round((rival.faith ?? 0)*1000)} ` +
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0} ` +
-        `ww${rival.warWeariness ?? 0} rrw${(rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0)} rrk${(rival.warKindFormal ?? []).reduce((m, id) => m | (1 << id), 0)} ` +
+        `ww${rival.warWeariness ?? 0} rrw${(rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0)} rrk${(rival.warKindFormal ?? []).reduce((m, id) => m | (1 << id), 0)} ers${state.eraScore?.[rival.id + 1] ?? 0} ` +
         `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length} ` +
         `tsum:${rt.reduce((s, t) => s + t.index, 0)} ` +
         `rsc:${Math.round(rivalEmpireScore(state, rival) * 1000)}`,

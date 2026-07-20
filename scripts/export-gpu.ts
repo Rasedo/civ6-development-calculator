@@ -85,6 +85,13 @@ import {
   RR_FORMAL_MIN_TURNS,
   WW_SURPRISE_MULT,
   WW_FORMAL_MULT,
+  ERA_LENGTH,
+  ERA_SCORE_FOUND,
+  ERA_SCORE_CONQUER,
+  ERA_SCORE_WONDER,
+  ERA_SCORE_PANTHEON,
+  ERA_SCORE_RELIGION,
+  ERA_SCORE_GP,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -508,6 +515,17 @@ const rules = {
     // B-22 (S3): casus-belli accrual multipliers (SURPRISE ×2, FORMAL ×1).
     surpriseMult: WW_SURPRISE_MULT,
     formalMult: WW_FORMAL_MULT,
+  },
+  // B-24 (task #68): era score / Ages (mirrors data/rivals.ts; S1 = the
+  // accumulator constants; age thresholds + governor constants land S2/S3).
+  eras: {
+    length: ERA_LENGTH,
+    found: ERA_SCORE_FOUND,
+    conquer: ERA_SCORE_CONQUER,
+    wonder: ERA_SCORE_WONDER,
+    pantheon: ERA_SCORE_PANTHEON,
+    religion: ERA_SCORE_RELIGION,
+    gp: ERA_SCORE_GP,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
@@ -1125,6 +1143,10 @@ for (let s = 0; s < N_SEEDS; s++) {
   // Captured AFTER creation: city-state and rival placement draw from the
   // in-state RNG, so the loop starts mid-stream, not at the seed.
   const rngInit = state.rngState >>> 0;
+  // B-24: t0 era-score snapshot (createGame's capital foundings accrue) —
+  // taken PRE-run like every Init snapshot (the A-12b exporter rule: the
+  // live state at dump time is the post-trace object).
+  const eraScoreInit = Array.from({ length: 1 + R_MAX }, (_, c) => state.eraScore?.[c] ?? 0);
   const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
   const rivalCitiesInit = new Map(
     state.rivals.map((r) => [r.id, r.cities.map((rc) => ({ id: rc.id, center: rc.centerIndex, pop: rc.population }))]),
@@ -1694,6 +1716,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     cities,
     tiles,
     ownerInit,
+    eraScoreInit, // B-24: unified-civ era score at t0
     boostSchedule,
     trace,
   };

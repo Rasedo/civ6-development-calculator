@@ -101,6 +101,18 @@ export const WAR_WEARINESS_CAP = 32;
  *  keeping the fixture-critical player path pristine. Integer, no float assoc. */
 export const WW_SURPRISE_MULT = 2;
 export const WW_FORMAL_MULT = 1;
+/** B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages. The game is
+ *  divided into fixed ERA_LENGTH-turn eras (no per-civ tech-era drift —
+ *  recorded residual). Each civ accrues an INTEGER era score from zero-draw
+ *  "historic moment" events; the accumulator resets at every era boundary
+ *  (S2 reads the just-ended era's score to set the civ's Age). */
+export const ERA_LENGTH = 50;
+export const ERA_SCORE_FOUND = 2; // founded a city
+export const ERA_SCORE_CONQUER = 3; // gained a city by capture/flip/transfer
+export const ERA_SCORE_WONDER = 3; // completed a world wonder
+export const ERA_SCORE_PANTHEON = 1;
+export const ERA_SCORE_RELIGION = 2;
+export const ERA_SCORE_GP = 1; // earned a Great Person
 /** B-22 (task #55 S3): a rival↔rival war is FORMAL iff the aggressor denounced
  *  the target at least this many turns before declaring; otherwise SURPRISE. */
 export const RR_FORMAL_MIN_TURNS = 5;

@@ -90,7 +90,14 @@ import {
   RR_DOW_WW_MAX,
   RR_PEACE_WW,
   RR_FORMAL_MIN_TURNS,
+  ERA_SCORE_FOUND,
+  ERA_SCORE_CONQUER,
+  ERA_SCORE_WONDER,
+  ERA_SCORE_PANTHEON,
+  ERA_SCORE_RELIGION,
+  ERA_SCORE_GP,
 } from '../data/rivals';
+import { addEraScore } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
 const ok: RuleResult = { ok: true };
@@ -196,6 +203,7 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
     }
   }
   rival.cities.push(city);
+  addEraScore(state, civOfRival(rival.id), ERA_SCORE_FOUND); // B-24: founded a city (t0 capitals included — exported)
   // GV-3: rival r's capital tile lives at civ index r+1, static once founded.
   if (city.isCapital) {
     if (!state.capitalTiles) state.capitalTiles = [];
@@ -687,6 +695,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) defected.outerHp = 0; // B-30: walls kept, outer pool 0
   winner.cities.push(defected);
+  addEraScore(state, civOfRival(winner.id), ERA_SCORE_CONQUER); // B-24: gained a city (flip or conquest; raze returned above)
   state.eventLog.push(`${city.name} has defected to ${winner.name}! (${why})`);
   return true;
 }
@@ -826,6 +835,7 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
         if (cap) spawnUnit(state, cls, cap.centerIndex, 'rival', rival.id);
       }
       state.greatPeople.earned.push(person.id); // gone from the shared pool
+      addEraScore(state, civOfRival(rival.id), ERA_SCORE_GP); // B-24: per earn
       state.eventLog.push(`${rival.name} claimed ${person.name}.`);
       earned++;
     }
@@ -846,6 +856,7 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
       const pick = open[Math.floor(nextRandom(state) * open.length)];
       state.claimedPantheons.push(pick);
       rival.pantheonClaimed = true;
+      addEraScore(state, civOfRival(rival.id), ERA_SCORE_PANTHEON); // B-24
       rival.pantheon = pick; // A-7: identity kept — its effects apply below
       state.eventLog.push(`${rival.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
     }
@@ -872,6 +883,7 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
       state.claimedBeliefs.push(fPick);
       state.claimedBeliefs.push(oPick);
       rival.religionFounded = true;
+      addEraScore(state, civOfRival(rival.id), ERA_SCORE_RELIGION); // B-24
       rival.followerBelief = fPick; // A-7: identities kept — effects apply
       rival.founderBelief = oPick;
       // B-18: freeze the holy tile (the founding civ's capital center) — the
@@ -1883,6 +1895,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // B-30: walls kept, outer pool 0
   to.cities.push(flipped);
+  addEraScore(state, civOfRival(to.id), ERA_SCORE_CONQUER); // B-24: gained a city (rc→rc flip or #55 war capture)
   state.eventLog.push(`${rc.name} defected from ${from.name} to ${to.name}!`);
 }
 
@@ -2603,7 +2616,10 @@ export function rivalPhase(state: GameState): void {
             rc.buildings.push(q.building);
             if (q.building === 'ANCIENT_WALLS') rc.outerHp = WALLS_HP; // AUDIT B-1
           }
-          else if (q.kind === 'wonder') state.map.tiles[q.tileIndex].builtWonderComplete = true; // A-4
+          else if (q.kind === 'wonder') {
+            state.map.tiles[q.tileIndex].builtWonderComplete = true; // A-4
+            addEraScore(state, civOfRival(rival.id), ERA_SCORE_WONDER); // B-24: wonder completed
+          }
           else if (q.kind === 'project') {
             // A-14: the completion lump lands in the RIVAL's own streams
             // (the player's completeProject applies via applyLumpYield to
