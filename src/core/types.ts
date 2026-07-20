@@ -384,8 +384,10 @@ export interface RivalCiv {
   spaceProjects?: string[];
   /** AUDIT A-11/A-12b: this civ's trade routes — `from` is always an own
    *  RivalCity id; domestic routes set `to` (own RivalCity id), routes to
-   *  a met city-state set `toCs` (CityState id) instead. */
-  tradeRoutes?: { from: number; to?: number; toCs?: number }[];
+   *  a met city-state set `toCs` (CityState id), B-23 international routes to
+   *  a player city set `toPlayer` (player City id). `expiresTurn` is
+   *  start + TRADE_ROUTE_DURATION (B-23 duration). */
+  tradeRoutes?: { from: number; to?: number; toCs?: number; toPlayer?: number; expiresTurn?: number }[];
   /** AUDIT A-12: this civ's influence accumulator + banked envoys — the
    *  player's influencePoints/envoysAvailable twins. */
   influencePoints?: number;
@@ -446,8 +448,16 @@ export interface TradeRoute {
   from: number;
   /** Destination city id (-1 when the destination is a city-state). */
   to: number;
-  /** Destination city-state id, if this is an international route. */
+  /** Destination city-state id, if this is a city-state route. */
   toCs?: number;
+  /** B-23 international: destination rival civ id (for a PLAYER route to a
+   *  met rival's city). Paired with toRivalCity. */
+  toRivalCiv?: number;
+  /** B-23 international: destination rival city id, within toRivalCiv. */
+  toRivalCity?: number;
+  /** B-23 duration: the turn this route expires (start + TRADE_ROUTE_DURATION).
+   *  At expiry the route is removed and the owner re-picks next turn. */
+  expiresTurn?: number;
 }
 
 export type CityStateType =

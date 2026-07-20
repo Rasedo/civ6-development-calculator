@@ -17,6 +17,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
+import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP } from '../data/rivals';
 import { UNITS, WALLS_HP } from '../data/units';
 import { FEATURES } from '../data/features';
@@ -894,6 +895,10 @@ export function endTurn(state: GameState): void {
   if (state.disasters) disasterPhase(state);
   cityStatePhase(state);
   rivalPhase(state);
+
+  // B-23 duration: expire the player's due trade routes after the turn's
+  // phases — the freed capacity re-picks next turn (arithmetic, zero draws).
+  expirePlayerRoutes(state);
 
   advanceResearch(state, turnScience, turnCulture);
   advanceGreatPeople(state);

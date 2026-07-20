@@ -583,7 +583,7 @@ describe('rival CS trade routes (A-12b)', () => {
     const y0 = rivalCityYields(state, rival, rc);
     rivalPhase(state);
     expect(rival.tradeRoutes?.length).toBe(1);
-    expect(rival.tradeRoutes![0]).toEqual({ from: rc.id, toCs: cs.id });
+    expect(rival.tradeRoutes![0]).toEqual({ from: rc.id, toCs: cs.id, expiresTurn: state.turn + 20 }); // B-23 duration
     const y1 = rivalCityYields(state, rival, rc);
     // csRouteYields: +3 gold, +1 science (both tier-scaled; band like the
     // envoy tests — the phase also grew the city, so compare channels the

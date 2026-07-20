@@ -15,6 +15,12 @@ import type { RuleResult } from './rules';
 
 export const TRADE_ROUTE_RANGE = 15;
 
+/** B-23: every trade route (domestic, city-state, international) expires this
+ * many turns after it starts; the owner re-picks next turn via the existing
+ * deterministic pickers (real-ish 21-turn land route trimmed to the model's
+ * online pace). Expiry is arithmetic — zero RNG draws. */
+export const TRADE_ROUTE_DURATION = 20;
+
 /** Total route capacity: Foreign Trade civic, Markets, Lighthouses, wonders,
  * plus +1 per trade city-state you are suzerain of. */
 export function tradeCapacity(state: GameState): number {
@@ -71,7 +77,10 @@ export function rivalRouteRaidedAt(state: GameState, rival: RivalCiv, endpoints:
   return false;
 }
 
-function specialtyDistricts(state: GameState, city: City): number {
+/** Count of completed, limit-counting (specialty) districts in a city — the
+ * shared basis for domestic and international route yields. Exported so the
+ * scripted/rival pickers score international destinations off the same count. */
+export function specialtyDistricts(state: GameState, city: City): number {
   return city.districts.filter(
     (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
   ).length;
@@ -90,6 +99,19 @@ export function routeYields(state: GameState, dest: City): Yields {
  * rules dump (A-12b: rival CS routes mirror these exactly). */
 export const CS_ROUTE_GOLD = 3;
 export const CS_ROUTE_SPEC = 1;
+
+/** B-23 international routes are gold-heavy: +INTL_ROUTE_GOLD base +1 gold per
+ * destination completed specialty district. No food/production (that is the
+ * domestic-only channel). Exported for the GPU rules dump. */
+export const INTL_ROUTE_GOLD = 3;
+
+/** Yields the origin receives from one INTERNATIONAL route to `dest` (a met
+ * rival's city, or — from a rival's seat — a player city). Gold only. */
+export function routeYieldsInternational(state: GameState, dest: City): Yields {
+  const out = emptyYields();
+  out.gold += INTL_ROUTE_GOLD + specialtyDistricts(state, dest);
+  return out;
+}
 
 /** Yields from one route to a city-state: gold-forward plus its specialty. */
 export function csRouteYields(cs: CityState): Yields {
@@ -134,6 +156,17 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       }
       continue;
     }
+    if (route.toRivalCiv !== undefined) {
+      // B-23 international: a player route to a met rival's city — gold only.
+      // Suspended while at war with that rival (destination-civ interdiction)
+      // or while hostiles prowl either endpoint.
+      const rv = state.rivals.find((r) => r.id === route.toRivalCiv);
+      const rc = rv?.cities.find((c) => c.id === route.toRivalCity);
+      if (rv && rc && !rv.atWar && !routeRaidedAt(state, [city.centerIndex, rc.centerIndex])) {
+        addYields(out, routeYieldsInternational(state, rc));
+      }
+      continue;
+    }
     const dest = state.cities.find((c) => c.id === route.to);
     if (dest && !routeRaided(state, city, dest)) {
       addYields(out, routeYields(state, dest));
@@ -170,7 +203,7 @@ export function canAddTradeRoute(state: GameState, from: number, to: number): Ru
 export function addTradeRoute(state: GameState, from: number, to: number): RuleResult {
   const check = canAddTradeRoute(state, from, to);
   if (!check.ok) return check;
-  state.tradeRoutes.push({ from, to });
+  state.tradeRoutes.push({ from, to, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
   return { ok: true };
 }
 
@@ -196,8 +229,45 @@ export function canAddCsTradeRoute(state: GameState, from: number, csId: number)
 export function addCsTradeRoute(state: GameState, from: number, csId: number): RuleResult {
   const check = canAddCsTradeRoute(state, from, csId);
   if (!check.ok) return check;
-  state.tradeRoutes.push({ from, to: -1, toCs: csId });
+  state.tradeRoutes.push({ from, to: -1, toCs: csId, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
   return { ok: true };
+}
+
+/** B-23 international: can the player route from own city `from` to met rival
+ * civ `rivalCiv`'s city `rivalCity`? */
+export function canAddIntlTradeRoute(state: GameState, from: number, rivalCiv: number, rivalCity: number): RuleResult {
+  const a = state.cities.find((c) => c.id === from);
+  const rv = state.rivals.find((r) => r.id === rivalCiv);
+  const rc = rv?.cities.find((c) => c.id === rivalCity);
+  if (!a || !rv || !rc) return { ok: false, reason: 'No such city / rival city.' };
+  if (state.tradeRoutes.length >= tradeCapacity(state)) {
+    return { ok: false, reason: `No spare trading capacity (${tradeCapacity(state)} in use).` };
+  }
+  if (state.tradeRoutes.some((r) => r.from === from && r.toRivalCiv === rivalCiv && r.toRivalCity === rivalCity)) {
+    return { ok: false, reason: 'That route already runs.' };
+  }
+  const ta = state.map.tiles[a.centerIndex];
+  const tb = state.map.tiles[rc.centerIndex];
+  if (hexDistance(ta.col, ta.row, tb.col, tb.row) > TRADE_ROUTE_RANGE) {
+    return { ok: false, reason: `Beyond trade range (${TRADE_ROUTE_RANGE} tiles).` };
+  }
+  return { ok: true };
+}
+
+export function addIntlTradeRoute(state: GameState, from: number, rivalCiv: number, rivalCity: number): RuleResult {
+  const check = canAddIntlTradeRoute(state, from, rivalCiv, rivalCity);
+  if (!check.ok) return check;
+  state.tradeRoutes.push({ from, to: -1, toRivalCiv: rivalCiv, toRivalCity: rivalCity, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  return { ok: true };
+}
+
+/** B-23 duration: drop the player's routes whose expiresTurn has arrived; the
+ * owner re-picks next turn. Called from endTurn AFTER the turn's production so
+ * a route freed this turn is re-pickable next turn (zero draws). */
+export function expirePlayerRoutes(state: GameState): void {
+  state.tradeRoutes = state.tradeRoutes.filter(
+    (r) => r.expiresTurn === undefined || r.expiresTurn > state.turn,
+  );
 }
 
 export function removeTradeRoute(state: GameState, index: number): void {

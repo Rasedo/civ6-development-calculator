@@ -58,7 +58,7 @@ import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDIN
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
-import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC } from '../src/core/trade';
+import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../src/core/trade';
 import { SUZERAIN_ENVOYS } from '../src/data/cityStates';
 import { TERRAINS } from '../src/data/terrains';
 import {
@@ -486,6 +486,10 @@ const rules = {
     // A-12b: rival CS-route income constants (csRouteYields mirror).
     csRouteGold: CS_ROUTE_GOLD,
     csRouteSpec: CS_ROUTE_SPEC,
+    // B-23: international-route gold base (routeYieldsInternational: +intlGold
+    // +1 gold per destination completed specialty district) + route duration.
+    intlGold: INTL_ROUTE_GOLD,
+    duration: TRADE_ROUTE_DURATION,
   },
   // B-15 war weariness (mirrors data/rivals.ts): integer accumulator → flat
   // empire-wide amenity penalty for the player AND each rival civ.
