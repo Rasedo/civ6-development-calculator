@@ -216,11 +216,26 @@ def main() -> None:
             res_idx = pairs[want_idx]
             src = (sim.res_id[0] == res_idx).nonzero(as_tuple=True)[0]
             own = (sim.rival_at[0] == R).nonzero(as_tuple=True)[0]
-            assert len(src) > 0 and len(own) > 0, f"{label}: no resource/territory tile to grant access"
+            assert len(own) > 0, f"{label}: no territory tile to grant access"
+            if len(src) > 0:
+                imp_idx = int(sim.res_imp[0, src[0]])
+            else:
+                # #55 S4: this fixture's map may carry NO tile of the resource
+                # at all (the rid/rq planes are exporter-baked per map) — read
+                # the resource's required improvement off any sibling fixture.
+                imp_idx = -1
+                for pp in sorted(FIXTURES.glob("seed*.json")):
+                    for tt in json.loads(pp.read_text())["tiles"]:
+                        if int(tt.get("rid", -1)) == res_idx and int(tt.get("rq", -1)) >= 0:
+                            imp_idx = int(tt["rq"])
+                            break
+                    if imp_idx >= 0:
+                        break
+                assert imp_idx >= 0, f"{label}: resource {res_idx} absent from every fixture"
             t = own[0]
             sim.res_id[0, t] = res_idx
-            sim.res_imp[0, t] = sim.res_imp[0, src[0]]
-            sim.improvement[0, t] = sim.res_imp[0, src[0]]
+            sim.res_imp[0, t] = imp_idx
+            sim.improvement[0, t] = imp_idx
             sim.pillaged[0, t] = False
         assert tre < settler_price(sim), f"{label} price {tre} not below the settler price — scenario invalid"
         assert mil_count(sim) < 2 * n_rc(sim), "military already at quota — pick an earlier turn"

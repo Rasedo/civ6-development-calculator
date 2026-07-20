@@ -106,14 +106,16 @@ def meet_quota(sim, r: int) -> None:
 
 
 def count_levy(sim, vn0: int, s: int, warr: int) -> int:
-    """New WARRIOR-type R units spawned ON/ADJACENT to CS `s`'s center — the
-    levy's signature, isolated from any queue-completed unit at a city."""
-    ctr = int(sim.cs_center[0, s])
+    """New WARRIOR-type R units in the pool since vn0 — the levy's signature.
+    #55 S4: POSITION is deliberately NOT asserted — the levy block precedes
+    R's war-acts in the same phase, so levied units can legally WAR-MARCH off
+    the CS ring before the poke reads them (seen: spawn 270 -> tile 272 in one
+    phase). Isolation comes from the prep instead: queues cleared and the
+    gold-buy unit branch quota-blocked, so every new R unit IS a levy spawn."""
     n = 0
     for slot in range(vn0, int(sim.v_next[0])):
         if int(sim.v_type[0, slot]) == warr and int(sim.v_civ[0, slot]) == R:
-            if int(sim.pair_dist[ctr, int(sim.v_tile[0, slot])]) <= 1:
-                n += 1
+            n += 1
     return n
 
 

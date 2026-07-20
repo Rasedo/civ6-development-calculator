@@ -141,10 +141,20 @@ def poke_iz_ec_adjacency(rules, rj, path):
     print(f"  a IZ/EC adjacency OK (IZ mine +{float(sim._dyn_mine[IZ])} quarry +{float(sim._dyn_quarry[IZ])}; EC no-adjacency)")
 
 
-def poke_encampment_placement(rules, rj, path):
+def poke_encampment_placement(rules, rj, paths):
     """b. ENCAMPMENT scaffold placement code 3 = notAdjacentToCityCenter: the
     best-tile scan never places it on a tile adjacent to a city center, even
-    when adjacent-center tiles are otherwise eligible."""
+    when adjacent-center tiles are otherwise eligible. #55 S4: which cities
+    have a legal far-tile is trajectory-dependent — probe fixtures in order
+    until one exercises the rule (the first fixture's cities can legitimately
+    have none after a reshuffle)."""
+    for path in paths:
+        if _try_encampment_placement(rules, rj, path):
+            return
+    raise AssertionError("no fixture's player cities could place an ENCAMPMENT to exercise the rule")
+
+
+def _try_encampment_placement(rules, rj, path) -> bool:
     sim = build(rules, path)
     EN = didx(rj, "ENCAMPMENT")
     # scaffold spec carries placement 3 for the encampment district
@@ -178,10 +188,10 @@ def poke_encampment_placement(rules, rj, path):
         assert int(cc[0, bt]) == 0, f"ENCAMPMENT placed adjacent to a city center (cc={int(cc[0, bt])})"
         assert int(sim.district[0, bt]) == EN, "ENCAMPMENT tile not paved"
         note = "adjacent-center tiles were available but excluded" if bool(adj_elig.any()) else "no adjacent-center tiles here"
-        print(f"  b ENCAMPMENT placement OK (city {c}, tile {bt}, cc==0; {note})")
+        print(f"  b ENCAMPMENT placement OK ({path.name} city {c}, tile {bt}, cc==0; {note})")
         placed = True
         break
-    assert placed, "no player city could place an ENCAMPMENT to exercise the rule"
+    return placed
 
 
 def poke_regional_channel(rules, rj, path):
@@ -471,7 +481,7 @@ def main() -> None:
     print(f"district_breadth_test on {path.name}")
 
     poke_iz_ec_adjacency(rules, rj, path)
-    poke_encampment_placement(rules, rj, path)
+    poke_encampment_placement(rules, rj, paths)
     poke_regional_channel(rules, rj, path)
     poke_exclusive_with(rules, rj, path)
     poke_worship_buy(rules, rj, path)

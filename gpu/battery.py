@@ -129,6 +129,7 @@ def main() -> int:
                 ("cs_bonus", [py, "gpu/cs_bonus_test.py"], 4),  # B8-K/B-21 CS envoy building re-key + suzerain perk (6-envoy tier gate-unreachable)
                 ("cs_verbs", [py, "gpu/cs_verbs_test.py"], 4),  # B8/A-12 rival levy + rival CS quests (zero-draw)
                 ("trade2", [py, "gpu/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
+                ("geopolitics", [py, "gpu/geopolitics_test.py"], 4),  # #55 A-19/B-33/B-22 per-pair wars + casus belli + rc->rc transfer
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

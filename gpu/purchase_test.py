@@ -189,7 +189,13 @@ def test_settler_sequencing(rules, path):
     sim2.treasury[:] = RICH
     sim2.step(production=torch.full((1, sim2.C), sim2.IDLE, dtype=torch.long))
     delta = float(sim2.treasury[0]) - float(sim.treasury[0])
-    assert abs(delta - (c1 + c2)) < 1e-6, f"sequenced settler prices {delta} != {c1}+{c2}"
+    # #55 S4: the bought settlers FOUND during the divergent step (the walker
+    # moves after production), and the new borders can re-carve an existing
+    # city's worked set — a ±few-gold income side-channel between the two runs
+    # (seen: −1 worked gold tile under a ×1.05 policy mult). The signal this
+    # poke guards is the SEQUENCING gap (non-sequenced would read c1+c1, 72
+    # gold off), so a 5-gold bound keeps full discriminating power.
+    assert abs(delta - (c1 + c2)) < 5.0, f"sequenced settler prices {delta} != {c1}+{c2}"
     gained = (int(sim.settlers[0]) - settlers_before) + (int(sim.alive[0].sum()) - founded_before)
     assert gained == 2, f"two bought settlers → settlers+founds == 2, got {gained}"
     print(f"  settler sequencing OK ({c1:.0f} then {c2:.0f} gold in one turn)")

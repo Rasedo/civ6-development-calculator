@@ -25,14 +25,19 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 23.5 | **57%** |
-| B fidelity | 88 | 73.5 | **84%** |
+| A symmetry | 41 | 27.5 | **67%** |
+| B fidelity | 88 | 78.2 | **89%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
-| G parity latents | 7 | 7 | **100%** |
-| **Overall (incl. closed)** | **186** | **153.0** | **82%** |
-| Open chapters only (A+B) | 129 | 97.0 | **75%** |
+| G parity latents | 9 | 7 | **78%** |
+| **Overall (incl. closed)** | **188** | **161.7** | **86%** |
+| Open chapters only (A+B) | 129 | 105.7 | **82%** |
+
+(#55 close-out note: chapter G's weight grew 7→9 — the new G-8
+dormant latent recorded by GEO-2's cap-32 experiment (UNVERIFIED,
+the G-3 re-verify rule applies) — so G drops below 100% despite no
+G regression; the denominator moved.)
 
 (B8 note: chapter A's weight grew 39→41 — the new A-25 latent found
 by slice K's hunt — so A's % DROPS despite A-12 resolving; the
@@ -116,7 +121,23 @@ lane `cs_verbs`); B-23 → 70% (T: route duration 20t ALL routes —
 1122 in-gate expiries; international routes rival→player +
 TS player→rival API, gold-only, war-interdicted, lane `trade2`;
 T's hunt: the GPU at-capacity early return skipped route expiry —
-`_expire_rival_routes` now runs on every exit path).)
+`_expire_rival_routes` now runs on every exit path). 2026-07-20
+task #55 SERIAL S1-S4 (brief gpu/GEOPOLITICS_DESIGN.md; GEO-1 agent
+S1 992ea13 + S2 00f386b, GEO-H hunt 97ace18 = G-6+G-7 fixes, GEO-2
+agent S3 c007280, S4 main-session): A-19 + B-33 RESOLVED — per-pair
+war state live both engines, rival↔rival DoW/peace/capture in-gate
+(4/24 seeds, 41 DoWs, 38 peaces); B-22 → 50% — denouncements +
+FORMAL/SURPRISE casus belli + ww ×2/×1; B-15 → 95% — rival↔rival
+magnitude raised, player −4 ceiling deferred on the NEW G-8 dormant
+sighting (cap-32 experiment, unverified); GEO-2's hunts: the
+anti-thrash DoW guard (same-turn declare/peace thrash) + the TS
+`hostileRangedStrike` ranged-vs-rival scope-out (a pre-existing
+S2-dormant latent). S4: lane `geopolitics` (8 pokes) +
+tests/geopolitics.test.ts (7); three poke lanes fixed TEST-side on
+the reshuffled trajectories — purchase (founding side-channel bound),
+cs_verbs (levy units war-march off the ring: count by pool+civ+type),
+district_breadth (Encampment placement probes fixtures in order) —
+the B5/B7 poke-lane lesson firing again.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -125,7 +146,11 @@ Per-item weights (done% in parens where partial):
   residual; the GPU player-route note rides A-18/#50),
   A-12 4 (RESOLVED — ROUND B8 slice L closed the levy + zero-draw
   quest deferrals; 2-step levy ladder + UI-only player levy are
-  recorded residuals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
+  recorded residuals), A-17 4 (done — #41 stage 1), A-18 3,
+  A-19 4 (RESOLVED — task #55 S1/S2: per-pair war state
+  `atWarRivals`/`rr_war`, symmetric hostility, rival↔rival capture
+  via the existing transfer, zero-draw pairwise DoW + peace),
+  A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan), A-24 2 (done — ROUND B10 slice R: per-rc
   placement rule + env-gated registry invariant scan), A-25 2 (new —
@@ -133,7 +158,10 @@ Per-item weights (done% in parens where partial):
   empire pool; dodged by the 9196→9197 reroll).
 - B combat: B-1 3 / B-2 2 / B-3 2 / B-4 3 / B-5 2 / B-6 8 / B-7 2 /
   B-9 3 / B-10 3 / B-28 1 / B-29 2 / B-30 2 / B-31 1 / B-32 2 (done);
-  B-15 2 (85% — magnitude waits on peace-suing); B-26 3 (70% —
+  B-15 2 (95% — task #55 S3: rival↔rival SURPRISE accrual ×2
+  (−1 amenity per 4 war-turns), FORMAL ×1, 38 in-gate peace firings
+  justify it; the player-facing −4 ceiling (cap 32) DEFERRED — it
+  surfaced the dormant G-8 divergence); B-26 3 (70% —
   ROUND B10: era ladder + barb ZOC; cliffs/ranged/naval/scout-raid
   remain); B-8 2 (90% — ROUND B7 slice G: spawn-at-claim chassis +
   +5 CS auras; +1 MP half residual).
@@ -150,15 +178,22 @@ Per-item weights (done% in parens where partial):
   routes (rival→player, TS player→rival; intl leg gate-unreachable,
   poke-pinned); Trader unit/roads remain).
 - B meta: B-25 3 (80% — religious victory landed; player project
-  path + Culture/Diplomatic victories open); B-22 3, B-24 3,
-  B-33 3 (open).
+  path + Culture/Diplomatic victories open); B-22 3 (50% — task #55
+  S3: denouncement grudge + FORMAL/SURPRISE warKind + ww ×2/×1
+  differential; alliances/World Congress/warmonger/peace-terms open);
+  B-24 3; B-33 3 (RESOLVED — task #55 S2, the fidelity face of A-19).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
-- G: G-1..G-7 done. G-6 (task #55: exporter `st` plane froze the
-  dynamic `!t.district` → razed-city tiles unsettleable in GPU) and
-  G-7 (task #55: TS `withFollowerBelief` shallow-clone aliased the
-  frozen per-turn mods, leaking a follower belief across cities) both
-  RESOLVED, chapter G EMPTY again.
+- G: G-1..G-7 done, G-8 2 (OPEN, UNVERIFIED). G-6 (task #55: exporter
+  `st` plane froze the dynamic `!t.district` → razed-city tiles
+  unsettleable in GPU) and G-7 (task #55: TS `withFollowerBelief`
+  shallow-clone aliased the frozen per-turn mods, leaking a follower
+  belief across cities) both RESOLVED. G-8 (task #55 S3, GEO-2's
+  cap-32 experiment): raising `WAR_WEARINESS_CAP` 16→32 surfaced a
+  dormant TS/GPU economic-timing divergence at the −3/−4 amenity tier
+  on the PLAYER war (seed 9092, score/treasury/building drift at
+  t216). Agent-diagnosed, NOT re-verified (the G-3 rule); dormant at
+  the shipped cap 16. Blocks the B-15 player-facing −4 ceiling.
 
 ---
 
@@ -322,16 +357,25 @@ untagged halves of tagged items stay Fable/main-session work.
   pillage/specialists incl. A-21/A-22) — new verbs are inert under the
   scripted player policy, so gates can't drift; the APPLY-path wiring
   and the P8 re-baseline decisions stay Fable/main.]
-- A-19 (new). Rival–rival war is structurally impossible:
-  `RivalCiv.atWar` (types.ts) is a single war-with-the-player boolean,
-  `unitsHostile` (units.ts) hard-returns false for rival-vs-rival, and
-  `declareWar`/`sueForPeace` (rivals.ts) plus the auto-DoW in
-  `rivalPhase` are all player-relative; GPU `r_atwar` is [B, R] vs
-  seat 0 and `war_mask`/`apply_rival_actions` (engine.py) only toggle
-  it. The player can fight every civ; a rival's only possible enemy is
-  the player (rivals never besiege, pillage or conquer each other —
-  see the "other rivals never besiege" guards in `rivalPhase` and
-  `_rival_phase`).
+- A-19. **RESOLVED (2026-07-20, task #55 S1/S2 — brief
+  gpu/GEOPOLITICS_DESIGN.md)**: per-pair war state on unified civ ids
+  (`RivalCiv.atWarRivals` + `civsAtWar`/`setRivalWar` in rivals.ts;
+  GPU `rr_war` [B,R,R] symmetric bool, `_MUTABLE`). The (0, r+1)
+  player pair still rides the untouched `atWar` boolean. S2 made it
+  LIVE: `unitsHostile` symmetric off the pair state, every war-act
+  scan (`attackTargets`, the war-march pick, `_rival_unit_war_act`
+  and the war-target planes) includes at-war rivals' units/cities,
+  rival↔rival capture via the EXISTING
+  `transferRivalCityToRival`/`_transfer_rc_to_rc`, plus a ZERO-DRAW
+  pairwise auto-DoW (`rivalRivalDeclareWars`/`_rival_rival_declare_wars`,
+  deterministic id-order scan, one new war per civ per turn) and
+  per-pair peace (`rivalRivalMakePeace`/`_rival_rival_make_peace`,
+  either side's ww > RR_PEACE_WW). Trace: `rrw`/`rrk` bitmask columns
+  in both statelog harnesses. RESIDUAL: a rival's RANGED unit stays
+  scoped OUT of rival-vs-rival strikes (melee captures; the
+  documented no-op quirk — `hostileRangedStrike`). Poke coverage:
+  `gpu/geopolitics_test.py` (battery lane `geopolitics`) +
+  `tests/geopolitics.test.ts`.
 - A-20. RESOLVED (2026-07-13, task #54): rival cities heal the flat +20
   when unbesieged (the 15/5 war split was a local invention), one
   source both engines (`CITY_HEAL_PER_TURN` / `cityHealPerTurn`).
@@ -770,10 +814,21 @@ gap; likewise GS disasters are modeled minus sea-level rise
   Range flat 15 (`TRADE_ROUTE_RANGE`).
 
 **Meta:**
-- B-22. No casus belli/grievances/alliances/World Congress: war is a
-  bare boolean toggle (`declareWar`/`makePeace`, core/rivals.ts; the
-  NATIONALISM boost text in data/boosts.ts is the only mention of
-  casus belli). No warmonger cost, no peace deals with terms.
+- B-22 (50% — 2026-07-20, task #55 S3). **LANDED**: casus belli on the
+  rival↔rival axis — a persistent directed denouncement grudge
+  (`denouncedTurn`/`rr_denounced`, zero-draw
+  `rivalRivalDenounce`/`_rival_rival_denounce` at the phase top, the
+  DoW gate family at the weaker `si > sj` bar so the stamp precedes
+  the war), per-pair `warKindFormal`/`rr_warkind` (FORMAL iff
+  denounced ≥ RR_FORMAL_MIN_TURNS earlier, else SURPRISE), and the
+  war-weariness accrual differential (SURPRISE ×WW_SURPRISE_MULT,
+  FORMAL ×WW_FORMAL_MULT — the modeled casus-belli benefit; the
+  player-war axis untouched). Anti-thrash DoW guard: never declare on
+  a target already past RR_PEACE_WW (it would sue out the same turn).
+  In-gate: 3 denouncements, 41 FORMAL / 0 SURPRISE scripted DoWs, 38
+  peace firings; SURPRISE ×2 manifests off-script (rollout-proven).
+  STILL OPEN: alliances, World Congress, warmonger cost, peace deals
+  with terms, a player-side denounce/grievance verb.
 - B-24. No governors, no era score/Ages: nothing in core/ or data/;
   the natural insertion points — `loyaltyDelta` (core/rivals.ts) for
   the governor/age multipliers, `GameState` (core/types.ts) for era
@@ -800,12 +855,13 @@ gap; likewise GS disasters are modeled minus sea-level rise
   `religion2` battery lane). STILL OPEN: a player project-production
   path (victoryType 3 can only be preserved, not produced, on the
   GPU), and Culture/Diplomatic victories (systems absent).
-- B-33 (new; the fidelity face of A-19). Rivals never interact with
-  each other: rival `atWar` is only vs the player (`declareWar`,
-  core/rivals.ts; `hostileUnitAct` comment "they never war other
-  rivals"), and there is no rival↔rival trade, denouncement, or
-  alliance. Real Civ 6 AIs war, ally and trade among themselves — the
-  geopolitical map here is a pure star topology around the player.
+- B-33. **RESOLVED (2026-07-20, task #55 S2/S3; the fidelity face of
+  A-19)**: rivals now war, denounce, sue for peace and conquer among
+  themselves (see A-19 + B-22 for the machinery). The star topology is
+  gone — the in-gate seeds run genuine rival↔rival wars (4/24 seeds,
+  41 DoWs, 38 peaces) with cross-rival city capture live in the
+  rollout. Rival↔rival TRADE and alliances remain out of scope
+  (recorded under B-23/B-22 respectively).
 
 Sweep corrections (2026-07-12): B-13 policy count 20→19 (direct
 recount); B-16 reframed — IZ mine value matches vanilla, deviation is
@@ -939,6 +995,18 @@ G-1..G-7 resolved (detail in git history / the cited logs):
   mirror — all fixed (`gpu/government_test.py`).
 - G-4. RESOLVED-ON-CATCH (2026-07-17, #56): scripted builder walker
   moved AFTER production (TS order), fixing a one-turn phantom job.
+
+- G-8 (OPEN, UNVERIFIED — 2026-07-20, task #55 S3, GEO-2's cap-32
+  experiment; the G-3 re-verify rule applies before any fix).
+  SIGHTING: raising `WAR_WEARINESS_CAP` 16→32 (the B-15 player-facing
+  −4 ceiling) turned scripted seed 9092 red — a player-only-war seed
+  drifting in score/treasury/buildings at t216, i.e. a dormant TS/GPU
+  economic-TIMING divergence at the −3/−4 amenity tier on the PLAYER
+  war axis. Dormant at the shipped cap 16 (the −3/−4 tiers are
+  unreachable). Suspect zone: the amenity-tier → growth/production
+  factor path (`computeCityStats` vs the GPU city walk) at deep
+  penalty tiers. Re-verify from a fresh cap-32 run BEFORE trusting
+  the tier attribution; resolving it unblocks the B-15 residual.
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 
