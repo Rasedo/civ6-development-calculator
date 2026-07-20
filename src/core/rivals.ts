@@ -96,8 +96,9 @@ import {
   ERA_SCORE_PANTHEON,
   ERA_SCORE_RELIGION,
   ERA_SCORE_GP,
+  GOVERNOR_LOYALTY,
 } from '../data/rivals';
-import { addEraScore, agePressureFactor } from './eras';
+import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
 const ok: RuleResult = { ok: true };
@@ -598,13 +599,15 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
  * Apply a turn of loyalty to `city` (called from endTurn with the stats it
  * already computed). Returns true when the city has hit 0 and must flip.
  */
-export function applyLoyalty(state: GameState, city: City, amenityTierName: string): boolean {
+export function applyLoyalty(state: GameState, city: City, amenityTierName: string, govBonus = 0): boolean {
   if (!state.rivals.some((r) => r.cities.length > 0)) return false;
   if (city.isCapital) {
     city.loyalty = LOYALTY_MAX;
     return false;
   }
-  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName);
+  // B-24 S3: govBonus = GOVERNOR_LOYALTY when this city holds a governor
+  // (the stateless per-turn pick endTurn computes before the city loop).
+  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus;
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
   return city.loyalty <= 0;
 }
@@ -2527,6 +2530,14 @@ export function rivalPhase(state: GameState): void {
     // luxMap discipline) — loyalty, growth and yields all read this turn's
     // tiers; defections resolve after the loop (the player pattern).
     const amenTiers = rivalAmenityTiers(state, rival);
+    // B-24 S3: this rival's governor seats for THIS turn — same stateless
+    // greedy as the player (quantized milli loyalty snapshot at the loop top,
+    // ties by array position == the GPU's rc slot order).
+    const rGovPicks = governorPicks(
+      rival.cities.map((rc) => Math.round((rc.loyalty ?? LOYALTY_MAX) * 1000)),
+      governorTitles(rival.research.civics.length),
+    );
+    const rGovIds = new Set([...rGovPicks].map((i) => rival.cities[i].id));
     const rcDefectors: RivalCity[] = [];
     for (const rc of [...rival.cities]) {
       const tier = amenTiers.get(rc.id) ?? amenityTier(0);
@@ -2567,7 +2578,11 @@ export function rivalPhase(state: GameState): void {
         }
         const pressure =
           own + foreign === 0 ? 0 : (LOYALTY_PRESSURE_SCALE * (own - foreign)) / (own + foreign);
-        const next = (rc.loyalty ?? LOYALTY_MAX) + pressure + (LOYALTY_AMENITY[tier.name] ?? 0);
+        const next =
+          (rc.loyalty ?? LOYALTY_MAX) +
+          pressure +
+          (LOYALTY_AMENITY[tier.name] ?? 0) +
+          (rGovIds.has(rc.id) ? GOVERNOR_LOYALTY : 0); // B-24 S3
         rc.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
         if (rc.loyalty <= 0) rcDefectors.push(rc);
       }

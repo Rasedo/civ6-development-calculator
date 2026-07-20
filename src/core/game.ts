@@ -18,8 +18,8 @@ import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
 import { expirePlayerRoutes } from './trade';
-import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP } from '../data/rivals';
-import { addEraScore, eraBoundary } from './eras';
+import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY } from '../data/rivals';
+import { addEraScore, eraBoundary, governorPicks, governorTitles } from './eras';
 import { UNITS, WALLS_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -787,11 +787,20 @@ export function endTurn(state: GameState): void {
   let turnCulture = 0;
   const defectors: City[] = [];
 
+  // B-24 S3: the player's governor seats for THIS turn — stateless greedy over
+  // the pre-loop loyalty snapshot (quantized milli, ties by array position);
+  // the GPU computes the same pick inside _apply_loyalty_and_flips.
+  const govPicks = governorPicks(
+    state.cities.map((c) => Math.round((c.loyalty ?? 100) * 1000)),
+    governorTitles(state.research.civics.length),
+  );
+  const govIds = new Set([...govPicks].map((i) => state.cities[i].id));
+
   for (const city of state.cities) {
     const stats = computeCityStats(state, city, luxMap, mods);
 
     // --- loyalty (rival-pressure games only) ---------------------------------
-    if (applyLoyalty(state, city, stats.amenities.tier.name)) {
+    if (applyLoyalty(state, city, stats.amenities.tier.name, govIds.has(city.id) ? GOVERNOR_LOYALTY : 0)) {
       defectors.push(city);
     }
 

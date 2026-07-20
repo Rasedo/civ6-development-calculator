@@ -95,6 +95,9 @@ import {
   ERA_DARK_T,
   ERA_GOLDEN_T,
   AGE_PRESSURE,
+  GOV_CIVICS_PER_TITLE,
+  GOV_MAX_TITLES,
+  GOVERNOR_LOYALTY,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -533,6 +536,10 @@ const rules = {
     darkT: ERA_DARK_T,
     goldenT: ERA_GOLDEN_T,
     agePressure: AGE_PRESSURE,
+    // S3: governors — stateless greedy loyalty anchors.
+    govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
+    govMaxTitles: GOV_MAX_TITLES,
+    governorLoyalty: GOVERNOR_LOYALTY,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the

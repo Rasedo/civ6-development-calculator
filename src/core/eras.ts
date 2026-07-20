@@ -1,5 +1,5 @@
 import type { GameState } from './types';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE } from '../data/rivals';
+import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
 // B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
@@ -33,4 +33,20 @@ export function eraBoundary(state: GameState): void {
  *  contributions (B-24 S2). Missing entries (era 0, fresh saves) read Normal. */
 export function agePressureFactor(state: GameState, civ: number): number {
   return AGE_PRESSURE[state.civAges?.[civ] ?? 1];
+}
+
+/** B-24 S3: governor titles a civ holds for `nCivics` completed civics. */
+export function governorTitles(nCivics: number): number {
+  return Math.min(GOV_MAX_TITLES, Math.floor(nCivics / GOV_CIVICS_PER_TITLE));
+}
+
+/** B-24 S3: the STATELESS greedy pick — the `titles` LOWEST-loyalty cities.
+ *  `qLoys` are QUANTIZED milli loyalties (Math.round(loy·1000) — ranking on
+ *  raw f64 would be float-association-fragile across engines; the B-29
+ *  quantization lesson), ties broken by ARRAY position (acquisition order —
+ *  the GPU mirrors with slot index / city_seq). Returns picked indices. */
+export function governorPicks(qLoys: number[], titles: number): Set<number> {
+  const idx = qLoys.map((q, i) => [q, i] as const);
+  idx.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  return new Set(idx.slice(0, titles).map(([, i]) => i));
 }

@@ -124,6 +124,14 @@ export const ERA_GOLDEN_T = 10;
  *  Golden). Halves are exact in f32 AND f64 (dyadic), so the modulated
  *  pressure sums stay association-free like the integer sums they replace. */
 export const AGE_PRESSURE = [0.5, 1.0, 1.5];
+/** B-24 S3: governors as STATELESS loyalty anchors. A civ holds
+ *  min(GOV_MAX_TITLES, floor(civics / GOV_CIVICS_PER_TITLE)) governors; each
+ *  turn they sit in its LOWEST-loyalty cities (quantized milli, ties by
+ *  acquisition order) and add GOVERNOR_LOYALTY to that city's delta.
+ *  RESIDUALS: establishment turns, promotions, non-loyalty abilities. */
+export const GOV_CIVICS_PER_TITLE = 10;
+export const GOV_MAX_TITLES = 5;
+export const GOVERNOR_LOYALTY = 8;
 /** B-22 (task #55 S3): a rival↔rival war is FORMAL iff the aggressor denounced
  *  the target at least this many turns before declaring; otherwise SURPRISE. */
 export const RR_FORMAL_MIN_TURNS = 5;

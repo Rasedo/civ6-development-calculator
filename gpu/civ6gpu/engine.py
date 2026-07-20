@@ -652,6 +652,11 @@ class BatchSim:
         self._era_dark = int(_er.get("darkT", 3))
         self._era_gold = int(_er.get("goldenT", 10))
         self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
+        # B-24 S3: governors — STATELESS greedy loyalty anchors (recomputed
+        # every turn from civics + the quantized loyalty snapshot; no state).
+        self._gov_per = int(_er.get("govCivicsPerTitle", 10))
+        self._gov_max = int(_er.get("govMaxTitles", 5))
+        self._gov_loy = float(_er.get("governorLoyalty", 8))
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
         self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)
@@ -10245,6 +10250,15 @@ class BatchSim:
             # P5/S6: the amenity map freezes at the loop top (the player's
             # luxMap discipline) — loyalty, growth and yields read it.
             amen_tidx, amen_gf, amen_yf = self._rival_amenity(r)
+            # B-24 S3: this rival's governor seats for THIS turn — the TS
+            # loop-top governorPicks mirror (quantized milli loyalty snapshot,
+            # ties by slot index == TS array order; alive-masked).
+            _titles_r = (self.r_civics[:, r].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
+            _q_rloy = js_round(self.rc_loyalty[:, r] * 1000).long()
+            _gk = torch.where(self.rc_alive[:, r], _q_rloy * 64 + torch.arange(self.RC, device=dev).view(1, -1), torch.full_like(_q_rloy, 1 << 40))
+            _gr = torch.empty_like(_gk)
+            _gr.scatter_(1, _gk.argsort(dim=1, stable=True), torch.arange(self.RC, device=dev).expand(B, self.RC))
+            rc_gov = (_gr < _titles_r.unsqueeze(1)) & self.rc_alive[:, r]  # [B, RC]
             rc_flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
             # AUDIT A-20: unbesieged cities heal the flat player rate, war
             # or not (real Civ 6) — the same cityHealPerTurn rules field
@@ -10361,7 +10375,7 @@ class BatchSim:
                         others = others | alive_o.any(dim=1)
                     tot_p = own_p + for_p
                     press = torch.where(tot_p > 0, lscale * (own_p - for_p) / tot_p.clamp(min=1e-9), torch.zeros_like(tot_p))
-                    delta_l = press + self._loyalty_amenity[amen_tidx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double()
+                    delta_l = press + self._loyalty_amenity[amen_tidx[:, j].clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)].double() + rc_gov[:, j].double() * self._gov_loy  # B-24 S3
                     upd_l = ncap & others
                     nxt_l = (self.rc_loyalty[:, r, j] + delta_l).clamp(min=0, max=float(rr.get("loyaltyMax", 100)))
                     self.rc_loyalty[:, r, j] = torch.where(upd_l, nxt_l, self.rc_loyalty[:, r, j])
@@ -11153,7 +11167,17 @@ class BatchSim:
         foreign = (foreign_r * f_age[:, 1 : 1 + self.R].unsqueeze(1)).sum(dim=2)
         tot = own + foreign
         pressure = torch.where(tot > 0, scale * (own - foreign) / tot.clamp(min=1e-9), torch.zeros_like(tot))
-        delta = pressure + self._loyalty_amenity[tier_idx.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)]
+        # B-24 S3: the player's governor seats — the endTurn governorPicks
+        # mirror. Rank alive cities on QUANTIZED milli loyalty (raw-f64
+        # ranking is float-association-fragile — the B-29 lesson), ties by
+        # city_seq (TS array position). Pick from the PRE-update snapshot.
+        titles_p = (self.civics.sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
+        q_loy = js_round(self.loyalty * 1000).long()
+        gov_key = torch.where(self.alive, q_loy * 256 + self.city_seq, torch.full_like(q_loy, 1 << 40))
+        gov_rank = torch.empty_like(gov_key)
+        gov_rank.scatter_(1, gov_key.argsort(dim=1, stable=True), torch.arange(C, device=dev).expand(B, C))
+        gov_b = (gov_rank < titles_p.unsqueeze(1)) & self.alive
+        delta = pressure + self._loyalty_amenity[tier_idx.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)] + gov_b.to(self.dtype) * self._gov_loy
         upd = self.alive & any_rc.unsqueeze(1)
         nxt = (self.loyalty + delta).clamp(min=0, max=float(self.rules.rivals.get("loyaltyMax", 100)))
         self.loyalty = torch.where(upd, nxt, self.loyalty)
