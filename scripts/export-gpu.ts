@@ -1082,7 +1082,9 @@ const SEED_OVERRIDES: Record<number, number> = {
   // A-23/A-24 registry family — ORTHOGONAL to B-21 (CS bonuses never touch
   // food/amenities; this seed's CS channels are culture/faith and cultureBox
   // matches exactly). Rerolled; latent recorded on AUDIT (new A-25).
-  15: 9197,
+  // A25_G8 S1 (2026-07-20): 9196 RESTORED — the A-25 repro rides in-gate
+  // again for the captured-luxury pool fix (brief gpu/A25_G8.md).
+  15: 9196,
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;
@@ -1187,8 +1189,11 @@ for (let s = 0; s < N_SEEDS; s++) {
       ocean: t.terrain === 'OCEAN' ? 1 : 0,
       work: isImpassable(t) ? 0 : 1, // C1-B1: citizen-workable (water IS workable; ice/mountains are not)
       // Luxury amenity source (mirrors luxuryAmenities): the luxury's catalog
-      // index + the improvement index that activates it (-9 = its improvement
-      // is outside the GPU roster, so it can never activate in either engine).
+      // index + the improvement index that activates it. -9 = its improvement
+      // is outside the GPU roster (PEARLS/WHALES -> FISHING_BOATS), so it can
+      // never activate in the GPU — currently true in TS too (no scripted
+      // builder path builds FISHING_BOATS), but #50's RL improvement verbs
+      // would make it a LIVE asymmetry: revisit with A-18 (AUDIT note).
       lux: t.resource && RESOURCES[t.resource].category === 'luxury' ? LUXURY_IDS.indexOf(t.resource) : -1,
       luxreq: (() => {
         if (!t.resource || RESOURCES[t.resource].category !== 'luxury') return -9;

@@ -23,6 +23,11 @@ Covered:
   c. INVARIANT SCAN: after a real 18-turn rollout the scan passes; a hand-forged
      sibling reference in rc_dist_tile makes it RAISE (forward check); a dangling
      reference into un-owned land makes it RAISE (backward check); repair passes.
+  d. A-25 CAPTURE-LUXURY HANDOVER (#69): a conquered rival city's improved
+     luxury re-owns with the A-17 ring and feeds the PLAYER empire amenity
+     pool (_luxury_amenities) the same turn — the B8-K sighting's suspected
+     path, poke-pinned since the historical repro (seed 9196 ~t240) no longer
+     reproduces on the current engine.
 """
 
 from __future__ import annotations
@@ -210,6 +215,60 @@ def poke_invariant_scan(rules, path):
     print(f"  c invariant scan OK (positive pass; forward+backward raise; repair passes; rc {r},{j} di {di})")
 
 
+def poke_capture_luxury_pool(rules, path):
+    """d. A-25 (#69): capture a rival city holding an IMPROVED in-roster
+    luxury on a tile registered to it; the tile must re-own to the new player
+    city (A-17 ring -> owner plane) and the luxury must join the PLAYER
+    empire amenity pool. The out-of-roster class (lux_req -9: PEARLS/WHALES
+    whose FISHING_BOATS improvement is absent from the GPU catalog) stays
+    inert in BOTH engines until #50's RL improvement verbs land (A-18 note)."""
+    sim = build(rules, path)
+    r = next(rr for rr in range(sim.R) if bool(sim.rc_alive[0, rr].any()))
+    j = int(sim.rc_alive[0, r].nonzero(as_tuple=True)[0][0])
+    c_t = int(sim.rc_center[0, r, j])
+    cid = int(sim.rc_id[0, r, j])
+    assert int(sim.alive[0].sum()) < 6, "player at the city cap — capture would raze; pick an earlier turn"
+
+    # an in-roster luxury spec whose id is NOT already active for the player
+    # (a duplicate would not change the unique-luxury count)
+    act = (sim.lux_id[0] >= 0) & (sim.owner[0] >= 0) & (sim.improvement[0] == sim.lux_req[0])
+    active_ids = set(sim.lux_id[0][act].tolist())
+    src = next(
+        (t for t in range(sim.T) if int(sim.lux_id[0, t]) >= 0 and int(sim.lux_req[0, t]) >= 0
+         and int(sim.lux_id[0, t]) not in active_ids),
+        -1,
+    )
+    assert src >= 0, "no in-roster luxury id free of player activation on this map"
+    lid, req = int(sim.lux_id[0, src]), int(sim.lux_req[0, src])
+
+    # plant it IMPROVED on a free tile registered to the rival city
+    t = next(
+        tt for tt in range(sim.T)
+        if int(sim.owner[0, tt]) < 0 and int(sim.rival_at[0, tt]) < 0 and int(sim.cs_at[0, tt]) < 0
+        and int(sim.lux_id[0, tt]) < 0 and int(sim.district[0, tt]) < 0 and int(sim.improvement[0, tt]) < 0
+        and int(sim.center_at[0, tt]) < 0 and int(sim.rvcity_at[0, tt]) < 0
+    )
+    sim.lux_id[0, t] = lid
+    sim.lux_req[0, t] = req
+    sim.improvement[0, t] = req
+    sim.pillaged[0, t] = False
+    sim.rival_at[0, t] = r
+    sim.rc_tile_id[0, t] = cid
+
+    have = torch.zeros(sim.B, sim.C, dtype=sim.dtype)
+    need = torch.full((sim.B, sim.C), 10.0, dtype=sim.dtype)
+    base = float(sim._luxury_amenities(have, need).sum())
+
+    sim._capture_rival_city(torch.tensor([0]), torch.tensor([r]), torch.tensor([j]), torch.tensor([c_t]))
+    c_new = int(sim.center_at[0, c_t])
+    assert c_new >= 0 and bool(sim.alive[0, c_new]), "capture did not land a player city"
+    assert int(sim.owner[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
+    after = float(sim._luxury_amenities(have, need).sum())
+    assert after >= base + 1.0, f"captured improved luxury did not feed the player pool ({base} -> {after})"
+    sim._check_rc_registry_invariant()  # the handover leaves the registry coherent
+    print(f"  d capture-luxury handover OK (lux {lid} req {req}: rival rc {cid} tile {t} -> city {c_new}, grants {base} -> {after})")
+
+
 def main() -> None:
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -219,6 +278,7 @@ def main() -> None:
     poke_placement_rule(rules, path)
     poke_never_picks_sibling(rules, path)
     poke_invariant_scan(rules, path)
+    poke_capture_luxury_pool(rules, path)
     print("RC REGISTRY (A-24) POKES OK")
 
 
