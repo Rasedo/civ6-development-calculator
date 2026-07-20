@@ -373,7 +373,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -612,6 +612,12 @@ class BatchSim:
         self.r_alive = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # static: placed at creation
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
+        # A-19/B-33 (task #55 S1): per-PAIR rival↔rival war matrix, unified with
+        # the TS `atWarRivals`. rr_war[b, i, j] = rival i is at war with rival j
+        # (symmetric, diagonal false). r_atwar stays the war-with-player [B, R]
+        # vector BESIDE this. INERT in S1 (nothing reads it); _MUTABLE-registered
+        # for snapshot/restore (civ-level — no slot compaction exposure).
+        self.rr_war = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
         self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)

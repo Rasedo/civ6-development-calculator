@@ -377,6 +377,14 @@ export interface RivalCiv {
   atWar: boolean;
   warTurns: number;
   peaceTurns: number;
+  /** A-19/B-33 (task #55 S1): rival-ids (0-based rival index) this rival is
+   *  currently at war with — the per-pair war substrate BESIDE `atWar` (which
+   *  stays the war-with-the-player boolean). Symmetric by construction via
+   *  `setRivalWar`; the (0, r+1) player pair is NOT stored here. Empty in the
+   *  t0 fixture, so the exporter's field-pick is untouched. Optional (the
+   *  codebase's war-state convention: warWeariness?, spaceProjects?) — readers
+   *  default to []. */
+  atWarRivals?: number[];
   /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
    *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
   warWeariness?: number;

@@ -235,6 +235,7 @@ export function placeRivals(state: GameState, count?: number): void {
       cities: [],
       nextCityId: 0,
       atWar: false,
+      atWarRivals: [], // A-19/B-33 (S1): per-pair war substrate, empty at t0
       warTurns: 0,
       peaceTurns: 0,
       warWeariness: 0, // B-15
@@ -307,6 +308,49 @@ export function rivalProximity(state: GameState, rival: RivalCiv): number {
 // ---------------------------------------------------------------------------
 // Player diplomacy actions
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// A-19/B-33 (task #55): per-pair war state on UNIFIED civ ids (0 = player,
+// r+1 = rival r). The (0, r+1) player pair reads/writes the EXISTING `atWar`
+// boolean; a rival↔rival pair reads/writes both rivals' `atWarRivals` arrays
+// (symmetric by construction). S1 ships these INERT (nothing reads them yet).
+// ---------------------------------------------------------------------------
+
+/** Are unified civs `a` and `b` at war right now? */
+export function civsAtWar(state: GameState, a: number, b: number): boolean {
+  if (a === b) return false;
+  // A player pair (one side is civ 0) reads the rival's war-with-player bool.
+  if (a === 0 || b === 0) {
+    const rivalUnified = a === 0 ? b : a;
+    return state.rivals.find((r) => r.id === rivalUnified - 1)?.atWar ?? false;
+  }
+  // A rival↔rival pair: membership in either side's list (symmetric).
+  return state.rivals.find((r) => r.id === a - 1)?.atWarRivals?.includes(b - 1) ?? false;
+}
+
+/** Set the war state between unified civs `a` and `b` (both sides written). */
+export function setRivalWar(state: GameState, a: number, b: number, on: boolean): void {
+  if (a === b) return;
+  if (a === 0 || b === 0) {
+    // The player pair rides the existing single boolean (both engines).
+    const rival = state.rivals.find((r) => r.id === (a === 0 ? b : a) - 1);
+    if (rival) rival.atWar = on;
+    return;
+  }
+  const ra = state.rivals.find((r) => r.id === a - 1);
+  const rb = state.rivals.find((r) => r.id === b - 1);
+  if (!ra || !rb) return;
+  const add = (r: RivalCiv, otherRivalId: number) => {
+    const list = (r.atWarRivals ??= []);
+    if (on) {
+      if (!list.includes(otherRivalId)) list.push(otherRivalId);
+    } else {
+      r.atWarRivals = list.filter((x) => x !== otherRivalId);
+    }
+  };
+  add(ra, b - 1);
+  add(rb, a - 1);
+}
 
 export function declareWar(state: GameState, rivalId: number): RuleResult {
   const rival = state.rivals.find((r) => r.id === rivalId);
