@@ -25,14 +25,18 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 39 | 23.1 | **59%** |
-| B fidelity | 88 | 70.4 | **80%** |
+| A symmetry | 41 | 23.5 | **57%** |
+| B fidelity | 88 | 73.5 | **84%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents | 6 | 5 | **83%** |
-| **Overall (incl. closed)** | **184** | **149.5** | **81%** |
-| Open chapters only (A+B) | 127 | 93.5 | **74%** |
+| **Overall (incl. closed)** | **186** | **153.0** | **82%** |
+| Open chapters only (A+B) | 129 | 97.0 | **75%** |
+
+(B8 note: chapter A's weight grew 39→41 — the new A-25 latent found
+by slice K's hunt — so A's % DROPS despite A-12 resolving; the
+denominator moved, not the work.)
 
 (B10 close-out note: the rows are re-added sums — the prior overall
 row carried a +2.0 arithmetic slip (144.0 vs the true 142.0), so
@@ -98,15 +102,30 @@ rival works in-gate 6 seeds/28 works, lane `great_works`); B-8 →
 land/naval auras at the quantized sites, rival GENERAL war-walk;
 the slice's hunt: the aura-plane cache missed RL-verb general
 moves → position-fingerprint key; ADMIRAL in-gate 18/24, lane
-`gp_aura`).)
+`gp_aura`). 2026-07-20 ROUND B8 K/L/T parallel worktrees (brief
+gpu/ROUND_B8.md, task #64): B-21 RESOLVED-minus-rows (K: 3/6-envoy
+channel re-keyed to CS_TYPE_BUILDINGS tiers both seats, suzerain
+perk LIVE 14/24 rows, lane `cs_bonus`; K's hunt found NEW A-25 —
+conquered-city luxuries missing from the GPU empire amenity pool —
+dodged 9196→9197, the B10 exporter sweep auto-removed the orphan);
+A-12 RESOLVED (L hunt-free: rival levy at the A-5 gold-block
+position, shared per-CS cooldown; rival quests ZERO-DRAW
+deterministic first-satisfiable — the draw-count-risk deferral
+dissolved by design; in-gate 6 levies/73 quests/24 completions,
+lane `cs_verbs`); B-23 → 70% (T: route duration 20t ALL routes —
+1122 in-gate expiries; international routes rival→player +
+TS player→rival API, gold-only, war-interdicted, lane `trade2`;
+T's hunt: the GPU at-capacity early return skipped route expiry —
+`_expire_rival_routes` now runs on every exit path).)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
   closed the card wiring), A-9 4 (90% — ROUND B9; NEIGHBORHOOD +
   palace-relocation residuals), A-11 4 (done — A-12b closed the CS
   residual; the GPU player-route note rides A-18/#50),
-  A-12 4 (90% — 3b-2 landed attack/capture; levy + quests are recorded
-  deferrals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
+  A-12 4 (RESOLVED — ROUND B8 slice L closed the levy + zero-draw
+  quest deferrals; 2-step levy ladder + UI-only player levy are
+  recorded residuals), A-17 4 (done — #41 stage 1), A-18 3, A-19 4, A-20 2 (done),
   A-21 2, A-22 2, A-23 2 (new — split from A-17: civ-level
   worked-tile scan), A-24 2 (done — ROUND B10 slice R: per-rc
   placement rule + env-gated registry invariant scan), A-25 2 (new —
