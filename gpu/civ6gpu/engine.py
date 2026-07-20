@@ -370,6 +370,7 @@ _MUTABLE = [
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
+    "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
     "r_atwar", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
@@ -536,6 +537,11 @@ class BatchSim:
         self.cs_quest_camp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.cs_quest_issued = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.cs_quest_district = torch.full((B, s_pad), -1, dtype=torch.long, device=device)  # askable idx of a buildDistrict quest (0=CAMPUS)
+        # A-12 (B8-L): RIVAL LEVY cooldown — per CS, SHARED across seats (TS
+        # cs.lastLevyTurn, `?? -LEVY_COOLDOWN`). Init to -levyCooldown so a
+        # never-levied CS reads cooldown-ready (turn - (-cd) >= cd for turn≥0).
+        self._levy_cooldown = int(rules.cs.get("levyCooldown", 20))
+        self.cs_last_levy = torch.full((B, s_pad), -self._levy_cooldown, dtype=torch.long, device=device)
         # V-CS: siege hit points (attackCityState) — TS `cs.hp ?? CS_MAX_HP`.
         self.cs_hp = torch.full((B, s_pad), int(rules.cs.get("maxHp", 150)), dtype=torch.long, device=device)
         self.influence = torch.zeros(B, dtype=dtype, device=device)
@@ -684,6 +690,15 @@ class BatchSim:
         self.cs_r_met = torch.zeros(B, r_pad, s_pad, dtype=torch.bool, device=device)
         self.r_influence = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_envoys_avail = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # A-12 (B8-L): RIVAL city-state quests — ONE per (rival, CS), the
+        # zero-draw twin of cs_quest. kind 0 none / 1 clearCamp / 2 trade /
+        # 3 district; the buildDistrict target is deterministic (the CS type's
+        # district, from _cs_didx) so no per-quest district plane is needed.
+        # cs_r_quest_issued zeros init → first issue at turn≥questCooldown (the
+        # TS `rqi[r] ?? 0` default). t0 fixtures carry none (rivals start unmet).
+        self.cs_r_quest = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
+        self.cs_r_quest_camp = torch.full((B, r_pad, s_pad), -1, dtype=torch.long, device=device)
+        self.cs_r_quest_issued = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
         self.rvcity_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at rival centers
         self.v_alive = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # rival units, spawn order
         self.v_acted = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # P4/D-2: spent MP since the last refresh (blocks healing)
@@ -8894,6 +8909,82 @@ class BatchSim:
             self.cs_r_envoys[rows, r, pick[rows]] += 1
             self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] - can.long()
 
+    def _rival_quest_phase(self, r: int, active: torch.Tensor) -> None:
+        """AUDIT A-12 (B8-L): RIVAL city-state quests — the ZERO-DRAW twin of
+        the cityStatePhase quest loop (issueRivalQuest/rivalQuestSatisfied),
+        called right after _rival_cs_phase (the A-12a accrual position). Each
+        MET CS keeps ONE quest per rival (cs_r_quest[:, r]); a satisfied one
+        resolves here (+questEnvoys to this rival's cs_r_envoys — a
+        yield-bearing write, so _eff_version bumps), else a new one issues on
+        cooldown expiry. The kind is DETERMINISTIC (no RNG, unlike the player's
+        2-draw path): the FIRST SATISFIABLE option in the fixed order
+        [clearCamp (nearest camp ≤6, ties lowest tile idx), buildDistrict (the
+        CS type's district, from _cs_didx), sendTradeRoute]."""
+        if self.S == 0:
+            return
+        B, S, dev = self.B, self.S, self.device
+        rr = self.rules.cs
+        cooldown = int(rr.get("questCooldown", 12))
+        q_env = int(rr.get("questEnvoys", 1))
+        csc = self.cs_center[:, :S].clamp(min=0)  # [B, S]
+        met_live = self.cs_r_met[:, r, :S] & self.cs_alive[:, :S]
+        act = active.unsqueeze(1) & met_live  # [B, S]
+        if not bool(act.any()):
+            return
+        # --- rival state used by BOTH resolve and issue (loop-invariant) -----
+        # buildDistrict target = the CS type's district (_cs_didx), owned
+        # COMPLETE by any of THIS rival's cities (rivalQuestSatisfied's
+        # buildDistrict / issueRivalQuest's `alreadyBuilt`).
+        dt = self.rc_dist_tile[:, r]  # [B, RC, nD]
+        nD = dt.shape[2]
+        di = self._cs_didx[:, :S].clamp(min=0, max=nD - 1)  # [B, S]
+        own_tile = dt.unsqueeze(1).expand(B, S, self.RC, nD).gather(
+            3, di.view(B, S, 1, 1).expand(B, S, self.RC, 1)
+        ).squeeze(3)  # [B, S, RC] tile of the CS-type district per rival city
+        own_dc = self.district_complete.gather(1, own_tile.clamp(min=0).reshape(B, -1)).reshape(B, S, self.RC)
+        owns_dist = ((own_tile >= 0) & own_dc).any(dim=2)  # [B, S]
+        # sendTradeRoute: this rival routes to CS s (r_routes dest == -(2+s)).
+        route_dest = self.r_routes[:, r, :, 1]  # [B, K_routes]
+        s_ar = torch.arange(S, device=dev)
+        has_route = (route_dest.unsqueeze(1) == (-(2 + s_ar)).view(1, S, 1)).any(dim=2)  # [B, S]
+        # clearCamp: the NEAREST camp within range 6, ties to the lowest tile
+        # index (key = dist·(T+1)+tile, the TS issueRivalQuest key).
+        cdist = self.pair_dist[csc.unsqueeze(2), self.camp_tile.clamp(min=0).unsqueeze(1)].to(torch.long)  # [B, S, K]
+        near_c = (self.camp_tile >= 0).unsqueeze(1) & (cdist <= 6)  # [B, S, K]
+        span = self.T + 1
+        key_c = torch.where(near_c, cdist * span + self.camp_tile.clamp(min=0).unsqueeze(1), torch.full_like(cdist, 10**18))
+        best_k = key_c.argmin(dim=2)  # [B, S]
+        has_camp = near_c.any(dim=2)  # [B, S]
+        camp_nearest = torch.where(has_camp, self.camp_tile.gather(1, best_k), torch.full((B, S), -1, dtype=torch.long, device=dev))
+
+        # --- RESOLVE existing quests (rivalQuestSatisfied) -------------------
+        cur = self.cs_r_quest[:, r, :S]  # [B, S]
+        camp_gone = ~(
+            (self.camp_tile.unsqueeze(1) == self.cs_r_quest_camp[:, r, :S].unsqueeze(2)) & (self.camp_tile >= 0).unsqueeze(1)
+        ).any(dim=2)  # [B, S]
+        res_camp = act & (cur == 1) & camp_gone
+        res_trade = act & (cur == 2) & has_route
+        res_dist = act & (cur == 3) & owns_dist
+        resolved = res_camp | res_trade | res_dist
+        if bool(resolved.any()):
+            self.cs_r_quest[:, r, :S] = torch.where(resolved, torch.zeros_like(cur), cur)
+            self.cs_r_quest_issued[:, r, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.cs_r_quest_issued[:, r, :S])
+            self.cs_r_envoys[:, r, :S] = self.cs_r_envoys[:, r, :S] + resolved.long() * q_env
+            self._eff_version += 1  # envoy bonuses feed this rival's city yields this phase
+
+        # --- ISSUE on cooldown (deterministic first-satisfiable) ------------
+        cur2 = self.cs_r_quest[:, r, :S]  # resolved ones now 0
+        due = act & (cur2 == 0) & (self.turn - self.cs_r_quest_issued[:, r, :S] >= cooldown)  # [B, S]
+        if bool(due.any()):
+            want_camp = due & has_camp
+            want_dist = due & ~has_camp & ~owns_dist
+            want_trade = due & ~has_camp & owns_dist & ~has_route
+            new_kind = want_camp.long() * 1 + want_dist.long() * 3 + want_trade.long() * 2  # 0 = nothing applies
+            issued = new_kind > 0
+            self.cs_r_quest[:, r, :S] = torch.where(issued, new_kind, cur2)
+            self.cs_r_quest_issued[:, r, :S] = torch.where(issued, torch.full_like(cur2, self.turn), self.cs_r_quest_issued[:, r, :S])
+            self.cs_r_quest_camp[:, r, :S] = torch.where(want_camp, camp_nearest, self.cs_r_quest_camp[:, r, :S])
+
     def _rival_trade_phase(self, r: int, active: torch.Tensor) -> None:
         """AUDIT A-11: ONE new domestic route per civ per turn while under
         capacity — the rivalPhase creation block. Capacity mirrors
@@ -9044,6 +9135,11 @@ class BatchSim:
             # AUDIT A-12: the CS-diplomacy block sits right after boost
             # detection — the exact rivalPhase position.
             self._rival_cs_phase(r, active)
+            # AUDIT A-12 (B8-L): rival CS quests resolve/issue right after the
+            # envoy accrual (the TS rivalPhase quest block sits at the tail of
+            # the same CS block) — a completed quest's envoy is visible to the
+            # levy suzerain test later this phase.
+            self._rival_quest_phase(r, active)
             # C1-B2: queue PICKS for the PRE-TURN city set, in slot order —
             # the capital (rc_is_cap, the rivals.ts:1077 rc.isCapital gate;
             # P7-FULL: compaction can move it off slot 0) prefers the
@@ -9539,6 +9635,46 @@ class BatchSim:
                         chg_m5 = self._p_charges[self._missionary_idx] + self._enh["mchg"][self.r_enhancer[:, r] + 1]
                         landed_m5 = self._spawn_rival_civ(buy_m5, at_m5, r, type_idx=self._missionary_idx, charges=chg_m5)
                         self.r_faith[:, r] = torch.where(landed_m5, self.r_faith[:, r] - mcost5, self.r_faith[:, r])
+            # AUDIT A-12 (B8-L): RIVAL LEVY — the levyUnits twin, AFTER every
+            # purchase (the TS gold-block tail; here just before the trade
+            # block — the same rivalPhase position). An AT-WAR rival suzerain
+            # of a militaristic CS levies levyUnits units of the 2-step ladder
+            # (WARRIOR ≤ spearmanAfterTurn else SPEARMAN) at the CS center when
+            # it can afford levyGoldCost — ONE CS per rival per turn (the FIRST
+            # eligible in slot order). levyCooldown is per-CS, SHARED across
+            # seats (cs_last_levy). Payment + cooldown are UNCONDITIONAL on a
+            # free spawn spot (levyUnits pays before spawnUnit, which lands the
+            # units on the CS center or its nearest free neighbor).
+            if self.S > 0:
+                Sl = self.S
+                mil_idx_l = int(self.rules.cs.get("militaristicIdx", -1))
+                levy_cost = float(self.rules.cs.get("levyGoldCost", 120))
+                levy_units_n = int(self.rules.cs.get("levyUnits", 2))
+                suz_min_l = int(self.rules.cs.get("suzerainEnvoys", 3))
+                mine_el = self.cs_r_envoys[:, r, :Sl]  # [B, S]
+                oth_el = self.cs_r_envoys[:, :, :Sl].clone()
+                oth_el[:, r] = -1
+                oth_max_l = oth_el.max(dim=1).values  # [B, S]
+                suz_rl = (  # rivalIsSuzerain: strict-most envoys, ≥ min, > player, > every other rival
+                    (mine_el >= suz_min_l)
+                    & (mine_el > self.cs_envoys[:, :Sl])
+                    & (mine_el > oth_max_l)
+                    & self.cs_alive[:, :Sl]
+                )
+                ready_l = (self.turn - self.cs_last_levy[:, :Sl]) >= self._levy_cooldown
+                is_mil_l = self.cs_type[:, :Sl] == mil_idx_l
+                afford_l = self._afford(self.r_treasury[:, r], levy_cost).unsqueeze(1)  # [B, 1]
+                elig_l = active.unsqueeze(1) & is_mil_l & suz_rl & self.r_atwar[:, r].unsqueeze(1) & ready_l & afford_l  # [B, S]
+                do_l = elig_l.any(dim=1)  # [B]
+                if bool(do_l.any()):
+                    first_l = elig_l & (elig_l.long().cumsum(dim=1) == 1)  # the FIRST eligible CS per row
+                    at_l = (self.cs_center[:, :Sl].clamp(min=0) * first_l.long()).sum(dim=1)  # [B] one nonzero term
+                    ltype = self._r_spearman if self.turn > int(self.rules.combat.get("spearmanAfterTurn", 60)) else self._warrior_idx
+                    ltype_t = torch.full((self.B,), ltype, dtype=torch.long, device=dev)
+                    for _ in range(levy_units_n):
+                        self._spawn_rival(do_l, at_l, ltype_t, r)  # best-effort; refunds nothing (TS pays before spawnUnit)
+                    self.r_treasury[:, r] = torch.where(do_l, self.r_treasury[:, r] - levy_cost, self.r_treasury[:, r])
+                    self.cs_last_levy[:, :Sl] = torch.where(first_l, torch.full_like(self.cs_last_levy[:, :Sl], self.turn), self.cs_last_levy[:, :Sl])
             # AUDIT A-11: the trade creation block sits between the buy block
             # and the city-loop snapshot — the exact rivalPhase position.
             self._rival_trade_phase(r, active)

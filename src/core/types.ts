@@ -489,6 +489,14 @@ export interface CityState {
   /** AUDIT A-12: which rivals have met this CS (index = rival id) —
    *  proximity contact (a rival city or unit within 3), not fog. */
   rivalMet?: boolean[];
+  /** AUDIT A-12 (B8-L): the per-RIVAL deterministic quest (index = rival
+   *  id) — the zero-draw twin of `quest`; the kind is the first satisfiable
+   *  option in a fixed order, no RNG. */
+  rivalQuest?: (CityStateQuest | null)[];
+  /** AUDIT A-12 (B8-L): turn each rival's quest was last issued/cleared
+   *  (index = rival id) — the reissue-cooldown clock, mirrors
+   *  `questIssuedTurn`. */
+  rivalQuestIssuedTurn?: number[];
 }
 
 export interface MapGenOptions {

@@ -220,7 +220,8 @@ untagged halves of tagged items stay Fable/main-session work.
   end with a live rival CS route. The GPU still has no PLAYER route
   machinery (unreachable in gated trajectories — no trade RL verb;
   batch with A-18/#50 if the P8 surface ever gains one).
-- A-12 (75% — 2026-07-18, task #41 stage 3a + A-12b stage 1). The DIPLOMATIC layer is
+- A-12. RESOLVED (2026-07-19, task #64 ROUND B8 slice L — rival levy + rival
+  CS quests). The DIPLOMATIC layer is
   live both engines: per-civ envoys (`CityState.rivalEnvoys`/
   `rivalMet` / GPU `cs_r_envoys`/`cs_r_met`), rival influence→envoy
   accrual with the adopted-government tier (`rivalPhase` CS block /
@@ -242,9 +243,39 @@ untagged halves of tagged items stay Fable/main-session work.
   ring re-tag to the A-17 registry, maxCities raze, route pruning).
   PROVEN IN-GATE: seed 9131's reference run contains a real rival CS
   conquest (it exposed the exporter's live-roster t0 dump — now
-  snapshotted pre-run). REMAINING 10% (recorded deferrals): rival
-  levy (verb exists player-only), rival CS quests (needs per-civ
-  quest RNG — draw-count risk, deliberately deferred).
+  snapshotted pre-run). Stage 3c (2026-07-19, ROUND B8 slice L):
+  RIVAL LEVY + RIVAL QUESTS close the last deferrals.
+  * LEVY — the `levyUnits` twin for rivals, in the `rivalPhase`
+    gold-block tail / `_rival_phase` levy block just before
+    `_rival_trade_phase` (the A-5 position, documented both engines):
+    an AT-WAR rival suzerain (`rivalIsSuzerain`) of a militaristic CS
+    spawns `LEVY_UNITS` of the 2-step ladder (`WARRIOR`≤60 else
+    `SPEARMAN`) at the CS center via `spawnUnit`/`_spawn_rival`
+    (POOL-END), paying `LEVY_GOLD_COST`, on `LEVY_COOLDOWN` per CS
+    SHARED across seats (`CityState.lastLevyTurn` / `cs_last_levy`,
+    init −cooldown). ONE CS per rival per turn (first eligible in id
+    order). Payment + cooldown are unconditional on a free spawn spot
+    (levyUnits pays before spawnUnit).
+  * QUESTS (zero-draw) — one deterministic quest per (rival, CS):
+    `CityState.rivalQuest`/`rivalQuestIssuedTurn` (types.ts, clock
+    default 0) / GPU `cs_r_quest`/`cs_r_quest_camp`/`cs_r_quest_issued`.
+    `issueRivalQuest`/`rivalQuestSatisfied` (rivals.ts) /
+    `_rival_quest_phase` — resolve-then-issue at the A-12a accrual
+    position, kind = the FIRST SATISFIABLE of [clearCamp (nearest camp
+    ≤6, ties lowest tile), buildDistrict (the CS type's district via
+    `CS_TYPE_DISTRICT`/`_cs_didx`), sendTradeRoute (reads route state
+    only)], NO `nextRandom` anywhere; completion pays `QUEST_ENVOYS` to
+    `rivalEnvoys`/`cs_r_envoys` (bumps `_eff_version`). The PLAYER quest
+    path (`issueQuest`/`cityStatePhase`) is untouched — draw-count
+    neutrality is proven by the `rng` trace column staying exact across
+    24×250 (any added draw would diverge it) and a dedicated TS
+    zero-draw poke. IN-GATE: 6 rival levies (seeds 9029/9092/9235) + 24
+    rival quest completions across 14/24 seeds (clearCamp 6 / trade 5 /
+    buildDistrict 13). RESIDUALS: levy era ladder stays 2-step (WARRIOR/
+    SPEARMAN, not the full era ladder); the PLAYER levy verb stays
+    UI-only (`main.ts` levyUnits call), absent from the scripted
+    reference so the GPU mirrors only the rival path. Pokes:
+    `gpu/cs_verbs_test.py` (battery lane `cs_verbs`) + `tests/cs-verbs.test.ts`.
 - A-17. RESOLVED (2026-07-18, task #41): rival territory gained a
   per-city tile registry (TS `Tile.rivalCityId` / GPU `rc_tile_id`,
   persistent-rc-id keyed), fixing per-city border adjacency and exact
