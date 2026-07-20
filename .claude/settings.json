@@ -11,5 +11,21 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(export PYTHONUTF8=1)",
+      "Bash(python gpu/parity_test.py *)",
+      "Bash(python gpu/parity_test.py)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx vite-node scripts/export-gpu.ts)",
+      "Bash(python gpu/rollout.py *)",
+      "Bash(python gpu/battery.py *)",
+      "Bash(npx vitest run *)",
+      "Bash(npm test)",
+      "Bash(npm run gpu:replay)",
+      "Bash(npm run gpu:export)",
+      "Bash(tasklist *)"
+    ]
   }
 }

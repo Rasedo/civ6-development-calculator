@@ -50,6 +50,9 @@ import {
   CS_SUZERAIN_YIELD,
   CS_MAX_HP,
   CS_MEET_RANGE,
+  LEVY_UNITS,
+  LEVY_GOLD_COST,
+  LEVY_COOLDOWN,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GREAT_WORK_CULTURE } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, type BeliefEffects } from '../src/data/religion';
@@ -526,6 +529,13 @@ const rules = {
     // amount in the CS's live channel (CS_SUZERAIN_LIVE). The channel is
     // shipped per-CS-instance on csAtStart (name-keyed), -1 = descoped.
     suzerainYield: CS_SUZERAIN_YIELD,
+    // A-12 (B8-L): RIVAL levy — a militaristic CS's suzerain (rival) at war
+    // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
+    // per CS shared across seats. (Player levy is UI-only, absent from the
+    // scripted reference, so the GPU only mirrors the rival path.)
+    levyUnits: LEVY_UNITS,
+    levyGoldCost: LEVY_GOLD_COST,
+    levyCooldown: LEVY_COOLDOWN,
   },
   // Rival-civ pacing (mirrors data/rivals.ts). loyaltyAmenity is keyed by
   // amenity-tier INDEX in the same order as amenityTiers above. The

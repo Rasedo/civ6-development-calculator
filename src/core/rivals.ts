@@ -6,7 +6,7 @@
  * units raid like barbarians, and cities can be conquered.
  */
 
-import type { City, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
+import type { City, CityState, CityStateQuest, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
@@ -17,8 +17,8 @@ import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, TRADE_ROUTE_RANGE } from './trade';
-import { isSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE } from '../data/cityStates';
+import { isSuzerain, rivalIsSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
@@ -1712,6 +1712,67 @@ export function assertRivalRegistryCoherent(state: GameState): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// AUDIT A-12 (B8-L): rival city-state quests — deterministic, zero-draw
+// ---------------------------------------------------------------------------
+
+/** Has this rival satisfied its `cs` quest? The rival-seat twin of
+ *  questSatisfied (cityStates.ts) — reads THIS rival's cities/routes. */
+function rivalQuestSatisfied(
+  state: GameState,
+  rival: RivalCiv,
+  cs: CityState,
+  quest: CityStateQuest,
+): boolean {
+  switch (quest.kind) {
+    case 'clearCamp':
+      return quest.campIndex !== undefined && !state.barbCamps.includes(quest.campIndex);
+    case 'sendTradeRoute':
+      // READ-ONLY on the rival's own route list (slice T owns trade.ts).
+      return (rival.tradeRoutes ?? []).some((r) => r.toCs === cs.id);
+    case 'buildDistrict':
+      return rival.cities.some((rc) =>
+        rc.districts.some(
+          (d) => d.type === quest.district && state.map.tiles[d.tileIndex].districtComplete,
+        ),
+      );
+  }
+}
+
+/** Pick this rival's next `cs` quest with NO RNG: the FIRST SATISFIABLE
+ *  option in the fixed order clearCamp → buildDistrict → sendTradeRoute
+ *  (the B8 zero-draw design). Returns null when none apply (retry next
+ *  turn, the questIssuedTurn clock unchanged — the player-path convention). */
+function issueRivalQuest(state: GameState, rival: RivalCiv, cs: CityState): CityStateQuest | null {
+  const center = state.map.tiles[cs.centerIndex];
+  // clearCamp — the NEAREST barb camp within range 6, ties to the LOWEST tile
+  // index (the deterministic key hexDist·(nTiles+1)+tile, the A-14 convention).
+  let campIndex: number | undefined;
+  let campKey = Infinity;
+  const span = state.map.tiles.length + 1;
+  for (const i of state.barbCamps) {
+    const t = state.map.tiles[i];
+    const d = hexDistance(t.col, t.row, center.col, center.row);
+    if (d > 6) continue;
+    const key = d * span + i;
+    if (key < campKey) {
+      campKey = key;
+      campIndex = i;
+    }
+  }
+  if (campIndex !== undefined) return { kind: 'clearCamp', campIndex };
+  // buildDistrict — the CS type's district, unless this rival already holds
+  // one completed (the player's `!already` gate, rival-seat).
+  const district = CS_TYPE_DISTRICT[cs.type];
+  const alreadyBuilt = rival.cities.some((rc) =>
+    rc.districts.some((d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete),
+  );
+  if (!alreadyBuilt) return { kind: 'buildDistrict', district };
+  // sendTradeRoute — unless this rival already routes to this CS.
+  if (!(rival.tradeRoutes ?? []).some((r) => r.toCs === cs.id)) return { kind: 'sendTradeRoute' };
+  return null;
+}
+
 export function rivalPhase(state: GameState): void {
   if (state.rivals.length === 0) return;
 
@@ -1788,6 +1849,39 @@ export function rivalPhase(state: GameState): void {
           const env = (pick.rivalEnvoys ??= []);
           env[rival.id] = (env[rival.id] ?? 0) + 1;
           rival.envoysAvailable = (rival.envoysAvailable ?? 0) - 1;
+        }
+      }
+
+      // AUDIT A-12 (B8-L): RIVAL city-state quests — the ZERO-DRAW twin of
+      // cityStatePhase's quest loop, at the A-12a accrual position (right
+      // after the greedy envoy assignment). Each MET CS keeps ONE quest per
+      // rival (cs.rivalQuest[rival.id]); a satisfied one resolves here
+      // (+QUEST_ENVOYS to THIS rival's envoys — the accrual channel), else a
+      // new one issues on cooldown expiry. The kind is DETERMINISTIC: the
+      // FIRST SATISFIABLE option in the fixed order [clearCamp, buildDistrict,
+      // sendTradeRoute] against this rival's state — NO nextRandom, so the
+      // player quest path's draw count is untouched (the deferral's stated
+      // risk removed by construction). questIssuedTurn clock defaults to 0
+      // (the GPU cs_r_quest_issued zeros init) → first issue at turn≥cooldown.
+      for (const cs of state.cityStates) {
+        if (!cs.rivalMet?.[rival.id]) continue;
+        const rq = (cs.rivalQuest ??= []);
+        const rqi = (cs.rivalQuestIssuedTurn ??= []);
+        const cur = rq[rival.id] ?? null;
+        if (cur) {
+          if (rivalQuestSatisfied(state, rival, cs, cur)) {
+            rq[rival.id] = null;
+            rqi[rival.id] = state.turn;
+            const env = (cs.rivalEnvoys ??= []);
+            env[rival.id] = (env[rival.id] ?? 0) + QUEST_ENVOYS;
+            state.eventLog.push(`${cs.name} quest complete for ${rival.name}: +${QUEST_ENVOYS} envoy.`);
+          }
+        } else if (state.turn - (rqi[rival.id] ?? 0) >= QUEST_COOLDOWN) {
+          const q = issueRivalQuest(state, rival, cs);
+          if (q) {
+            rq[rival.id] = q;
+            rqi[rival.id] = state.turn;
+          }
         }
       }
     }
@@ -2073,6 +2167,37 @@ export function rivalPhase(state: GameState): void {
             }
             break;
           }
+        }
+      }
+
+      // AUDIT A-12 (B8-L): RIVAL LEVY — the levyUnits(state, csId) twin for
+      // rivals, inside the gold block AFTER every purchase (the A-5 position;
+      // the GPU levies just before _rival_trade_phase — the same point). An
+      // AT-WAR rival that is suzerain of a militaristic CS levies its troops
+      // when it can afford LEVY_GOLD_COST — ONE CS per rival per turn (the
+      // FIRST eligible in id order). LEVY_COOLDOWN is per-CS and SHARED across
+      // seats (cs.lastLevyTurn — real Civ 6: levied troops go to ONE civ), so
+      // a rival levy blocks the player and other rivals alike for the cooldown.
+      // Payment + cooldown are UNCONDITIONAL on a free spawn spot (levyUnits
+      // pays before spawnUnit, which lands the LEVY_UNITS units on the CS
+      // center or its nearest free neighbor). The type era ladder stays 2-step
+      // (WARRIOR ≤ turn 60 else SPEARMAN — residual note, mirrors levyUnits).
+      if (rival.atWar && goldAffordable(rival.treasury ?? 0, LEVY_GOLD_COST)) {
+        for (const cs of state.cityStates) {
+          if (cs.type !== 'militaristic') continue;
+          if (!rivalIsSuzerain(cs, rival.id)) continue;
+          const since = state.turn - (cs.lastLevyTurn ?? -LEVY_COOLDOWN);
+          if (since < LEVY_COOLDOWN) continue;
+          rival.treasury = (rival.treasury ?? 0) - LEVY_GOLD_COST;
+          const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
+          for (let i = 0; i < LEVY_UNITS; i++) {
+            spawnUnit(state, type, cs.centerIndex, 'rival', rival.id);
+          }
+          cs.lastLevyTurn = state.turn;
+          state.eventLog.push(
+            `${cs.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to ${rival.name}.`,
+          );
+          break;
         }
       }
     }
