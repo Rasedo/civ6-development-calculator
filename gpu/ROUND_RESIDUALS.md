@@ -113,7 +113,37 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**PLACEMENT HYPOTHESIS ALSO REFUTED (2026-07-26).** Dumped the 7 spawn
+**ROOT CLASS FOUND (2026-07-26): the draw ORDER WITHIN the turn differs,
+not the draw COUNT.** Logged the per-camp grow-roll VALUE on both sides,
+seed 9274 t139, camps in the identical order 419 / 300 / 950:
+```
+        TS          GPU
+419     0.976786    0.423530
+300     0.427542    0.635496
+950     0.159459    0.024931   <- GPU passes 0.1 and spawns; TS does not
+```
+The VALUES ARE DIFFERENT even though (a) the rng STATE is bit-identical at
+t138 AND t139, and (b) both engines consume exactly 11 draws that turn.
+Same start state + same count ⇒ the same MULTISET of 11 values. So the
+grow rolls are landing at DIFFERENT POSITIONS in that sequence: some other
+draw in the turn happens before/after them in one engine relative to the
+other. The counts cancel by end of turn, which is why every aggregate
+check (rng column, per-turn totals, per-phase totals) looked clean.
+**THIS INVALIDATES the whole "which gate differs" line of attack.** No
+gate, threshold, ordering-of-camps or placement rule is wrong — the rolls
+are simply fed different numbers.
+NEXT: find WHICH draw moved. Log, for t139, the ORDERED list of
+(phase, k-tag/site, value) on BOTH engines and diff the sequences
+position by position. The first position where the tags disagree is the
+draw that changed places. Suspects are any site whose draw is CONDITIONAL
+on state that #71 perturbed — but note the flags are all off, so look
+first at sites whose ORDER (not existence) depends on a loop bound or a
+tensor width that changed: the widened barb tables (unitCombat/
+unitRangedStrength/unitRangedRange/unitMoves are 7 wide now, was 6) are
+the standout candidate, since a `for` bound over a table width can move
+every later draw.
+
+(refuted) PLACEMENT HYPOTHESIS. Dumped the 7 spawn
 candidates around camp 950 at t139:
 ```
 950 passable barb_at=2 (its own garrison)   <- blocked, correctly
