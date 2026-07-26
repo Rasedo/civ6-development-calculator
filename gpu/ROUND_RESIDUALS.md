@@ -113,7 +113,31 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**CITY-STRIKE ASSEMBLY ALSO ELIMINATED — the CS terms MATCH (2026-07-26).**
+**THE DIVERGENT ROLL IS FOUND (2026-07-26): `vrng`, diff off by EXACTLY 10.**
+Logged EVERY k-tagged damage roll on both sides for the turn:
+```
+        TS          GPU
+pcstk   diff=-11    diff=-11   tile 864   MATCH
+rcstk   diff= 18    diff= 18   tile 297   MATCH
+vrng    diff=  3    diff= -7   tile 297   <-- DIFFERS BY 10
+```
+`vrng` is the rival RANGED strike against a unit. `diff = attacker ranged
+strength - defender CS`, so the GPU's assembly makes that defender **10
+points stronger** than TS's (or the attacker 10 weaker). The defender is
+the BARBARIAN SPEARMAN at tile 297. TS deals more damage (diff 3 vs -7),
+which is exactly the direction needed: TS kills a barb, the GPU does not.
+**THAT IS THE BUG.** Candidate 10-point terms, in order of suspicion:
+ * `xpLevelBonus` — +5 per level, so TWO levels = 10. Barbarians must
+   accrue NO xp (`gainXp` guards it) — check the GPU is not granting
+   `u_xp`/level to a barb defender, or reading a stale/reclaimed slot's xp.
+ * fortify — +3/+6, cannot make 10 alone but can combine.
+ * `religionDefenseCS` — enhancer defender adder.
+ * support — +2 per adjacent ally (5 would be needed; unlikely).
+**NEXT:** print the DEFENDER-side term breakdown at the `vrng` site on
+both engines for tile 297 (base combat, terrain, wound, fortify, xp,
+support, religion, aura) and find the 10. One print each side ends this.
+
+(eliminated) CITY-STRIKE ASSEMBLY — the CS terms match.
 Instrumented TS's pcstk/rcstk sites and compared with the GPU rows:
 ```
         TS                                     GPU
