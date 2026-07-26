@@ -113,8 +113,35 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**!! THE "DRAW ORDER" CONCLUSION IS UNFOUNDED — I COMPARED MISALIGNED
-TURNS (2026-07-26). READ THIS BEFORE USING THE TABLE BELOW. !!**
+**CORRECTED COMPARISON — THE ROLLS ARE IDENTICAL; THE DIVERGENCE IS
+DOWNSTREAM OF THE SPAWN (2026-07-26).**
+Re-ran the TS probe at `state.turn === 138` (the correct pairing for the
+GPU step producing trace label 139 — TS increments `turn` AFTER the
+phases, game.ts:938 vs barbarianPhase at :912):
+```
+camp    TS          GPU
+419     0.423530    0.423530
+300     0.635496    0.635496
+950     0.024931    0.024931   <- BOTH < 0.1: BOTH ENGINES SPAWN
+```
+So EVERYTHING upstream matches: same rng stream, same draw order, same
+camp order, same gates, same thresholds, same decision. **TS spawns a
+barbarian at camp 950 too.** The earlier "draw order differs" claim was
+purely the turn-misalignment artifact and is fully retracted.
+
+=> The divergence is what happens to that unit AFTERWARDS, inside the same
+turn: the raider walk runs later in `barbarianPhase`, and the GPU's new
+unit ends t139 alive at tile 864 with hp 82. The TS unit must either fail
+to PLACE (spawnUnit returns null -> no unit) or be KILLED during that
+walk. Either way it is a post-spawn difference, which also explains the
+hp 82 and the 2 extra draws at t140 (the surviving GPU unit attacks).
+**NEXT:** in TS at `state.turn === 138`, log immediately after the camp
+loop whether the camp-950 `spawnUnit` returned a unit and, if so, its
+tile; then log the barb roster at the END of that turn. Compare with the
+GPU's slot30 (spawn tile, end tile 864, hp 82). That pins it to either
+placement-returned-null or a death in the raider walk.
+
+(retracted, artifact) the misaligned-turn table:
 TS increments `state.turn` at game.ts:938, AFTER `barbarianPhase` at
 game.ts:912. So a TS probe firing at `state.turn === 139` logs the phases
 that produce the trace row labelled **140**, while my GPU probe logged the
