@@ -113,8 +113,33 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**A CONTRADICTION — one of the 'matching' premises below is FALSE and
-must be re-measured first (2026-07-26).**
+**CONTRADICTION RESOLVED — it is a SPAWN-PLACEMENT divergence, not an
+RNG one (2026-07-26).** Printed both engines' rng side by side:
+```
+t138: TS=566183240   GPU=566183240    draws TS=9  GPU=9
+t139: TS=3533537999  GPU=3533537999   draws TS=11 GPU=11   <-- IDENTICAL
+t140: TS=2837761132  GPU=2205925462   draws TS=9  GPU=11   <-- diverges
+```
+So the rng premise was CORRECT: through t139 the two engines are
+bit-identical in state AND in draw count (11 each). Yet the GPU gains a
+barbarian at t139 (traced barbs 6 vs 7).
+=> Same draws, same values, same thresholds, same camps, same order, same
+gates — and still a different unit count. The ONLY way that happens is a
+spawn that CONSUMES NO DRAW: the roll passed in BOTH engines, but the
+GPU PLACED the unit and TS did NOT.
+**THE BUG IS IN SPAWN PLACEMENT.** TS `spawnUnit` returns null when it
+finds no legal free tile (and the raid branch then simply produces
+nothing); the GPU's `_spawn_barb` calls `_first_free_spot(at_tile,
+"barb")` and evidently found one. Diff those two placement rules —
+candidate ring order, what counts as occupied (stacking rules: own
+civilian vs military, embarked units), water/impassable exclusion, and
+whether a unit spawned EARLIER in the same camp loop blocks the tile.
+This also explains the extra unit arriving at hp 82 rather than 100: it
+was placed somewhere it immediately took fire.
+The whole earlier gate/threshold/order analysis was chasing the wrong
+half of the mechanism — the draw was never the difference.
+
+(resolved) A CONTRADICTION — one of the premises is false.
 Thresholds now checked too: `garrisonGrowChance` 0.1, `campSpawnChance`
 0.08, `maxBarbPerCamp` 3 — all identical to the TS literals. So the
 collected facts are mutually inconsistent:
