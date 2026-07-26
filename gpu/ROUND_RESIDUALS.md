@@ -60,7 +60,38 @@ its verification status.
   #70-era "suspicious" note to dissolve under verification rather than
   need a fix.
 
-## LADDER STATE (2026-07-26) — scripted GREEN, rollout RED
+## LADDER STATE — resume HERE
+
+GREEN: tsc; full vitest (45 files / 389 tests); export (rules.json
+asserted); FORCED compaction 0.0 milli.
+
+RED, scripted parity: ONE seed, at the very LAST turns —
+`seed 9287 turn 250: MISMATCH [('rng', ...), ('barbs', 5.0, 4.0)]`.
+The GPU holds one FEWER barbarian and draw counts split. Prime suspect is
+#71's SCOUT-THEN-RAID opener (B-26): a new camp's first unit is a SCOUT
+(barb u_type 6) instead of a warrior, and a scout has combat 10 vs a
+warrior's 20 — so it dies where a warrior lived, which changes how many
+rolls follow. CHECK FIRST: that every barb-indexed table is 7 wide on the
+GPU (unitCombat is; verify unit_naval / charges / any other u_type-indexed
+tensor), and that _barb_scout_type resolves to 6 and not the 0 fallback.
+If the tables are fine, this is a genuine behaviour split at the camp
+spawn and wants a statelog.
+
+RED, rollout: 3 failures — seed 9235 rng 2026006132 t110 col88, seed 9235
+rng 2026006134 t38 col9 (rng), seed 9261 rng 2026006138 t134 col11. Same
+draw-count family, off-script only.
+
+**A SELF-INFLICTED BUG WORTH REMEMBERING.** Python `str.replace` replaces
+ALL occurrences. Patching the ranged sites by string match silently hit
+the PRE-EXISTING B6-S1 unit-vs-unit religion adders as well as the new
+city ones, stripping them and turning scripted parity red across many
+seeds. Fixed by normalising all FIVE ranged damage-roll sites explicitly
+BY LINE: 583 rngrc and 591 rngcs are PLAYER-only and carry NO religion
+term (the GPU never sets the player's holy city); 603 rng, 633 vrngc and
+655 vrng DO carry it. When patching repeated code shapes, edit by line
+index or assert an occurrence count — never a bare replace.
+
+## (superseded) earlier ladder note — scripted GREEN, rollout RED
 
 RUN AND GREEN: tsc; full vitest (45 files, 389 tests); export (24 seeds,
 rules.json asserted — new keys land under rivals.beliefs / rivals.eras);

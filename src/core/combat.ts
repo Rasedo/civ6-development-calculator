@@ -379,11 +379,16 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-4: attacker veterancy (the city is not a unit — no defender xp)
-    // #71 (debt): the enhancer attacker adders apply to city assaults too.
-    // Crusade/Just War raise the UNIT's combat strength by where the unit is
-    // standing, not by what it is hitting, so a city target cannot exempt
-    // them. Term order matches the unit-vs-unit assembly: religion then aura.
-    religionAttackCS(state, attacker, city.centerIndex) +
+    // #71 (debt): the enhancer attacker adders apply to city assaults too —
+    // Crusade/Just War raise the UNIT's combat strength by where it STANDS,
+    // not by what it hits. Scoped to RIVAL attackers only, because the GPU
+    // never sets the PLAYER's holy city (holy_tile[:, 0] is written nowhere),
+    // so a player religion exists in TS and not on the GPU. That asymmetry is
+    // PRE-EXISTING (the unit-vs-unit sites carry it too, dormant) but applying
+    // the term here made it REACHABLE off-script — rollout seeds 9183/9235 went
+    // red on draw counts. Record as a G-item; drop this guard the moment the
+    // GPU grows a player holy city (it rides #50's religion verb).
+    (attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) +
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8): the aura covers city assaults too
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
@@ -528,7 +533,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // folds in support AND the embarked-defender override (flat CS, no terms).
     // B-4: attacker veterancy joins the flank term; defenderCS folds in the
     // defender's own level bonus. Applied once so both paired rolls agree.
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
@@ -575,7 +580,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
         const defCS = rivalCityDefense(state, rc.rival, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
         return ok;
@@ -583,7 +588,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const cs = cityStateAt(state, targetIndex);
       if (cs && cs.centerIndex === targetIndex) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
         return ok;
@@ -730,7 +735,7 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-29 wound + river (city not a unit) + B-4 attacker veterancy
-    religionAttackCS(state, attacker, city.centerIndex) + // #71 (debt): see attackCity
+    (attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = rivalCityDefense(state, rival, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
@@ -777,7 +782,7 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
-    religionAttackCS(state, attacker, cs.centerIndex) + // #71 (debt): see attackCity
+    (attacker.owner === 'rival' ? religionAttackCS(state, attacker, cs.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
