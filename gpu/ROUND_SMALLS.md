@@ -97,6 +97,25 @@ at a single mechanic.
 
 ## BATCH STATUS (2026-07-26) — RESUME HERE
 
+### Live status (updated 2026-07-26, mid-batch)
+| slice | TS | GPU |
+|---|---|---|
+| S1 music split | DONE (committed `040c49b`, fully gated) | DONE |
+| S2 aura at city/CS sites | DONE (10 sites incl. `rngrc`) | DONE (12 sites) |
+| S3 aura +1 MP | DONE (`aura.ts`, `movesFull`, 5 vitest green) | IN PROGRESS |
+| S4 palace relocation | DONE (`relocatePalace`, 3 loser-side sites) | NOT STARTED |
+| S5 ranged barbs | DONE (`barbRangedType`, every 3rd camp) | NOT STARTED |
+
+`npx tsc --noEmit` clean; ALL TS work for the round is complete and
+uncommitted. NO gate has been run since S1 (batched round). Do not
+commit a slice whose GPU half is missing.
+
+CAUGHT BY THE S2 AGENT, worth keeping: my TS pass MISSED the `rngrc`
+site (player ranged bombardment of a rival city). The agent left the GPU
+side untouched rather than silently diverge, and reported it — both
+sides are now fixed. A second inventory gap, same lesson as the
+fabricated premises: enumerate by damage-roll KEY, never by memory.
+
 - **S1 B-20 music split — DONE, gated, committed `040c49b`.**
 - **S2 aura at city/CS sites — TS SIDE COMPLETE (uncommitted), GPU SIDE
   NOT STARTED.** TS edits landed at all 9 sites: `attackCity`,
@@ -172,8 +191,31 @@ model and stay untouched. Net effect: TS converges ON the GPU's design,
 so the engines end up MORE aligned than before, and the one-turn
 mis-gate quirk of the rejected option never exists.
 
-GPU work for S3 is then only: add the aura MP at the movement-reset site
-so the granted pool matches TS.
+GPU work for S3 — CORRECTION (found 2026-07-26 while mirroring): it is
+NOT a one-line add, and it DOES need new pooled state.
+
+TS freezes the granted pool ONCE per turn: `refreshUnits` runs at the TOP
+of `endTurn`, before anything moves, and `movesLeft` is spent down from
+that frozen value. The GPU has no persistent movesLeft at all — it
+recomputes `full_mp = self._p_moves[...]` INSIDE each walker (7 sites:
+~6780, 6894, 6970, 8872, 8885, 9190, 9196), i.e. at WALK time, partway
+through the turn.
+
+That difference is invisible today because `full_mp` depends only on unit
+TYPE, which cannot change mid-turn. The aura breaks it: the bonus depends
+on a GENERAL's POSITION, and rival generals war-walk during the very
+phase these walkers run (`rivalGeneralActions` / `_rival_general_actions`).
+So a rival unit could read a pre-move aura in TS and a post-move aura on
+the GPU — a textbook dormant divergence, the same class as the B7-G
+stale-aura-plane catch.
+
+REQUIRED DESIGN: snapshot the per-unit aura MP bonus on the GPU at the
+SAME point TS freezes it — the refresh site where `p_acted`/`u_acted`/
+`v_acted` are zeroed — into per-pool tensors, and have all 7 walkers read
+the snapshot instead of recomputing. Barbarians never have generals, so
+only the player and rival pools need it. The tensors are per-slot pooled
+state: register in `_MUTABLE` and carry them through `_reclaim_pool` /
+`_reclaim_rc` slot permutations like every other per-unit field.
 
 ## Bar (once, at the END of the batch)
 
