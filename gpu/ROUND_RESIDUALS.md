@@ -60,7 +60,33 @@ its verification status.
   #70-era "suspicious" note to dissolve under verification rather than
   need a fix.
 
-## OPEN PARITY FAILURE — resume the hunt HERE
+## LADDER STATE (2026-07-26) — scripted GREEN, rollout RED
+
+RUN AND GREEN: tsc; full vitest (45 files, 389 tests); export (24 seeds,
+rules.json asserted — new keys land under rivals.beliefs / rivals.eras);
+scripted parity 24x250 at 0.0 milli; FORCED compaction
+(CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3) at 0.0 milli.
+
+RED: `gpu/rollout.py --shards 4 --pipeline-replay` — 2 failures, first at
+`seed 9235 rng 2026006134 turn 38, column 9` (= the `rng` HEAD column).
+A DRAW-COUNT divergence, and OFF-SCRIPT ONLY: scripted play never reaches
+it. Draw counts diverging means an earlier OUTCOME differed and changed
+how many rolls followed — the rng column is the symptom, not the cause.
+
+Nothing landed this round adds a conditional draw by construction
+(theological combat, dedications, the scout opener and the religion/aura
+adders are all zero-draw), so the likely cause is a DAMAGE change killing
+a unit in one engine and not the other, which then changes how many
+attacks follow. Prime suspect: #71's religion adders on the six
+city-attack sites, or B-8's admiral march changing unit positions.
+HUNT RECIPE: `python gpu/rollout.py --turns 250 --log 2026006134` +
+`CIV6_LOG=2026006134 npx vite-node scripts/replay-gpu.ts` +
+`python gpu/logdiff.py` — the statelog names the first divergent FIELD,
+which is what to chase, not the rng column itself.
+
+NOT YET RUN: standalone poke-lane sweep, battery, AUDIT close-out.
+
+## RESOLVED PARITY FAILURES (kept — the ruled-out list is load-bearing)
 
 The ladder was run mid-round (deliberately, to validate 8 landed items
 before adding more). tsc clean, full export clean, rules.json asserted —
