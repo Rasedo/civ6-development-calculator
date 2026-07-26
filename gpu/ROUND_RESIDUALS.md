@@ -113,8 +113,33 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**CORRECTED COMPARISON — THE ROLLS ARE IDENTICAL; THE DIVERGENCE IS
-DOWNSTREAM OF THE SPAWN (2026-07-26).**
+**IT IS COMBAT DAMAGE IN THE RAIDER WALK — units and positions MATCH,
+only HP differs (2026-07-26).**
+Logged the TS barb roster before and after the raider walk at the
+correctly-aligned turn:
+```
+TS after camp loop : 419 W100, 300 W100, 950 W100, 299 S100, 341 S100,
+                     342 P100, 951 P100        <- 7 barbs, the new PIKEMAN at 951
+TS after raider walk: ... 297 SPEARMAN 100 ... 864 PIKEMAN 100   <- 7 barbs
+GPU same turn      : ... 297 SPEARMAN  13 ... 864 PIKEMAN  82
+```
+So TS SPAWNS the pikeman too (at tile 951, exactly where the GPU places
+it), and BOTH engines walk it to 864 and the spearman to 297. **Same
+units, same count, same tiles — ONLY THE HP DIFFERS.** The GPU's two
+raiders take 87 and 18 damage that the TS units do not.
+=> Spawn, placement, walk destination and draw stream are ALL identical.
+The divergence is DAMAGE RESOLUTION during the raider walk. (And the
+traced `barbs` column showing TS 6 vs GPU 7 is a LATER effect: with a
+barb at hp 100 vs 13, the city/walls strike that runs after the walk
+kills one in TS and not on the GPU.)
+**NEXT: diff the damage assembly for those two barb attacks.** #70 put
+LIVE changes exactly there — the general/admiral aura now applies at the
+city-strike sites AND the +1 MP half is live. Check `_hostile_vs_unit` /
+`hostileUnitAct` CS terms for a barb attacker and its defender, and dump
+the k-tagged damage rolls for this turn on both engines side by side
+(the CB combat-log lines exist for precisely this).
+
+(context) CORRECTED COMPARISON — rolls identical, divergence downstream.
 Re-ran the TS probe at `state.turn === 138` (the correct pairing for the
 GPU step producing trace label 139 — TS increments `turn` AFTER the
 phases, game.ts:938 vs barbarianPhase at :912):
