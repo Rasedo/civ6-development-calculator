@@ -612,6 +612,12 @@ class BatchSim:
         # columns enumerate AXIAL_DIRS order (E NE NW W SW SE), the same
         # order the mask's bits use: bit d = crossing toward neigh column d.
         self.river_mask = torch.tensor([[int(t.get("rm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # A-9 (#71): per-tile APPEAL contribution (core/appeal.ts tileAppeal
+        # sums what each NEIGHBOUR contributes). `ap` = static part + the t0
+        # feature term; `ap_feat` isolates that feature term so a chopped tile
+        # subtracts exactly it. Dynamic terms are applied in _tile_appeal.
+        self.appeal_base = torch.tensor([[int(t.get("ap", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        self.appeal_feat = torch.tensor([[int(t.get("apf", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.r_alive = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # static: placed at creation
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
@@ -1029,6 +1035,8 @@ class BatchSim:
         self._imp_ids = list(ids)  # A-13: roster names (statelog TI lines)
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
+        self.QUARRY = ids.index("QUARRY") if "QUARRY" in ids else -1  # A-9 (#71): appeal -1
+        self.OIL_WELL = ids.index("OIL_WELL") if "OIL_WELL" in ids else -1
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
         # P4/D-20: food improvements heal their pillager (combat.ts
         # PILLAGE_HEAL_IMPROVEMENTS); indexed by improvement code.
@@ -1133,6 +1141,18 @@ class BatchSim:
         # its scaffold slot (the player queue-head codes for the district and
         # its buildings — game.ts isEncampmentItem).
         self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "ENCAMPMENT"), -1)
+        # A-9 (#71): districts that LOWER neighbouring appeal (core/appeal.ts),
+        # and the NEIGHBORHOOD column whose housing reads the appeal tier.
+        self._appeal_bad_dist = [
+            i for i, d in enumerate(self.districts_cat)
+            if d.get("id") in ("INDUSTRIAL_ZONE", "ENCAMPMENT")
+        ]
+        self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
+        # appealTier thresholds -> Neighborhood housing (real Civ 6, sourced):
+        # >=4 Breathtaking 6, >=2 Charming 5, >=0 Average 4, >=-2 Uninviting 3,
+        # else Disgusting 2.
+        self._appeal_cuts = [(4, 6), (2, 5), (0, 4), (-2, 3)]
+        self._appeal_floor = 2
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
         self._rl_district_active = True  # D5b: the RL production head can place districts (off-script) — mask columns NB+2+NU+si
@@ -1566,6 +1586,7 @@ class BatchSim:
         self._adjc_cache = None
         self._adjh_cache = None
         self._fadjq_cache = None
+        self._appeal_cache = None  # A-9 (#71): _tile_appeal, _eff_version-keyed
         self._fadjf_cache = None
         self._rcy_cache = None
         self._bld_cache = None
@@ -2786,6 +2807,38 @@ class BatchSim:
         )
         self.v_aura_mp = (v_hit & v_ok).long() * self._gen_aura_mp
 
+    def _tile_appeal(self) -> torch.Tensor:
+        """A-9 (#71): [B, T] tile appeal, the `tileAppeal` (core/appeal.ts)
+        mirror. TS sums each NEIGHBOUR's contribution, so build a per-tile
+        contribution then gather it over `neigh`.
+
+        `appeal_base` carries the static part (natural wonder +2, mountain +1,
+        coast/lake +1) plus the tile's t0 feature term; a chopped tile
+        subtracts `appeal_feat` via feat_stripped. The rest is live: a
+        COMPLETED built wonder +1, MINE/QUARRY/OIL_WELL -1, and an
+        INDUSTRIAL_ZONE or ENCAMPMENT district -1. Version-cached like
+        _farmadj_qual — every contributing write already bumps _eff_version."""
+        if self._appeal_cache is not None and self._appeal_cache[0] == self._eff_version:
+            return self._appeal_cache[1]
+        contrib = self.appeal_base - torch.where(self.feat_stripped, self.appeal_feat, torch.zeros_like(self.appeal_feat))
+        contrib = contrib + (self.built_wonder_complete & (self.built_wonder >= 0)).long()
+        imp = self.improvement
+        bad_imp = torch.zeros_like(contrib, dtype=torch.bool)
+        for _i in (self.MINE, self.QUARRY, self.OIL_WELL):
+            if _i >= 0:
+                bad_imp |= imp == _i
+        contrib = contrib - bad_imp.long()
+        if self._appeal_bad_dist:
+            bad_d = torch.zeros_like(contrib, dtype=torch.bool)
+            for _d in self._appeal_bad_dist:
+                bad_d |= self.district == _d
+            contrib = contrib - bad_d.long()
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        out = (contrib[:, nbc] * (nb >= 0).unsqueeze(0).long()).sum(dim=2)  # [B, T]
+        self._appeal_cache = (self._eff_version, out)
+        return out
+
     def _farmadj_qual(self) -> torch.Tensor:
         """[B, T] bool: a non-pillaged FARM with >=2 neighboring FARM tiles
         (yields.ts:60). Tile-based and CIV-INDEPENDENT — the per-civ tier
@@ -3206,6 +3259,21 @@ class BatchSim:
             water_h = torch.where(has_aq, aq_h, self.water_housing)
         house_b = cc["house_b"] if cc is not None else torch.einsum("bcn,n->bc", bf_live, rd.b_housing)  # D-10 (B-32: bf_live)
         housing = water_h + self.is_cap.to(self.dtype) * self._palace_housing + house_b
+        # A-9 (#71): NEIGHBORHOOD housing is APPEAL-based, so it cannot ride the
+        # flat b_housing/district table (its catalog row is housing: 0). TS:
+        # `total += appealTier(tileAppeal(map, dt)).housing` per COMPLETE
+        # unpillaged Neighborhood the city owns (computeHousing, city.ts).
+        if self._nbhd_didx >= 0:
+            _ap = self._tile_appeal()
+            _hv = torch.full_like(_ap, self._appeal_floor)
+            for _cut, _val in sorted(self._appeal_cuts):  # ascending: higher tiers overwrite
+                _hv = torch.where(_ap >= _cut, torch.full_like(_ap, _val), _hv)
+            _nb_ok = (self.district == self._nbhd_didx) & self.district_complete & ~self.district_pillaged
+            _own = self.owner
+            _src = (_hv * _nb_ok.long()).to(self.dtype) * (_own >= 0).to(self.dtype)
+            _nb_h = torch.zeros_like(housing)
+            _nb_h.scatter_add_(1, _own.clamp(min=0), _src)
+            housing = housing + _nb_h
         # B-18: follower Religious Community — +housing on Shrines/Temples
         # (computeHousing beliefHousing), keyed per-city on the followed religion.
         if _pcfol is not None:
@@ -10786,6 +10854,23 @@ class BatchSim:
                 # rc.buildings, which now hold the founding PALACE; CITY_CENTER
                 # never pillages so no darkness gate).
                 housing = water + bh + self._palace_housing * (self.rc_is_cap[:, r] & self.rc_alive[:, r]).double() + farm
+                # A-9 (#71): appeal-based NEIGHBORHOOD housing, the player twin
+                # (computeHousing). rc tiles are keyed by the A-17 per-city
+                # registry (rc_tile_id), so sum per rc SLOT over its own tiles.
+                if self._nbhd_didx >= 0:
+                    _ap = self._tile_appeal()
+                    _hv = torch.full_like(_ap, self._appeal_floor)
+                    for _cut, _val in sorted(self._appeal_cuts):
+                        _hv = torch.where(_ap >= _cut, torch.full_like(_ap, _val), _hv)
+                    _nb_ok = (self.district == self._nbhd_didx) & self.district_complete & ~self.district_pillaged
+                    _mine = _nb_ok & (self.rival_at == r)
+                    _srcd = (_hv * _mine.long()).double()
+                    _rid = self.rc_tile_id  # [B, T] persistent rc id, -1 = none
+                    _nbh = torch.zeros_like(housing)
+                    for _j in range(self.RC):
+                        _idj = self.rc_id[:, r, _j].unsqueeze(1)  # [B, 1]
+                        _nbh[:, _j] = (_srcd * ((_rid == _idj) & (_idj >= 0)).double()).sum(dim=1)
+                    housing = housing + _nbh
                 if _rcy_bel:
                     housing = housing + torch.einsum("bjn,bjn->bj", selb_h.double(), self._fol_tab("bldgH", _fol_h_rc))
                     housing = housing + _riv_h.unsqueeze(1) * self.tile_river.gather(1, _ctr_r).double()

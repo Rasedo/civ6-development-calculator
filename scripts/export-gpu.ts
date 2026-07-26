@@ -1390,6 +1390,24 @@ for (let s = 0; s < N_SEEDS; s++) {
         return (s.food ?? 0) * 1.2 + (s.production ?? 0) + (s.gold ?? 0) * 0.5;
       }),
       hl: t.elevation === 'HILLS' ? 1 : 0,
+      // A-9 (#71): tile APPEAL contributions. `tileAppeal` (core/appeal.ts)
+      // sums what each NEIGHBOUR contributes, so ship the per-tile
+      // contribution and let the GPU gather it over `neigh`. `ap` is the
+      // STATIC part (natural wonder +2, mountain +1, coast/lake +1) PLUS this
+      // tile's t0 feature term; `apf` isolates that removable-feature term so
+      // a chopped tile can subtract exactly it via feat_stripped. The rest is
+      // DYNAMIC and recomputed GPU-side (completed built wonder +1,
+      // MINE/QUARRY/OIL_WELL -1, INDUSTRIAL_ZONE/ENCAMPMENT -1).
+      ap: (() => {
+        let a = 0;
+        if (t.wonder) a += 2;
+        if (isMountain(t) && !t.wonder) a += 1;
+        if (t.terrain === 'COAST' || t.terrain === 'LAKE') a += 1;
+        if (t.feature === 'WOODS') a += 1;
+        if (t.feature === 'RAINFOREST' || t.feature === 'MARSH') a -= 1;
+        return a;
+      })(),
+      apf: t.feature === 'WOODS' ? 1 : t.feature === 'RAINFOREST' || t.feature === 'MARSH' ? -1 : 0,
       // AUDIT A-8: river-edge crossing bits for the rival MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
       // the same order riverMask bits use — so bit d = crossing toward

@@ -74,31 +74,21 @@ its verification status.
    `_gen_aura_hit`, not by the walker. B-8's ONLY remaining residual is
    the controlled-rival RL mask, which rides #50 — so B-8 is complete
    for everything outside #50.
-3. **A-9 (0.2)** — NEIGHBORHOOD. **PREMISE VERIFIED 2026-07-26, spec
-   below is sourced — implement directly, do NOT re-derive:**
-   * housing BY APPEAL TIER: Breathtaking 6 / Charming 5 / Average 4 /
-     Uninviting 3 / Disgusting 2;
-   * unlocked by the URBANIZATION civic;
-   * NO per-city limit (it is not a specialty district, so
-     `countsTowardLimit` must be FALSE — note the P4 boost bug where
-     AQUEDUCT wrongly counted toward "build any specialty district");
-   * `districtMaintenance` already exempts NEIGHBORHOOD (0 gold).
-   **RECON RESULT — the TS side is ALREADY DONE.** `computeHousing`
-   (city.ts) already runs `total += appealTier(tileAppeal(map, dt)).housing`
-   for a complete unpillaged NEIGHBORHOOD, and the districts row already
-   carries `countsTowardLimit: false`, `allowMultiple: true` and
-   `housing: 0 // appeal-based`. So A-9's REAL remaining work is only:
-   (a) add NEIGHBORHOOD to `SCAFFOLD_DISTRICTS` — it is deliberately held
-   out with a now-STALE comment ("stays out pending the appeal-housing
-   stage"; that stage has landed), so today nothing ever BUILDS one;
-   (b) the GPU side, which has NO NEIGHBORHOOD handling at all (grep finds
-   it only in the exporter's maintenance-exempt list) and NO appeal plane —
-   the plane must be derived and kept live against feature/terrain changes,
-   which is the whole cost of this item.
-   VERIFY BEFORE (a): that `appealTier().housing` really returns 6/5/4/3/2,
-   and that flipping the scaffold does not trip the specialty-district
-   BOOST predicate (the P4 AQUEDUCT bug) — `countsTowardLimit: false`
-   should already protect it, but the GPU `_detect_boosts` twin must agree.
+3. [x] **A-9 (0.2) — DONE, BOTH ENGINES.** Sourced values shipped:
+   housing 6/5/4/3/2 at appeal >=4 / >=2 / >=0 / >=-2 / else, URBANIZATION
+   unlock, `countsTowardLimit:false` + `allowMultiple:true`.
+   TS already had `computeHousing`'s appeal term; added the RIVAL twin
+   (rivals get no generic district housing, so NEIGHBORHOOD is the one
+   district row contributing there — same shape as the GPU) and flipped
+   NEIGHBORHOOD into `SCAFFOLD_DISTRICTS` (its hold-out comment was stale).
+   GPU: exporter ships per-tile `ap` (static appeal contribution + the t0
+   feature term) and `apf` (that feature term alone, so a chopped tile
+   subtracts exactly it); `_tile_appeal()` gathers contributions over
+   `neigh` with the LIVE deltas TS applies — completed built wonder +1,
+   MINE/QUARRY/OIL_WELL -1, INDUSTRIAL_ZONE/ENCAMPMENT -1 — cached on
+   `_eff_version` like `_farmadj_qual`; the tier housing is summed per
+   player city column and per rc slot (via the A-17 `rc_tile_id` registry).
+
 4. **B-18 (0.2)** — apostles + theological combat on the existing
    missionary chassis. VERIFY apostle combat rules.
 5. **B-26 (0.6)** — cliffs, naval barbs, scout-then-raid escalation.

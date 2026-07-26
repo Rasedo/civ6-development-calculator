@@ -61,6 +61,7 @@ import {
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
 import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
+import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from './units';
@@ -1532,6 +1533,15 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
     if (bd && pillaged.has(bd.district)) continue; // B-32: dark buildings
     total += bd?.housing ?? 0;
     total += m.buildingHousingAdd[id] ?? 0;
+  }
+  // A-9 (#71): appeal-based NEIGHBORHOOD housing — the computeHousing twin.
+  // Rivals get no GENERIC district housing (only the Aqueduct term above), so
+  // this is the one district row that contributes here, exactly as on the GPU.
+  for (const d of rc.districts) {
+    if (d.type !== 'NEIGHBORHOOD') continue;
+    const dt = map.tiles[d.tileIndex];
+    if (!dt.districtComplete || dt.districtPillaged) continue;
+    total += appealTier(tileAppeal(map, dt)).housing;
   }
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
   const civ = civOfRival(rival.id);

@@ -254,7 +254,13 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
  * the append runs yields-first with Encampment last (its BUILD_PLAN D6
  * hold-out is lifted; cap competition is intended, real AIs build early
  * Encampments). `unlockKind: 'civic'` marks civic-tree unlocks (the default
- * is a tech id); NEIGHBORHOOD stays out pending the appeal-housing stage.
+ * is a tech id). A-9 (#71): NEIGHBORHOOD is IN now — the appeal-housing stage
+ * it was waiting on has landed on both engines (computeHousing /
+ * rivalCityHousing read appealTier(tileAppeal(...)), and the GPU mirrors it
+ * via _tile_appeal over the exported `ap`/`apf` contributions). It is placed
+ * LAST so the specialty scaffold keeps first-placeable-wins priority, and it
+ * carries countsTowardLimit:false + allowMultiple:true, so it neither eats a
+ * specialty slot nor trips the "build any specialty district" boost.
  */
 export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?: 'civic'; placement?: 'aqueduct' | 'coastal' | 'encampment' }[] = [
   { id: 'CAMPUS', unlockId: 'WRITING' },
@@ -266,4 +272,5 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'THEATER_SQUARE', unlockId: 'DRAMA_AND_POETRY', unlockKind: 'civic' },
   { id: 'ENTERTAINMENT_COMPLEX', unlockId: 'GAMES_AND_RECREATION', unlockKind: 'civic' },
   { id: 'ENCAMPMENT', unlockId: 'BRONZE_WORKING', placement: 'encampment' },
+  { id: 'NEIGHBORHOOD', unlockId: 'URBANIZATION', unlockKind: 'civic' }, // A-9 (#71)
 ];
