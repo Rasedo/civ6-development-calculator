@@ -86,7 +86,27 @@ own bug, so reverting either one still leaves the other red.
   such revert. An ENGINE-side divergence that survives a near-total src
   revert.
 
-CAVEAT ON THE SECOND MEASUREMENT — read before trusting it. When I ran
+**CLEAN RE-RUN DONE — the engine-side divergence is CONFIRMED.** ALL of
+`src/` and `scripts/` at 6a8fd48, ONLY `gpu/civ6gpu/engine.py` at #71,
+re-exported: parity RED at `seed 9274 turn 140 [('rng', ...)]`. So the
+#71 engine diverges from the baseline TS reference with every flag off.
+The caveat below is resolved; the label holds.
+
+It is an `rng` (DRAW-COUNT) divergence, which narrows it hard: with the
+baseline exporter every #71 gate is off (`apostleIdx` -1 so the
+theological pre-pass is skipped, `_apostle_buy_live` / `_tile_buy_live` /
+`_ded_payouts_live` / `_city_rel_live` / `_barb_scout_live` all False),
+and the always-on additions — `_tile_appeal`, the player and rc
+NEIGHBORHOOD housing adds, `prev_age`/`dedications`, `_u_moves` — are all
+pure arithmetic that add exact zeros and CANNOT move a draw count.
+So look for a path that changes CONTROL FLOW, not arithmetic. Highest
+value next step: instrument draws per phase for seed 9274 around t140 in
+both engines (the H300 technique — dump `rng_state` per phase, then per
+sub-phase, since mulberry32 step count == draw count) rather than
+re-reading diffs. Also worth checking that `r_tiles_purchased` joining
+`_MUTABLE` has not perturbed snapshot/restore ordering.
+
+(resolved) CAVEAT ON THE SECOND MEASUREMENT. When I ran
 "#71 engine + baseline src", `src/core/eras.ts` and `src/core/game.ts`
 had ALREADY BEEN RESTORED to #71, so the dedication substrate was live on
 the TS side during that run. The "engine-side" label is therefore NOT
