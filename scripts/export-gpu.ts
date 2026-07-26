@@ -728,6 +728,16 @@ const rules = {
     missionaryCost: UNITS.MISSIONARY.cost,
     spreadPressure: SPREAD_PRESSURE,
     missionaryCap: MISSIONARY_CAP,
+    // B-18 (#71): the APOSTLE — faith-buy twin of the missionary, plus the
+    // theological-combat constants. Religious strengths ride the roster.
+    apostleIdx: Object.values(UNITS).findIndex((u) => u.id === 'APOSTLE'),
+    apostleCost: UNITS.APOSTLE.cost,
+    apostleCap: APOSTLE_CAP,
+    relStrength: Object.values(UNITS).map((u) => u.religiousStrength ?? 0),
+    theoDamage: THEO_DAMAGE,
+    theoBaseDamage: THEO_BASE_DAMAGE,
+    theoPressureSwing: THEO_PRESSURE_SWING,
+    theoPressureRange: THEO_PRESSURE_RANGE,
     pantheons: Object.values(PANTHEONS).map(beliefRow),
     followers: Object.values(FOLLOWER_BELIEFS).map(beliefRow),
     founders: Object.values(FOUNDER_BELIEFS).map(beliefRow),

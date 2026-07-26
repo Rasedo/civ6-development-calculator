@@ -877,6 +877,16 @@ class BatchSim:
         _mlump0 = int(_bl.get("spreadPressure", 10))
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
+        # B-18 (#71): APOSTLE + theological combat.
+        self._apostle_idx = int(_bl.get("apostleIdx", -1))
+        self._apostle_cost = float(_bl.get("apostleCost", 200))
+        self._apostle_cap = int(_bl.get("apostleCap", 1))
+        _rs = _bl.get("relStrength") or []
+        self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
+        self._theo_dmg = int(_bl.get("theoDamage", 2))
+        self._theo_base = int(_bl.get("theoBaseDamage", 30))
+        self._theo_swing = float(_bl.get("theoPressureSwing", 15))
+        self._theo_range = int(_bl.get("theoPressureRange", 6))
         self._enh = {
             "presR": torch.tensor([0.0] + [float(x.get("presR", 0)) for x in _erows], dtype=torch.float64, device=device),
             "tradeRel": torch.tensor([[0.0] * 6] + [list(x.get("tradeRel", [0.0] * 6)) for x in _erows], dtype=torch.float64, device=device),
@@ -7150,7 +7160,11 @@ class BatchSim:
         _rel_combat_planes key both stay exact — no version bump. Zero RNG."""
         B, T, dev = self.B, self.T, self.device
         g = r + 1
-        cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._missionary_idx) & (self.v_charges > 0)
+        # B-18 (#71): apostles spread on the SAME chassis as missionaries.
+        _relig = (self.v_type == self._missionary_idx)
+        if self._apostle_idx >= 0:
+            _relig = _relig | (self.v_type == self._apostle_idx)
+        cand = self.v_alive & (self.v_civ == r) & _relig & (self.v_charges > 0)
         if not bool(cand.any()):
             return
         # target mask [B, T]: ALIVE city centers following != g. scatter_add_
@@ -10717,6 +10731,24 @@ class BatchSim:
                         chg_m5 = self._p_charges[self._missionary_idx] + self._enh["mchg"][self.r_enhancer[:, r] + 1]
                         landed_m5 = self._spawn_rival_civ(buy_m5, at_m5, r, type_idx=self._missionary_idx, charges=chg_m5)
                         self.r_faith[:, r] = torch.where(landed_m5, self.r_faith[:, r] - mcost5, self.r_faith[:, r])
+            # B-18 (#71): the APOSTLE buy — the missionary block's twin, run
+            # AFTER it so the cheaper unit still saturates first (the TS
+            # ordering). Same SHRINE + complete unpillaged HOLY_SITE gate,
+            # same first-eligible-slot pick, same spawn-refund convention.
+            if self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
+                n_live_a = (self.v_alive & (self.v_civ == r) & (self.v_type == self._apostle_idx)).sum(dim=1)
+                acost = self._enh["mcost"][self.r_enhancer[:, r] + 1] * 0 + float(round(self._apostle_cost))
+                want_a = active & self.r_religion_done[:, r] & (n_live_a < self._apostle_cap) & self._afford(self.r_faith[:, r], acost)
+                if bool(want_a.any()):
+                    hs_ta = self.rc_dist_tile[:, r, :, self._hs_idx]
+                    hs_oka = (hs_ta >= 0) & self.district_complete.gather(1, hs_ta.clamp(min=0)) & ~self.district_pillaged.gather(1, hs_ta.clamp(min=0))
+                    elig_a = self.rc_alive[:, r] & self.rc_bldg[:, r, :, self._shrine_bidx] & hs_oka
+                    buy_a = want_a & elig_a.any(dim=1)
+                    if bool(buy_a.any()):
+                        first_a = elig_a & (elig_a.long().cumsum(dim=1) == 1)
+                        at_a = (self.rc_center[:, r].clamp(min=0) * first_a.long()).sum(dim=1)
+                        landed_a = self._spawn_rival_civ(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._p_charges[self._apostle_idx])
+                        self.r_faith[:, r] = torch.where(landed_a, self.r_faith[:, r] - acost, self.r_faith[:, r])
             # AUDIT A-12 (B8-L): RIVAL LEVY — the levyUnits twin, AFTER every
             # purchase (the TS gold-block tail; here just before the trade
             # block — the same rivalPhase position). An AT-WAR rival suzerain
