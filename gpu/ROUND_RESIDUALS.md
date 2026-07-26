@@ -121,6 +121,21 @@ a latent worth guarding for tidiness, but it is not this bug). Had I
 applied the "obvious" one-line fix from reading the code, I would have
 shipped a no-op and declared the hunt closed.
 
+SUPPORT ALSO ELIMINATED (2026-07-26): wrapped `_flank_support` — at tile
+297 it returns **support = 0.0** on both defender-side calls, so the
++2-per-adjacency term is not the 10.
+=> **XP IS NOW THE PRIME SUSPECT and it fits the arithmetic exactly.**
+`xpLevelBonus` is +5 PER LEVEL, so TWO levels == 10, and BARBARIANS MUST
+HAVE NONE (`gainXp` guards it: barbs never accrue). Check whether the GPU
+adds `_xp_lvl_bonus` for this barbarian defender — either by reading a
+plane that is not barb-aware, or by indexing `v_xp`/`p_xp` with a barb
+slot id (the pools are separate, so a mis-keyed gather silently returns
+another unit's xp). TS's `defenderCS` adds `xpLevelBonus(defender)`, which
+is 0 for a barb because barbs never gain xp.
+CONFIRM FIRST (this hunt has now produced TWO wrong answers from reading
+code): print the GPU's xp term for the tile-297 defender and TS's
+`xpLevelBonus(defender)` for the same unit, side by side.
+
 STILL OPEN: the `vrng` defender is 10 CS stronger on the GPU (TS diff=3 vs
 GPU diff=-7, tile 297, barbarian SPEARMAN defender). Remaining terms in
 that assembly, now that religion and aura are both excluded by
