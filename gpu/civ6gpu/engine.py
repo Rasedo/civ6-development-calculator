@@ -378,6 +378,7 @@ _MUTABLE = [
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
     "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
+    "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
     "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
     "r_route_dest",  # B-23: international dest player-city CENTER TILE (>=0), else -1 (domestic/CS)
@@ -878,6 +879,7 @@ class BatchSim:
         self._missionary_idx = int(_bl.get("missionaryIdx", -1))
         self._missionary_cap = int(_bl.get("missionaryCap", 2))
         # B-18 (#71): APOSTLE + theological combat.
+        self.r_tiles_purchased = torch.zeros(B, r_pad, dtype=torch.long, device=device)  # A-5r (#71)
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
         self._apostle_cost = float(_bl.get("apostleCost", 200))
         self._apostle_cap = int(_bl.get("apostleCap", 1))
@@ -8357,37 +8359,15 @@ class BatchSim:
         self.rvcity_at[b, c_t] = r_to
         self._eff_version += 1
 
-    def _rival_border_growth(self, r: int, j: int, cact: torch.Tensor, cul_c: torch.Tensor) -> None:
-        """P5/S4 (C-15): the player's cultural border growth for rc slot j —
-        box += this city's culture, then consume against _border_cost with
-        the player's pick key (dist asc, resource priority desc, yield-sum
-        desc, index asc; radius 5; fully unowned tiles — water, impassables
-        and natural wonders all claimable like borderCandidates). The yield
-        sum uses the RIVAL's planes (strip-adjusted food/prod + its own
-        farm-adjacency and mine boosts — the rivalCityYields ctx). A-17:
-        adjacency is PER-CITY via the rc_tile_id registry, mirroring the
-        player's n.cityId === city.id borderCandidates check."""
-        self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
-        B, dev = self.B, self.device
-        center = self.rc_center[:, r, j]
-        # A-7: Religious Settlements — Math.round(base * borderCostMult),
-        # the player's city.ts:507 form (mult 1 without beliefs: js_round of
-        # the integral base curve is exact, so the expression is identical).
+    def _rival_border_key(self, r: int, j: int, center: torch.Tensor):
+        """A-5r (#71) / C-15: the SHARED border-candidate pick key for rc slot
+        j — dist asc, resource priority desc, milli-rounded yield sum desc,
+        global tile index asc (the pickRivalBorderTile twin). Factored out so
+        the CULTURE claim (_rival_border_growth) and the GOLD purchase (A-5r)
+        use ONE construction and can never drift apart. Loop-invariant: claims
+        mutate ownership only, never the key. Returns (tiles, tc, nbs, key0)."""
+        B = self.B
         _bmul = self._bel_mul("border", r) if self._r_has_beliefs(r) else None
-        def _rc_cost():
-            base = self._border_cost(self.rc_acquired[:, r, j])
-            return js_round(base * _bmul) if _bmul is not None else base
-        # lazy like the original: most calls have no border-ready city —
-        # bail before building anything (the loop re-checks per claim).
-        if not bool((cact & (self.rc_cbox[:, r, j] >= _rc_cost())).any()):
-            return
-        # D-6: claims only mutate OWNERSHIP (rival_at) — the candidate
-        # window, the rival ySum plane and the pick key are loop-invariant,
-        # so build them ONCE (they were rebuilt per claim iteration).
-        # D-2: the strip-adjusted planes come from the shared cache — the
-        # same construction _rival_city_yields scores worked tiles with
-        # (bit-equal to TS tileYields under modifiersFromResearch: all
-        # shipped yields are dyadic).
         tiles = tiles_from_offsets(center, self._off5, self.W, self.H)  # [B, M]
         tc = tiles.clamp(min=0)
         nbs = self.neigh[tc.reshape(-1)].reshape(B, -1, 6)  # [B, M, 6]
@@ -8426,6 +8406,40 @@ class BatchSim:
             - torch.round(y_sum * 1000) * 1e4
             + tiles.to(self.dtype)
         )
+        return tiles, tc, nbs, key0
+
+    def _rival_border_growth(self, r: int, j: int, cact: torch.Tensor, cul_c: torch.Tensor) -> None:
+        """P5/S4 (C-15): the player's cultural border growth for rc slot j —
+        box += this city's culture, then consume against _border_cost with
+        the player's pick key (dist asc, resource priority desc, yield-sum
+        desc, index asc; radius 5; fully unowned tiles — water, impassables
+        and natural wonders all claimable like borderCandidates). The yield
+        sum uses the RIVAL's planes (strip-adjusted food/prod + its own
+        farm-adjacency and mine boosts — the rivalCityYields ctx). A-17:
+        adjacency is PER-CITY via the rc_tile_id registry, mirroring the
+        player's n.cityId === city.id borderCandidates check."""
+        self.rc_cbox[:, r, j] = torch.where(cact, self.rc_cbox[:, r, j] + cul_c, self.rc_cbox[:, r, j])
+        B, dev = self.B, self.device
+        center = self.rc_center[:, r, j]
+        # A-7: Religious Settlements — Math.round(base * borderCostMult),
+        # the player's city.ts:507 form (mult 1 without beliefs: js_round of
+        # the integral base curve is exact, so the expression is identical).
+        _bmul = self._bel_mul("border", r) if self._r_has_beliefs(r) else None
+        def _rc_cost():
+            base = self._border_cost(self.rc_acquired[:, r, j])
+            return js_round(base * _bmul) if _bmul is not None else base
+        # lazy like the original: most calls have no border-ready city —
+        # bail before building anything (the loop re-checks per claim).
+        if not bool((cact & (self.rc_cbox[:, r, j] >= _rc_cost())).any()):
+            return
+        # D-6: claims only mutate OWNERSHIP (rival_at) — the candidate
+        # window, the rival ySum plane and the pick key are loop-invariant,
+        # so build them ONCE (they were rebuilt per claim iteration).
+        # D-2: the strip-adjusted planes come from the shared cache — the
+        # same construction _rival_city_yields scores worked tiles with
+        # (bit-equal to TS tileYields under modifiersFromResearch: all
+        # shipped yields are dyadic).
+        tiles, tc, nbs, key0 = self._rival_border_key(r, j, center)
         unowned = None  # D-13: window planes dense once, then incremental per claim
         adj_own = None
         for _ in range(64):  # the TS while-loop (multiple claims per turn, escalating cost)
@@ -10835,6 +10849,59 @@ class BatchSim:
                         at_a = (self.rc_center[:, r].clamp(min=0) * first_a.long()).sum(dim=1)
                         landed_a = self._spawn_rival_civ(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._p_charges[self._apostle_idx])
                         self.r_faith[:, r] = torch.where(landed_a, self.r_faith[:, r] - acost, self.r_faith[:, r])
+            # AUDIT A-5r (#71): TILE PURCHASE — the LAST rung of the gold
+            # ladder, so it can never starve the building/settler/unit
+            # priorities. Position matters: TS buys here, in the gold block,
+            # which runs BEFORE _rival_border_growth — a claim feeds the yields
+            # computed in between, so this must NOT be folded into the border
+            # walker. Candidate + key come from the SHARED _rival_border_key,
+            # the same pick the culture claim uses. ONE tile per civ per turn,
+            # first rc in slot order with a candidate. P4/D-17: the claim does
+            # NOT advance rc_cbox (purchases and culture keep separate clocks).
+            # tilePurchaseMult is TS-only on the rival seat (no adopted rival
+            # government carries it — the A-7r note), so it is 1 here; when a
+            # rival government ever ships it, thread it through like the other
+            # mults. `bought_r5` is the gold ladder's priority thread.
+            if True:
+                _tp_left = active & ~bought_r5
+                for _j in range(self.RC):
+                    if not bool(_tp_left.any()):
+                        break
+                    _live = _tp_left & self.rc_alive[:, r, _j]
+                    if not bool(_live.any()):
+                        continue
+                    _ctr = self.rc_center[:, r, _j]
+                    _tiles, _tc, _nbs, _key0 = self._rival_border_key(r, _j, _ctr)
+                    _unowned = (self.owner.gather(1, _tc) < 0) & (self.cs_at.gather(1, _tc) < 0) & (self.rival_at.gather(1, _tc) < 0)
+                    _nbf = _nbs.clamp(min=0).reshape(self.B, -1)
+                    _adj = (
+                        (self.rival_at.gather(1, _nbf).reshape(self.B, -1, 6) == r)
+                        & (self.rc_tile_id.gather(1, _nbf).reshape(self.B, -1, 6) == self.rc_id[:, r, _j].view(self.B, 1, 1))
+                        & (_nbs >= 0)
+                    ).any(dim=2)
+                    _ok = (_tiles >= 0) & _unowned & _adj & _live.unsqueeze(1)
+                    _has = _ok.any(dim=1)
+                    if not bool(_has.any()):
+                        continue
+                    _best = torch.where(_ok, _key0, self._inf_f).argmin(dim=1)
+                    _tgt = _tiles.gather(1, _best.unsqueeze(1)).squeeze(1)
+                    _ring = self.pair_dist[_ctr, _tgt].clamp(min=2)
+                    _tpct = self.r_techs[:, r].sum(dim=1).double() / max(1, self.r_techs.shape[2])
+                    _cpct = self.r_civics[:, r].sum(dim=1).double() / max(1, self.r_civics.shape[2])
+                    _base = js_round(torch.full_like(_tpct, 1.0) * (50.0 + 25.0 * (_ring - 2).double()) * self.rules.game_speed)
+                    _step = js_round(torch.full_like(_tpct, 5.0 * self.rules.game_speed))
+                    _cost = js_round((_base * (1.0 + 4.0 * torch.maximum(_tpct, _cpct)) + _step * self.r_tiles_purchased[:, r].double()) * 1.0)
+                    _buy = _has & _live & self._afford(self.r_treasury[:, r], _cost)
+                    if not bool(_buy.any()):
+                        continue
+                    _rows = _buy.nonzero(as_tuple=True)[0]
+                    self.r_treasury[_rows, r] -= _cost[_rows]
+                    self.rival_at[_rows, _tgt[_rows]] = r
+                    self.rc_tile_id[_rows, _tgt[_rows]] = self.rc_id[_rows, r, _j]
+                    self.rc_acquired[_rows, r, _j] += 1
+                    self.r_tiles_purchased[_rows, r] += 1
+                    self._eff_version += 1
+                    _tp_left = _tp_left & ~_buy
             # AUDIT A-12 (B8-L): RIVAL LEVY — the levyUnits twin, AFTER every
             # purchase (the TS gold-block tail; here just before the trade
             # block — the same rivalPhase position). An AT-WAR rival suzerain
