@@ -92,7 +92,36 @@ re-exported: parity RED at `seed 9274 turn 140 [('rng', ...)]`. So the
 #71 engine diverges from the baseline TS reference with every flag off.
 The caveat below is resolved; the label holds.
 
-**BOTH SIDES DUMPED (2026-07-26) — `_disaster_phase` is CLEARED.**
+**LOCALISED TO ONE PHASE AND ITS CALL SITES (2026-07-26).**
+Seed 9274 identified in the TS dump by `cities=5, camps=3`:
+    **TS t140: barb 3, riv 1, dis 5, cs 0 (= 9).**
+    **GPU t140: barb 5, riv 1, dis 5, cs 0 (= 11).**
+So `_rival_phase`, `_disaster_phase` and the CS phase ALL MATCH exactly.
+**The 2 extra draws are entirely inside `_barbarian_phase`.**
+
+GPU `_next_random` call sites during t140 (logged by patching the method
+and recording the caller line): `5911` once, `5969` THREE times (one per
+camp, K=3), plus a `4176` damage roll. Line 5969 is the garrison/raid
+roll inside the per-camp loop:
+    `can_grow = active & near_any & (u_alive.sum() < n_camps * maxBarbPerCamp)`
+    `r = self._next_random(can_grow)`
+TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
+```
+} else if (barbUnits(state).length < state.barbCamps.length * MAX_BARB_PER_CAMP
+           && nextRandom(state) < 0.1) {
+```
+— and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
+a camp with NO barb within 1 tile takes the regarrison branch and draws
+NOTHING. TS drew for 1 camp; the GPU drew for 3.
+**NEXT: dump per-camp `near_any` and `can_grow` for seed 9274 t140 and
+compare against TS's `nearCamp.length === 0` branch for the same 3 camps.**
+The suspect is the staleness contract: TS computes `nearCamp` from a
+`barbs` array captured BEFORE the camp loop while its COUNT check calls
+`barbUnits(state)` FRESH; the GPU uses `pre_alive` for `near_any` and a
+fresh `u_alive.sum()` for the count. Those should agree — verify they do
+with units spawned mid-loop.
+
+(superseded) BOTH SIDES DUMPED — disaster cleared.
 Instrumented the TS reference run too (wrapped the four phase calls in
 `endTurn` behind a `globalThis` flag, differenced `state.rngState`, ran
 the exporter, then removed the instrumentation).
