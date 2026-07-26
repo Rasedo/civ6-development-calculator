@@ -75,7 +75,18 @@ both engines, draw-neutral spawn-TYPE change). REMAINING in B-26:
  * CLIFFS — a genuinely new MAP property: mapgen must place them, then
    movement must block crossing (except at river mouths) and district
    adjacency must account for them. Biggest single piece left in B-26.
-NOT STARTED: B-17, B-23, B-24, B-27.
+B-24 PARTIAL: the DEDICATION SUBSTRATE + payouts landed here, both
+engines — `prevAges`/`prev_age` (the HEROIC-age substrate the owner
+called out: the current age alone cannot tell Dark->Golden from an
+ordinary Golden), `dedications`/`dedications` (1 normally,
+HEROIC_DEDICATIONS on a Heroic age), and the per-turn payout at the TS
+endTurn position: a GOLDEN/HEROIC age pays faith (the Monumentality
+flavour), a DARK or NORMAL age pays era score (the climb-out
+dedication), both scaled by the dedication COUNT so a Heroic age pays
+triple. REMAINING in B-24: the named Golden-Age dedication CATALOG
+(Monumentality et al. as distinct choices rather than one flat payout),
+dark-age POLICY cards, and governor establishment/promotions.
+NOT STARTED: B-17, B-23, B-27.
 No gate has run since #70's battery. Closing ladder at the very end.
 
 ### A-5r GPU half — exact spec

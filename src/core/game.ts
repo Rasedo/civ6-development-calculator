@@ -19,7 +19,7 @@ import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY } from '../data/rivals';
-import { addEraScore, eraBoundary, governorPicks, governorTitles } from './eras';
+import { addEraScore, eraBoundary, applyDedications, governorPicks, governorTitles } from './eras';
 import { UNITS, WALLS_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -937,6 +937,17 @@ export function endTurn(state: GameState): void {
 
   state.turn += 1;
   eraBoundary(state); // B-24: era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
+  // B-24 (#71): DEDICATION payouts — a Golden/Heroic age pays faith, a Dark or
+  // Normal age pays era score (the climb-out dedication), both scaled by the
+  // dedication COUNT so a Heroic age pays triple. Immediately after the
+  // boundary so the GPU mirrors at the same position.
+  applyDedications(state, (civ, amt) => {
+    if (civ === 0) state.faithTotal += amt;
+    else {
+      const rv = state.rivals[civ - 1];
+      if (rv) rv.faith = (rv.faith ?? 0) + amt;
+    }
+  });
   // GV-3/GV-4: domination ends the game the instant a civ holds every capital;
   // otherwise the score victory fires at TURN_LIMIT. Detection only — no freeze
   // (GV-2 is indicator-only), so at the gate (dom == -1 by t100) this is inert.

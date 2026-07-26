@@ -376,7 +376,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -657,6 +657,10 @@ class BatchSim:
         # _age_factor = the SOURCE civ's loyalty-pressure multiplier (halves —
         # exact in f32 AND f64, so modulated sums stay association-free).
         self.civ_age = torch.ones(B, 1 + r_pad, dtype=torch.long, device=device)
+        # B-24 (#71): dedication substrate — the PREVIOUS age (the Heroic test)
+        # and how many dedications each civ committed this era.
+        self.prev_age = torch.ones_like(self.civ_age)
+        self.dedications = torch.ones_like(self.civ_age)
         self._era_dark = int(_er.get("darkT", 3))
         self._era_gold = int(_er.get("goldenT", 10))
         self._age_factor = torch.tensor(_er.get("agePressure", [0.5, 1.0, 1.5]), dtype=torch.float64, device=device)
@@ -664,6 +668,9 @@ class BatchSim:
         # every turn from civics + the quantized loyalty snapshot; no state).
         self._gov_per = int(_er.get("govCivicsPerTitle", 10))
         self._gov_max = int(_er.get("govMaxTitles", 5))
+        self._heroic_ded = int(_er.get("heroicDedications", 3))
+        self._ded_faith = int(_er.get("dedicationFaith", 2))
+        self._ded_era = int(_er.get("dedicationEraScore", 1))
         self._gov_loy = float(_er.get("governorLoyalty", 8))
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
@@ -13186,12 +13193,36 @@ class BatchSim:
         # alive-masked zero contributions.
         if self._era_len > 0 and self.turn % self._era_len == 0:
             sc = self.era_score
+            _was = self.civ_age  # B-24 (#71): the PREVIOUS age, the Heroic test's substrate
             self.civ_age = torch.where(
                 sc < self._era_dark,
                 torch.zeros_like(self.civ_age),
                 torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
             )
+            # B-24 (#71): DEDICATIONS. One per civ per era, except the HEROIC
+            # age — Dark -> Golden — which grants heroicDedications. The
+            # current age alone cannot tell a Heroic age from an ordinary
+            # Golden one, which is exactly why prev_age is substrate.
+            self.prev_age = _was
+            self.dedications = torch.where(
+                (_was == 0) & (self.civ_age == 2),
+                torch.full_like(self.dedications, self._heroic_ded),
+                torch.ones_like(self.dedications),
+            )
             self.era_score[:] = 0
+        # B-24 (#71): DEDICATION payouts, every turn, at the TS endTurn
+        # position (immediately after eraBoundary). A GOLDEN/HEROIC age pays
+        # faith; a DARK or NORMAL age pays era score (the climb-out
+        # dedication). Both scale with the dedication COUNT, so a Heroic age
+        # pays triple. Zero-draw, integer-only.
+        if self._ded_faith > 0 or self._ded_era > 0:
+            _gold = self.civ_age == 2
+            _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
+            _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
+            self.era_score = self.era_score + _es
+            self.player_faith = self.player_faith + _fa[:, 0].to(self.player_faith.dtype)
+            if self.R > 0:
+                self.r_faith = self.r_faith + _fa[:, 1 : 1 + self.R].to(self.r_faith.dtype)
         dom = self._domination()  # GV-3
         # B-25 (Round B3): a science victory (3, player) / defeat (4, a rival)
         # set during THIS turn's project completions takes precedence over the

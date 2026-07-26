@@ -249,6 +249,12 @@ export interface GameState {
    *  assigned at each era boundary from the just-ended window's eraScore.
    *  Absent entries read Normal (era 0, fresh saves). */
   civAges?: number[];
+  /** B-24 (#71): the age each civ held in the PREVIOUS era. Substrate for the
+   * HEROIC age (Dark -> Golden), which the current age alone cannot detect. */
+  prevAges?: number[];
+  /** B-24 (#71): dedications each civ committed this era — 1 normally,
+   * HEROIC_DEDICATIONS on a Heroic age. */
+  dedications?: number[];
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).

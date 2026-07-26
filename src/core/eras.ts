@@ -1,5 +1,5 @@
 import type { GameState } from './types';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES } from '../data/rivals';
+import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
 // B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
@@ -22,11 +22,49 @@ export function addEraScore(state: GameState, civ: number, pts: number): void {
 export function eraBoundary(state: GameState): void {
   if (state.turn % ERA_LENGTH !== 0) return;
   const ages = (state.civAges ??= []);
+  const prev = (state.prevAges ??= []);
+  const ded = (state.dedications ??= []);
   for (let c = 0; c < 1 + state.rivals.length; c++) {
     const s = state.eraScore?.[c] ?? 0;
-    ages[c] = s < ERA_DARK_T ? 0 : s >= ERA_GOLDEN_T ? 2 : 1;
+    const was = ages[c] ?? 1; // era 0 is Normal for everyone
+    const now = s < ERA_DARK_T ? 0 : s >= ERA_GOLDEN_T ? 2 : 1;
+    // B-24 (#71): DEDICATIONS. Each civ commits to one dedication per era —
+    // except the HEROIC AGE, real Civ 6's reward for climbing straight out of
+    // a DARK age into a GOLDEN one, which grants THREE. That test is why the
+    // PREVIOUS age has to be substrate: `now` alone cannot distinguish a
+    // Heroic Age from an ordinary Golden one.
+    prev[c] = was;
+    ages[c] = now;
+    ded[c] = was === 0 && now === 2 ? HEROIC_DEDICATIONS : 1;
   }
   state.eraScore = [];
+}
+
+/** B-24 (#71): true when this civ's CURRENT age is a HEROIC age — it entered
+ *  a Golden age directly from a Dark one. */
+export function isHeroicAge(state: GameState, civ: number): boolean {
+  return (state.prevAges?.[civ] ?? 1) === 0 && (state.civAges?.[civ] ?? 1) === 2;
+}
+
+/**
+ * B-24 (#71): the per-turn DEDICATION yield a civ's commitments pay.
+ * A GOLDEN (or HEROIC) age dedicates to a bonus — modeled as flat faith, the
+ * Monumentality flavour — while a DARK or NORMAL age dedicates to CLIMBING,
+ * which real Civ 6 pays in extra era score. Both scale with the dedication
+ * COUNT, so a Heroic age is literally three times the commitment.
+ */
+export function dedicationFaith(state: GameState, civ: number): number {
+  const age = state.civAges?.[civ] ?? 1;
+  if (age !== 2) return 0;
+  return DEDICATION_FAITH * (state.dedications?.[civ] ?? 1);
+}
+
+/** B-24 (#71): extra era score per turn while DARK or NORMAL — the
+ *  climb-out dedication (the Golden-age twin of dedicationFaith). */
+export function dedicationEraScore(state: GameState, civ: number): number {
+  const age = state.civAges?.[civ] ?? 1;
+  if (age === 2) return 0;
+  return DEDICATION_ERA_SCORE * (state.dedications?.[civ] ?? 1);
 }
 
 /** The loyalty-pressure factor the SOURCE civ's age grants its pop-pressure
@@ -49,4 +87,23 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
   const idx = qLoys.map((q, i) => [q, i] as const);
   idx.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   return new Set(idx.slice(0, titles).map(([, i]) => i));
+}
+
+/**
+ * B-24 (#71): apply this turn's DEDICATION payouts for every civ. Called once
+ * per turn from endTurn, right beside eraBoundary, so the GPU can mirror it at
+ * the same position. A GOLDEN/HEROIC age pays faith; a DARK or NORMAL age pays
+ * era score (the climb-out dedication). Both scale with the dedication COUNT,
+ * so a Heroic age pays triple. Zero-draw, integer-only.
+ *
+ * `addFaith` is injected because the player's faith lives on GameState while
+ * each rival keeps its own — the caller knows which accumulator to touch.
+ */
+export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {
+  for (let c = 0; c < 1 + state.rivals.length; c++) {
+    const f = dedicationFaith(state, c);
+    if (f > 0) addFaith(c, f);
+    const es = dedicationEraScore(state, c);
+    if (es > 0) addEraScore(state, c, es);
+  }
 }

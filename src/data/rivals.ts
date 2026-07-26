@@ -131,6 +131,16 @@ export const AGE_PRESSURE = [0.5, 1.0, 1.5];
  *  RESIDUALS: establishment turns, promotions, non-loyalty abilities. */
 export const GOV_CIVICS_PER_TITLE = 10;
 export const GOV_MAX_TITLES = 5;
+/** B-24 (#71): dedications granted on a HEROIC age (Dark -> Golden). Real
+ * Civ 6 grants three; every other transition grants one. */
+export const HEROIC_DEDICATIONS = 3;
+/** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
+ * Monumentality flavour — a Golden age dedicates to a BONUS). */
+export const DEDICATION_FAITH = 2;
+/** Era score per turn per dedication while DARK or NORMAL — real Civ 6's
+ * climb-out dedications pay in era score, not yields. */
+export const DEDICATION_ERA_SCORE = 1;
+
 export const GOVERNOR_LOYALTY = 8;
 /** B-22 (task #55 S3): a rival↔rival war is FORMAL iff the aggressor denounced
  *  the target at least this many turns before declaring; otherwise SURPRISE. */
