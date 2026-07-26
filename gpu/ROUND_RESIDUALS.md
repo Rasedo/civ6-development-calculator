@@ -92,7 +92,25 @@ re-exported: parity RED at `seed 9274 turn 140 [('rng', ...)]`. So the
 #71 engine diverges from the baseline TS reference with every flag off.
 The caveat below is resolved; the label holds.
 
-It is an `rng` (DRAW-COUNT) divergence, which narrows it hard: with the
+**EXACT DRAW COUNT MEASURED (2026-07-26).** mulberry32 advances its state
+by a FIXED increment (0x6D2B79F5) per draw, so the draw count between two
+recorded states is computable without instrumenting anything:
+`n = (after - before) * inverse(0x6D2B79F5) mod 2**32`.
+For seed 9274 turn 140 (rng at t139 = 3533537999, TS t140 = 2837761132,
+GPU t140 = 2205925462):
+    **TS made 9 draws that turn; the GPU made 11. The GPU makes 2 EXTRA.**
+Two is the signature of the NEW-CAMP branch in `barbarianPhase`: the 0.08
+spawn roll plus the candidate pick — TS takes ZERO draws there when its
+guard short-circuits, so a guard mismatch costs exactly 2. Check the
+`can_roll` guard first: TS is
+`anyCivCity && barbCamps.length < maxCamps && nextRandom() < 0.08`, where
+`anyCivCity` counts PLAYER **or any RIVAL** city (A-15), while the GPU's
+is `self.alive.any(dim=1) & (n_camps < max_camps)` — `self.alive` is
+PLAYER cities only. If the player is city-less while rivals live, TS rolls
+and the GPU does not (or vice versa). Verify against this seed's
+`nCities`/`camps` columns around t140 before assuming.
+
+(the earlier reasoning, still valid:) with the
 baseline exporter every #71 gate is off (`apostleIdx` -1 so the
 theological pre-pass is skipped, `_apostle_buy_live` / `_tile_buy_live` /
 `_ded_payouts_live` / `_city_rel_live` / `_barb_scout_live` all False),
