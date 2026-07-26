@@ -26,13 +26,20 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 31.5 | **77%** |
-| B fidelity | 88 | 82.6 | **94%** |
+| B fidelity | 88 | 80.6 | **92%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 9 | 9 | 100% |
-| **Overall (incl. closed)** | **189** | **174.1** | **92%** |
-| Open chapters only (A+B) | 129 | 114.1 | **88%** |
+| **Overall (incl. closed)** | **189** | **172.1** | **91%** |
+| Open chapters only (A+B) | 129 | 112.1 | **87%** |
+
+(2026-07-26 correction: the #69 "re-added" B row itself carried a
++2.0 slip — 82.6-claimed at the #68 close vs 80.6 by a fresh
+per-item sum (the third +2.0-magnitude drift; B10 and #69 caught
+the first two). The A row was clean. Every row above is re-summed
+from the per-item weights. Consequence worth noting: B-22 (1.5
+open weight), not B-24 (0.9), is the largest single open B item.)
 
 (#69 close-out note: A-25 + G-8 + B-15 all closed in one round —
 A-25 and G-8 resolved by RE-VERIFICATION (unreproducible sighting +
