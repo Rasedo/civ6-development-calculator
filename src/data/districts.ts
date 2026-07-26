@@ -254,7 +254,13 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
  * the append runs yields-first with Encampment last (its BUILD_PLAN D6
  * hold-out is lifted; cap competition is intended, real AIs build early
  * Encampments). `unlockKind: 'civic'` marks civic-tree unlocks (the default
- * is a tech id). A-9 (#71): NEIGHBORHOOD is IN now — the appeal-housing stage
+ * is a tech id). A-9 (#71): NEIGHBORHOOD's appeal-housing MACHINERY is in on
+ * both engines (computeHousing / rivalCityHousing read appealTier(tileAppeal),
+ * the GPU mirrors via _tile_appeal over the exported ap/apf contributions),
+ * but the scaffold entry stays OUT for now: with it in, the two engines queued
+ * DIFFERENT districts (seed 9183 t189, rQCost0 1895 vs 1988), a placement/cost
+ * divergence needing its own hunt. Re-adding the row below is the remaining
+ * A-9 step. Historical note: the appeal-housing stage
  * it was waiting on has landed on both engines (computeHousing /
  * rivalCityHousing read appealTier(tileAppeal(...)), and the GPU mirrors it
  * via _tile_appeal over the exported `ap`/`apf` contributions). It is placed
@@ -272,5 +278,4 @@ export const SCAFFOLD_DISTRICTS: { id: DistrictId; unlockId: string; unlockKind?
   { id: 'THEATER_SQUARE', unlockId: 'DRAMA_AND_POETRY', unlockKind: 'civic' },
   { id: 'ENTERTAINMENT_COMPLEX', unlockId: 'GAMES_AND_RECREATION', unlockKind: 'civic' },
   { id: 'ENCAMPMENT', unlockId: 'BRONZE_WORKING', placement: 'encampment' },
-  { id: 'NEIGHBORHOOD', unlockId: 'URBANIZATION', unlockKind: 'civic' }, // A-9 (#71)
 ];

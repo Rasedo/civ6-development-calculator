@@ -133,6 +133,18 @@ export const GOV_CIVICS_PER_TITLE = 10;
 export const GOV_MAX_TITLES = 5;
 /** B-24 (#71): dedications granted on a HEROIC age (Dark -> Golden). Real
  * Civ 6 grants three; every other transition grants one. */
+/**
+ * A-5r (#71): the rival TILE-PURCHASE master switch, landed INERT (the
+ * B-24/S1 substrate-then-flip pattern). The cost curve, the shared
+ * border-candidate pick and both engines' mirrors are IN; only the scripted
+ * purchase is gated off.
+ *
+ * WHY: with it live the engines bought tiles on different turns (seed 9158:
+ * ~98 gold of rival treasury divergence by t157), which needs its own hunt
+ * inside the gold ladder. Flipping this to `true` is the remaining A-5r step.
+ */
+export const RIVAL_TILE_BUY_LIVE = false;
+
 export const HEROIC_DEDICATIONS = 3;
 /** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
  * Monumentality flavour — a Golden age dedicates to a BONUS). */

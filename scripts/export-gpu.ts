@@ -56,7 +56,7 @@ import {
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GW_WRITING_CULTURE, GW_MUSIC_CULTURE } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../src/core/trade';
@@ -100,6 +100,7 @@ import {
   GOV_MAX_TITLES,
   GOVERNOR_LOYALTY,
   HEROIC_DEDICATIONS,
+  RIVAL_TILE_BUY_LIVE,
   DEDICATION_FAITH,
   DEDICATION_ERA_SCORE,
 } from '../src/data/rivals';
@@ -566,7 +567,7 @@ const rules = {
     // S3: governors — stateless greedy loyalty anchors.
     govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
     govMaxTitles: GOV_MAX_TITLES,
-    heroicDedications: HEROIC_DEDICATIONS, dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
+    rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, heroicDedications: HEROIC_DEDICATIONS, dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
@@ -736,6 +737,7 @@ const rules = {
     apostleIdx: Object.values(UNITS).findIndex((u) => u.id === 'APOSTLE'),
     apostleCost: UNITS.APOSTLE.cost,
     apostleCap: APOSTLE_CAP,
+    apostleBuyLive: APOSTLE_BUY_LIVE, // B-18 (#71): inert until the buy-timing hunt lands
     relStrength: Object.values(UNITS).map((u) => u.religiousStrength ?? 0),
     theoDamage: THEO_DAMAGE,
     theoBaseDamage: THEO_BASE_DAMAGE,

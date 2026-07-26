@@ -32,7 +32,7 @@ import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -99,6 +99,7 @@ import {
   ERA_SCORE_RELIGION,
   ERA_SCORE_GP,
   GOVERNOR_LOYALTY,
+  RIVAL_TILE_BUY_LIVE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
@@ -2512,7 +2513,7 @@ export function rivalPhase(state: GameState): void {
       // THIS civ's research, and the same decoupling from the culture counter
       // (P4/D-17 — a purchase claims the tile but does NOT advance cultureBox).
       // ONE tile per civ per turn, first rc in slot order with a candidate.
-      if (!bought) {
+      if (RIVAL_TILE_BUY_LIVE && !bought) {
         for (const rc of rival.cities) {
           const next = pickRivalBorderTile(state, rival, rc);
           if (next === null) continue;
@@ -2558,6 +2559,7 @@ export function rivalPhase(state: GameState): void {
       // Spawns at that city center (no free spot = refund, the spawn-refund
       // convention). SCRIPTURE adds +1 charge at purchase.
       if (rival.religionFounded) {
+        let boughtRelig = false; // B-18 (#71)
         const liveM = state.units.filter(
           (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'MISSIONARY',
         ).length;
@@ -2572,6 +2574,7 @@ export function rivalPhase(state: GameState): void {
             const u = spawnUnit(state, 'MISSIONARY', rc.centerIndex, 'rival', rival.id);
             if (u) {
               rival.faith = (rival.faith ?? 0) - mCost;
+              boughtRelig = true; // B-18 (#71): one religious unit per civ per turn
               if (eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
             }
             break;
@@ -2582,6 +2585,10 @@ export function rivalPhase(state: GameState): void {
         // missionary precedence this whole gold/faith ladder follows). Same
         // SHRINE + complete unpillaged HOLY_SITE gate, same spawn-refund
         // convention, same cap (an apostle counts against APOSTLE_CAP only).
+        // B-18 (#71): ONE religious unit per civ per turn — an apostle is only
+        // bought when no missionary was. Keeps the two buys from interacting
+        // through the shared faith pool, which is a timing surface both
+        // engines would have to reproduce exactly.
         const liveA = state.units.filter(
           (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'APOSTLE',
         ).length;
@@ -2589,7 +2596,7 @@ export function rivalPhase(state: GameState): void {
         // MISSIONARY discount and does not extend to apostles here (both
         // engines flat, so the belief can never desync the two prices).
         const aCost = Math.round(UNITS.APOSTLE.cost);
-        if (liveA < APOSTLE_CAP && goldAffordable(rival.faith ?? 0, aCost)) {
+        if (APOSTLE_BUY_LIVE && !boughtRelig && liveA < APOSTLE_CAP && goldAffordable(rival.faith ?? 0, aCost)) {
           for (const rc of rival.cities) {
             if (!rc.buildings.includes('SHRINE')) continue;
             const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');

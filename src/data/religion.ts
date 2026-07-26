@@ -268,6 +268,20 @@ export const MISSIONARY_CAP = 2;
 /** B-18 (#71): live APOSTLE cap per civ — apostles are the expensive combat
  * arm, so one at a time keeps the faith ladder from starving worship buys. */
 export const APOSTLE_CAP = 1;
+/**
+ * B-18 (#71): the APOSTLE BUY master switch, landed INERT (the B-24/S1
+ * pattern — substrate first, flip second). The apostle unit, its religious
+ * strength, the theological-combat resolver and both engines' mirrors are all
+ * IN; only the scripted rival's PURCHASE is gated off, so no apostle ever
+ * exists in the gate and the whole mechanic is provably zero-impact.
+ *
+ * WHY: with the buy live, the two engines bought apostles on DIFFERENT turns
+ * (seed 9066: the GPU held one at t77 that TS did not), a faith-timing
+ * divergence inside the shared worship/missionary/apostle ladder that needs
+ * its own hunt. Flipping this to `true` is the remaining B-18 step; everything
+ * it switches on is already written and mirrored.
+ */
+export const APOSTLE_BUY_LIVE = false;
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may

@@ -668,6 +668,7 @@ class BatchSim:
         # every turn from civics + the quantized loyalty snapshot; no state).
         self._gov_per = int(_er.get("govCivicsPerTitle", 10))
         self._gov_max = int(_er.get("govMaxTitles", 5))
+        self._tile_buy_live = bool(_er.get("rivalTileBuyLive", False))  # A-5r (#71): inert until the gold-ladder hunt lands
         self._heroic_ded = int(_er.get("heroicDedications", 3))
         self._ded_faith = int(_er.get("dedicationFaith", 2))
         self._ded_era = int(_er.get("dedicationEraScore", 1))
@@ -890,6 +891,7 @@ class BatchSim:
         self._apostle_idx = int(_bl.get("apostleIdx", -1))
         self._apostle_cost = float(_bl.get("apostleCost", 200))
         self._apostle_cap = int(_bl.get("apostleCap", 1))
+        self._apostle_buy_live = bool(_bl.get("apostleBuyLive", False))  # B-18 (#71): inert until the buy-timing hunt lands
         _rs = _bl.get("relStrength") or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
         self._theo_dmg = int(_bl.get("theoDamage", 2))
@@ -10829,6 +10831,7 @@ class BatchSim:
             # unpillaged Holy Site. Spawns at that city center via the
             # civilian spawner (POOL-END; no free spot = refund). SCRIPTURE
             # ships mchg=+1 charge, applied at purchase.
+            _bought_relig = torch.zeros(B, dtype=torch.bool, device=dev)  # B-18 (#71)
             if self._missionary_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
                 n_live_m5 = (self.v_alive & (self.v_civ == r) & (self.v_type == self._missionary_idx)).sum(dim=1)
                 mcost5 = self._enh["mcost"][self.r_enhancer[:, r] + 1]  # [B] f64
@@ -10844,16 +10847,19 @@ class BatchSim:
                         chg_m5 = self._p_charges[self._missionary_idx] + self._enh["mchg"][self.r_enhancer[:, r] + 1]
                         landed_m5 = self._spawn_rival_civ(buy_m5, at_m5, r, type_idx=self._missionary_idx, charges=chg_m5)
                         self.r_faith[:, r] = torch.where(landed_m5, self.r_faith[:, r] - mcost5, self.r_faith[:, r])
+                        _bought_relig = _bought_relig | landed_m5
             # B-18 (#71): the APOSTLE buy — the missionary block's twin, run
             # AFTER it so the cheaper unit still saturates first (the TS
             # ordering). Same SHRINE + complete unpillaged HOLY_SITE gate,
             # same first-eligible-slot pick, same spawn-refund convention.
-            if self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
+            if self._apostle_buy_live and self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
                 n_live_a = (self.v_alive & (self.v_civ == r) & (self.v_type == self._apostle_idx)).sum(dim=1)
                 # B-18 (#71): FLAT cost (the TS twin — missionaryCostMult is a
                 # MISSIONARY discount and does not extend to apostles).
                 acost = torch.full((self.B,), float(round(self._apostle_cost)), dtype=torch.float64, device=self.device)
-                want_a = active & self.r_religion_done[:, r] & (n_live_a < self._apostle_cap) & self._afford(self.r_faith[:, r], acost)
+                # B-18 (#71): ONE religious unit per civ per turn — skip rows that
+                # just bought a missionary (the TS boughtRelig twin).
+                want_a = active & self.r_religion_done[:, r] & ~_bought_relig & (n_live_a < self._apostle_cap) & self._afford(self.r_faith[:, r], acost)
                 if bool(want_a.any()):
                     hs_ta = self.rc_dist_tile[:, r, :, self._hs_idx]
                     hs_oka = (hs_ta >= 0) & self.district_complete.gather(1, hs_ta.clamp(min=0)) & ~self.district_pillaged.gather(1, hs_ta.clamp(min=0))
@@ -10877,7 +10883,7 @@ class BatchSim:
             # government carries it — the A-7r note), so it is 1 here; when a
             # rival government ever ships it, thread it through like the other
             # mults. `bought_r5` is the gold ladder's priority thread.
-            if True:
+            if self._tile_buy_live:
                 _tp_left = active & ~bought_r5
                 for _j in range(self.RC):
                     if not bool(_tp_left.any()):
