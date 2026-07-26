@@ -78,7 +78,24 @@ earlier wins are already banked if it needs its own hunt.
 - Everything riding #50/A-18 (player verbs) and the B-24 dedication
   system (needs the prevAge substrate).
 
-## Bar (every slice)
+## EXPERIMENTAL MODE (owner directive 2026-07-26, mid-round)
+
+**This round abandons gate-serialization after S1.** S2..S5 are all
+implemented FIRST, in one batch, with NO gates between them; the ladder
+runs ONCE at the end over the combined change, and a parity-hunt
+follows only if it goes red. DO NOT SEPARATE THE FIXES.
+
+Owner-accepted trade: gate-serialization exists to buy ATTRIBUTION — a
+red gate names the one slice that caused it. Batching trades that away,
+so a red ladder means bisecting across four behaviour changes that all
+reshuffle trajectories (aura CS, unit MP, capital relocation, barb
+spawn types). Mitigation if red: the slices are separable commits in
+principle, so the hunt can `git stash`/revert individual hunks — but
+the first move stays the standard one, statelog-first from the named
+turn (gpu/HUNTING.md), since a single divergence usually still points
+at a single mechanic.
+
+## Bar (once, at the END of the batch)
 
 ALWAYS-RUN CORE, FOREGROUND: `npx tsc --noEmit` → touched vitest → `npx
 vite-node scripts/export-gpu.ts` (READ the output) → scripted
