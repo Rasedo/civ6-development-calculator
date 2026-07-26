@@ -113,8 +113,28 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**CONTRADICTION RESOLVED — it is a SPAWN-PLACEMENT divergence, not an
-RNG one (2026-07-26).** Printed both engines' rng side by side:
+**THE DIFF SURFACE IS NOW TWO EXPRESSIONS (2026-07-26).**
+GPU `_first_free_spot(at_tile, "barb")`:
+  `cand7 = [anchor, *neigh]`; `blocked = barb|pmil|pciv|rv|rvc`;
+  `terr = self.passable[cand]`; `ok7 = (cand7>=0) & terr & ~blocked`;
+  take the FIRST index 0..6.
+TS `spawnUnit`:
+  `[near, ...neighbors(map, near)].sort(by distance).find(t =>
+   tileFreeForUnit(state, t.index, probe))`.
+Ordering agrees (V8's sort is stable, so the anchor then the neighbours in
+`neighbors()` order == the `neigh` column order). So the ONLY place they
+can disagree is the PREDICATE:
+    **`self.passable | occupancy masks`   vs   `tileFreeForUnit`.**
+DO THIS: for seed 9274 t139, camp tile 950, print the 7 candidate tiles
+and, for each, the GPU's `passable`/`barb`/`pmil`/`pciv`/`rv`/`rvc` bits
+NEXT TO TS's `tileFreeForUnit` verdict and its reason. The first tile
+where they disagree IS the bug. Likely suspects inside `tileFreeForUnit`
+that the GPU's flat `passable` plane may not model: a tile holding a
+DISTRICT or city centre, a camp tile, or a stacking rule the barb branch
+flattens (`blocked` treats every unit as blocking, which is right for
+barbs — verify TS agrees for a barb probe specifically).
+
+(context) CONTRADICTION RESOLVED — spawn placement, not RNG. Printed both engines' rng side by side:
 ```
 t138: TS=566183240   GPU=566183240    draws TS=9  GPU=9
 t139: TS=3533537999  GPU=3533537999   draws TS=11 GPU=11   <-- IDENTICAL
