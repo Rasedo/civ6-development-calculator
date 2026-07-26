@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 31.8 | **78%** |
-| B fidelity | 88 | 81.8 | **93%** |
+| B fidelity | 88 | 82.3 | **93%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **175.6** | **92%** |
-| Open chapters only (A+B) | 129 | 113.6 | **88%** |
+| **Overall (incl. closed)** | **191** | **176.1** | **92%** |
+| Open chapters only (A+B) | 129 | 114.1 | **88%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -276,6 +276,30 @@ Per-item weights (done% in parens where partial):
   corrected to the real GS value; see the REFUTATION and the six-item
   enumeration in its entry); B-26 3 (80% — ranged barbs live, every
   third camp; cliffs, naval barbs and scout-raid escalation remain).
+- #71 ROUND RESIDUALS deltas (2026-07-26). Batch 1: A-5r 2 (97% —
+  scripted rival tile purchase landed BOTH engines, the trigger held
+  inert behind RIVAL_TILE_BUY_LIVE pending its own hunt); A-9 4 (97% —
+  NEIGHBORHOOD housing/appeal tiers both engines, scaffold row inert);
+  B-8 2 (100% outside #50 — naval war-march targeting closed the last
+  non-#50 residual); B-18 4 (97% — Apostle chassis + theological combat
+  landed, the buy inert behind APOSTLE_BUY_LIVE); B-24 3 (75% —
+  dedication substrate + payouts incl. the prevAge Heroic substrate;
+  the named Golden-Age catalog, dark-age policies and governor
+  establishment/promotions remain); B-26 3 (85% — scout-then-raid
+  opener; cliffs and naval barbs remain).
+  Batch 2: B-17 2 (95% — the ENCAMPMENT garrison pool and its movement
+  block, both engines: a 100 HP per-TILE pool mustered at completion,
+  hostile entry barred until it is beaten to 0, a melee assault wired
+  through attackTargets so barbs/rivals/the player all reach it, the
+  strike silenced at 0, repair on the wall pool's gate. Ranged-vs-
+  district is the recorded residual); B-23 3 (85% — ROADS: laid by
+  trade routes along the Trader's walk, road-to-road steps ignore the
+  terrain penalty and, from the Classical era, the river charge. The
+  physical Trader unit remains the residual).
+  ARITHMETIC NOTE: batch 1's header re-add put B at 81.8; re-summing
+  from these per-item weights gives 81.63. The 0.2 over-claim is
+  corrected here — the FOURTH time this table has drifted from its own
+  ledger. Always re-sum from the per-item lines, last occurrence wins.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -778,7 +802,27 @@ gap; likewise GS disasters are modeled minus sea-level rise
   INDUSTRIAL_ZONE +0.5/mine +1/quarry +2/adjacent-Aqueduct, HARBOR +1
   per CITY_CENTER (was +2); IZ channels LIVE since ROUND B9 R1 made
   IZ scaffold-reachable (2026-07-19).
-- B-17 (~85%, ROUND B7 #63 slice E 2026-07-19). Encampment now carries
+- B-17 (~95% — #71 batch 2 2026-07-26 added the GARRISON POOL and the
+  MOVEMENT BLOCK, the two residuals this entry recorded; sourced first:
+  the Encampment fights independently of its city, carries 100 HP, and
+  bars enemy entry until reduced to 0, after which the tile is occupied
+  and the district goes silent. Modeled per-TILE (`Tile.encampHp` /
+  `encamp_hp` [B,T], absent = FULL on the TS side, the `outerHp ??
+  WALLS_HP` convention) so every walker's check is O(1). Mustered at all
+  four completion sites; blocks via `encampmentBlocks`/`_encamp_block`
+  folded into tileFreeForUnit, findPath, walkPath, the patrol passOk,
+  the GPU `_blocked_for` and the player step verb; reduced by a MELEE
+  assault ON the tile wired through `attackTargets`, so barbarians,
+  war-marching rivals and the scripted/RL player all reach it with no
+  walker surgery. Defense = the owner's civ-level max(15, bestMeleeCS),
+  deliberately WITHOUT the city-centre garrison term. Heals on the wall
+  pool's unbesieged gate/rate. STILL OPEN: ranged-vs-district (matching
+  the ranged-vs-rival-city scope-out). NOTE: B-17 is GATE-UNREACHABLE —
+  zero Encampments are built across the 24 scripted seeds, so scripted
+  parity says nothing about it; the `encampment` poke lane and the
+  random-action rollout are what actually exercise it, and the rollout
+  is where this round's two bugs were caught.
+  Earlier (ROUND B7 #63 slice E 2026-07-19): Encampment now carries
   its three residual roles, both engines, player + rival, poke-covered
   (gpu/encampment_test.py + tests/encampment.test.ts, battery lane
   `encampment`): (1) SPECIALIST SLOT — `SPECIALIST_YIELDS.ENCAMPMENT` =
@@ -908,7 +952,18 @@ gap; likewise GS disasters are modeled minus sea-level rise
   Mexico City's project %) to a flat channel yield; industrial tier-2
   (FACTORY) is regional → its 6-tier is inert in both engines (parity-
   safe). Seed 9196 rerolled → 9197 (see A-25).
-- B-23 (~70% — 2026-07-20, ROUND B8 slice T, task #64). Route DURATION +
+- B-23 (~85% — #71 batch 2 2026-07-26 landed ROADS, one of the two
+  residuals this entry recorded. Sourced: roads are laid automatically
+  by TRADERS serving land routes; an Ancient road lets a unit moving
+  road-to-road ignore terrain penalties and has NO bridges; the
+  Classical road adds bridges. `Tile.road` / `self.road` [B,T];
+  `layTradeRoad`/`_lay_trade_road` walks the trader's path (nearest-
+  neighbour toward the destination, ties by direction order — the
+  war-march's own integer rule) and lays nothing at all for a SEA
+  route; `moveCostInto` now takes the tile being LEFT; the bridge flag
+  is latched at the era boundary in both engines. Gate-proven and NOT
+  vacuous: 55-90 road tiles per game at turn 250. STILL OPEN: the
+  physical Trader unit. Earlier (2026-07-20, ROUND B8 slice T, #64): Route DURATION +
   international routes landed both engines. DURATION: every route carries
   `expiresTurn = turn + TRADE_ROUTE_DURATION` (20, `core/trade.ts`); at
   expiry the route is removed and the owner re-picks NEXT turn via the
