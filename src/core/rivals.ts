@@ -32,7 +32,7 @@ import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import {
   growthFoodNeeded,
   housingGrowthFactor,
@@ -1363,6 +1363,59 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
  * flip lands; yields/combat read followedReligion, which does not move
  * mid-turn. Zero RNG.
  */
+/**
+ * B-18 (#71): resolve one theological combat for `att` (an APOSTLE of religion
+ * `g`). Returns true when a fight happened and the attacker spent its turn.
+ *
+ * Sourced shape: only Apostles initiate; both combatants take damage from the
+ * RELIGIOUS-STRENGTH DIFFERENCE; 0 HP kills; the loser's religion loses
+ * pressure in nearby cities and the winner's gains. DETERMINISTIC on purpose —
+ * a conditional RNG draw here would have to be mirrored draw-for-draw on both
+ * engines, the surface the A-12 rival quests dissolved by design.
+ *
+ * Target pick is a TOTAL order (dist, then unit id) so both engines agree.
+ */
+function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number): boolean {
+  const at = state.map.tiles[att.tileIndex];
+  const atkStr = UNITS[att.type]?.religiousStrength ?? 0;
+  let def: Unit | null = null;
+  for (const n of neighbors(state.map, at)) {
+    for (const u of unitsAt(state, n.index)) {
+      if ((UNITS[u.type]?.religiousStrength ?? 0) <= 0) continue;
+      const ug = u.owner === 'player' ? 0 : (u.civId ?? -1) + 1;
+      if (ug === g) continue; // same religion — no contest
+      if (!def || u.id < def.id) def = u;
+    }
+  }
+  if (!def) return false;
+  const defStr = UNITS[def.type]?.religiousStrength ?? 0;
+  const toDef = Math.max(1, THEO_BASE_DAMAGE + THEO_DAMAGE * (atkStr - defStr));
+  const toAtk = Math.max(1, THEO_BASE_DAMAGE + THEO_DAMAGE * (defStr - atkStr));
+  def.hp -= toDef;
+  att.hp -= toAtk;
+  att.movesLeft = 0;
+  const loserRel = def.hp <= 0 ? (def.owner === 'player' ? 0 : (def.civId ?? -1) + 1) : att.hp <= 0 ? g : -1;
+  const winnerRel = def.hp <= 0 ? g : att.hp <= 0 ? (def.owner === 'player' ? 0 : (def.civId ?? -1) + 1) : -1;
+  if (winnerRel >= 0) {
+    const deadTile = def.hp <= 0 ? def.tileIndex : att.tileIndex;
+    const dt = state.map.tiles[deadTile];
+    for (const c of [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)]) {
+      const ct = state.map.tiles[c.centerIndex];
+      if (hexDistance(dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
+      let pres = c.religionPressure;
+      if (!pres || pres.length !== nRel) {
+        pres = new Array(nRel).fill(0);
+        c.religionPressure = pres;
+      }
+      pres[winnerRel] += THEO_PRESSURE_SWING;
+      if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - THEO_PRESSURE_SWING);
+    }
+  }
+  if (def.hp <= 0) disbandUnit(state, def.id);
+  if (att.hp <= 0) disbandUnit(state, att.id);
+  return true;
+}
+
 function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
   const g = state.rivals.indexOf(rival) + 1;
   const nRel = 1 + state.rivals.length;
@@ -1371,7 +1424,15 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
   const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
   const allCities: City[] = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
   for (const u of [...state.units]) {
-    if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'MISSIONARY' || (u.charges ?? 0) <= 0) continue;
+    if (u.owner !== 'rival' || u.civId !== rival.id || (u.charges ?? 0) <= 0) continue;
+    if (u.type !== 'MISSIONARY' && u.type !== 'APOSTLE') continue; // B-18 (#71): apostles spread too
+    // B-18 (#71): THEOLOGICAL COMBAT, before the spread/walk. Only an APOSTLE
+    // may INITIATE (real Civ 6 also allows Inquisitors — out of scope), and
+    // only against an ADJACENT religious unit of a DIFFERENT religion. Both
+    // sides take damage scaled by the religious-strength difference; a unit at
+    // 0 HP dies and its religion sheds THEO_PRESSURE_SWING in nearby cities
+    // while the winner's gains it. ZERO-DRAW by design (see THEO_DAMAGE).
+    if (u.type === 'APOSTLE' && theologicalCombat(state, u, g, nRel)) continue;
     const ut = state.map.tiles[u.tileIndex];
     let target: City | null = null;
     let bestKey = Infinity;
@@ -2467,6 +2528,26 @@ export function rivalPhase(state: GameState): void {
               rival.faith = (rival.faith ?? 0) - mCost;
               if (eb?.missionaryChargeBonus) u.charges = (u.charges ?? 0) + eb.missionaryChargeBonus;
             }
+            break;
+          }
+        }
+        // B-18 (#71): the APOSTLE buy — the missionary block's twin, run AFTER
+        // it so the cheaper unit still saturates first (the worship-then-
+        // missionary precedence this whole gold/faith ladder follows). Same
+        // SHRINE + complete unpillaged HOLY_SITE gate, same spawn-refund
+        // convention, same cap (an apostle counts against APOSTLE_CAP only).
+        const liveA = state.units.filter(
+          (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'APOSTLE',
+        ).length;
+        const aCost = Math.round(UNITS.APOSTLE.cost * (eb?.missionaryCostMult ?? 1));
+        if (liveA < APOSTLE_CAP && goldAffordable(rival.faith ?? 0, aCost)) {
+          for (const rc of rival.cities) {
+            if (!rc.buildings.includes('SHRINE')) continue;
+            const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');
+            const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
+            if (!ht?.districtComplete || ht.districtPillaged) continue;
+            const u = spawnUnit(state, 'APOSTLE', rc.centerIndex, 'rival', rival.id);
+            if (u) rival.faith = (rival.faith ?? 0) - aCost;
             break;
           }
         }

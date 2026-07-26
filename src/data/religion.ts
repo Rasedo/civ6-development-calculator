@@ -265,6 +265,30 @@ export const RELIGION_PRESSURE_PER_TURN = 1;
 export const SPREAD_PRESSURE = 10;
 /** B6-S2: max LIVE missionaries per civ (the rival buy gate). */
 export const MISSIONARY_CAP = 2;
+/** B-18 (#71): live APOSTLE cap per civ — apostles are the expensive combat
+ * arm, so one at a time keeps the faith ladder from starving worship buys. */
+export const APOSTLE_CAP = 1;
+
+/**
+ * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
+ * initiate against an adjacent religious unit of a DIFFERENT religion; both
+ * sides take damage scaled by the RELIGIOUS-STRENGTH DIFFERENCE; a unit at 0
+ * HP dies; and the loser's religion loses pressure in nearby cities while the
+ * winner's gains. DELIBERATELY ZERO-DRAW: damage is the strength difference
+ * scaled by THEO_DAMAGE, with no RNG multiplier. Real Civ 6 rolls, but a new
+ * draw here would have to be mirrored draw-for-draw in both engines on a
+ * conditional path — the exact surface the A-12 rival quests dissolved by
+ * making the mechanic deterministic. Recorded simplification.
+ */
+export const THEO_DAMAGE = 2;
+/** Flat damage both sides take before the strength difference is applied. */
+export const THEO_BASE_DAMAGE = 30;
+/** Cities within this range of the fallen unit feel the pressure swing. */
+export const THEO_PRESSURE_RANGE = 6;
+/** Pressure the winner's religion gains (and the loser's sheds) in cities
+ * within SPREAD/PRESSURE range when a religious unit dies in theological
+ * combat. */
+export const THEO_PRESSURE_SWING = 15;
 
 /**
  * B-18 pressure→yields coupling master switch (Round B3, slice U). When false

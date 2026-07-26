@@ -34,6 +34,14 @@ export interface UnitDef {
   /** B6-S2: faith-purchase-only (MISSIONARY) — never offered by trainableUnits,
    * so it can't be queued or gold-purchased by either seat. */
   faithOnly?: boolean;
+  /**
+   * B-18 (#71): RELIGIOUS STRENGTH — the stat theological combat resolves on.
+   * Only units that carry it can take part; only an APOSTLE may INITIATE
+   * (real Civ 6: Apostles and Inquisitors attack, Missionaries only defend).
+   * Magnitudes are stylized (the ORDER apostle > missionary is the sourced
+   * part); promotions and Inquisitors stay out of scope.
+   */
+  religiousStrength?: number;
   /** B7-G (B-8): spawn-ONLY chassis (GENERAL/ADMIRAL) — never trainable,
    * gold-purchasable, or faith-buyable; the only birth path is the
    * Great-General/Admiral claim (applyGreatPersonEffect + the rival mirror).
@@ -224,6 +232,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 3,
       faithOnly: true,
+      religiousStrength: 25, // B-18 (#71): defends theological combat, never initiates
       description: 'Spreads its religion to nearby cities (3 charges, faith purchase only).',
     }),
     // B7-G (B-8): the Great General / Great Admiral support chassis (appended
@@ -260,6 +269,24 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 1,
       spawnOnly: true,
       description: 'Great Admiral — +5 CS to own naval/embarked units within 2 tiles (spawned on claim).',
+    }),
+    // B-18 (#71): the APOSTLE — appended LAST, because roster indices ARE the
+    // GPU's unit type ids and inserting anywhere else would renumber them.
+    // Faith-purchase only like the Missionary, spreads like it, but carries a
+    // higher religiousStrength and is the ONLY unit that may INITIATE
+    // theological combat (real Civ 6 also lets Inquisitors — out of scope).
+    U({
+      id: 'APOSTLE',
+      name: 'Apostle',
+      code: 'A',
+      cost: 200, // ×GAME_SPEED → 120 faith (faith-only; never a production cost)
+      maintenance: 0,
+      moves: 4,
+      combat: 0, // civilian: never garrisons, flanks, supports or fights normal combat
+      charges: 3,
+      faithOnly: true,
+      religiousStrength: 35,
+      description: 'Spreads its religion and wins theological combat (3 charges, faith purchase only).',
     }),
   ].map((u) => [u.id, u]),
 );
