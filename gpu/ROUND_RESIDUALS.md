@@ -60,6 +60,30 @@ its verification status.
   #70-era "suspicious" note to dissolve under verification rather than
   need a fix.
 
+## LIVE STATUS (keep current — this file survives compaction)
+
+DONE, BOTH ENGINES: DEBT-1, DEBT-2, DEBT-3 (non-issue), B-8, A-9, B-18.
+DONE, TS ONLY: A-5r (rival tile purchase) — GPU half specified below.
+NOT STARTED: B-17, B-26, B-23, B-24, B-27.
+No gate has run since #70's battery. Closing ladder at the very end.
+
+### A-5r GPU half — exact spec
+Mirror `rivalTilePurchaseCost` + the purchase step. Needs:
+* `r_tiles_purchased` [B, R] long in `_MUTABLE` (the cost escalator; the
+  TS twin is `RivalCiv.tilesPurchased`).
+* Export `tilePurchaseMult` per rival modifiers if not already shipped.
+* POSITION IS LOAD-BEARING: TS buys at the A-5 GOLD-LADDER tail (only when
+  nothing else was bought), which runs BEFORE `_rival_border_growth`. Do
+  NOT bolt the purchase onto `_rival_border_growth` just to reuse its pick
+  — that runs LATER in the phase, and a territory claim feeds the yields
+  computed in between, so the engines would diverge.
+* The candidate pick must equal `pickRivalBorderTile`'s: radius 5, fully
+  unowned (`owner == -1 & cs_at < 0 & rival_at < 0`), adjacency to THIS
+  rc via the A-17 `rc_tile_id` registry, key = dist asc, resource
+  priority desc, yield-sum desc, index asc. That key is built inline
+  inside `_rival_border_growth` (~line 8390) — FACTOR IT OUT into a
+  helper both call, rather than duplicating it.
+
 ## ORDER (cheapest and best-verified first)
 
 1. **DEBT-2 GPU half** — finish what is already half-landed. No new
