@@ -113,7 +113,30 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**CAMP-ORDER HYPOTHESIS REFUTED (2026-07-26).** Dumped TS's
+**A CONTRADICTION — one of the 'matching' premises below is FALSE and
+must be re-measured first (2026-07-26).**
+Thresholds now checked too: `garrisonGrowChance` 0.1, `campSpawnChance`
+0.08, `maxBarbPerCamp` 3 — all identical to the TS literals. So the
+collected facts are mutually inconsistent:
+  if the rng STATE matches at t138 AND at t139, then both engines drew the
+  SAME COUNT, and mulberry32 is deterministic, so the same count from the
+  same state yields the SAME VALUES. Same values + same thresholds + same
+  camps in the same order + same gates ⇒ the SAME outcome. But the
+  outcomes differ (GPU spawns at camp 950, TS does not).
+Therefore at least one premise is wrong. Rank them by how they were
+measured and re-check the weakest FIRST:
+ 1. "rng matches at t139" — inferred from the parity report listing t140
+    as the first mismatch. WEAKEST: re-read the report directly, and
+    print the GPU vs TS rng at t138 AND t139 side by side. If they differ
+    at t139, everything else collapses into an ordinary draw divergence
+    and the hunt restarts one turn earlier.
+ 2. "both drew 3 grow rolls at t139" — my draw counts were measured at
+    t140, NOT t139. Re-run the advancing-draw logger for t139.
+ 3. "near_any true for all three camps" — measured at t140, not t139.
+DO NOT trust any t140 measurement as evidence about t139. That conflation
+is the most likely error in this whole hunt.
+
+(refuted) CAMP-ORDER HYPOTHESIS. Dumped TS's
 `state.barbCamps` for this seed at t138/t139: **`[419, 300, 950]` — the
 SAME tiles in the SAME order as the GPU's `camp_tile`.** So iteration
 order is NOT the cause. Do not re-open it.
