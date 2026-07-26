@@ -10850,7 +10850,9 @@ class BatchSim:
             # same first-eligible-slot pick, same spawn-refund convention.
             if self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0 and bool(self.r_religion_done[:, r].any()):
                 n_live_a = (self.v_alive & (self.v_civ == r) & (self.v_type == self._apostle_idx)).sum(dim=1)
-                acost = self._enh["mcost"][self.r_enhancer[:, r] + 1] * 0 + float(round(self._apostle_cost))
+                # B-18 (#71): FLAT cost (the TS twin — missionaryCostMult is a
+                # MISSIONARY discount and does not extend to apostles).
+                acost = torch.full((self.B,), float(round(self._apostle_cost)), dtype=torch.float64, device=self.device)
                 want_a = active & self.r_religion_done[:, r] & (n_live_a < self._apostle_cap) & self._afford(self.r_faith[:, r], acost)
                 if bool(want_a.any()):
                     hs_ta = self.rc_dist_tile[:, r, :, self._hs_idx]
@@ -10860,7 +10862,7 @@ class BatchSim:
                     if bool(buy_a.any()):
                         first_a = elig_a & (elig_a.long().cumsum(dim=1) == 1)
                         at_a = (self.rc_center[:, r].clamp(min=0) * first_a.long()).sum(dim=1)
-                        landed_a = self._spawn_rival_civ(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._p_charges[self._apostle_idx])
+                        landed_a = self._spawn_rival_civ(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._p_charges[self._apostle_idx].expand(self.B))
                         self.r_faith[:, r] = torch.where(landed_a, self.r_faith[:, r] - acost, self.r_faith[:, r])
             # AUDIT A-5r (#71): TILE PURCHASE — the LAST rung of the gold
             # ladder, so it can never starve the building/settler/unit

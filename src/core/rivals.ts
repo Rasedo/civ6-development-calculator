@@ -2119,10 +2119,12 @@ function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity,
   const cPct = rival.research.civics.length / Object.keys(CIVICS).length;
   const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
   const step = Math.round(5 * GAME_SPEED);
-  return Math.round(
-    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (rival.tilesPurchased ?? 0)) *
-      getRivalModifiers(state, rival).tilePurchaseMult,
-  );
+  // A-5r (#71): tilePurchaseMult stays 1 on the RIVAL seat. It is a
+  // government/policy effect the GPU does not model for rivals (the A-7r
+  // note), so reading it here would desync the two prices the moment a rival
+  // adopted a government carrying it. Flat on both engines until the GPU
+  // grows the channel.
+  return Math.round(base * (1 + 4 * Math.max(tPct, cPct)) + step * (rival.tilesPurchased ?? 0));
 }
 
 export function rivalPhase(state: GameState): void {
@@ -2583,7 +2585,10 @@ export function rivalPhase(state: GameState): void {
         const liveA = state.units.filter(
           (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'APOSTLE',
         ).length;
-        const aCost = Math.round(UNITS.APOSTLE.cost * (eb?.missionaryCostMult ?? 1));
+        // B-18 (#71): FLAT cost — the enhancer's missionaryCostMult is a
+        // MISSIONARY discount and does not extend to apostles here (both
+        // engines flat, so the belief can never desync the two prices).
+        const aCost = Math.round(UNITS.APOSTLE.cost);
         if (liveA < APOSTLE_CAP && goldAffordable(rival.faith ?? 0, aCost)) {
           for (const rc of rival.cities) {
             if (!rc.buildings.includes('SHRINE')) continue;

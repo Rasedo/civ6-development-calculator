@@ -60,6 +60,48 @@ its verification status.
   #70-era "suspicious" note to dissolve under verification rather than
   need a fix.
 
+## OPEN PARITY FAILURE — resume the hunt HERE
+
+The ladder was run mid-round (deliberately, to validate 8 landed items
+before adding more). tsc clean, full export clean, rules.json asserted —
+all new keys land under `rivals.beliefs` / `rivals.eras`, which is where
+the engine reads them. `python gpu/parity_test.py` is RED on TWO seeds:
+
+```
+seed 9066 turn 77: MISMATCH [('rUnits0', 3.0, 4.0)]
+seed 9066 turn 79: MISMATCH [('rUnits0', 3.0, 5.0), ('rUnits1', 5.0, 4.0)]
+seed 9066 turn 80: MISMATCH [('rUnits0', 5.0, 4.0), ('rUnits1', 4.0, 5.0)]
+seed 9235 turn 90: MISMATCH [('imp', 20.0, 21.0), ('rQProg0', ...), ('rGScore0', ...)]
+```
+Tuples are (name, TS, GPU). At 9066 t77 the GPU holds one MORE rival unit
+than TS; by t80 the counts SWAP between the two rivals, which reads as a
+TIMING difference in rival unit spawning, not a miscount.
+
+ALREADY RULED OUT (tried, no change — do not re-try):
+* the APOSTLE price — the enhancer `missionaryCostMult` was applied in TS
+  but not on the GPU; both are FLAT now and the failure is identical;
+* `tilePurchaseMult` on the rival seat — TS read it, the GPU hardcodes 1;
+  TS is flat now and the failure is identical.
+* A crash fixed on the way in: `_spawn_rival_civ` indexes `charges[rows]`,
+  so the apostle buy must pass a [B] tensor, not the 0-dim
+  `_p_charges[idx]`.
+
+PRIME SUSPECTS, in order:
+1. **B-18 apostle buy TIMING.** rUnits is a RIVAL unit count and the
+   apostle is the round's only new rival unit. Check the buy GATE order
+   against TS: TS runs the apostle block INSIDE `if (rival.religionFounded)`
+   AFTER the missionary buy; the GPU gates on `r_religion_done.any()` then
+   masks per row. Verify a row can not buy on a turn TS skips.
+2. **B-18 theological-combat PRE-PASS.** The GPU resolves all combats
+   before the walk where TS interleaves. The equivalence argument (a
+   spread only writes pressure; a fight only kills a DIFFERENT civ's unit)
+   holds WITHIN one civ's pass — re-check it ACROSS civs, since
+   `_rival_phase` loops civs and a kill lands in another civ's pool.
+3. **A-5r tile purchase** for the seed-9235 `imp` divergence — a purchased
+   tile changes territory, which moves builder improvement choices.
+Fast loop: write a one-seed probe (the #70 `probe9183.py` pattern, ~15s)
+rather than the 280s gate.
+
 ## LIVE STATUS (keep current — this file survives compaction)
 
 DONE, BOTH ENGINES: DEBT-1, DEBT-2, DEBT-3 (non-issue), B-8, A-9, B-18,
