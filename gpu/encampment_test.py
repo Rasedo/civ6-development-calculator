@@ -102,6 +102,11 @@ def build_strike_scene(rules, path):
     enc_tile = int(owned[0])
     sim.district[0, enc_tile] = sim._encamp_didx
     sim.district_complete[0, enc_tile] = True
+    # B-17 (#71): a completed Encampment musters its garrison, and the strike
+    # now requires a LIVE one (an Encampment at 0 HP is occupied and fires
+    # nothing). The engine writes this at every completion site; a hand-built
+    # fixture has to write it too, exactly like district_complete.
+    sim.encamp_hp[0, enc_tile] = sim._encamp_hp_max
     sim.district_pillaged[0, enc_tile] = False
     sim.district_dead[0, enc_tile] = False
     # a distance-1 empty tile for the target
