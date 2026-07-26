@@ -10,7 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, RivalCity,
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
+import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain, encampmentIntact, encampmentBlocks } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
@@ -29,7 +29,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
+import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
@@ -972,6 +972,7 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
   // mirror); only the terrain half becomes mover-aware.
   const passOk = (t: Tile): boolean => {
     if (isImpassable(t)) return false;
+    if (encampmentBlocks(state, t, unit)) return false; // B-17 (#71)
     // Water steps are the LIVE-gated surface (mirror of the war-march and the
     // GPU peace-act's _embark_live gate); with the flag off every mover here is
     // land-only, exactly as pre-N2.
@@ -2842,7 +2843,11 @@ export function rivalPhase(state: GameState): void {
         if (q.progress >= cost) {
           rc.queue.shift();
           if (q.kind === 'settler') tryFoundCity(state, rival);
-          else if (q.kind === 'district') state.map.tiles[q.tileIndex].districtComplete = true;
+          else if (q.kind === 'district') {
+            const dt = state.map.tiles[q.tileIndex];
+            dt.districtComplete = true;
+            if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP; // B-17 (#71)
+          }
           else if (q.kind === 'building') {
             rc.buildings.push(q.building);
             if (q.building === 'ANCIENT_WALLS') rc.outerHp = WALLS_HP; // AUDIT B-1
@@ -2960,14 +2965,9 @@ export function rivalPhase(state: GameState): void {
       // (the pestk twin). A rival city with a COMPLETE unpillaged ENCAMPMENT
       // fires the same once-per-turn ranged strike right AFTER its walls strike
       // (walls first, then Encampment — per rc, before the heal), k="restk".
-      if (
-        rc.districts.some(
-          (dd) =>
-            dd.type === 'ENCAMPMENT' &&
-            state.map.tiles[dd.tileIndex].districtComplete &&
-            !state.map.tiles[dd.tileIndex].districtPillaged,
-        )
-      ) {
+      // B-17 (#71): a LIVE garrison is now required — an Encampment reduced to
+      // 0 HP is occupied and fires nothing (the pestk twin's rule).
+      if (rc.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
@@ -3015,6 +3015,14 @@ export function rivalPhase(state: GameState): void {
         rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
         if (rc.buildings.includes('ANCIENT_WALLS')) {
           rc.outerHp = Math.min(WALLS_HP, (rc.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
+        }
+        // B-17 (#71): the Encampment garrison repairs on the same gate/rate —
+        // the player's barbarianPhase mirror.
+        for (const d of rc.districts) {
+          if (d.type !== 'ENCAMPMENT') continue;
+          const dt = state.map.tiles[d.tileIndex];
+          if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
+          dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? 0) + CITY_HEAL_PER_TURN);
         }
       }
     }

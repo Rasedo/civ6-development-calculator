@@ -117,7 +117,7 @@ import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
-import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP } from '../src/data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, ENCAMPMENT_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
@@ -840,6 +840,7 @@ const rules = {
     crossbowmanAfterTurn: 120,
     cityHealPerTurn: 20,
     wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
+    encampHp: ENCAMPMENT_HP, // B-17 (#71): the ENCAMPMENT garrison pool cap
     unitHealPerTurn: 10,
     // B-26 era ladder: barb u_type 0/1/2/3 = WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN.
     // #70/S5 appends the RANGED pair: 4 = ARCHER, 5 = CROSSBOWMAN; #71/B-26

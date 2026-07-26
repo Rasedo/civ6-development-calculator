@@ -21,7 +21,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../data/religion';
-import { UNITS } from '../data/units';
+import { UNITS, ENCAMPMENT_HP } from '../data/units';
 import { PROJECTS } from '../data/projects';
 
 const DISTRICT_MAP: Record<string, DistrictId> = {
@@ -286,6 +286,7 @@ export function parseLiveSync(text: string): SyncResult {
       if (type && DISTRICTS[type] && owner) {
         tile.district = type;
         tile.districtComplete = true;
+        if (type === 'ENCAMPMENT') tile.encampHp = ENCAMPMENT_HP; // B-17 (#71)
         tile.improvement = null;
         owner.districts.push({ type, tileIndex: i });
       } else {

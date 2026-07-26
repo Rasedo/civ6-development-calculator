@@ -90,6 +90,13 @@ export interface Tile {
    * yields/buildings/housing/amenities/GPP go dark until a builder repairs it;
    * static counts — cost/limit/maintenance — stay, since it is still owned). */
   districtPillaged?: boolean;
+  /** B-17 (#71): the ENCAMPMENT garrison pool (max ENCAMPMENT_HP = 100), set
+   *  when the district COMPLETES. While positive the tile blocks hostile
+   *  entry and the district may strike; a melee attack on the tile depletes
+   *  it, and at 0 the tile is enterable and the strike goes silent. Lives on
+   *  the TILE (not the city) so every walker's legality check stays O(1) and
+   *  the GPU can mirror it as one [B, T] plane. */
+  encampHp?: number;
   /** Tribal village (goody hut) waiting for a unit to claim it. */
   goodyHut: boolean;
   /** Volcano (a mountain that occasionally erupts when disasters are on). */

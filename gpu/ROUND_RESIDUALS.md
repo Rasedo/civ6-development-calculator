@@ -846,7 +846,24 @@ triple. REMAINING in B-24: the named Golden-Age dedication CATALOG
 (Monumentality et al. as distinct choices rather than one flat payout),
 dark-age POLICY cards, and governor establishment/promotions.
 NOT STARTED: B-17, B-23, B-27.
-No gate has run since #70's battery. Closing ladder at the very end.
+
+### BATCH 1 CLOSED GREEN (2026-07-26, a7ef8ca)
+The first batch's closing ladder ran in full and every lane passed:
+tsc; full vitest; export (24 seeds, rules.json asserted); scripted
+parity 24x250 at 0.0 milli; FORCED compaction 0.0 milli; rollout 72/72;
+standalone sweep of all 31 poke lanes; BATTERY OK wall 600s (parity
+556s, gpu-gate 487s, mcts 410s — parity is still the critical path).
+AUDIT re-summed from per-item weights: A 31.8/41 78%, B 81.8/88 93%,
+overall 175.6/191 92%, open A+B 113.6/129 88%.
+
+The parity hunt that preceded it found the divergence was MY OWN bulk
+`str.replace` collateral damage — a gating edit meant for the city-attack
+sites also wrapped the unit-vs-unit `mel`/`vrng` religion adders. That is
+the SECOND time a bulk replace hit pre-existing sites this round. Rule:
+after any bulk replace, diff the touched sites individually.
+
+BATCH 2 (in flight): B-27, B-23, B-17 — same experimental mode, one
+ladder at the end. a7ef8ca is the known-green base to return to.
 
 ### A-5r GPU half — exact spec
 Mirror `rivalTilePurchaseCost` + the purchase step. Needs:

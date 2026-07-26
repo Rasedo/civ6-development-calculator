@@ -10,7 +10,7 @@
 import type { City, CityState, DistrictId, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
-import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { CS_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
@@ -28,6 +28,8 @@ import {
   fortifyBonus,
   rivalCityAt,
   moveCostInto,
+  encampmentIntact,
+  encampmentBlocks,
   crossesRiver,
 } from './units';
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
@@ -424,6 +426,66 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
   }
 }
 
+/**
+ * B-17 (#71): a melee assault ON an Encampment tile. Real Civ 6: the district
+ * fights independently of its city, so the attacker trades rolls with it at the
+ * CITY's defense strength and the district's own garrison pool takes the
+ * damage. Beating it to 0 opens the tile (the block in `tileFreeForUnit` lifts)
+ * and silences its strike — the game's "occupied Encampment". The attacker does
+ * NOT advance: entry costs a separate move, exactly like a city assault.
+ *
+ * The attacker's CS is assembled EXACTLY as `attackCity` assembles it (wound,
+ * river, veterancy, the gated religion adder, aura) so the two assault kinds
+ * cannot drift; only the target pool and the roll keys differ.
+ */
+function attackEncampment(
+  state: GameState,
+  attacker: Unit,
+  tileIndex: number,
+  defCS: number,
+  k: string,
+): void {
+  const tile = state.map.tiles[tileIndex];
+  const atkCS =
+    (UNITS[attacker.type]?.combat ?? 0) -
+    woundPenalty(attacker) -
+    (crossesRiver(state.map.tiles[attacker.tileIndex], tile) ? RIVER_ATTACK_PENALTY : 0) +
+    xpLevelBonus(attacker) +
+    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, tileIndex) : 0) +
+    generalAuraCS(state, attacker, attacker.tileIndex);
+  const dmgToEncamp = damageRoll(state, atkCS - defCS, k, tileIndex);
+  const dmgToAttacker = damageRoll(state, defCS - atkCS, k + 'c', tileIndex);
+  gainXp(attacker, XP_ATTACK);
+  tile.encampHp = Math.max(0, (tile.encampHp ?? 0) - dmgToEncamp);
+  attacker.hp -= dmgToAttacker;
+  attacker.movesLeft = 0;
+  if (attacker.hp <= 0) killUnit(state, attacker);
+}
+
+/**
+ * B-17 (#71): the defense strength an Encampment on `tile` fights at — its
+ * OWNING city's, since the district is part of that city's defenses. Returns
+ * null when the tile is not a live enemy Encampment for this attacker.
+ */
+export function encampmentDefense(
+  state: GameState,
+  attacker: Unit,
+  tile: Tile,
+): { defCS: number; k: string } | null {
+  if (!encampmentBlocks(state, tile, attacker)) return null;
+  // The CIV-level defense floor, deliberately WITHOUT the city-center garrison
+  // term: that +5 is "a unit is standing in the city centre", which has nothing
+  // to do with this district. A unit standing on the ENCAMPMENT is fought as a
+  // unit instead (the `enemies.length === 0` precedence in meleeAttack), so the
+  // district never doubles up with a defender.
+  if (tile.rivalId !== undefined) {
+    const rival = state.rivals.find((r) => r.id === tile.rivalId);
+    if (!rival) return null;
+    return { defCS: Math.max(15, rival.bestMeleeCS ?? 0), k: 'renc' };
+  }
+  return { defCS: Math.max(15, state.bestMeleeCS ?? 0), k: 'penc' };
+}
+
 /** Melee attack an adjacent enemy unit or city tile. */
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
@@ -470,8 +532,16 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     return undefined;
   })();
 
-  if (enemies.length === 0 && !enemyCity && !rivalTarget && !csTarget) {
+  // B-17 (#71): a live enemy Encampment is a target in its own right. Checked
+  // BEFORE the "nothing to attack" bail and AFTER the unit scan, so a garrison
+  // standing on the district is fought first (real Civ 6 hits the unit).
+  const encamp = enemies.length === 0 ? encampmentDefense(state, attacker, target) : null;
+  if (enemies.length === 0 && !enemyCity && !rivalTarget && !csTarget && !encamp) {
     return no('Nothing to attack there.');
+  }
+  if (encamp && !enemyCity && !rivalTarget && !csTarget) {
+    attackEncampment(state, attacker, targetIndex, encamp.defCS, encamp.k);
+    return ok;
   }
 
   if (enemyCity) {
@@ -710,7 +780,11 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
       d === 1 &&
       !def.ranged &&
       state.cityStates.some((c) => c.centerIndex === t.index && isSuzerain(c));
-    if (hasEnemy || playerCity || rivalCity || rivalVsRivalCity || csWar) out.push(t.index);
+    // B-17 (#71): an adjacent live enemy Encampment is a melee target — the
+    // only way to open its tile. Ranged-vs-district stays out of scope
+    // (recorded residual), matching the ranged-vs-rival-city scope-out.
+    const encampTarget = d === 1 && !def.ranged && encampmentBlocks(state, t, unit);
+    if (hasEnemy || playerCity || rivalCity || rivalVsRivalCity || csWar || encampTarget) out.push(t.index);
   }
   return out;
 }
@@ -1383,16 +1457,11 @@ export function barbarianPhase(state: GameState): void {
   // documented above). A city with a COMPLETE unpillaged ENCAMPMENT fires the
   // same pattern — range 2, nearest player-hostile unit, one roll at the
   // city's defense strength, no retaliation, never captures — under k="pestk".
-  // No separate Encampment HP pool (recorded B-17 residual).
+  // B-17 (#71): the strike now needs a LIVE garrison — an Encampment beaten to
+  // 0 HP is occupied, and an occupied Encampment fires nothing (real Civ 6).
+  // `encampmentIntact` folds in the complete/unpillaged tests it used to spell.
   for (const city of state.cities) {
-    if (
-      !city.districts.some(
-        (dd) =>
-          dd.type === 'ENCAMPMENT' &&
-          map.tiles[dd.tileIndex].districtComplete &&
-          !map.tiles[dd.tileIndex].districtPillaged,
-      )
-    )
+    if (!city.districts.some((dd) => encampmentIntact(map.tiles[dd.tileIndex])))
       continue;
     const center = map.tiles[city.centerIndex];
     let bestTile = -1;
@@ -1434,6 +1503,17 @@ export function barbarianPhase(state: GameState): void {
     if (hp < CITY_MAX_HP) state.cityHp[String(city.id)] = Math.min(CITY_MAX_HP, hp + CITY_HEAL_PER_TURN);
     if (city.buildings.includes('ANCIENT_WALLS')) {
       city.outerHp = Math.min(WALLS_HP, (city.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
+    }
+    // B-17 (#71): the Encampment garrison repairs on the SAME unbesieged gate
+    // and rate as the walls — real Civ 6 districts heal back, which is what
+    // lets a beaten-down Encampment re-block its tile later. Deliberate
+    // simplification: the gate is the CITY's siege state, not the district's
+    // own adjacency, so it matches the wall pool exactly.
+    for (const d of city.districts) {
+      if (d.type !== 'ENCAMPMENT') continue;
+      const dt = map.tiles[d.tileIndex];
+      if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
+      dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? 0) + CITY_HEAL_PER_TURN);
     }
   }
 }

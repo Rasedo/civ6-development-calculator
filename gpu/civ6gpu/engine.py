@@ -376,7 +376,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -1122,6 +1122,12 @@ class BatchSim:
         # Paving/eligibility/cap consumers deliberately stay placement-based
         # (TS paves and caps on tile.district regardless of completeness).
         self.district_complete = torch.zeros(B, T, dtype=torch.bool, device=device)
+        # B-17 (#71): the ENCAMPMENT garrison pool, per TILE (the TS
+        # `Tile.encampHp` twin). Mustered to ENCAMPMENT_HP when the district
+        # completes; while positive the tile bars hostile entry and the
+        # district may strike; a melee assault depletes it and at 0 the tile
+        # opens and the strike goes silent.
+        self.encamp_hp = torch.zeros(B, T, dtype=torch.long, device=device)
         # AUDIT B-32: a COMPLETE, non-CITY_CENTER district raided into darkness —
         # its adjacency/buildings/housing/amenities/GPP/CS-envoy channels stop
         # until a builder repairs it (static counts stay: still owned). t0 world
@@ -1307,6 +1313,8 @@ class BatchSim:
         self._trade_intl_gold = int(_tr.get("intlGold", 3))  # B-23 international base gold
         self._trade_duration = int(_tr.get("duration", 20))  # B-23 route lifetime
         self._walls_hp = int(rules.combat.get("wallsHp", 100))
+        # B-17 (#71): the ENCAMPMENT garrison pool cap (TS ENCAMPMENT_HP).
+        self._encamp_hp_max = int(rules.combat.get("encampHp", 100))
         # Which district types count toward the specialty cap (Aqueduct/Neighborhood
         # do NOT). Aqueduct also carries housing, not an adjacency yield.
         self._is_specialty = torch.tensor([bool(d.get("countsTowardLimit", True)) for d in self.districts_cat], dtype=torch.bool, device=device)  # [nD]
@@ -4285,6 +4293,59 @@ class BatchSim:
         )
         return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
 
+    def _encamp_live(self) -> torch.Tensor:
+        """[B, T] bool — B-17 (#71): a LIVE Encampment garrison. The exact
+        `encampmentIntact` twin: the district is an ENCAMPMENT, complete,
+        unpillaged, and still holding HP. (`district_dead` is deliberately NOT
+        a term — TS has no twin for it, and a captured Encampment keeps
+        defending its new owner in both engines.)"""
+        if self._encamp_didx < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        return (
+            (self.district == self._encamp_didx)
+            & self.district_complete
+            & ~self.district_pillaged
+            & (self.encamp_hp > 0)
+        )
+
+    def _encamp_block_plane(self, side: str, civ=None) -> torch.Tensor:
+        """[B, T] bool — the `encampmentBlocks` twin over the WHOLE map: does a
+        LIVE ENEMY Encampment bar this side from each tile? Hostility mirrors
+        `unitsHostile` exactly — barbarians are hostile to every owner, the
+        player to at-war rivals, a rival to the player when `r_atwar` and to
+        another rival when `rr_war`. `civ` may be an int or a [B, 1] tensor
+        (the war-march passes `v_civ` per slot)."""
+        live = self._encamp_live()  # [B, T]
+        if side == "barb":
+            return live  # barbarians are hostile to every owner
+        r_at = self.rival_at  # [B, T] owning rival, else -1
+        if side in ("pmil", "pciv"):
+            war_r = self.r_atwar.gather(1, r_at.clamp(min=0))
+            return live & (r_at >= 0) & war_r
+        # rival probe: `civ` is this rival's index (int or [B, 1] tensor)
+        p_tile = (r_at < 0) & (self.owner >= 0)
+        if torch.is_tensor(civ):
+            cv = civ.reshape(self.B, 1)
+            war_p = self.r_atwar.gather(1, cv)  # [B, 1]
+            rr = self.rr_war.gather(
+                1, cv.unsqueeze(-1).expand(self.B, 1, self.rr_war.shape[2])
+            ).squeeze(1)  # [B, R]
+            same = r_at == cv
+        else:
+            war_p = self.r_atwar[:, civ].unsqueeze(1)
+            rr = self.rr_war[:, civ]
+            same = r_at == civ
+        war_r = rr.gather(1, r_at.clamp(min=0)) & ~same
+        hostile = torch.where(r_at >= 0, war_r, p_tile & war_p)
+        return live & hostile
+
+    def _encamp_block(self, tiles: torch.Tensor, side: str, civ=None) -> torch.Tensor:
+        """[B, N] — `_encamp_block_plane` sampled at `tiles` (one source of
+        truth for the predicate; the walkers probe a handful of tiles)."""
+        if self._encamp_didx < 0:
+            return torch.zeros_like(tiles, dtype=torch.bool)
+        return self._encamp_block_plane(side, civ).gather(1, tiles.clamp(min=0))
+
     def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
         """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
         foreign unit blocks entirely; an own unit of the same domain blocks;
@@ -4299,22 +4360,25 @@ class BatchSim:
         rv = rv_slot >= 0
         rvc_slot = self.rvciv_at.gather(1, tc)
         rvc = rvc_slot >= 0
+        # B-17 (#71): a live enemy Encampment bars entry on every side, exactly
+        # as TS's `tileFreeForUnit` now does.
+        enc = self._encamp_block(tiles, side, civ)
         if side == "pmil":
-            return barb | pmil | rv | rvc
+            return barb | pmil | rv | rvc | enc
         if side == "pciv":
-            return barb | pciv | rv | rvc
+            return barb | pciv | rv | rvc | enc
         if side == "rmil":
             # foreign anything; own-civ military (same domain); own-civ
             # civilian stacks (cross-domain)
             rvc_foreign = rvc & (self.v_civ.gather(1, rvc_slot.clamp(min=0)) != civ)
-            return barb | pmil | pciv | rv | rvc_foreign
+            return barb | pmil | pciv | rv | rvc_foreign | enc
         if side == "rciv":
             # foreign anything; own-civ civilian (same domain); own-civ
             # military stacks (cross-domain)
             rv_foreign = rv & (self.v_civ.gather(1, rv_slot.clamp(min=0)) != civ)
-            return barb | pmil | pciv | rv_foreign | rvc
+            return barb | pmil | pciv | rv_foreign | rvc | enc
         # 'barb': anything standing there blocks.
-        return barb | pmil | pciv | rv | rvc
+        return barb | pmil | pciv | rv | rvc | enc
 
     def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -5411,6 +5475,27 @@ class BatchSim:
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
                 self.p_acted[:, p] = self.p_acted[:, p] | siege  # P4/D-2
+            # B-17 (#71): a LIVE enemy Encampment on the target tile is assaulted
+            # (meleeAttack's encamp arm). Requires the tile to hold no unit and
+            # no rival city — the exact TS precedence — and a MELEE attacker.
+            if self._encamp_didx >= 0:
+                enc_ok = self._encamp_block(tc.unsqueeze(1), "pmil").squeeze(1)
+                enc_att = (
+                    alive
+                    & (a >= 6)
+                    & (a < 12)
+                    & (tgt >= 0)
+                    & (bslot < 0)
+                    & ~v_ok
+                    & ~rvc_ok
+                    & ~rc_ok
+                    & enc_ok
+                    & (self._p_combat[self.p_type[:, p]] > 0)
+                    & (self._p_rng_str[self.p_type[:, p]] == 0)
+                )
+                if bool(enc_att.any()):
+                    self._attack_encampment(enc_att, tc, "player", p)
+                    self.p_acted[:, p] = self.p_acted[:, p] | enc_att
             att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
             # V-R: ranged units strike instead of meleeing (rangedAttack —
             # one roll, no retaliation, no advance). The mask above is
@@ -5827,6 +5912,9 @@ class BatchSim:
                 & (self.rv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)
                 & (self.rvciv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)  # C1-B5b: rival builders block player moves (foreign)
                 & (side < 0)
+                # B-17 (#71): a LIVE enemy Encampment bars the step (walkPath's
+                # blockedByEnemy twin — the melee arm is the only way in).
+                & ~self._encamp_block(tgt.clamp(min=0).unsqueeze(1), "pmil"  # player hostility is side-independent here).squeeze(1)
             )
             if bool(ok.any()):
                 rows = ok.nonzero(as_tuple=True)[0]
@@ -6026,7 +6114,10 @@ class BatchSim:
                 | (self.rvciv_at.gather(1, nbc) >= 0)
             )
             rvc = self.rvcity_at.gather(1, nbc) >= 0
-            valid = (nb >= 0) & ((ctr >= 0) | has_unit | rvc)
+            # B-17 (#71): an adjacent LIVE Encampment is a melee target for a
+            # barbarian too (hostile to every owner) — attackTargets' encampTarget.
+            enc_nb = self._encamp_block(nb, "barb") if self._encamp_didx >= 0 else None
+            valid = (nb >= 0) & ((ctr >= 0) | has_unit | rvc | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
             target_tile = tkey.min(dim=1).values
             # #70/S5 (B-26): a RANGED raider (ARCHER/CROSSBOWMAN) scans its FULL
@@ -6070,6 +6161,16 @@ class BatchSim:
             city_att = attack & ~rngd & (tgt_city >= 0)
             unit_att = attack & ~rngd & (tgt_city < 0) & has_u
             rvc_att = attack & ~rngd & (tgt_city < 0) & ~has_u & (self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0)
+            enc_att = (
+                attack
+                & ~rngd
+                & (tgt_city < 0)
+                & ~has_u
+                & (self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) < 0)
+                & self._encamp_block(ttc.unsqueeze(1), "barb").squeeze(1)
+                if self._encamp_didx >= 0
+                else None
+            )
 
             if bool(city_att.any()):
                 self._hostile_city_attack(city_att, tgt_city, "barb", u)
@@ -6077,7 +6178,11 @@ class BatchSim:
                 self._hostile_vs_unit(unit_att, ttc, "barb", u)
             if bool(rvc_att.any()):
                 self._attack_rival_city(rvc_att, ttc, u)
+            if enc_att is not None and bool(enc_att.any()):
+                self._attack_encampment(enc_att, ttc, "barb", u)
             acted_att = city_att | unit_att | rvc_att
+            if enc_att is not None:
+                acted_att = acted_att | enc_att
             # #70/S5 (B-26): a RANGED raider strikes instead — hostileUnitAct
             # routes any UNITS[type].ranged attacker through hostileRangedStrike:
             # ONE roll, no retaliation, no advance, civilians take the roll, a
@@ -6338,7 +6443,7 @@ class BatchSim:
             rcap = max(self.R - 1, 0)
             walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
             owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.C).bool() & (self.owner >= 0).unsqueeze(2)  # [B,T,C]
-            has_enc = (((self.district == self._encamp_didx) & self.district_complete & ~self.district_dead & ~self.district_pillaged).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE unpillaged Encampment
+            has_enc = (((self.district == self._encamp_didx) & self.district_complete & ~self.district_dead & ~self.district_pillaged & (self.encamp_hp > 0)).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE unpillaged Encampment; B-17 (#71): an Encampment beaten to 0 HP is occupied and fires nothing
             for s_rank in range(self.C):
                 col = walk_ord[:, s_rank]  # [B] — this game's s_rank-th city (TS array order)
                 enc_city = self.alive[bidx, col] & has_enc[bidx, col]
@@ -6427,6 +6532,24 @@ class BatchSim:
         if self._walls_bidx >= 0:
             heal_o = self.alive & self.buildings[:, :, self._walls_bidx] & ~besieged
             self.outer_hp = torch.where(heal_o, (self.outer_hp + cb.get("cityHealPerTurn", 20)).clamp(max=self._walls_hp), self.outer_hp)
+        # B-17 (#71): the ENCAMPMENT garrison repairs on the SAME unbesieged
+        # gate and rate as the wall pool (the TS barbarianPhase twin — the gate
+        # is the CITY's siege state, not the district's own adjacency).
+        if self._encamp_didx >= 0:
+            _enc_t = (
+                (self.district == self._encamp_didx)
+                & self.district_complete
+                & ~self.district_pillaged
+                & ~self.district_dead  # captured: TS's fresh City has no districts
+                & (self.owner >= 0)
+            )
+            _unbes = self.alive & ~besieged  # [B, C]
+            _heal_t = _enc_t & _unbes.gather(1, self.owner.clamp(min=0))
+            self.encamp_hp = torch.where(
+                _heal_t,
+                (self.encamp_hp + cb.get("cityHealPerTurn", 20)).clamp(max=self._encamp_hp_max),
+                self.encamp_hp,
+            )
 
     # --- city-states (phase 4c) ---------------------------------------------------
 
@@ -9162,6 +9285,11 @@ class BatchSim:
             & ((((self.center_at >= 0) | (self.rvcity_at >= 0)) & hp.unsqueeze(1)) | units_pl)
         )
         valid = valid | (enemy_rc & (d_all == 1) & ~rngd.unsqueeze(1))  # A-19/B-33: enemy rival center, melee CAPTURE (vs the no-op quirk above)
+        # B-17 (#71): an adjacent LIVE enemy Encampment is a melee target — the
+        # only way to open its tile (attackTargets' encampTarget: d==1, !ranged).
+        enc_plane = self._encamp_block_plane("rmil", ac) if self._encamp_didx >= 0 else None
+        if enc_plane is not None:
+            valid = valid | (enc_plane & (d_all == 1) & ~rngd.unsqueeze(1))
         if cs_suz_t is not None:
             valid = valid | (cs_suz_t & (d_all == 1) & ~rngd.unsqueeze(1) & hp.unsqueeze(1))  # csWar requires hostileToPlayer
         tkey = torch.where(valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
@@ -9185,8 +9313,17 @@ class BatchSim:
             self._hostile_city_attack(city_att, tgt_city, "rival", v)
         if bool(unit_att.any()):
             self._hostile_vs_unit(unit_att, ttc, "rival", v)
+        # B-17 (#71): an ungarrisoned, non-city Encampment tile is assaulted.
+        # Ordered AFTER the city classes exactly as meleeAttack orders them.
+        if enc_plane is not None:
+            tgt_enc = enc_plane.gather(1, ttc.unsqueeze(1)).squeeze(1)
+            enc_att = attack & (tgt_city < 0) & ~has_u & ~tgt_enemy_rc & tgt_enc & ~rngd
+        else:
+            enc_att = None
         if bool(rc_att.any()):
             self._rival_attack_rival_city(rc_att, ttc, v)
+        if enc_att is not None and bool(enc_att.any()):
+            self._attack_encampment(enc_att, ttc, "rival", v)
         acted_att = city_att | unit_att | rc_att
         # A-6: ranged rows strike instead — one roll, no retaliation; the
         # method returns the rows that actually rolled (quirk rows spend
@@ -9436,6 +9573,75 @@ class BatchSim:
             moving = mv & (mp > 0)
         if self._embark_live:
             self.v_emb[:, v] = emb  # persist embark state across turns
+
+    def _attack_encampment(self, att: torch.Tensor, tile: torch.Tensor, atk_kind: str, u: int) -> None:
+        """B-17 (#71): the `attackEncampment` twin — a melee assault ON an
+        Encampment tile. The district fights at its OWNER's civ-level defense
+        floor (max(15, bestMeleeCS); no city-centre garrison term, since that
+        +5 describes a unit standing in the CITY, not on this district), its
+        own garrison pool takes the damage, and the attacker never advances.
+
+        The roll KEY differs by target owner ('penc' vs 'renc'), so the two
+        owner classes roll under DISJOINT masks. Rows are independent games and
+        `_damage_roll` advances only masked rows, so every attacking row still
+        draws exactly twice, in TS's order (damage-to-district, then counter)."""
+        if atk_kind == "barb":
+            a_hp, a_at, a_tile, a_alive = self.u_hp, self.barb_at, self.u_tile, self.u_alive
+            atk_cs = self._unit_combat[self.u_type[:, u]]
+        elif atk_kind == "player":
+            a_hp, a_at, a_tile, a_alive = self.p_hp, self.pmil_at, self.p_tile, self.p_alive
+            atk_cs = self._p_combat[self.p_type[:, u]]
+        else:
+            a_hp, a_at, a_tile, a_alive = self.v_hp, self.rv_at, self.v_tile, self.v_alive
+            atk_cs = self._p_combat[self.v_type[:, u]]
+        tc = tile.clamp(min=0)
+        r_at = self.rival_at.gather(1, tc.unsqueeze(1)).squeeze(1)  # [B] owning rival, else -1
+        floor = torch.full_like(self.best_melee, 15)
+        p_def = torch.maximum(self.best_melee, floor)
+        r_def = torch.maximum(
+            self.r_best_melee.gather(1, r_at.clamp(min=0).unsqueeze(1)).squeeze(1), floor
+        )
+        def_cs = torch.where(r_at >= 0, r_def, p_def)
+        # Attacker CS assembled exactly as _hostile_city_attack assembles it.
+        if atk_kind == "barb":
+            atk_lvl5 = torch.zeros_like(a_hp[:, u])
+        elif atk_kind == "player":
+            atk_lvl5 = self._xp_lvl_bonus(self.p_xp[:, u])
+        else:
+            atk_lvl5 = self._xp_lvl_bonus(self.v_xp[:, u])
+        atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], tc) + atk_lvl5
+        if atk_kind == "player":
+            # The PLAYER's aura (unified civ 0); its religion adder is
+            # structurally absent on the GPU (no player holy city — the
+            # pre-existing #71 asymmetry, and TS gates that term on rivals).
+            p_naval = self.unit_naval[self.p_type[:, u].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, u]
+            atk_e = atk_e + self._gen_aura_cs(
+                torch.zeros_like(tc), a_tile[:, u], p_naval
+            ).to(atk_e.dtype)
+        if atk_kind == "rival":
+            atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
+            atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
+            atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        p_att, r_att = att & (r_at < 0), att & (r_at >= 0)
+        diff, cdiff = atk_e - def_cs, def_cs - atk_e
+        d_enc = self._damage_roll(p_att, diff, k="penc", tile=tc)
+        d_self = self._damage_roll(p_att, cdiff, k="pencc", tile=tc)
+        d_enc = d_enc + self._damage_roll(r_att, diff, k="renc", tile=tc)
+        d_self = d_self + self._damage_roll(r_att, cdiff, k="rencc", tile=tc)
+        if atk_kind == "rival":
+            self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
+        elif atk_kind == "player":
+            self.p_xp[:, u] = torch.where(att, self.p_xp[:, u] + XP_ATTACK, self.p_xp[:, u])
+        rows = att.nonzero(as_tuple=True)[0]
+        if len(rows) > 0:
+            tr = tc[rows]
+            self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - d_enc[rows]).clamp(min=0)
+        a_hp[:, u] = torch.where(att, a_hp[:, u] - d_self, a_hp[:, u])
+        died = att & (a_hp[:, u] <= 0)
+        if bool(died.any()):
+            dr = died.nonzero(as_tuple=True)[0]
+            a_at[dr, a_tile[dr, u]] = -1
+            a_alive[:, u] = a_alive[:, u] & ~died
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
@@ -11241,7 +11447,13 @@ class BatchSim:
                         if bool(done_d.any()):
                             dr = done_d.nonzero(as_tuple=True)[0]
                             dtile = self.rc_qtile[:, r, j]
-                            self.district_complete[dr, dtile[dr].clamp(min=0)] = True
+                            _dt = dtile[dr].clamp(min=0)
+                            self.district_complete[dr, _dt] = True
+                            # B-17 (#71): a completed ENCAMPMENT musters its garrison.
+                            _enc = self.district[dr, _dt] == self._encamp_didx
+                            self.encamp_hp[dr, _dt] = torch.where(
+                                _enc, torch.full_like(_dt, self._encamp_hp_max), self.encamp_hp[dr, _dt]
+                            )
                             self.rc_qtile[dr, r, j] = -1
                             self._eff_version += 1
                         # C1-B4b-2: a finished building joins the registry
@@ -11413,7 +11625,9 @@ class BatchSim:
                     Bn, Tn, dev2 = self.B, self.T, self.device
                     bidx = torch.arange(Bn, device=dev2)
                     enc_reg = self.rc_dist_tile[:, r, j, self._encamp_didx]  # [B]
-                    enc_ok = (enc_reg >= 0) & self.district_complete.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) & ~self.district_pillaged.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    # B-17 (#71): `encamp_hp > 0` joins the gate — a beaten-down
+                    # Encampment is occupied and fires nothing (the pestk twin).
+                    enc_ok = (enc_reg >= 0) & self.district_complete.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) & ~self.district_pillaged.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) & (self.encamp_hp.gather(1, enc_reg.clamp(min=0).unsqueeze(1)).squeeze(1) > 0)
                     has_enc = cact & enc_ok
                     if bool(has_enc.any()):
                         ctr = self.rc_center[:, r, j].clamp(min=0)  # [B]
@@ -11510,6 +11724,24 @@ class BatchSim:
                     heal_oj = cact & ~besieged_j & self.rc_bldg[:, r, j, self._walls_bidx]
                     self.rc_outer_hp[:, r, j] = torch.where(
                         heal_oj, (self.rc_outer_hp[:, r, j] + heal).clamp(max=self._walls_hp), self.rc_outer_hp[:, r, j]
+                    )
+                # B-17 (#71): the rival Encampment garrison repairs on the same
+                # gate/rate — the player's barbarianPhase mirror. rc_dist_tile
+                # is districts_cat-indexed, so the Encampment column IS the tile.
+                if self._encamp_didx >= 0:
+                    _et = self.rc_dist_tile[:, r, j, self._encamp_didx]  # [B]
+                    _etc = _et.clamp(min=0)
+                    _live = (
+                        (_et >= 0)
+                        & self.district_complete.gather(1, _etc.unsqueeze(1)).squeeze(1)
+                        & ~self.district_pillaged.gather(1, _etc.unsqueeze(1)).squeeze(1)
+                    )
+                    _ok = cact & ~besieged_j & _live
+                    _cur = self.encamp_hp.gather(1, _etc.unsqueeze(1)).squeeze(1)
+                    self.encamp_hp[:, :] = self.encamp_hp.scatter(
+                        1,
+                        _etc.unsqueeze(1),
+                        torch.where(_ok, (_cur + heal).clamp(max=self._encamp_hp_max), _cur).unsqueeze(1),
                     )
 
             # P5/S6 (C-19): loyalty collapses resolve after the city loop —
@@ -12854,7 +13086,13 @@ class BatchSim:
             made_district = done & (cur_c >= self.UNIT_BASE + self.NU)
             if bool(made_district.any()):
                 db_ = made_district.nonzero(as_tuple=True)[0]
-                self.district_complete[db_, self.q_dtile[db_, col[db_]].clamp(min=0)] = True
+                _dt = self.q_dtile[db_, col[db_]].clamp(min=0)
+                self.district_complete[db_, _dt] = True
+                # B-17 (#71): a completed ENCAMPMENT musters its garrison.
+                _enc = self.district[db_, _dt] == self._encamp_didx
+                self.encamp_hp[db_, _dt] = torch.where(
+                    _enc, torch.full_like(_dt, self._encamp_hp_max), self.encamp_hp[db_, _dt]
+                )
                 self.q_dtile[db_, col[db_]] = -1
                 self._eff_version += 1
             self.current[bidx, col] = torch.where(done, torch.full_like(cur_c, -1), cur_c)

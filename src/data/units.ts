@@ -298,6 +298,17 @@ export const CITY_MAX_HP = 200;
  * and `rivalPhase` to rival cities; the GPU reads it as the exported
  * `cityHealPerTurn` rules field. */
 export const CITY_HEAL_PER_TURN = 20;
+/**
+ * B-17 (#71): the ENCAMPMENT garrison pool. Real Civ 6: the Encampment fights
+ * INDEPENDENTLY of its city — it strikes on its own and must be beaten down
+ * before enemy units may enter its tile, and its garrison carries 100 HP
+ * (its wall defenses match the city center's, which this model folds into the
+ * city's own outer pool rather than duplicating). At 0 the tile becomes
+ * enterable and the district goes silent, exactly as an occupied Encampment
+ * does in the real game. The GPU reads it as the exported `encampHp` rules
+ * field.
+ */
+export const ENCAMPMENT_HP = 100;
 /** AUDIT B-1: the ANCIENT_WALLS outer-defense pool — full HP a walled city
  * gets on top of its normal HP. Damage depletes it first (combat.ts); it
  * heals with the city (CITY_HEAL_PER_TURN, unbesieged). The GPU reads it as

@@ -148,6 +148,48 @@ export function unitsHostile(
 }
 
 /**
+ * B-17 (#71): is this tile a LIVE Encampment garrison? Complete, unpillaged
+ * and still holding HP. `districtPillaged` (B-32) already means "the district
+ * is down", so a pillaged Encampment blocks nothing.
+ */
+export function encampmentIntact(tile: Tile): boolean {
+  return (
+    tile.district === 'ENCAMPMENT' &&
+    tile.districtComplete &&
+    !tile.districtPillaged &&
+    (tile.encampHp ?? 0) > 0
+  );
+}
+
+/**
+ * B-17 (#71): the OWNER of a district tile, as a hostility probe. Rival
+ * territory carries `rivalId`; otherwise an owned tile belongs to the player.
+ * (City-states never build Encampments in this model, so `csId` needs no arm.)
+ */
+export function tileOwnerSide(tile: Tile): { owner: Unit['owner']; civId?: number } | null {
+  if (tile.rivalId !== undefined) return { owner: 'rival', civId: tile.rivalId };
+  if (tile.cityId >= 0) return { owner: 'player' };
+  return null;
+}
+
+/**
+ * B-17 (#71): does a LIVE enemy Encampment bar this unit from the tile?
+ * Real Civ 6: enemy units may not enter the district's tile until its garrison
+ * is reduced to 0 — the melee attack that beats it down IS the entry attempt
+ * (meleeAttack / the scripted walkers' attack step). The owner's own units and
+ * anyone not at war pass freely.
+ */
+export function encampmentBlocks(
+  state: GameState,
+  tile: Tile,
+  unit: { owner: Unit['owner']; civId?: number },
+): boolean {
+  if (!encampmentIntact(tile)) return false;
+  const side = tileOwnerSide(tile);
+  return side !== null && unitsHostile(state, unit, side);
+}
+
+/**
  * B-3 ZONE OF CONTROL (deliberate simplification): a MILITARY unit hostile
  * to `mover` standing ADJACENT to `tileIndex` exerts a zone of control —
  * entering that tile ends the mover's movement this turn. Civilians exert
@@ -202,6 +244,9 @@ export function tileFreeForUnit(
     // Land tile: naval units cannot stand ashore; land units use the land plane.
     if (naval) return false;
   }
+  // B-17 (#71): a LIVE enemy Encampment garrison bars entry outright. The
+  // beat-it-down path is the melee attack ON the tile, never a move.
+  if (unit && encampmentBlocks(state, tile, unit)) return false;
   const side = unit ? unitSide(unit) : 'player';
   const domain = unit ? unitDomain(unit.type) : 'civilian';
   for (const u of unitsAt(state, tileIndex)) {
@@ -229,7 +274,9 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   // findPath, so this only serves player-ordered ship moves / auto-explore.
   const naval = !!UNITS[unit.type]?.naval;
   const passOk = (t: Tile): boolean =>
-    naval ? isWater(t) && !isImpassable(t) && waterEnterable(state, t, unit) : unitPassable(t);
+    // B-17 (#71): routing never plans THROUGH a live enemy Encampment.
+    !encampmentBlocks(state, t, unit) &&
+    (naval ? isWater(t) && !isImpassable(t) && waterEnterable(state, t, unit) : unitPassable(t));
   if (!passOk(target)) return null;
   const start = map.tiles[unit.tileIndex];
 
@@ -291,7 +338,9 @@ export function walkPath(state: GameState, unit: Unit): void {
     // an embarked land unit uses EMBARK_MOVES (naval units keep their own moves).
     const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     // Enemy-occupied tiles block; the final step also needs a free slot.
-    const blockedByEnemy = unitsAt(state, nextIndex).some((u) => u.owner !== unit.owner);
+    const blockedByEnemy =
+      unitsAt(state, nextIndex).some((u) => u.owner !== unit.owner) ||
+      encampmentBlocks(state, to, unit); // B-17 (#71)
     if (blockedByEnemy || (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit))) {
       unit.path = null;
       return;

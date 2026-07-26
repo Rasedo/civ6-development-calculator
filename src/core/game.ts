@@ -20,7 +20,7 @@ import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, governorPicks, governorTitles } from './eras';
-import { UNITS, WALLS_HP } from '../data/units';
+import { UNITS, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -309,6 +309,8 @@ export function queueDistrict(
   const tile = state.map.tiles[tileIndex];
   tile.district = type;
   tile.districtComplete = state.sandbox;
+  // B-17 (#71): sandbox completes instantly, so the garrison musters here too.
+  if (state.sandbox && type === 'ENCAMPMENT') tile.encampHp = ENCAMPMENT_HP;
   tile.improvement = null;
   tile.feature = null;
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
@@ -823,7 +825,10 @@ export function endTurn(state: GameState): void {
         const item = city.queue.shift()!;
         const overflow = item.progress - itemCost(item);
         if (item.kind === 'district') {
-          state.map.tiles[item.tileIndex].districtComplete = true;
+          const dt = state.map.tiles[item.tileIndex];
+          dt.districtComplete = true;
+          // B-17 (#71): a completed ENCAMPMENT musters its garrison.
+          if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
         } else if (item.kind === 'wonder') {
           state.map.tiles[item.tileIndex].builtWonderComplete = true;
           // B-24: player wonder moment. GATE-UNREACHABLE (queueWonder is a
