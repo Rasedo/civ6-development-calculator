@@ -181,6 +181,29 @@ const R_MAX = Number(process.argv[5] ?? 2);  // C3c-i: parametric (the default 2
 // argv[6] = output dir. The O=4 pool: `-- 24 100 5 3 gpu/fixtures_o4`.
 const OUT = process.argv[6] ?? 'gpu/fixtures';
 
+/**
+ * #71 (DEBT-1): SEED_OVERRIDES is keyed by INDEX and tuned for the
+ * PARITY-CONTRACT roster (R_MAX 2). Alternate-roster exports — notably
+ * melee_test's `gpu/fixtures_o4` at 3 rivals — run a harsher world where a
+ * seed the 2-rival set keeps can lose every city, and the exporter then
+ * throws. Overriding it in the shared map would silently reshuffle the MAIN
+ * fixture set and invalidate the whole gate, so alternate rosters get their
+ * OWN map, consulted only when R_MAX differs from the contract.
+ */
+const SEED_OVERRIDES_ALT: Record<number, Record<number, number>> = {
+  // 3 rivals: 9196's player is wiped by t100 under the post-#70 world
+  // (ranged barbs + general auras + a third rival). 9199 survives.
+  3: { 15: 9199 },
+};
+
+function seedFor(s: number): number {
+  if (R_MAX !== 2) {
+    const alt = SEED_OVERRIDES_ALT[R_MAX];
+    if (alt && alt[s] !== undefined) return alt[s];
+  }
+  return SEED_OVERRIDES[s] ?? 9001 + s * 13;
+}
+
 mkdirSync(OUT, { recursive: true });
 
 // --- rules -------------------------------------------------------------------
@@ -1141,7 +1164,7 @@ const SEED_OVERRIDES: Record<number, number> = {
   15: 9196,
 };
 for (let s = 0; s < N_SEEDS; s++) {
-  const seed = SEED_OVERRIDES[s] ?? 9001 + s * 13;
+  const seed = seedFor(s);
   // withVillages: false — goody-hut claiming (a fog-era mechanic with its
   // own reward rolls) is outside the ported scope, so the reference maps
   // must not carry huts a moving unit could trip over.
@@ -1774,7 +1797,7 @@ for (let s = 0; s < N_SEEDS; s++) {
 // float association past the milli tolerances. Sweep them here — the
 // emit set is the single source of truth.
 const emitted = new Set<string>();
-for (let s = 0; s < N_SEEDS; s++) emitted.add(`seed${SEED_OVERRIDES[s] ?? 9001 + s * 13}.json`);
+for (let s = 0; s < N_SEEDS; s++) emitted.add(`seed${seedFor(s)}.json`);
 for (const f of readdirSync(OUT)) {
   if (/^seed\d+\.json$/.test(f) && !emitted.has(f)) {
     rmSync(`${OUT}/${f}`);

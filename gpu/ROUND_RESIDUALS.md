@@ -42,15 +42,23 @@ its verification status.
   the GPU player carries no religion — `holy_tile[:, 0]` is never set in
   any gate mode) — add a comment, not a call, matching the existing
   convention. The BARB `_attack_rival_city` site takes no term.
-- [ ] DEBT-1 melee_test fixtures_o4 — needs a 3-rival SEED_OVERRIDES
-  entry (seed 9196 loses all cities by t100 in the current harsher
-  world). `SEED_OVERRIDES` is shared and position-indexed, so an o4-only
-  override needs care.
-- [ ] DEBT-3 city-state-owned units invisible to both GPU hostile scans
-  (`has_unit` melee and `r_valid` ranged). PRE-VERIFY: do city-states own
-  units at all in this model, or only levied units that belong to the
-  levying civ? If the latter, this is a NON-ISSUE to be recorded, not
-  fixed. Check `unitsAt`/`unitsHostile` in TS for a CS-owned unit first.
+- [x] **DEBT-1 melee_test fixtures_o4 — DONE.** `SEED_OVERRIDES` is
+  keyed by INDEX and tuned for the parity-contract roster (R_MAX 2);
+  overriding a dying seed there would silently reshuffle the MAIN fixture
+  set and invalidate the whole gate. Added `SEED_OVERRIDES_ALT`, a
+  per-roster map consulted by the new `seedFor(s)` ONLY when R_MAX differs
+  from 2 (3 rivals: index 15 → 9199, since 9196's player is wiped by t100
+  under the post-#70 world). R_MAX 2 takes the identical old path, so the
+  main fixtures are byte-unaffected. fixtures_o4 regenerated; melee_test
+  prints "C3c MELEE OK".
+- [x] **DEBT-3 — RESOLVED AS A NON-ISSUE (verified, no code change).**
+  `Unit.owner` (types.ts) admits ONLY `'player' | 'barbarian' | 'rival'`,
+  and no site anywhere in src/core constructs a city-state-owned unit —
+  levied units belong to the LEVYING civ (A-12). So there is no CS unit
+  plane for the GPU hostile scans to omit; the reported asymmetry cannot
+  occur. This is the G-3 re-verify rule paying out again: the third
+  #70-era "suspicious" note to dissolve under verification rather than
+  need a fix.
 
 ## ORDER (cheapest and best-verified first)
 
