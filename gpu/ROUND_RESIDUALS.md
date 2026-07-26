@@ -83,11 +83,22 @@ its verification status.
      `countsTowardLimit` must be FALSE — note the P4 boost bug where
      AQUEDUCT wrongly counted toward "build any specialty district");
    * `districtMaintenance` already exempts NEIGHBORHOOD (0 gold).
-   TS has `tileAppeal` + `appealTier` ALREADY (city.ts imports them), so
-   the TS work is: the districts-catalog row, the `computeHousing` term,
-   and adding it to `SCAFFOLD_DISTRICTS` so both scripted seats build it.
-   The GPU work is the real cost: it has NO appeal plane, so one must be
-   exported/derived and kept live against feature/terrain changes.
+   **RECON RESULT — the TS side is ALREADY DONE.** `computeHousing`
+   (city.ts) already runs `total += appealTier(tileAppeal(map, dt)).housing`
+   for a complete unpillaged NEIGHBORHOOD, and the districts row already
+   carries `countsTowardLimit: false`, `allowMultiple: true` and
+   `housing: 0 // appeal-based`. So A-9's REAL remaining work is only:
+   (a) add NEIGHBORHOOD to `SCAFFOLD_DISTRICTS` — it is deliberately held
+   out with a now-STALE comment ("stays out pending the appeal-housing
+   stage"; that stage has landed), so today nothing ever BUILDS one;
+   (b) the GPU side, which has NO NEIGHBORHOOD handling at all (grep finds
+   it only in the exporter's maintenance-exempt list) and NO appeal plane —
+   the plane must be derived and kept live against feature/terrain changes,
+   which is the whole cost of this item.
+   VERIFY BEFORE (a): that `appealTier().housing` really returns 6/5/4/3/2,
+   and that flipping the scaffold does not trip the specialty-district
+   BOOST predicate (the P4 AQUEDUCT bug) — `countsTowardLimit: false`
+   should already protect it, but the GPU `_detect_boosts` twin must agree.
 4. **B-18 (0.2)** — apostles + theological combat on the existing
    missionary chassis. VERIFY apostle combat rules.
 5. **B-26 (0.6)** — cliffs, naval barbs, scout-then-raid escalation.
