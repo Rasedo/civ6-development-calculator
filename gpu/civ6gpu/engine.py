@@ -7143,6 +7143,81 @@ class BatchSim:
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
 
+    def _theological_combat(self, r: int, act: torch.Tensor) -> torch.Tensor:
+        """B-18 (#71): the `theologicalCombat` mirror. For each APOSTLE slot of
+        rival r flagged in `act` (slot order), find an ADJACENT religious unit
+        of a DIFFERENT religion, damage both by the RELIGIOUS-STRENGTH
+        difference, kill at 0 HP, and swing pressure in cities within
+        theoPressureRange of the fallen unit. Returns [B, U] — the slots that
+        fought and therefore skip the spread/walk (the TS `continue`).
+
+        Target pick is the LOWEST SLOT among adjacent enemies, which is the
+        v-pool's spawn order and so mirrors TS's lowest-unit-id. Zero RNG."""
+        fought = torch.zeros_like(act)
+        if not bool(act.any()):
+            return fought
+        U = self.v_alive.shape[1]
+        rs = self._rel_strength
+        for u in range(U):
+            a_on = act[:, u] & self.v_alive[:, u]
+            if not bool(a_on.any()):
+                continue
+            a_tile = self.v_tile[:, u]
+            a_str = rs[self.v_type[:, u].clamp(min=0)]
+            # adjacency + different religion + carries religious strength
+            d = self.pair_dist[a_tile.unsqueeze(1), self.v_tile]  # [B, U]
+            elig = (
+                self.v_alive & (d == 1) & (self.v_civ != r)
+                & (rs[self.v_type.clamp(min=0)] > 0)
+            )
+            elig = elig & a_on.unsqueeze(1)
+            if not bool(elig.any()):
+                continue
+            first = elig & (elig.long().cumsum(dim=1) == 1)  # lowest slot
+            has = first.any(dim=1)
+            d_str = (rs[self.v_type.clamp(min=0)] * first.long()).sum(dim=1)
+            to_def = (self._theo_base + self._theo_dmg * (a_str - d_str)).clamp(min=1)
+            to_atk = (self._theo_base + self._theo_dmg * (d_str - a_str)).clamp(min=1)
+            rows = has.nonzero(as_tuple=True)[0]
+            if rows.numel() == 0:
+                continue
+            j = first.long().argmax(dim=1)  # defender slot
+            self.v_hp[rows, j[rows]] = self.v_hp[rows, j[rows]] - to_def[rows].to(self.v_hp.dtype)
+            self.v_hp[rows, u] = self.v_hp[rows, u] - to_atk[rows].to(self.v_hp.dtype)
+            self.v_acted[rows, u] = True
+            fought[rows, u] = True
+            def_dead = self.v_hp[rows, j[rows]] <= 0
+            atk_dead = self.v_hp[rows, u] <= 0
+            # pressure swing at the fallen unit's tile
+            win_rel = torch.where(def_dead, torch.full_like(j[rows], r + 1), self.v_civ[rows, j[rows]] + 1)
+            los_rel = torch.where(def_dead, self.v_civ[rows, j[rows]] + 1, torch.full_like(j[rows], r + 1))
+            any_dead = def_dead | atk_dead
+            dead_tile = torch.where(def_dead, self.v_tile[rows, j[rows]], self.v_tile[rows, u])
+            if bool(any_dead.any()):
+                dr = rows[any_dead]
+                dt = dead_tile[any_dead]
+                wr = win_rel[any_dead]
+                lr = los_rel[any_dead]
+                sw = int(self._theo_swing)
+                dpc = self.pair_dist[self.site[dr].clamp(min=0), dt.unsqueeze(1)]  # [n, C]
+                near_pc = (dpc <= self._theo_range) & self.alive[dr]
+                for _k in range(dr.numel()):
+                    m = near_pc[_k]
+                    if bool(m.any()):
+                        self.city_pressure[dr[_k], m, wr[_k]] += sw
+                        self.city_pressure[dr[_k], m, lr[_k]] = (self.city_pressure[dr[_k], m, lr[_k]] - sw).clamp(min=0)
+                    drc = self.pair_dist[self.rc_center[dr[_k]].clamp(min=0), dt[_k]]  # [R, RC]
+                    mrc = (drc <= self._theo_range) & self.rc_alive[dr[_k]]
+                    if bool(mrc.any()):
+                        self.rc_pressure[dr[_k], mrc, wr[_k]] += sw
+                        self.rc_pressure[dr[_k], mrc, lr[_k]] = (self.rc_pressure[dr[_k], mrc, lr[_k]] - sw).clamp(min=0)
+            if bool(def_dead.any()):
+                dd = rows[def_dead]
+                self.v_alive[dd, j[dd]] = False
+            if bool(atk_dead.any()):
+                self.v_alive[rows[atk_dead], u] = False
+        return fought
+
     def _rival_missionary_actions(self, r: int, active: torch.Tensor) -> None:
         """B6-S2: mirrors rivalMissionaryActions — per missionary (slot order):
         target the NEAREST city of ANY civ (player + every rival, own
@@ -7165,6 +7240,17 @@ class BatchSim:
         if self._apostle_idx >= 0:
             _relig = _relig | (self.v_type == self._apostle_idx)
         cand = self.v_alive & (self.v_civ == r) & _relig & (self.v_charges > 0)
+        # B-18 (#71): THEOLOGICAL COMBAT resolves BEFORE the spread/walk, as a
+        # pre-pass over this civ's apostle slots in SLOT ORDER. TS interleaves
+        # it per unit (fight -> `continue`, else spread), and a pre-pass is
+        # ORDER-EQUIVALENT here: within one civ's pass a spread only writes
+        # pressure (read at endTurn, never mid-turn) and a fight can only kill a
+        # unit of a DIFFERENT civ, so no unit in this pass can change another's
+        # outcome. Units that fought are removed from `cand` — the TS
+        # `continue`. Zero-draw (see THEO_DAMAGE).
+        if self._apostle_idx >= 0:
+            fought = self._theological_combat(r, cand & (self.v_type == self._apostle_idx))
+            cand = cand & ~fought & self.v_alive
         if not bool(cand.any()):
             return
         # target mask [B, T]: ALIVE city centers following != g. scatter_add_
