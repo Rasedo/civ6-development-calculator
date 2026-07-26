@@ -9407,6 +9407,12 @@ class BatchSim:
         if enc_att is not None and bool(enc_att.any()):
             self._attack_encampment(enc_att, ttc, "rival", v)
         acted_att = city_att | unit_att | rc_att
+        # B-17 (#71): an Encampment assault SPENDS the attacker, exactly like
+        # every other attack class — TS's attackEncampment sets movesLeft = 0.
+        # Without this the unit went on to MARCH, which is how the hunt found
+        # it (turn 157: acted a1 in TS, a0 on GPU; the rng slipped at 237).
+        if enc_att is not None:
+            acted_att = acted_att | enc_att
         # A-6: ranged rows strike instead — one roll, no retaliation; the
         # method returns the rows that actually rolled (quirk rows spend
         # nothing, mirroring hostileRangedStrike's early return).
@@ -9705,10 +9711,17 @@ class BatchSim:
             atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
         p_att, r_att = att & (r_at < 0), att & (r_at >= 0)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
-        d_enc = self._damage_roll(p_att, diff, k="penc", tile=tc)
-        d_self = self._damage_roll(p_att, cdiff, k="pencc", tile=tc)
-        d_enc = d_enc + self._damage_roll(r_att, diff, k="renc", tile=tc)
-        d_self = d_self + self._damage_roll(r_att, cdiff, k="rencc", tile=tc)
+        # CAREFUL: _damage_roll returns a value on EVERY row — only the RNG
+        # ADVANCE is masked. Each roll must therefore be gated to its own rows
+        # before the two owner classes are combined; summing them raw would
+        # roughly DOUBLE both the damage dealt and the counter taken.
+        _z = torch.zeros_like(tc)
+        _dp = self._damage_roll(p_att, diff, k="penc", tile=tc)
+        _sp = self._damage_roll(p_att, cdiff, k="pencc", tile=tc)
+        _dr = self._damage_roll(r_att, diff, k="renc", tile=tc)
+        _sr = self._damage_roll(r_att, cdiff, k="rencc", tile=tc)
+        d_enc = torch.where(p_att, _dp, _z) + torch.where(r_att, _dr, _z)
+        d_self = torch.where(p_att, _sp, _z) + torch.where(r_att, _sr, _z)
         if atk_kind == "rival":
             self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
         elif atk_kind == "player":
