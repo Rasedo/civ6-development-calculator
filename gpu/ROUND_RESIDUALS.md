@@ -92,7 +92,24 @@ re-exported: parity RED at `seed 9274 turn 140 [('rng', ...)]`. So the
 #71 engine diverges from the baseline TS reference with every flag off.
 The caveat below is resolved; the label holds.
 
-**PER-PHASE DUMP DONE (2026-07-26) — the answer, as far as it goes.**
+**BOTH SIDES DUMPED (2026-07-26) — `_disaster_phase` is CLEARED.**
+Instrumented the TS reference run too (wrapped the four phase calls in
+`endTurn` behind a `globalThis` flag, differenced `state.rngState`, ran
+the exporter, then removed the instrumentation).
+RESULT: at t140 TS spends **`dis` = 5 draws in EVERY seed** and **`cs` = 0
+in every seed** — the GPU also spends 5 in `_disaster_phase` and 0 in the
+CS phase, so BOTH are exact matches and are ruled out. My "suspect
+disaster first" guess was wrong.
+The GPU spends `barb 5 + riv 1 = 6`; TS's total for seed 9274 is 9 with
+dis 5 and cs 0, so TS spends `barb + riv = 4`. **The 2 extra draws are in
+`_barbarian_phase` or `_rival_phase`, almost certainly the barbarian one
+(GPU 5 vs a TS value of 3 in the matching shape).**
+TO FINISH: re-run the TS probe printing the SEED alongside each row (the
+probe emitted rows in export order without labels, so seed 9274's group
+was not isolated), read its `barb`/`riv` pair, and diff that phase's
+draw sites. The instrumentation recipe is in the commit for this change.
+
+(superseded) PER-PHASE DUMP — GPU side only.
 GPU draws during seed 9274 turn 140, by phase (wrapping each phase method
 and differencing `rng_state`):
     `_barbarian_phase 5`, `_disaster_phase 5`, `_rival_phase 1` = **11**.
