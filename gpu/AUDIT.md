@@ -25,14 +25,24 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 31.7 | **77%** |
-| B fidelity | 88 | 81.2 | **92%** |
+| A symmetry | 41 | 31.8 | **78%** |
+| B fidelity | 88 | 81.8 | **93%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **174.9** | **92%** |
-| Open chapters only (A+B) | 129 | 112.9 | **88%** |
+| **Overall (incl. closed)** | **191** | **175.6** | **92%** |
+| Open chapters only (A+B) | 129 | 113.6 | **88%** |
+
+(#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
+weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
+scripted TRIGGERS held inert pending their own hunts); B-8 95%→100%
+outside #50 (naval war-march); B-18 95%→97% (apostle + theological
+combat landed, buy inert); B-26 80%→85% (scout-then-raid opener);
+B-24 70%→75% (dedication substrate + payouts, incl. the prevAge Heroic
+substrate). B-17/B-23/B-27 UNCHANGED — not started. Gains are modest by
+design: this round spent most of its effort on a parity hunt, and three
+mechanics ship INERT behind flags rather than live.)
 
 (#70 ROUND SMALLS close-out, 2026-07-26 — table RE-ADDED from per-item
 weights, never by deltas. A: A-9 90%→95% (palace relocation). B: B-8
