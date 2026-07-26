@@ -113,8 +113,25 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**STRONGEST LEAD (2026-07-26): the GPU carries an EXTRA LIVE BARB SLOT
-that the trace's `barbs` column does not count.**
+**THE EXTRA UNIT IS IDENTIFIED (2026-07-26) — slot 30.**
+Slot-by-slot dump, seed 9274:
+  t138  traced barbs TS=6 GPU=6, u_alive=6 — IDENTICAL:
+        slots 0/1/2 (type0 @419/300/950), 14 (type1 @299),
+        24 (type1 @341 hp100), 28 (type2 @342)
+  t139  traced barbs TS=6 **GPU=7**, u_alive=7:
+        same six PLUS **slot30: type=2 (PIKEMAN) @tile 864, hp 82**
+        and slot24 moved 341 -> 297 and dropped to **hp 13**
+So at t139 the GPU gains a barbarian TS never has, and an existing barb
+takes heavy damage. That extra unit is what attacks at t140 and spends the
+2 extra draws (the mel/melc pair).
+NOTE the hp values: slot30 arrives at 82 (not 100) and slot24 is at 13, so
+BOTH were in combat during t139 — this is not a clean spawn. Chase t139
+itself, not t140: dump the same slot table plus every `_damage_roll` k-tag
+for t138->t139 on both engines. A unit arriving at hp 82 smells like a
+SURVIVOR the GPU kept and TS killed (or a capture/pool-end slot reused),
+which is the KILL-hygiene / B-31 POOL-END class.
+
+(superseded) STRONGEST LEAD: the GPU carries an extra live barb slot.
 Compared `sim.u_alive.sum()` against the trace `barbs` column every turn:
 first divergence at **t139 — TS 6, GPU 7** (camps agree at 3). Note the
 scripted gate's FIRST reported mismatch is t140 on `rng`, NOT t139 on
