@@ -113,7 +113,34 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**THE DIVERGENT ROLL IS FOUND (2026-07-26): `vrng`, diff off by EXACTLY 10.**
+**ROOT CAUSE (2026-07-26, high confidence): the `vrng` DEFENDER religion
+term passes `_dciv` UNGUARDED, so a BARBARIAN defender receives a rival's
+Defender-of-the-Faith / Just War bonus.**
+In `_hostile_ranged_strike` the two defender adders sit adjacent and are
+NOT guarded the same way:
+```python
+def_e += where(d_emb, 0, self._rel_def_cs(_dciv, tgt))        # RELIGION: _dciv RAW
+def_civ_u = where(def_is_b | civ_def, -1,
+                  where(def_is_v, _dciv + 1, 0))              # barb -> -1
+def_e += self._gen_aura_cs(def_civ_u, tgt, def_naval)         # AURA: guarded
+```
+The AURA line explicitly maps a barbarian (and a lone civilian) to civ
+-1 so the term is zero. The RELIGION line one above passes `_dciv`
+straight through — and `_rel_def_cs` treats its argument as a RIVAL INDEX
+with -1 meaning none, so a barb defender whose `_dciv` is not -1 collects
+that rival's defensive belief. TS's `religionDefenseCS` returns 0 for a
+barbarian (`unitEnhancer`: barbarians have no faith), hence the GPU
+defender being exactly one belief-adder stronger — the missing 10.
+**FIX:** guard `_rel_def_cs`'s civ argument the same way the aura line
+does, e.g. pass `where(def_is_b | civ_def, -1, _dciv)`. Then re-export and
+re-run parity.
+This is #70/S5 code (the pool-generic `_hostile_ranged_strike` refactor
+that added the barb-attacker path and its defender terms), NOT a #71
+change — #71 merely moved the trajectory into a state that reaches it.
+VERIFY BEFORE FIXING (the G-3 rule): print `_dciv` and `def_is_b` at this
+site for tile 297 and confirm `_rel_def_cs` returns non-zero there.
+
+(evidence) THE DIVERGENT ROLL: `vrng` diff off by EXACTLY 10.
 Logged EVERY k-tagged damage roll on both sides for the turn:
 ```
         TS          GPU
