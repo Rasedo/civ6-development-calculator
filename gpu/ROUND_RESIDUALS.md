@@ -113,7 +113,30 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**ROOT HYPOTHESIS (2026-07-26) — CAMP ITERATION ORDER, not a gate.**
+**CAMP-ORDER HYPOTHESIS REFUTED (2026-07-26).** Dumped TS's
+`state.barbCamps` for this seed at t138/t139: **`[419, 300, 950]` — the
+SAME tiles in the SAME order as the GPU's `camp_tile`.** So iteration
+order is NOT the cause. Do not re-open it.
+
+WHERE THAT LEAVES IT — the facts that must ALL hold simultaneously:
+ * camps identical and identically ordered; `near_any` true for all three;
+   `maxBarbPerCamp` 3 both sides; count test `6 < 9` true both sides;
+ * the rng column MATCHES at t139 ⇒ both engines consumed the SAME NUMBER
+   of draws that turn;
+ * yet the GPU spawns a PIKEMAN at camp 950 (line 5975) and TS does not.
+Same stream position, same camp, same gate, different outcome. The only
+remaining explanations are (a) the two engines compare the draw against a
+DIFFERENT THRESHOLD or with a different comparison, or (b) the draw
+VALUES differ despite the state matching — i.e. the two mulberry32
+implementations return different floats for the same state, or the GPU's
+`_next_random` returns `out` computed from a different point in the
+sequence than TS's `nextRandom` for this call shape.
+**CHECK NEXT, cheapest first:** print the actual float each engine
+compares at camp 950 on t139 and the threshold it uses
+(`garrisonGrowChance` vs the TS literal 0.1). A single side-by-side of
+those two numbers ends this hunt.
+
+(refuted) ROOT HYPOTHESIS — CAMP ITERATION ORDER.
 Logged which spawn site creates the extra unit: at t139 the ONLY barb
 spawn is at **engine.py line 5975 — the RAID spawn**
 (`_spawn_barb(can_grow & (r < garrisonGrowChance), camp, grow_type)`),
