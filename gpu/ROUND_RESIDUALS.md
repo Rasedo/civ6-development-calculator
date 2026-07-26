@@ -113,9 +113,26 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**ROOT CAUSE (2026-07-26, high confidence): the `vrng` DEFENDER religion
-term passes `_dciv` UNGUARDED, so a BARBARIAN defender receives a rival's
-Defender-of-the-Faith / Just War bonus.**
+**THAT ROOT CAUSE WAS REFUTED BY VERIFICATION (2026-07-26) — the G-3 rule
+earned its keep.** Wrapped `_rel_def_cs` and logged every NON-ZERO return
+for the divergent turn: **there are none.** The religion defender term is
+0 throughout, so the unguarded `_dciv` is NOT the missing 10 (it is still
+a latent worth guarding for tidiness, but it is not this bug). Had I
+applied the "obvious" one-line fix from reading the code, I would have
+shipped a no-op and declared the hunt closed.
+
+STILL OPEN: the `vrng` defender is 10 CS stronger on the GPU (TS diff=3 vs
+GPU diff=-7, tile 297, barbarian SPEARMAN defender). Remaining terms in
+that assembly, now that religion and aura are both excluded by
+measurement: base combat, terrain defence, wound penalty, FORTIFY, XP
+level bonus, SUPPORT. Print each ONE BY ONE on both sides for tile 297 —
+do not infer from reading the code, which has now produced a wrong answer
+twice in this hunt.
+Note 10 = 2 x 5 (two xp levels) or 5 x 2 (five support adjacencies) or
+6 + 4, so several combinations fit; only the term-by-term print settles it.
+
+(refuted, but the guard is still worth adding separately) the `vrng`
+DEFENDER religion term passes `_dciv` unguarded:
 In `_hostile_ranged_strike` the two defender adders sit adjacent and are
 NOT guarded the same way:
 ```python
