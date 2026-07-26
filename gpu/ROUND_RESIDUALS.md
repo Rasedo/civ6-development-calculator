@@ -1,0 +1,98 @@
+# ROUND RESIDUALS (#71) — the nine-item + three-debt sweep
+
+Owner goal 2026-07-26: B-8, B-18, B-17, B-26, B-23, B-24, B-27, A-5r,
+A-9 residuals + the three debts. EXPERIMENTAL mode: no per-stage gates,
+NO subagents, ONE ladder + parity-hunt at the very END.
+
+## SCOPE REALITY — read first
+
+This is roughly **6.85 of B's open weight plus 0.3 of A's, across ~10
+independent mechanics**, several of which are full subsystems (tourism,
+the Trader unit + roads, the dedication system, an Encampment HP pool =
+a new attackable entity). For calibration: #70 moved 2.8 of weight with
+five slices, needed four latent fixes, and consumed a full context
+window WITH subagents. This goal is several times that, with subagents
+disallowed. It will span multiple context windows — that is a fact
+about the size, not a reason to stop. Work the order below; each item is
+independently landable, so a context boundary costs nothing if this file
+is kept current.
+
+**HARD RULE (from #70): verify every fidelity premise against a real
+Civ 6 source BEFORE writing code.** Two of #70's five premises were
+fabrications found in this repo's own AUDIT text. The gates prove the two
+engines agree, never that they agree with Civ 6. Each item below carries
+its verification status.
+
+## STATUS
+
+- [x] **DEBT-2 religionAttackCS on city attacks — TS DONE, GPU PENDING.**
+  VERIFIED: Crusade/Just War raise the UNIT's combat strength based on
+  where the unit stands, not on what it hits, so a city target cannot
+  exempt them. The recorded debt understated it — ALL SIX city-attack
+  sites omitted the term, not just the ranged ones. TS now adds
+  `religionAttackCS` at `attackCity`, `attackRivalCity`,
+  `attackCityState`, and the `rngcs`/`vrngc`/`rngrc` rolls, ordered
+  religion-then-aura to match the unit-vs-unit assembly.
+  GPU REMAINING: add `_rel_atk_cs(v_civ[:, u], tgt)` immediately BEFORE
+  the aura add (order is load-bearing for float association) at the
+  RIVAL-attacker sites only — `_rival_attack_rival_city` (rcty), the
+  rival `csty` block, `_hostile_city_attack`'s rival branch (pcty), and
+  `_hostile_ranged_strike`'s city branch (vrngc). The four
+  PLAYER-attacker sites are structurally 0 (`_rel_atk_cs` documents that
+  the GPU player carries no religion — `holy_tile[:, 0]` is never set in
+  any gate mode) — add a comment, not a call, matching the existing
+  convention. The BARB `_attack_rival_city` site takes no term.
+- [ ] DEBT-1 melee_test fixtures_o4 — needs a 3-rival SEED_OVERRIDES
+  entry (seed 9196 loses all cities by t100 in the current harsher
+  world). `SEED_OVERRIDES` is shared and position-indexed, so an o4-only
+  override needs care.
+- [ ] DEBT-3 city-state-owned units invisible to both GPU hostile scans
+  (`has_unit` melee and `r_valid` ranged). PRE-VERIFY: do city-states own
+  units at all in this model, or only levied units that belong to the
+  levying civ? If the latter, this is a NON-ISSUE to be recorded, not
+  fixed. Check `unitsAt`/`unitsHostile` in TS for a CS-owned unit first.
+
+## ORDER (cheapest and best-verified first)
+
+1. **DEBT-2 GPU half** — finish what is already half-landed. No new
+   premise to verify.
+2. **B-8 (0.1)** — naval war-march targeting. The rival war-march picks
+   land targets; naval/embarked hulls need the same scan. Small, and the
+   aura work already touched these blocks.
+3. **A-9 (0.2)** — NEIGHBORHOOD district: URBANIZATION civic,
+   appeal-tier housing, and a GPU appeal plane. VERIFY the housing
+   table against real Civ 6 before coding.
+4. **B-18 (0.2)** — apostles + theological combat on the existing
+   missionary chassis. VERIFY apostle combat rules.
+5. **B-26 (0.6)** — cliffs, naval barbs, scout-then-raid escalation.
+   Cliffs need a new map property (mapgen + movement + adjacency);
+   naval barbs need barb hulls on the water plane.
+6. **B-25/B-27 (1.0)** — the improvements roster tail. Blocked on appeal
+   and naval, so land it AFTER 3 and 5.
+7. **A-5r (0.1)** — tile purchase. `buyTile`/`tilePurchaseCost` are
+   TS-player-only with no GPU twin on any seat. Scripted-rival tile
+   purchase is landable now; the PLAYER verb rides #50.
+8. **B-23 (0.9)** — Trader unit + roads. A real subsystem: a new unit
+   class that physically walks a route and lays roads, plus a road plane
+   affecting movement cost on both engines.
+9. **B-24 (0.9)** — the dedication system. Owner-enumerated: Golden Age
+   bonuses, the Normal/Dark dedication converting to era score, and the
+   HEROIC Age (Dark→Golden grants three dedications) which needs a
+   `prevAge` substrate — a new per-civ column on both engines.
+10. **B-17 (0.3)** — Encampment HP pool + movement block. LAST because
+    it is the largest despite its small weight: in real Civ 6 these are
+    ONE mechanic (enemies cannot enter until the district's own HP is
+    reduced), i.e. a new ATTACKABLE ENTITY with targeting, damage, heal,
+    capture and a movement-legality term in every walker on both
+    engines. #70 deliberately scoped it out for exactly this reason.
+
+## CLOSING LADDER (once, at the end)
+
+tsc → full vitest → re-export (READ output) → scripted parity ALONE as
+the tripwire → then rollout + forced compaction CONCURRENTLY (every item
+here touches units/slots) → standalone poke-lane sweep → ONE battery →
+AUDIT close-out with the table RE-SUMMED from per-item weights.
+
+Expect a multi-mechanic hunt: batching trades away attribution, so a red
+gate will not name its cause. `.claude/scratchpad/` one-seed probes
+(~15s) beat the 280s gate while localizing — write one early.
