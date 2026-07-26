@@ -74,9 +74,20 @@ its verification status.
    `_gen_aura_hit`, not by the walker. B-8's ONLY remaining residual is
    the controlled-rival RL mask, which rides #50 — so B-8 is complete
    for everything outside #50.
-3. **A-9 (0.2)** — NEIGHBORHOOD district: URBANIZATION civic,
-   appeal-tier housing, and a GPU appeal plane. VERIFY the housing
-   table against real Civ 6 before coding.
+3. **A-9 (0.2)** — NEIGHBORHOOD. **PREMISE VERIFIED 2026-07-26, spec
+   below is sourced — implement directly, do NOT re-derive:**
+   * housing BY APPEAL TIER: Breathtaking 6 / Charming 5 / Average 4 /
+     Uninviting 3 / Disgusting 2;
+   * unlocked by the URBANIZATION civic;
+   * NO per-city limit (it is not a specialty district, so
+     `countsTowardLimit` must be FALSE — note the P4 boost bug where
+     AQUEDUCT wrongly counted toward "build any specialty district");
+   * `districtMaintenance` already exempts NEIGHBORHOOD (0 gold).
+   TS has `tileAppeal` + `appealTier` ALREADY (city.ts imports them), so
+   the TS work is: the districts-catalog row, the `computeHousing` term,
+   and adding it to `SCAFFOLD_DISTRICTS` so both scripted seats build it.
+   The GPU work is the real cost: it has NO appeal plane, so one must be
+   exported/derived and kept live against feature/terrain changes.
 4. **B-18 (0.2)** — apostles + theological combat on the existing
    missionary chassis. VERIFY apostle combat rules.
 5. **B-26 (0.6)** — cliffs, naval barbs, scout-then-raid escalation.
