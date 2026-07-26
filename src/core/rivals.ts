@@ -1445,7 +1445,14 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
   if (!rival.atWar || state.cities.length === 0) return;
   const nTiles = state.map.tiles.length;
   for (const u of [...state.units]) {
-    if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'GENERAL') continue;
+    // #71 (B-8 residual: naval war-march targeting). ADMIRALs march the war
+    // effort exactly as GENERALs do — real Civ 6 Great Admirals are units you
+    // move with the fleet, and an admiral parked in the capital can never put
+    // its +5/+1MP naval aura over the front. Same chassis, same target scan,
+    // same ≤range stop; only the aura's DOMAIN differs, and that is decided at
+    // the roll sites by inGeneralAura, not here.
+    if (u.owner !== 'rival' || u.civId !== rival.id) continue;
+    if (u.type !== 'GENERAL' && u.type !== 'ADMIRAL') continue;
     const ut = state.map.tiles[u.tileIndex];
     // war-march target: the nearest player city center (total-order key —
     // centerIndex is unique, so the min is deterministic).

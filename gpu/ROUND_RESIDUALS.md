@@ -25,7 +25,7 @@ its verification status.
 
 ## STATUS
 
-- [x] **DEBT-2 religionAttackCS on city attacks — TS DONE, GPU PENDING.**
+- [x] **DEBT-2 religionAttackCS on city attacks — DONE, BOTH ENGINES.**
   VERIFIED: Crusade/Just War raise the UNIT's combat strength based on
   where the unit stands, not on what it hits, so a city target cannot
   exempt them. The recorded debt understated it — ALL SIX city-attack
@@ -33,10 +33,10 @@ its verification status.
   `religionAttackCS` at `attackCity`, `attackRivalCity`,
   `attackCityState`, and the `rngcs`/`vrngc`/`rngrc` rolls, ordered
   religion-then-aura to match the unit-vs-unit assembly.
-  GPU REMAINING: add `_rel_atk_cs(v_civ[:, u], tgt)` immediately BEFORE
-  the aura add (order is load-bearing for float association) at the
-  RIVAL-attacker sites only — `_rival_attack_rival_city` (rcty), the
-  rival `csty` block, `_hostile_city_attack`'s rival branch (pcty), and
+  GPU DONE: `_rel_atk_cs` added immediately BEFORE
+  the aura add (order is load-bearing for float association) at the four
+  RIVAL-attacker sites — `_rival_attack_rival_city` (rcty), the rival
+  `csty` block, `_hostile_city_attack`'s rival branch (pcty), and
   `_hostile_ranged_strike`'s city branch (vrngc). The four
   PLAYER-attacker sites are structurally 0 (`_rel_atk_cs` documents that
   the GPU player carries no religion — `holy_tile[:, 0]` is never set in
@@ -56,9 +56,16 @@ its verification status.
 
 1. **DEBT-2 GPU half** — finish what is already half-landed. No new
    premise to verify.
-2. **B-8 (0.1)** — naval war-march targeting. The rival war-march picks
-   land targets; naval/embarked hulls need the same scan. Small, and the
-   aura work already touched these blocks.
+2. [x] **B-8 (0.1) — DONE, BOTH ENGINES.** Naval war-march targeting:
+   rival ADMIRALs now march the war effort on the SAME chassis, target
+   scan and ≤range stop as GENERALs (`rivalGeneralActions` /
+   `_rival_general_actions`). VERIFIED: real Civ 6 Great Admirals are
+   units you move with the fleet; an admiral held at the capital can
+   never put its naval aura over the front. Only the aura's DOMAIN
+   differs and that is decided at the roll sites by `inGeneralAura` /
+   `_gen_aura_hit`, not by the walker. B-8's ONLY remaining residual is
+   the controlled-rival RL mask, which rides #50 — so B-8 is complete
+   for everything outside #50.
 3. **A-9 (0.2)** — NEIGHBORHOOD district: URBANIZATION civic,
    appeal-tier housing, and a GPU appeal plane. VERIFY the housing
    table against real Civ 6 before coding.

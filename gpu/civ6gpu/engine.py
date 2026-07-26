@@ -7185,14 +7185,25 @@ class BatchSim:
         walks with the war effort toward the civ's CURRENT war-march target (the
         NEAREST player city center, dist·(T+1)+centerIndex key), on real MP,
         stopping within gen_aura_range so its +5 aura covers the front. Gated on
-        r_atwar (peace → hold; ADMIRALs and the scripted player general are
-        absent from this rival-only walker). The _rival_missionary_actions step
-        loop verbatim, with the ≤range stop and no spread. Zero RNG."""
-        if self._general_unit_idx < 0:
+        r_atwar (peace → hold; the scripted player general is absent from this
+        rival-only walker). The _rival_missionary_actions step loop verbatim,
+        with the ≤range stop and no spread. Zero RNG.
+
+        #71 (B-8 residual): ADMIRALs march too, on the SAME chassis and target
+        scan — real Civ 6 Great Admirals move with the fleet, and an admiral
+        held at the capital could never put its naval aura over the front. Only
+        the aura's DOMAIN differs, and that is decided at the roll sites by
+        _gen_aura_hit, not here."""
+        if self._general_unit_idx < 0 and self._admiral_unit_idx < 0:
             return
         B, T, dev = self.B, self.T, self.device
         atw = active & self.r_atwar[:, r]
-        cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._general_unit_idx)
+        _is_gp = torch.zeros_like(self.v_type, dtype=torch.bool)
+        if self._general_unit_idx >= 0:
+            _is_gp |= self.v_type == self._general_unit_idx
+        if self._admiral_unit_idx >= 0:
+            _is_gp |= self.v_type == self._admiral_unit_idx
+        cand = self.v_alive & (self.v_civ == r) & _is_gp
         if not (bool(atw.any()) and bool(cand.any())):
             return
         # war-march target mask [B, T]: alive PLAYER city centers (scatter_add
@@ -8806,6 +8817,10 @@ class BatchSim:
         # #70/S2 (B-8): the RIVAL attacker's own general/admiral aura joins
         # attackRivalCity's atkCS — once, before both paired rolls.
         atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
+        # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
+        # Crusade/Just War key on where the UNIT stands, not on what it hits.
+        # Inserted BEFORE the aura add so term order matches the TS assembly.
+        atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
         atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, self.v_tile[:, u], atk_naval).to(atk_e.dtype)
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
@@ -8998,6 +9013,10 @@ class BatchSim:
                 # #70/S2 (B-8): the rival attacker's aura on attackCityState's
                 # atkCS — once, so the cstyc counter sees the same atk_e.
                 atk_naval = self.unit_naval[vt0] | self.v_emb[:, v]
+                # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
+                # Crusade/Just War key on where the UNIT stands, not on what it hits.
+                # Inserted BEFORE the aura add so term order matches the TS assembly.
+                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, v], ttc).to(atk_e.dtype)
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, v] + 1, here, atk_naval).to(atk_e.dtype)
                 d_cs = self._damage_roll(cs_att, atk_e - def_cs, k="csty", tile=ttc)
                 d_atk = self._damage_roll(cs_att, def_cs - atk_e, k="cstyc", tile=ttc)
@@ -9239,6 +9258,10 @@ class BatchSim:
         # Added once, before both paired rolls (pcty + the pctyc counter).
         if atk_kind == "rival":
             atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
+            # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
+            # Crusade/Just War key on where the UNIT stands, not on what it hits.
+            # Inserted BEFORE the aura add so term order matches the TS assembly.
+            atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], _ct).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
         d_city = self._damage_roll(att, atk_e - def_cs, k="pcty", tile=_ct)
         d_self = self._damage_roll(att, def_cs - atk_e, k="pctyc", tile=_ct)
@@ -9343,6 +9366,10 @@ class BatchSim:
             if not barb:
                 # #70/S2 (B-8): aura inside hostileRangedStrike's ranged-strength
                 # parentheses, after xpLevelBonus (the rngcs twin).
+                # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
+                # Crusade/Just War key on where the UNIT stands, not on what it hits.
+                # Inserted BEFORE the aura add so term order matches the TS assembly.
+                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile, a_naval).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             rows = city_att.nonzero(as_tuple=True)[0]
