@@ -132,6 +132,15 @@ The divergence is DAMAGE RESOLUTION during the raider walk. (And the
 traced `barbs` column showing TS 6 vs GPU 7 is a LATER effect: with a
 barb at hp 100 vs 13, the city/walls strike that runs after the walk
 kills one in TS and not on the GPU.)
+**HOW TO GET THE DAMAGE LOG:** `sim._combat_events` came back EMPTY —
+the CB combat-log lines are gated (they populate only under the
+`--log`/`CIV6_LOG` statelog path, not on a bare `BatchSim.step()`). So
+either drive the seed through `gpu/rollout.py --log` + the TS
+`CIV6_LOG` replay + `gpu/logdiff.py` (the documented pairing, which is
+what this class of bug was built for), or patch `_damage_roll` locally to
+print `(k, attacker, defender, diff, roll, dmg)` for the target turn.
+The paired k-tags are what pin it: both engines label every roll.
+
 **NEXT: diff the damage assembly for those two barb attacks.** #70 put
 LIVE changes exactly there — the general/admiral aura now applies at the
 city-strike sites AND the +1 MP half is live. Check `_hostile_vs_unit` /
