@@ -113,7 +113,28 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**IT IS THE CITY-STRIKE DAMAGE, NOT THE RAIDER WALK (2026-07-26).**
+**CITY-STRIKE ASSEMBLY ALSO ELIMINATED — the CS terms MATCH (2026-07-26).**
+Instrumented TS's pcstk/rcstk sites and compared with the GPU rows:
+```
+        TS                                     GPU
+pcstk   atkCS=30 defCS=41 defCSa=41 diff=-11   diff=-11  tile=864   MATCH
+rcstk   atkCS=46 defCS=28 defCSa=28 diff= 18   diff= 18  tile=297   MATCH
+```
+Note `defCSa == defCS` on BOTH strikes: the #70/S2 aura term contributes
+ZERO for these barbarian defenders, exactly as intended. So the aura at
+strike sites is NOT the bug, and neither is the strike CS assembly.
+STILL UNEXPLAINED: the GPU also rolls `k=vrng diff=-7 dmg=27 tile=297`
+(a rival RANGED strike). My TS probe covered only pcstk/rcstk, so whether
+TS makes that vrng roll is UNKNOWN and is the next thing to check — but
+beware the direction: extra GPU damage would make the GPU's barbs WEAKER,
+whereas the observed end state is TS losing a barb and the GPU keeping it.
+So the missing damage is on the TS side, not an extra roll on the GPU's.
+**NEXT:** log EVERY k-tagged damage roll on the TS side for this turn (not
+just the two strike sites) and diff the full ordered list against the
+GPU's three rows. The asymmetry must be a roll TS makes that the GPU does
+not — the reverse of what I assumed all along.
+
+(eliminated) IT IS THE CITY-STRIKE DAMAGE.
 Printed the GPU's k-tagged damage rolls for the turn:
 ```
 k=pcstk  diff=-11.000  dmg=18.000  tile=864   <- PLAYER walls strike
