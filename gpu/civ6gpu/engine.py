@@ -4322,7 +4322,9 @@ class BatchSim:
         if side in ("pmil", "pciv"):
             war_r = self.r_atwar.gather(1, r_at.clamp(min=0))
             return live & (r_at >= 0) & war_r
-        # rival probe: `civ` is this rival's index (int or [B, 1] tensor)
+        # rival probe ("rmil"/"rciv", and the loose "rival" that _blocked_for
+        # resolves through its strict fallthrough): `civ` is this rival's index
+        # (int or [B, 1] tensor).
         p_tile = (r_at < 0) & (self.owner >= 0)
         if torch.is_tensor(civ):
             cv = civ.reshape(self.B, 1)
@@ -5914,7 +5916,8 @@ class BatchSim:
                 & (side < 0)
                 # B-17 (#71): a LIVE enemy Encampment bars the step (walkPath's
                 # blockedByEnemy twin — the melee arm is the only way in).
-                & ~self._encamp_block(tgt.clamp(min=0).unsqueeze(1), "pmil"  # player hostility is side-independent here).squeeze(1)
+                # (player hostility is side-independent, so "pmil" covers both)
+                & ~self._encamp_block(tgt.clamp(min=0).unsqueeze(1), "pmil").squeeze(1)
             )
             if bool(ok.any()):
                 rows = ok.nonzero(as_tuple=True)[0]
@@ -8813,7 +8816,7 @@ class BatchSim:
             a_hp, a_tile, a_at = self.v_hp, self.v_tile, self.rv_at
             a_alive = self.v_alive
             atk_cs_all = self._p_combat[self.v_type[:, u]]
-            blocked_side = "rival"
+            blocked_side = "rival"  # _blocked_for's strict fallthrough (unchanged)
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
         dm = self.pmil_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
@@ -8961,7 +8964,8 @@ class BatchSim:
                 adv_terr = torch.where(naval_att, water_ok, land_ok)
             else:  # barbarians are never naval — land plane only
                 adv_terr = land_ok
-            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1) & adv_terr
+            _bciv = None if atk_kind == "barb" else self.v_civ[:, u]  # B-17 (#71)
+            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv).squeeze(1) & adv_terr
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
@@ -9046,7 +9050,8 @@ class BatchSim:
         # advance; a rival captor (civ_att under atk_kind=="rival") stays put.
         kill_adv = (civ_att | rvciv_att) if atk_kind == "barb" else torch.zeros_like(civ_att)
         if bool(kill_adv.any()):
-            adv = kill_adv & ~self._blocked_for(tgt.unsqueeze(1), blocked_side).squeeze(1)
+            _bciv2 = None if atk_kind == "barb" else self.v_civ[:, u]  # B-17 (#71)
+            adv = kill_adv & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv2).squeeze(1)
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
