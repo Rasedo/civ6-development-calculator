@@ -103,8 +103,22 @@ at a single mechanic.
 | S1 music split | DONE (committed `040c49b`, fully gated) | DONE |
 | S2 aura at city/CS sites | DONE (10 sites incl. `rngrc`) | DONE (12 sites) |
 | S3 aura +1 MP | DONE (`aura.ts`, `movesFull`, 5 vitest green) | DONE (snapshot + 7 walkers) |
-| S4 palace relocation | DONE (`relocatePalace`, 3 sites, 6 vitest green) | IN PROGRESS |
-| S5 ranged barbs | DONE (`barbRangedType`, every 3rd camp) | NOT STARTED |
+| S4 palace relocation | DONE (`relocatePalace`, 3 sites, 6 vitest green) | DONE (3 twins + 2 helpers) |
+| S5 ranged barbs | DONE (`barbRangedType`, every 3rd camp) | IN PROGRESS |
+
+**S4 structural note (checked, NOT a seam).** The GPU has no PALACE
+building column at all — the exporter filters it out (`b.id !== 'PALACE'`)
+because both engines model it as a CAPITAL TERM: `is_cap * _palace_y` /
+`_palace_housing` / `_palace_amenities`, and `rc_is_cap` for rivals. So
+TS's two writes (`isCapital = true` + `buildings.push('PALACE')`) collapse
+to ONE GPU write of the flag. Verified safe: PALACE is a `cost: 0` catalog
+entry, so `buildingMaintenance` returns 0 and the extra array element
+costs nothing; its yields reach the GPU through the flag instead of the
+building loop; and `relocatePalace` sets the flag AND the building
+together, exactly as founding does (`isCapital = len===0` with
+`buildings: ['PALACE']`) and as capture undoes (`isCapital = false` with
+the PALACE filtered out). The pairing is what keeps the two
+representations equivalent — never write one without the other.
 
 **S3 FREEZE-POINT BUG — caught by the S3 agent, fixed, worth keeping.**
 The agent implemented the snapshot as specified and then reported that
