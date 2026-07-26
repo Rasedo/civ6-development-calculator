@@ -118,11 +118,11 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
     P('GENERAL', 'GP_EL_CID', 'El Cid', { productionToCapital: 600 }, '+600 production in the capital'),
   ],
   // B-19: per-era Writer/Musician rosters (4 each, one per era tier — keeps
-  // the gpEffects tensor rectangular). B-20 degradation: their real output is
-  // a Great Work of Writing / Music (culture + tourism, slotted into a
-  // building). Tourism is absent and Great-Work slots are deferred, so each
-  // lands as an INSTANT culture lump toward the current civic (the Artist
-  // channel). Recorded in gpu/ROUND_B2_LOG.md.
+  // the gpEffects tensor rectangular). Their real output is a Great Work of
+  // Writing / Music, which ROUND B7 landed (slots + per-turn yield); the
+  // per-person `culture` value below is now only the OVERFLOW lump a charge
+  // falls back to when no slot is open anywhere. Tourism stays absent.
+  // Recorded in gpu/ROUND_B2_LOG.md; slot model in the B-20 block below.
   WRITER: [
     P('WRITER', 'GP_LI_BAI', 'Li Bai', { culture: 45 }, '+45 culture toward the current civic'),
     P('WRITER', 'GP_CHAUCER', 'Geoffrey Chaucer', { culture: 110 }, '+110 culture toward the current civic'),
@@ -147,24 +147,44 @@ export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
  * Broadcast Center, but that tier is unlocked far past the gate horizon, so the
  * earlier Theater-line building carries music works here and the ARTIST-only Art
  * Museum slots are repurposed since ARTIST stays instant-lump) holds music
- * works. Each such building offers SLOTS_PER_BUILDING slots. A slotted work
- * yields GREAT_WORK_CULTURE culture/turn as a building-tier city yield (writing
- * and music both +2 culture — the music +1 culture/+1 gold split is a recorded
- * residual, cheap to add since the counts are tracked separately). Charges with
+ * works. Each such building offers SLOTS_PER_BUILDING slots. Charges with
  * no open slot ANYWHERE degrade to the person's instant culture lump (the pre-B7
  * behaviour), one lump per overflowing charge. ARTIST stays the instant class.
+ *
+ * #70/S1 — PER-KIND YIELDS, sourced. Real Civ 6 pays every Great Work in
+ * CULTURE and TOURISM; NO Great Work pays gold (Relics pay faith + tourism).
+ * Under Gathering Storm — this repo's canon (D-11) — a Great Work of Writing
+ * is +2 culture/+2 tourism and a Great Work of Music is +4 culture/+4 tourism.
+ * The B7-era note that recorded a "music +1 culture/+1 gold split" as the
+ * residual was a stylization with no basis in the game; it is REFUTED here and
+ * the real gap was the magnitude (music was paying writing's 2).
+ *
+ * TOURISM IS UNMODELED (no tourism system anywhere in this engine — see the
+ * B-20/B-27 scope-outs). When a tourism system lands it must pay these same
+ * two kinds +2 (writing) / +4 (music) tourism from these same counts, and the
+ * Culture-victory work in B-25 is its natural home.
  */
 export const GW_WRITING_BUILDING = 'AMPHITHEATER';
 export const GW_MUSIC_BUILDING = 'MUSEUM';
 export const WORKS_PER_PERSON = 2;
 export const SLOTS_PER_BUILDING = 2;
-export const GREAT_WORK_CULTURE = 2;
+export const GW_WRITING_CULTURE = 2;
+export const GW_MUSIC_CULTURE = 4;
 /** Classes whose people carry Great Works (vs. the instant-lump classes). */
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'MUSICIAN']);
 
-/** Great works stored in a city (writing + music) — the +GREAT_WORK_CULTURE yield count. */
+/** Great works stored in a city (writing + music) — the total slotted count. */
 export function cityGreatWorks(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
   return (city.greatWorksWriting ?? 0) + (city.greatWorksMusic ?? 0);
+}
+
+/**
+ * #70/S1: the building-tier CULTURE a city's slotted works pay, by kind.
+ * Both engines add this single sum at the buildings-bucket position in this
+ * association — culture += (writingTerm + musicTerm).
+ */
+export function greatWorkCulture(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
+  return GW_WRITING_CULTURE * (city.greatWorksWriting ?? 0) + GW_MUSIC_CULTURE * (city.greatWorksMusic ?? 0);
 }
 
 /**

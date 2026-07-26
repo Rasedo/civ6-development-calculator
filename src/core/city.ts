@@ -17,7 +17,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { SPECIALIST_YIELDS, GREAT_WORK_CULTURE, cityGreatWorks } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, greatWorkCulture } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
 import {
@@ -448,11 +448,12 @@ export function computeCityStats(
     if (w.def.cityYields) addYields(buildings, w.def.cityYields);
   }
   if (m.faithPerWonder > 0) buildings.faith += m.faithPerWonder * wonders.length;
-  // B-20: slotted Great Works — +GREAT_WORK_CULTURE culture/turn each, in the
-  // buildings bucket so it scales with the amenity tier + government yieldMult
-  // (like every building yield), but NOT the district buildingYieldMult (which
+  // B-20: slotted Great Works — culture/turn per work BY KIND (#70/S1: writing
+  // 2, music 4 — the real GS values; tourism unmodeled), in the buildings
+  // bucket so it scales with the amenity tier + government yieldMult (like
+  // every building yield), but NOT the district buildingYieldMult (which
   // cityBuildingYields already applied to the building's own yields).
-  buildings.culture += GREAT_WORK_CULTURE * cityGreatWorks(city);
+  buildings.culture += greatWorkCulture(city);
 
   const trade = cityTradeYields(state, city);
 

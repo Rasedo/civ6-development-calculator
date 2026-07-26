@@ -42,7 +42,13 @@ def main() -> None:
     assert museum >= 0, "MUSEUM must exist in the building catalog (music slots)"
     assert amph != museum, "writing and music must use distinct building columns"
     assert rr["gwSlotsPerBuilding"] == 2 and rr["gwWorksPerPerson"] == 2
-    assert rr["gwWorkCulture"] == 2
+    # #70/S1: per-KIND culture (real GS values). The old uniform key is gone,
+    # and NO gold key exists — no Great Work pays gold in Civ 6.
+    assert "gwWorkCulture" not in rr, "the uniform per-work culture key must be gone"
+    assert rr["gwWritingCulture"] == 2
+    assert rr["gwMusicCulture"] == 4
+    assert not any("gold" in k.lower() for k in rr if k.startswith("gw")), \
+        "no Great Work pays gold — a gw*Gold key would be a fidelity regression"
 
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run the exporter first"
@@ -95,17 +101,38 @@ def main() -> None:
         assert bool((sim.gw_writing[:, hi] == 2).all()), "overflow spills to the next city"
         sim.buildings[:, 1, amph] = False
 
-    # --- yield coupling: +gwWorkCulture/turn per work, linear -------------
+    # --- yield coupling: per-work culture, linear, and NO gold ------------
     sim.gw_writing.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, amph] = True
-    base = sim._city_totals()[0][:, 0, 4].clone()  # capital culture yield, 0 works
+    _t0 = sim._city_totals()[0]
+    base = _t0[:, 0, 4].clone()  # capital culture yield, 0 works
+    base_g = _t0[:, 0, 2].clone()  # capital gold yield, 0 works
     sim.gw_writing[:, 0] = 1; sim._eff_version += 1
-    one = sim._city_totals()[0][:, 0, 4].clone()
+    _t1 = sim._city_totals()[0]
+    one = _t1[:, 0, 4].clone(); one_g = _t1[:, 0, 2].clone()
     sim.gw_writing[:, 0] = 2; sim._eff_version += 1
     two = sim._city_totals()[0][:, 0, 4].clone()
     d1 = one - base; d2 = two - base
     assert bool((d1 > 0).all()), "a slotted work must raise the city's culture yield"
     assert bool(((d2 - 2 * d1).abs() < 1e-9).all()), "the work yield must be linear (2 works = 2 x 1 work)"
+    assert bool(((one_g - base_g).abs() < 1e-9).all()), "a Great Work must pay NO gold"
+
+    # --- #70/S1: a MUSIC work pays DOUBLE a writing work's culture (4 vs 2).
+    # Both kinds land at the same buildings-bucket position, so the amenity /
+    # government factors cancel in the ratio — a factor-independent assertion.
+    sim.gw_writing.zero_(); sim.gw_music.zero_()
+    sim.buildings[:, 0, museum] = True
+    sim._eff_version += 1
+    _m0 = sim._city_totals()[0]
+    mbase, mbase_g = _m0[:, 0, 4].clone(), _m0[:, 0, 2].clone()
+    sim.gw_music[:, 0] = 1; sim._eff_version += 1
+    _m1 = sim._city_totals()[0]
+    dm, dm_g = _m1[:, 0, 4].clone() - mbase, _m1[:, 0, 2].clone() - mbase_g
+    assert bool(((dm - 2 * d1).abs() < 1e-9).all()), \
+        f"a music work must pay 2x a writing work ({float(dm[0])} vs {float(d1[0])})"
+    assert bool((dm_g.abs() < 1e-9).all()), "a MUSIC work must pay no gold either"
+    sim.buildings[:, 0, museum] = False
+    sim.gw_music.zero_(); sim._eff_version += 1
 
     # --- music uses the MUSEUM column (writing Amphitheater is music-blind) --
     sim.gw_writing.zero_(); sim.gw_music.zero_()

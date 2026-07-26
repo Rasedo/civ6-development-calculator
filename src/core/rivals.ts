@@ -30,7 +30,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
-import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, GREAT_WORK_CULTURE, cityGreatWorks } from '../data/greatPeople';
+import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP } from '../data/religion';
 import {
   growthFoodNeeded,
@@ -1713,9 +1713,9 @@ export function rivalCityYields(
     const regional = rivalRegionalEffects(state, rival, rc);
     for (const [k, v] of Object.entries(regional.yields)) total[k as keyof Yields] += v ?? 0;
   }
-  // B-20: slotted Great Works (+GREAT_WORK_CULTURE culture/turn each) — the
+  // B-20: slotted Great Works — culture/turn per work BY KIND (#70/S1), the
   // buildings-tier position, pre-tier like the player's (city.ts).
-  total.culture += GREAT_WORK_CULTURE * cityGreatWorks(rc);
+  total.culture += greatWorkCulture(rc);
   // A-4: wonder flat city yields + the belief faithPerWonder (city.ts:435-437
   // positions — pre-tier, with the buildings).
   for (const wd of rcWonders) {

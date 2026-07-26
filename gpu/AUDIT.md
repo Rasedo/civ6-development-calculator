@@ -789,17 +789,42 @@ gap; likewise GS disasters are modeled minus sea-level rise
   `GW_MUSIC_BUILDING`=MUSEUM slots (`SLOTS_PER_BUILDING`=2; Broadcast
   Center is past-horizon, Museum's slots repurposed since ARTIST
   stays instant-lump), deterministic lowest-city (city_seq/rc order)
-  then lowest-slot. Each slotted work yields `GREAT_WORK_CULTURE`=+2
-  culture/turn as a building-tier city yield (`cityGreatWorks` in
-  city.ts/rivals.ts; GPU `gw_writing`/`gw_music`/`rc_gw_*` in
-  `_city_totals`/`_rival_city_yields`/`_rival_city_yields_all`,
-  `_eff_version`-bumped, reset-on-birth + `_RC_SLOT_FIELDS`).
-  Overflow charges degrade to the instant culture lump. In-gate: 6
-  seeds slot RIVAL works (28 works at t250); player slotting
-  gate-unreachable in 250t (all overflow). STILL OPEN: music +1c/+1g
-  split (uniform +2c shipped, counts tracked separately), Broadcast
-  Center as a further tier, tile activation, per-person abilities,
-  player GP units (ride #50/A-18).
+  then lowest-slot. Each slotted work yields building-tier culture BY
+  KIND (`greatWorkCulture` in city.ts/rivals.ts; GPU `gw_writing`/
+  `gw_music`/`rc_gw_*` in `_city_totals`/`_rival_city_yields`/
+  `_rival_city_yields_all`, `_eff_version`-bumped, reset-on-birth +
+  `_RC_SLOT_FIELDS`). Overflow charges degrade to the instant culture
+  lump. In-gate: 6 seeds slot RIVAL works (28 works at t250); player
+  slotting gate-unreachable in 250t (all overflow).
+  **#70/S1 (2026-07-26) — the recorded "music +1 culture/+1 gold split"
+  residual was REFUTED, not implemented.** NO Great Work pays gold in
+  Civ 6; every Great Work pays CULTURE + TOURISM (Relics pay faith +
+  tourism). The B7 note was an unsourced stylization; shipping it would
+  have moved the engine AWAY from Civ 6 (the source-of-truth rule) and
+  pinned the error into the battery. The REAL gap was the magnitude:
+  `GW_WRITING_CULTURE` 2 / `GW_MUSIC_CULTURE` 4 (the Gathering Storm
+  values, this repo's canon per D-11) now ship — writing unchanged,
+  music 2→4. STILL OPEN, enumerated (owner-prompted 2026-07-26):
+  (1) TOURISM entirely — no channel anywhere; when it lands these same
+  counts owe +2 (writing) / +4 (music) tourism, and it is the gating
+  dependency for the Culture victory (B-25), `RELIQUARIES`
+  (religion.ts, catalog-present but effect-inert `{}`), the
+  ONLINE_COMMUNITIES-class policy fillers, several wonder abilities
+  (builtWonders.ts "tourism/appeal ability dropped") and the Anshan
+  suzerain row (cityStates.ts).
+  (2) GREAT WORKS OF ART — ARTIST is still an instant culture lump and
+  carries NO works, so the whole art-work class is absent.
+  (3) ARCHAEOLOGY — no Archaeologist unit, no antiquity sites, no
+  ARTIFACT concept anywhere in either engine.
+  (4) RELICS — no relic entity; only dropped-effect notes survive
+  (builtWonders.ts "Relic slots ... dropped" ×2, RELIQUARIES inert).
+  (5) SLOT HOMES are stylized, not real: real Civ 6 puts music in the
+  BROADCAST_CENTER (1 slot) and splits the Museum into ART MUSEUM
+  (3 art works) / ARCHAEOLOGICAL MUSEUM (3 artifacts) as a player
+  choice; this model uses one generic MUSEUM with 2 slots repurposed
+  for music because BROADCAST_CENTER (catalog-present, tech-unlocked)
+  is past the 250t horizon. Palace/wonder work slots are also absent.
+  (6) tile activation, per-person abilities, player GP units (#50/A-18).
 - B-21. RESOLVED-minus-descoped-rows (2026-07-20, ROUND B8 slice K).
   The LIVE 3/6-envoy channel now keys to BUILDINGS: `csEnvoyBonuses` /
   `csRivalEnvoyBonuses` return `buildingAdd` keyed on the type's tier-1

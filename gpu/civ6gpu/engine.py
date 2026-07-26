@@ -972,8 +972,10 @@ class BatchSim:
         # gwWorksPerPerson works into its civ's cities — writing into the
         # AMPHITHEATER column, music into the MUSEUM column (b_cost catalog
         # order) — gwSlotsPerBuilding each; overflow charges fall back to the
-        # instant culture lump. Per-city work counts feed a +gwWorkCulture
-        # culture/turn building-tier yield (both engines, player + rival). Every
+        # instant culture lump. Per-city work counts feed a culture/turn
+        # building-tier yield BY KIND (#70/S1: gwWritingCulture 2 /
+        # gwMusicCulture 4 — the real GS values; no Great Work pays gold and
+        # tourism is unmodeled; greatWorkCulture is the TS twin). Every
         # write bumps _eff_version (yield-bearing state, the B9/B10 invariant).
         self._writer_cls = int(rr.get("writerCls", -1))
         self._musician_cls = int(rr.get("musicianCls", -1))
@@ -981,7 +983,8 @@ class BatchSim:
         self._gw_music_bidx = int(rr.get("gwMusicBidx", -1))
         self._gw_slots = int(rr.get("gwSlotsPerBuilding", 2))
         self._gw_works = int(rr.get("gwWorksPerPerson", 2))
-        self._gw_culture = float(rr.get("gwWorkCulture", 2))
+        self._gw_w_cul = float(rr.get("gwWritingCulture", 2))
+        self._gw_m_cul = float(rr.get("gwMusicCulture", 4))
         self.gw_writing = torch.zeros(B, C, dtype=torch.long, device=device)  # AMPHITHEATER slots used, per player city
         self.gw_music = torch.zeros(B, C, dtype=torch.long, device=device)    # MUSEUM slots used, per player city
         self.rc_gw_writing = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -2992,12 +2995,17 @@ class BatchSim:
         popf = self.pop.to(self.dtype)
         total[:, :, 3] += popf * r.citizen_science
         total[:, :, 4] += popf * r.citizen_culture
-        # B-20: slotted Great Works — +gwWorkCulture culture/turn each, a
-        # building-tier yield (pre-amenity-factor, so it rides yield_f and the
-        # government yieldMult below, the city.ts buildings-bucket position).
-        # Pop-free and version-keyed (every gw write bumps _eff_version), so an
-        # unconditional add each call reproduces exactly like the popf terms.
-        total[:, :, 4] += self._gw_culture * (self.gw_writing + self.gw_music).to(self.dtype)
+        # B-20: slotted Great Works — culture/turn per work BY KIND (#70/S1:
+        # writing 2, music 4), a building-tier yield (pre-amenity-factor, so it
+        # rides yield_f and the government yieldMult below, the city.ts
+        # buildings-bucket position). Pop-free and version-keyed (every gw write
+        # bumps _eff_version), so an unconditional add each call reproduces
+        # exactly like the popf terms. Association mirrors greatWorkCulture:
+        # culture += (writingTerm + musicTerm).
+        total[:, :, 4] += (
+            self._gw_w_cul * self.gw_writing.to(self.dtype)
+            + self._gw_m_cul * self.gw_music.to(self.dtype)
+        )
 
         # City-state envoy bonuses land on the capital (mods.capitalYields),
         # summed before the amenity multiplier like every other bonus.
@@ -3538,10 +3546,16 @@ class BatchSim:
             sci = sci + _route_inc[:, :, 3] * a6
             cul = cul + _route_inc[:, :, 4] * a6
             faith = faith + _route_inc[:, :, 5] * a6
-        # B-20: slotted Great Works — +gwWorkCulture culture/turn each, the
-        # buildings-tier position (pre-tier, so it rides yf below like TS's
-        # total.culture in rivalCityYields). Gated by alive; dead slots reset.
-        cul = cul + self._gw_culture * (self.rc_gw_writing[:, r] + self.rc_gw_music[:, r]).double() * alive.double()
+        # B-20: slotted Great Works — culture/turn per work BY KIND (#70/S1:
+        # writing 2, music 4), the buildings-tier position (pre-tier, so it
+        # rides yf below like TS's total.culture in rivalCityYields). Gated by
+        # alive; dead slots reset. The .double() PRECEDES the scalar multiply —
+        # a python float times a long tensor promotes to the DEFAULT dtype, not
+        # f64. Association mirrors greatWorkCulture.
+        cul = cul + (
+            self._gw_w_cul * self.rc_gw_writing[:, r].double()
+            + self._gw_m_cul * self.rc_gw_music[:, r].double()
+        ) * alive.double()
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
         # G4: the economy loop passes its loop-top FROZEN factors instead
@@ -7651,9 +7665,12 @@ class BatchSim:
             sci = sci + _route_inc[:, j, 3] * m6
             cul = cul + _route_inc[:, j, 4] * m6
             faith = faith + _route_inc[:, j, 5] * m6
-        # B-20: slotted Great Works for city j — +gwWorkCulture culture/turn
-        # each, pre-tier; gated by mask so column j matches the batched twin.
-        cul = cul + self._gw_culture * (self.rc_gw_writing[:, r, j] + self.rc_gw_music[:, r, j]).double() * mask.double()
+        # B-20: slotted Great Works for city j — culture/turn per work BY KIND
+        # (#70/S1), pre-tier; gated by mask so column j matches the batched twin.
+        cul = cul + (
+            self._gw_w_cul * self.rc_gw_writing[:, r, j].double()
+            + self._gw_m_cul * self.rc_gw_music[:, r, j].double()
+        ) * mask.double()
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
