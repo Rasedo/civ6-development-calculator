@@ -80,11 +80,21 @@ earlier wins are already banked if it needs its own hunt.
 
 ## Bar (every slice)
 
-Full ladder, FOREGROUND: `npx tsc --noEmit` → touched vitest → `npx
+ALWAYS-RUN CORE, FOREGROUND: `npx tsc --noEmit` → touched vitest → `npx
 vite-node scripts/export-gpu.ts` (READ the output) → scripted
-`PYTHONUTF8=1 python gpu/parity_test.py` (24 seeds × 250t, 0.0 milli) →
-forced `CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3` parity → `python
-gpu/rollout.py --shards 4 --pipeline-replay` (72 games). Zero new draws
+`PYTHONUTF8=1 python gpu/parity_test.py` (24 seeds × 250t, 0.0 milli)
+ALONE as the tripwire → then `python gpu/rollout.py --shards 4
+--pipeline-replay` (72 games).
+
+The forced-compaction run (`CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3`)
+is CONDITIONAL on the slice touching units/pools/slots/spawn-death-
+capture — so: NOT S1 (yield weight, already skipped in hindsight), NOT
+S2 (read-only CS term); YES S3 (unit movement state), S4 (capture paths
+create/destroy city slots), S5 (barb pool spawn types). When it IS
+indicated, run it CONCURRENTLY with the rollout — both are confirm
+gates and battery.py proves they coexist on this box.
+
+Zero new draws
 anywhere in S1/S2/S3/S4; S5 changes the spawn TYPE only (the raid roll
 itself is untouched — draw-count neutral). Every yield-bearing write
 bumps `_eff_version`. S6 sweeps ALL poke lanes STANDALONE after the
