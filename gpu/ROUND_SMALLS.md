@@ -102,9 +102,26 @@ at a single mechanic.
 |---|---|---|
 | S1 music split | DONE (committed `040c49b`, fully gated) | DONE |
 | S2 aura at city/CS sites | DONE (10 sites incl. `rngrc`) | DONE (12 sites) |
-| S3 aura +1 MP | DONE (`aura.ts`, `movesFull`, 5 vitest green) | IN PROGRESS |
-| S4 palace relocation | DONE (`relocatePalace`, 3 loser-side sites) | NOT STARTED |
+| S3 aura +1 MP | DONE (`aura.ts`, `movesFull`, 5 vitest green) | DONE (snapshot + 7 walkers) |
+| S4 palace relocation | DONE (`relocatePalace`, 3 sites, 6 vitest green) | IN PROGRESS |
 | S5 ranged barbs | DONE (`barbRangedType`, every 3rd camp) | NOT STARTED |
+
+**S3 FREEZE-POINT BUG — caught by the S3 agent, fixed, worth keeping.**
+The agent implemented the snapshot as specified and then reported that
+the spec itself was wrong: TS `rivalPhase` RE-RESETS every rival unit's
+`movesLeft` to plain `full` at its top, AFTER `refreshUnits`. So (1) the
+rival half of the aura was being silently wiped in TS while the GPU
+walkers granted it — a guaranteed 1-MP divergence, and (2) `movesFull`
+was left at refreshUnits' `full + aura` while `movesLeft` reset to
+`full`, so next turn a rival that never moved would FAIL the "spent no
+MP" gate — no heal, fortify wrongly reset. A real bug introduced by S3.
+FIX: `rivalPhase` now applies the aura and rewrites `movesFull`, and the
+GPU rival snapshot moved out of the refreshUnits mirror into a separate
+`_refresh_aura_mp_rival()` called at the TOP of `_rival_phase` — the
+matching freeze moment, and before any general war-walks. The PLAYER
+snapshot stays at the refreshUnits site. LESSON: "mirror the TS position"
+requires finding the position where the value is ACTUALLY established,
+not the first place it is written.
 
 `npx tsc --noEmit` clean; ALL TS work for the round is complete and
 uncommitted. NO gate has been run since S1 (batched round). Do not
