@@ -8762,7 +8762,7 @@ class BatchSim:
             # defender gets the defense terms (embarked = flat, none). Barbs
             # and player units carry no religion (no GPU player founding).
             if atk_kind == "rival":
-                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
+                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype))  # B6-S1 unit-vs-unit: NEVER gated (the #71 city flag must not reach here)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_rv, _dciv, torch.full_like(_dciv, -1)), tgt).to(def_e.dtype))
             # B7-G (B-8): Great General / Admiral aura. Attacker keyed on its own
             # tile `here` (a RIVAL attacker gets its civ's aura; a BARB has none);
@@ -9665,7 +9665,7 @@ class BatchSim:
             # only from the #70/S5 barb-archer path (a rival ranged attacker
             # never engages rival units).
             if not barb:
-                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
+                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype))  # B6-S1 unit-vs-unit: NEVER gated (the #71 city flag must not reach here)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(_dciv, tgt).to(def_e.dtype))
             # B7-G (B-8): attacker aura on its OWN tile (barb: none); defender
             # aura keyed on tgt — player military (civ 0) or rival military

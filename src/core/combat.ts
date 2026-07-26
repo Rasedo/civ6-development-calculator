@@ -533,7 +533,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // folds in support AND the embarked-defender override (flat CS, no terms).
     // B-4: attacker veterancy joins the flank term; defenderCS folds in the
     // defender's own level bonus. Applied once so both paired rolls agree.
-    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
+    const atkCSf = atkCS + FLANKING_CS * flankCount(state, targetIndex, attacker, defender) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex); // B6-S1 + B7-G (B-8): aura keyed on the ATTACKER's own tile
     const defCSf = defenderCS(state, defender, targetIndex);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
