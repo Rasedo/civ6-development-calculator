@@ -463,6 +463,9 @@ export interface RivalCiv {
   buildersTrained?: number;
   /** P4/D-22: this civ's strongest melee unit ever fielded (city defense). */
   bestMeleeCS?: number;
+  /** AUDIT A-5r (#71): tiles this civ has GOLD-purchased — the escalator in
+   * rivalTilePurchaseCost, the player's state.tilesPurchased twin. */
+  tilesPurchased?: number;
 }
 
 export interface ReligionState {

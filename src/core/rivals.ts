@@ -2104,6 +2104,27 @@ function issueRivalQuest(state: GameState, rival: RivalCiv, cs: CityState): City
   return null;
 }
 
+/**
+ * AUDIT A-5r (#71): the `tilePurchaseCost` twin for a rival. Same curve — ring
+ * base (50 + 25 per ring past 2, GAME_SPEED-scaled) x (1 + 4 x the civ's best
+ * research fraction) + a flat step per tile this civ has already bought — but
+ * keyed on THIS rival's techs/civics and its own borderCostMult-carrying
+ * modifiers, exactly as the player's reads state.research and getModifiers.
+ */
+function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity, tileIndex: number): number {
+  const center = state.map.tiles[rc.centerIndex];
+  const t = state.map.tiles[tileIndex];
+  const ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
+  const tPct = rival.research.techs.length / Object.keys(TECHS).length;
+  const cPct = rival.research.civics.length / Object.keys(CIVICS).length;
+  const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
+  const step = Math.round(5 * GAME_SPEED);
+  return Math.round(
+    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (rival.tilesPurchased ?? 0)) *
+      getRivalModifiers(state, rival).tilePurchaseMult,
+  );
+}
+
 export function rivalPhase(state: GameState): void {
   if (state.rivals.length === 0) return;
 
@@ -2479,6 +2500,29 @@ export function rivalPhase(state: GameState): void {
               if (xp > 0) u.xp = xp;
             }
           }
+        }
+      }
+      // AUDIT A-5r (#71): TILE PURCHASE — the last rung of the gold ladder,
+      // reached only when nothing else was bought, so it can never starve the
+      // building/settler/unit priorities above. The player's `buyTile` twin:
+      // the SAME deterministic border candidate the culture growth uses
+      // (pickRivalBorderTile), the SAME cost curve as tilePurchaseCost keyed on
+      // THIS civ's research, and the same decoupling from the culture counter
+      // (P4/D-17 — a purchase claims the tile but does NOT advance cultureBox).
+      // ONE tile per civ per turn, first rc in slot order with a candidate.
+      if (!bought) {
+        for (const rc of rival.cities) {
+          const next = pickRivalBorderTile(state, rival, rc);
+          if (next === null) continue;
+          const cost = rivalTilePurchaseCost(state, rival, rc, next);
+          if (!goldAffordable(rival.treasury ?? 0, cost)) break;
+          rival.treasury = (rival.treasury ?? 0) - cost;
+          state.map.tiles[next].rivalId = rival.id;
+          state.map.tiles[next].rivalCityId = rc.id; // A-17 registry
+          rc.tilesAcquired += 1;
+          rival.tilesPurchased = (rival.tilesPurchased ?? 0) + 1;
+          bought = true;
+          break;
         }
       }
       // B9-R3 (A-9): WORSHIP — a civ that FOUNDED a religion faith-buys its
