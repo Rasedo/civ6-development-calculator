@@ -132,6 +132,12 @@ check (rng column, per-turn totals, per-phase totals) looked clean.
 **THIS INVALIDATES the whole "which gate differs" line of attack.** No
 gate, threshold, ordering-of-camps or placement rule is wrong — the rolls
 are simply fed different numbers.
+ALSO ELIMINATED (2026-07-26): the widened barb tables. Narrowed
+`unitCombat` back to 6 and dropped `unitMoves`/the 7th ranged entries,
+re-exported, re-ran parity — the failure is UNCHANGED (seed 9274 t140,
+identical rng values). So the table width is not what moved the draw.
+That was my standout suspect and it is dead; exporter restored.
+
 NEXT: find WHICH draw moved. Log, for t139, the ORDERED list of
 (phase, k-tag/site, value) on BOTH engines and diff the sequences
 position by position. The first position where the tags disagree is the
