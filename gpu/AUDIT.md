@@ -25,14 +25,24 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 31.5 | **77%** |
-| B fidelity | 88 | 80.6 | **92%** |
+| A symmetry | 41 | 31.7 | **77%** |
+| B fidelity | 88 | 81.2 | **92%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
-| G parity latents (closed) | 9 | 9 | 100% |
-| **Overall (incl. closed)** | **189** | **172.1** | **91%** |
-| Open chapters only (A+B) | 129 | 112.1 | **87%** |
+| G parity latents (closed) | 11 | 11 | 100% |
+| **Overall (incl. closed)** | **191** | **174.9** | **92%** |
+| Open chapters only (A+B) | 129 | 112.9 | **88%** |
+
+(#70 ROUND SMALLS close-out, 2026-07-26 — table RE-ADDED from per-item
+weights, never by deltas. A: A-9 90%→95% (palace relocation). B: B-8
+90%→95% (strike-site auras + the +1 MP half), B-20 70%→75% (the music
+magnitude fixed — see the REFUTATION in its entry; its residual list
+also GREW, which is why the % barely moves), B-26 70%→80% (ranged
+barbs). Chapter G grew 9→11 and stays closed: G-9 and G-10 were both
+found AND fixed inside this round. The headline is not the +2.8 of done
+weight — it is that a round of small residuals exposed FOUR dormant
+parity latents, three of them one family. See the #70 chronicle entry.)
 
 (2026-07-26 correction: the #69 "re-added" B row itself carried a
 +2.0 slip — 82.6-claimed at the #68 close vs 80.6 by a fresh
@@ -177,7 +187,26 @@ pokes + 7 vitest (player-Golden axis poke-pinned). B-24 → 70% —
 the DEDICATION system (Golden bonuses, Normal/Dark dedication,
 HEROIC Age w/ prevAge substrate), dark-age policies and governor
 establishment/promotions stay open (owner-confirmed enumeration).
-Battery 37 lanes 543s.)
+Battery 37 lanes 543s. 2026-07-26 #70 ROUND SMALLS (brief
+gpu/ROUND_SMALLS.md, owner-directed EXPERIMENTAL batched mode — all
+slices implemented FIRST, ONE ladder at the end, no per-slice gates):
+S1 B-20 music yields per kind, S2 B-8 aura at every unit-vs-city and
+city-strike roll (23 sites), S3 B-8 +1 MP via a frozen per-turn
+snapshot, S4 A-9 palace relocation, S5 B-26 ranged barbs. TWO
+FABRICATED PREMISES caught by the OWNER before they shipped: B-20's
+recorded "music +1c/+1g split" (no Great Work pays gold in Civ 6 — the
+real gap was the MAGNITUDE, music 4 vs writing 2 under GS) and A-9's
+invented selection rule (real Civ 6 uses HIGHEST POPULATION). Both are
+why verify-before-implement is now mandatory: the gates prove the two
+engines agree, never that they agree with Civ 6. The batch then
+exposed FOUR dormant latents — G-9's capital-is-column-0 family (trace
+Palace count, CS envoy capital bonus, suzerain perk, and the scripted
+production chain) and G-10's missing CITY_CENTER district on conquered
+city-states — none introduced by this round, all fixed. Subagents
+caught three spec errors of MINE by reporting discrepancies instead of
+silently mirroring: a missing `rngrc` site, the rivalPhase movement
+re-reset that wiped the rival aura AND broke the heal gate, and the
+`full_mp` freeze-point.)
 
 Per-item weights (done% in parens where partial):
 - A: A-5r 2 (95% — tile purchase → #50), A-7r 4 (done — ROUND B3
@@ -225,9 +254,25 @@ Per-item weights (done% in parens where partial):
   Normal-Dark dedication / Heroic Age), dark-age policies and
   governor establishment/promotions remain);
   B-33 3 (RESOLVED — task #55 S2, the fidelity face of A-19).
+- #70 ROUND SMALLS deltas (2026-07-26): A-9 4 (95% — palace relocation
+  LIVE both engines, highest-population survivor, ties to acquisition
+  order; `capitalTiles`/`cap_tile_*` deliberately static, which is what
+  real Civ 6 does — original capital = domination target, relocated
+  Palace = the bonuses. NEIGHBORHOOD + thin player regional coverage
+  remain); B-8 2 (95% — the aura now joins EVERY roll where a unit
+  fights a city or a city strikes a unit, and the +1 MP half is live via
+  a per-turn FROZEN snapshot; naval war-march targeting + the
+  controlled-rival RL mask ride #50); B-20 3 (75% — the music magnitude
+  corrected to the real GS value; see the REFUTATION and the six-item
+  enumeration in its entry); B-26 3 (80% — ranged barbs live, every
+  third camp; cliffs, naval barbs and scout-raid escalation remain).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
-- G: G-1..G-8 ALL done — chapter G EMPTY again. G-6 (task #55:
+- G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
+  assumption in FOUR places, all fixed; see the body entry).
+- G-10 2 (RESOLVED — #70: a conquered city-state's centre tile never got
+  its CITY_CENTER district in TS; see the body entry).
+- G: G-1..G-10 ALL done — chapter G EMPTY again. G-6 (task #55:
   exporter `st` plane froze the dynamic `!t.district`) and G-7 (task
   #55: TS `withFollowerBelief` shallow-clone aliasing) RESOLVED;
   G-8 2 (RESOLVED-AS-REFUTED — #69 S2: the cap-32 sighting was an
@@ -1110,6 +1155,48 @@ G-1..G-7 resolved (detail in git history / the cited logs):
   player-war seed. Both engines clamp the accumulator at the cap
   (verified at all four accrual sites); cap 32 is now SHIPPED
   (B-15's −4 ceiling).
+
+- G-9. **RESOLVED (2026-07-26, #70 — found by the round's own hunt).**
+  THE CLASS: "the capital is always city column 0". `is_cap` is set on
+  column 0 at creation and was thereafter only ever CLEARED, so every
+  reader that hardcoded column 0 agreed with TS by accident. A-9 palace
+  RELOCATION broke the invariant and exposed four sites, each a real
+  divergence the moment a capital falls and the Palace re-crowns a
+  survivor:
+  (1) `trace_row` counted the player's Palace as `+ (1 if c == 0 else 0)`
+      — a HARNESS bug (the recurring D-10 class), while the RIVAL row
+      already keyed correctly on `rc_is_cap`;
+  (2) the city-state envoy CAPITAL bonus and (3) the B-21 SUZERAIN perk
+      were added to `total[:, 0, :]`, where TS applies them through
+      `mods.capitalYields` under `if (city.isCapital)`;
+  (4) the SCRIPTED PRODUCTION chain — builder/settler/district branches —
+      drove off column 0, so after seed 9183's capital was razed at t218
+      the GPU queued nothing from a dead column while TS kept building in
+      the new capital (the t226 `punits` 8-vs-7 symptom, with the missing
+      BUILDER's improvements trailing behind it). The same pass fixed the
+      `applyGreatPersonEffect` mirror: `productionToCapital` credited
+      column 0 and GENERAL/ADMIRAL spawned at column 0.
+  All four now resolve a live capital column / mask from `is_cap`. NOTE
+  for #50: `holy_tile[:, 0]` is the same asymmetry, currently unreachable
+  (player religion verb absent) — it needs the flag when #50 lands.
+  LESSON: an invariant that holds only because a value never moves is a
+  latent, not an invariant; the mechanic that makes it move finds them
+  all at once.
+
+- G-10. **RESOLVED (2026-07-26, #70)**. `captureCityState` and
+  `captureCityStateForRival` (combat.ts) pushed a CITY_CENTER entry into
+  the new city's `districts` array but never set
+  `center.district = 'CITY_CENTER'` on the TILE — unlike `foundCity`
+  (game.ts) and `foundRivalCity` (rivals.ts), which both do. So an
+  annexed city-state's centre was invisible to every `tile.district`
+  reader: `attackTargets`' playerCity check could not target it,
+  `workableTiles` would let a citizen WORK the city centre, and
+  settle/site scans counted the tile free. The GPU has no
+  district-CITY_CENTER plane (it uses `center_at`/`rvcity_at` as the
+  proxy) and so always treated it as a city — TS was the WRONG engine,
+  and real Civ 6 agrees: a conquered city-state IS a city. Dormant
+  because it needed a CS conquest AND a hostile in range; surfaced when
+  #70/S5's ranged barb scan widened the exposure from d==1 to d<=2.
 
 ## F. Hunt tooling — MOVED (2026-07-13)
 

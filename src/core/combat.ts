@@ -33,9 +33,10 @@ import {
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, type BeliefEffects } from '../data/religion';
 import { revealAround } from './fog';
-import { transferCityToRival, transferRivalCityToRival, civsAtWar } from './rivals';
+import { transferCityToRival, transferRivalCityToRival, civsAtWar, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
 import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
+import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -188,29 +189,26 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
 }
 
 // B7-G (B-8): Great General / Great Admiral aura. Real Civ 6 grants nearby own
-// units +5 CS (and +1 MP — the movement half is DESCOPED, recorded on B-8). An
-// own LAND military unit within GENERAL_AURA_RANGE of an own live GENERAL — or
-// an own NAVAL/EMBARKED unit within range of an own live ADMIRAL — gains
-// +GENERAL_AURA_CS at every damage-roll site (attack AND defense), an INTEGER
-// add joining the B-29 quantized assembly (q=round(Δ·10) preserved) exactly
-// like the JUST_WAR/CRUSADE religion adders. "Own" = same owner AND civId.
-// Scope: the unit-vs-unit rolls only — the same sites as religionAttackCS /
-// religionDefenseCS; city/CS strikes (slice E's B-2 zone) are out of scope
-// (recorded on B-8). The GENERAL/ADMIRAL units themselves are combat-0
-// civilians and never trigger this on their own account.
-export const GENERAL_AURA_CS = 5;
-export const GENERAL_AURA_RANGE = 2;
+// units +5 CS AND +1 MP. An own LAND military unit within GENERAL_AURA_RANGE of
+// an own live GENERAL — or an own NAVAL/EMBARKED unit within range of an own
+// live ADMIRAL — gains +GENERAL_AURA_CS at every damage-roll site (attack AND
+// defense), an INTEGER add joining the B-29 quantized assembly (q=round(Δ·10)
+// preserved) exactly like the JUST_WAR/CRUSADE religion adders. "Own" = same
+// owner AND civId. The GENERAL/ADMIRAL units themselves are combat-0 civilians
+// and never trigger this on their own account.
+//
+// #70/S2 widened the SCOPE from unit-vs-unit to every roll where a unit fights
+// a city or a city strikes a unit (pcty/rcty/csty + their counter-rolls, the
+// ranged-vs-city rolls, and the four city-strike keys pcstk/pestk/rcstk/restk).
+// #70/S3 added the movement half (see `generalAuraMP` in aura.ts).
+//
+// The PREDICATE itself lives in aura.ts so this file and units.ts share ONE
+// definition — combat.ts already imports units.ts, so units.ts cannot import
+// back from here. Re-exported below to keep every existing importer working.
+export { GENERAL_AURA_CS, GENERAL_AURA_RANGE };
 
 export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): number {
-  if ((UNITS[unit.type]?.combat ?? 0) <= 0) return 0; // civilians never fight these rolls
-  const auraType = unit.embarked || UNITS[unit.type]?.naval ? 'ADMIRAL' : 'GENERAL';
-  const tile = state.map.tiles[tileIndex];
-  for (const g of state.units) {
-    if (g.type !== auraType || g.owner !== unit.owner || g.civId !== unit.civId) continue;
-    const gt = state.map.tiles[g.tileIndex];
-    if (hexDistance(tile.col, tile.row, gt.col, gt.row) <= GENERAL_AURA_RANGE) return GENERAL_AURA_CS;
-  }
-  return 0;
+  return inGeneralAura(state, unit, tileIndex) ? GENERAL_AURA_CS : 0;
 }
 
 /** B6-S1: the enhancer belief of a UNIT's civ religion (religion id = unified
@@ -380,7 +378,8 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker); // B-4: attacker veterancy (the city is not a unit — no defender xp)
+    xpLevelBonus(attacker) + // B-4: attacker veterancy (the city is not a unit — no defender xp)
+    generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8): the aura covers city assaults too
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'pctyc', city.centerIndex);
@@ -571,7 +570,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
         const defCS = rivalCityDefense(state, rc.rival, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'rngrc', targetIndex));
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
         return ok;
@@ -579,7 +578,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       const cs = cityStateAt(state, targetIndex);
       if (cs && cs.centerIndex === targetIndex) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'rngcs', targetIndex));
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
         return ok;
@@ -621,7 +620,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     const defCS = cityDefenseStrength(state, enemyCity);
     state.cityHp[String(enemyCity.id)] = Math.max(
       1,
-      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker)) - defCS, 'vrngc', targetIndex),
+      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
     );
     attacker.movesLeft = 0;
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
@@ -725,7 +724,8 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker); // B-29 wound + river (city not a unit) + B-4 attacker veterancy
+    xpLevelBonus(attacker) + // B-29 wound + river (city not a unit) + B-4 attacker veterancy
+    generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = rivalCityDefense(state, rival, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
   const dmgToCity = damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
@@ -770,7 +770,8 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker); // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
+    xpLevelBonus(attacker) + // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
+    generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
@@ -816,6 +817,17 @@ export function captureCityState(state: GameState, cs: CityState): void {
       if (t.cityId === -1) t.cityId = id;
     }
   }
+  // #70 HUNT (new G-item): a conquered city-state's centre tile never got its
+  // CITY_CENTER district, unlike foundCity (game.ts) and foundRivalCity
+  // (rivals.ts) which both set it. Every `tile.district` reader therefore
+  // treated an annexed CS centre as open ground: `attackTargets`' playerCity
+  // check could not see it, `workableTiles` would let a citizen work it, and
+  // settle/site scans counted it free. The GPU has no district-CITY_CENTER
+  // plane and uses center_at/rvcity_at as the proxy, so it always treated it
+  // as a city — i.e. TS was the wrong engine (real Civ 6: a conquered
+  // city-state IS a city with a centre). Surfaced by #70/S5's ranged barb
+  // scan, which extended the exposure from d==1 melee to d<=2.
+  center.district = 'CITY_CENTER';
   center.cityId = id;
   state.cities.push({
     id,
@@ -866,6 +878,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
       t.rivalCityId = id; // A-17: the conquered claim registers to the new rc
     }
   }
+  center.district = 'CITY_CENTER'; // #70 HUNT: the captureCityState twin — see the note there
   rival.cities.push({
     id,
     name: cs.name,
@@ -895,6 +908,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
  * and elimination semantics, no +40 and no conquest log line. */
 export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity, plunder = true): void {
   rival.cities = rival.cities.filter((c) => c.id !== city.id);
+  relocatePalace(rival.cities); // #70/S4 (A-9): the losing rival re-crowns its biggest city
   // A-11: routes die with their endpoint (the state.tradeRoutes twin).
   rival.tradeRoutes = rival.tradeRoutes?.filter((x) => x.from !== city.id && x.to !== city.id);
   const center = state.map.tiles[city.centerIndex];
@@ -1200,12 +1214,23 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
  * spawn sites in barbarianPhase (new camp, empty-camp regarrison, the 0.1-roll
  * raid) climb it together — WARRIOR → SPEARMAN (t>60) → PIKEMAN (t>120) →
  * MUSKETMAN (t>180). Sized to the model (real Civ 6 scales barbs by era). The
- * CS levy ladder in rivals.ts is A-12 scope and untouched. Ranged barbs are a
- * recorded residual (the GPU raider block is a melee-adjacency scanner with no
- * range-2 / ranged-strike dispatch for barb owners — a new walker class).
+ * CS levy ladder in rivals.ts is A-12 scope and untouched.
  */
 function barbMeleeType(turn: number): string {
   return turn > 180 ? 'MUSKETMAN' : turn > 120 ? 'PIKEMAN' : turn > 60 ? 'SPEARMAN' : 'WARRIOR';
+}
+
+/**
+ * #70/S5 (B-26): the RANGED barb ladder — real Civ 6 barbarian camps field
+ * archers alongside melee. Every third camp (by its index in `state.barbCamps`,
+ * NOT its tile) raids with a ranged unit instead of the melee ladder type.
+ * Spawn TYPE only: the 0.1 raid roll above is untouched, so this is
+ * draw-count neutral in both engines. TS needed no dispatch work —
+ * `hostileUnitAct` already routes any `UNITS[type].ranged` attacker through
+ * `hostileRangedStrike`; the GPU raider block needed a new ranged path.
+ */
+function barbRangedType(turn: number): string {
+  return turn > 120 ? 'CROSSBOWMAN' : 'ARCHER';
 }
 
 /** Camps spawn, garrison, raid; cities heal when unbothered. */
@@ -1232,7 +1257,10 @@ export function barbarianPhase(state: GameState): void {
 
   // Garrisons + raiders.
   const barbs = barbUnits(state);
-  for (const campIdx of state.barbCamps) {
+  // #70/S5: indexed loop (identical iteration ORDER, so no draw-order change)
+  // because the ranged ladder keys off the camp's INDEX, not its tile.
+  for (let campNo = 0; campNo < state.barbCamps.length; campNo++) {
+    const campIdx = state.barbCamps[campNo];
     const camp = map.tiles[campIdx];
     const nearCamp = barbs.filter(
       (u) =>
@@ -1244,7 +1272,8 @@ export function barbarianPhase(state: GameState): void {
       barbUnits(state).length < state.barbCamps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1
     ) {
-      const type = barbMeleeType(state.turn); // B-26 era ladder (ranged raiders descoped — see barbMeleeType)
+      // #70/S5 (B-26): every third camp raids RANGED, the rest melee.
+      const type = campNo % 3 === 0 ? barbRangedType(state.turn) : barbMeleeType(state.turn);
       spawnUnit(state, type, campIdx, 'barbarian');
     }
   }
@@ -1305,8 +1334,12 @@ export function barbarianPhase(state: GameState): void {
     const defCS = defender.embarked
       ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
       : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
+    // #70/S2 (B-8): a general/admiral shields its units from city fire too —
+    // added OUTSIDE the embarked ternary, mirroring defenderCS (an embarked
+    // defender keeps its flat CS but still gets its ADMIRAL's aura).
+    const defCSa = defCS + generalAuraCS(state, defender, bestTile);
     const atkCS = cityDefenseStrength(state, city);
-    defender.hp -= damageRoll(state, atkCS - defCS, 'pcstk', bestTile);
+    defender.hp -= damageRoll(state, atkCS - defCSa, 'pcstk', bestTile);
     awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city — no attacker xp)
     if (defender.hp <= 0) killUnit(state, defender);
   }
@@ -1345,8 +1378,9 @@ export function barbarianPhase(state: GameState): void {
     const defCS = defender.embarked
       ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
       : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
+    const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the pcstk mirror
     const atkCS = cityDefenseStrength(state, city);
-    defender.hp -= damageRoll(state, atkCS - defCS, 'pestk', bestTile);
+    defender.hp -= damageRoll(state, atkCS - defCSa, 'pestk', bestTile);
     awardDefenseXp(defender);
     if (defender.hp <= 0) killUnit(state, defender);
   }

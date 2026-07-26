@@ -273,7 +273,17 @@ def poke_transfer(rules, path):
     assert int(rekeyed.sum()) == n_own, (
         f"A-17: exactly the flipping city's {n_own} tiles must re-key to the receiver ({int(rekeyed.sum())})"
     )
-    assert sim._eff_version == ev0 + 1, "the transfer must bump _eff_version exactly once"
+    # #70/S4 (A-9): the transfer bumps once for itself, and AGAIN when the
+    # losing civ's capital was the city that just left and the Palace has to
+    # relocate to its highest-population survivor. Both are real yield-bearing
+    # changes, so the old "exactly once" is too strict — assert the invariant
+    # that actually matters (it bumped, and no more than the two known writes).
+    _bumped = sim._eff_version - ev0
+    _relocated = bool(sim.rc_is_cap[0, r_from].any())
+    assert 1 <= _bumped <= 2, f"the transfer must bump _eff_version (got {_bumped})"
+    assert _bumped == (2 if _relocated else 1), (
+        f"expected {'transfer + palace relocation' if _relocated else 'transfer only'}, got {_bumped} bumps"
+    )
     sim._check_rc_registry_invariant()  # A-24: raises on any registry drift
     print(f"  g transfer OK (slot {j} r{r_from} -> pool-end slot {exp_slot} r{r_to}, {n_own} tiles re-keyed, registry green)")
 

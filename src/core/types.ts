@@ -338,6 +338,20 @@ export interface Unit {
   civId?: number;
   tileIndex: number;
   movesLeft: number;
+  /**
+   * #70/S3 (B-8): the movement pool this unit was GRANTED at its last
+   * refresh. Civ 6's rule is "if you have used any movement points during a
+   * turn, the unit will not start healing until the next turn" — the heal and
+   * B-5 fortify gates therefore ask "did this unit spend any MP", which is
+   * `movesLeft >= movesFull`. It used to be derived as `movesLeft >= (the unit
+   * type's moves)`, correct only while the granted pool was constant per type;
+   * the Great General/Admiral +1 MP aura breaks that, since the pool now
+   * varies per turn with a general's position. The GPU needs no mirror — it
+   * already tracks the same fact explicitly as p_acted/u_acted/v_acted, so
+   * this field converges TS onto the GPU's model. Undefined on units that
+   * predate a refresh (the `?? full` fallback reproduces the old behaviour).
+   */
+  movesFull?: number;
   hp: number;
   /** Builder charges; null for non-builders. */
   charges: number | null;

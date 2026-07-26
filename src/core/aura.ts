@@ -1,0 +1,48 @@
+/**
+ * #70/S3 (AUDIT B-8): the Great General / Great Admiral aura predicate, in its
+ * own module so BOTH consumers can share one definition without an import
+ * cycle — `combat.ts` needs it for the +CS half and `units.ts` needs it for the
+ * +MP half, and `combat.ts` already imports `units.ts`.
+ *
+ * Real Civ 6 grants nearby own units +5 Combat Strength AND +1 Movement:
+ * an own LAND military unit within GENERAL_AURA_RANGE of an own live GENERAL,
+ * or an own NAVAL/EMBARKED unit within range of an own live ADMIRAL. "Own"
+ * means same owner AND same civId. The GENERAL/ADMIRAL units are themselves
+ * combat-0 civilians and never qualify on their own account.
+ */
+
+import { hexDistance } from './hex';
+import { UNITS } from '../data/units';
+import type { GameState, Unit } from './types';
+
+export const GENERAL_AURA_CS = 5;
+export const GENERAL_AURA_RANGE = 2;
+/** #70/S3: the movement half of the same aura. */
+export const GENERAL_AURA_MP = 1;
+
+/**
+ * Is `unit` (evaluated as standing on `tileIndex`) inside an own general's or
+ * admiral's aura? THE single predicate behind both halves — keeping the +CS and
+ * +MP effects from ever drifting apart.
+ */
+export function inGeneralAura(state: GameState, unit: Unit, tileIndex: number): boolean {
+  if ((UNITS[unit.type]?.combat ?? 0) <= 0) return false; // civilians are never affected
+  const auraType = unit.embarked || UNITS[unit.type]?.naval ? 'ADMIRAL' : 'GENERAL';
+  const tile = state.map.tiles[tileIndex];
+  for (const g of state.units) {
+    if (g.type !== auraType || g.owner !== unit.owner || g.civId !== unit.civId) continue;
+    const gt = state.map.tiles[g.tileIndex];
+    if (hexDistance(tile.col, tile.row, gt.col, gt.row) <= GENERAL_AURA_RANGE) return true;
+  }
+  return false;
+}
+
+/**
+ * #70/S3: the aura's movement bonus for this unit on its CURRENT tile, applied
+ * at the `refreshUnits` movement reset. Because the granted pool now varies per
+ * turn, `refreshUnits` records it as `Unit.movesFull` so the heal / fortify
+ * "spent no MP" gates keep measuring against what was actually granted.
+ */
+export function generalAuraMP(state: GameState, unit: Unit): number {
+  return inGeneralAura(state, unit, unit.tileIndex) ? GENERAL_AURA_MP : 0;
+}

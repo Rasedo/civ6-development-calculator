@@ -34,6 +34,7 @@ import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } fro
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from '../src/core/combat';
+import { GENERAL_AURA_MP } from '../src/core/aura'; // #70/S3 (B-8)
 import { assignEnvoy } from '../src/core/cityStates';
 import {
   CITY_STATE_TYPES,
@@ -671,6 +672,7 @@ const rules = {
     admiralUnitIdx: Object.values(UNITS).findIndex((u) => u.id === 'ADMIRAL'),
     generalAuraCs: GENERAL_AURA_CS,
     generalAuraRange: GENERAL_AURA_RANGE,
+    generalAuraMp: GENERAL_AURA_MP, // #70/S3 (B-8): the aura's movement half
     pantheonPool: Object.keys(PANTHEONS).length,
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,
     founderPool: Object.keys(FOUNDER_BELIEFS).length,
@@ -790,11 +792,28 @@ const rules = {
     // reads these; the TS barbMeleeType hard-codes the same thresholds.
     pikemanAfterTurn: 120,
     musketmanAfterTurn: 180,
+    // #70/S5 (B-26): the RANGED barb ladder threshold (barbRangedType —
+    // ARCHER, then CROSSBOWMAN after turn 120). The GPU reads this; the TS
+    // barbRangedType hard-codes the same number.
+    crossbowmanAfterTurn: 120,
     cityHealPerTurn: 20,
     wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
     unitHealPerTurn: 10,
     // B-26 era ladder: barb u_type 0/1/2/3 = WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN.
-    unitCombat: [UNITS.WARRIOR.combat, UNITS.SPEARMAN.combat, UNITS.PIKEMAN.combat, UNITS.MUSKETMAN.combat],
+    // #70/S5 appends the RANGED pair: 4 = ARCHER, 5 = CROSSBOWMAN. `unitCombat`
+    // is the DEFENSE strength (a ranged unit defends on UNITS.combat, 15 for
+    // both); the strike itself reads unitRangedStrength / unitRangedRange —
+    // the barb (u_*) twins of the roster's rangedStrength / rangedRange.
+    unitCombat: [
+      UNITS.WARRIOR.combat,
+      UNITS.SPEARMAN.combat,
+      UNITS.PIKEMAN.combat,
+      UNITS.MUSKETMAN.combat,
+      UNITS.ARCHER.combat,
+      UNITS.CROSSBOWMAN.combat,
+    ],
+    unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0],
+    unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0],
     campClearReward: 50,
     dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1

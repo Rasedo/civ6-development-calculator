@@ -10,6 +10,7 @@ import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
 import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
+import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
@@ -510,7 +511,12 @@ export function refreshUnits(state: GameState): void {
     // reset below, so any move/attack/build blocks it) — +20 in a friendly
     // city (barbs: on their camp), +15 in own territory, +10 on neutral
     // ground, +5 on foreign-owned land.
-    if (unit.movesLeft >= full) {
+    // #70/S3: "spent no MP" is measured against what this unit was GRANTED
+    // last refresh, not against its type's base moves — the aura's +1 MP makes
+    // the granted pool vary per turn. `?? full` reproduces the pre-S3 gate for
+    // units that have never been refreshed.
+    const grantedLast = unit.movesFull ?? full;
+    if (unit.movesLeft >= grantedLast) {
       const unowned = tile.cityId === -1 && tile.rivalId === undefined && tile.csId === undefined;
       let heal: number;
       if (unit.owner === 'player') {
@@ -536,9 +542,14 @@ export function refreshUnits(state: GameState): void {
     // ships. (Embarked land units are still military but march every turn, so
     // their fortify gate resets to 0 in practice.)
     if (unitDomain(unit.type) === 'military' && !naval) {
-      unit.fortifyTurns = unit.movesLeft >= full ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
+      unit.fortifyTurns = unit.movesLeft >= grantedLast ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
     }
-    unit.movesLeft = full;
+    // #70/S3 (B-8): the Great General/Admiral aura grants +1 MP alongside its
+    // +5 CS (real Civ 6). Record what was granted so NEXT turn's gates above
+    // can tell "spent no MP" from "was simply given less".
+    const granted = full + generalAuraMP(state, unit);
+    unit.movesFull = granted;
+    unit.movesLeft = granted;
     if (unit.path) walkPath(state, unit);
     // Auto-explore: keep chasing the fog until there is none in reach.
     if (unit.mission === 'explore' && !unit.path && unit.movesLeft > 0) {

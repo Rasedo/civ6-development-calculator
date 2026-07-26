@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
@@ -31,6 +31,7 @@ import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP } from '../data/units';
 import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
+import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP } from '../data/religion';
 import {
   growthFoodNeeded,
@@ -635,8 +636,34 @@ export function flipCityToRival(state: GameState, city: City): void {
 
 /** The player-city → rival-city transfer (shared by loyalty flips and
  * V-W2's reverse capture — a rival melee finishing a player city). */
+/**
+ * #70/S4 (AUDIT A-9): PALACE RELOCATION. Real Civ 6 does not leave a civ
+ * capital-less when its capital falls — the Palace is rebuilt in the surviving
+ * city with the HIGHEST POPULATION (ties → acquisition order, which is this
+ * array's own order, so a strict `>` keeps the earliest). Call this on the
+ * LOSER's city list immediately after a city leaves it, by capture, loyalty
+ * defection or raze; it is a no-op while a capital is still held.
+ *
+ * `state.capitalTiles` is deliberately NOT touched: it is the STATIC domination
+ * record (GV-3), and real Civ 6 agrees — the ORIGINAL capital remains the
+ * domination target while the relocated Palace carries the capital BONUSES
+ * (recapturing the original yields an "Original Capital" plus a "New Capital").
+ * Both engines therefore relocate the BUILDING and the isCapital FLAG only.
+ */
+export function relocatePalace(
+  cities: { isCapital: boolean; population: number; buildings: string[] }[],
+): void {
+  if (cities.length === 0) return; // civ eliminated — nothing to crown
+  if (cities.some((c) => c.isCapital)) return; // capital still held
+  let best = cities[0];
+  for (const c of cities) if (c.population > best.population) best = c;
+  best.isCapital = true;
+  if (!best.buildings.includes('PALACE')) best.buildings.push('PALACE');
+}
+
 export function transferCityToRival(state: GameState, city: City, winner: RivalCiv, why: string): boolean {
   state.cities = state.cities.filter((c) => c.id !== city.id);
+  relocatePalace(state.cities); // #70/S4 (A-9): the player's Palace moves on capital loss
   delete state.cityHp[String(city.id)];
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.from !== city.id && r.to !== city.id);
   // P5/S7 (C-5): CONQUEST razes at the winner's city cap, mirroring the
@@ -1869,6 +1896,7 @@ function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void
  * the transferCityToRival shape on the rival side. */
 export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
   from.cities = from.cities.filter((c) => c.id !== rc.id);
+  relocatePalace(from.cities); // #70/S4 (A-9)
   // A-11: routes die with their endpoint (the receiver starts route-less).
   from.tradeRoutes = from.tradeRoutes?.filter((x) => x.from !== rc.id && x.to !== rc.id);
   // A-17: exactly the flipping city's tiles re-tag (registry scan) — the old
@@ -2005,9 +2033,22 @@ export function rivalPhase(state: GameState): void {
   // #45/B-6: an EMBARKED land unit moves on the flat EMBARK_MOVES pool (not its
   // land moves) — mirrors refreshUnits and the GPU war-march's full_mp. Naval
   // units keep their own moves.
+  // #70/S3 (B-8): this reset — NOT refreshUnits — is where a rival unit's
+  // movement budget for the turn is actually established, so it is where the
+  // general/admiral aura's +1 MP must be applied, and `movesFull` must be
+  // rewritten to match. Two bugs live here if it is not:
+  //   (1) the rival half of the aura would be silently wiped (the GPU rival
+  //       walkers grant it, so the engines would diverge by 1 MP);
+  //   (2) leaving `movesFull` at refreshUnits' `full + aura` while movesLeft
+  //       resets to plain `full` makes NEXT turn's "spent no MP" gate fail for
+  //       a rival that never moved — no heal, and fortify wrongly reset.
+  // Rival generals war-walk LATER in this phase, so freezing the bonus here
+  // (before any of them moves) is also what keeps the GPU snapshot turn-exact.
   for (const u of state.units) {
     if (u.owner !== 'rival') continue;
-    u.movesLeft = u.embarked && !UNITS[u.type]?.naval ? EMBARK_MOVES : UNITS[u.type]?.moves ?? 2;
+    const fullR = u.embarked && !UNITS[u.type]?.naval ? EMBARK_MOVES : UNITS[u.type]?.moves ?? 2;
+    u.movesLeft = fullR + generalAuraMP(state, u);
+    u.movesFull = u.movesLeft;
   }
 
   // A-19/B-33 (S2): pairwise rival↔rival auto-DoW — BEFORE the per-rival loop
@@ -2745,8 +2786,11 @@ export function rivalPhase(state: GameState): void {
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender); // B-4 defender veterancy (embarked → flat, no xp)
+          // #70/S2 (B-8): the general/admiral aura shields against city fire,
+          // outside the embarked ternary (the combat.ts pcstk mirror).
+          const defCSa = defCS + generalAuraCS(state, defender, bestTile);
           const atkCS = rivalCityDefense(state, rival, rc);
-          defender.hp -= damageRoll(state, atkCS - defCS, 'rcstk', bestTile);
+          defender.hp -= damageRoll(state, atkCS - defCSa, 'rcstk', bestTile);
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
           if (defender.hp <= 0) disbandUnit(state, defender.id);
         }
@@ -2788,8 +2832,9 @@ export function rivalPhase(state: GameState): void {
           const defCS = defender.embarked
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
+          const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the rcstk mirror
           const atkCS = rivalCityDefense(state, rival, rc);
-          defender.hp -= damageRoll(state, atkCS - defCS, 'restk', bestTile);
+          defender.hp -= damageRoll(state, atkCS - defCSa, 'restk', bestTile);
           awardDefenseXp(defender);
           if (defender.hp <= 0) disbandUnit(state, defender.id);
         }
