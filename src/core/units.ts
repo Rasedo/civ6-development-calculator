@@ -83,16 +83,98 @@ export function waterEnterable(
   return true;
 }
 
+/**
+ * B-23 (#71): is this step ROAD-to-ROAD? Real Civ 6 roads only help a unit
+ * moving FROM a road tile TO a road tile — a single roaded tile in open
+ * country does nothing.
+ */
+export function roadStep(from: Tile, to: Tile): boolean {
+  return !!from.road && !!to.road;
+}
+
+/**
+ * B-23 (#71): do roads carry BRIDGES yet? Civ 6 upgrades roads by ERA — the
+ * Ancient road has no bridges, the Classical road does. The flag is latched at
+ * the first era boundary (eras.ts), the one site both engines already fire in
+ * lockstep. From the Classical era on, a road-to-road step pays no river.
+ */
+export function roadBridges(state: GameState): boolean {
+  return !!state.roadBridges;
+}
+
 /** Civ 6-ish movement cost to ENTER a tile (river handled separately).
  * #45/B-6: water tiles enter at a flat 1 (embarked/naval movement — no
- * hills/features on water). Land tiles keep the terrain schedule. */
-export function moveCostInto(tile: Tile): number {
+ * hills/features on water). Land tiles keep the terrain schedule.
+ * B-23 (#71): a ROAD-to-ROAD step ignores the terrain penalty entirely —
+ * "roads let a unit pass through Woods or Hills as if it were flat".
+ * `from` is the tile being left; passing the same tile twice is harmless. */
+export function moveCostInto(from: Tile, tile: Tile): number {
   if (isWater(tile)) return 1;
+  if (roadStep(from, tile)) return 1;
   let cost = 1;
   if (tile.elevation === 'HILLS') cost += 1;
   if (tile.feature === 'WOODS' || tile.feature === 'RAINFOREST' || tile.feature === 'MARSH') cost += 1;
   return cost;
 }
+
+/**
+ * B-23 (#71): the river charge a step pays — 0 on water, 0 for a road-to-road
+ * step once bridges exist, else RIVER_CROSS_MP when the edge carries a river.
+ */
+export function riverCharge(state: GameState, from: Tile, to: Tile): number {
+  if (isWater(to)) return 0;
+  if (roadStep(from, to) && roadBridges(state)) return 0;
+  return crossesRiver(from, to) ? RIVER_CROSS_MP : 0;
+}
+
+/**
+ * B-23 (#71): lay the ROAD a new trade route's Trader would leave behind.
+ *
+ * Real Civ 6 builds roads automatically as a Trader walks its land route, so
+ * the road network is a CONSEQUENCE of trade, not a builder job. This models
+ * the trader's walk without the unit: from the origin centre, repeatedly step
+ * to the neighbour with the lowest hexDistance to the destination (ties by
+ * direction order) — the SAME integer stepping rule the war-march already
+ * uses, so both engines can mirror it exactly. Zero draws, integer-only.
+ *
+ * A route whose walk needs a water or impassable tile is a SEA route: real
+ * Civ 6 lays no road for those, so nothing is written at all (the walk is
+ * collected first and committed only if it reaches the destination).
+ */
+export function layTradeRoad(state: GameState, fromIndex: number, toIndex: number): void {
+  const map = state.map;
+  const dest = map.tiles[toIndex];
+  if (!dest || isWater(dest) || isImpassable(dest)) return;
+  let at = map.tiles[fromIndex];
+  if (!at || isWater(at) || isImpassable(at)) return;
+  const path: Tile[] = [at];
+  for (let step = 0; step < TRADE_ROAD_MAX_STEPS && at.index !== toIndex; step++) {
+    let best: Tile | undefined;
+    let bestD = hexDistance(at.col, at.row, dest.col, dest.row);
+    for (const n of neighbors(map, at)) {
+      if (isWater(n) || isImpassable(n)) continue;
+      const d = hexDistance(n.col, n.row, dest.col, dest.row);
+      if (d < bestD) {
+        bestD = d;
+        best = n;
+      }
+    }
+    if (!best) return; // blocked by water/impassable — a sea route lays nothing
+    path.push(best);
+    at = best;
+  }
+  if (at.index !== toIndex) return; // never arrived — lay nothing
+  for (const t of path) t.road = true;
+}
+
+/** B-23 (#71): the trade-road walk is bounded by the route range — a route
+ *  longer than this cannot exist (canAddTradeRoute gates on TRADE_ROUTE_RANGE),
+ *  so the bound is a safety rail, not a rule. */
+export const TRADE_ROAD_MAX_STEPS = 32;
+
+/** The MP a river crossing costs (real Civ 6 ends movement; this model charges
+ *  a flat 3 — the pre-existing convention, now named). */
+export const RIVER_CROSS_MP = 3;
 
 /** Does stepping from `from` toward `to` cross a river edge? */
 export function crossesRiver(from: Tile, to: Tile): boolean {
@@ -311,7 +393,7 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
       if (closed.has(n.index) || !passOk(n)) continue;
       // Rivers cost +3 to cross — the same charge the walker pays (water steps
       // never pay a river charge, so naval routing skips it).
-      const g = cur.g + moveCostInto(n) + (!naval && crossesRiver(curTile, n) ? 3 : 0);
+      const g = cur.g + moveCostInto(curTile, n) + (naval ? 0 : riverCharge(state, curTile, n)); // B-23 (#71): roads
       const existing = open.get(n.index);
       if (!existing || g < existing.g) {
         open.set(n.index, { g, f: g + hexDistance(n.col, n.row, target.col, target.row), from: bestIdx });
@@ -355,7 +437,7 @@ export function walkPath(state: GameState, unit: Unit): void {
     // everything (cost = movesLeft); water steps never pay river.
     const cost = transition
       ? unit.movesLeft
-      : moveCostInto(to) + (isWater(to) ? 0 : crossesRiver(from, to) ? 3 : 0);
+      : moveCostInto(from, to) + riverCharge(state, from, to); // B-23 (#71): roads
     if (unit.movesLeft < cost && unit.movesLeft < full) return; // path resumes next turn
     if (transition) unit.embarked = isWater(to);
     unit.tileIndex = nextIndex;

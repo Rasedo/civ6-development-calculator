@@ -1324,7 +1324,11 @@ for (let s = 0; s < N_SEEDS; s++) {
       // (= moveCostInto − 1): hills +3, slow feature (woods/rainforest/marsh)
       // +3; floodplains is NOT slow. tmove//3 is byte-identical to the OLD
       // tdef//3 for every tile, so movement trajectories are unchanged.
-      tmove: (moveCostInto(t) - 1) * 3,
+      // B-23 (#71): moveCostInto now takes the tile being LEFT. Passing the
+      // same tile is the no-road terrain schedule, which is what tmove encodes
+      // (the road discount is applied at step time, not baked into the plane).
+      tmove: (moveCostInto(t, t) - 1) * 3,
+      rd: t.road ? 1 : 0, // B-23 (#71): the ROAD plane (false at t0)
       // statically camp-eligible (dynamic exclusions — ownership, distance
       // to cities/camps — are the engine's job; mirrors campCandidates)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,

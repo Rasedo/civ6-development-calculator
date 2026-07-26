@@ -10,7 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, RivalCity,
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, crossesRiver, unitDomain, encampmentIntact, encampmentBlocks } from './units';
+import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, unitDomain, encampmentIntact, encampmentBlocks, riverCharge, layTradeRoad } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
@@ -997,7 +997,7 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
     const transition = !naval && isWater(here) !== isWater(step);
     const cost = transition
       ? unit.movesLeft
-      : moveCostInto(step) + (isWater(step) ? 0 : crossesRiver(here, step) ? 3 : 0);
+      : moveCostInto(here, step) + riverCharge(state, here, step); // B-23 (#71): roads
     if (unit.movesLeft < cost && unit.movesLeft < full) return;
     if (transition) unit.embarked = isWater(step);
     unit.tileIndex = step.index;
@@ -1336,7 +1336,7 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
       }
       if (dest < 0) break;
       const dt = state.map.tiles[dest];
-      const cost = moveCostInto(dt) + (crossesRiver(at, dt) ? 3 : 0);
+      const cost = moveCostInto(at, dt) + riverCharge(state, at, dt); // B-23 (#71): roads
       if (u.movesLeft < cost && u.movesLeft < fullB) break;
       u.tileIndex = dest;
       u.movesLeft = Math.max(0, u.movesLeft - cost);
@@ -1481,7 +1481,7 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
       }
       if (dest < 0) break;
       const dt = state.map.tiles[dest];
-      const cost = moveCostInto(dt) + (crossesRiver(at, dt) ? 3 : 0);
+      const cost = moveCostInto(at, dt) + riverCharge(state, at, dt); // B-23 (#71): roads
       if (u.movesLeft < cost && u.movesLeft < fullM) break;
       u.tileIndex = dest;
       u.movesLeft = Math.max(0, u.movesLeft - cost);
@@ -1557,7 +1557,7 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
       }
       if (dest < 0) break;
       const dt = state.map.tiles[dest];
-      const cost = moveCostInto(dt) + (crossesRiver(at, dt) ? 3 : 0);
+      const cost = moveCostInto(at, dt) + riverCharge(state, at, dt); // B-23 (#71): roads
       if (u.movesLeft < cost && u.movesLeft < fullM) break;
       u.tileIndex = dest;
       u.movesLeft = Math.max(0, u.movesLeft - cost);
@@ -2709,6 +2709,16 @@ export function rivalPhase(state: GameState): void {
           else if (best.toPlayer !== undefined) route.toPlayer = best.toPlayer;
           else route.to = best.to!;
           routes.push(route);
+          // B-23 (#71): the rival route's Trader lays road along its land path.
+          // Destination centre: an own city, a met city-state, or a player city.
+          const fromRc = rival.cities.find((c) => c.id === route.from);
+          const destIdx =
+            route.toCs !== undefined
+              ? state.cityStates.find((c) => c.id === route.toCs)?.centerIndex ?? -1
+              : route.toPlayer !== undefined
+              ? state.cities.find((c) => c.id === route.toPlayer)?.centerIndex ?? -1
+              : rival.cities.find((c) => c.id === route.to)?.centerIndex ?? -1;
+          if (fromRc && destIdx >= 0) layTradeRoad(state, fromRc.centerIndex, destIdx);
         }
       }
       // B-23 duration: after the pick, drop routes whose expiresTurn has

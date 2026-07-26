@@ -21,6 +21,11 @@ export function addEraScore(state: GameState, civ: number, pts: number): void {
  *  (S2), then the accumulators reset for the new window. */
 export function eraBoundary(state: GameState): void {
   if (state.turn % ERA_LENGTH !== 0) return;
+  // B-23 (#71): Civ 6 upgrades ROADS by era — the Ancient road has no bridges,
+  // the Classical road does. Latched at the FIRST era boundary and never
+  // cleared. Set here (rather than off a raw turn comparison) because this site
+  // is already proven to fire at the same moment in both engines.
+  state.roadBridges = true;
   const ages = (state.civAges ??= []);
   const prev = (state.prevAges ??= []);
   const ded = (state.dedications ??= []);

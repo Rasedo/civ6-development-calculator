@@ -262,6 +262,7 @@ SUPPORT_CS = 2
 # barb xp plane); civilians never fight. XP_LEVELS grant a flat +5 CS per level
 # at every roll the unit fights — an integer add into the CS assembly like the
 # B-7 terms, preserved by the B-29 diff quantization.
+TRADE_ROAD_MAX_STEPS = 32  # B-23 (#71): the layTradeRoad safety rail
 XP_ATTACK = 5
 XP_DEFEND = 2
 XP_LEVEL_CS = 5
@@ -376,7 +377,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -1128,6 +1129,13 @@ class BatchSim:
         # district may strike; a melee assault depletes it and at 0 the tile
         # opens and the strike goes silent.
         self.encamp_hp = torch.zeros(B, T, dtype=torch.long, device=device)
+        # B-23 (#71): the ROAD plane (the TS `Tile.road` twin). Laid by trade
+        # routes; a road-to-road step ignores the terrain penalty, and once
+        # `road_bridged` latches at the first era boundary, the river charge too.
+        self.road = torch.tensor(
+            [[bool(t.get("rd", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device
+        )
+        self.road_bridged = False
         # AUDIT B-32: a COMPLETE, non-CITY_CENTER district raided into darkness —
         # its adjacency/buildings/housing/amenities/GPP/CS-envoy channels stop
         # until a builder repairs it (static counts stay: still owned). t0 world
@@ -1676,7 +1684,11 @@ class BatchSim:
         for cheap save/restore during search (MCTS). Eval-only — never touched by
         the parity gates. The derived caches are keyed by _eff_version, which
         restore() bumps, so they need not be captured."""
-        return {"mut": {k: getattr(self, k).clone() for k in _MUTABLE}, "turn": self.turn}
+        return {
+            "mut": {k: getattr(self, k).clone() for k in _MUTABLE},
+            "turn": self.turn,
+            "road_bridged": self.road_bridged,  # B-23 (#71): a scalar latch, not a plane
+        }
 
     def restore(self, snap: dict) -> None:
         """Restore a snapshot() in place. Bumps _eff_version + clears the derived
@@ -1684,6 +1696,7 @@ class BatchSim:
         for k, v in snap["mut"].items():
             getattr(self, k).copy_(v)
         self.turn = snap["turn"]
+        self.road_bridged = snap.get("road_bridged", False)  # B-23 (#71)
         self._eff_version += 1
         self._eff_cache = None
         self._food_cache = None
@@ -4293,6 +4306,74 @@ class BatchSim:
         )
         return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
 
+    def _lay_trade_road(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor) -> None:
+        """B-23 (#71): the `layTradeRoad` twin — lay the ROAD a new trade
+        route's Trader would leave behind. From the origin centre, repeatedly
+        step to the neighbour with the lowest hexDistance to the destination
+        (ties by direction order — the same integer rule the war-march uses, so
+        both engines agree by construction). A walk that needs a water or
+        impassable tile is a SEA route and lays NOTHING, so the path is
+        collected first and committed only if it reaches the destination.
+        Zero draws, integer-only."""
+        if len(rows) == 0:
+            return
+        dev = self.device
+        ar6 = torch.arange(6, device=dev)
+        rows2 = rows.unsqueeze(1)
+        cur = frm.clone()
+        alive = (
+            (frm >= 0)
+            & (dest >= 0)
+            & self.passable[rows, frm.clamp(min=0)]
+            & self.passable[rows, dest.clamp(min=0)]
+        )
+        arrived = alive & (cur == dest)
+        path = [torch.where(alive, cur, torch.full_like(cur, -1))]
+        for _ in range(TRADE_ROAD_MAX_STEPS):
+            walking = alive & ~arrived
+            if not bool(walking.any()):
+                break
+            nb = self.neigh[cur.clamp(min=0)]  # [n, 6]
+            nbc = nb.clamp(min=0)
+            okn = (nb >= 0) & self.passable[rows2, nbc]
+            d_nb = self.pair_dist[dest.clamp(min=0).unsqueeze(1), nbc].to(torch.long)
+            d_cur = self.pair_dist[dest.clamp(min=0), cur.clamp(min=0)].to(torch.long)
+            key = torch.where(okn & (d_nb < d_cur.unsqueeze(1)), d_nb * 8 + ar6, 10**9)
+            best = key.min(dim=1).values
+            step_ok = walking & (best < 10**9)
+            nxt = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
+            cur = torch.where(step_ok, nxt, cur)
+            path.append(torch.where(step_ok, cur, torch.full_like(cur, -1)))
+            # a walking row that could not step is a SEA route — it dies here
+            alive = alive & (arrived | step_ok)
+            arrived = arrived | (alive & (cur == dest))
+        commit = alive & arrived
+        if not bool(commit.any()):
+            return
+        for pt in path:
+            m = commit & (pt >= 0)
+            if bool(m.any()):
+                self.road[rows[m], pt[m]] = True
+
+    def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor):
+        """B-23 (#71): the (terrain, river) MP terms a step pays, road-aware —
+        the `moveCostInto` + `riverCharge` twin. A ROAD-to-ROAD step ignores the
+        terrain penalty entirely ("roads let a unit pass through Woods or Hills
+        as if it were flat"), and once `road_bridged` latches at the first era
+        boundary (Classical roads bring bridges) it ignores the river charge
+        too. A road on only ONE end does nothing, exactly as in real Civ 6."""
+        tm = torch.div(
+            self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor"
+        )
+        rd = (
+            self.road.gather(1, frm.clamp(min=0).unsqueeze(1)).squeeze(1)
+            & self.road.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
+        )
+        z = torch.zeros_like(tm)
+        terr = torch.where(rd, z, tm)
+        riv = torch.where(rd, torch.zeros_like(river3), river3) if self.road_bridged else river3
+        return terr, riv
+
     def _encamp_live(self) -> torch.Tensor:
         """[B, T] bool — B-17 (#71): a LIVE Encampment garrison. The exact
         `encampmentIntact` twin: the district is an ENCAMPMENT, complete,
@@ -6305,11 +6386,10 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb2.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                cost = (
-                    1
-                    + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
-                    + 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+                _terr, _riv = self._road_terms(  # B-23 (#71): roads
+                    cur, dest, 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
                 )
+                cost = 1 + _terr + _riv
                 mv = (
                     moving
                     & (best < 10**9)
@@ -7268,11 +7348,10 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                cost = (
-                    1
-                    + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
-                    + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+                _terr, _riv = self._road_terms(  # B-23 (#71): roads
+                    curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
                 )
+                cost = 1 + _terr + _riv
                 mv = (
                     moving
                     & (best < 10**9)
@@ -7473,11 +7552,10 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                cost = (
-                    1
-                    + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
-                    + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+                _terr, _riv = self._road_terms(  # B-23 (#71): roads
+                    curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
                 )
+                cost = 1 + _terr + _riv
                 mv = (
                     moving
                     & (best < 10**9)
@@ -7563,11 +7641,10 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                cost = (
-                    1
-                    + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
-                    + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+                _terr, _riv = self._road_terms(  # B-23 (#71): roads
+                    curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
                 )
+                cost = 1 + _terr + _riv
                 mv = (
                     moving
                     & (best < 10**9)
@@ -9535,11 +9612,10 @@ class BatchSim:
             best = skey.min(dim=1).values
             dir_i = (best % 8).clamp(max=5)
             dest = nb2.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-            land_cost = (
-                1
-                + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
-                + 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+            _terr, _riv = self._road_terms(  # B-23 (#71): roads
+                cur, dest, 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
             )
+            land_cost = 1 + _terr + _riv
             if self._embark_live:
                 # embark/disembark (a LAND unit crossing land↔water) costs ALL
                 # remaining MP; a water→water step enters at 1 (no river charge).
@@ -10022,11 +10098,10 @@ class BatchSim:
             pdir = (best % 8).clamp(max=5)
             dest = nbp.gather(1, pdir.unsqueeze(1)).squeeze(1)
             true_dir = perm_t[pdir]  # river bits index the NEIGH direction, not the patrol order
-            land_cost = (
-                1
-                + torch.div(self.tmove.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1), 3, rounding_mode="floor")
-                + 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> true_dir) & 1)
+            _terr, _riv = self._road_terms(  # B-23 (#71): roads
+                curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> true_dir) & 1)
             )
+            land_cost = 1 + _terr + _riv
             if self._embark_live:
                 to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
                 transition = (emb != to_water) & ~is_naval_p
@@ -10321,6 +10396,16 @@ class BatchSim:
             self.r_routes[rows, r, slot, 1] = to_id
             self.r_route_dest[rows, r, slot] = -1  # domestic/CS
             self.r_route_exp[rows, r, slot] = exp_val
+            # B-23 (#71): the route's Trader lays road along its land path.
+            # i_pick / jj_pick ARE the slot indices the ids arrays are keyed by,
+            # so the centres come straight off them (CS destinations sit past RC).
+            _o = self.rc_center[rows, r, i_pick]
+            _d = torch.where(
+                jj_pick < RC,
+                self.rc_center[rows, r, jj_pick.clamp(max=RC - 1)],
+                self.cs_center[rows, (jj_pick - RC).clamp(min=0, max=max(self.S - 1, 0))],
+            )
+            self._lay_trade_road(rows, _o, _d)
 
         # B-23 international: rows that WANT a route but found no domestic/CS
         # candidate consider a player city — NEAREST-city preference (min hex
@@ -10366,6 +10451,9 @@ class BatchSim:
                 self.r_routes[rows, r, slot, 1] = -1  # intl: dest carried in r_route_dest
                 self.r_route_dest[rows, r, slot] = dest_tile
                 self.r_route_exp[rows, r, slot] = exp_val
+                # B-23 (#71): the international route lays road too (dest_tile
+                # is already the destination player city's CENTRE tile).
+                self._lay_trade_road(rows, self.rc_center[rows, r, i_pick], dest_tile)
 
         # B-23 duration: after the pick, expire due routes (freed capacity
         # re-picks NEXT turn). ALWAYS runs — TS applies the expiry filter
@@ -13452,6 +13540,9 @@ class BatchSim:
         # from score 0 — harmless: their factor only ever multiplies
         # alive-masked zero contributions.
         if self._era_len > 0 and self.turn % self._era_len == 0:
+            # B-23 (#71): roads reach the CLASSICAL tier (bridges) at the first
+            # era boundary — latched here, the site TS latches it at too.
+            self.road_bridged = True
             sc = self.era_score
             _was = self.civ_age  # B-24 (#71): the PREVIOUS age, the Heroic test's substrate
             self.civ_age = torch.where(

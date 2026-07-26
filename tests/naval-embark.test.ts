@@ -59,7 +59,7 @@ describe('#45/B-6 movement primitives', () => {
     const land = tileAtCoords(map, 5, 5);
     const water = tileAtCoords(map, 6, 5);
     water.terrain = 'COAST';
-    expect(moveCostInto(water)).toBe(1);
+    expect(moveCostInto(water, water)).toBe(1);
     // land plane: a land unit (WARRIOR) stands on land, never on water
     const warrior = { type: 'WARRIOR' };
     expect(unitPassable(land, warrior)).toBe(true);

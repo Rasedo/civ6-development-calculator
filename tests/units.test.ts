@@ -42,11 +42,21 @@ describe('movement', () => {
   it('terrain movement costs stack', () => {
     const map = makeMap();
     const t = tileAtCoords(map, 5, 5);
-    expect(moveCostInto(t)).toBe(1);
+    // B-23 (#71): moveCostInto now takes the tile being LEFT as well. Passing
+    // the same tile keeps these terrain assertions (no road on either end).
+    expect(moveCostInto(t, t)).toBe(1);
     t.elevation = 'HILLS';
-    expect(moveCostInto(t)).toBe(2);
+    expect(moveCostInto(t, t)).toBe(2);
     t.feature = 'WOODS';
-    expect(moveCostInto(t)).toBe(3);
+    expect(moveCostInto(t, t)).toBe(3);
+    // B-23 (#71): a ROAD-to-ROAD step ignores the terrain penalty entirely.
+    const from = tileAtCoords(map, 5, 6);
+    from.road = true;
+    t.road = true;
+    expect(moveCostInto(from, t)).toBe(1);
+    // ...but a road on only ONE end does nothing (real Civ 6).
+    from.road = false;
+    expect(moveCostInto(from, t)).toBe(3);
   });
 
   it('river crossings end the turn; pathfinding avoids blockers', () => {

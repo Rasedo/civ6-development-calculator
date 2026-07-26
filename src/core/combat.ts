@@ -28,6 +28,7 @@ import {
   fortifyBonus,
   rivalCityAt,
   moveCostInto,
+  riverCharge,
   encampmentIntact,
   encampmentBlocks,
   crossesRiver,
@@ -1274,7 +1275,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     const transition = !naval && isWater(at) !== isWater(step);
     const cost = transition
       ? unit.movesLeft
-      : moveCostInto(step) + (isWater(step) ? 0 : crossesRiver(at, step) ? 3 : 0);
+      : moveCostInto(at, step) + riverCharge(state, at, step); // B-23 (#71): roads
     if (unit.movesLeft < cost && unit.movesLeft < full) return;
     if (transition) unit.embarked = isWater(step);
     unit.tileIndex = step.index;

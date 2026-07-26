@@ -6,6 +6,7 @@
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
 import { hexDistance } from './hex';
+import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { isCivicComplete } from './effects';
 import { DISTRICTS } from '../data/districts';
 import { csTradeCapacityBonus, rivalIsSuzerain } from './cityStates';
@@ -204,7 +205,18 @@ export function addTradeRoute(state: GameState, from: number, to: number): RuleR
   const check = canAddTradeRoute(state, from, to);
   if (!check.ok) return check;
   state.tradeRoutes.push({ from, to, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  // B-23 (#71): the route's Trader lays road along its land path.
+  layRouteRoad(state, from, state.cities.find((c) => c.id === to)?.centerIndex ?? -1);
   return { ok: true };
+}
+
+/** B-23 (#71): lay the route's road between two CENTER tiles (either endpoint
+ *  missing = nothing to walk). Kept here so all four creation sites — the three
+ *  player verbs and the rival pick — call ONE thing. */
+export function layRouteRoad(state: GameState, fromCityId: number, toCenterIndex: number): void {
+  const a = state.cities.find((c) => c.id === fromCityId);
+  if (!a || toCenterIndex < 0) return;
+  layTradeRoad(state, a.centerIndex, toCenterIndex);
 }
 
 export function canAddCsTradeRoute(state: GameState, from: number, csId: number): RuleResult {
@@ -230,6 +242,7 @@ export function addCsTradeRoute(state: GameState, from: number, csId: number): R
   const check = canAddCsTradeRoute(state, from, csId);
   if (!check.ok) return check;
   state.tradeRoutes.push({ from, to: -1, toCs: csId, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  layRouteRoad(state, from, state.cityStates.find((c) => c.id === csId)?.centerIndex ?? -1); // B-23 (#71)
   return { ok: true };
 }
 
@@ -258,6 +271,11 @@ export function addIntlTradeRoute(state: GameState, from: number, rivalCiv: numb
   const check = canAddIntlTradeRoute(state, from, rivalCiv, rivalCity);
   if (!check.ok) return check;
   state.tradeRoutes.push({ from, to: -1, toRivalCiv: rivalCiv, toRivalCity: rivalCity, expiresTurn: state.turn + TRADE_ROUTE_DURATION });
+  layRouteRoad(
+    state,
+    from,
+    state.rivals.find((r) => r.id === rivalCiv)?.cities.find((c) => c.id === rivalCity)?.centerIndex ?? -1,
+  ); // B-23 (#71)
   return { ok: true };
 }
 

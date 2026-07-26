@@ -97,6 +97,12 @@ export interface Tile {
    *  the TILE (not the city) so every walker's legality check stays O(1) and
    *  the GPU can mirror it as one [B, T] plane. */
   encampHp?: number;
+  /** B-23 (#71): a ROAD lies on this tile. Laid by trade routes (real Civ 6:
+   *  Traders lay road as they serve a land route). A step from one road tile
+   *  to another ignores the terrain penalty, and from the Classical era on it
+   *  also ignores the river crossing charge (Civ 6's Classical road brings
+   *  bridges). Absent = no road. */
+  road?: boolean;
   /** Tribal village (goody hut) waiting for a unit to claim it. */
   goodyHut: boolean;
   /** Volcano (a mountain that occasionally erupts when disasters are on). */
@@ -262,6 +268,9 @@ export interface GameState {
   /** B-24 (#71): dedications each civ committed this era — 1 normally,
    * HEROIC_DEDICATIONS on a Heroic age. */
   dedications?: number[];
+  /** B-23 (#71): have roads reached the CLASSICAL tier (bridges)? Latched true
+   *  at the first era boundary; a road-to-road step then pays no river charge. */
+  roadBridges?: boolean;
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
