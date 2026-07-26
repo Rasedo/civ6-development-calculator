@@ -862,8 +862,69 @@ sites also wrapped the unit-vs-unit `mel`/`vrng` religion adders. That is
 the SECOND time a bulk replace hit pre-existing sites this round. Rule:
 after any bulk replace, diff the touched sites individually.
 
-BATCH 2 (in flight): B-27, B-23, B-17 — same experimental mode, one
-ladder at the end. a7ef8ca is the known-green base to return to.
+BATCH 2 (in flight): B-17 DONE (bce7699 + f15d5dd), B-23 next, B-27
+after. Same experimental mode, one ladder at the end. a7ef8ca is the
+known-green base; f15d5dd is green on scripted parity 24x250 (a crash
+smoke, not the gate).
+
+### B-17 AS SHIPPED (sourced, then built)
+Sourced: the Encampment fights independently of its city, carries a 100
+HP garrison, and bars enemy entry until that garrison is 0 — then the
+tile is occupied and the district goes silent. Modeled per-TILE
+(`Tile.encampHp` / `encamp_hp` [B,T]) so every walker's check is O(1).
+Mustered at completion (player queue, rival queue, sandbox, livesync);
+blocks via `encampmentBlocks`/`_encamp_block` folded into
+tileFreeForUnit + findPath + walkPath + the patrol passOk + GPU
+`_blocked_for` (which every march already routes through) + the player
+step verb; reduced by a MELEE assault ON the tile wired through
+`attackTargets`, so barbs, war-marching rivals and the scripted/RL
+player all reach it with NO walker surgery. Defense = the owner's
+civ-level `max(15, bestMeleeCS)` with NO city-centre garrison term (that
++5 is a unit in the CITY, not on this district); a unit standing ON the
+Encampment is fought as a unit instead. Keys penc/pencc + renc/rencc,
+rolled under DISJOINT owner masks so each row still draws twice in TS's
+order. Heals on the wall pool's unbesieged gate/rate. DESCOPED:
+ranged-vs-district (matches the ranged-vs-rival-city scope-out).
+GOTCHA FOUND: `_hostile_vs_unit` probes its advance through
+`_blocked_for` with the LOOSE side string "rival" and no civ — fine for
+the stacking fallthrough, fatal for a civ-aware arm. Both sites now pass
+v_civ.
+
+### B-23 DESIGN (sourced 2026-07-26, ready to build)
+SOURCES: roads are laid by TRADERS serving land routes (Military
+Engineers too — out of scope). Ancient Road: a unit moving road->road
+ignores terrain penalties (cost 1); NO bridges. Classical Road adds
+BRIDGES over rivers. Industrial 0.75 / Modern 0.5 / Railroad 0.25 are
+past this tech tree — out of scope, recorded.
+
+SCOPE: the ROAD half only. A physical Trader unit that walks its route
+stays a recorded residual — it would rewrite trade economics, and the
+gameplay-relevant consequence of trade routes IS the road network.
+
+MODEL (both engines, zero draws, integer-only):
+1. A per-tile `road` boolean plane.
+2. When a LAND trade route is established, road is laid along the path
+   the trader would walk: from the origin centre, repeatedly step to the
+   neighbour with the lowest hexDistance to the destination centre, ties
+   by direction index — the SAME integer stepping rule the existing
+   war-march uses, so it is already proven mirrorable. Bounded by
+   TRADE_ROUTE_RANGE (15). If the walk needs a water/impassable tile it
+   is a SEA route: no road laid, and the walk aborts.
+3. Movement: `moveCostInto` becomes `moveCostInto(from, to)` — a
+   road->road step costs 1 flat (terrain penalty ignored). ~8 TS call
+   sites (units.ts x3, rivals.ts x4, combat.ts x1) and the GPU's
+   `tmove`-based step-cost expressions (6310/7273/7478/7568 and the
+   walkPath/player-step twins).
+4. Bridges: road->road across a river pays no +3 once the civ is in the
+   CLASSICAL era or later (turn // ERA_LENGTH >= 1) — Civ 6 upgrades
+   roads by ERA, and the era machinery already exists (B-24).
+5. Export the t0 `road` plane (all false at t0, but shipped so fixtures
+   that start later stay honest).
+
+RISK: this is the most invasive movement change available — every
+walker reads the cost. Edit each call site DELIBERATELY; the two
+regressions this round both came from bulk `str.replace` hitting
+pre-existing sites.
 
 ### A-5r GPU half — exact spec
 Mirror `rivalTilePurchaseCost` + the purchase step. Needs:
