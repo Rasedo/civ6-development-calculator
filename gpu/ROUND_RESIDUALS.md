@@ -86,9 +86,24 @@ own bug, so reverting either one still leaves the other red.
   such revert. An ENGINE-side divergence that survives a near-total src
   revert.
 
+CAVEAT ON THE SECOND MEASUREMENT — read before trusting it. When I ran
+"#71 engine + baseline src", `src/core/eras.ts` and `src/core/game.ts`
+had ALREADY BEEN RESTORED to #71, so the dedication substrate was live on
+the TS side during that run. The "engine-side" label is therefore NOT
+established. RE-RUN it properly: revert ALL of src/ and scripts/ to
+6a8fd48 in one go, keep only gpu/civ6gpu/engine.py at #71, re-export and
+run parity. Green => the engine is clean and both bugs are TS-side; red
+=> a genuine engine-side bug, and the remaining suspects are below.
+
 The engine-side one is the cheaper target and the suspect list is short,
 since with src at baseline everything else is inert:
- 1. **`_rival_border_key` REFACTOR — PRIME SUSPECT, check first.** It is a
+ 0. **`_rival_border_key` REFACTOR — RULED OUT, byte-identical (verified
+    2026-07-26).** Diffed the extracted helper body against 6a8fd48's
+    inline block: 39 lines vs 39 lines, ZERO diff lines. The extraction is
+    faithful; `_bmul` is recomputed in the helper but `_bel_mul` is pure,
+    and the enclosing `_rc_cost()` still reads the outer copy. Do NOT
+    re-open this one.
+ 1. (superseded, kept for the record) `_rival_border_key` refactor. It is a
     PURE extraction from `_rival_border_growth`, a hot, already-verified
     path, so ANY behaviour change is a transcription error. Diff the
     helper against 6a8fd48's inline block LINE BY LINE. Note the original
