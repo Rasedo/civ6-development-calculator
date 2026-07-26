@@ -113,8 +113,24 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**NEXT: dump per-camp `near_any` and `can_grow` for seed 9274 t140 and
-compare against TS's `nearCamp.length === 0` branch for the same 3 camps.**
+**PER-CAMP DUMP DONE.** seed 9274 t140: camps at tiles 419, 300, 950;
+7 live barbs; EVERY camp has a garrison sitting ON it (distance 0), so
+`near_any` is TRUE for all three and the GPU legitimately reaches the
+grow roll 3x. TS's `nearCamp` would also be non-empty for all three, and
+its count gate is `7 < 3*3 = 9` -> TRUE, so TS should ALSO draw 3 grow
+rolls. But TS's barb-phase TOTAL is only 3.
+=> the 2 extra GPU draws are therefore NOT the grow rolls. They are the
+OTHER two GPU barb-phase draws: the **camp-spawn roll (line 5911)** and a
+**damage roll (line 4176)**. Check the camp-spawn gate FIRST:
+  TS: `anyCivCity && barbCamps.length < maxCamps && nextRandom() < 0.08`
+      with `maxCamps = max(1, floor(nonWaterTiles / 120))`
+  GPU: `can_roll = alive.any(dim=1) & (n_camps < max_camps)`
+Two candidate mismatches, both cheap to check: (1) `max_camps` differs, so
+the GPU rolls where TS short-circuits on `3 >= maxCamps`; (2) `anyCivCity`
+- TS counts the player OR ANY RIVAL city (A-15), the GPU's `self.alive`
+is PLAYER cities only. Dump both scalars for this seed and compare.
+The remaining damage roll implies a barb ATTACK the GPU makes and TS does
+not, which would follow from the extra spawn.
 The suspect is the staleness contract: TS computes `nearCamp` from a
 `barbs` array captured BEFORE the camp loop while its COUNT check calls
 `barbUnits(state)` FRESH; the GPU uses `pre_alive` for `near_any` and a
