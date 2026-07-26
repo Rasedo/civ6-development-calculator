@@ -113,7 +113,34 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**THE DIFF SURFACE IS NOW TWO EXPRESSIONS (2026-07-26).**
+**PLACEMENT HYPOTHESIS ALSO REFUTED (2026-07-26).** Dumped the 7 spawn
+candidates around camp 950 at t139:
+```
+950 passable barb_at=2 (its own garrison)   <- blocked, correctly
+951 passable, EMPTY, no district/city/camp  <- the GPU places here
+907 passable, empty | 906 passable, empty
+949 / 994 / 995 impassable
+```
+Nothing exotic: no district, no city centre, no stacking subtlety. Tile
+951 is plainly free under BOTH engines' rules, so `tileFreeForUnit` would
+have accepted it too. TS did not fail to PLACE — TS never decided to
+spawn. (Note the spawned unit ends the turn at tile 864 hp 82 because the
+raider walk runs later in the same phase and it moved and took fire; do
+not confuse its END tile with its SPAWN tile.)
+
+=> Back to the roll itself, but now with placement, ordering, gates and
+thresholds ALL eliminated. The remaining possibility is that the three
+grow rolls are DISTRIBUTED differently across the three camps even though
+the total count matches: e.g. one engine draws twice for one camp and not
+at all for another. That is invisible to every measurement taken so far,
+all of which were aggregate.
+**THE ONE EXPERIMENT LEFT:** log the per-camp roll VALUE on both sides —
+TS: print `(campNo, campTile, r)` at the 0.1 raid roll; GPU: print
+`(k, camp_tile, r)` at line 5975 — for seed 9274 t139, and compare the
+three pairs directly. Anything else is guessing; every aggregate signal
+has now been exhausted.
+
+(refuted) THE DIFF SURFACE IS TWO EXPRESSIONS.
 GPU `_first_free_spot(at_tile, "barb")`:
   `cand7 = [anchor, *neigh]`; `blocked = barb|pmil|pciv|rv|rvc`;
   `terr = self.passable[cand]`; `ok7 = (cand7>=0) & terr & ~blocked`;
