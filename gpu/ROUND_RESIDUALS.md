@@ -113,8 +113,26 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**ROOT CLASS FOUND (2026-07-26): the draw ORDER WITHIN the turn differs,
-not the draw COUNT.** Logged the per-camp grow-roll VALUE on both sides,
+**!! THE "DRAW ORDER" CONCLUSION IS UNFOUNDED — I COMPARED MISALIGNED
+TURNS (2026-07-26). READ THIS BEFORE USING THE TABLE BELOW. !!**
+TS increments `state.turn` at game.ts:938, AFTER `barbarianPhase` at
+game.ts:912. So a TS probe firing at `state.turn === 139` logs the phases
+that produce the trace row labelled **140**, while my GPU probe logged the
+step that produces the row labelled **139**. The two columns in the table
+below are therefore DIFFERENT TURNS, and their values SHOULD differ.
+This is the documented turn-label gotcha: trace label N == TS
+`state.turn` N during phases == GPU `self.turn` N+1. It has bitten this
+project before (recorded in the H300 notes) and it bit me here.
+**REDO THE COMPARISON WITH THE OFFSET FIXED** — TS at `state.turn === 138`
+against the GPU step producing label 139, or equivalently print the trace
+label from both sides rather than the raw counter — BEFORE drawing any
+conclusion about draw ORDER. Mathematically, if both engines start a turn
+from the same rng state and take the same number of draws, draw #k has the
+SAME value in both (mulberry32 state == start + k*INC), so "same state,
+same count, different values" is IMPOSSIBLE and was always a sign of a
+measurement error rather than an engine one.
+
+(measured, but MISALIGNED — see above) draw values by camp: Logged the per-camp grow-roll VALUE on both sides,
 seed 9274 t139, camps in the identical order 419 / 300 / 950:
 ```
         TS          GPU
