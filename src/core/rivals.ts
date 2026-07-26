@@ -3032,7 +3032,7 @@ export function rivalPhase(state: GameState): void {
           if (d.type !== 'ENCAMPMENT') continue;
           const dt = state.map.tiles[d.tileIndex];
           if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
-          dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? 0) + CITY_HEAL_PER_TURN);
+          dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
         }
       }
     }

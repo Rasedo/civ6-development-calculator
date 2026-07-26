@@ -457,7 +457,7 @@ function attackEncampment(
   const dmgToEncamp = damageRoll(state, atkCS - defCS, k, tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, k + 'c', tileIndex);
   gainXp(attacker, XP_ATTACK);
-  tile.encampHp = Math.max(0, (tile.encampHp ?? 0) - dmgToEncamp);
+  tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
@@ -1514,7 +1514,7 @@ export function barbarianPhase(state: GameState): void {
       if (d.type !== 'ENCAMPMENT') continue;
       const dt = map.tiles[d.tileIndex];
       if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
-      dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? 0) + CITY_HEAL_PER_TURN);
+      dt.encampHp = Math.min(ENCAMPMENT_HP, (dt.encampHp ?? ENCAMPMENT_HP) + CITY_HEAL_PER_TURN);
     }
   }
 }

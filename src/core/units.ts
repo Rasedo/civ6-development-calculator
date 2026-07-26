@@ -9,7 +9,7 @@ import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from 
 import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
-import { UNITS, UNIT_HP, type UnitDef } from '../data/units';
+import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
@@ -239,7 +239,12 @@ export function encampmentIntact(tile: Tile): boolean {
     tile.district === 'ENCAMPMENT' &&
     tile.districtComplete &&
     !tile.districtPillaged &&
-    (tile.encampHp ?? 0) > 0
+    // Absent = FULL, the convention `outerHp ?? WALLS_HP` already uses for the
+    // wall pool: a COMPLETE Encampment always has a garrison unless one has
+    // actually been beaten down (which writes an explicit 0). Keeps imported
+    // saves and directly-constructed states correct; the completion sites still
+    // write the value explicitly so the GPU's zero-initialised plane agrees.
+    (tile.encampHp ?? ENCAMPMENT_HP) > 0
   );
 }
 

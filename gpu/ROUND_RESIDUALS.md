@@ -921,6 +921,29 @@ MODEL (both engines, zero draws, integer-only):
 5. Export the t0 `road` plane (all false at t0, but shipped so fixtures
    that start later stay honest).
 
+### B-27 — SOURCED AND SPEC'D, NOT BUILT (and the AUDIT's blocker was stale)
+The AUDIT said the improvements tail was "blocked on naval/appeal".
+Both shipped, so the tail was re-sourced. What it is ACTUALLY blocked on
+is different, and the entry should say so:
+* SEASIDE_RESORT — requires RADIO (present in the tech tree), a FLAT
+  COASTAL Grassland/Plains/Desert tile, and Appeal >= 4 (Breathtaking).
+  Yields GOLD equal to the tile's Appeal and TOURISM equal to it.
+  LANDABLE NOW: appeal exists on both engines (`_tile_appeal`, cached on
+  _eff_version). Two blockers of a different kind: TOURISM does not
+  exist at all (a B-20 residual, so only the gold half could ship), and
+  RADIO is a modern tech no 250-turn scripted game reaches — it would
+  land GATE-UNREACHABLE, provable only by a poke, while touching the
+  float yield pipeline (the highest-risk area for parity). Deliberately
+  NOT built in this round's remaining budget: a gate-unreachable
+  float-yield change with no room left to hunt a red is a bad trade.
+  The spec above is complete; build it as its own gated stage.
+* FORT — requires MILITARY_ENGINEERING (present) but is placed by a
+  MILITARY ENGINEER, a unit this model does not have. Blocked on the
+  unit, not on appeal.
+* Offshore Oil Rig / Fishery / Ski Resort / the power improvements —
+  all past this tech tree or dependent on systems (power, tourism) that
+  do not exist.
+
 RISK: this is the most invasive movement change available — every
 walker reads the cost. Edit each call site DELIBERATELY; the two
 regressions this round both came from bulk `str.replace` hitting

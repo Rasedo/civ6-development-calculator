@@ -20,6 +20,11 @@ function battlefield() {
 /** Plant a COMPLETE unpillaged Encampment district on a tile near the city. */
 function addEncampment(state: any, city: any, col: number, row: number) {
   const t = tileAtCoords(state.map, col, row);
+  // B-17 (#71): real placement writes the TYPE onto the tile as well as into
+  // city.districts (game.ts placeDistrict). The gates now read the type off the
+  // tile — encampmentIntact folds type + complete + unpillaged + garrison into
+  // one predicate — so the fixture has to be consistent the same way.
+  t.district = 'ENCAMPMENT';
   t.districtComplete = true;
   t.districtPillaged = false;
   city.districts.push({ type: 'ENCAMPMENT', tileIndex: t.index });
