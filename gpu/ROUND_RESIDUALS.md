@@ -113,7 +113,28 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**THE EXTRA UNIT IS IDENTIFIED (2026-07-26) — slot 30.**
+**ROOT HYPOTHESIS (2026-07-26) — CAMP ITERATION ORDER, not a gate.**
+Logged which spawn site creates the extra unit: at t139 the ONLY barb
+spawn is at **engine.py line 5975 — the RAID spawn**
+(`_spawn_barb(can_grow & (r < garrisonGrowChance), camp, grow_type)`),
+type 2 at **camp tile 950**. TS makes no such spawn.
+
+Why that is almost certainly ORDER and not a gate: the gates provably
+agree (`maxBarbPerCamp` = 3 both sides; the count test is `6 < 9` = true;
+`near_any` true for all three camps), AND the rng column still MATCHES at
+t139 — meaning both engines consumed the SAME NUMBER of draws that turn.
+Same draw count but a different outcome ⇒ the two engines assigned those
+draws to DIFFERENT CAMPS. The GPU loops `for k in range(self.K)` over
+camp SLOTS; TS loops `state.barbCamps` in ARRAY order. If the orders have
+drifted, camp 950 consumes a draw that TS gave to a different camp, and a
+0.1 roll that failed for one camp passes for another.
+**VERIFY:** print the GPU `camp_tile[0][:n_camps]` against TS's
+`state.barbCamps` at t138/t139 and compare ELEMENT ORDER, not just the
+set. The #70/S5 note claims slots stay dense and ordered because
+`_clear_camp_at` left-shifts like `splice` — that claim is what to test.
+A camp cleared and later re-added is the obvious way the orders desync.
+
+(evidence) THE EXTRA UNIT — slot 30.
 Slot-by-slot dump, seed 9274:
   t138  traced barbs TS=6 GPU=6, u_alive=6 — IDENTICAL:
         slots 0/1/2 (type0 @419/300/950), 14 (type1 @299),
