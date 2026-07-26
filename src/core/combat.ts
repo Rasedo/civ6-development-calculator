@@ -1240,6 +1240,19 @@ function barbRangedType(turn: number): string {
   return turn > 120 ? 'CROSSBOWMAN' : 'ARCHER';
 }
 
+/**
+ * B-26 (#71): SCOUT-THEN-RAID. Real Civ 6 camps open with a scout that goes
+ * looking for a target, and only then start producing raiders. Mirrored as
+ * the spawn TYPE of a BRAND-NEW camp: its first unit is a SCOUT, while the
+ * regarrison and raid sites keep the melee/ranged ladders. Draw-count neutral
+ * (the camp-spawn roll above is untouched), and the scout rides the existing
+ * barb walker — it marches and can attack like any melee barb, it is simply
+ * weaker, which is exactly the early-camp pressure Civ 6 models.
+ */
+function barbScoutType(): string {
+  return 'SCOUT';
+}
+
 /** Camps spawn, garrison, raid; cities heal when unbothered. */
 export function barbarianPhase(state: GameState): void {
   const map = state.map;
@@ -1258,7 +1271,7 @@ export function barbarianPhase(state: GameState): void {
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
       state.barbCamps.push(spot.index);
-      spawnUnit(state, barbMeleeType(state.turn), spot.index, 'barbarian'); // B-26 era ladder
+      spawnUnit(state, barbScoutType(), spot.index, 'barbarian'); // B-26 (#71): a NEW camp opens with a scout
     }
   }
 

@@ -5871,6 +5871,8 @@ class BatchSim:
         # TS barbMeleeType. self.turn is a batch scalar, so one index serves the
         # whole batch. Used at ALL THREE spawn sites (new camp, empty-camp
         # regarrison, the 0.1-roll raid). Ranged raiders are a recorded residual.
+        # B-26 (#71): barb u_type 6 = SCOUT (see the exported unitCombat table).
+        self._barb_scout_type = 6 if self._unit_combat.numel() > 6 else 0
         melee_type = (
             3 if self.turn > cb.get("musketmanAfterTurn", 180)
             else 2 if self.turn > cb.get("pikemanAfterTurn", 120)
@@ -5926,7 +5928,11 @@ class BatchSim:
                 rows = has.nonzero(as_tuple=True)[0]
                 self.camp_tile[rows, self.n_camps[rows]] = spot[rows]
                 self.n_camps[rows] += 1
-                self._spawn_barb(has, spot, melee_type)  # B-26 era ladder (was WARRIOR)
+                # B-26 (#71): SCOUT-THEN-RAID — a BRAND-NEW camp opens with a
+                # SCOUT (barb u_type 6), the TS barbScoutType twin. Regarrison
+                # and raid sites keep the melee/ranged ladders. Spawn TYPE only,
+                # so the camp roll above is untouched and this is draw-neutral.
+                self._spawn_barb(has, spot, self._barb_scout_type)
 
         # Garrisons + growth. The near-camp check uses the unit list as it
         # stood BEFORE this loop (TS snapshots `barbs` first); the cap check

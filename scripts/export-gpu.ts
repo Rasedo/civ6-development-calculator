@@ -833,7 +833,8 @@ const rules = {
     wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
     unitHealPerTurn: 10,
     // B-26 era ladder: barb u_type 0/1/2/3 = WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN.
-    // #70/S5 appends the RANGED pair: 4 = ARCHER, 5 = CROSSBOWMAN. `unitCombat`
+    // #70/S5 appends the RANGED pair: 4 = ARCHER, 5 = CROSSBOWMAN; #71/B-26
+    // appends 6 = SCOUT (the scout-then-raid opener). `unitCombat`
     // is the DEFENSE strength (a ranged unit defends on UNITS.combat, 15 for
     // both); the strike itself reads unitRangedStrength / unitRangedRange —
     // the barb (u_*) twins of the roster's rangedStrength / rangedRange.
@@ -844,9 +845,10 @@ const rules = {
       UNITS.MUSKETMAN.combat,
       UNITS.ARCHER.combat,
       UNITS.CROSSBOWMAN.combat,
+      UNITS.SCOUT.combat, // B-26 (#71): 6 = SCOUT — the scout-then-raid opener
     ],
-    unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0],
-    unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0],
+    unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0, 0],
+    unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0, 0],
     campClearReward: 50,
     dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1

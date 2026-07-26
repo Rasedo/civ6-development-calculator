@@ -62,9 +62,20 @@ its verification status.
 
 ## LIVE STATUS (keep current — this file survives compaction)
 
-DONE, BOTH ENGINES: DEBT-1, DEBT-2, DEBT-3 (non-issue), B-8, A-9, B-18.
-DONE, TS ONLY: A-5r (rival tile purchase) — GPU half specified below.
-NOT STARTED: B-17, B-26, B-23, B-24, B-27.
+DONE, BOTH ENGINES: DEBT-1, DEBT-2, DEBT-3 (non-issue), B-8, A-9, B-18,
+A-5r.
+B-26 PARTIAL: ranged barbs landed in #70; the SCOUT-THEN-RAID opener
+landed here (a brand-new camp's first unit is a SCOUT, barb u_type 6,
+both engines, draw-neutral spawn-TYPE change). REMAINING in B-26:
+ * NAVAL BARBS — a coastal camp should spawn a hull on an ADJACENT WATER
+   tile. The roster (GALLEY/QUADRIREME) and the `wpass` water planes
+   already exist, but the GPU barb raider block is a LAND walker: it
+   needs a water-capable variant, which is the real cost. Widen the barb
+   `unitCombat` table again (7 = GALLEY) when it lands.
+ * CLIFFS — a genuinely new MAP property: mapgen must place them, then
+   movement must block crossing (except at river mouths) and district
+   adjacency must account for them. Biggest single piece left in B-26.
+NOT STARTED: B-17, B-23, B-24, B-27.
 No gate has run since #70's battery. Closing ladder at the very end.
 
 ### A-5r GPU half — exact spec
