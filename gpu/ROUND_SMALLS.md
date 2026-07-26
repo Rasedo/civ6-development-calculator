@@ -97,6 +97,51 @@ at a single mechanic.
 
 ## BATCH STATUS (2026-07-26) — RESUME HERE
 
+## THE BATCH HUNT (2026-07-26) — three latents found, one open
+
+All five slices are implemented in BOTH engines. The single ladder ran and
+23/24 scripted seeds are 0.0-milli green; seed 9183 fails. The hunt so far
+found THREE separate dormant bugs, all of the same family — "the capital
+is always column 0" / "TS forgot a tile field":
+
+1. **TRACE (fixed).** `trace_row` counted the player's Palace with a
+   hardcoded `+ (1 if c == 0 else 0)`. TS traces raw
+   `city.buildings.length`, which includes PALACE; the GPU has no PALACE
+   column (it is an `is_cap` term). The hardcode was only ever right
+   because the Palace could not move. Now keyed on `is_cap & live` —
+   exactly what the RIVAL row already did with `rc_is_cap`. Symptom:
+   seed 9183 t219 `bldgs2` TS 5 vs GPU 4. **This was a HARNESS bug, not an
+   engine bug** — the recurring D-10 class.
+2. **ENGINE (fixed).** The city-state envoy CAPITAL bonus and the B-21
+   suzerain perk were added to `total[:, 0, :]` — city column 0 — while
+   TS applies them through `mods.capitalYields` under
+   `if (city.isCapital)`. Dormant before A-9: when a capital fell, TS had
+   NO capital and the GPU added to a dead column, so both were ~nothing
+   and agreed by accident. Once the Palace re-crowns a survivor they
+   diverge. Symptom: seed 9183 t219 score 171400 vs 161725 with 3 CS at
+   4/4/4 envoys. Both now key on `is_cap`; the government/policy
+   capitalYields term already did.
+3. **TS ENGINE (fixed, independent).** `captureCityState` and
+   `captureCityStateForRival` never set `center.district = 'CITY_CENTER'`,
+   unlike `foundCity` and `foundRivalCity` which both do. So an annexed
+   city-state's centre was invisible to every `tile.district` reader:
+   `attackTargets`' playerCity check, `workableTiles` (a citizen could
+   WORK the centre), settle/site scans. The GPU has no
+   district-CITY_CENTER plane and uses `center_at`/`rvcity_at`, so it
+   always treated it as a city — TS was the wrong engine, and real Civ 6
+   agrees (a conquered city-state IS a city). Surfaced by S5's ranged scan
+   widening exposure from d==1 to d<=2. Did NOT change the 9183
+   divergence; fixed anyway as a real latent. **Record as a new G-item.**
+
+STILL OPEN — seed 9183 t226: `punits` TS 8 vs GPU 7 (the GPU LOSES a
+player unit TS keeps), then `imp` TS 27 vs GPU 26 from t228 (consistent
+with the survivor being a BUILDER that keeps working). `rng` matches
+through t237, so draw counts agree — a different OUTCOME, not a lost draw.
+Prime hypothesis under investigation: S5's new barb ranged target scan
+admits a target TS's `attackTargets` does not (likely a player CIVILIAN at
+range 2). Fast loop: `.claude/scratchpad/probe9183.py` runs one seed
+(~15s) instead of the 280s gate.
+
 ### Live status (updated 2026-07-26, mid-batch)
 | slice | TS | GPU |
 |---|---|---|
