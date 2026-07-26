@@ -44,13 +44,19 @@ FINGERPRINT (the B7-G lesson); the MP read must use the same key or it
 goes stale.
 
 **S4 — A-9 palace relocation.** Both engines grant the PALACE once and
-strip it forever on capture; real Civ 6 relocates it to another city.
-On losing the city holding the PALACE, the civ re-grants it to its
-next city (acquisition order = `city_seq` / rc slot order, the standing
-tie rule) and that city becomes `isCapital`. CRITICAL: `capitalTiles`
-is the STATIC domination record (GV-3) and must NOT move — only the
-building + the `isCapital` flag relocate. Sites: all five capture/
-transfer families both engines. Gate-reachable via rollout captures.
+strip it forever on capture; real Civ 6 relocates it. SOURCED
+(2026-07-26, correcting this brief's first draft): the Palace is
+rebuilt in the remaining city with the HIGHEST POPULATION — NOT the
+next city in acquisition order, which is what the first draft guessed.
+Acquisition order (`city_seq` / rc slot order) is the TIE-BREAK only,
+per the standing rule. That city becomes `isCapital`.
+CRITICAL and already correct in this engine: `capitalTiles` is the
+STATIC domination record (GV-3) and must NOT move — real Civ 6 keeps
+the ORIGINAL capital as the domination target while the relocated
+Palace carries the capital BONUSES, which is exactly the split GV-3
+already models. So only the building + the `isCapital` flag relocate.
+Sites: all five capture/transfer families both engines. Gate-reachable
+via rollout captures.
 
 **S5 — B-26 ranged barbs.** The `campIdx % 3 == 0` raid site spawns
 ARCHER (t≤120) / CROSSBOWMAN (t>120) instead of the melee ladder type.
