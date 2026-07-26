@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 31.8 | **78%** |
-| B fidelity | 88 | 82.3 | **93%** |
+| B fidelity | 88 | 82.7 | **94%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **176.1** | **92%** |
-| Open chapters only (A+B) | 129 | 114.1 | **88%** |
+| **Overall (incl. closed)** | **191** | **176.5** | **92%** |
+| Open chapters only (A+B) | 129 | 114.5 | **89%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -296,6 +296,23 @@ Per-item weights (done% in parens where partial):
   trade routes along the Trader's walk, road-to-road steps ignore the
   terrain penalty and, from the Classical era, the river charge. The
   physical Trader unit remains the residual).
+  Batch 3: B-27 4 (85% — SEASIDE RESORT, both engines. Sourced against
+  the Civilopedia: requires RADIO, buildable only on a FLAT COASTAL
+  Grassland/Plains/Desert tile with BREATHTAKING appeal (>= 4), and it
+  yields GOLD equal to that tile's Appeal — a DYNAMIC yield, so the
+  catalog row is empty and the gold is computed in tileYields /
+  _eff_yields and BOTH rival yield paths. Appended LAST to
+  IMPROVEMENT_IDS so no existing improvement index moves. The matching
+  TOURISM (also = Appeal) is NOT modeled — tourism does not exist in
+  either engine, a recorded B-20 residual — and the PLAYER's RL build
+  verb rides #50/A-18 with the other resource-improvement verbs, so the
+  15% residual is those two. CORRECTION: the pre-build claim that this
+  would be gate-UNREACHABLE was WRONG — Radio is reached and a resort is
+  built in 1 of the 24 seeds (seed 9066, ~turn 210), which is exactly
+  what caught the real bug: the rival yield paths do not share
+  _eff_yields, so the appeal-gold had to be added to all three.
+  Remaining B-27 tail: FORT (needs a Military Engineer unit) and the
+  post-tech-tree improvements.
   ARITHMETIC NOTE: batch 1's header re-add put B at 81.8; re-summing
   from these per-item weights gives 81.63. The 0.2 over-claim is
   corrected here — the FOURTH time this table has drifted from its own
@@ -789,7 +806,18 @@ gap; likewise GS disasters are modeled minus sea-level rise
 - B-14. RESOLVED (2026-07-17, Round B2, owner-ruled): `CITIZEN_SCIENCE`
   0.7 → 0.5 (real Civ 6); reshuffled every trajectory (fixture regen,
   seed 9053 reroll pending #56).
-- B-27 (largely RESOLVED 2026-07-17, Round B2). Now: world wonders 30,
+- B-27 (~85% — #71 batch 3 2026-07-26 landed the SEASIDE RESORT, closing
+  the improvements-tail residual this entry recorded. The recorded
+  blocker ("rest need naval/appeal") was STALE — both shipped earlier in
+  #71. Requires RADIO, a FLAT COASTAL Grassland/Plains/Desert tile and
+  BREATHTAKING appeal (>= 4); yields GOLD equal to the tile's appeal,
+  computed dynamically in tileYields/_eff_yields and BOTH rival yield
+  paths (the bug the gate caught: those paths do not share _eff_yields).
+  Appended LAST to IMPROVEMENT_IDS so no index moved. STILL OPEN: the
+  resort's TOURISM half (tourism does not exist — rides B-20), the
+  PLAYER's RL build verb (rides #50/A-18 with the other
+  resource-improvement verbs), and FORT (needs a Military Engineer).
+  Earlier (largely RESOLVED 2026-07-17, Round B2): world wonders 30,
   natural wonders 12, pantheons 25 / follower 9 / founder 8 (+7
   enhancers), great people 9 classes incl. Writer/Musician, projects
   incl. the space-race chain; buildings were already real-complete per

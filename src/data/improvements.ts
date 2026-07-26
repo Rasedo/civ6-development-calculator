@@ -20,6 +20,10 @@ export interface ImprovementDef {
   description: string;
 }
 
+/** B-27 (#71): the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
+ *  — the same >= 4 threshold `appealTier` calls Breathtaking). */
+export const SEASIDE_RESORT_MIN_APPEAL = 4;
+
 export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
   FARM: {
     id: 'FARM',
@@ -101,5 +105,21 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     housing: 0,
     resourceOnly: true,
     description: 'Oil.',
+  },
+  // B-27 (#71): appended LAST (roster order = the GPU's improvement index).
+  // Real Civ 6 (verified against the Civilopedia): requires RADIO, buildable
+  // only on a FLAT COASTAL Grassland/Plains/Desert tile whose Appeal is
+  // BREATHTAKING (>= 4), and it yields GOLD equal to that tile's Appeal —
+  // a DYNAMIC yield, so `yields` here is empty and the gold is computed in
+  // tileYields. The matching TOURISM (also = Appeal) is NOT modeled: tourism
+  // does not exist in either engine yet (a recorded B-20 residual).
+  SEASIDE_RESORT: {
+    id: 'SEASIDE_RESORT',
+    name: 'Seaside Resort',
+    code: 'Sr',
+    yields: {}, // dynamic: gold = tile appeal (see seasideResortGold)
+    housing: 0,
+    resourceOnly: false,
+    description: 'Flat coastal grassland/plains/desert with Breathtaking appeal. Gold equal to the tile appeal.',
   },
 };

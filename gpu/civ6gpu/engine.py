@@ -1062,6 +1062,8 @@ class BatchSim:
         self.QUARRY = ids.index("QUARRY") if "QUARRY" in ids else -1  # A-9 (#71): appeal -1
         self.OIL_WELL = ids.index("OIL_WELL") if "OIL_WELL" in ids else -1
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
+        # B-27 (#71): the Seaside Resort (appended LAST in IMPROVEMENT_IDS).
+        self.SEASIDE = ids.index("SEASIDE_RESORT") if "SEASIDE_RESORT" in ids else -1
         # P4/D-20: food improvements heal their pillager (combat.ts
         # PILLAGE_HEAL_IMPROVEMENTS); indexed by improvement code.
         heal_names = ("FARM", "PASTURE", "CAMP", "PLANTATION", "FISHING_BOATS")
@@ -1078,6 +1080,8 @@ class BatchSim:
         self._farmadj_tech = int(imp.get("farmAdjTech", -1))    # GS: Replaceable Parts +1 more
         self._mine_unlock_tech = int(imp.get("mineUnlockTech", -1))       # MINING
         self._lumber_unlock_tech = int(imp.get("lumberUnlockTech", -1))   # CONSTRUCTION
+        self._seaside_unlock_tech = int(imp.get("seasideUnlockTech", -1))  # B-27 (#71): RADIO
+        self._seaside_min_appeal = int(imp.get("seasideMinAppeal", 4))     # BREATHTAKING
         # techs that permanently lift a MINE's yield (Apprenticeship, Industrialization → +1⚙ each)
         mbt = imp.get("mineBoostTechs", [])  # [[techIdx, prodAmount], ...]
         self._mine_boost_tech = torch.tensor([x[0] for x in mbt], dtype=torch.long, device=device)
@@ -1106,6 +1110,13 @@ class BatchSim:
         self._fa_f_c = torch.tensor([[t.get("fa_f_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self._fa_h_c = torch.tensor([[t.get("fa_h_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self._mi_c = torch.tensor([[t.get("mi_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # B-27 (#71): the Seaside Resort's STATIC half (flat G/P/D beside COAST,
+        # unpaved) and whether the tile carried NO feature at t0. The live
+        # feature test is `sr_nf | feat_stripped` (a chop makes a tile eligible,
+        # exactly as TS gates on the LIVE tile.feature === null); the appeal
+        # test is dynamic and runs off _tile_appeal().
+        self._sr_c = torch.tensor([[t.get("sr_c", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        self._sr_nf = torch.tensor([[t.get("sr_nf", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
@@ -1973,6 +1984,16 @@ class BatchSim:
             live_imp = (self.improvement >= 0) & ~self.pillaged
             if bool(live_imp.any()):
                 ty[:, :, 2:] = ty[:, :, 2:] + self._imp_yields[self.improvement.clamp(min=0), 2:] * live_imp.unsqueeze(-1).to(ty.dtype)
+                # B-27 (#71): the SEASIDE RESORT's gold IS the tile's appeal
+                # (real Civ 6), so it cannot come from the static catalog row.
+                # Floored at 0 like the TS twin. Cached with the rest on
+                # _eff_version — _tile_appeal() is keyed the same way.
+                if self.SEASIDE >= 0:
+                    sr_live = live_imp & (self.improvement == self.SEASIDE)
+                    if bool(sr_live.any()):
+                        ty[:, :, 2] = ty[:, :, 2] + (
+                            self._tile_appeal().clamp(min=0).to(ty.dtype) * sr_live.to(ty.dtype)
+                        )
         # V-H1: a chopped (or founding-stripped) tile loses its feature's own
         # yields on every column — TS reads tile.feature === null live. The
         # center path is untouched (it reads the neutral planes and applies
@@ -2852,6 +2873,23 @@ class BatchSim:
             self.unit_naval[self.v_type] | self.v_emb,
         )
         self.v_aura_mp = (v_hit & v_ok).long() * self._gen_aura_mp
+
+    def _seaside_ok(self) -> torch.Tensor:
+        """[B, T] bool — B-27 (#71): where a SEASIDE RESORT may be built, the
+        `validImprovementsIn` arm's twin. Static half from `sr_c` (flat
+        Grassland/Plains/Desert beside a COAST tile, unpaved, no resource);
+        live feature test = carried none at t0 OR has since been chopped;
+        appeal must be BREATHTAKING. The unlock tech and ownership are the
+        caller's business, exactly as for farm/mine/lumber."""
+        if self.SEASIDE < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        return (
+            self._sr_c
+            & (self._sr_nf | self.feat_stripped)
+            & (self.improvement < 0)
+            & (self.district < 0)
+            & (self._tile_appeal() >= self._seaside_min_appeal)
+        )
 
     def _tile_appeal(self) -> torch.Tensor:
         """A-9 (#71): [B, T] tile appeal, the `tileAppeal` (core/appeal.ts)
@@ -7141,6 +7179,9 @@ class BatchSim:
             ok = ok | (self.mine_ok & tk[:, self._mine_unlock_tech].unsqueeze(1))
         if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0:
             ok = ok | (self.lumber_ok & tk[:, self._lumber_unlock_tech].unsqueeze(1))
+        # B-27 (#71): the SEASIDE RESORT joins the job set on RADIO.
+        if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0:
+            ok = ok | (self._seaside_ok() & tk[:, self._seaside_unlock_tech].unsqueeze(1))
         # A-13: grown-roster resource tiles (rq >= 3; rq 0-2 resource tiles
         # already ride the fa_f/mi planes with the right gates).
         new_res = self.res_imp >= 3
@@ -7204,6 +7245,11 @@ class BatchSim:
         B, T, dev = self.B, self.T, self.device
         gains = self.rules.rivals.get("builder", {}).get("gains", [1.0, 1.0, 1.0])
         opts = [(self.FARM, float(gains[0])), (self.MINE, float(gains[1])), (self.LUMBER, float(gains[2]))]
+        # B-27 (#71): SEASIDE_RESORT is appended LAST so ties keep
+        # validImprovementsIn's push order (FARM > MINE > LUMBER > RESORT).
+        # Its gain is DYNAMIC (gold = tile appeal), filled in per tile below.
+        if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0:
+            opts = opts + [(self.SEASIDE, 0.0)]
         cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx) & (self.v_charges > 0)
         if not bool(cand.any()):
             return
@@ -7249,7 +7295,13 @@ class BatchSim:
                 farm_h = (self.farm_flat | (self.farm_hill & cv0[:, self._hillfarms_civic].unsqueeze(1))).gather(1, here.unsqueeze(1)).squeeze(1)
                 mine_h = (self.mine_ok.gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._mine_unlock_tech]) if self.MINE >= 0 and self._mine_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
                 lum_h = (self.lumber_ok.gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._lumber_unlock_tech]) if self.LUMBER >= 0 and self._lumber_unlock_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev)
-                valid = [farm_h, mine_h, lum_h]
+                # B-27 (#71): the Seaside Resort's validity HERE.
+                sr_h = (
+                    (self._seaside_ok().gather(1, here.unsqueeze(1)).squeeze(1) & tk0[:, self._seaside_unlock_tech])
+                    if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0
+                    else torch.zeros(B, dtype=torch.bool, device=dev)
+                )
+                valid = [farm_h, mine_h, lum_h] + ([sr_h] if len(opts) > 3 else [])
                 # C1-B5b-iii parity: TS scores each option as Δ tileScore(tileYields, 'balanced')
                 # = (the yield the improvement adds) · focus_base, and focus_base ([2,2,1,1,1,1])
                 # is NOT the exported BALANCED_WEIGHTS gains (a different set — food 1 vs 2). Compute
@@ -7279,7 +7331,15 @@ class BatchSim:
                 farm_g = (self._farm_food + tier_r * adj_h) * float(wt[0]) * unpil
                 mine_g = (self._mine_prod + mboost) * float(wt[1]) * unpil
                 lum_g = torch.full((B,), self._lumber_prod * float(wt[1]), dtype=torch.float64, device=dev) * unpil
-                opt_g = [farm_g, mine_g, lum_g]
+                # B-27 (#71): the resort's Δ-gain is its DYNAMIC gold — the
+                # tile's appeal (floored at 0, as tileYields floors it) times
+                # the gold focus weight. Same unpil zeroing as the others.
+                sr_g = (
+                    self._tile_appeal().gather(1, here.unsqueeze(1)).squeeze(1).clamp(min=0).double()
+                    * float(wt[2])
+                    * unpil
+                )
+                opt_g = [farm_g, mine_g, lum_g] + ([sr_g] if len(opts) > 3 else [])
                 pick = torch.full((B,), -1, dtype=torch.long, device=dev)
                 best_g = torch.full((B,), float("-inf"), dtype=torch.float64, device=dev)
                 for (imp_i, _g), v, og in zip(opts, valid, opt_g):
@@ -7714,6 +7774,13 @@ class BatchSim:
         if self.improvements_on:
             live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
             ty_oth[:, :, 2:] = ty_oth[:, :, 2:] + self._imp_yields[self.improvement.clamp(min=0), 2:] * live_imp.unsqueeze(-1)
+            # B-27 (#71): the SEASIDE RESORT's gold is the tile's APPEAL, not a
+            # catalog constant — the rival yield path needs the same term the
+            # player's _eff_yields got, or a resort pays nothing here.
+            if self.SEASIDE >= 0:
+                sr_live = (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
+                if bool(sr_live.any()):
+                    ty_oth[:, :, 2] = ty_oth[:, :, 2] + self._tile_appeal().clamp(min=0).to(self.dtype) * sr_live
         w = self.rules_dev.focus_base.double()
         oth_score = (ty_oth[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2)  # [B, T]
         g = {"fs": fs, "f_base": f_base, "p_plane": p_plane, "ty_oth": ty_oth, "oth_score": oth_score, "w": w, "f_r": {}}
@@ -8611,6 +8678,11 @@ class BatchSim:
         if self.improvements_on:
             live_imp = ((self.improvement >= 0) & ~self.pillaged).to(self.dtype)
             y_oth = y_oth + self._imp_yields[self.improvement.clamp(min=0), 2:].sum(dim=2) * live_imp
+            # B-27 (#71): the resort's appeal-gold rides the border pick key too.
+            if self.SEASIDE >= 0:
+                y_oth = y_oth + self._tile_appeal().clamp(min=0).to(self.dtype) * (
+                    (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
+                )
         if _bmul is not None or self._r_has_beliefs(r):
             # A-7: belief featureYields ride the pick key too (TS
             # pickRivalBorderTile's ctx carries getRivalModifiers now)

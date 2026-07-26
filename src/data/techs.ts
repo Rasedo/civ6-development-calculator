@@ -177,6 +177,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('RADIO', 'Radio', 'Modern', 1250, ['INDUSTRIALIZATION'], [
       { kind: 'unlockBuilding', building: 'BROADCAST_CENTER' },
+      { kind: 'unlockImprovement', improvement: 'SEASIDE_RESORT' }, // B-27 (#71)
     ]),
     T('CHEMISTRY', 'Chemistry', 'Modern', 1250, ['SANITATION'], [
       { kind: 'unlockBuilding', building: 'RESEARCH_LAB' },

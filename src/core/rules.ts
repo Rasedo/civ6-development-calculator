@@ -4,11 +4,13 @@
  * Every rule returns a reason so the UI can explain refusals.
  */
 
-import type { City, DistrictId, GameState, ImprovementId, Tile } from './types';
+import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors } from './hex';
 import { isWater, isImpassable, isMountain, isCoastalWater, hasRiver } from './query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
+import { tileAppeal } from './appeal'; // B-27 (#71): SEASIDE_RESORT gates on appeal
+import { SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -80,7 +82,7 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
  */
 export function validImprovementsIn(
   tile: Tile,
-  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean },
+  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean; map?: GameMap },
 ): ImprovementId[] {
   if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
   // A-8 gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
@@ -114,6 +116,21 @@ export function validImprovementsIn(
   }
   if (unlocked('MINE') && hills && tile.feature === null) out.push('MINE');
   if (unlocked('LUMBER_MILL') && tile.feature === 'WOODS') out.push('LUMBER_MILL');
+  // B-27 (#71) SEASIDE RESORT — real Civ 6: a FLAT COASTAL Grassland/Plains/
+  // Desert tile with BREATHTAKING appeal (>= 4). Needs the map (coast
+  // adjacency + appeal), so callers that pass none simply never offer it —
+  // a safe default, not a silent rule change.
+  if (
+    unlocked('SEASIDE_RESORT') &&
+    opts.map &&
+    flat &&
+    tile.feature === null &&
+    (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS' || tile.terrain === 'DESERT') &&
+    neighbors(opts.map, tile).some((n) => n.terrain === 'COAST') &&
+    tileAppeal(opts.map, tile) >= SEASIDE_RESORT_MIN_APPEAL
+  ) {
+    out.push('SEASIDE_RESORT');
+  }
   return out;
 }
 
@@ -121,6 +138,7 @@ export function validImprovements(state: GameState, tile: Tile): ImprovementId[]
   return validImprovementsIn(tile, {
     unlocks: gates(state),
     ownsTile: (t) => t.cityId !== -1,
+    map: state.map, // B-27 (#71): SEASIDE_RESORT needs coast adjacency + appeal
   });
 }
 

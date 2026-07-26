@@ -31,7 +31,7 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
-import { IMPROVEMENTS } from '../src/data/improvements';
+import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../src/data/improvements'; // B-27 (#71)
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../src/core/combat';
 import { GENERAL_AURA_MP } from '../src/core/aura'; // #70/S3 (B-8)
@@ -153,7 +153,9 @@ import {
 // plane/consumer keys on them); the resource-only improvements append.
 // FISHING_BOATS stays OUT: water-only, and a land builder can never stand
 // on the tile (unreachable in both engines).
-const IMPROVEMENT_IDS = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL'];
+// B-27 (#71): SEASIDE_RESORT appended LAST — this array's order IS the GPU's
+// improvement index, so anything but an append renumbers every other row.
+const IMPROVEMENT_IDS = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT'];
 // Canonical luxury catalog order for the per-tile `lux` plane.
 const LUXURY_IDS = Object.values(RESOURCES)
   .filter((r) => r.category === 'luxury')
@@ -954,6 +956,11 @@ const rules = {
     mineUnlockTech: techList.findIndex((t) =>
       t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'MINE'),
     ),
+    // B-27 (#71): RADIO unlocks SEASIDE_RESORT.
+    seasideUnlockTech: techList.findIndex((t) =>
+      t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'SEASIDE_RESORT'),
+    ),
+    seasideMinAppeal: SEASIDE_RESORT_MIN_APPEAL,
     lumberUnlockTech: techList.findIndex((t) =>
       t.effects.some((e) => e.kind === 'unlockImprovement' && e.improvement === 'LUMBER_MILL'),
     ),
@@ -1507,6 +1514,19 @@ for (let s = 0; s < N_SEEDS; s++) {
       // post-CHOP variants (feature treated as removed): _strip_feature_at
       // switches farm/mine to these so a chopped WOODS/RAINFOREST tile becomes
       // farm/mine-able (TS validImprovementsIn gates on the LIVE feature).
+      // B-27 (#71): SEASIDE_RESORT's STATIC half — flat G/P/D adjacent to a
+      // COAST tile, on an unpaved passable tile. The two DYNAMIC halves stay
+      // at runtime: the live feature test (a chop makes a tile eligible) and
+      // the Breathtaking appeal test (neighbours change it).
+      sr_c:
+        !t.district && !t.wonder && !t.builtWonder && !isImpassable(t) && !isWater(t) &&
+        !t.resource && t.elevation === 'FLAT' &&
+        (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS' || t.terrain === 'DESERT') &&
+        neighbors(map, t).some((n) => n.terrain === 'COAST')
+          ? 1 : 0,
+      // the tile carries NO feature right now (t0). A chop clears it, which the
+      // engine tracks with feat_stripped — exactly the fa_f_c pattern.
+      sr_nf: t.feature === null ? 1 : 0,
       fa_f_c:
         !t.district && !t.wonder && !isImpassable(t) &&
         (t.resource

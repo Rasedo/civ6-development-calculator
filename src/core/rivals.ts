@@ -1226,7 +1226,7 @@ function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boole
       !isWater(t) &&
       (t.pillaged ||
         t.districtPillaged || // B-32: a pillaged district is a repair job too
-        (!t.improvement && validImprovementsIn(t, { unlocks, ownsTile: owns }).length > 0)),
+        (!t.improvement && validImprovementsIn(t, { unlocks, ownsTile: owns, map: state.map }).length > 0)), // B-27 (#71)
   );
 }
 
@@ -1243,7 +1243,9 @@ function rivalHasJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boole
  */
 function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks): void {
   const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id));
-  const vopts = { unlocks, ownsTile: owns };
+  // B-27 (#71): pass the map so the rival builder is offered SEASIDE_RESORT
+  // on exactly the same terms the player is (the symmetry contract).
+  const vopts = { unlocks, ownsTile: owns, map: state.map };
   // C1-B5b-iii: the OWNER's research boosts apply (mine yields; farm-adj
   // rides along but FEUDALISM sits outside the 100-turn horizon, matching
   // the player path's latent status). Government/religion/CS blocks stay

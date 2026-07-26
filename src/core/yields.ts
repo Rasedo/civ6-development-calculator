@@ -12,6 +12,7 @@ import { TERRAINS, HILLS_YIELDS } from '../data/terrains';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { IMPROVEMENTS } from '../data/improvements';
+import { tileAppeal } from './appeal'; // B-27 (#71): the Seaside Resort's dynamic gold
 import { WONDERS } from '../data/wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -49,6 +50,9 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   if (tile.improvement && !tile.pillaged) {
     const imp = tile.improvement as ImprovementId;
     addYields(out, IMPROVEMENTS[imp].yields);
+    // B-27 (#71): the Seaside Resort's gold IS the tile's appeal (real Civ 6),
+    // so it cannot live in the static roster row. Negative appeal pays nothing.
+    if (imp === 'SEASIDE_RESORT') out.gold += Math.max(0, tileAppeal(ctx.map, tile));
     const boost = ctx.mods.improvementYields[imp];
     if (boost) addYields(out, boost);
     if (tile.resource) {
