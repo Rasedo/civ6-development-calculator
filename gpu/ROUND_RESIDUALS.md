@@ -113,6 +113,23 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
+**METHOD CORRECTION — READ BEFORE REUSING THE LINE NUMBERS.**
+`_next_random(mask)` advances the state ONLY where `mask` is true
+(verified in its docstring and body: `rng_state = where(mask, a, state)`).
+My per-line tally counted CALLS, so the "5911 once, 5969 three times"
+attribution does NOT equal draws — a call with an all-false mask costs
+nothing. The PHASE-level numbers are still valid because they were
+measured from rng_state DELTAS, not call counts.
+CONFIRMED here: `max_camps = 3` and `n_camps` reaches 3, so
+`can_roll = any_city & (n_camps < max_camps)` is FALSE at t140 and the
+line-5911 call consumes NO draw. Also confirmed the GPU's `any_city`
+ALREADY includes rivals (`alive.any() | rc_alive.reshape(B,-1).any()`),
+so the A-15 guard matches TS — that suspect is dead too.
+REDO THE ATTRIBUTION PROPERLY: log the rng_state DELTA per call, not the
+call itself, e.g. wrap `_next_random` to record
+`(caller_line, popcount(mask))` or the before/after state pair. Then the
+2 extra draws inside `_barbarian_phase` will be attributable for real.
+
 **PER-CAMP DUMP DONE.** seed 9274 t140: camps at tiles 419, 300, 950;
 7 live barbs; EVERY camp has a garrison sitting ON it (distance 0), so
 `near_any` is TRUE for all three and the GPU legitimately reaches the
