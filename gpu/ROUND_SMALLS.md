@@ -144,16 +144,36 @@ ranged-vs-CITY rolls (rngcs, vrngc) omit `religionAttackCS`, which the
 ranged-vs-UNIT rolls DO apply. Either a deliberate B6 scope-out or a
 gap — needs its own verification pass before anyone "fixes" it.
 
-S3 DESIGN DECISION (the +1 MP half): `refreshUnits` derives the
-"spent no MP" heal/fortify gate from `movesLeft >= full`. Adding aura MP
-breaks that derivation — a unit granted 3 MP that spends 1 reads
-`2 >= 2` and heals as though it never moved. Correct fixes are (a) a new
-per-unit `movesFull` field mirrored as a GPU tensor with _MUTABLE +
-reclaim discipline (real substrate, NOT small), or (b) use `full + aura`
-for BOTH the gate and the grant, accepting a one-turn mis-gate only when
-the aura CHANGES between turns (general moves in/out of range).
-CHOSEN: (b), mirrored identically in both engines so it is parity-exact,
-with the quirk recorded as a B-8 residual. Revisit if it ever bites.
+S3 DESIGN (the +1 MP half) — OWNER OVERRULED the cheap option
+2026-07-26; use real per-unit state, and it turns out to be CHEAPER than
+feared AND it closes an engine asymmetry.
+
+SOURCED first: Civ 6's rule is "**if you have used any movement points
+during a turn, the unit will not start healing until the next turn**"
+(and the fortify +3/+6 CS bonus keys off the same "hasn't used any
+Movement or performed other actions" condition). So the real predicate
+is MP-SPENT / ACTED — a property of what the unit DID, never of how much
+MP it was granted.
+
+That is exactly what the GPU ALREADY models: `p_acted` / `u_acted` /
+`v_acted` bool tensors, set at every act site and cleared at the heal
+(the P4/D-2 design). Only TS lacks the notion — it DERIVES it as
+`movesLeft >= full` inside `refreshUnits`, which is correct only while
+`full` is a constant per unit type. The aura's +1 MP is what breaks the
+derivation, not the aura itself.
+
+THEREFORE: the new state is **TS-ONLY**. Add `Unit.movesFull?: number`
+recording what the unit was actually granted at its last refresh;
+the heal gate and the B-5 fortify gate both become
+`unit.movesLeft >= (unit.movesFull ?? full)`. One write at refresh, one
+read at each gate. NO new GPU tensor, NO _MUTABLE entry, NO reclaim or
+slot-hygiene burden — the GPU's acted flags are already the faithful
+model and stay untouched. Net effect: TS converges ON the GPU's design,
+so the engines end up MORE aligned than before, and the one-turn
+mis-gate quirk of the rejected option never exists.
+
+GPU work for S3 is then only: add the aura MP at the movement-reset site
+so the granted pool matches TS.
 
 ## Bar (once, at the END of the batch)
 
