@@ -1154,6 +1154,14 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // covering collapse trajectories, so no coverage is lost. Diagnose a dying
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
+  // #71 FLAG 2 (DEDICATION_PAYOUTS_LIVE, 2026-07-26): with the per-turn
+  // dedication payouts LIVE the world is slightly richer for everyone, and
+  // index 16's default seed 9209 now loses every player city before t250 —
+  // the documented wiped-player class above, not a parity fault (the GPU and
+  // TS agree on the collapse; the exporter simply cannot record a dead
+  // player). 9210 survives but only just (1 city, pop 2); 9212 is the healthy
+  // pick at 2 cities, pop 13/8.
+  16: 9212,
   // A-19/B-33 (task #55 S2, 2026-07-20): rival-rival wars let a rival CONQUER
   // its neighbour down to a rump (seed 9001 r0 held 13-14 cities off r1). Deep
   // in that heavily-diverged conquest regime, ONE captured city's identity

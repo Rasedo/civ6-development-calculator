@@ -155,7 +155,7 @@ export const ADMIRAL_MARCH_LIVE = false;
  * parity-exact; only the per-turn faith / era-score payouts are gated, because
  * they feed rival faith and therefore purchases, and the engines diverged on a
  * downstream rival unit (seed 9287 t235). Flip when its hunt lands. */
-export const DEDICATION_PAYOUTS_LIVE = false;
+export const DEDICATION_PAYOUTS_LIVE = true; // #71: LIVE — hunted 2026-07-26
 
 export const HEROIC_DEDICATIONS = 3;
 /** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
