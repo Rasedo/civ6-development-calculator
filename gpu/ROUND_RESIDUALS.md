@@ -74,7 +74,28 @@ something landed this round changes behaviour WITHOUT going through a
 flag. Gating more mechanics is now the WRONG move — each gate just
 reshuffled the trajectory and surfaced the next seed. STOP GATING.
 
-DO THIS INSTEAD — bisect against the baseline, do not guess:
+**BISECT STEP 1 DONE — the break is in `src/` or `scripts/`, NOT engine.py.**
+Checked out `gpu/civ6gpu/engine.py` at the green baseline 6a8fd48, kept
+this round's src/scripts, re-exported: parity STILL RED (seed 9261 t244).
+So the divergence is introduced by the TypeScript/exporter side while
+every behaviour flag is off. Engine restored afterwards.
+
+RULED OUT while narrowing: the APOSTLE row is NOT missing its production
+mask — `faithOnly` ships per unit as the `fo` column and the engine masks
+on it in all four places (queue, gold-buy, RL apply, trainable), so the
+B6 new-unit checklist is satisfied automatically.
+
+BISECT STEP 2 (do this next): halve within src/scripts. Note
+`src/data/units.ts` cannot simply be reverted — rivals.ts references
+UNITS.APOSTLE — so revert PAIRS. Suggested order, cheapest first:
+ a. `scripts/export-gpu.ts` alone (the barb table widening to 7, the
+    unitMoves table, the tile ap/apf columns) — a pure data change that
+    should be provably inert with the flags off;
+ b. `src/core/eras.ts` + `src/core/game.ts` (the dedication substrate —
+    it WRITES prevAges/dedications every boundary even with payouts off);
+ c. `src/core/rivals.ts` (the largest delta).
+
+OLD PLAN (superseded by step 1):
 1. `git stash` / branch, then `git checkout 6a8fd48 -- src/ scripts/` and
    re-export + parity. Green confirms the break is in src/scripts, red
    points at gpu/civ6gpu/engine.py.
