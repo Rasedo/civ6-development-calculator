@@ -74,7 +74,33 @@ something landed this round changes behaviour WITHOUT going through a
 flag. Gating more mechanics is now the WRONG move — each gate just
 reshuffled the trajectory and surfaced the next seed. STOP GATING.
 
-**BISECT STEP 1 DONE — the break is in `src/` or `scripts/`, NOT engine.py.**
+**BISECT RESULT — THERE ARE TWO INDEPENDENT DIVERGENCES, one per side.**
+That is why single-side reverts kept "not fixing it": each side has its
+own bug, so reverting either one still leaves the other red.
+
+* baseline `engine.py` + #71 `src`/`scripts` -> RED at seed 9261 t244.
+  A TypeScript/exporter-side divergence.
+* #71 `engine.py` + baseline `src/core/units.ts`, `rivals.ts`,
+  `combat.ts`, `eras.ts`, `game.ts` AND baseline `scripts/export-gpu.ts`
+  -> RED at seed 9274 t140, with BIT-IDENTICAL rng values across every
+  such revert. An ENGINE-side divergence that survives a near-total src
+  revert.
+
+The engine-side one is the cheaper target and the suspect list is short,
+since with src at baseline everything else is inert:
+ 1. **`_rival_border_key` REFACTOR — PRIME SUSPECT, check first.** It is a
+    PURE extraction from `_rival_border_growth`, a hot, already-verified
+    path, so ANY behaviour change is a transcription error. Diff the
+    helper against 6a8fd48's inline block LINE BY LINE. Note the original
+    computed `_bmul` ONCE in the enclosing scope and the extracted copy
+    recomputes it — verify `_r_has_beliefs(r)` is not order-dependent.
+ 2. `_tile_appeal()` being invoked in `_city_totals` whenever
+    `_nbhd_didx >= 0` (true — NEIGHBORHOOD is in PLACEABLE_DISTRICTS even
+    with the scaffold row out), plus the per-city/per-rc housing adds.
+ 3. `prev_age` / `dedications` written at every era boundary.
+ 4. the barb `_u_moves` lookup replacing the hardcoded 2.
+
+(superseded first reading:) the break is in `src/` or `scripts/`, NOT engine.py.
 Checked out `gpu/civ6gpu/engine.py` at the green baseline 6a8fd48, kept
 this round's src/scripts, re-exported: parity STILL RED (seed 9261 t244).
 So the divergence is introduced by the TypeScript/exporter side while
