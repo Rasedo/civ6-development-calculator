@@ -113,7 +113,28 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**METHOD CORRECTION — READ BEFORE REUSING THE LINE NUMBERS.**
+**ROOT LOCALISED (2026-07-26) — the 2 extra draws are a BARBARIAN MELEE
+ATTACK the GPU makes and TS does not.**
+Re-instrumented correctly (log only calls where `rng_state` actually
+CHANGED, and wrap `_damage_roll` too). Seed 9274 t140, GPU advancing
+draws, deduplicated:
+    `5969 x3` (the three camp grow rolls)
+    `_damage_roll k="mel"` + `k="melc"`  <-- a barb melee attack + counter
+    5 draws in the 2019/2034/2034/2049/2062 block (disaster)
+    `_damage_roll k="rcstk"` (rival walls strike)
+  = 11 total, matching the measured delta exactly.
+Barb phase = 3 grow rolls + the mel/melc PAIR = 5. TS's barb phase = 3,
+i.e. the three grow rolls and NO attack. **So a barbarian engages in the
+GPU that does not engage in TS — a POSITION or TARGET-ELIGIBILITY
+difference, not a gate/short-circuit difference.**
+NEXT: dump the barb roster (tile, type, hp) and the chosen target for
+seed 9274 t140 in BOTH engines and diff the positions. If positions
+match, the difference is target eligibility in the raider block's
+adjacency scan; if they differ, walk back to the turn where a barb first
+moved differently. Note `_u_moves` was ALREADY tested and reverted with no
+effect, so the barb MP path is not the cause.
+
+(superseded) METHOD CORRECTION — call counts are not draw counts.
 `_next_random(mask)` advances the state ONLY where `mask` is true
 (verified in its docstring and body: `rng_state = where(mask, a, state)`).
 My per-line tally counted CALLS, so the "5911 once, 5969 three times"
