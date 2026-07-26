@@ -92,6 +92,21 @@ re-exported: parity RED at `seed 9274 turn 140 [('rng', ...)]`. So the
 #71 engine diverges from the baseline TS reference with every flag off.
 The caveat below is resolved; the label holds.
 
+**PER-PHASE DUMP DONE (2026-07-26) — the answer, as far as it goes.**
+GPU draws during seed 9274 turn 140, by phase (wrapping each phase method
+and differencing `rng_state`):
+    `_barbarian_phase 5`, `_disaster_phase 5`, `_rival_phase 1` = **11**.
+TS total that turn is **9** (computed below). So ONE of those phases
+spends 2 draws too many. Camps/barbs/punits/nCities are IDENTICAL at
+t138-141, which KILLS the new-camp-branch theory — no camp was created.
+NEXT STEP, and the only thing still missing: TS's per-phase counts.
+Instrument the EXPORTER's reference run the same way (wrap
+barbarianPhase / disasterPhase / rivalPhase, difference the rng each
+turn, print at t140) and compare against the triple above. Suspect order:
+`_disaster_phase` first — `fert`/`drought` columns appeared in the
+earlier seed-9287 mismatch list, and disaster draws scale with eligible
+tiles/cities — then `_barbarian_phase`.
+
 **EXACT DRAW COUNT MEASURED (2026-07-26).** mulberry32 advances its state
 by a FIXED increment (0x6D2B79F5) per draw, so the draw count between two
 recorded states is computable without instrumenting anything:
