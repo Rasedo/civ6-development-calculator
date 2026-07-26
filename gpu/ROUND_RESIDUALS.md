@@ -60,7 +60,37 @@ its verification status.
   #70-era "suspicious" note to dissolve under verification rather than
   need a fix.
 
-## LADDER STATE — resume HERE
+## LADDER STATE — resume HERE (parity STILL RED)
+
+Every behaviour flip this round is now INERT behind an explicit flag
+(APOSTLE_BUY_LIVE, RIVAL_TILE_BUY_LIVE, the NEIGHBORHOOD scaffold row,
+BARB_SCOUT_OPENER_LIVE, ADMIRAL_MARCH_LIVE, DEDICATION_PAYOUTS_LIVE,
+CITY_RELIGION_ADDER_LIVE) — and scripted parity is STILL RED:
+`seed 9261 turn 119: MISMATCH [('rng', ...), ('rQProg1', 347400 vs 345600)]`.
+
+THAT IS THE IMPORTANT SIGNAL. With every flip off, the tree SHOULD be
+behaviourally identical to #70's green baseline (6a8fd48). It is not, so
+something landed this round changes behaviour WITHOUT going through a
+flag. Gating more mechanics is now the WRONG move — each gate just
+reshuffled the trajectory and surfaced the next seed. STOP GATING.
+
+DO THIS INSTEAD — bisect against the baseline, do not guess:
+1. `git stash` / branch, then `git checkout 6a8fd48 -- src/ scripts/` and
+   re-export + parity. Green confirms the break is in src/scripts, red
+   points at gpu/civ6gpu/engine.py.
+2. Halve from there. The suspects that change behaviour WITHOUT a flag:
+   * the APOSTLE roster row (unit indices ARE the GPU's type ids, and the
+     rival "best of roster" scans iterate UNITS order);
+   * `Unit.religiousStrength` added to MISSIONARY (25) — check nothing
+     reads it as a combat term;
+   * the widened barb `unitCombat`/`unitMoves` tables (7 wide now);
+   * `_tile_appeal` being CALLED unconditionally in `_city_totals`
+     (harmless arithmetic, but it perturbs nothing only if truly unused);
+   * the `_rival_border_key` REFACTOR — extracting that key out of
+     `_rival_border_growth` is the one change that touched a hot,
+     already-verified path.
+   The last one is the highest-prior suspect: it is a pure refactor, so
+   any behaviour change there is a transcription error.
 
 GREEN: tsc; full vitest (45 files / 389 tests); export (rules.json
 asserted); FORCED compaction 0.0 milli.

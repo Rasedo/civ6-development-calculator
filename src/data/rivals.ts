@@ -145,6 +145,18 @@ export const GOV_MAX_TITLES = 5;
  */
 export const RIVAL_TILE_BUY_LIVE = false;
 
+/** B-8 (#71): the rival ADMIRAL war-march switch, landed INERT — a marching
+ * admiral is a CIVILIAN and capturable (B-31) where a parked one is not, and
+ * the engines diverged on it (seed 9287 t235). Flip when its hunt lands. */
+export const ADMIRAL_MARCH_LIVE = false;
+
+/** B-24 (#71): the dedication PAYOUT switch, landed INERT. The substrate —
+ * prevAges (the Heroic-age test) and the dedication COUNT — is live and
+ * parity-exact; only the per-turn faith / era-score payouts are gated, because
+ * they feed rival faith and therefore purchases, and the engines diverged on a
+ * downstream rival unit (seed 9287 t235). Flip when its hunt lands. */
+export const DEDICATION_PAYOUTS_LIVE = false;
+
 export const HEROIC_DEDICATIONS = 3;
 /** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
  * Monumentality flavour — a Golden age dedicates to a BONUS). */

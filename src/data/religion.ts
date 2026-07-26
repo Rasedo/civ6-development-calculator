@@ -294,6 +294,13 @@ export const APOSTLE_BUY_LIVE = false;
  * conditional path — the exact surface the A-12 rival quests dissolved by
  * making the mechanic deterministic. Recorded simplification.
  */
+/** #71 DEBT-2: the city-attack religion-adder switch, landed INERT. The term is
+ * written and mirrored at all six sites (TS: rival attackers only, matching the
+ * GPU, which never sets the player's holy city); only the switch is off,
+ * because turning it on shifted rival combat outcomes and the engines split on
+ * downstream unit counts. Flip when its hunt lands. */
+export const CITY_RELIGION_ADDER_LIVE = false;
+
 export const THEO_DAMAGE = 2;
 /** Flat damage both sides take before the strength difference is applied. */
 export const THEO_BASE_DAMAGE = 30;

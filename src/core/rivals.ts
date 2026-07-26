@@ -100,6 +100,7 @@ import {
   ERA_SCORE_GP,
   GOVERNOR_LOYALTY,
   RIVAL_TILE_BUY_LIVE,
+  ADMIRAL_MARCH_LIVE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
@@ -1515,7 +1516,13 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
     // same ≤range stop; only the aura's DOMAIN differs, and that is decided at
     // the roll sites by inGeneralAura, not here.
     if (u.owner !== 'rival' || u.civId !== rival.id) continue;
-    if (u.type !== 'GENERAL' && u.type !== 'ADMIRAL') continue;
+    // B-8 (#71): the ADMIRAL march is landed INERT (ADMIRAL_MARCH_LIVE) — the
+    // substrate-then-flip pattern this round used for B-18/A-5r/A-9/B-26. The
+    // walker admits admirals on both engines; only the switch is off. WHY: a
+    // marching admiral is a CIVILIAN and can be captured (B-31) where one
+    // parked in the capital never was, and the engines diverged on it
+    // (seed 9287 t235, rUnits0 1 vs 0). Flip = drop the guard.
+    if (u.type !== 'GENERAL' && !(ADMIRAL_MARCH_LIVE && u.type === 'ADMIRAL')) continue;
     const ut = state.map.tiles[u.tileIndex];
     // war-march target: the nearest player city center (total-order key —
     // centerIndex is unique, so the min is deterministic).

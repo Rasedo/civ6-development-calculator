@@ -1,5 +1,5 @@
 import type { GameState } from './types';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE } from '../data/rivals';
+import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
 // B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
@@ -100,6 +100,7 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
  * each rival keeps its own — the caller knows which accumulator to touch.
  */
 export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {
+  if (!DEDICATION_PAYOUTS_LIVE) return; // B-24 (#71): substrate live, payouts inert
   for (let c = 0; c < 1 + state.rivals.length; c++) {
     const f = dedicationFaith(state, c);
     if (f > 0) addFaith(c, f);

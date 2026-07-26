@@ -33,7 +33,7 @@ import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSett
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
-import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from '../src/core/combat';
+import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../src/core/combat';
 import { GENERAL_AURA_MP } from '../src/core/aura'; // #70/S3 (B-8)
 import { assignEnvoy } from '../src/core/cityStates';
 import {
@@ -56,7 +56,7 @@ import {
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GW_WRITING_CULTURE, GW_MUSIC_CULTURE } from '../src/data/greatPeople';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../src/core/trade';
@@ -101,8 +101,10 @@ import {
   GOVERNOR_LOYALTY,
   HEROIC_DEDICATIONS,
   RIVAL_TILE_BUY_LIVE,
+  ADMIRAL_MARCH_LIVE,
   DEDICATION_FAITH,
   DEDICATION_ERA_SCORE,
+  DEDICATION_PAYOUTS_LIVE,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -567,7 +569,7 @@ const rules = {
     // S3: governors — stateless greedy loyalty anchors.
     govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
     govMaxTitles: GOV_MAX_TITLES,
-    rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, heroicDedications: HEROIC_DEDICATIONS, dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
+    rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, heroicDedications: HEROIC_DEDICATIONS, dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the
@@ -699,7 +701,8 @@ const rules = {
     admiralUnitIdx: Object.values(UNITS).findIndex((u) => u.id === 'ADMIRAL'),
     generalAuraCs: GENERAL_AURA_CS,
     generalAuraRange: GENERAL_AURA_RANGE,
-    generalAuraMp: GENERAL_AURA_MP, // #70/S3 (B-8): the aura's movement half
+    generalAuraMp: GENERAL_AURA_MP,
+    admiralMarchLive: ADMIRAL_MARCH_LIVE, // B-8 (#71): inert pending its hunt // #70/S3 (B-8): the aura's movement half
     pantheonPool: Object.keys(PANTHEONS).length,
     followerPool: Object.keys(FOLLOWER_BELIEFS).length,
     founderPool: Object.keys(FOUNDER_BELIEFS).length,
@@ -739,6 +742,7 @@ const rules = {
     apostleCap: APOSTLE_CAP,
     apostleBuyLive: APOSTLE_BUY_LIVE, // B-18 (#71): inert until the buy-timing hunt lands
     relStrength: Object.values(UNITS).map((u) => u.religiousStrength ?? 0),
+    cityReligionAdderLive: CITY_RELIGION_ADDER_LIVE, // #71 DEBT-2: inert pending its hunt
     theoDamage: THEO_DAMAGE,
     theoBaseDamage: THEO_BASE_DAMAGE,
     theoPressureSwing: THEO_PRESSURE_SWING,
@@ -851,6 +855,19 @@ const rules = {
       UNITS.ARCHER.combat,
       UNITS.CROSSBOWMAN.combat,
       UNITS.SCOUT.combat, // B-26 (#71): 6 = SCOUT — the scout-then-raid opener
+    ],
+    // B-26 (#71): the barb MOVES table. The GPU raider march used to hardcode
+    // 2 MP, which was correct only while every barb type had 2 — the SCOUT
+    // opener has 3, so the march must read the type.
+    barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // B-26 (#71): inert pending its hunt
+    unitMoves: [
+      UNITS.WARRIOR.moves ?? 2,
+      UNITS.SPEARMAN.moves ?? 2,
+      UNITS.PIKEMAN.moves ?? 2,
+      UNITS.MUSKETMAN.moves ?? 2,
+      UNITS.ARCHER.moves ?? 2,
+      UNITS.CROSSBOWMAN.moves ?? 2,
+      UNITS.SCOUT.moves ?? 2,
     ],
     unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0, 0],
     unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0, 0],

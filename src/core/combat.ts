@@ -31,7 +31,7 @@ import {
   crossesRiver,
 } from './units';
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
-import { ENHANCER_BELIEFS, JUST_WAR_RANGE, type BeliefEffects } from '../data/religion';
+import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, civsAtWar, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
@@ -388,7 +388,7 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
     // the term here made it REACHABLE off-script — rollout seeds 9183/9235 went
     // red on draw counts. Record as a G-item; drop this guard the moment the
     // GPU grows a player holy city (it rides #50's religion verb).
-    (attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) +
+    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) +
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8): the aura covers city assaults too
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
@@ -630,7 +630,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
     const defCS = cityDefenseStrength(state, enemyCity);
     state.cityHp[String(enemyCity.id)] = Math.max(
       1,
-      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
+      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
     );
     attacker.movesLeft = 0;
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
@@ -735,7 +735,7 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-29 wound + river (city not a unit) + B-4 attacker veterancy
-    (attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
+    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = rivalCityDefense(state, rival, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
@@ -782,7 +782,7 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
-    (attacker.owner === 'rival' ? religionAttackCS(state, attacker, cs.centerIndex) : 0) + // #71 (debt): see attackCity
+    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, cs.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
@@ -1254,6 +1254,8 @@ function barbRangedType(turn: number): string {
  * barb walker — it marches and can attack like any melee barb, it is simply
  * weaker, which is exactly the early-camp pressure Civ 6 models.
  */
+export const BARB_SCOUT_OPENER_LIVE = false; // B-26 (#71): see the spawn site
+
 function barbScoutType(): string {
   return 'SCOUT';
 }
@@ -1276,7 +1278,15 @@ export function barbarianPhase(state: GameState): void {
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
       state.barbCamps.push(spot.index);
-      spawnUnit(state, barbScoutType(), spot.index, 'barbarian'); // B-26 (#71): a NEW camp opens with a scout
+      // B-26 (#71): the SCOUT opener is landed INERT (BARB_SCOUT_OPENER_LIVE),
+      // the substrate-then-flip pattern used for B-18/A-5r/A-9 this round.
+      // barbScoutType + the barb u_type 6 column + the type-aware barb march
+      // (the GPU used to hardcode 2 MP, wrong the moment a SCOUT with 3 MP
+      // spawns — fixed and kept) are all IN. WHY INERT: seed 9287 t250 splits
+      // barbs 5 vs 4 with a draw-count split; the GPU ends up one barbarian
+      // short and _spawn_barb accepts the type fine, so it is a later
+      // death/gate difference needing a statelog. Flip = drop the guard.
+      spawnUnit(state, BARB_SCOUT_OPENER_LIVE ? barbScoutType() : barbMeleeType(state.turn), spot.index, 'barbarian');
     }
   }
 

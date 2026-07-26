@@ -669,6 +669,7 @@ class BatchSim:
         self._gov_per = int(_er.get("govCivicsPerTitle", 10))
         self._gov_max = int(_er.get("govMaxTitles", 5))
         self._tile_buy_live = bool(_er.get("rivalTileBuyLive", False))  # A-5r (#71): inert until the gold-ladder hunt lands
+        self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))  # B-24 (#71): substrate live, payouts inert
         self._heroic_ded = int(_er.get("heroicDedications", 3))
         self._ded_faith = int(_er.get("dedicationFaith", 2))
         self._ded_era = int(_er.get("dedicationEraScore", 1))
@@ -894,6 +895,7 @@ class BatchSim:
         self._apostle_buy_live = bool(_bl.get("apostleBuyLive", False))  # B-18 (#71): inert until the buy-timing hunt lands
         _rs = _bl.get("relStrength") or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
+        self._city_rel_live = bool(_bl.get("cityReligionAdderLive", False))  # #71 DEBT-2: inert pending its hunt
         self._theo_dmg = int(_bl.get("theoDamage", 2))
         self._theo_base = int(_bl.get("theoBaseDamage", 30))
         self._theo_swing = float(_bl.get("theoPressureSwing", 15))
@@ -1523,6 +1525,7 @@ class BatchSim:
         # #70/S5 (B-26): barb ranged strength / range, parallel to _unit_combat
         # (0 = melee-only). The u_ twins of _p_rng_str / _p_rng_rng.
         self._u_rng_str = torch.tensor(_urs, dtype=torch.long, device=device)
+        self._u_moves = torch.tensor(list(cb.get("unitMoves") or [2, 2, 2, 2, 2, 2, 3]), dtype=torch.long, device=device)  # B-26 (#71)
         self._u_rng_rng = torch.tensor(_urr, dtype=torch.long, device=device)
         # #45/B-6 EMBARK: flat embarked MP, the LIVE war-march water-step master
         # switch (N1 ships it INERT — mirrors TS embarkState.live; poke
@@ -1583,6 +1586,7 @@ class BatchSim:
         # 2-tile range are data-driven off the exporter.
         self._general_unit_idx = int(rr.get("generalUnitIdx", -1))
         self._admiral_unit_idx = int(rr.get("admiralUnitIdx", -1))
+        self._admiral_march_live = bool(rr.get("admiralMarchLive", False))  # B-8 (#71): inert pending its hunt
         self._general_cls = int(rr.get("generalClassIdx", -1))
         self._admiral_cls = int(rr.get("admiralClassIdx", -1))
         self._gen_aura_cs_val = float(rr.get("generalAuraCs", 5))
@@ -5882,6 +5886,7 @@ class BatchSim:
         # regarrison, the 0.1-roll raid). Ranged raiders are a recorded residual.
         # B-26 (#71): barb u_type 6 = SCOUT (see the exported unitCombat table).
         self._barb_scout_type = 6 if self._unit_combat.numel() > 6 else 0
+        self._barb_scout_live = bool(self.rules.combat.get("barbScoutOpenerLive", False))  # B-26 (#71): inert pending its hunt
         melee_type = (
             3 if self.turn > cb.get("musketmanAfterTurn", 180)
             else 2 if self.turn > cb.get("pikemanAfterTurn", 120)
@@ -5941,7 +5946,7 @@ class BatchSim:
                 # SCOUT (barb u_type 6), the TS barbScoutType twin. Regarrison
                 # and raid sites keep the melee/ranged ladders. Spawn TYPE only,
                 # so the camp roll above is untouched and this is draw-neutral.
-                self._spawn_barb(has, spot, self._barb_scout_type)
+                self._spawn_barb(has, spot, self._barb_scout_type if self._barb_scout_live else melee_type)
 
         # Garrisons + growth. The near-camp check uses the unit list as it
         # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
@@ -6174,7 +6179,11 @@ class BatchSim:
             # SPEARMAN / PIKEMAN / MUSKETMAN and #70/S5's ARCHER /
             # CROSSBOWMAN) has UNITS.moves == 2, so full_mp stays 2. Camps are
             # a barb no-op (clearCampFor skips barbarians).
-            full_mp = torch.full_like(here, 2)
+            # B-26 (#71): READ the barb type's moves. This was a hardcoded 2,
+            # correct only while every barb type had 2 MP — the SCOUT opener
+            # has 3, and the mismatch showed up as a barb-count + draw-count
+            # split at seed 9287 t250.
+            full_mp = self._u_moves[self.u_type[:, u].clamp(min=0, max=self._u_moves.numel() - 1)]
             mp = full_mp.clone()
             cur = here.clone()
             d_cur = d_here.clone()
@@ -7386,7 +7395,7 @@ class BatchSim:
         _is_gp = torch.zeros_like(self.v_type, dtype=torch.bool)
         if self._general_unit_idx >= 0:
             _is_gp |= self.v_type == self._general_unit_idx
-        if self._admiral_unit_idx >= 0:
+        if self._admiral_unit_idx >= 0 and self._admiral_march_live:
             _is_gp |= self.v_type == self._admiral_unit_idx
         cand = self.v_alive & (self.v_civ == r) & _is_gp
         if not (bool(atw.any()) and bool(cand.any())):
@@ -8753,7 +8762,7 @@ class BatchSim:
             # defender gets the defense terms (embarked = flat, none). Barbs
             # and player units carry no religion (no GPU player founding).
             if atk_kind == "rival":
-                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_rv, _dciv, torch.full_like(_dciv, -1)), tgt).to(def_e.dtype))
             # B7-G (B-8): Great General / Admiral aura. Attacker keyed on its own
             # tile `here` (a RIVAL attacker gets its civ's aura; a BARB has none);
@@ -9017,7 +9026,7 @@ class BatchSim:
         # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
         # Crusade/Just War key on where the UNIT stands, not on what it hits.
         # Inserted BEFORE the aura add so term order matches the TS assembly.
-        atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+        atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
         atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, self.v_tile[:, u], atk_naval).to(atk_e.dtype)
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
@@ -9213,7 +9222,7 @@ class BatchSim:
                 # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
                 # Crusade/Just War key on where the UNIT stands, not on what it hits.
                 # Inserted BEFORE the aura add so term order matches the TS assembly.
-                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, v], ttc).to(atk_e.dtype)
+                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, v], ttc).to(atk_e.dtype) if self._city_rel_live else 0)
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, v] + 1, here, atk_naval).to(atk_e.dtype)
                 d_cs = self._damage_roll(cs_att, atk_e - def_cs, k="csty", tile=ttc)
                 d_atk = self._damage_roll(cs_att, def_cs - atk_e, k="cstyc", tile=ttc)
@@ -9458,7 +9467,7 @@ class BatchSim:
             # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
             # Crusade/Just War key on where the UNIT stands, not on what it hits.
             # Inserted BEFORE the aura add so term order matches the TS assembly.
-            atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], _ct).to(atk_e.dtype)
+            atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], _ct).to(atk_e.dtype) if self._city_rel_live else 0)
             atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
         d_city = self._damage_roll(att, atk_e - def_cs, k="pcty", tile=_ct)
         d_self = self._damage_roll(att, def_cs - atk_e, k="pctyc", tile=_ct)
@@ -9566,7 +9575,7 @@ class BatchSim:
                 # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
                 # Crusade/Just War key on where the UNIT stands, not on what it hits.
                 # Inserted BEFORE the aura add so term order matches the TS assembly.
-                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile, a_naval).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
             rows = city_att.nonzero(as_tuple=True)[0]
@@ -9656,7 +9665,7 @@ class BatchSim:
             # only from the #70/S5 barb-archer path (a rival ranged attacker
             # never engages rival units).
             if not barb:
-                atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(_dciv, tgt).to(def_e.dtype))
             # B7-G (B-8): attacker aura on its OWN tile (barb: none); defender
             # aura keyed on tgt — player military (civ 0) or rival military
@@ -13223,7 +13232,7 @@ class BatchSim:
         # faith; a DARK or NORMAL age pays era score (the climb-out
         # dedication). Both scale with the dedication COUNT, so a Heroic age
         # pays triple. Zero-draw, integer-only.
-        if self._ded_faith > 0 or self._ded_era > 0:
+        if self._ded_payouts_live and (self._ded_faith > 0 or self._ded_era > 0):
             _gold = self.civ_age == 2
             _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
             _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
