@@ -1329,7 +1329,7 @@ function barbRangedType(turn: number): string {
  * barb walker — it marches and can attack like any melee barb, it is simply
  * weaker, which is exactly the early-camp pressure Civ 6 models.
  */
-export const BARB_SCOUT_OPENER_LIVE = false; // B-26 (#71): see the spawn site
+export const BARB_SCOUT_OPENER_LIVE = true; // B-26 (#71): LIVE — hunted 2026-07-26, see the spawn site
 
 function barbScoutType(): string {
   return 'SCOUT';
