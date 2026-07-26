@@ -113,8 +113,32 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**IT IS COMBAT DAMAGE IN THE RAIDER WALK — units and positions MATCH,
-only HP differs (2026-07-26).**
+**IT IS THE CITY-STRIKE DAMAGE, NOT THE RAIDER WALK (2026-07-26).**
+Printed the GPU's k-tagged damage rolls for the turn:
+```
+k=pcstk  diff=-11.000  dmg=18.000  tile=864   <- PLAYER walls strike
+k=rcstk  diff= 18.000  dmg=60.000  tile=297   <- RIVAL walls strike
+k=vrng   diff= -7.000  dmg=27.000  tile=297   <- rival ranged
+```
+That is exactly the missing HP: pikeman 100->82 (18), spearman 100->13
+(60+27=87). These are the CITY/WALLS STRIKES, which run AFTER the raider
+walk in both engines.
+**SO MY PREVIOUS "only HP differs after the walk" WAS ALSO MISALIGNED** —
+I compared the TS roster logged BEFORE the strikes against the GPU state
+AFTER them. Both engines are identical at end-of-walk; the real,
+end-of-turn difference is the trace's `barbs` 6 (TS) vs 7 (GPU), i.e. TS's
+strikes KILL a barbarian and the GPU's do not.
+=> **The bug is in the CITY-STRIKE DAMAGE ASSEMBLY — which is exactly
+where #70/S2 added the general/admiral aura to the DEFENDER**
+(`defCSa = defCS + generalAuraCS(...)` in TS; the `_def_civ_u` / `_gen_aura_cs`
+term on the GPU, at the pcstk/pestk/rcstk/restk sites). A defender-CS
+difference changes `diff`, hence the damage, hence who dies.
+**NEXT:** instrument TS's pcstk/rcstk sites to print `(k, atkCS, defCS,
+diff, dmg, tile)` for this turn and diff against the three GPU rows above.
+The aura term for a BARBARIAN defender must be 0 on both sides — verify
+that first, then the support/terrain/xp terms one by one.
+
+(superseded, misaligned) IT IS COMBAT DAMAGE IN THE RAIDER WALK.
 Logged the TS barb roster before and after the raider walk at the
 correctly-aligned turn:
 ```
