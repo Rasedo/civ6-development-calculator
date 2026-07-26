@@ -113,7 +113,23 @@ TS's twin SHORT-CIRCUITS in a way the GPU's mask cannot express directly:
 — and, crucially, that `else if` is only reached when `nearCamp.length !== 0`;
 a camp with NO barb within 1 tile takes the regarrison branch and draws
 NOTHING. TS drew for 1 camp; the GPU drew for 3.
-**ROOT LOCALISED (2026-07-26) — the 2 extra draws are a BARBARIAN MELEE
+**STRONGEST LEAD (2026-07-26): the GPU carries an EXTRA LIVE BARB SLOT
+that the trace's `barbs` column does not count.**
+Compared `sim.u_alive.sum()` against the trace `barbs` column every turn:
+first divergence at **t139 — TS 6, GPU 7** (camps agree at 3). Note the
+scripted gate's FIRST reported mismatch is t140 on `rng`, NOT t139 on
+`barbs`, so the traced `barbs` column still MATCHED at t139 — i.e. the
+extra alive slot is INVISIBLE to `trace_row`'s barb count but is alive
+enough to ATTACK at t140, which is exactly the mel/melc pair below.
+=> Find why `trace_row`'s barb count and `u_alive` disagree. Either the
+trace filters barbs (by type/tile/camp) and that filter is hiding a unit,
+or a slot is flagged alive without being a real unit (KILL-hygiene: a
+reclaimed or captured slot left `u_alive=True`). The B-31 POOL-END
+capture path and `_reclaim_pool` are the places that class has bitten
+before. Dump slot-by-slot `u_alive / u_type / u_tile / u_hp` at t138-139
+and find the slot the trace omits.
+
+(context) ROOT LOCALISED (2026-07-26) — the 2 extra draws are a BARBARIAN MELEE
 ATTACK the GPU makes and TS does not.**
 Re-instrumented correctly (log only calls where `rng_state` actually
 CHANGED, and wrap `_damage_roll` too). Seed 9274 t140, GPU advancing
