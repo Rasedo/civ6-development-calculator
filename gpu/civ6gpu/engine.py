@@ -13854,6 +13854,12 @@ class BatchSim:
                 # only becomes visible when it flips a PURCHASE, so a surplus
                 # that crosses no threshold is invisible. Traced now.
                 torch.where(live, js_round(self.r_faith[:, r] * 1000).to(self.dtype), zero),
+                # #71 COVERAGE: a checksum of this rival's cities' FOLLOWED
+                # religion. Only PLAYER cities carry a `followed` trace column,
+                # so a rival city converting on a different turn was invisible
+                # — the same hole `rFaith` just closed. Sum of (followed+1)
+                # over LIVE cities: any single-city change moves it.
+                torch.where(live, ((self.rc_followed[:, r] + 1) * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

@@ -310,9 +310,23 @@ export const APOSTLE_CAP = 1;
  * earlier "TS never fights" reading was an artefact of running the exporter
  * at an 84-turn horizon — the survival heuristics make that a DIFFERENT game.
  * Always reproduce at the real 250-turn horizon.
- * NEXT STEP: diff the per-city `followedReligion` / religionPressure arrays
- * on both engines at seed 9183 t92-93. Target SELECTION has been read and
- * matches; the pressure APPLICATION has not been checked.
+ * THIRD HUNT (2026-07-27, with `rFollowedSum` now traced too):
+ * LOCALISED TO ONE CITY. The new per-rival followed-religion checksum makes
+ * the divergence explicit: seed 9183 t93 `rFollowedSum1` TS=14 GPU=13, and it
+ * OSCILLATES (t95 TS=13 GPU=14). So exactly ONE of rival 1's cities settles
+ * on a different religion, and the two engines swap which one they pick from
+ * turn to turn. That is a RELIGION-PRESSURE difference on a single city, not
+ * a rule difference: both engines resolve identically (TS `pres[g] > bestP`
+ * from bestP=0 iterating g ascending; GPU `argmax` + a `sum > 0` guard — the
+ * same lowest-id-on-tie semantics, and equivalent for non-negative pressure,
+ * which it always is since theologicalCombat clamps at 0).
+ * So the remaining suspect is the pressure ARRAY: some city is receiving a
+ * different spread lump, or receiving it on a different turn, once an apostle
+ * is in the pool.
+ * NEXT STEP: dump `rc_pressure[b, 1, j, :]` and the TS `religionPressure`
+ * array for every rival-1 city at seed 9183 t92 and t93 and diff them
+ * element-wise. That is a handful of numbers and should name the city, the
+ * religion and the magnitude in one pass.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
