@@ -406,7 +406,22 @@ export const APOSTLE_CAP = 1;
  * Note the costs make this bite hard: via 363 the route is cost 2 but leads
  * onward cheaply to 408; via 406 the next step costs 4 against 3 MP left, so
  * the unit stalls. That is exactly the 408-vs-406 split.
- * NEXT STEP: log, for BOTH engines on the same event, rival 0's unit position
+ * HUNT #11 — the BLOCKING RULE is identical, so it is the TIMING.
+ * Read both: TS `tileFreeForUnit` rejects a foreign rival's unit outright
+ * (`unitSide(u) !== side || (side === 'rival' && u.civId !== unit.civId)`),
+ * and the GPU's `_blocked_for("rciv")` includes `rvc` unconditionally, which
+ * covers foreign rival civilians too. Same rule, both directions.
+ * Therefore the split is WHEN tile 363 is occupied. Both engines process
+ * rivals in id order, and rival 0's missionary sits on 363 from t90 and
+ * leaves at t92 in BOTH. So rival 1's route depends on the exact interleaving
+ * of rival 0's walk with rival 1's spread pass — the one remaining surface.
+ * ARITHMETIC WORTH CHECKING FIRST: from 362 with 4 MP, going via 363 costs
+ * 2 then 1 (to 407) then 2 (to 408) = 5, which the "always one step at full
+ * MP" rule should still cut short at 407 — yet TS reports the unit AT 408.
+ * So either TS's unit had more MP than 4, or it started that turn nearer than
+ * 362. Resolve THAT before assuming an interleaving bug: it may be that the
+ * TS unit's turn-91 start position is not what the mid-turn log implies.
+ * OLD NEXT STEP: log, for BOTH engines on the same event, rival 0's unit position
  * at the moment rival 1's spread phase reads tile 363 — i.e. print the
  * occupancy of 363 at the top of each civ's spread pass, t90-t92. If the
  * occupancy differs, the bug is upstream in rival 0's walk timing; if it
