@@ -143,7 +143,7 @@ export const GOV_MAX_TITLES = 5;
  * ~98 gold of rival treasury divergence by t157), which needs its own hunt
  * inside the gold ladder. Flipping this to `true` is the remaining A-5r step.
  */
-export const RIVAL_TILE_BUY_LIVE = false;
+export const RIVAL_TILE_BUY_LIVE = true; // #71: LIVE — hunted 2026-07-27
 
 /** B-8 (#71): the rival ADMIRAL war-march switch, landed INERT — a marching
  * admiral is a CIVILIAN and capturable (B-31) where a parked one is not, and

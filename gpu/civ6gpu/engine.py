@@ -11305,17 +11305,25 @@ class BatchSim:
                     _base = js_round(torch.full_like(_tpct, 1.0) * (50.0 + 25.0 * (_ring - 2).double()) * self.rules.game_speed)
                     _step = js_round(torch.full_like(_tpct, 5.0 * self.rules.game_speed))
                     _cost = js_round((_base * (1.0 + 4.0 * torch.maximum(_tpct, _cpct)) + _step * self.r_tiles_purchased[:, r].double()) * 1.0)
-                    _buy = _has & _live & self._afford(self.r_treasury[:, r], _cost)
-                    if not bool(_buy.any()):
-                        continue
-                    _rows = _buy.nonzero(as_tuple=True)[0]
-                    self.r_treasury[_rows, r] -= _cost[_rows]
-                    self.rival_at[_rows, _tgt[_rows]] = r
-                    self.rc_tile_id[_rows, _tgt[_rows]] = self.rc_id[_rows, r, _j]
-                    self.rc_acquired[_rows, r, _j] += 1
-                    self.r_tiles_purchased[_rows, r] += 1
-                    self._eff_version += 1
-                    _tp_left = _tp_left & ~_buy
+                    # A-5r HUNT (#71, seed 9158 t157): TS BREAKS out of the rc
+                    # loop when the first rc WITH a candidate cannot be
+                    # afforded — it does not try the next city. Only a
+                    # candidate-less rc is skipped (`continue`). Treating
+                    # unaffordable as "try the next rc" let the GPU buy a
+                    # cheaper tile at a LATER slot on turn 157 while TS waited
+                    # until 166, a ~98-gold treasury split. `_has` already
+                    # folds in `_live`, so it IS the has-a-candidate set.
+                    _buy = _has & self._afford(self.r_treasury[:, r], _cost)
+                    _abort = _has & ~_buy  # the TS `break`
+                    if bool(_buy.any()):
+                        _rows = _buy.nonzero(as_tuple=True)[0]
+                        self.r_treasury[_rows, r] -= _cost[_rows]
+                        self.rival_at[_rows, _tgt[_rows]] = r
+                        self.rc_tile_id[_rows, _tgt[_rows]] = self.rc_id[_rows, r, _j]
+                        self.rc_acquired[_rows, r, _j] += 1
+                        self.r_tiles_purchased[_rows, r] += 1
+                        self._eff_version += 1
+                    _tp_left = _tp_left & ~_buy & ~_abort
             # AUDIT A-12 (B8-L): RIVAL LEVY — the levyUnits twin, AFTER every
             # purchase (the TS gold-block tail; here just before the trade
             # block — the same rivalPhase position). An AT-WAR rival suzerain
