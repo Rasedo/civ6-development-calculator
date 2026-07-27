@@ -3533,6 +3533,11 @@ class BatchSim:
         valid = (
             (tiles >= 0)
             & (gat(self.rival_at) == r)
+            # AUDIT A-23 (2026-07-27): PER-CITY, not civ-level — the A-17
+            # registry entry must be THIS city, mirroring the player's
+            # `t.cityId === city.id`. Without it two adjacent rival cities
+            # both worked the same civ tile.
+            & (gat(self.rc_tile_id) == self.rc_id[:, r].unsqueeze(2))
             & gat(self.work_ok)
             & (tiles != centers.unsqueeze(2))
             & ~districted
@@ -8094,6 +8099,8 @@ class BatchSim:
         valid = (
             (tiles >= 0)
             & (self.rival_at.gather(1, tc) == r)
+            # AUDIT A-23 (2026-07-27): PER-CITY (see the _all twin).
+            & (self.rc_tile_id.gather(1, tc) == self.rc_id[:, r, j].unsqueeze(1))
             & self.work_ok.gather(1, tc)
             & (tiles != center.unsqueeze(1))
             & ~districted

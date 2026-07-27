@@ -1742,7 +1742,13 @@ export function rivalCityYields(
   const ranked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
       (t) =>
+        // AUDIT A-23 (2026-07-27): PER-CITY, not civ-level. The player's
+        // workableTiles keys on `t.cityId === city.id`; the rival twin now
+        // keys on the A-17 registry the same way, so two adjacent rival
+        // cities can no longer BOTH work the same civ tile — a
+        // double-count the player is structurally incapable of.
         tileOwnedByCiv(t, civOfRival(rival.id)) &&
+        t.rivalCityId === rc.id &&
         t.index !== rc.centerIndex &&
         !t.district &&
         !t.builtWonder &&

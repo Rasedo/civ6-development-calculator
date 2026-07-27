@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 31.9 | **78%** |
+| A symmetry | 41 | 33.9 | **83%** |
 | B fidelity | 88 | 83.0 | **94%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **176.9** | **93%** |
-| Open chapters only (A+B) | 129 | 114.9 | **89%** |
+| **Overall (incl. closed)** | **191** | **178.9** | **94%** |
+| Open chapters only (A+B) | 129 | 116.9 | **91%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -223,6 +223,7 @@ Per-item weights (done% in parens where partial):
   closed the card wiring), A-9 4 (90% — ROUND B9; NEIGHBORHOOD +
   palace-relocation residuals), A-11 4 (done — A-12b closed the CS
   residual; the GPU player-route note rides A-18/#50),
+  A-23 2 (RESOLVED — 2026-07-27, per-city worked-tile scan),
   A-12 4 (RESOLVED — ROUND B8 slice L closed the levy + zero-draw
   quest deferrals; 2-step levy ladder + UI-only player levy are
   recorded residuals), A-17 4 (done — #41 stage 1), A-18 3,
@@ -555,7 +556,19 @@ untagged halves of tagged items stay Fable/main-session work.
   scope-out in gpu/BUILD_PLAN.md). Inert under scripted play today,
   but it becomes a live asymmetry the moment the P8 surface gains the
   verb — track alongside A-18.
-- A-23 (new, split from A-17). The rival WORKED-TILE scan is still
+- A-23. **RESOLVED (2026-07-27).** The rival worked-tile scan is now
+  PER-CITY on both engines: `rivalCityYields`'s candidate filter gained
+  `t.rivalCityId === rc.id` and BOTH GPU twins (`_rival_city_yields_all`'s
+  batched-j `valid` and `_rival_city_yields`'s per-j `valid`) gained
+  `rc_tile_id == rc_id[:, r, j]` — mirroring the player's
+  `t.cityId === city.id`. Two adjacent rival cities can no longer both work
+  the same civ tile, a double-count the player is structurally incapable of.
+  Hunt-free: parity was green on the first pass, and it is NOT vacuous —
+  1719 civ-owned tiles sit inside a rival city's work radius while
+  registered to a SIBLING city across the 24 gate games, and every one of
+  them was being double-counted before. Gates: scripted parity 24x250 0.0
+  milli, FORCED compaction 0.0 milli, rollout 72/72, vitest 389, all 30
+  poke lanes. Earlier description (the gap this closed): the scan was
   CIV-level: `rivalCityYields` (rivals.ts) ranks
   `tileOwnedByCiv(t, civOfRival(r))` tiles in the work radius (twin
   `_rival_city_yields` planes key on `rival_at == r`), vs the player's
