@@ -465,8 +465,18 @@ export const APOSTLE_CAP = 1;
  * whether it was in `cand`, and any despawn) for t86-t90 on both engines.
  * The unit is at 363 with 2 charges and target 362 at d1, so it should
  * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
- * relocates it there and the other does not. Prime suspects: the
- * charge-exhaustion despawn path and the POOL-END slot reuse.
+ * relocates it there and the other does not.
+ * DESPAWN PATHS INSPECTED (hunt #16) AND THEY LOOK EQUIVALENT, so do not
+ * assume this: TS does `u.charges -= 1; if (u.charges <= 0) disbandUnit(...)`
+ * and the GPU does `v_charges -= 1; dead = sp & (v_charges <= 0)` then clears
+ * BOTH `v_alive` and `rvciv_at[here]`. Occupancy is released on both sides.
+ * So the "GPU keeps a spent body" theory is NOT confirmed by reading and
+ * needs the per-turn dump to settle. The open puzzle is sharp: at t86 the
+ * unit shows 2 charges in BOTH engines, so one spread should leave 1 and it
+ * should reappear at t87 — yet it vanishes from BOTH logs at t87 while only
+ * the GPU still has a body on the tile. Dump alive/tile/charges every turn
+ * t85-t90 on both sides; one of those three fields will disagree first.
+ * Remaining suspect: POOL-END slot reuse.
  * OLD (superseded) ARITHMETIC NOTE: from 362 with 4 MP, going via 363 costs
  * 2 then 1 (to 407) then 2 (to 408) = 5, which the "always one step at full
  * MP" rule should still cut short at 407 — yet TS reports the unit AT 408.
