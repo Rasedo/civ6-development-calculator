@@ -427,7 +427,25 @@ export const APOSTLE_CAP = 1;
  * cannot both be that unit's turn-boundary position. START HERE: re-derive
  * that unit's true position at the top of t91 and t92 with ONE log point,
  * before trusting any of the 362/406/408 geometry above.
- * ARITHMETIC WORTH CHECKING FIRST: from 362 with 4 MP, going via 363 costs
+ * HUNT #13 — the premise is CONFIRMED, so my COST MODEL was the wrong part.
+ * Same log point, same state, both engines: TS's #52 is @362 mp4 c3 at t91 and
+ * @408 mp4 c3 at t92. It really does cross 362 -> 408 on 4 MP. The GPU's slot
+ * goes 362 -> 406 and stalls. So the earlier "that route costs 5, therefore
+ * impossible" reasoning was wrong — I had assumed the route 362-363-407-408,
+ * but 408's neighbours are {409, 365, 364, 407, 452, 453} and 363's are
+ * {364, 319, 318, 362, 406, 407}, so 362-363-364-408 also exists and I never
+ * priced it. DO NOT trust my cost arithmetic above; price the ACTUAL route.
+ * The real question is unchanged and now sharp: from 362 the two strictly
+ * closer neighbours are 363 (dir 0) and 406 (dir 5), both d3. Direction order
+ * demands 363. TS takes it; the GPU does not, because rival 0's missionary is
+ * parked on 363 (GPU: `t90 r0 u11 407->363`, still there at t91, leaves t92).
+ * SO THE ONE UNANSWERED QUESTION IS: is 363 occupied in TS at that same
+ * moment? If NO, the bug is upstream in rival 0's walk timing. If YES, TS is
+ * stepping onto an occupied tile and the bug is in the blocking rule's
+ * application (not its definition — the definitions match, hunt #11).
+ * ONE PROBE: log tile 363's occupant at the top of rival 1's spread pass,
+ * t90-t92, on BOTH engines.
+ * OLD (superseded) ARITHMETIC NOTE: from 362 with 4 MP, going via 363 costs
  * 2 then 1 (to 407) then 2 (to 408) = 5, which the "always one step at full
  * MP" rule should still cut short at 407 — yet TS reports the unit AT 408.
  * So either TS's unit had more MP than 4, or it started that turn nearer than
