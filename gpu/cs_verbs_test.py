@@ -144,6 +144,13 @@ def main() -> None:
     assert sim.S >= 1, "fixture has no city-states"
     base = sim.snapshot()
 
+    # #71 FLAG 4 (RIVAL_TILE_BUY_LIVE): the tile-purchase rung runs inside the
+    # gold ladder BEFORE the levy, so with it live it drains a treasury this
+    # test deliberately sets to EXACTLY the levy price (the affordability edge
+    # these cases are about). Held off for this lane; flag 4 has its own
+    # coverage in the parity gate.
+    sim._tile_buy_live = False
+
     cd = int(sim.rules.cs["levyCooldown"])
     cost = float(sim.rules.cs["levyGoldCost"])
     n_units = int(sim.rules.cs["levyUnits"])

@@ -271,6 +271,14 @@ def main() -> None:
     # spawn refunds — no unit, no gold spent (vs the free-spot twin).
     sim.restore(base)
     prep_peace(sim)
+    # #71 FLAG 4 (RIVAL_TILE_BUY_LIVE): the tile-purchase rung sits at the TAIL
+    # of the gold ladder and fires only when NOTHING else was bought. A REFUNDED
+    # unit purchase leaves `bought` false, so the refund arm would also buy a
+    # tile and the two arms would no longer differ by exactly the unit price.
+    # This assertion is about the UNIT ladder, so the tile rung is held off for
+    # it (both arms alike); flag 4 has its own coverage in the parity gate.
+    _tbl = sim._tile_buy_live
+    sim._tile_buy_live = False
     sim.rc_bldg[0, R] = True
     sim.r_treasury[0, R] = unit_price(sim, warr)
     vn0 = v_next(sim)
@@ -291,6 +299,8 @@ def main() -> None:
     assert abs((treasury_refund - treasury_spawn) - unit_price(sim, warr)) < 1e-6, (
         f"refund kept {treasury_refund - treasury_spawn} gold, want {unit_price(sim, warr)}"
     )
+
+    sim._tile_buy_live = _tbl
     print(f"  5 refund-on-no-spot OK (kept {unit_price(sim, warr):.0f} gold, no spawn)")
 
     print("RIVAL PURCHASE (A-5r) OK")

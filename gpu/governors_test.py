@@ -162,7 +162,16 @@ def poke_boundary(rules, path):
         assert int(sim.turn) % elen == 0, "the step must land on the boundary"
         got = int(sim.civ_age[0, 0])
         assert got == exp_age, f"score {score} must map to age {exp_age} (got {got})"
-        assert int(sim.era_score[0, 0]) == 0, "the just-ended window must reset to 0"
+        # #71 FLAG 2 (DEDICATION_PAYOUTS_LIVE): the window still RESETS at the
+        # boundary, but the dedication payout runs IMMEDIATELY after it (the TS
+        # endTurn order: eraBoundary -> applyDedications), so a DARK or NORMAL
+        # civ has already banked one turn of climb-out score into the FRESH
+        # window. A GOLDEN civ is paid in faith instead and stays at 0.
+        want_es = 0 if exp_age == 2 else sim._ded_era * int(sim.dedications[0, 0])
+        assert int(sim.era_score[0, 0]) == want_es, (
+            f"fresh window must hold exactly this turn's dedication payout "
+            f"({want_es}), got {int(sim.era_score[0, 0])}"
+        )
     print(f"  b boundary OK (darkT {dark}, goldenT {gold}: {dark-1}→Dark, {dark}→Normal, {gold-1}→Normal, {gold}→Golden; window reset)")
 
 

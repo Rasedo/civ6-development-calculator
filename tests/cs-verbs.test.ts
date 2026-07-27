@@ -133,7 +133,11 @@ describe('A-12 (B8-L): rival levy', () => {
     const { state, rival, cs } = scenario();
     expect(rivalIsSuzerain(cs, rival.id)).toBe(true);
     rival.atWar = true;
-    rival.treasury = LEVY_GOLD_COST;
+    // #71 FLAG 4 (RIVAL_TILE_BUY_LIVE): the tile-purchase rung sits in the gold
+    // ladder BEFORE the levy, so an exactly-LEVY_GOLD_COST treasury is drained
+    // by a tile and the levy never fires. This case is about the levy FIRING;
+    // the affordability edge is covered by the "cannot afford" case below.
+    rival.treasury = LEVY_GOLD_COST + 500;
     meetQuota(state, rival);
     rivalPhase(state);
     expect(cs.lastLevyTurn).toBe(state.turn);
