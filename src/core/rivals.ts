@@ -1383,14 +1383,23 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
 function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number): boolean {
   const at = state.map.tiles[att.tileIndex];
   const atkStr = UNITS[att.type]?.religiousStrength ?? 0;
+  // B-18 (#71) PARITY FIX: pick the defender in `state.units` ARRAY ORDER,
+  // not by unit ID. Array order is this codebase's shared convention — the GPU
+  // mirrors it with slot order, and B-31 capture deliberately moves a captured
+  // unit to the END of both the TS array and the GPU pool precisely so the two
+  // stay aligned. An ID tie-break was the odd one out: after any capture a
+  // unit's id no longer reflects its array position, so TS picked #171 (apostle)
+  // where the GPU picked the lower-slotted #176 (missionary) — seed 9040 t207,
+  // which then split the damage rolls and the followed-religion checksum.
   let def: Unit | null = null;
-  for (const n of neighbors(state.map, at)) {
-    for (const u of unitsAt(state, n.index)) {
-      if ((UNITS[u.type]?.religiousStrength ?? 0) <= 0) continue;
-      const ug = u.owner === 'player' ? 0 : (u.civId ?? -1) + 1;
-      if (ug === g) continue; // same religion — no contest
-      if (!def || u.id < def.id) def = u;
-    }
+  for (const u of state.units) {
+    if ((UNITS[u.type]?.religiousStrength ?? 0) <= 0) continue;
+    const ug = u.owner === 'player' ? 0 : (u.civId ?? -1) + 1;
+    if (ug === g) continue; // same religion — no contest
+    const ut2 = state.map.tiles[u.tileIndex];
+    if (hexDistance(at.col, at.row, ut2.col, ut2.row) !== 1) continue;
+    def = u;
+    break;
   }
   if (!def) return false;
   const defStr = UNITS[def.type]?.religiousStrength ?? 0;

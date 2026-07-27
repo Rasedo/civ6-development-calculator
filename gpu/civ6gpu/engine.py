@@ -7623,9 +7623,12 @@ class BatchSim:
         # unit of a DIFFERENT civ, so no unit in this pass can change another's
         # outcome. Units that fought are removed from `cand` — the TS
         # `continue`. Zero-draw (see THEO_DAMAGE).
-        if self._apostle_idx >= 0:
-            fought = self._theological_combat(r, cand & (self.v_type == self._apostle_idx))
-            cand = cand & ~fought & self.v_alive
+        # B-18 (#71) PARITY FIX: the fight resolves AT EACH UNIT'S TURN in the
+        # order, not as a pre-pass. TS interleaves it, and a fight KILLS units —
+        # which FREES THEIR TILE for everyone later in the same pass. Resolving
+        # every fight up front handed later movers a tile TS still had occupied
+        # (seed 9235 t85: rival 0's missionary walked 341->340->296 through its
+        # OWN apostle's tile because the pre-pass had already killed it).
         if not bool(cand.any()):
             return
         # target mask [B, T]: ALIVE city centers following != g. scatter_add_
@@ -7647,6 +7650,13 @@ class BatchSim:
         arT = torch.arange(T, device=dev, dtype=torch.float64)
         arange6 = torch.arange(6, device=dev)
         for u in cand.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            # TS: `if (u.type === 'APOSTLE' && theologicalCombat(...)) continue;`
+            if self._apostle_idx >= 0:
+                _ap = cand[:, u] & active & (self.v_type[:, u] == self._apostle_idx)
+                if bool(_ap.any()):
+                    _f = torch.zeros_like(cand)
+                    _f[:, u] = _ap
+                    cand = cand & ~self._theological_combat(r, _f) & self.v_alive
             act = cand[:, u] & active & has_t
             if not bool(act.any()):
                 continue
