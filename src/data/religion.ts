@@ -275,13 +275,31 @@ export const APOSTLE_CAP = 1;
  * IN; only the scripted rival's PURCHASE is gated off, so no apostle ever
  * exists in the gate and the whole mechanic is provably zero-impact.
  *
- * WHY: with the buy live, the two engines bought apostles on DIFFERENT turns
- * (seed 9066: the GPU held one at t77 that TS did not), a faith-timing
- * divergence inside the shared worship/missionary/apostle ladder that needs
- * its own hunt. Flipping this to `true` is the remaining B-18 step; everything
- * it switches on is already written and mirrored.
+ * HUNT LOG (2026-07-27, #71 flag sweep — flipped, hunted, REVERTED):
+ * The recorded "bought on different turns" description is WRONG. With the buy
+ * live the two engines are IDENTICAL through trace turn 78 — the apostle is
+ * bought on the SAME turn (73), fights on the same turns, and DIES on the same
+ * turn (75) in both. The split appears at trace turn 79 (seed 9066, rUnits0
+ * TS=3 GPU=4) and is a downstream RELIGIOUS-UNIT LIFECYCLE drift, not a buy
+ * timing one: from t80 the GPU's missionary count oscillates 2<->1 (spend last
+ * charge, die, re-buy) while TS holds steady at 2.
+ * ELIMINATED, with evidence:
+ *  - the buy conditions (cost 120 flat, cap 1, the one-religious-unit-per-turn
+ *    `boughtRelig` guard, the first-eligible-city pick) all mirror exactly;
+ *    apostleIdx/apostleCap/apostleCost are exported correctly;
+ *  - the GPU's theological-combat PRE-PASS vs TS's per-unit interleave: I
+ *    rewrote the GPU to interleave exactly as TS does and the divergence was
+ *    BYTE-IDENTICAL, so the pre-pass is genuinely order-equivalent. Reverted.
+ * FOUND BUT DORMANT (fix it when the player grows religious units, #50):
+ *  - `_theological_combat`'s defender scan only searches the RIVAL pool
+ *    (`self.v_civ != r`), while TS's `theologicalCombat` scans `unitsAt` and
+ *    explicitly handles a PLAYER defender (`ug = u.owner === 'player' ? 0`).
+ *    Dormant only because the scripted player never owns a religious unit.
+ * NEXT STEP: instrument the missionary SPREAD target choice (charges spent per
+ * turn per slot) on both engines around seed 9066 t78-t83 — that is where the
+ * lifecycle diverges, and it is the last unexplored surface.
  */
-export const APOSTLE_BUY_LIVE = false;
+export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
