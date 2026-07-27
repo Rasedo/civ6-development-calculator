@@ -439,12 +439,24 @@ export const APOSTLE_CAP = 1;
  * closer neighbours are 363 (dir 0) and 406 (dir 5), both d3. Direction order
  * demands 363. TS takes it; the GPU does not, because rival 0's missionary is
  * parked on 363 (GPU: `t90 r0 u11 407->363`, still there at t91, leaves t92).
- * SO THE ONE UNANSWERED QUESTION IS: is 363 occupied in TS at that same
- * moment? If NO, the bug is upstream in rival 0's walk timing. If YES, TS is
- * stepping onto an occupied tile and the bug is in the blocking rule's
- * application (not its definition — the definitions match, hunt #11).
- * ONE PROBE: log tile 363's occupant at the top of rival 1's spread pass,
- * t90-t92, on BOTH engines.
+ * HUNT #14 — ANSWERED. ROOT CAUSE LOCATED (seed 9183):
+ *   GPU: tile 363 holds rival 0's CIVILIAN slot 11 at t90, t91 AND t92.
+ *   TS : tile 363 is EMPTY at t90, t91 and t92.
+ * Measured at the same log point (top of each civ's spread pass) on both
+ * engines. So RIVAL 0's missionary is in a DIFFERENT PLACE in the two
+ * engines, and that is what blocks rival 1's route out of 362 on the GPU
+ * only — everything downstream (rival 1 diverting to 406, stalling, the
+ * missing lump on rc4, rc4 flipping at 53-vs-54, rGScore/rQProg/rFollowedSum)
+ * follows from it.
+ * THE BUG IS THEREFORE UPSTREAM AND IS NOT ABOUT APOSTLES AT ALL: it is
+ * rival 0's own religious-unit position, diverging BEFORE t90. The apostle
+ * flag merely perturbs the trajectory enough to expose it.
+ * NEXT SESSION STARTS HERE: bisect backwards for the first turn at which
+ * rival 0's civilian slot 11 (TS: the corresponding missionary) sits on a
+ * different tile in the two engines. Log that unit's tile at the top of its
+ * own civ's spread pass from ~t80, both engines, and find the first
+ * mismatch. Note tile 363 is reached from 407 on the GPU (`t90 r0 u11
+ * 407->363`), so start by asking whether TS's unit was ever on 407.
  * OLD (superseded) ARITHMETIC NOTE: from 362 with 4 MP, going via 363 costs
  * 2 then 1 (to 407) then 2 (to 408) = 5, which the "always one step at full
  * MP" rule should still cut short at 407 — yet TS reports the unit AT 408.
@@ -461,7 +473,7 @@ export const APOSTLE_CAP = 1;
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
-export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
+export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — root cause LOCATED, see below
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
