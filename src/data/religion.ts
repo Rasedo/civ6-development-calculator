@@ -328,12 +328,12 @@ export const APOSTLE_CAP = 1;
  * (centre 453), religion 2. TS reaches pressure 54, the GPU 44 — a gap of
  * EXACTLY ONE spread lump (SPREAD_PRESSURE = 10). Every other rival-1 city
  * matches element-wise, so precisely one spread is missing on the GPU.
- * WHY: at the aligned turn TS's MISSIONARY#52 sits on tile 408 and the GPU's
- * equivalent slot on tile 406. 408 is ADJACENT to 453, so TS spreads (its log
- * reads `-> city4@453 d1`); 406 is not, so the GPU walks instead. Both engines
- * choose the SAME TARGET (city4) — the target-selection key was read and
- * matches, and three of the four religious units on that turn are on identical
- * tiles with identical charges. It is the WALK that differs by two tiles.
+ * RETRACTED (hunt #6): I previously blamed the WALK, on a "TS at 408 / GPU at
+ * 406" comparison. That was MIS-ALIGNED — the TS log point is mid-turn (inside
+ * rivalMissionaryActions) while the GPU snapshot was end-of-turn. Logging BOTH
+ * walks directly, step by step, they MATCH exactly across t88-t92: same tiles
+ * (362->406), same per-step costs, same MP, same stop decisions. The walk is
+ * NOT the divergence.
  * rc4 is a knife-edge city (religion 1 vs 2 pressure 53 vs 54), which is why a
  * single lump flips it and why the checksum then OSCILLATES.
  * BOTH #71 MOVEMENT CHANGES ARE CLEARED as the cause:
@@ -342,13 +342,14 @@ export const APOSTLE_CAP = 1;
  *  - B-23 (the road discount): bisected directly. With the road-to-road
  *    movement discount disabled in BOTH engines (roads still laid), the
  *    divergence persists and merely moves EARLIER, to t84. Roads are not it.
- * NEXT STEP: log that one unit's per-turn walk on both engines for seed 9183
- * t88-t92 — start tile, MP left, each candidate step, the cost paid and the
- * stop reason. The walk's remaining inputs are the neighbour ordering, the
- * `tileFreeForUnit` stacking rules and the MP schedule; one of those lets the
- * GPU stop two tiles short. Note the unit STARTS on a roaded tile (362), so
- * check the first step's cost specifically even though the discount is
- * cleared as the root cause.
+ * NEXT STEP: the pressure gap on rc4 is solid and exact (one lump of 10 on
+ * religion 2), and the walk, the target pick, the buy, the fight and both #71
+ * movement changes are all cleared. What has NOT been instrumented is the
+ * SPREAD ITSELF: which unit actually applied its lump, and to which city, on
+ * each turn. Log the spread APPLICATION on both engines (unit, target city,
+ * lump, resulting pressure) for seed 9183 t85-t93 and diff. Do it with ONE
+ * aligned log point on each side — mid-turn vs end-of-turn cost me a wrong
+ * conclusion here, so print the turn AND the phase position.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
