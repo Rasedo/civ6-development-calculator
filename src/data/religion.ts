@@ -342,14 +342,27 @@ export const APOSTLE_CAP = 1;
  *  - B-23 (the road discount): bisected directly. With the road-to-road
  *    movement discount disabled in BOTH engines (roads still laid), the
  *    divergence persists and merely moves EARLIER, to t84. Roads are not it.
- * NEXT STEP: the pressure gap on rc4 is solid and exact (one lump of 10 on
- * religion 2), and the walk, the target pick, the buy, the fight and both #71
- * movement changes are all cleared. What has NOT been instrumented is the
- * SPREAD ITSELF: which unit actually applied its lump, and to which city, on
- * each turn. Log the spread APPLICATION on both engines (unit, target city,
- * lump, resulting pressure) for seed 9183 t85-t93 and diff. Do it with ONE
- * aligned log point on each side — mid-turn vs end-of-turn cost me a wrong
- * conclusion here, so print the turn AND the phase position.
+ * HUNT #7 — THE SPREAD APPLICATION, and this one is clean. Logging the SAME
+ * EVENT on both sides (the moment the lump is added to a city's pressure
+ * array) removes the alignment problem entirely. Seed 9183, t84-t93:
+ *   t84/t86/t87/t88/t89-g1/t92-g1/t93-g1  -> IDENTICAL, event for event,
+ *                                            including the resulting arrays.
+ *   t89 g2, t90 g2 (x2), t92 g2           -> TS applies FOUR spreads that the
+ *                                            GPU does not apply at all.
+ * The t92 g2 one is the decisive lump: TS `u#52 MISSIONARY -> city4@453
+ * lump10 pres=0,52,53`, which is exactly the +10 rc4 is missing on the GPU.
+ * So RIVAL 1's religious units stop spreading on the GPU from t89 while TS
+ * keeps spreading. Faith is exact, so the units EXIST and were bought
+ * identically — the divergence is in each unit's target choice or its
+ * distance test, for rival 1 specifically.
+ * CAVEAT ON MY OWN PROBE: the GPU log covered only the RIVAL-city branch
+ * (`rc_pressure`), not the PLAYER-city branch (`city_pressure`). Two of the
+ * four missing spreads target a city at centre 534, which may well BE a
+ * player city — so the first thing the next session should do is log BOTH
+ * branches before concluding those two are missing.
+ * NEXT STEP: re-run that same paired log with the player-city branch included,
+ * then for the t92 rc4 spread specifically, print the unit's tile, its chosen
+ * target and the computed distance on both sides.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
