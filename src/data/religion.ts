@@ -466,6 +466,27 @@ export const APOSTLE_CAP = 1;
  * The unit is at 363 with 2 charges and target 362 at d1, so it should
  * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
  * relocates it there and the other does not.
+ * ##### CORRECTION (hunt #21) — THE "ROOT CAUSE FOUND" BELOW IS WRONG #####
+ * I claimed the GPU never runs that fight. IT DOES. Instrumenting
+ * `_theological_combat`'s eligibility for seed 9183 shows rival 1's apostle
+ * (slot 10, tile 406) finding exactly ONE eligible defender at BOTH t85 and
+ * t86 — slot 11 @363, civ 0, d1, religious strength 25, i.e. the very unit
+ * TS kills:
+ *   TE-cand t85 r1 att@406 elig=1 ... (11, 363, 0, 1, 25.0)
+ *   TE-cand t86 r1 att@406 elig=1 ... (11, 363, 0, 1, 25.0)
+ * So BOTH engines fight, on the same turns, with the same attacker and the
+ * same defender. Two fights at toDef = 30 + 2*(35-25) = 50 should total 100
+ * and kill a full-health missionary after t86 — which is what TS does.
+ * YET `rvciv_at[363]` still reads slot 11 on the GPU at t90. The most likely
+ * explanation left, and it was already on the suspect list: POOL-END SLOT
+ * REUSE — the original slot-11 missionary dies in both engines, and the GPU
+ * later re-uses slot 11 for a NEW rival-0 missionary that ends up on 363,
+ * while TS's replacement unit gets a fresh id and goes elsewhere.
+ * NEXT PROBE: print slot 11's (alive, type, civ, tile, hp) every turn t84-t91
+ * on the GPU, and TS's full rival-0 unit list with HP, and see whether the
+ * body on 363 at t90 is the SAME unit or a re-used slot. Do NOT trust the
+ * "root cause" block below until that is settled.
+ * ########################################################################
  * ============================ ROOT CAUSE FOUND ============================
  * HUNT #20. Instrumented `disbandUnit` to print its CALLER (which is what I
  * should have done ~15 passes earlier) and it names the path outright:
@@ -555,7 +576,7 @@ export const APOSTLE_CAP = 1;
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
-export const APOSTLE_BUY_LIVE = false; // #71: INERT — ROOT CAUSE FOUND, see below
+export const APOSTLE_BUY_LIVE = false; // #71: INERT — see the hunt log (root cause NOT yet correct)
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
