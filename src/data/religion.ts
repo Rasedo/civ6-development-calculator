@@ -360,9 +360,25 @@ export const APOSTLE_CAP = 1;
  * four missing spreads target a city at centre 534, which may well BE a
  * player city — so the first thing the next session should do is log BOTH
  * branches before concluding those two are missing.
- * NEXT STEP: re-run that same paired log with the player-city branch included,
- * then for the t92 rc4 spread specifically, print the unit's tile, its chosen
- * target and the computed distance on both sides.
+ * HUNT #8 — PINNED TO ONE WALK, ONE TURN. Printing each religious unit's
+ * tile / chosen target / distance on both engines:
+ *   t91  TS #52 @362 -> city4@453 d4   |  GPU u21 civ1 @362 -> 453 d4
+ *        IDENTICAL: same tile, same target, same distance, 3 charges each.
+ *   t92  TS #52 @408 -> city4@453 d1 -> SPREADS (the missing lump)
+ *        GPU u21     @406 -> 453 d3 -> does NOT spread
+ * So during turn 91's WALK, from the SAME start tile 362 toward the SAME
+ * target, TS advances to 408 (d4->d1, ~3 tiles) and the GPU only to 406
+ * (d4->d3, 1 tile). Everything before that walk is bit-identical.
+ * PRIME SUSPECT: the walk's neighbour TIE-BREAK. Both engines step to the
+ * neighbour with the lowest distance to the target, ties by direction order —
+ * TS iterates `neighbors(map, at)`, the GPU `self.neigh` + `arange6`. If those
+ * two orders differ, equidistant neighbours are chosen differently and the
+ * routes diverge; from 406 the next step costs 4 with 3 MP left, so the GPU
+ * stalls while TS's route stays cheap. Note engine.py already warns that
+ * `self.neigh` order is "NOT the riverMask direction order neighbors() uses".
+ * NEXT STEP: print the candidate list at tile 362 on both sides — each
+ * neighbour, its distance to 453 and its move cost — and compare the ORDER.
+ * This is a single probe on one tile and should end the hunt.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
