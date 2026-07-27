@@ -466,6 +466,22 @@ export const APOSTLE_CAP = 1;
  * The unit is at 363 with 2 charges and target 362 at d1, so it should
  * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
  * relocates it there and the other does not.
+ * HUNT #18/#19 — TWO MORE LEADS KILLED BY READING, so do not re-try them:
+ *  - the "second charge-decrement site" (rivals.ts:1299) lives inside
+ *    `rivalBuilderActions` and only ever runs for BUILDERs. It cannot touch a
+ *    missionary.
+ *  - the BANKRUPTCY disband explicitly SKIPS zero-maintenance units
+ *    (`if (m <= 0) continue`), and every religious unit is maintenance 0, so
+ *    a missionary can never be its victim.
+ * WHAT IS LEFT: #39 is removed from rival 0's unit list mid-turn-86 with
+ * charges remaining, and tile 363 is EMPTY in TS afterwards. A B-31 CAPTURE
+ * would keep a body on the tile (it only flips the owner), so the tile being
+ * empty points at a KILL: a barbarian melee on a lone civilian KILLS rather
+ * than captures. LEADING CANDIDATE: a barbarian (or an at-war unit) kills
+ * #39 at t86 in TS and does not on the GPU.
+ * FASTEST CONFIRMATION: instrument `disbandUnit` to print the CALLER for that
+ * unit id — one line, and it names the removal path outright instead of
+ * another round of inference.
  * HUNT #17 — PINNED TO A SINGLE TURN. Dumping rival 0's religious units
  * every turn (seed 9183, all of them, not just those eligible to act):
  *   TS  t84 [#39@363c2 #44@629c3]
