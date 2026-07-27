@@ -323,10 +323,25 @@ export const APOSTLE_CAP = 1;
  * So the remaining suspect is the pressure ARRAY: some city is receiving a
  * different spread lump, or receiving it on a different turn, once an apostle
  * is in the pool.
- * NEXT STEP: dump `rc_pressure[b, 1, j, :]` and the TS `religionPressure`
- * array for every rival-1 city at seed 9183 t92 and t93 and diff them
- * element-wise. That is a handful of numbers and should name the city, the
- * religion and the magnitude in one pass.
+ * FOURTH HUNT (2026-07-27) — DOWN TO ONE UNIT'S POSITION.
+ * The pressure diff is exact and tiny: seed 9183, rival 1's city rc4
+ * (centre 453), religion 2. TS reaches pressure 54, the GPU 44 — a gap of
+ * EXACTLY ONE spread lump (SPREAD_PRESSURE = 10). Every other rival-1 city
+ * matches element-wise, so precisely one spread is missing on the GPU.
+ * WHY: at the aligned turn TS's MISSIONARY#52 sits on tile 408 and the GPU's
+ * equivalent slot on tile 406. 408 is ADJACENT to 453, so TS spreads (its log
+ * reads `-> city4@453 d1`); 406 is not, so the GPU walks instead. Both engines
+ * choose the SAME TARGET (city4) — the target-selection key was read and
+ * matches, and three of the four religious units on that turn are on identical
+ * tiles with identical charges. It is the WALK that differs by two tiles.
+ * rc4 is a knife-edge city (religion 1 vs 2 pressure 53 vs 54), which is why a
+ * single lump flips it and why the checksum then OSCILLATES.
+ * NEXT STEP: log that one unit's per-turn walk on both engines for seed 9183
+ * t88-t92 — start tile, MP, each step and the cost paid. The walk pays
+ * `moveCostInto` + `riverCharge` and consults `tileFreeForUnit`, all three of
+ * which this round CHANGED (B-23 roads, B-17 the Encampment block), so those
+ * are the first things to check even though both are parity-green with this
+ * flag off.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
