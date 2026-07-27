@@ -450,6 +450,10 @@ export interface RivalCiv {
    *  construction (both sides written), broken by a denouncement or a war.
    *  Allies never declare war on each other. Empty at t0. */
   alliedRivals?: number[];
+  /** B-22 (2026-07-27): this civ's WARMONGER score (grievances). Grows on
+   *  declaring war and taking cities, decays 1/turn at peace. Blocks
+   *  alliances and, past RR_WARMONGER_GANG, invites unprovoked war. */
+  warmonger?: number;
   /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
    *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
   warWeariness?: number;

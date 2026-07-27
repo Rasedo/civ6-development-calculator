@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 84.1 | **96%** |
+| B fidelity | 88 | 84.6 | **96%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **186.1** | **97%** |
-| Open chapters only (A+B) | 129 | 124.1 | **96%** |
+| **Overall (incl. closed)** | **191** | **186.6** | **98%** |
+| Open chapters only (A+B) | 129 | 124.6 | **97%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -262,7 +262,7 @@ Per-item weights (done% in parens where partial):
   routes (rival→player, TS player→rival; intl leg gate-unreachable,
   poke-pinned); Trader unit/roads remain).
 - B meta: B-25 3 (80% — religious victory landed; player project
-  path + Culture/Diplomatic victories open); B-22 3 (65% — alliances 2026-07-27; task #55
+  path + Culture/Diplomatic victories open); B-22 3 (80% — alliances + warmonger cost 2026-07-27; task #55
   S3: denouncement grudge + FORMAL/SURPRISE warKind + ww ×2/×1
   differential; alliances/World Congress/warmonger/peace-terms open);
   B-24 3 (70% — #68: era score + Ages + loyalty modulation +
@@ -1195,8 +1195,19 @@ gap; likewise GS disasters are modeled minus sea-level rise
   `~rr_allied[a, b]`. NOT vacuous: alliances form in 12 of the 24 gate games.
   Gates: scripted parity 24x250 0.0 milli, FORCED compaction 0.0 milli,
   rollout 72/72, vitest 389/389, all 30 poke lanes, BATTERY OK 702s.
-  STILL OPEN: World Congress, warmonger cost, peace deals with terms, a
-  player-side denounce/grievance verb.
+  **WARMONGER COST LANDED (2026-07-27).** Real Civ 6 prices aggression in
+  GRIEVANCES: declaring war and taking cities make a civ shunned and ganged
+  up on. Per-civ score (`RivalCiv.warmonger` / GPU `r_warmonger`, in
+  _MUTABLE): +4 on declaring, +3 on taking a rival city, decaying 1 per turn
+  while at peace on EVERY axis (floor 0). Two costs follow, which is what
+  makes it a cost rather than a counter: any grievances BLOCK alliance
+  formation, and past `rrWarmongerGang` (6) others may declare on the
+  warmonger WITHOUT the usual strength advantage. Zero-draw, integer-only,
+  and the decay sits beside the other per-turn civ accumulators so both
+  engines apply it at the same position. NOT vacuous: the score peaks at 26
+  in-gate. Parity was green on the first pass.
+  STILL OPEN: World Congress, peace deals with terms, a player-side
+  denounce/grievance verb.
 - B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
   serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
   hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw

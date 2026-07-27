@@ -179,6 +179,20 @@ export const RR_FORMAL_MIN_TURNS = 5;
  * immediately. Zero-draw and symmetric, exactly like `atWarRivals`.
  */
 export const RR_ALLY_MIN_PEACE = 30;
+
+/**
+ * B-22 (2026-07-27): WARMONGER COST. Real Civ 6 makes aggression carry a
+ * diplomatic price — declaring war and taking cities generate GRIEVANCES, and
+ * a warmonger is shunned and ganged up on. Modeled as a per-civ score:
+ * +RR_WARMONGER_DOW on declaring, +RR_WARMONGER_CAPTURE on taking a rival
+ * city, decaying by 1 per turn while NOT at war (floor 0). Two costs follow —
+ * a civ with any grievances cannot form an ALLIANCE, and once it passes
+ * RR_WARMONGER_GANG others may declare on it WITHOUT the usual strength
+ * advantage. Zero-draw, integer-only.
+ */
+export const RR_WARMONGER_DOW = 4;
+export const RR_WARMONGER_CAPTURE = 3;
+export const RR_WARMONGER_GANG = 6;
 /** Empire-wide amenity penalty (≥0) for a weariness accumulator value. */
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.min(weariness, WAR_WEARINESS_CAP) / WAR_WEARINESS_PER_AMENITY);

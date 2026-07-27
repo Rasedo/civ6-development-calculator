@@ -379,7 +379,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -643,6 +643,8 @@ class BatchSim:
         # B-22 (2026-07-27): rival<->rival ALLIANCES, symmetric. Allies never
         # declare war on each other; a denouncement or a war breaks it.
         self.rr_allied = torch.zeros_like(self.rr_denounced, dtype=torch.bool)
+        # B-22 (2026-07-27): per-civ WARMONGER score (grievances).
+        self.r_warmonger = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
         # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
         # Integer, zero-draw event hooks only; resets at every eraLength
@@ -657,6 +659,10 @@ class BatchSim:
                 self.era_score[b, c] = int(v)
         _er = rules.eras
         self._rr_ally_min_peace = int((rules.rivals.get("eras") or {}).get("rrAllyMinPeace", 30))  # B-22
+        _er2 = rules.rivals.get("eras") or {}
+        self._wm_dow = int(_er2.get("rrWarmongerDow", 4))
+        self._wm_cap = int(_er2.get("rrWarmongerCapture", 3))
+        self._wm_gang = int(_er2.get("rrWarmongerGang", 6))
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         # B-24 S2: per-civ Age (0 Dark / 1 Normal / 2 Golden), assigned at each
@@ -8902,6 +8908,8 @@ class BatchSim:
         fresh boxes, CITY_CENTER-only registry, half HP, the city's own
         tiles re-tag (A-17 registry; the transferRivalCityToRival mirror).
         The loser slot dies with full queue/registry hygiene (the S5 lesson)."""
+        # B-22 (2026-07-27): taking a rival's city earns GRIEVANCES.
+        self.r_warmonger[b, r_to] += self._wm_cap
         c_t = int(self.rc_center[b, r_from, j])
         old_pop = int(self.rc_pop[b, r_from, j])
         old_acq = int(self.rc_acquired[b, r_from, j])
@@ -10958,6 +10966,8 @@ class BatchSim:
                         & ~self.rr_allied[:, a, b]
                         & (self.rr_denounced[:, a, b] < 0)
                         & (self.rr_denounced[:, b, a] < 0)
+                        & (self.r_warmonger[:, a] <= 0)  # B-22: grievances block
+                        & (self.r_warmonger[:, b] <= 0)
                     )
                     if bool(form.any()):
                         self.rr_allied[:, a, b] = self.rr_allied[:, a, b] | form
@@ -10997,7 +11007,9 @@ class BatchSim:
                     & ~used[:, b]
                     & ~self.rr_war[:, a, b]
                     & (prox <= prox_max)
-                    & (rstr[:, a] > rstr[:, b] * ratio)
+                    # B-22: a WARMONGER invites unprovoked war — past the gang
+                    # threshold the strength advantage is not required.
+                    & ((rstr[:, a] > rstr[:, b] * ratio) | (self.r_warmonger[:, b] >= self._wm_gang))
                     # B-22 (S3) anti-thrash: skip a target already past the peace
                     # threshold — it would sue out the SAME turn (mirror of the
                     # TS `rj.warWeariness > RR_PEACE_WW` guard).
@@ -11006,6 +11018,8 @@ class BatchSim:
                 )
                 if bool(declare.any()):
                     self.rr_war[:, a, b] = self.rr_war[:, a, b] | declare
+                    # B-22: declaring earns GRIEVANCES.
+                    self.r_warmonger[:, a] = self.r_warmonger[:, a] + declare.long() * self._wm_dow
                     self.rr_war[:, b, a] = self.rr_war[:, b, a] | declare
                     # B-22 (S3): FORMAL iff a denounced b ≥ formal_min turns ago.
                     dt = self.rr_denounced[:, a, b]
@@ -12387,6 +12401,13 @@ class BatchSim:
                 self._civ_era(self.r_techs[:, r], self.r_civics[:, r]),
             )
             self.r_tourism[:, r] = torch.where(active, self.r_tourism[:, r] + _tour_r, self.r_tourism[:, r])
+            # B-22: grievances DECAY by 1 per turn at peace on every axis.
+            _at_peace = ~self.r_atwar[:, r] & ~self.rr_war[:, r].any(dim=1)
+            self.r_warmonger[:, r] = torch.where(
+                active & _at_peace & (self.r_warmonger[:, r] > 0),
+                self.r_warmonger[:, r] - 1,
+                self.r_warmonger[:, r],
+            )
             picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
             self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])

@@ -103,6 +103,9 @@ import {
   RIVAL_TILE_BUY_LIVE,
   ADMIRAL_MARCH_LIVE,
   RR_ALLY_MIN_PEACE,
+  RR_WARMONGER_DOW,
+  RR_WARMONGER_CAPTURE,
+  RR_WARMONGER_GANG,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
@@ -469,6 +472,8 @@ function rivalRivalDenounce(state: GameState): void {
       if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if ((ri.alliedRivals ?? []).includes(rj.id)) continue;
       if (ri.denouncedTurn?.[rj.id] !== undefined || rj.denouncedTurn?.[ri.id] !== undefined) continue;
+      // B-22: grievances block alliances outright.
+      if ((ri.warmonger ?? 0) > 0 || (rj.warmonger ?? 0) > 0) continue;
       if (state.turn < RR_ALLY_MIN_PEACE) continue;
       (ri.alliedRivals ??= []).push(rj.id);
       (rj.alliedRivals ??= []).push(ri.id);
@@ -497,7 +502,10 @@ function rivalRivalDeclareWars(state: GameState): void {
       if (rj.cities.length === 0 || used.has(rj.id)) continue;
       if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if (rivalRivalProximity(state, ri, rj) > RR_DOW_PROXIMITY) continue;
-      if (!(si > rivalStrength(state, rj) * RR_DOW_STRENGTH_RATIO)) continue;
+      // B-22 (2026-07-27): a WARMONGER invites unprovoked war — past
+      // RR_WARMONGER_GANG the usual strength advantage is not required.
+      const gang = (rj.warmonger ?? 0) >= RR_WARMONGER_GANG;
+      if (!gang && !(si > rivalStrength(state, rj) * RR_DOW_STRENGTH_RATIO)) continue;
       // B-22 (S3) anti-thrash: never declare on a target already over the peace
       // threshold — the peace pass (EITHER side's ww > RR_PEACE_WW) would sue it
       // out the SAME turn, and the aggressor would re-declare next turn ad
@@ -509,6 +517,8 @@ function rivalRivalDeclareWars(state: GameState): void {
       // B-22 (2026-07-27): ALLIES NEVER DECLARE ON EACH OTHER (real Civ 6).
       if ((ri.alliedRivals ?? []).includes(rj.id)) continue;
       setRivalWar(state, ri.id + 1, rj.id + 1, true);
+      // B-22 (2026-07-27): declaring earns GRIEVANCES.
+      ri.warmonger = (ri.warmonger ?? 0) + RR_WARMONGER_DOW;
       // B-22 (S3): FORMAL iff the aggressor denounced this target ≥ the min turns
       // earlier; else SURPRISE (the default). Deterministic — no draws.
       const dt = ri.denouncedTurn?.[rj.id];
@@ -2072,6 +2082,8 @@ function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void
  * fresh boxes, CITY_CENTER-only registry, half HP, territory re-tags —
  * the transferCityToRival shape on the rival side. */
 export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: RivalCiv, rc: RivalCity): void {
+  // B-22 (2026-07-27): taking a rival's city earns GRIEVANCES.
+  to.warmonger = (to.warmonger ?? 0) + RR_WARMONGER_CAPTURE;
   from.cities = from.cities.filter((c) => c.id !== rc.id);
   relocatePalace(from.cities); // #70/S4 (A-9)
   // A-11: routes die with their endpoint (the receiver starts route-less).
@@ -3170,6 +3182,12 @@ export function rivalPhase(state: GameState): void {
     // the civ level (Great Works + owned Seaside Resorts, each worth its
     // tile's appeal). Zero-draw, integer-only.
     rival.tourism = (rival.tourism ?? 0) + rivalTourism(state, rival);
+    // B-22 (2026-07-27): grievances DECAY by 1 each turn this civ is at peace
+    // on every axis (floor 0) — the same position as the other per-turn civ
+    // accumulators so the GPU mirrors it exactly.
+    if ((rival.warmonger ?? 0) > 0 && !rival.atWar && (rival.atWarRivals ?? []).length === 0) {
+      rival.warmonger = (rival.warmonger ?? 0) - 1;
+    }
     rival.treasury -= state.units.reduce(
       (s, u) => s + (u.owner === 'rival' && u.civId === rival.id ? UNITS[u.type]?.maintenance ?? 0 : 0),
       0,
