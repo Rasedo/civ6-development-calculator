@@ -16,9 +16,9 @@ import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
-import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTurn, playerSuzerainCount } from './rivals';
+import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTurn, playerSuzerainCount, worldCongress } from './rivals';
 import { expirePlayerRoutes } from './trade';
-import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../data/rivals';
+import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, governorPicks, governorTitles } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { FEATURES } from '../data/features';
@@ -956,7 +956,10 @@ export function endTurn(state: GameState): void {
   spreadReligiousPressure(state);
 
   state.turn += 1;
-  eraBoundary(state); // B-24: era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
+  eraBoundary(state);
+  // B-22 (#76): the WORLD CONGRESS convenes on the same post-increment turn
+  // number the era boundary uses, so both engines fire it at one position.
+  worldCongress(state); // B-24: era-score window reset at ERA_LENGTH multiples (GPU mirrors at its turn increment)
   // B-24 (#71): DEDICATION payouts — a Golden/Heroic age pays faith, a Dark or
   // Normal age pays era score (the climb-out dedication), both scaled by the
   // dedication COUNT so a Heroic age pays triple. Immediately after the
@@ -984,7 +987,12 @@ export function endTurn(state: GameState): void {
   // precedence space > domination > religion > culture > score. 7 = the
   // player wins on tourism, 8 = a rival does (defeat).
   const cul = rel >= 0 ? -1 : cultureVictor(state);
-  state.gameOver = spaceWon || dom >= 0 || rel >= 0 || cul >= 0 || state.turn > TURN_LIMIT;
+  // B-22/B-25 (#76): DIPLOMATIC victory — 20 Diplomatic Victory Points, real
+  // Civ 6's threshold. Checked LAST of the real conditions: precedence is
+  // space > domination > religion > culture > DIPLOMATIC > score. 9 = the
+  // player wins, 10 = a rival does (defeat).
+  const dip = rel >= 0 || cul >= 0 ? -1 : diplomaticVictor(state);
+  state.gameOver = spaceWon || dom >= 0 || rel >= 0 || cul >= 0 || dip >= 0 || state.turn > TURN_LIMIT;
   state.victoryType = spaceWon
     ? state.victoryType
     : dom >= 0
@@ -997,9 +1005,29 @@ export function endTurn(state: GameState): void {
           ? cul === 0
             ? 7
             : 8
-          : state.gameOver
-            ? 1
-            : 0;
+          : dip >= 0
+            ? dip === 0
+              ? 9
+              : 10
+            : state.gameOver
+              ? 1
+              : 0;
+}
+
+/**
+ * B-22/B-25 (#76): the DIPLOMATIC victory — the first civ to reach
+ * DIPLO_VICTORY_POINTS (20, real Civ 6's threshold) Diplomatic Victory Points.
+ * Points come from winning World Congress resolutions (see `worldCongress`).
+ * A civ with no cities cannot win. Ascending scan, so ties go to the lowest
+ * unified civ id. Returns the winner's unified id, or -1.
+ */
+function diplomaticVictor(state: GameState): number {
+  const alive = [state.cities.length > 0, ...state.rivals.map((rv) => rv.cities.length > 0)];
+  const pts = [state.diploPoints ?? 0, ...state.rivals.map((rv) => rv.diploPoints ?? 0)];
+  for (let c = 0; c < pts.length; c++) {
+    if (alive[c] && pts[c] >= DIPLO_VICTORY_POINTS) return c;
+  }
+  return -1;
 }
 
 /**

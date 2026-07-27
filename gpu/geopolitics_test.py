@@ -366,6 +366,78 @@ def main() -> None:
     )
     print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
 
+    # --- B-22 (#76): the WORLD CONGRESS + the DIPLOMATIC victory ------------
+    for _f in ("congress_sessions", "diplo_points", "r_diplo_points"):
+        assert _f in _MUT2, f"{_f} must be registered in _MUTABLE"
+    s6 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
+    assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"
+    assert s6._dvp_win == 20, f"GS diplomatic victory is 20 points, got {s6._dvp_win}"
+
+    # not a session turn -> nothing happens, favor untouched
+    s6.diplo_favor[:] = 50
+    s6.turn = s6._congress_interval + 1
+    s6._world_congress()
+    assert int(s6.congress_sessions[0]) == 0 and int(s6.diplo_favor[0]) == 50, "off-interval turns must do nothing"
+
+    # a session turn but nobody is Medieval -> still nothing
+    s6.turn = s6._congress_interval
+    s6.techs.zero_(); s6.r_techs.zero_(); s6.civics.zero_(); s6.r_civics.zero_()
+    s6._world_congress()
+    assert int(s6.congress_sessions[0]) == 0, "pre-Medieval sessions must not convene"
+    assert int(s6.diplo_favor[0]) == 50, "... and must not spend favor"
+
+    # force Medieval via a tech whose era clears the bar, then run one session
+    _era_ok = None
+    for _t in range(s6.techs.shape[1]):
+        s6.techs.zero_(); s6.techs[:, _t] = True
+        if int(s6._civ_era(s6.techs, s6.civics)[0]) >= s6._congress_min_era:
+            _era_ok = _t
+            break
+    assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
+    if s6.R > 0:
+        s6.r_diplo_favor[:, 0] = 90  # the rival outspends the player 90 vs 50
+    s6._world_congress()
+    assert int(s6.congress_sessions[0]) == 1, "the session must convene"
+    assert int(s6.diplo_favor[0]) == 0, "every commitment is spent"
+    if s6.R > 0:
+        assert int(s6.r_diplo_favor[0, 0]) == 0, "the winner's favor is spent too"
+        assert int(s6.r_diplo_points[0, 0]) == s6._dvp_per_res, "the largest commitment takes the point"
+        assert int(s6.diplo_points[0]) == 0, "the loser takes nothing"
+
+    # a TIE keeps the LOWER civ id (the player)
+    s7 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s7.turn = s7._congress_interval
+    s7.techs.zero_(); s7.techs[:, _era_ok] = True
+    s7.diplo_favor[:] = 25
+    if s7.R > 0:
+        s7.r_diplo_favor[:, 0] = 25
+    s7._world_congress()
+    assert int(s7.diplo_points[0]) == s7._dvp_per_res, "a tie must go to the lower civ id"
+    if s7.R > 0:
+        assert int(s7.r_diplo_points[0, 0]) == 0
+
+    # zero favor everywhere: the session counts but awards nothing
+    s8 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s8.turn = s8._congress_interval
+    s8.techs.zero_(); s8.techs[:, _era_ok] = True
+    s8.diplo_favor.zero_(); s8.r_diplo_favor.zero_()
+    s8._world_congress()
+    assert int(s8.congress_sessions[0]) == 1 and int(s8.diplo_points[0]) == 0, "no favor -> no award"
+
+    # the victory check itself
+    s9 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    s9.diplo_points[:] = s9._dvp_win - 1
+    assert int(s9._diplomatic_victor()[0]) == -1, "one point short is not a win"
+    s9.diplo_points[:] = s9._dvp_win
+    assert int(s9._diplomatic_victor()[0]) == 0, "the player wins at the threshold"
+    if s9.R > 0:
+        s9.diplo_points.zero_()
+        s9.r_diplo_points[:, 0] = s9._dvp_win
+        assert int(s9._diplomatic_victor()[0]) == 1, "a rival wins at the threshold"
+    print("world congress OK — schedule, Medieval gate, vote, tie rule, spend, DVP, victory")
+
+
 
 if __name__ == "__main__":
     main()

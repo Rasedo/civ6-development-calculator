@@ -156,6 +156,35 @@ export const GOV_MAX_TITLES = 5;
  */
 export const DIPLO_FAVOR_PER_SUZERAIN = 1;
 
+/**
+ * B-22 (#76): the WORLD CONGRESS. Sourced (Civilopedia GS "World Congress"):
+ * the Congress begins meeting once the game reaches the MEDIEVAL era and
+ * convenes every 30 turns on Standard speed. Resolutions are voted on with
+ * DIPLOMATIC FAVOR, and ties go to whoever spent the greater PERCENTAGE of
+ * their favor. Diplomatic Victory needs 20 Diplomatic Victory Points (wiki,
+ * "Victory (Civ6)").
+ *
+ * TWO RECORDED STYLIZATIONS, both because the real thing needs subsystems that
+ * do not exist here:
+ *  1. VOTE SIZE. Real Civ 6 lets each player choose how much favor to commit.
+ *     There is no chooser on either seat (and a roll would break the zero-draw
+ *     contract), so every civ commits ALL its favor. The tie-break by
+ *     percentage-of-favor-spent is then always 100% and resolves to civ id —
+ *     kept in the code anyway so the rule is right when a chooser arrives.
+ *  2. DVP SOURCE. Real Civ 6 awards Diplomatic Victory Points mainly through
+ *     Emergencies and Scored Competitions, neither of which is modeled. GS
+ *     does also award them through a late-game World Congress resolution, so
+ *     awarding DVP to the resolution winner is faithful in SHAPE while
+ *     overstating the rate. Recorded, not hidden.
+ */
+export const CONGRESS_INTERVAL = 30;
+/** Index into data/techs ERAS — 2 = Medieval, when the Congress first meets. */
+export const CONGRESS_MIN_ERA = 2;
+/** Diplomatic Victory Points awarded to the winner of a session's resolution. */
+export const DVP_PER_RESOLUTION = 1;
+/** Diplomatic Victory threshold (real Civ 6 GS: 20 points). */
+export const DIPLO_VICTORY_POINTS = 20;
+
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;
 

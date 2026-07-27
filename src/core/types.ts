@@ -286,6 +286,11 @@ export interface GameState {
   /** B-22 (#75): the PLAYER's cumulative DIPLOMATIC FAVOR — the World Congress
    *  currency. +government tier and +1 per suzerained city-state each turn. */
   diploFavor?: number;
+  /** B-22 (#76): World Congress sessions held so far (both engines count the
+   *  same sessions; traced so parity proves the schedule). */
+  congressSessions?: number;
+  /** B-22 (#76): the PLAYER's DIPLOMATIC VICTORY POINTS. 20 wins. */
+  diploPoints?: number;
   /** B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of
    *  RivalCiv.warmonger. Grows on declaring war and on taking a rival city,
    *  decays 1/turn while at peace with every rival. Past RR_WARMONGER_GANG a
@@ -475,6 +480,8 @@ export interface RivalCiv {
   tourism?: number;
   /** B-22 (#75): this rival's cumulative DIPLOMATIC FAVOR (the player's twin). */
   diploFavor?: number;
+  /** B-22 (#76): this rival's DIPLOMATIC VICTORY POINTS (the player's twin). */
+  diploPoints?: number;
   /** B-25 (#72): this rival's cumulative LIFETIME CULTURE — the twin of the
    *  player's `cultureTotal`. Real Civ 6 derives DOMESTIC TOURISTS from
    *  lifetime culture, so the Culture victory cannot be judged without it;

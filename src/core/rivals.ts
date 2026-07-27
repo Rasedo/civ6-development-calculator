@@ -60,7 +60,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, rivalTourism } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, rivalTourism, civEraIndex } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -107,6 +107,9 @@ import {
   RR_WARMONGER_CAPTURE,
   RR_WARMONGER_GANG,
   DIPLO_FAVOR_PER_SUZERAIN,
+  CONGRESS_INTERVAL,
+  CONGRESS_MIN_ERA,
+  DVP_PER_RESOLUTION,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
@@ -1513,6 +1516,46 @@ export function playerSuzerainCount(state: GameState): number {
 /** B-22 (#75): city-states rival `rivalId` is Suzerain of. */
 export function rivalSuzerainCount(state: GameState, rivalId: number): number {
   return state.cityStates.reduce((n, cs) => n + (rivalIsSuzerain(cs, rivalId) ? 1 : 0), 0);
+}
+
+/**
+ * B-22 (#76): the WORLD CONGRESS session. Convenes at every CONGRESS_INTERVAL
+ * turn once ANY civ has reached CONGRESS_MIN_ERA (Medieval), and runs one
+ * resolution: every civ commits ALL its DIPLOMATIC FAVOR as votes, the largest
+ * commitment wins and takes DVP_PER_RESOLUTION Diplomatic Victory Points, and
+ * every commitment is spent. Ties go to the greater PERCENTAGE of favor spent
+ * (always 100% while there is no chooser — see the constants' comment), then to
+ * the lowest unified civ id.
+ *
+ * A civ with ZERO favor casts no vote and cannot win; if nobody has favor the
+ * session still counts but awards nothing. Zero-draw and integer-only: the
+ * outcome is a pure function of state, never a roll. Called from endTurn right
+ * after eraBoundary, the same position the GPU mirrors.
+ */
+export function worldCongress(state: GameState): void {
+  if (state.turn % CONGRESS_INTERVAL !== 0) return;
+  const eras = [
+    civEraIndex(state.research.techs, state.research.civics),
+    ...state.rivals.map((rv) => civEraIndex(rv.research.techs, rv.research.civics)),
+  ];
+  if (!eras.some((e) => e >= CONGRESS_MIN_ERA)) return;
+  state.congressSessions = (state.congressSessions ?? 0) + 1;
+  // every civ commits ALL its favor; the largest commitment wins
+  const votes = [state.diploFavor ?? 0, ...state.rivals.map((rv) => rv.diploFavor ?? 0)];
+  let win = -1;
+  for (let c = 0; c < votes.length; c++) {
+    if (votes[c] <= 0) continue; // no favor, no vote
+    if (win < 0 || votes[c] > votes[win]) win = c; // ties keep the LOWER id
+  }
+  // the commitments are spent whether or not they won
+  state.diploFavor = 0;
+  for (const rv of state.rivals) rv.diploFavor = 0;
+  if (win < 0) return; // nobody could vote
+  if (win === 0) state.diploPoints = (state.diploPoints ?? 0) + DVP_PER_RESOLUTION;
+  else {
+    const rv = state.rivals[win - 1];
+    if (rv) rv.diploPoints = (rv.diploPoints ?? 0) + DVP_PER_RESOLUTION;
+  }
 }
 
 function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {

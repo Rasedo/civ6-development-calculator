@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 86.15 | **98%** |
+| B fidelity | 88 | 86.96 | **99%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **188.15** | **98%** |
-| Open chapters only (A+B) | 129 | 126.15 | **98%** |
+| **Overall (incl. closed)** | **191** | **188.96** | **99%** |
+| Open chapters only (A+B) | 129 | 126.96 | **98%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -490,6 +490,10 @@ Per-item weights (done% in parens where partial):
   live at 192 civ-turns over the threshold). Delta +0.09 +0.40 = +0.49 on B.
 - #75 WORLD CONGRESS S1 (2026-07-28). B-22 4 (60% -> 70% — DIPLOMATIC FAVOR on
   both seats, traced, measured at 175-656 by t250). Delta +0.40 on B.
+- #76 WORLD CONGRESS S2+S3 (2026-07-28). B-22 4 (70% -> 85% — sessions, the
+  favor vote and Diplomatic Victory Points; measured at 5-6 sessions/seed and
+  102 DVP awarded) and B-25 3 (90% -> 97% — the DIPLOMATIC victory closes the
+  last named victory condition). Delta +0.60 +0.21 = +0.81 on B.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -1421,9 +1425,42 @@ gap; likewise GS disasters are modeled minus sea-level rise
   battery lane (suzerain contest, tie rule, tier+suzerainty accrual, _MUTABLE).
   B-22 -> 70%. NEXT: S2 sessions + a resolution, S3 Diplomatic Victory Points
   and the win at 20 — see gpu/WORLD_CONGRESS_DESIGN.md.
-  STILL OPEN: the Congress sessions/resolutions themselves, Diplomatic Victory
-  Points (which B-25's Diplomatic victory is blocked on), and peace deals with
-  terms.
+  **WORLD CONGRESS S2+S3 LANDED (2026-07-28, #76).** The Congress convenes at
+  every CONGRESS_INTERVAL (30) turn once ANY civ has reached CONGRESS_MIN_ERA
+  (2 = Medieval), at the same post-increment position `eraBoundary` uses on
+  both engines. One resolution runs per session: every civ commits ALL its
+  DIPLOMATIC FAVOR as votes, the LARGEST commitment takes DVP_PER_RESOLUTION
+  (1) Diplomatic Victory Point, and every commitment is SPENT whether or not it
+  won. Ties keep the LOWER unified civ id; a civ with zero favor casts no vote
+  and cannot win; a session with no favor anywhere still counts but awards
+  nothing. Zero-draw — the outcome is a pure function of state.
+  **DIPLOMATIC VICTORY** at DIPLO_VICTORY_POINTS (20, real Civ 6's threshold):
+  victoryType 9 (player) / 10 (rival defeat). Precedence is now
+  space > domination > religion > culture > DIPLOMATIC > score, and the
+  diplomatic check is evaluated only where neither religion nor culture already
+  won. This CLOSES B-25's last named victory condition.
+  Three more COMPARED trace columns from day one: `congressSessions` and
+  `diploPoints` on HEAD (now 28), `rDiploPoints` on PER_RIVAL (now 22).
+  MEASURED, in three parts: the SESSION machinery is live (the Congress
+  convenes 5-6 times per seed); the AWARD is live (102 DVP handed out across
+  the 24 seeds, max 6 to any one civ); the 20-point WIN is GATE-UNREACHABLE at
+  250 turns (6 of 20 is the best anyone manages), so the victory itself rests
+  on the poke lanes exactly as the culture victory does.
+  TWO RECORDED STYLIZATIONS, both because the real thing needs subsystems that
+  do not exist: (1) VOTE SIZE — real Civ 6 lets each player choose how much
+  favor to commit; there is no chooser on either seat and a roll would break
+  the zero-draw contract, so every civ commits ALL its favor (the
+  percentage-of-favor-spent tie-break is kept in the code so the rule is right
+  when a chooser arrives); (2) DVP SOURCE — real Civ 6 awards points mainly
+  through Emergencies and Scored Competitions, neither modeled, though GS does
+  also award them via a late-game Congress resolution, so awarding to the
+  resolution winner is faithful in SHAPE while overstating the rate.
+  Poke lanes: tests/world-congress.test.ts (10: the schedule, the Medieval gate
+  reading ANY civ, the vote, the tie rule, the spend, zero-favor, and all four
+  victory cases including culture outranking diplomacy) + the `geopolitics`
+  battery lane (the same on tensors).
+  B-22 -> 85%. STILL OPEN: multiple/varied resolutions, Emergencies and Scored
+  Competitions as real DVP sources, and peace deals with terms.
 - B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
   serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
   hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw
@@ -1498,9 +1535,13 @@ gap; likewise GS disasters are modeled minus sea-level rise
   ACCUMULATOR; the CHECK is pinned by `tests/culture-victory.test.ts` (7
   pokes) and the new `culture_victory` battery lane (the same 7 semantics
   on GPU tensors + the _MUTABLE round-trip). B-25 -> 90%.
-  STILL OPEN: a player project-production path (victoryType 3 can only be
-  preserved, not produced, on the GPU), and the DIPLOMATIC victory, which
-  is blocked on the World Congress (a B-22 residual).
+  **DIPLOMATIC victory LANDED (2026-07-28, #76)** — see the B-22 entry: the
+  World Congress awards Diplomatic Victory Points and 20 wins (victoryType
+  9/10). That was B-25's last unmodeled victory condition, so every named
+  Civ 6 victory now exists on both engines: score, domination, science,
+  religion, culture and diplomacy.
+  STILL OPEN in B-25: only the player project-production path (victoryType 3
+  can be preserved but not produced on the GPU). B-25 -> 97%.
 - B-33. **RESOLVED (2026-07-20, task #55 S2/S3; the fidelity face of
   A-19)**: rivals now war, denounce, sue for peace and conquer among
   themselves (see A-19 + B-22 for the machinery). The star topology is

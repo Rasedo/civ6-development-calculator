@@ -379,7 +379,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "congress_sessions", "diplo_points", "r_diplo_points", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -652,6 +652,10 @@ class BatchSim:
         # B-22 (#75): DIPLOMATIC FAVOR — the World Congress currency, per civ.
         self.diplo_favor = torch.zeros(B, dtype=torch.long, device=device)
         self.r_diplo_favor = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # B-22 (#76): World Congress sessions held + Diplomatic Victory Points.
+        self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
+        self.diplo_points = torch.zeros(B, dtype=torch.long, device=device)
+        self.r_diplo_points = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
         # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
         # Integer, zero-draw event hooks only; resets at every eraLength
@@ -671,6 +675,11 @@ class BatchSim:
         self._wm_cap = int(_er2.get("rrWarmongerCapture", 3))
         self._wm_gang = int(_er2.get("rrWarmongerGang", 6))
         self._favor_per_suz = int(_er2.get("diploFavorPerSuzerain", 1))  # B-22 (#75)
+        # B-22 (#76): the WORLD CONGRESS schedule + victory threshold.
+        self._congress_interval = int(_er2.get("congressInterval", 30))
+        self._congress_min_era = int(_er2.get("congressMinEra", 2))
+        self._dvp_per_res = int(_er2.get("dvpPerResolution", 1))
+        self._dvp_win = int(_er2.get("diploVictoryPoints", 20))
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         # B-24 S2: per-civ Age (0 Dark / 1 Normal / 2 Golden), assigned at each
@@ -8216,6 +8225,54 @@ class BatchSim:
             m = m & (mine > self.cs_r_envoys[:, o])
         return m.sum(dim=1)
 
+    def _world_congress(self) -> None:
+        """B-22 (#76), the TS `worldCongress` mirror. At every
+        congressInterval turn, once ANY civ has reached congressMinEra
+        (Medieval), one resolution runs: every civ commits ALL its favor as
+        votes, the LARGEST commitment wins DVP_PER_RESOLUTION Diplomatic
+        Victory Points, and every commitment is spent. Ties keep the LOWER
+        unified civ id (the ascending scan). A civ with zero favor casts no
+        vote and cannot win. Zero-draw — a pure function of state."""
+        if self._congress_interval <= 0:
+            return
+        fires = (self.turn % self._congress_interval) == 0
+        if not fires:
+            return
+        era_ok = self._civ_era(self.techs, self.civics) >= self._congress_min_era
+        for r in range(self.R):
+            era_ok = era_ok | (self._civ_era(self.r_techs[:, r], self.r_civics[:, r]) >= self._congress_min_era)
+        if not bool(era_ok.any()):
+            return
+        self.congress_sessions = self.congress_sessions + era_ok.long()
+        # the ascending scan: strictly-greater keeps the LOWER id on a tie
+        best = self.diplo_favor.clone()
+        win = torch.where(best > 0, torch.zeros_like(best), torch.full_like(best, -1))
+        for r in range(self.R):
+            v = self.r_diplo_favor[:, r]
+            take = (v > 0) & (v > best)
+            win = torch.where(take, torch.full_like(win, r + 1), win)
+            best = torch.where(take, v, best)
+        # commitments are spent whether or not they won (only where the
+        # session actually convened)
+        self.diplo_favor = torch.where(era_ok, torch.zeros_like(self.diplo_favor), self.diplo_favor)
+        for r in range(self.R):
+            self.r_diplo_favor[:, r] = torch.where(era_ok, torch.zeros_like(self.r_diplo_favor[:, r]), self.r_diplo_favor[:, r])
+        self.diplo_points = self.diplo_points + (era_ok & (win == 0)).long() * self._dvp_per_res
+        for r in range(self.R):
+            self.r_diplo_points[:, r] = self.r_diplo_points[:, r] + (era_ok & (win == r + 1)).long() * self._dvp_per_res
+
+    def _diplomatic_victor(self) -> torch.Tensor:
+        """B-22/B-25 (#76), the TS `diplomaticVictor` mirror: [B] the lowest
+        unified civ id holding >= diploVictoryPoints Diplomatic Victory Points
+        and still holding a city; -1 none."""
+        winner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        ok = self.alive.any(dim=1) & (self.diplo_points >= self._dvp_win)
+        winner = torch.where(ok, torch.zeros_like(winner), winner)
+        for r in range(self.R):
+            okr = self.rc_alive[:, r].any(dim=1) & (self.r_diplo_points[:, r] >= self._dvp_win)
+            winner = torch.where((winner < 0) & okr, torch.full_like(winner, r + 1), winner)
+        return winner
+
     def _culture_victor(self) -> torch.Tensor:
         """B-25 (#72), the TS `cultureVictor` mirror: [B] the lowest unified civ
         id (0 player, r+1 rival r) whose VISITING tourists exceed EVERY other
@@ -14339,6 +14396,9 @@ class BatchSim:
                 torch.ones_like(self.dedications),
             )
             self.era_score[:] = 0
+        # B-22 (#76): the WORLD CONGRESS convenes on the same post-increment
+        # turn number the era boundary uses — the TS position exactly.
+        self._world_congress()
         # B-24 (#71): DEDICATION payouts, every turn, at the TS endTurn
         # position (immediately after eraBoundary). A GOLDEN/HEROIC age pays
         # faith; a DARK or NORMAL age pays era score (the climb-out
@@ -14365,11 +14425,15 @@ class BatchSim:
         # already win — the TS `rel >= 0 ? -1 : cultureVictor(state)` twin, so
         # the precedence is space > domination > religion > culture > score.
         cul = torch.where(rel >= 0, torch.full_like(rel, -1), self._culture_victor())
-        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25 + B6-S3
-        # precedence space > domination > religion (5/6) > culture (7/8) > score
+        # B-22/B-25 (#76): DIPLOMATIC victory, evaluated only where neither
+        # religion nor culture already won — the TS guard's twin.
+        dip = torch.where((rel >= 0) | (cul >= 0), torch.full_like(rel, -1), self._diplomatic_victor())
+        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (dip >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25 + B6-S3 + B-22
+        # precedence space > domination > religion (5/6) > culture (7/8) > DIPLOMATIC (9/10) > score
         rel_vt = torch.where(rel == 0, torch.full_like(rel, 5), torch.full_like(rel, 6))
         cul_vt = torch.where(cul == 0, torch.full_like(cul, 7), torch.full_like(cul, 8))
-        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))  # GV-4/GV-3 + B-25 + B6-S3
+        dip_vt = torch.where(dip == 0, torch.full_like(dip, 9), torch.full_like(dip, 10))
+        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(dip >= 0, dip_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))))))  # GV-4/GV-3 + B-25 + B6-S3 + B-22
         # D-1: leader() (a full empire+rival score pass) only matters where a
         # game just ENDED — torch.where evaluated it eagerly every turn and
         # threw it away. Winner stays -1 for running games either way.
@@ -14412,6 +14476,8 @@ class BatchSim:
             self.tourism_total.to(self.dtype),  # B-20 (#71): cumulative TOURISM
             self.p_warmonger.to(self.dtype),  # B-22 (#74): the player's GRIEVANCES
             self.diplo_favor.to(self.dtype),  # B-22 (#75): DIPLOMATIC FAVOR
+            self.congress_sessions.to(self.dtype),  # B-22 (#76): Congress sessions held
+            self.diplo_points.to(self.dtype),  # B-22 (#76): Diplomatic Victory Points
         ]
         for s in range(self.S):
             cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)
@@ -14477,6 +14543,8 @@ class BatchSim:
                 torch.where(live, js_round(self.r_culture[:, r] * 1000).to(self.dtype), zero),
                 # B-22 (#75): rival DIPLOMATIC FAVOR (appended LAST).
                 torch.where(live, self.r_diplo_favor[:, r].to(self.dtype), zero),
+                # B-22 (#76): rival Diplomatic Victory Points (appended LAST).
+                torch.where(live, self.r_diplo_points[:, r].to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):
