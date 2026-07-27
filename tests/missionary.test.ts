@@ -71,6 +71,14 @@ describe('B6-S2 rival missionary chassis', () => {
       const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, 'rival', rvC.id);
       if (u) u.charges = 0;
     }
+    // #71 (APOSTLE_BUY_LIVE): the apostle rung only fires when NO missionary
+    // was bought, which is exactly this control's situation — so pre-fill its
+    // cap too, or the control spends 120 on an apostle and the delta no longer
+    // isolates the missionary price.
+    {
+      const a = spawnUnit(ctl, 'APOSTLE', rvC.cities[0].centerIndex, 'rival', rvC.id);
+      if (a) a.charges = 0;
+    }
     endTurn(ctl);
     expect(rivalMissionaries(ctl, rvC.id).length).toBe(2);
     expect((rvC.faith ?? 0) - faithBuy).toBeCloseTo(60, 5);
@@ -92,6 +100,14 @@ describe('B6-S2 rival missionary chassis', () => {
     for (let k = 0; k < 2; k++) {
       const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, 'rival', rvC.id);
       if (u) u.charges = 0;
+    }
+    // #71 (APOSTLE_BUY_LIVE): the apostle rung only fires when NO missionary
+    // was bought, which is exactly this control's situation — so pre-fill its
+    // cap too, or the control spends 120 on an apostle and the delta no longer
+    // isolates the missionary price.
+    {
+      const a = spawnUnit(ctl, 'APOSTLE', rvC.cities[0].centerIndex, 'rival', rvC.id);
+      if (a) a.charges = 0;
     }
     endTurn(ctl);
     expect(rivalMissionaries(ctl, rvC.id).length).toBe(2);

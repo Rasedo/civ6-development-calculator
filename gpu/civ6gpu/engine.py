@@ -7562,11 +7562,35 @@ class BatchSim:
                     if bool(mrc.any()):
                         self.rc_pressure[dr[_k], mrc, wr[_k]] += sw
                         self.rc_pressure[dr[_k], mrc, lr[_k]] = (self.rc_pressure[dr[_k], mrc, lr[_k]] - sw).clamp(min=0)
+            # B-18 (#71) PARITY FIX: a killed unit must also LEAVE ITS TILE.
+            # TS's `disbandUnit` drops it from `state.units` entirely, so the
+            # tile is free; the GPU only cleared `v_alive` and left the
+            # occupancy plane pointing at the corpse, so the tile stayed
+            # permanently blocked. That stale entry blocked OTHER civs' movers
+            # forever (seed 9183: rival 0's missionary dies at t86 but
+            # `rvciv_at[363]` still read its slot at t91, rerouting rival 1 and
+            # costing it a spread). Religious units are civilians, but clear
+            # whichever plane actually points at the slot so a military
+            # defender can never leak either.
+            def _vacate(_rws: torch.Tensor, _slots: torch.Tensor) -> None:
+                if _rws.numel() == 0:
+                    return
+                _t = self.v_tile[_rws, _slots]
+                _c = self.rvciv_at[_rws, _t] == _slots
+                if bool(_c.any()):
+                    self.rvciv_at[_rws[_c], _t[_c]] = -1
+                _m = self.rv_at[_rws, _t] == _slots
+                if bool(_m.any()):
+                    self.rv_at[_rws[_m], _t[_m]] = -1
+
             if bool(def_dead.any()):
                 dd = rows[def_dead]
                 self.v_alive[dd, j[dd]] = False
+                _vacate(dd, j[dd])
             if bool(atk_dead.any()):
-                self.v_alive[rows[atk_dead], u] = False
+                ad = rows[atk_dead]
+                self.v_alive[ad, u] = False
+                _vacate(ad, torch.full_like(ad, u))
         return fought
 
     def _rival_missionary_actions(self, r: int, active: torch.Tensor) -> None:

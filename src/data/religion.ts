@@ -466,6 +466,32 @@ export const APOSTLE_CAP = 1;
  * The unit is at 363 with 2 charges and target 362 at d1, so it should
  * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
  * relocates it there and the other does not.
+ * ######################## HUNT #22 — A REAL BUG, FIXED ####################
+ * FOUND AND FIXED: `_theological_combat` killed a unit by setting
+ * `v_alive = False` but NEVER cleared its occupancy plane, while TS's
+ * `disbandUnit` drops the unit from `state.units` entirely. The corpse kept
+ * blocking the tile FOREVER. Measured directly (seed 9183, slot 11):
+ *   t86 alive=True  hp=50  tile=363   occ363=11
+ *   t87 alive=False hp=0   tile=363   occ363=11   <-- corpse still blocking
+ * That stale entry is what rerouted rival 1 out of 362 and cost it the spread.
+ * The fix clears whichever plane (`rvciv_at` / `rv_at`) points at the dead
+ * slot, for BOTH the dead defender and a dead attacker. Every other
+ * unit-death site in engine.py was audited and already clears occupancy —
+ * this was the only leak.
+ * RESULT: with the flag ON, scripted parity AND the forced-compaction gate
+ * both go from RED to GREEN (0.0 milli), and vitest is green after updating
+ * the two missionary control runs (the apostle rung fires exactly when no
+ * missionary was bought, which IS the control's situation — its cap now gets
+ * pre-filled too).
+ * STILL RED, so the flag stays inert: the ROLLOUT, 3 failures all in seed
+ * 9235 on `rUnits0` (t88 TS=6 GPU=8, t98 TS=5 GPU=4, t88 TS=5 GPU=6) — an
+ * ALIVE-count difference off-script, in both directions, so it is a
+ * different fault from the occupancy leak. The fix itself is kept and is
+ * inert while the flag is off (no apostle exists -> no fight).
+ * NEXT: hunt the rollout reds with the same discipline that finally worked
+ * here — print the CALLER that creates/removes the differing unit rather
+ * than inferring from positions.
+ * #########################################################################
  * ##### CORRECTION (hunt #21) — THE "ROOT CAUSE FOUND" BELOW IS WRONG #####
  * I claimed the GPU never runs that fight. IT DOES. Instrumenting
  * `_theological_combat`'s eligibility for seed 9183 shows rival 1's apostle
@@ -576,7 +602,7 @@ export const APOSTLE_CAP = 1;
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
-export const APOSTLE_BUY_LIVE = false; // #71: INERT — see the hunt log (root cause NOT yet correct)
+export const APOSTLE_BUY_LIVE = false; // #71: INERT — one real bug FIXED, one rollout red left
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
