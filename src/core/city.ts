@@ -21,7 +21,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
 import {
@@ -466,7 +466,7 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
 
 export function playerTourism(state: GameState): number {
   let t = 0;
-  for (const c of state.cities) t += greatWorkTourism(c);
+  for (const c of state.cities) t += greatWorkTourism(c) + relicTourism(c); // B-20 (#73): relics
   const owns = (tile: Tile) => tile.cityId !== -1;
   const era = civEraIndex(state.research.techs, state.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
@@ -476,12 +476,12 @@ export function rivalTourism(
   state: GameState,
   rival: {
     id: number;
-    cities: { greatWorksWriting?: number; greatWorksMusic?: number }[];
+    cities: { greatWorksWriting?: number; greatWorksMusic?: number; relics?: number }[];
     research: { techs: string[]; civics: string[] };
   },
 ): number {
   let t = 0;
-  for (const rc of rival.cities) t += greatWorkTourism(rc);
+  for (const rc of rival.cities) t += greatWorkTourism(rc) + relicTourism(rc); // B-20 (#73): relics
   const owns = (tile: Tile) => tile.rivalId === rival.id;
   const era = civEraIndex(rival.research.techs, rival.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
@@ -546,6 +546,9 @@ export function computeCityStats(
   // every building yield), but NOT the district buildingYieldMult (which
   // cityBuildingYields already applied to the building's own yields).
   buildings.culture += greatWorkCulture(city);
+  // B-20 (#73): RELICS pay FAITH (4 each), in the same buildings bucket and at
+  // the same position — a relic is a Great Work held in the Temple's slot.
+  buildings.faith += relicFaith(city);
 
   const trade = cityTradeYields(state, city);
 

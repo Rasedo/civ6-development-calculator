@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 85.05 | **97%** |
+| B fidelity | 88 | 85.26 | **97%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **187.05** | **98%** |
-| Open chapters only (A+B) | 129 | 125.05 | **97%** |
+| **Overall (incl. closed)** | **191** | **187.26** | **98%** |
+| Open chapters only (A+B) | 129 | 125.26 | **97%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -367,6 +367,60 @@ Per-item weights (done% in parens where partial):
   Moved to the matching position.
   STILL OPEN in B-20: relics, artifacts, National Parks, the Printing
   doubling, Great Works of ART and archaeology. B-20 -> 85%.
+  **RELICS LANDED (2026-07-27, #73).** Real Civ 6 counts a Relic as a Great
+  Work held in a TEMPLE's single slot, paying +4 FAITH and +8 TOURISM — the
+  densest tourism source in the game (verified: Civilization wiki
+  "Relics"/"Great Work (Civ6)", Gathering Storm). Per-city counter
+  `City.relics` / GPU `relics` + `rc_relics` (both in _MUTABLE), placed into
+  the LOWEST city holding a temple with a free slot (array order =
+  city/rc slot order); a relic with no open slot anywhere is LOST (real
+  Civ 6's reserve storage is a recorded simplification). Faith rides the
+  BUILDINGS bucket at the `greatWorkCulture` position in all three yield
+  paths; tourism joins `_tourism_of`, ALIVE-masked like the Great Works.
+  SOURCE + the one deviation: a relic is created when an Apostle carrying
+  the MARTYR promotion dies in theological combat. Promotions are unmodeled
+  and `theologicalCombat` is deliberately ZERO-DRAW (a conditional roll
+  there would have to be mirrored draw-for-draw), so EVERY apostle killed
+  in theological combat martyrs. That overstates relic frequency by roughly
+  the promotion odds (~1 in 7); recorded, not hidden. A dead MISSIONARY
+  yields nothing. Granted defender-then-attacker, matching the TS disband
+  order, so slot placement is order-exact.
+  MEASURED REACHABLE (this is why relics and not art works — see below):
+  26 relics are held at t250 across 4 of the 24 seeds, and the tourism
+  ceiling rose from 7 visiting tourists to 12. Parity green at 0.0 milli on
+  the first pass, and NOT vacuously — rFaith and rTourism are both compared
+  columns. Poke lanes: `tests/relics.test.ts` (6) + the `relics` battery
+  lane (constants, placement, dead-city masking, tourism term, _MUTABLE).
+  B-20 -> 92%.
+  **GREAT WORKS RE-KEYED TO THE REAL CIV 6 MAPPING (2026-07-27, #73).**
+  ART is now a real Great Work kind and the three kinds sit in their REAL
+  buildings (verified: Civilization wiki per-building and per-Great-Person
+  pages, Gathering Storm):
+    kind 0 WRITING - Amphitheater,     2 slots, +2 culture / +2 tourism, Writer   makes 2
+    kind 1 ART     - Art Museum,       3 slots, +2 culture / +2 tourism, Artist   makes 3
+    kind 2 MUSIC   - Broadcast Center, 1 slot,  +4 culture / +4 tourism, Musician makes 2
+  ARTIST is a work-carrying class now (it was instant-lump), and both engines
+  index works by KIND rather than the old writing/music boolean:
+  `GW_BUILDINGS/GW_SLOTS/GW_WORKS_PER_PERSON/GW_CULTURE/GW_TOURISM` +
+  `GW_CLASS_KIND` in TS, `gw*ByKind` exported, `gw_art`/`rc_gw_art` planes and
+  a `kind` argument through `_place_player_works`/`_place_rival_works` on GPU.
+  WHY THIS ENTRY WAS REWRITTEN — a process correction worth keeping. The
+  first version of this round MEASURED that the Theater-Square line is nearly
+  unbuilt in the gate (AMPHITHEATER in 1 city, MUSEUM in 1, BROADCAST_CENTER
+  in 0) and used that to REJECT the faithful re-key, on the grounds that
+  moving music to its real home would take the gate's music works from 2 to
+  zero. The owner rejected that reasoning outright: the ultimate goal is RL on
+  a FAITHFUL reproduction of Civ 6, so gate reachability is a measurement tool
+  for coverage and prioritisation, never a licence to keep a deviation. The
+  deviation is now GONE.
+  MEASURED EFFECT, reported honestly: player Great Works over the 24 seeds x
+  250 turns went writing 2 / music 2 / art 0 -> writing 2 / music 0 / art 3.
+  Music really did drop to zero (no Broadcast Center is ever built) and art
+  gained 3 (one Artist fills the one Museum). Net Great-Work tourism 12 -> 10.
+  Lower, and correct. Poke lanes updated to the real slot counts on both sides
+  (`tests/great-works.test.ts` gained an ARTIST lane; the `great_works`
+  battery lane asserts the per-kind exporter tables, the 1-slot Broadcast
+  Center overflow and the exact 3-into-3 Artist fill).
   #72 MEASUREMENT — these residuals now have a NUMBER on them. With only
   Great Works (writing/music), Seaside Resorts and wonders feeding it,
   lifetime tourism reaches at most 7 VISITING tourists over 250 turns while
@@ -391,6 +445,33 @@ Per-item weights (done% in parens where partial):
   win lands on both engines, with per-rival lifetime culture as its traced
   substrate; see the body entry). Delta +0.30 on B. Diplomatic victory is the
   remaining named condition and is blocked on the World Congress (B-22).
+- B-20 RELICS + the REAL GREAT-WORK MAPPING (2026-07-27, #73). B-20 3
+  (85% -> 92%): martyr relics on both engines (temple-slotted, 4 faith + 8
+  tourism, measured reachable at 26 held by t250 over 4 seeds), PLUS ART as a
+  real Great Work kind with all three kinds moved to their real Civ 6 buildings
+  (Amphitheater 2 / Art Museum 3 / Broadcast Center 1). Delta +0.21 on B.
+  I first REJECTED the re-key because it costs the gate its music works; the
+  owner overruled that — reachability never licenses a deviation. Artifacts,
+  National Parks, the Printing doubling and archaeology remain.
+- **NEW RESIDUAL CLASS — UNSOURCED DATA VALUES (raised 2026-07-27, #73).**
+  The #73 owner directive ("the ultimate source of truth is Civ 6; the goal is
+  RL on a FAITHFUL reproduction") points at a gap the A/B chapters do not
+  currently name. The MECHANICS have been sourced item by item, but the DATA
+  LAYER largely has not: 18 files under src/data + src/core carry explicit
+  `eyeballed` / `approximate` / `stand-in` markers on their magnitudes —
+  builtWonders (4 sites), policies (2), improvements (2), core/rivals (2), and
+  one each in wonders, units, rivals, resources, religion, projects,
+  constants, cityStates, buildings, boosts, appeal, combat.
+  WHY IT MATTERS FOR P8: parity gates prove the two engines agree, and every
+  fidelity round so far has verified a RULE. A wrong CONSTANT passes every gate
+  forever and is invisible to both — and a policy card or wonder yield that is
+  off by 2 changes what an RL agent learns to value just as surely as a wrong
+  rule does. This is the same structural blind spot the verify-before-implement
+  directive was written for, applied to numbers instead of behaviours.
+  NOT SCOPED HERE — recorded so it is not re-derived. The natural shape is a
+  per-file sourcing sweep (cite or correct each marked value), cheapest first:
+  buildings/improvements/projects are small tables with well-documented Civ 6
+  values; builtWonders and policies are the large ones.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant

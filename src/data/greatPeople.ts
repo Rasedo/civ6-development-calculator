@@ -140,92 +140,152 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
 /**
- * B-20 (Round B7): Great Works. A claimed WRITER or MUSICIAN no longer applies
- * an instant culture lump — each carries WORKS_PER_PERSON Great Works that seek
- * an OPEN SLOT in the claiming civ's cities. AMPHITHEATER holds writing works;
- * MUSEUM (the later Theater-line building — real Civ 6 splits music into the
- * Broadcast Center, but that tier is unlocked far past the gate horizon, so the
- * earlier Theater-line building carries music works here and the ARTIST-only Art
- * Museum slots are repurposed since ARTIST stays instant-lump) holds music
- * works. Each such building offers SLOTS_PER_BUILDING slots. Charges with
- * no open slot ANYWHERE degrade to the person's instant culture lump (the pre-B7
- * behaviour), one lump per overflowing charge. ARTIST stays the instant class.
+* B-20: GREAT WORKS. A claimed WRITER, ARTIST or MUSICIAN no longer applies an
+ * instant culture lump — each carries GW_WORKS_PER_PERSON[kind] Great Works
+ * that seek an OPEN SLOT of the matching building in the claiming civ's cities.
+ * Charges with no open slot ANYWHERE degrade to the person's instant culture
+ * lump (the pre-B7 behaviour), one lump per overflowing charge.
  *
- * #70/S1 — PER-KIND YIELDS, sourced. Real Civ 6 pays every Great Work in
- * CULTURE and TOURISM; NO Great Work pays gold (Relics pay faith + tourism).
- * Under Gathering Storm — this repo's canon (D-11) — a Great Work of Writing
- * is +2 culture/+2 tourism and a Great Work of Music is +4 culture/+4 tourism.
- * The B7-era note that recorded a "music +1 culture/+1 gold split" as the
- * residual was a stylization with no basis in the game; it is REFUTED here and
- * the real gap was the magnitude (music was paying writing's 2).
+ * #73 (2026-07-27) — THE REAL CIV 6 MAPPING. This block previously held music
+ * in the MUSEUM with 2 slots and left ARTIST an instant-lump class, justified
+ * by the Broadcast Center sitting past this repo's 250-turn gate horizon. That
+ * justification is RETIRED by owner directive: gate reachability is a
+ * measurement tool, never a licence to deviate from Civ 6 — the goal is RL on a
+ * faithful reproduction, and a model trained on a deliberately-wrong mechanic
+ * has learned the wrong game. The real Gathering Storm mapping, verified
+ * against the Civilization wiki ("Great Work (Civ6)", per-building and
+ * per-Great-Person pages):
  *
- * TOURISM IS UNMODELED (no tourism system anywhere in this engine — see the
- * B-20/B-27 scope-outs). When a tourism system lands it must pay these same
- * two kinds +2 (writing) / +4 (music) tourism from these same counts, and the
- * Culture-victory work in B-25 is its natural home.
+ *   kind 0 WRITING — Amphitheater,      2 slots, +2 culture / +2 tourism, Writer   makes 2
+ *   kind 1 ART     — Art Museum,        3 slots, +2 culture / +2 tourism, Artist   makes 3
+ *   kind 2 MUSIC   — Broadcast Center,  1 slot,  +4 culture / +4 tourism, Musician makes 2
+ *
+ * (RELICS are the fourth Great Work kind and live in their own constants below
+ * — they sit in a Temple slot and pay faith + tourism, not culture.)
+ *
+ * NO Great Work pays gold. The B7-era "music +1 culture/+1 gold split" note was
+ * a stylization with no basis in the game and stays REFUTED.
  */
-export const GW_WRITING_BUILDING = 'AMPHITHEATER';
-export const GW_MUSIC_BUILDING = 'MUSEUM';
-export const WORKS_PER_PERSON = 2;
-export const SLOTS_PER_BUILDING = 2;
-/**
- * B-20 (#71, 2026-07-27): TOURISM per Great Work. Sourced (Gathering Storm,
- * the ruleset this model follows — the same source as the music CULTURE
- * value): GS pairs a Great Work's tourism with its culture, so Writing pays
- * 2 Culture AND 2 Tourism and the higher-value Music work pays 4 and 4. The
- * Printing doubling (Writing 2 -> 4) is NOT modeled: no such tech effect
- * exists in this tree.
- */
-export const GW_WRITING_TOURISM = 2;
-export const GW_MUSIC_TOURISM = 4;
+/** The three slotted Great Work kinds, in the order both engines index them. */
+export const GW_WRITING = 0;
+export const GW_ART = 1;
+export const GW_MUSIC = 2;
 
-/** B-20 (#71): the per-turn TOURISM a city's Great Works generate. */
-export function greatWorkTourism(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
-  return GW_WRITING_TOURISM * (city.greatWorksWriting ?? 0) + GW_MUSIC_TOURISM * (city.greatWorksMusic ?? 0);
+/** Per-kind building, slot count, works per Great Person, culture and tourism. */
+export const GW_BUILDINGS = ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'] as const;
+export const GW_SLOTS = [2, 3, 1] as const;
+export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
+export const GW_CULTURE = [2, 2, 4] as const;
+export const GW_TOURISM = [2, 2, 4] as const;
+
+/** The Great Person class that produces each kind (the work-carrying classes). */
+export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
+  WRITER: GW_WRITING,
+  ARTIST: GW_ART,
+  MUSICIAN: GW_MUSIC,
+};
+/** Classes whose people carry Great Works (vs. the instant-lump classes). */
+export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
+
+type GwCity = { greatWorksWriting?: number; greatWorksArt?: number; greatWorksMusic?: number };
+
+/** The per-kind slotted count of a city, in kind order. */
+export function gwCount(city: GwCity, kind: number): number {
+  return (kind === GW_WRITING ? city.greatWorksWriting : kind === GW_ART ? city.greatWorksArt : city.greatWorksMusic) ?? 0;
 }
 
-export const GW_WRITING_CULTURE = 2;
-export const GW_MUSIC_CULTURE = 4;
-/** Classes whose people carry Great Works (vs. the instant-lump classes). */
-export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'MUSICIAN']);
+function gwSet(city: GwCity, kind: number, n: number): void {
+  if (kind === GW_WRITING) city.greatWorksWriting = n;
+  else if (kind === GW_ART) city.greatWorksArt = n;
+  else city.greatWorksMusic = n;
+}
 
-/** Great works stored in a city (writing + music) — the total slotted count. */
-export function cityGreatWorks(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
-  return (city.greatWorksWriting ?? 0) + (city.greatWorksMusic ?? 0);
+/** B-20 (#71): the per-turn TOURISM a city's Great Works generate. */
+export function greatWorkTourism(city: GwCity): number {
+  return GW_TOURISM[GW_WRITING] * gwCount(city, GW_WRITING) + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC);
+}
+
+/**
+ * B-20 (#73, 2026-07-27): RELICS — the fourth Great Work kind. Real Civ 6 holds
+ * a Relic in a TEMPLE's single slot and pays it +4 Faith and +8 Tourism, the
+ * densest tourism source in the game (verified: Civilization wiki
+ * "Relics"/"Great Work (Civ6)", Gathering Storm). Relics pay no culture, which
+ * is why they sit outside the GW_* kind arrays above.
+ *
+ * SOURCE, and the one deliberate deviation: real Civ 6 creates a relic when an
+ * Apostle carrying the MARTYR promotion is killed in theological combat.
+ * Promotions are not modeled, and `theologicalCombat` is deliberately ZERO-DRAW
+ * (a conditional RNG draw there would have to be mirrored draw-for-draw across
+ * both engines), so rolling for Martyr is not available. Every APOSTLE killed
+ * in theological combat martyrs instead. That OVERSTATES relic frequency by
+ * roughly the promotion odds (~1 in 7); it is recorded rather than hidden, and
+ * it keeps the routine draw-count exact. A dead MISSIONARY never yields a relic.
+ */
+export const RELIC_BUILDING = 'TEMPLE';
+export const RELIC_SLOTS_PER_BUILDING = 1;
+export const RELIC_FAITH = 4;
+export const RELIC_TOURISM = 8;
+
+/** B-20 (#73): the per-turn FAITH a city's relics pay. */
+export function relicFaith(city: { relics?: number }): number {
+  return RELIC_FAITH * (city.relics ?? 0);
+}
+
+/** B-20 (#73): the per-turn TOURISM a city's relics pay. */
+export function relicTourism(city: { relics?: number }): number {
+  return RELIC_TOURISM * (city.relics ?? 0);
+}
+
+/**
+ * B-20 (#73): place ONE relic into `cities` (visited in array order — the
+ * acquisition/slot order both engines share). It fills the LOWEST city with an
+ * open TEMPLE relic slot. Returns true when it found a home; a relic with no
+ * open slot anywhere is LOST (real Civ 6 would hold it in reserve for a later
+ * slot — that storage is a recorded simplification, not modeled).
+ */
+export function placeRelic(cities: { buildings: string[]; relics?: number }[]): boolean {
+  for (const c of cities) {
+    if (!c.buildings.includes(RELIC_BUILDING)) continue;
+    const used = c.relics ?? 0;
+    if (used >= RELIC_SLOTS_PER_BUILDING) continue;
+    c.relics = used + 1;
+    return true;
+  }
+  return false;
+}
+
+/** Great works stored in a city (all kinds) — the total slotted count. */
+export function cityGreatWorks(city: GwCity): number {
+  return gwCount(city, GW_WRITING) + gwCount(city, GW_ART) + gwCount(city, GW_MUSIC);
 }
 
 /**
  * #70/S1: the building-tier CULTURE a city's slotted works pay, by kind.
  * Both engines add this single sum at the buildings-bucket position in this
- * association — culture += (writingTerm + musicTerm).
+ * association — culture += (writingTerm + artTerm + musicTerm).
  */
-export function greatWorkCulture(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
-  return GW_WRITING_CULTURE * (city.greatWorksWriting ?? 0) + GW_MUSIC_CULTURE * (city.greatWorksMusic ?? 0);
+export function greatWorkCulture(city: GwCity): number {
+  return GW_CULTURE[GW_WRITING] * gwCount(city, GW_WRITING) + GW_CULTURE[GW_ART] * gwCount(city, GW_ART) + GW_CULTURE[GW_MUSIC] * gwCount(city, GW_MUSIC);
 }
 
 /**
- * B-20: place a Great Person's WORKS_PER_PERSON works into `cities` (visited in
- * array order — state.cities for the player, rival.cities for a rival, the
- * acquisition/slot order both engines share). Each work fills the LOWEST city
- * with an open slot of the matching building (AMPHITHEATER for writing, MUSEUM
- * for music), lowest slot first; the per-city count is bumped. Returns the count
- * of works that found NO slot (the overflow charges that fall back to a lump).
+ * B-20: place a Great Person's GW_WORKS_PER_PERSON[kind] works into `cities`
+ * (visited in array order — the acquisition/slot order both engines share).
+ * Each work fills the LOWEST city with an open slot of the matching building,
+ * lowest slot first; the per-city count is bumped. Returns the count of works
+ * that found NO slot (the overflow charges that fall back to a lump).
  */
-export function placeGreatWorks(
-  cities: { buildings: string[]; greatWorksWriting?: number; greatWorksMusic?: number }[],
-  writing: boolean,
-): number {
-  const building = writing ? GW_WRITING_BUILDING : GW_MUSIC_BUILDING;
-  let remaining = WORKS_PER_PERSON;
+export function placeGreatWorks(cities: (GwCity & { buildings: string[] })[], kind: number): number {
+  const building = GW_BUILDINGS[kind];
+  let remaining: number = GW_WORKS_PER_PERSON[kind];
   for (const c of cities) {
     if (remaining <= 0) break;
     if (!c.buildings.includes(building)) continue;
-    const used = (writing ? c.greatWorksWriting : c.greatWorksMusic) ?? 0;
-    const open = SLOTS_PER_BUILDING - used;
+    const used = gwCount(c, kind);
+    const open = GW_SLOTS[kind] - used;
     if (open <= 0) continue;
     const take = Math.min(open, remaining);
-    if (writing) c.greatWorksWriting = used + take;
-    else c.greatWorksMusic = used + take;
+    gwSet(c, kind, used + take);
     remaining -= take;
   }
   return remaining;

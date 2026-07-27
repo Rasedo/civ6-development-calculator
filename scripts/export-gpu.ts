@@ -55,7 +55,7 @@ import {
   LEVY_GOLD_COST,
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GW_WRITING_CULTURE, GW_MUSIC_CULTURE, GW_WRITING_TOURISM, GW_MUSIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -640,16 +640,23 @@ const rules = {
     // (#70/S1: writing 2, music 4 — the real GS values; NO Great Work pays
     // gold, and tourism is unmodeled). The GPU slots works into these building
     // columns and adds the matching culture at the buildings-bucket position.
-    writerCls: GP_CLASSES.indexOf('WRITER'),
-    musicianCls: GP_CLASSES.indexOf('MUSICIAN'),
-    gwWritingBidx: buildingIdx.get(GW_WRITING_BUILDING) ?? -1,
-    gwMusicBidx: buildingIdx.get(GW_MUSIC_BUILDING) ?? -1,
-    gwSlotsPerBuilding: SLOTS_PER_BUILDING,
-    gwWorksPerPerson: WORKS_PER_PERSON,
-    gwWritingCulture: GW_WRITING_CULTURE,
-    gwMusicCulture: GW_MUSIC_CULTURE,
-    gwWritingTourism: GW_WRITING_TOURISM, // B-20 (#71): tourism per Great Work
-    gwMusicTourism: GW_MUSIC_TOURISM,
+    // #73: the three slotted Great Work kinds, in kind order
+    // (0 WRITING / 1 ART / 2 MUSIC) — the REAL Civ 6 mapping:
+    // Amphitheater 2 slots, Art Museum 3, Broadcast Center 1.
+    gwClsByKind: [GP_CLASSES.indexOf('WRITER'), GP_CLASSES.indexOf('ARTIST'), GP_CLASSES.indexOf('MUSICIAN')],
+    gwBidxByKind: GW_BUILDINGS.map((b) => buildingIdx.get(b) ?? -1),
+    gwSlotsByKind: [...GW_SLOTS],
+    gwWorksByKind: [...GW_WORKS_PER_PERSON],
+    gwCultureByKind: [...GW_CULTURE],
+    gwTourismByKind: [...GW_TOURISM], // B-20 (#71): tourism per Great Work
+    // B-20 (#73): RELICS — held in a TEMPLE's single slot, paying 4 faith and
+    // 8 tourism each (GS values). Created when an APOSTLE dies in theological
+    // combat; see the RELIC_* comment in src/data/greatPeople.ts for the
+    // Martyr-promotion deviation and the reachability measurement.
+    relicBidx: buildingIdx.get(RELIC_BUILDING) ?? -1,
+    relicSlots: RELIC_SLOTS_PER_BUILDING,
+    relicFaith: RELIC_FAITH,
+    relicTourism: RELIC_TOURISM,
     // B-20 (#71): WONDER tourism = base + 1 per era advanced PAST the wonder's
     // own era. Wonder era = the era of its unlock (tech or civic); a civ's era
     // = the highest era among its completed techs/civics — the SAME scale.

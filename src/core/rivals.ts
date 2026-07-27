@@ -31,7 +31,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
-import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, GW_CLASS_KIND, placeGreatWorks, greatWorkCulture, placeRelic, relicFaith } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import {
@@ -899,7 +899,7 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
       // culture/turn each, deferred); overflow charges fall back to the instant
       // culture lump, one per charge. Other classes apply culture instantly.
       if (GW_WORK_CLASSES.has(cls)) {
-        const overflow = placeGreatWorks(rival.cities, cls === 'WRITER');
+        const overflow = placeGreatWorks(rival.cities, GW_CLASS_KIND[cls]!); // #73: per-kind
         if (fx.culture) rival.research.civicProgress += fx.culture * overflow;
       } else if (fx.culture) {
         rival.research.civicProgress += fx.culture;
@@ -1469,9 +1469,24 @@ function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number)
       if (loserRel >= 0) pres[loserRel] = Math.max(0, pres[loserRel] - THEO_PRESSURE_SWING);
     }
   }
+  // B-20 (#73): RELICS. Real Civ 6 creates a relic when an Apostle killed in
+  // theological combat carried the MARTYR promotion; promotions are unmodeled
+  // and this routine is deliberately ZERO-DRAW, so every dead APOSTLE martyrs
+  // (a recorded overstatement — see the RELIC_* comment in data/greatPeople).
+  // A dead MISSIONARY yields nothing. Granted in the SAME order as the two
+  // disbands below (defender first, then attacker) so slot placement is
+  // order-exact across engines.
+  if (def.hp <= 0 && def.type === 'APOSTLE') grantRelic(state, def.owner === 'player' ? 0 : (def.civId ?? -1) + 1);
+  if (att.hp <= 0) grantRelic(state, g); // the attacker is always an APOSTLE
   if (def.hp <= 0) disbandUnit(state, def.id);
   if (att.hp <= 0) disbandUnit(state, att.id);
   return true;
+}
+
+/** B-20 (#73): hand unified civ `civ` (0 player, r+1 rival r) one relic. */
+function grantRelic(state: GameState, civ: number): void {
+  if (civ === 0) placeRelic(state.cities);
+  else placeRelic(state.rivals[civ - 1]?.cities ?? []);
 }
 
 function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
@@ -1930,6 +1945,7 @@ export function rivalCityYields(
   // B-20: slotted Great Works — culture/turn per work BY KIND (#70/S1), the
   // buildings-tier position, pre-tier like the player's (city.ts).
   total.culture += greatWorkCulture(rc);
+  total.faith += relicFaith(rc); // B-20 (#73): relics pay faith, the city.ts twin position
   // A-4: wonder flat city yields + the belief faithPerWonder (city.ts:435-437
   // positions — pre-tier, with the buildings).
   for (const wd of rcWonders) {
