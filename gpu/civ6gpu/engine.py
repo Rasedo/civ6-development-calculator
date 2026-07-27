@@ -379,7 +379,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -647,6 +647,8 @@ class BatchSim:
         self.rr_allied = torch.zeros_like(self.rr_denounced, dtype=torch.bool)
         # B-22 (2026-07-27): per-civ WARMONGER score (grievances).
         self.r_warmonger = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # B-22 (#74): the PLAYER's grievance score — the exact r_warmonger twin.
+        self.p_warmonger = torch.zeros(B, dtype=torch.long, device=device)
         # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
         # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
         # Integer, zero-draw event hooks only; resets at every eraLength
@@ -1045,6 +1047,9 @@ class BatchSim:
         self._gw_cul_k = [float(x) for x in rr.get("gwCultureByKind", [2, 2, 4])]
         # B-20 (#71): TOURISM per Great Work — GS pairs it with culture.
         self._gw_tour_k = [int(x) for x in rr.get("gwTourismByKind", [2, 2, 4])]
+        # B-20 (#74): PRINTING doubles Great Work of WRITING tourism.
+        self._gw_printing_tech = int(rr.get("gwPrintingTech", -1))
+        self._gw_printing_mult = int(rr.get("gwPrintingWritingMult", 2))
         # B-20 (#71): WONDER tourism — base + 1 per era advanced PAST the
         # wonder's own era. Wonder era comes from its unlock; a civ's era is
         # the highest era among its completed techs/civics (the same scale).
@@ -2951,7 +2956,7 @@ class BatchSim:
             e = torch.maximum(e, (civics[:, :nc].long() * self._civic_era[:nc]).max(dim=1).values)
         return e
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — B-20 (#71): a civ's per-turn TOURISM, the `playerTourism` /
         `rivalTourism` twin. Great Works pay the GS values that pair tourism
         with culture; every OWNED unpillaged SEASIDE RESORT pays its tile's
@@ -2964,8 +2969,14 @@ class BatchSim:
         # keep paying tourism for a city the civ no longer owns — the exact
         # off-script red this arrived with (seed 9105 t144, +4 = one music
         # work of a lost city).
+        # B-20 (#74): PRINTING doubles the WRITING term (tourism only).
+        _wmult = self._gw_tour_k[0] * torch.where(
+            printing if printing is not None else torch.zeros(self.B, dtype=torch.bool, device=self.device),
+            torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
+            torch.ones(self.B, dtype=torch.long, device=self.device),
+        )
         t = (
-            self._gw_tour_k[0] * (gw_w * alive.long()).sum(dim=1)
+            _wmult * (gw_w * alive.long()).sum(dim=1)
             + self._gw_tour_k[1] * (gw_a * alive.long()).sum(dim=1)
             + self._gw_tour_k[2] * (gw_m * alive.long()).sum(dim=1)
         )
@@ -5313,6 +5324,13 @@ class BatchSim:
         from wh, river from riv, dist from the pair_dist row)."""
         for i in range(len(rows)):
             b = int(rows[i]); r = int(civ[i]); j = int(slot[i]); c_t = int(ctr[i])
+            # B-22 (#74): taking a rival city earns GRIEVANCES. At the TOP of
+            # the loop, matching TS's position at the top of captureRivalCity —
+            # which means a RAZED capture earns them too. Off-script catch
+            # (seed 9118 t69, warmonger TS=12 GPU=9): the accrual first sat
+            # below the two raze `continue`s, so razing was free. Razing a city
+            # is if anything MORE warmongering than keeping it, so TS is right.
+            self.p_warmonger[b] += self._wm_cap
             pop = max(1, (int(self.rc_pop[b, r, j]) * 3) // 4)
             # AUDIT B-30: conquest keeps infrastructure — snapshot the rival
             # city's buildings BEFORE the rc-slot hygiene wipes them, so the
@@ -12619,6 +12637,7 @@ class BatchSim:
                 self.rival_at == r,
                 self._civ_era(self.r_techs[:, r], self.r_civics[:, r]),
                 self.rc_relics[:, r],  # B-20 (#73)
+                self.r_techs[:, r, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,  # B-20 (#74)
             )
             self.r_tourism[:, r] = torch.where(active, self.r_tourism[:, r] + _tour_r, self.r_tourism[:, r])
             # B-22: grievances DECAY by 1 per turn at peace on every axis.
@@ -12900,7 +12919,12 @@ class BatchSim:
                 & (self.alive.sum(dim=1) > 0)
                 & (self.r_peaceturns[:, r] > 20)
                 & (prox <= 9)
-                & (r_str > p_str.double() * 1.3)
+                # B-22 (#74): a WARMONGERING player is ganged up on — past
+                # _wm_gang grievances the strength advantage is not required
+                # (the rival↔rival gang rule's twin). Evaluated BEFORE the
+                # draw, so it changes how often the roll fires; both engines
+                # gate identically.
+                & ((r_str > p_str.double() * 1.3) | (self.p_warmonger >= self._wm_gang))
                 & ~self.controlled[:, r]
             )
             rw = self._next_random(cond)
@@ -13987,6 +14011,19 @@ class BatchSim:
         self.tourism_total = self.tourism_total + self._tourism_of(
             self.gw_writing, self.gw_art, self.gw_music, self.alive, self.owner >= 0, self._civ_era(self.techs, self.civics),
             self.relics,  # B-20 (#73)
+            self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,  # B-20 (#74)
+        )
+        # B-22 (#74): the PLAYER's grievances decay by 1 each turn at peace with
+        # EVERY rival (floor 0) — the TS twin position, immediately after the
+        # tourism accumulator. NOTE: the +RR_WARMONGER_DOW accrual on declaring
+        # has NO GPU twin, because the GPU player has no declare-war verb at all
+        # (no diplomacy action exists in the RL space); the CAPTURE accrual does
+        # mirror, in _capture_rival_city. Recorded asymmetry — it lands with the
+        # #50 player-verb work if a DoW action is ever added.
+        self.p_warmonger = torch.where(
+            (self.p_warmonger > 0) & ~self.r_atwar.any(dim=1),
+            self.p_warmonger - 1,
+            self.p_warmonger,
         )
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------
@@ -14340,6 +14377,7 @@ class BatchSim:
             self.victory_type.to(self.dtype),  # GV-4/GV-3 victoryType
             self.civ_age[:, 0].to(self.dtype),  # B-24 S2: the player's Age (compared)
             self.tourism_total.to(self.dtype),  # B-20 (#71): cumulative TOURISM
+            self.p_warmonger.to(self.dtype),  # B-22 (#74): the player's GRIEVANCES
         ]
         for s in range(self.S):
             cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)

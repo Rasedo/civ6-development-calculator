@@ -200,9 +200,19 @@ function gwSet(city: GwCity, kind: number, n: number): void {
   else city.greatWorksMusic = n;
 }
 
+/**
+ * B-20 (#74): PRINTING doubles the TOURISM of Great Works of WRITING (real
+ * Civ 6 — verified against the Civilization wiki's Printing/Great Work pages;
+ * it is the TOURISM that doubles, not the Amphitheater's slot count, which
+ * stays at 2). Culture is untouched. `printing` is the owning civ's tech state.
+ */
+export const GW_PRINTING_TECH = 'PRINTING';
+export const GW_PRINTING_WRITING_MULT = 2;
+
 /** B-20 (#71): the per-turn TOURISM a city's Great Works generate. */
-export function greatWorkTourism(city: GwCity): number {
-  return GW_TOURISM[GW_WRITING] * gwCount(city, GW_WRITING) + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC);
+export function greatWorkTourism(city: GwCity, printing = false): number {
+  const writing = GW_TOURISM[GW_WRITING] * (printing ? GW_PRINTING_WRITING_MULT : 1) * gwCount(city, GW_WRITING);
+  return writing + GW_TOURISM[GW_ART] * gwCount(city, GW_ART) + GW_TOURISM[GW_MUSIC] * gwCount(city, GW_MUSIC);
 }
 
 /**

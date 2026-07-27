@@ -21,7 +21,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
 import {
@@ -466,7 +466,9 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
 
 export function playerTourism(state: GameState): number {
   let t = 0;
-  for (const c of state.cities) t += greatWorkTourism(c) + relicTourism(c); // B-20 (#73): relics
+  // B-20 (#74): PRINTING doubles Great Work of Writing tourism.
+  const printing = state.research.techs.includes(GW_PRINTING_TECH);
+  for (const c of state.cities) t += greatWorkTourism(c, printing) + relicTourism(c); // B-20 (#73): relics
   const owns = (tile: Tile) => tile.cityId !== -1;
   const era = civEraIndex(state.research.techs, state.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
@@ -481,7 +483,8 @@ export function rivalTourism(
   },
 ): number {
   let t = 0;
-  for (const rc of rival.cities) t += greatWorkTourism(rc) + relicTourism(rc); // B-20 (#73): relics
+  const printing = rival.research.techs.includes(GW_PRINTING_TECH); // B-20 (#74)
+  for (const rc of rival.cities) t += greatWorkTourism(rc, printing) + relicTourism(rc); // B-20 (#73): relics
   const owns = (tile: Tile) => tile.rivalId === rival.id;
   const era = civEraIndex(rival.research.techs, rival.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);

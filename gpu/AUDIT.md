@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 85.26 | **97%** |
+| B fidelity | 88 | 85.75 | **97%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **187.26** | **98%** |
-| Open chapters only (A+B) | 129 | 125.26 | **97%** |
+| **Overall (incl. closed)** | **191** | **187.75** | **98%** |
+| Open chapters only (A+B) | 129 | 125.75 | **98%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -365,8 +365,9 @@ Per-item weights (done% in parens where partial):
   accumulated one step early, so the wonder term read a stale ERA and lost
   exactly one era-past point per wonder (seed 9014 t112, a constant +1/+2).
   Moved to the matching position.
-  STILL OPEN in B-20: relics, artifacts, National Parks, the Printing
-  doubling, Great Works of ART and archaeology. B-20 -> 85%.
+  STILL OPEN in B-20 (as of #71): relics, artifacts, National Parks, the
+  Printing doubling, Great Works of ART and archaeology. B-20 -> 85%.
+  (#73 closed relics + ART; #74 closes the PRINTING doubling — see below.)
   **RELICS LANDED (2026-07-27, #73).** Real Civ 6 counts a Relic as a Great
   Work held in a TEMPLE's single slot, paying +4 FAITH and +8 TOURISM — the
   densest tourism source in the game (verified: Civilization wiki
@@ -421,6 +422,17 @@ Per-item weights (done% in parens where partial):
   (`tests/great-works.test.ts` gained an ARTIST lane; the `great_works`
   battery lane asserts the per-kind exporter tables, the 1-slot Broadcast
   Center overflow and the exact 3-into-3 Artist fill).
+  **PRINTING LANDED (2026-07-27, #74).** Real Civ 6's PRINTING tech DOUBLES the
+  TOURISM of Great Works of WRITING (verified: Civilization wiki Printing /
+  Great Work pages — it is the TOURISM that doubles, NOT the Amphitheater's
+  slot count, which stays at 2; culture is untouched). `GW_PRINTING_TECH` +
+  `GW_PRINTING_WRITING_MULT`, `greatWorkTourism(city, printing)` keyed on the
+  OWNING civ's tech state on both seats; GPU `_gw_printing_tech` multiplies the
+  writing term inside `_tourism_of`. Zero-draw, integer-only.
+  MEASURED reachable: PRINTING is researched in 9 of the 24 player seeds and by
+  46 rival civs by t250. Poke-pinned in tests/great-works.test.ts (doubles
+  writing, leaves art/music and all culture untouched).
+  B-20 RESIDUALS NOW: artifacts, National Parks and archaeology. B-20 -> 95%.
   #72 MEASUREMENT — these residuals now have a NUMBER on them. With only
   Great Works (writing/music), Seaside Resorts and wonders feeding it,
   lifetime tourism reaches at most 7 VISITING tourists over 250 turns while
@@ -472,6 +484,10 @@ Per-item weights (done% in parens where partial):
   per-file sourcing sweep (cite or correct each marked value), cheapest first:
   buildings/improvements/projects are small tables with well-documented Civ 6
   values; builtWonders and policies are the large ones.
+- #74 SMALLS (2026-07-27). B-20 3 (92% -> 95% — the PRINTING writing-tourism
+  doubling, measured reachable in 9/24 player seeds + 46 rival civs) and B-22 4
+  (50% -> 60% — the PLAYER's grievance twin + the gang-up consequence, measured
+  live at 192 civ-turns over the threshold). Delta +0.09 +0.40 = +0.49 on B.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -1352,8 +1368,34 @@ gap; likewise GS disasters are modeled minus sea-level rise
   and the decay sits beside the other per-turn civ accumulators so both
   engines apply it at the same position. NOT vacuous: the score peaks at 26
   in-gate. Parity was green on the first pass.
-  STILL OPEN: World Congress, peace deals with terms, a player-side
-  denounce/grievance verb.
+  **PLAYER GRIEVANCES LANDED (2026-07-27, #74).** The warmonger score was
+  rival-only; the PLAYER now carries the exact twin (`state.warmonger` / GPU
+  `p_warmonger`, in _MUTABLE), growing by RR_WARMONGER_DOW on declaring war and
+  RR_WARMONGER_CAPTURE on taking a rival city, decaying 1/turn while at peace
+  with EVERY rival (floor 0), at the same per-turn accumulator position in both
+  engines. The CONSEQUENCE is what makes it a cost: past RR_WARMONGER_GANG a
+  rival may declare on the player WITHOUT the usual 1.3x strength advantage —
+  the rival-rival gang rule's twin. That gate sits BEFORE the 0.08 roll, so it
+  changes how often the draw fires; both engines gate identically and scripted
+  parity is green at 0.0 milli.
+  Added to the HEAD trace as a compared column (`warmonger`, tol 0) — HEAD is 25.
+  MEASURED live, not inert: the player's score peaks at exactly the gang
+  threshold (6) with 192 civ-turns at or over it across the 24 seeds, so the
+  changed DoW gate is genuinely exercised by the scripted policy.
+  ONE OFF-SCRIPT BUG, caught by the new trace column on its first rollout
+  (seed 9118 t69, warmonger TS=12 GPU=9 — exactly one capture): the GPU
+  accrual sat BELOW the two raze `continue` branches in `_capture_rival_city`,
+  so RAZING a city was free of grievances while keeping it was not. TS accrues
+  at the top of `captureRivalCity`, before any raze logic, and TS is right —
+  razing is if anything MORE warmongering than keeping. Moved to the top of the
+  per-row loop. This is exactly why a new accumulator gets a compared trace
+  column the day it lands.
+  RECORDED ASYMMETRY: the +DOW accrual has no GPU twin because the GPU player
+  has NO declare-war verb at all (no diplomacy action exists in the RL space);
+  the CAPTURE accrual does mirror. It lands with the #50 player-verb work if a
+  DoW action is ever added. Poke lanes: tests/grievances.test.ts (5) + the
+  `geopolitics` battery lane (_MUTABLE, decay, floor).
+  STILL OPEN: World Congress and peace deals with terms.
 - B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
   serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
   hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw

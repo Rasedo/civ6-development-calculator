@@ -283,6 +283,12 @@ export interface GameState {
    *  Seaside Resorts; wonders/relics/artifacts/National Parks are recorded
    *  residuals, and the Culture VICTORY itself rides B-25. */
   tourismTotal?: number;
+  /** B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of
+   *  RivalCiv.warmonger. Grows on declaring war and on taking a rival city,
+   *  decays 1/turn while at peace with every rival. Past RR_WARMONGER_GANG a
+   *  rival may declare on the player WITHOUT the usual strength advantage,
+   *  which is real Civ 6's gang-up-on-the-warmonger consequence. */
+  warmonger?: number;
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).

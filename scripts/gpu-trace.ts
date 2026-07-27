@@ -65,6 +65,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     state.victoryType ?? 0, // GV-4/GV-3 victoryType
     state.civAges?.[0] ?? 1, // B-24 S2: the player's Age (compared)
     state.tourismTotal ?? 0, // B-20 (#71): cumulative TOURISM (integer)
+    state.warmonger ?? 0, // B-22 (#74): the player's GRIEVANCES (integer)
   ];
   for (let s = 0; s < csMax; s++) {
     // Keyed by id (== the GPU's static slot), NOT array position: a captured
@@ -157,13 +158,13 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
   // Must match traceRow's column order EXACTLY. HEAD is 24: the 18 base cols
-  // + GV leader/gameOver/winner/victoryType + playerAge + TOURISM (all
-  // integer; B-24 S2 and B-20 #71). Each rival is 19: the 12 base +
+  // + GV leader/gameOver/winner/victoryType + playerAge + TOURISM + WARMONGER
+  // (all integer; B-24 S2, B-20 #71, B-22 #74). HEAD is 25 now. Each rival is 19: the 12 base +
   // treasury/rGScore (both float ×1000, tol 2) + rrWarMask + age + tourism
   // + faith (float ×1000, tol 2) + followedSum + cultureTotal (float ×1000,
   // tol 2, B-25 #72) = 20. A stale tol silently shifts every later
   // column's tolerance — keep them in lockstep.
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
   for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 2, 0, 2);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)

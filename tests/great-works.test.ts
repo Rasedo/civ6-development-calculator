@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders } from './helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
-import { placeGreatWorks, cityGreatWorks, greatWorkCulture, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC } from '../src/data/greatPeople';
+import { placeGreatWorks, cityGreatWorks, greatWorkCulture, greatWorkTourism, GW_TOURISM, GW_CULTURE, GW_WORKS_PER_PERSON, GW_SLOTS, GW_WRITING, GW_ART, GW_MUSIC } from '../src/data/greatPeople';
 // #73: the kind arrays replaced the writing/music pair — these aliases keep the
 // existing assertions readable now that ART is a real kind with its own slots.
 const GW_WRITING_CULTURE = GW_CULTURE[GW_WRITING];
@@ -84,6 +84,20 @@ describe('B-20 Great Works', () => {
 
     const cul1 = computeCityStats(state, city).breakdown.buildings.culture;
     expect(cul1 - cul0).toBe(GW_CULTURE[GW_ART] * 3); // +6
+  });
+
+  // B-20 (#74): PRINTING doubles the TOURISM of Great Works of WRITING (real
+  // Civ 6 — the tourism, not the Amphitheater's slot count). Culture is
+  // untouched, and the other two kinds are untouched.
+  it('#74: PRINTING doubles WRITING tourism only', () => {
+    const w = { greatWorksWriting: 2 };
+    expect(greatWorkTourism(w, false)).toBe(GW_TOURISM[GW_WRITING] * 2);
+    expect(greatWorkTourism(w, true)).toBe(GW_TOURISM[GW_WRITING] * 2 * 2);
+    // ... art and music are NOT doubled
+    const am = { greatWorksArt: 2, greatWorksMusic: 1 };
+    expect(greatWorkTourism(am, true)).toBe(greatWorkTourism(am, false));
+    // ... and CULTURE never moves
+    expect(greatWorkCulture(w)).toBe(GW_CULTURE[GW_WRITING] * 2);
   });
 
   it('#70/S1: greatWorkCulture weights every kind separately', () => {

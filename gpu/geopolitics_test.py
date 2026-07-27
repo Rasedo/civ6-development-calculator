@@ -313,5 +313,26 @@ def main() -> None:
     print("GEOPOLITICS (A-19/B-33/B-22) POKES OK")
 
 
+    # --- B-22 (#74): the PLAYER's grievance twin -----------------------------
+    from civ6gpu.engine import _MUTABLE as _MUT2
+    assert "p_warmonger" in _MUT2, "p_warmonger must be registered in _MUTABLE"
+    s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    assert s3.p_warmonger.shape == (1,), s3.p_warmonger.shape
+    # snapshot/restore round-trip
+    s3.p_warmonger[:] = 7
+    _snap = s3.snapshot()
+    s3.p_warmonger[:] = 0
+    s3.restore(_snap)
+    assert int(s3.p_warmonger[0]) == 7, "p_warmonger must survive snapshot/restore"
+    # decay only at peace on EVERY axis, floored at 0
+    s3.r_atwar[:] = False
+    s3.p_warmonger[:] = 2
+    s3.step()
+    assert int(s3.p_warmonger[0]) <= 1, "grievances must decay at peace"
+    s3.p_warmonger[:] = 0
+    s3.step()
+    assert int(s3.p_warmonger[0]) == 0, "decay floors at zero"
+    print("player grievances OK — _MUTABLE, decay, floor")
+
 if __name__ == "__main__":
     main()

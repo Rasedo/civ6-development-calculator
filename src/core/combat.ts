@@ -14,7 +14,7 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_H
 import { BUILDINGS } from '../data/buildings';
 import { CS_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
-import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP, ERA_SCORE_CONQUER } from '../data/rivals';
+import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP, ERA_SCORE_CONQUER, RR_WARMONGER_CAPTURE } from '../data/rivals';
 import { addEraScore } from './eras';
 import {
   nextRandom,
@@ -994,6 +994,9 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
  * P5/S6: `plunder=false` for loyalty defections — same raze-at-6, territory
  * and elimination semantics, no +40 and no conquest log line. */
 export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity, plunder = true): void {
+  // B-22 (#74): taking a rival's city earns the PLAYER grievances — the twin of
+  // transferRivalCityToRival's RR_WARMONGER_CAPTURE on the rival side.
+  state.warmonger = (state.warmonger ?? 0) + RR_WARMONGER_CAPTURE;
   rival.cities = rival.cities.filter((c) => c.id !== city.id);
   relocatePalace(rival.cities); // #70/S4 (A-9): the losing rival re-crowns its biggest city
   // A-11: routes die with their endpoint (the state.tradeRoutes twin).

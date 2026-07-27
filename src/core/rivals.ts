@@ -560,6 +560,9 @@ export function declareWar(state: GameState, rivalId: number): RuleResult {
   if (rival.atWar) return no('Already at war.');
   rival.atWar = true;
   rival.warTurns = 0;
+  // B-22 (#74): the player earns GRIEVANCES for declaring, exactly as a rival
+  // does (RR_WARMONGER_DOW at the rival↔rival DoW site).
+  state.warmonger = (state.warmonger ?? 0) + RR_WARMONGER_DOW;
   state.eventLog.push(`War declared on ${rival.name}!`);
   return ok;
 }
@@ -3290,7 +3293,10 @@ export function rivalPhase(state: GameState): void {
         state.cities.length > 0 &&
         rival.peaceTurns > 20 &&
         rivalProximity(state, rival) <= 9 &&
-        rivalStrength(state, rival) > playerStrength(state) * 1.3 &&
+        // B-22 (#74): a WARMONGERING player is ganged up on — past
+        // RR_WARMONGER_GANG grievances a rival declares without the usual
+        // strength advantage, the exact twin of the rival↔rival gang rule.
+        ((state.warmonger ?? 0) >= RR_WARMONGER_GANG || rivalStrength(state, rival) > playerStrength(state) * 1.3) &&
         nextRandom(state) < 0.08 * (0.5 + rival.aggression)
       ) {
         rival.atWar = true;

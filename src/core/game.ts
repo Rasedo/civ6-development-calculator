@@ -896,6 +896,12 @@ export function endTurn(state: GameState): void {
   // after the city loop, so the GPU mirrors at the same position. Great Works
   // plus every owned Seaside Resort (worth its tile's appeal).
   state.tourismTotal = (state.tourismTotal ?? 0) + playerTourism(state);
+  // B-22 (#74): the player's GRIEVANCES decay by 1 each turn they are at peace
+  // with EVERY rival (floor 0) — the exact twin of the rival decay, at the same
+  // per-turn accumulator position so both engines apply it together.
+  if ((state.warmonger ?? 0) > 0 && !state.rivals.some((rv) => rv.atWar)) {
+    state.warmonger = (state.warmonger ?? 0) - 1;
+  }
 
   // Loyalty collapses resolve after the city loop (they mutate the list).
   for (const city of defectors) flipCityToRival(state, city);

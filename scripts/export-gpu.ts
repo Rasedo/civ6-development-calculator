@@ -55,7 +55,7 @@ import {
   LEVY_GOLD_COST,
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -649,6 +649,10 @@ const rules = {
     gwWorksByKind: [...GW_WORKS_PER_PERSON],
     gwCultureByKind: [...GW_CULTURE],
     gwTourismByKind: [...GW_TOURISM], // B-20 (#71): tourism per Great Work
+    // B-20 (#74): PRINTING doubles Great Work of WRITING tourism (real Civ 6 —
+    // the tourism, not the slot count). Index into the exported tech list.
+    gwPrintingTech: techIdx.get(GW_PRINTING_TECH) ?? -1,
+    gwPrintingWritingMult: GW_PRINTING_WRITING_MULT,
     // B-20 (#73): RELICS — held in a TEMPLE's single slot, paying 4 faith and
     // 8 tourism each (GS values). Created when an APOSTLE dies in theological
     // combat; see the RELIC_* comment in src/data/greatPeople.ts for the
