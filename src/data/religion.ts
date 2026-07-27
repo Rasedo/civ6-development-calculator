@@ -391,7 +391,28 @@ export const APOSTLE_CAP = 1;
  * routes diverge; from 406 the next step costs 4 with 3 MP left, so the GPU
  * stalls while TS's route stays cheap. Note engine.py already warns that
  * `self.neigh` order is "NOT the riverMask direction order neighbors() uses".
- * NEXT STEP: print the candidate list at tile 362 on both sides — each
+ * HUNT #10 — THE CANDIDATE LIST AT 362, and it names the mechanism.
+ * From 362 (d4 to 453) there are exactly TWO strictly-closer neighbours, and
+ * they are EQUIDISTANT: direction 0 = tile 363 (d3, tmove 3 -> cost 2) and
+ * direction 5 = tile 406 (d3, tmove 0 -> cost 1). Direction order must pick
+ * 363. The GPU picked 406, so 363 was REJECTED by its step-legality check —
+ * and indeed rival 0's own missionary walked ONTO 363 at t90 and was still
+ * standing there at t91 (GPU log: `t90 r0 u11 407->363`).
+ * So rival 1's route depends on WHETHER RIVAL 0'S UNIT HAS VACATED 363 at the
+ * moment rival 1's phase runs. Both engines process rivals in id order, so the
+ * suspect is now precise: a one-step difference in WHEN rival 0's missionary
+ * leaves 363 (or in whether the occupied tile blocks a foreign civilian at
+ * all) reroutes rival 1 and costs it the two tiles.
+ * Note the costs make this bite hard: via 363 the route is cost 2 but leads
+ * onward cheaply to 408; via 406 the next step costs 4 against 3 MP left, so
+ * the unit stalls. That is exactly the 408-vs-406 split.
+ * NEXT STEP: log, for BOTH engines on the same event, rival 0's unit position
+ * at the moment rival 1's spread phase reads tile 363 — i.e. print the
+ * occupancy of 363 at the top of each civ's spread pass, t90-t92. If the
+ * occupancy differs, the bug is upstream in rival 0's walk timing; if it
+ * matches, the bug is in the foreign-civilian blocking rule
+ * (`tileFreeForUnit` vs `_blocked_for("rciv")`).
+ * OLD NEXT STEP: print the candidate list at tile 362 on both sides — each
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
