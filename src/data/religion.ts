@@ -466,6 +466,33 @@ export const APOSTLE_CAP = 1;
  * The unit is at 363 with 2 charges and target 362 at d1, so it should
  * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
  * relocates it there and the other does not.
+ * ============================ ROOT CAUSE FOUND ============================
+ * HUNT #20. Instrumented `disbandUnit` to print its CALLER (which is what I
+ * should have done ~15 passes earlier) and it names the path outright:
+ *   DIS s9183 t86 #39 MISSIONARY civ0 @363 c1
+ *        <- at theologicalCombat (rivals.ts:1419)
+ *           at rivalMissionaryActions (rivals.ts:1440)
+ * So in TS an APOSTLE initiates THEOLOGICAL COMBAT at t86 and KILLS rival 0's
+ * missionary #39. The GPU never runs that fight, so its slot 11 survives,
+ * stays parked on tile 363, and becomes the phantom blocker that reroutes
+ * rival 1 — which is the whole cascade.
+ * I MUST CORRECT MY OWN EARLIER CONCLUSION: hunt #14 said "the bug is
+ * upstream and has nothing to do with apostles". That was WRONG. I had
+ * checked the theological-combat log for seed 9066 (first fight t201) and
+ * generalised it — but the divergence seed is 9183, where a fight happens at
+ * t86. Checking the wrong seed's log is what cost the intervening passes.
+ * ALREADY-KNOWN CANDIDATE FIX, now promoted to prime suspect: the GPU's
+ * `_theological_combat` defender scan searches ONLY the rival pool
+ * (`self.v_civ != r`), while TS's scans `unitsAt` over the neighbours and
+ * explicitly handles a PLAYER defender. Re-examine that scan against this
+ * case: attacker = rival 1's apostle, defender = rival 0's MISSIONARY (a
+ * rival civilian). Check in particular whether the GPU's `d == 1` adjacency
+ * and its `rs > 0` religious-strength gate actually admit a rival CIVILIAN
+ * slot, and whether `act`/`cand` even contains the attacking apostle that
+ * turn.
+ * NEXT SESSION: diff `_theological_combat`'s eligibility against TS's at
+ * seed 9183 t86 — attacker apostle, defender #39 @363. One targeted probe.
+ * =========================================================================
  * HUNT #18/#19 — TWO MORE LEADS KILLED BY READING, so do not re-try them:
  *  - the "second charge-decrement site" (rivals.ts:1299) lives inside
  *    `rivalBuilderActions` and only ever runs for BUILDERs. It cannot touch a
@@ -528,7 +555,7 @@ export const APOSTLE_CAP = 1;
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
-export const APOSTLE_BUY_LIVE = false; // #71: INERT — divergence pinned to ONE TURN, see below
+export const APOSTLE_BUY_LIVE = false; // #71: INERT — ROOT CAUSE FOUND, see below
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
