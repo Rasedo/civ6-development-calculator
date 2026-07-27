@@ -109,6 +109,24 @@ describe('#70/S3 general aura: +1 movement', () => {
     expect(still.fortifyTurns).toBe(2); // one per refresh, capped at 2
   });
 
+  // B-26 (2026-07-27): a NAVAL unit never digs in (real Civ 6 has no naval
+  // fortify), and that now matters for BARBARIANS too — coastal camps field
+  // GALLEY/QUADRIREME raiders. The GPU's barb pool was missing this gate, so
+  // every idle hull collected +6 defense TS never granted it.
+  it('a naval unit never fortifies — barbarian hulls included', () => {
+    const state = newGame();
+    const ctr = state.cities[0].centerIndex;
+    const water = state.map.tiles[tileAt(state, ctr, 1)];
+    water.terrain = 'COAST';
+    const hull = spawnUnit(state, 'GALLEY', water.index, 'barbarian')!;
+    const land = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 'barbarian')!;
+    refreshUnits(state);
+    refreshUnits(state);
+    refreshUnits(state);
+    expect(hull.fortifyTurns ?? 0).toBe(0);
+    expect(land.fortifyTurns).toBe(2); // the land control: same idleness, digs in
+  });
+
   it('units that never refreshed fall back to their base moves (no NaN gate)', () => {
     const state = newGame();
     const w = spawnUnit(state, 'WARRIOR', tileAt(state, state.cities[0].centerIndex, 3), 'player')!;

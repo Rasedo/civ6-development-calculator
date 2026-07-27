@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 84.6 | **96%** |
+| B fidelity | 88 | 84.75 | **96%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **186.6** | **98%** |
-| Open chapters only (A+B) | 129 | 124.6 | **97%** |
+| **Overall (incl. closed)** | **191** | **186.75** | **98%** |
+| Open chapters only (A+B) | 129 | 124.75 | **97%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -375,6 +375,12 @@ Per-item weights (done% in parens where partial):
   from these per-item weights gives 81.63. The 0.2 over-claim is
   corrected here — the FOURTH time this table has drifted from its own
   ledger. Always re-sum from the per-item lines, last occurrence wins.
+- B-26 NAVAL BARBS (2026-07-27). B-26 3 (90% -> 95% — coastal camps field
+  GALLEY/QUADRIREME raiders on both engines; see the body entry for the four
+  GPU bugs and the two poke lanes). Delta +0.15 on B. Only CLIFFS and
+  camp-spawn escalation remain in B-26, and cliffs are the larger of the two
+  by a wide margin (a new edge property touching mapgen, movement and
+  adjacency).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -892,8 +898,57 @@ gap; likewise GS disasters are modeled minus sea-level rise
   (unlike `_rival_unit_war_act`, which has both); wiring it needs a new
   GPU walker class (full-range scan + a barb `_hostile_ranged_strike`
   variant), so per the brief's descope clause ranged barbs are recorded
-  here. STILL OPEN in B-26: no cliffs, ranged/naval barbs, scout-then-
-  raid escalation, camp-spawn escalation beyond the melee ladder.
+  here. (RANGED barbs LANDED later, #70/S5 — see the ledger.)
+  **NAVAL BARBS LANDED (2026-07-27, #71).** Real Civ 6 coastal camps put
+  out hulls, so the 0.1-roll raid site now spawns a GALLEY (QUADRIREME
+  past the same era turn the crossbow ladder uses) for every FOURTH camp
+  by INDEX (`campNo % 4 === 1` — a residue chosen so it never collides
+  with the `% 3` ranged rule), on the LOWEST-INDEX free water neighbour
+  of the camp. ZERO-DRAW: the 0.1 roll already fired and nothing else is
+  consulted, so the draw stream is untouched. A barbarian owns no tech,
+  so its water plane is `wpass` MINUS ocean — TS `waterEnterable` gates
+  OCEAN on the owner's CARTOGRAPHY, which barbs never have; both engines
+  therefore restrict spawn, march and post-kill advance to COAST/LAKE.
+  Exporter: `unitCombat`/`unitMoves`/`unitRangedStrength`/`unitRangedRange`
+  widened to 9 entries (7 = GALLEY, 8 = QUADRIREME) plus `unitNaval` and
+  `barbNavalTypes`; GPU `_barb_galley_idx`/`_barb_quad_idx`,
+  `_barb_water_ok`, `_spawn_barb(..., naval=True)`.
+  FOUR GPU BUGS, all ONE stale assumption ("barbarians are never naval")
+  written into four different places: (1) `_spawn_barb` probed the LAND
+  plane, so the hull was silently dropped (seed 9170 t16, barbs TS=4
+  GPU=3); (2) the melee post-kill ADVANCE hard-coded `adv_terr = land_ok`
+  for barb attackers, so a hull that killed an adjacent land civilian
+  walked ASHORE and then besieged the city from a land tile (seed 9170
+  t34, city hp 113 vs 93 — the GPU city never healed); (3) the roll-free
+  civilian-kill advance had no terrain gate at all; (4) the barb FORTIFY
+  update had no `~naval` term — the rival and player pools have always
+  had one (TS `refreshUnits` gates the dig-in on `!naval`), and its
+  comment said in so many words "barbs are never naval so u_fortify is
+  untouched". Every idle hull therefore collected the full +6 fortify
+  defense TS never grants it. `_barb_water_ok` is now the single shared
+  plane for the first three sites. A pre-existing field-name collision
+  surfaced too: `_galley_idx` was already the roster index 12, so the
+  barb-table field was renamed.
+  HUNT NOTE: (4) was invisible to scripted parity (0.0 milli across
+  24x250) and surfaced only in the ROLLOUT, as a 6.0-CS split on the
+  `mel`/`melc` pair the moment a player unit first attacked a hull (seed
+  9212 t80). The statelog pinned the turn but named the wrong culprit —
+  the GPU BU line prints a side marker, not the unit type, so the
+  defender read as a SPEARMAN; instrumenting TS's `meleeAttack` to dump
+  its CS terms is what identified it as a GALLEY at `fort0`. Lesson
+  recorded: when a mechanic gains a NEW UNIT CLASS, grep every comment
+  that asserts the old invariant — all four sites here were findable by
+  searching for the sentence, not by reading the diff.
+  IN-GATE: exercised — seed 9170 spawns a galley by t16 and it kills a
+  civilian at t33, which is what caught bugs (2) and (3). Poke lanes:
+  `tests/combat.test.ts` "a coastal camp fields a barbarian hull, on
+  water" and "a barbarian hull kills ashore but never advances onto
+  land"; `tests/aura-movement.test.ts` "a naval unit never fortifies —
+  barbarian hulls included" (with a land control unit in the same test).
+  B-26 -> 95%.
+  STILL OPEN in B-26: no cliffs (a new edge property — mapgen +
+  movement + adjacency, the single largest remaining item), and
+  camp-spawn escalation beyond the melee ladder.
 - B-28. RESOLVED (2026-07-13, task #44): `terrainDefense` gives −2 on
   MARSH/FLOODPLAINS (was +3); GPU split the dual-purpose plane into
   `tdef` (defense) + `tmove` (enter cost) so movement is unchanged.

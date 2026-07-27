@@ -21,6 +21,7 @@ import {
 import { routeRaided } from '../src/core/trade';
 import { CITY_MAX_HP } from '../src/data/units';
 import { neighbors } from '../src/core/hex';
+import { isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 
 function battlefield() {
@@ -80,6 +81,44 @@ describe('combat', () => {
     expect(atk.tileIndex).toBe(campTile.index);
     expect(state.barbCamps.length).toBe(0);
     expect(state.treasury).toBe(gold + 50);
+  });
+
+  // B-26 (2026-07-27): NAVAL barbarians. Two invariants the GPU mirror got
+  // wrong until seed 9170 t34 caught it — a hull spawns on WATER, and killing
+  // an adjacent LAND unit never walks it ashore (tileFreeForUnit refuses land
+  // to a naval unit, so meleeAttack's advance is skipped).
+  it('B-26: a coastal camp fields a barbarian hull, on water', () => {
+    const state = makeState(makeMap(20, 20));
+    state.unitsMode = true;
+    foundCity(state, tileAtCoords(state.map, 9, 9).index);
+    // campNo % 4 === 1 is the naval camp, so camp 0 is a landlocked decoy.
+    state.barbCamps.push(tileAtCoords(state.map, 3, 3).index);
+    const camp1 = tileAtCoords(state.map, 15, 15);
+    state.barbCamps.push(camp1.index);
+    for (const n of neighbors(state.map, camp1)) n.terrain = 'COAST';
+
+    let galley: ReturnType<typeof spawnUnit> = null;
+    for (let i = 0; i < 400 && !galley; i++) {
+      barbarianPhase(state);
+      galley = state.units.find((u) => u.owner === 'barbarian' && u.type === 'GALLEY') ?? null;
+    }
+    expect(galley).not.toBeNull();
+    expect(isWater(state.map.tiles[galley!.tileIndex])).toBe(true);
+  });
+
+  it('B-26: a barbarian hull kills ashore but never advances onto land', () => {
+    const { state } = battlefield();
+    const water = tileAtCoords(state.map, 11, 9);
+    water.terrain = 'COAST';
+    const galley = spawnUnit(state, 'GALLEY', water.index, 'barbarian')!;
+    galley.tileIndex = water.index;
+    const land = tileAtCoords(state.map, 12, 9);
+    const builder = spawnUnit(state, 'BUILDER', land.index)!;
+    builder.tileIndex = land.index;
+
+    expect(meleeAttack(state, galley.id, land.index).ok).toBe(true);
+    expect(state.units.some((u) => u.id === builder.id)).toBe(false); // the kill lands
+    expect(galley.tileIndex).toBe(water.index); // ... the hull stays afloat
   });
 
   it('ranged attacks take no retaliation and civilians die to melee', () => {

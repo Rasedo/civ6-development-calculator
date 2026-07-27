@@ -879,6 +879,11 @@ const rules = {
       UNITS.ARCHER.combat,
       UNITS.CROSSBOWMAN.combat,
       UNITS.SCOUT.combat, // B-26 (#71): 6 = SCOUT — the scout-then-raid opener
+      // B-26 (2026-07-27): 7 = GALLEY, 8 = QUADRIREME — the barb NAVAL ladder
+      // for coastal camps. Appended LAST: this array's order IS the GPU's barb
+      // u_type, so anything but an append renumbers every existing barb.
+      UNITS.GALLEY.combat,
+      UNITS.QUADRIREME.combat,
     ],
     // B-26 (#71): the barb MOVES table. The GPU raider march used to hardcode
     // 2 MP, which was correct only while every barb type had 2 — the SCOUT
@@ -892,9 +897,15 @@ const rules = {
       UNITS.ARCHER.moves ?? 2,
       UNITS.CROSSBOWMAN.moves ?? 2,
       UNITS.SCOUT.moves ?? 2,
+      UNITS.GALLEY.moves ?? 3,
+      UNITS.QUADRIREME.moves ?? 3,
     ],
-    unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0, 0],
-    unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0, 0],
+    unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0, 0, 0, UNITS.QUADRIREME.ranged?.strength ?? 0],
+    unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0, 0, 0, UNITS.QUADRIREME.ranged?.range ?? 0],
+    // B-26 (2026-07-27): which barb u_types are NAVAL hulls — the barb twin of
+    // the roster's `naval` flag, so the raider march can pick the water plane.
+    unitNaval: [0, 0, 0, 0, 0, 0, 0, 1, 1],
+    barbNavalTypes: [7, 8], // GALLEY, then QUADRIREME past crossbowmanAfterTurn
     campClearReward: 50,
     dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1

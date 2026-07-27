@@ -1321,6 +1321,15 @@ function barbRangedType(turn: number): string {
 }
 
 /**
+ * B-26 (2026-07-27): the barbarian NAVAL ladder. Real Civ 6 coastal camps put
+ * out hulls, not just land raiders. GALLEY, then QUADRIREME past the same era
+ * turn the crossbow ladder uses. Spawn TYPE only — draw-count neutral.
+ */
+function barbNavalType(turn: number): string {
+  return turn > 120 ? 'QUADRIREME' : 'GALLEY';
+}
+
+/**
  * B-26 (#71): SCOUT-THEN-RAID. Real Civ 6 camps open with a scout that goes
  * looking for a target, and only then start producing raiders. Mirrored as
  * the spawn TYPE of a BRAND-NEW camp: its first unit is a SCOUT, while the
@@ -1383,8 +1392,29 @@ export function barbarianPhase(state: GameState): void {
       nextRandom(state) < 0.1
     ) {
       // #70/S5 (B-26): every third camp raids RANGED, the rest melee.
-      const type = campNo % 3 === 0 ? barbRangedType(state.turn) : barbMeleeType(state.turn);
-      spawnUnit(state, type, campIdx, 'barbarian');
+      // B-26 (2026-07-27): NAVAL barbarians — every FOURTH camp (a different
+      // residue, so it never collides with the ranged rule) puts out a hull
+      // instead, when it is COASTAL and has a free adjacent water tile. The
+      // spot is the LOWEST-index free water neighbour, so this is zero-draw:
+      // the 0.1 roll above already fired and nothing else is consulted.
+      const water = neighbors(map, map.tiles[campIdx])
+        // A tech-less barbarian cannot enter OCEAN (waterEnterable gates it on
+        // CARTOGRAPHY), so only COAST/LAKE count — otherwise spawnUnit's own
+        // probe would reject the pick and the two engines would disagree.
+        .filter(
+          (n) =>
+            isWater(n) &&
+            n.terrain !== 'OCEAN' &&
+            !isImpassable(n) &&
+            unitsAt(state, n.index).length === 0,
+        )
+        .sort((x, y) => x.index - y.index)[0];
+      if (campNo % 4 === 1 && water) {
+        spawnUnit(state, barbNavalType(state.turn), water.index, 'barbarian');
+      } else {
+        const type = campNo % 3 === 0 ? barbRangedType(state.turn) : barbMeleeType(state.turn);
+        spawnUnit(state, type, campIdx, 'barbarian');
+      }
     }
   }
 

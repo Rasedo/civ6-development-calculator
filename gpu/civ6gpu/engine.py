@@ -1583,6 +1583,13 @@ class BatchSim:
             _urs.append(_s)
             _urr.append(_r)
         self._unit_combat = torch.tensor(_uc, dtype=torch.long, device=device)
+        # B-26 (2026-07-27): barb NAVAL flags + the two hull u_types, in the
+        # BARB table's own index space (not the roster's).
+        _un = rules.combat.get("unitNaval", []) or [0] * len(_uc)
+        self._u_naval = torch.tensor(list(_un) + [0] * 8, dtype=torch.bool, device=device)
+        _bn = rules.combat.get("barbNavalTypes", []) or []
+        self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
+        self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
         # #70/S5 (B-26): barb ranged strength / range, parallel to _unit_combat
         # (0 = melee-only). The u_ twins of _p_rng_str / _p_rng_rng.
         self._u_rng_str = torch.tensor(_urs, dtype=torch.long, device=device)
@@ -4632,12 +4639,22 @@ class BatchSim:
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         return first < 7, spot
 
-    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int) -> None:
+    def _barb_water_ok(self, tiles: torch.Tensor) -> torch.Tensor:
+        """B-26: the water plane a BARBARIAN hull may enter — wpass minus
+        OCEAN. Barbarians own no tech, so TS's waterEnterable (which gates
+        OCEAN on the owner's CARTOGRAPHY) always refuses ocean for them."""
+        tc = tiles.clamp(min=0).unsqueeze(1)
+        return (self.wpass.gather(1, tc) & ~self.ocean_tile.gather(1, tc)).squeeze(1)
+
+    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int, naval: bool = False) -> None:
         """Barbarians are military; appends to the slot list, which is what
         keeps GPU unit order identical to state.units array order."""
         if not bool(mask.any()):
             return
-        found, spot = self._first_free_spot(at_tile, "barb")
+        # B-26: a NAVAL barb probes the WATER plane (its hull cannot stand
+        # ashore), exactly as TS's spawnUnit branches on UNITS[type].naval.
+        _nm = torch.ones(self.B, dtype=torch.bool, device=self.device) if naval else None
+        found, spot = self._first_free_spot(at_tile, "barb", naval_mask=_nm)
         can = mask & found
         if not bool(can.any()):
             return
@@ -6344,6 +6361,13 @@ class BatchSim:
         # list (campNo % 3 === 0). Spawn TYPE only: the 0.1 raid roll is
         # untouched, so this stays draw-count neutral.
         ranged_type = 5 if self.turn > cb.get("crossbowmanAfterTurn", 120) else 4
+        # B-26 (2026-07-27): the barb NAVAL ladder — GALLEY, then QUADRIREME
+        # past the same era turn the crossbow ladder uses.
+        self._barb_naval_type = (
+            self._barb_quad_idx
+            if self.turn > cb.get("crossbowmanAfterTurn", 120)
+            else self._barb_galley_idx
+        )
 
         # New camp? One draw whenever below the cap AND any CIVILIZATION
         # still holds a city — A-15: the TS gate is anyCivCity now (player
@@ -6417,7 +6441,32 @@ class BatchSim:
             # splices left exactly like state.barbCamps.splice, so slots
             # 0..n_camps-1 are dense and in the same order as the TS array.
             grow_type = ranged_type if k % 3 == 0 else melee_type
-            self._spawn_barb(can_grow & (r < cb.get("garrisonGrowChance", 0.1)), camp, grow_type)
+            _raid = can_grow & (r < cb.get("garrisonGrowChance", 0.1))
+            # B-26 (2026-07-27): NAVAL barbs. Every FOURTH camp (a residue that
+            # never collides with the ranged rule) puts out a HULL instead when
+            # it is coastal, on the LOWEST-index free water neighbour. Zero-draw
+            # — the 0.1 roll above already fired and nothing else is consulted.
+            _nav_done = torch.zeros_like(_raid)
+            if k % 4 == 1 and self._barb_naval_type >= 0:
+                _nb = self.neigh[camp.clamp(min=0)]  # [B, 6]
+                _nbc = _nb.clamp(min=0)
+                _free = (
+                    (_nb >= 0)
+                    & self.wpass.gather(1, _nbc)
+                    & ~self.ocean_tile.gather(1, _nbc)  # barbs have no CARTOGRAPHY
+                    & (self.barb_at.gather(1, _nbc) < 0)
+                    & (self.pmil_at.gather(1, _nbc) < 0)
+                    & (self.pciv_at.gather(1, _nbc) < 0)
+                    & (self.rv_at.gather(1, _nbc) < 0)
+                    & (self.rvciv_at.gather(1, _nbc) < 0)
+                )
+                _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
+                _best = _key.min(dim=1).values
+                _nav = _raid & (_best <= self.T)
+                if bool(_nav.any()):
+                    self._spawn_barb(_nav, _best.clamp(max=self.T - 1), self._barb_naval_type, naval=True)
+                    _nav_done = _nav
+            self._spawn_barb(_raid & ~_nav_done, camp, grow_type)
 
         # One guard stays home per camp: first unit (in unit order) within
         # reach of each camp (in camp order), like the TS guard set. Only
@@ -6653,7 +6702,17 @@ class BatchSim:
             while bool(moving.any()):
                 nb2 = self.neigh[cur.clamp(min=0)]
                 nb2c = nb2.clamp(min=0)
-                step_ok = (nb2 >= 0) & self.passable.gather(1, nb2c) & ~self._blocked_for(nb2, "barb")
+                # B-26 (2026-07-27): a NAVAL barb walks the WATER plane. Land
+                # hulls and water hulls never share a plane, so this is the
+                # whole change the barb march needs (TS's tileFreeForUnit
+                # already branches on UNITS[type].naval).
+                _navm = self._u_naval[self.u_type[:, u].clamp(min=0)].unsqueeze(1)
+                _plane = torch.where(
+                    _navm,
+                    self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),  # no CARTOGRAPHY
+                    self.passable.gather(1, nb2c),
+                )
+                step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, "barb")
                 d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)  # dist(neighbor, target); symmetric
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values
@@ -9442,8 +9501,18 @@ class BatchSim:
                     ~self.ocean_tile.gather(1, ttc_adv.unsqueeze(1)).squeeze(1) | cart_u
                 )
                 adv_terr = torch.where(naval_att, water_ok, land_ok)
-            else:  # barbarians are never naval — land plane only
-                adv_terr = land_ok
+            else:
+                # B-26 (2026-07-27): barbarians CAN be naval now (the GALLEY /
+                # QUADRIREME raiders), so the old "never naval — land plane
+                # only" shortcut is wrong: a hull that killed an adjacent land
+                # civilian advanced ASHORE. A barb owns no tech, so its water
+                # plane is wpass minus OCEAN (no CARTOGRAPHY), which is exactly
+                # what TS's tileFreeForUnit/waterEnterable allows it.
+                adv_terr = torch.where(
+                    self._u_naval[self.u_type[:, u].clamp(min=0)],
+                    self._barb_water_ok(ttc_adv),
+                    land_ok,
+                )
             _bciv = None if atk_kind == "barb" else self.v_civ[:, u]  # B-17 (#71)
             adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv).squeeze(1) & adv_terr
             if bool(adv.any()):
@@ -9531,7 +9600,20 @@ class BatchSim:
         kill_adv = (civ_att | rvciv_att) if atk_kind == "barb" else torch.zeros_like(civ_att)
         if bool(kill_adv.any()):
             _bciv2 = None if atk_kind == "barb" else self.v_civ[:, u]  # B-17 (#71)
-            adv = kill_adv & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv2).squeeze(1)
+            # B-26 (2026-07-27): the SAME naval-plane gate as the melee advance
+            # above — a roll-free civilian kill by a barb GALLEY must not walk
+            # the hull onto the (land) tile it just cleared.
+            _kt = tgt.clamp(min=0)
+            _kterr = (
+                torch.where(
+                    self._u_naval[self.u_type[:, u].clamp(min=0)],
+                    self._barb_water_ok(_kt),
+                    self.passable.gather(1, _kt.unsqueeze(1)).squeeze(1),
+                )
+                if atk_kind == "barb"
+                else torch.ones_like(kill_adv)
+            )
+            adv = kill_adv & _kterr & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv2).squeeze(1)
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
@@ -10256,7 +10338,10 @@ class BatchSim:
             atk_rs = self._u_rng_str[ut0]
             a_hp, a_tile = self.u_hp[:, u], self.u_tile[:, u]
             a_lvl = torch.zeros_like(a_hp)  # B-4: barbarians never accrue XP
-            a_naval = torch.zeros(self.B, dtype=torch.bool, device=self.device)  # barbs are never naval/embarked
+            # A barb hull IS naval since B-26, but this flag only selects the
+            # general-vs-ADMIRAL aura and a barbarian (civ -1) has no aura at
+            # all, so the constant false stays behaviourally exact.
+            a_naval = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         else:
             vt0 = self.v_type[:, u].clamp(min=0, max=self.NU - 1)
             atk_rs = self._p_rng_str[vt0]
@@ -13513,13 +13598,16 @@ class BatchSim:
             # SAME gate (~X_acted = spent no MP since the last refresh). A live
             # MILITARY unit that stayed put digs in (+1, cap 2); a move/attack
             # (X_acted) resets it. Civilians never fortify. Symmetric across pools.
-            u_mil = self._unit_combat[self.u_type] > 0
+            # #45/B-6: NAVAL units never fortify (TS refreshUnits gates on
+            # !naval). B-26 (2026-07-27): barbs CAN be naval now, so the barb
+            # pool needs the same gate the other two always had — without it a
+            # barb GALLEY dug in for +6 defense that TS never grants it (seed
+            # 9212 t80, a 6.0 CS split on every hull the player attacked).
+            u_mil = (self._unit_combat[self.u_type] > 0) & ~self._u_naval[self.u_type]
             self.u_fortify = torch.where(
                 self.u_alive & u_mil & ~self.u_acted, (self.u_fortify + 1).clamp(max=2),
                 torch.where(self.u_alive & u_mil & self.u_acted, torch.zeros_like(self.u_fortify), self.u_fortify),
             )
-            # #45/B-6: NAVAL units never fortify (TS refreshUnits gates on
-            # !naval; barbs are never naval so u_fortify is untouched).
             v_mil = (self._p_combat[self.v_type] > 0) & ~self.unit_naval[self.v_type]
             self.v_fortify = torch.where(
                 self.v_alive & v_mil & ~self.v_acted, (self.v_fortify + 1).clamp(max=2),
