@@ -81,7 +81,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age (B-24 S2) +tourism (B-20 #71)
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age +tourism +faith (#71)
       continue;
     }
     row.push(
@@ -120,6 +120,9 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       state.civAges?.[rival.id + 1] ?? 1,
       // B-20 (#71): this rival's cumulative TOURISM (appended LAST).
       rival.tourism ?? 0,
+      // #71 COVERAGE: rival FAITH — untraced until now, which let a +2.0
+      // faith divergence hide behind five green gates.
+      Math.round((rival.faith ?? 0) * 1000),
     );
   }
   for (let c = 0; c < cMax; c++) {
@@ -147,12 +150,13 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
   // Must match traceRow's column order EXACTLY. HEAD is 24: the 18 base cols
   // + GV leader/gameOver/winner/victoryType + playerAge + TOURISM (all
-  // integer; B-24 S2 and B-20 #71). Each rival is 17: the 12 base +
-  // treasury/rGScore (both float ×1000, tol 2) + rrWarMask + age + tourism. A stale tol silently shifts every later
+  // integer; B-24 S2 and B-20 #71). Each rival is 18: the 12 base +
+  // treasury/rGScore (both float ×1000, tol 2) + rrWarMask + age + tourism
+  // + faith (float ×1000, tol 2). A stale tol silently shifts every later
   // column's tolerance — keep them in lockstep.
   const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 2);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
   return tol;
 }

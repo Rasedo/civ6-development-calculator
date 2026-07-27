@@ -13849,6 +13849,11 @@ class BatchSim:
                 # EVERY civ at the boundary, dead ones included.
                 torch.where(live, self.civ_age[:, r + 1].to(self.dtype), zero),
                 torch.where(live, self.r_tourism[:, r].to(self.dtype), zero),  # B-20 (#71): rival TOURISM (appended LAST)
+                # #71 COVERAGE: rival FAITH. It was untraced, which is how a
+                # +2.0 faith divergence hid behind five green gates — faith
+                # only becomes visible when it flips a PURCHASE, so a surplus
+                # that crosses no threshold is invisible. Traced now.
+                torch.where(live, js_round(self.r_faith[:, r] * 1000).to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

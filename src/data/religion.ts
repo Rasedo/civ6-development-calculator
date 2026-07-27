@@ -295,9 +295,24 @@ export const APOSTLE_CAP = 1;
  *    (`self.v_civ != r`), while TS's `theologicalCombat` scans `unitsAt` and
  *    explicitly handles a PLAYER defender (`ug = u.owner === 'player' ? 0`).
  *    Dormant only because the scripted player never owns a religious unit.
- * NEXT STEP: instrument the missionary SPREAD target choice (charges spent per
- * turn per slot) on both engines around seed 9066 t78-t83 — that is where the
- * lifecycle diverges, and it is the last unexplored surface.
+ * SECOND HUNT (2026-07-27, with rival FAITH now traced):
+ * FAITH IS EXACT. Adding `rFaith` to the trace was the missing instrument —
+ * with it, flipping this flag no longer diverges on faith at all, which
+ * ELIMINATES the entire purchase family: the apostle is bought on the same
+ * turn, for the same price, leaving the same faith, in both engines.
+ * The first divergence is now seed 9183 turn 93 on `rGScore1` (1.8) and
+ * `rQProg1` (0.9) — rival empire score and QUEUE PROGRESS. Those are yield
+ * consequences, so the remaining suspect is narrow: the religious SPREAD's
+ * effect on a city (which city gets converted, or the pressure lump), which
+ * feeds follower beliefs -> yields -> production and score.
+ * ALSO ELIMINATED this round: theological combat is NOT involved in seed
+ * 9066 (its first fight there is turn 201, long after the split), and the
+ * earlier "TS never fights" reading was an artefact of running the exporter
+ * at an 84-turn horizon — the survival heuristics make that a DIFFERENT game.
+ * Always reproduce at the real 250-turn horizon.
+ * NEXT STEP: diff the per-city `followedReligion` / religionPressure arrays
+ * on both engines at seed 9183 t92-93. Target SELECTION has been read and
+ * matches; the pressure APPLICATION has not been checked.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
