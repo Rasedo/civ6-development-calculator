@@ -415,6 +415,18 @@ export const APOSTLE_CAP = 1;
  * rivals in id order, and rival 0's missionary sits on 363 from t90 and
  * leaves at t92 in BOTH. So rival 1's route depends on the exact interleaving
  * of rival 0's walk with rival 1's spread pass — the one remaining surface.
+ * HUNT #12 — the +1 MP aura theory is DEAD, and it kills the premise.
+ * A missionary is combat 0, and BOTH engines exclude civilians from the
+ * general's movement aura: TS `inGeneralAura` returns false when
+ * `combat <= 0`, and the GPU's `_refresh_aura_mp_rival` masks on
+ * `_p_combat[v_type] > 0`. So the unit has exactly 4 MP in both.
+ * With 4 MP the route 362 -> 363 (2) -> 407 (1) -> 408 (2) costs 5 and the
+ * walker must stop at 407. TS therefore CANNOT have moved that unit from 362
+ * to 408 in one turn — which means the premise is wrong, not the engines:
+ * the two SPR log lines I read as "#52 @362 at t91" and "#52 @408 at t92"
+ * cannot both be that unit's turn-boundary position. START HERE: re-derive
+ * that unit's true position at the top of t91 and t92 with ONE log point,
+ * before trusting any of the 362/406/408 geometry above.
  * ARITHMETIC WORTH CHECKING FIRST: from 362 with 4 MP, going via 363 costs
  * 2 then 1 (to 407) then 2 (to 408) = 5, which the "always one step at full
  * MP" rule should still cut short at 407 — yet TS reports the unit AT 408.
