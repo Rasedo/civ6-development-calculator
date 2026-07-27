@@ -16,7 +16,7 @@ import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
-import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
+import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTurn, playerSuzerainCount } from './rivals';
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, governorPicks, governorTitles } from './eras';
@@ -896,6 +896,10 @@ export function endTurn(state: GameState): void {
   // after the city loop, so the GPU mirrors at the same position. Great Works
   // plus every owned Seaside Resort (worth its tile's appeal).
   state.tourismTotal = (state.tourismTotal ?? 0) + playerTourism(state);
+  // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, accumulated
+  // once per turn at the civ level, the same position the rival seat uses.
+  state.diploFavor =
+    (state.diploFavor ?? 0) + diploFavorPerTurn(state.government.current, playerSuzerainCount(state));
   // B-22 (#74): the player's GRIEVANCES decay by 1 each turn they are at peace
   // with EVERY rival (floor 0) — the exact twin of the rival decay, at the same
   // per-turn accumulator position so both engines apply it together.

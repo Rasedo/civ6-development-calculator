@@ -283,6 +283,9 @@ export interface GameState {
    *  Seaside Resorts; wonders/relics/artifacts/National Parks are recorded
    *  residuals, and the Culture VICTORY itself rides B-25. */
   tourismTotal?: number;
+  /** B-22 (#75): the PLAYER's cumulative DIPLOMATIC FAVOR — the World Congress
+   *  currency. +government tier and +1 per suzerained city-state each turn. */
+  diploFavor?: number;
   /** B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of
    *  RivalCiv.warmonger. Grows on declaring war and on taking a rival city,
    *  decays 1/turn while at peace with every rival. Past RR_WARMONGER_GANG a
@@ -470,6 +473,8 @@ export interface RivalCiv {
   warWeariness?: number;
   /** B-20 (#71): this rival's cumulative TOURISM (the player's twin). */
   tourism?: number;
+  /** B-22 (#75): this rival's cumulative DIPLOMATIC FAVOR (the player's twin). */
+  diploFavor?: number;
   /** B-25 (#72): this rival's cumulative LIFETIME CULTURE — the twin of the
    *  player's `cultureTotal`. Real Civ 6 derives DOMESTIC TOURISTS from
    *  lifetime culture, so the Culture victory cannot be judged without it;

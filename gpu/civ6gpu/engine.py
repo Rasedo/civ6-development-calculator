@@ -379,7 +379,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -649,6 +649,9 @@ class BatchSim:
         self.r_warmonger = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-22 (#74): the PLAYER's grievance score — the exact r_warmonger twin.
         self.p_warmonger = torch.zeros(B, dtype=torch.long, device=device)
+        # B-22 (#75): DIPLOMATIC FAVOR — the World Congress currency, per civ.
+        self.diplo_favor = torch.zeros(B, dtype=torch.long, device=device)
+        self.r_diplo_favor = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
         # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
         # Integer, zero-draw event hooks only; resets at every eraLength
@@ -667,6 +670,7 @@ class BatchSim:
         self._wm_dow = int(_er2.get("rrWarmongerDow", 4))
         self._wm_cap = int(_er2.get("rrWarmongerCapture", 3))
         self._wm_gang = int(_er2.get("rrWarmongerGang", 6))
+        self._favor_per_suz = int(_er2.get("diploFavorPerSuzerain", 1))  # B-22 (#75)
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         # B-24 S2: per-civ Age (0 Dark / 1 Normal / 2 Golden), assigned at each
@@ -8189,6 +8193,29 @@ class BatchSim:
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
+    def _player_suzerain_count(self) -> torch.Tensor:
+        """B-22 (#75): [B] city-states the PLAYER is Suzerain of — the
+        `isSuzerain` twin (>= suzerainEnvoys and STRICTLY more than every
+        rival's envoys; a tie leaves no suzerain)."""
+        suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+        m = (self.cs_envoys >= suz_min) & self.cs_alive
+        if self.R > 0:
+            m = m & (self.cs_envoys > self.cs_r_envoys.max(dim=1).values)
+        return m.sum(dim=1)
+
+    def _rival_suzerain_count(self, r: int) -> torch.Tensor:
+        """B-22 (#75): [B] city-states rival r is Suzerain of — the
+        `rivalIsSuzerain` twin (>= suzerainEnvoys, strictly more than the
+        PLAYER and strictly more than every OTHER rival)."""
+        suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+        mine = self.cs_r_envoys[:, r]  # [B, S]
+        m = (mine >= suz_min) & self.cs_alive & (mine > self.cs_envoys)
+        for o in range(self.R):
+            if o == r:
+                continue
+            m = m & (mine > self.cs_r_envoys[:, o])
+        return m.sum(dim=1)
+
     def _culture_victor(self) -> torch.Tensor:
         """B-25 (#72), the TS `cultureVictor` mirror: [B] the lowest unified civ
         id (0 player, r+1 rival r) whose VISITING tourists exceed EVERY other
@@ -12640,6 +12667,9 @@ class BatchSim:
                 self.r_techs[:, r, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,  # B-20 (#74)
             )
             self.r_tourism[:, r] = torch.where(active, self.r_tourism[:, r] + _tour_r, self.r_tourism[:, r])
+            # B-22 (#75): DIPLOMATIC FAVOR — the player's twin, same position.
+            _fav_r = self._adopted_gov_tier(self.r_civics[:, r]) + self._favor_per_suz * self._rival_suzerain_count(r)
+            self.r_diplo_favor[:, r] = torch.where(active, self.r_diplo_favor[:, r] + _fav_r, self.r_diplo_favor[:, r])
             # B-22: grievances DECAY by 1 per turn at peace on every axis.
             _at_peace = ~self.r_atwar[:, r] & ~self.rr_war[:, r].any(dim=1)
             self.r_warmonger[:, r] = torch.where(
@@ -14013,6 +14043,9 @@ class BatchSim:
             self.relics,  # B-20 (#73)
             self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,  # B-20 (#74)
         )
+        # B-22 (#75): DIPLOMATIC FAVOR — government TIER + suzerainties, once
+        # per turn at the civ level, the TS twin position.
+        self.diplo_favor = self.diplo_favor + self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._player_suzerain_count()
         # B-22 (#74): the PLAYER's grievances decay by 1 each turn at peace with
         # EVERY rival (floor 0) — the TS twin position, immediately after the
         # tourism accumulator. NOTE: the +RR_WARMONGER_DOW accrual on declaring
@@ -14378,6 +14411,7 @@ class BatchSim:
             self.civ_age[:, 0].to(self.dtype),  # B-24 S2: the player's Age (compared)
             self.tourism_total.to(self.dtype),  # B-20 (#71): cumulative TOURISM
             self.p_warmonger.to(self.dtype),  # B-22 (#74): the player's GRIEVANCES
+            self.diplo_favor.to(self.dtype),  # B-22 (#75): DIPLOMATIC FAVOR
         ]
         for s in range(self.S):
             cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)
@@ -14441,6 +14475,8 @@ class BatchSim:
                 # from the day it lands, the way #71 traced tourism — an
                 # untraced accumulator is exactly how the rFaith divergence hid.
                 torch.where(live, js_round(self.r_culture[:, r] * 1000).to(self.dtype), zero),
+                # B-22 (#75): rival DIPLOMATIC FAVOR (appended LAST).
+                torch.where(live, self.r_diplo_favor[:, r].to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

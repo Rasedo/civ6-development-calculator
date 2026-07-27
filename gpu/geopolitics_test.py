@@ -334,5 +334,38 @@ def main() -> None:
     assert int(s3.p_warmonger[0]) == 0, "decay floors at zero"
     print("player grievances OK — _MUTABLE, decay, floor")
 
+    # --- B-22 (#75): DIPLOMATIC FAVOR ---------------------------------------
+    for _f in ("diplo_favor", "r_diplo_favor"):
+        assert _f in _MUT2, f"{_f} must be registered in _MUTABLE"
+    s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
+    # the suzerain tests: >= suzerainEnvoys AND strictly more than every rival
+    suz_min = int(s4.rules.cs.get("suzerainEnvoys", 3))
+    s4.cs_envoys.zero_(); s4.cs_r_envoys.zero_()
+    assert int(s4._player_suzerain_count()[0]) == 0, "no envoys -> no suzerainties"
+    s4.cs_envoys[:, 0] = suz_min - 1
+    assert int(s4._player_suzerain_count()[0]) == 0, "below the envoy minimum is not suzerainty"
+    s4.cs_envoys[:, 0] = suz_min
+    assert int(s4._player_suzerain_count()[0]) == 1, "at the minimum with no rival contest -> suzerain"
+    if s4.R > 0:
+        s4.cs_r_envoys[:, 0, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
+        assert int(s4._player_suzerain_count()[0]) == 0, "a tie must leave NO suzerain"
+        s4.cs_r_envoys[:, 0, 0] = suz_min + 1
+        assert int(s4._rival_suzerain_count(0)[0]) == 1, "the strictly-higher rival is suzerain"
+        assert int(s4._player_suzerain_count()[0]) == 0, "... and the player is not"
+    # the accrual itself: tier + suzerainties, and it is CUMULATIVE
+    s5 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    f0 = int(s5.diplo_favor[0])
+    s5.step()
+    f1 = int(s5.diplo_favor[0])
+    assert f1 >= f0, "favor never decreases"
+    exp = int(s5._adopted_gov_tier(s5.civics)[0]) + s5._favor_per_suz * int(s5._player_suzerain_count()[0])
+    s5.step()
+    assert int(s5.diplo_favor[0]) - f1 == exp, (
+        f"favor step must be tier+suzerainties ({exp}), got {int(s5.diplo_favor[0]) - f1}"
+    )
+    print("diplomatic favor OK — suzerain contest, tie rule, tier+suz accrual, _MUTABLE")
+
+
 if __name__ == "__main__":
     main()

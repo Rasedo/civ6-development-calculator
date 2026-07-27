@@ -140,6 +140,22 @@ export const GOV_MAX_TITLES = 5;
  * tourists. The 200 is the Rise-and-Fall-onward value (it was 150 in vanilla),
  * so it is the right one for the GS ruleset this repo models.
  */
+/**
+ * B-22 (#75): DIPLOMATIC FAVOR — the World Congress currency. Real Civ 6
+ * (Gathering Storm, verified against the Civilopedia "World Congress" concept
+ * and the Civilization wiki "Diplomatic Favor (Civ6)" page): each civ earns
+ * favor per turn equal to its GOVERNMENT TIER (1-4; Chiefdom is tier 0 and
+ * pays nothing), plus +1 per city-state it is SUZERAIN of.
+ *
+ * NOT MODELED, and deliberately not invented: favor from ALLIANCES (the player
+ * has no alliance axis yet), and the favor PENALTIES for CO2 (no climate
+ * system), global grievances and occupying original capitals. The wiki names
+ * those terms but not their rates, and guessing a rate would be exactly the
+ * fabrication the verify-before-implement rule exists to prevent. Recorded as
+ * B-22 residuals instead.
+ */
+export const DIPLO_FAVOR_PER_SUZERAIN = 1;
+
 export const TOURISM_PER_VISITOR_PER_CIV = 200;
 export const CULTURE_PER_DOMESTIC_TOURIST = 100;
 

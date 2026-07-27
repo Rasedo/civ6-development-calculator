@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 85.75 | **97%** |
+| B fidelity | 88 | 86.15 | **98%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **187.75** | **98%** |
-| Open chapters only (A+B) | 129 | 125.75 | **98%** |
+| **Overall (incl. closed)** | **191** | **188.15** | **98%** |
+| Open chapters only (A+B) | 129 | 126.15 | **98%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -488,6 +488,8 @@ Per-item weights (done% in parens where partial):
   doubling, measured reachable in 9/24 player seeds + 46 rival civs) and B-22 4
   (50% -> 60% — the PLAYER's grievance twin + the gang-up consequence, measured
   live at 192 civ-turns over the threshold). Delta +0.09 +0.40 = +0.49 on B.
+- #75 WORLD CONGRESS S1 (2026-07-28). B-22 4 (60% -> 70% — DIPLOMATIC FAVOR on
+  both seats, traced, measured at 175-656 by t250). Delta +0.40 on B.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -1395,7 +1397,33 @@ gap; likewise GS disasters are modeled minus sea-level rise
   the CAPTURE accrual does mirror. It lands with the #50 player-verb work if a
   DoW action is ever added. Poke lanes: tests/grievances.test.ts (5) + the
   `geopolitics` battery lane (_MUTABLE, decay, floor).
-  STILL OPEN: World Congress and peace deals with terms.
+  **WORLD CONGRESS S1 — DIPLOMATIC FAVOR LANDED (2026-07-28, #75).** The
+  Congress currency now exists on both seats (`state.diploFavor` / GPU
+  `diplo_favor`; `RivalCiv.diploFavor` / `r_diplo_favor`, all in _MUTABLE).
+  Sourced (Civilopedia GS "World Congress" + Civilization wiki "Diplomatic
+  Favor (Civ6)"): a civ earns favor per turn equal to its GOVERNMENT TIER
+  (1-4; Chiefdom is tier 0 and pays nothing) plus DIPLO_FAVOR_PER_SUZERAIN (1)
+  per city-state it is SUZERAIN of. Zero-draw, integer-only, accumulated once
+  per turn at the civ level at the same position on both seats.
+  The suzerain test is the exact `isSuzerain`/`rivalIsSuzerain` twin, including
+  real Civ 6's TIE rule (a tie leaves NO suzerain) — pinned in the poke lane.
+  Both new columns are COMPARED trace columns from day one: `diploFavor` on
+  HEAD (now 26) and `rDiploFavor` on PER_RIVAL (now 21).
+  MEASURED strongly reachable: by t250 the player holds 175-656 favor
+  (mean 364) and rivals up to 576, with 0-2 suzerainties per seed. Parity green
+  at 0.0 milli on the first pass.
+  NOT MODELED, and deliberately NOT invented: favor from ALLIANCES (the player
+  has no alliance axis), and the favor PENALTIES for CO2 (no climate system),
+  global grievances and occupying original capitals. The sources name those
+  terms but not their rates, and guessing a rate is exactly the fabrication the
+  verify-before-implement rule exists to prevent.
+  Poke lanes: tests/grievances.test.ts (4 favor cases) + the `geopolitics`
+  battery lane (suzerain contest, tie rule, tier+suzerainty accrual, _MUTABLE).
+  B-22 -> 70%. NEXT: S2 sessions + a resolution, S3 Diplomatic Victory Points
+  and the win at 20 — see gpu/WORLD_CONGRESS_DESIGN.md.
+  STILL OPEN: the Congress sessions/resolutions themselves, Diplomatic Victory
+  Points (which B-25's Diplomatic victory is blocked on), and peace deals with
+  terms.
 - B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
   serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
   hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw

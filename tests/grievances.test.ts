@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { declareWar } from '../src/core/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
-import { RR_WARMONGER_DOW, RR_WARMONGER_GANG } from '../src/data/rivals';
+import { RR_WARMONGER_DOW, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN } from '../src/data/rivals';
+import { diploFavorPerTurn } from '../src/core/rivals';
+import { GOVERNMENTS } from '../src/data/policies';
 
 // B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of
 // RivalCiv.warmonger, which #55/S3 landed for rivals only. Real Civ 6 prices
@@ -28,6 +30,36 @@ function newGame(rivals = 1) {
   state.autoResearch = false;
   return state;
 }
+
+describe('B-22 diplomatic favor', () => {
+  // Real Civ 6 (GS): a civ earns favor per turn equal to its GOVERNMENT TIER,
+  // plus +1 per city-state it is Suzerain of. Chiefdom is tier 0 and pays
+  // nothing, which is why an early game accrues favor only through envoys.
+  it('pays the government TIER per turn', () => {
+    expect(diploFavorPerTurn('CHIEFDOM', 0)).toBe(0); // tier 0
+    expect(diploFavorPerTurn('MONARCHY', 0)).toBe(GOVERNMENTS.MONARCHY.tier);
+    expect(GOVERNMENTS.MONARCHY.tier).toBe(2); // sourced: Monarchy is tier 2
+  });
+
+  it('pays per SUZERAINTY on top of the tier', () => {
+    const tier = GOVERNMENTS.MONARCHY.tier;
+    expect(diploFavorPerTurn('MONARCHY', 3)).toBe(tier + 3 * DIPLO_FAVOR_PER_SUZERAIN);
+  });
+
+  it('no government pays nothing but suzerainties still count', () => {
+    expect(diploFavorPerTurn(null, 0)).toBe(0);
+    expect(diploFavorPerTurn(null, 2)).toBe(2 * DIPLO_FAVOR_PER_SUZERAIN);
+  });
+
+  it('accrues on the player each turn', () => {
+    const state = newGame(1);
+    state.diploFavor = 0;
+    state.government.current = 'MONARCHY';
+    endTurn(state);
+    // no suzerainties in a fresh game -> exactly the tier
+    expect(state.diploFavor).toBe(GOVERNMENTS.MONARCHY.tier);
+  });
+});
 
 describe('B-22 player grievances', () => {
   it('declaring war earns grievances', () => {

@@ -21,7 +21,7 @@ import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, rou
 import { isSuzerain, rivalIsSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
-import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
+import { GOVERNMENTS_ADOPTION_LIVE, GOVERNMENTS } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
@@ -106,6 +106,7 @@ import {
   RR_WARMONGER_DOW,
   RR_WARMONGER_CAPTURE,
   RR_WARMONGER_GANG,
+  DIPLO_FAVOR_PER_SUZERAIN,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
@@ -1490,6 +1491,28 @@ function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number)
 function grantRelic(state: GameState, civ: number): void {
   if (civ === 0) placeRelic(state.cities);
   else placeRelic(state.rivals[civ - 1]?.cities ?? []);
+}
+
+/**
+ * B-22 (#75): the DIPLOMATIC FAVOR a civ earns this turn — its GOVERNMENT TIER
+ * plus DIPLO_FAVOR_PER_SUZERAIN for every city-state it is Suzerain of. Both
+ * seats share this shape; `gov` is the civ's adopted government id (null =
+ * none, which pays nothing — Chiefdom is tier 0 anyway) and `suzerains` the
+ * count from that seat's suzerain test. Zero-draw, integer-only.
+ */
+export function diploFavorPerTurn(gov: string | null, suzerains: number): number {
+  const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
+  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains;
+}
+
+/** B-22 (#75): city-states the PLAYER is Suzerain of. */
+export function playerSuzerainCount(state: GameState): number {
+  return state.cityStates.reduce((n, cs) => n + (isSuzerain(cs) ? 1 : 0), 0);
+}
+
+/** B-22 (#75): city-states rival `rivalId` is Suzerain of. */
+export function rivalSuzerainCount(state: GameState, rivalId: number): number {
+  return state.cityStates.reduce((n, cs) => n + (rivalIsSuzerain(cs, rivalId) ? 1 : 0), 0);
 }
 
 function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
@@ -3206,6 +3229,14 @@ export function rivalPhase(state: GameState): void {
     // the civ level (Great Works + owned Seaside Resorts, each worth its
     // tile's appeal). Zero-draw, integer-only.
     rival.tourism = (rival.tourism ?? 0) + rivalTourism(state, rival);
+    // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, the
+    // player's twin at the same per-turn accumulator position.
+    rival.diploFavor =
+      (rival.diploFavor ?? 0) +
+      diploFavorPerTurn(
+        GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(rival.research).government : null,
+        rivalSuzerainCount(state, rival.id),
+      );
     // B-22 (2026-07-27): grievances DECAY by 1 each turn this civ is at peace
     // on every axis (floor 0) — the same position as the other per-turn civ
     // accumulators so the GPU mirrors it exactly.
