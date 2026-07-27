@@ -109,6 +109,8 @@ import {
   RR_WARMONGER_DOW,
   RR_WARMONGER_CAPTURE,
   RR_WARMONGER_GANG,
+  TOURISM_PER_VISITOR_PER_CIV,
+  CULTURE_PER_DOMESTIC_TOURIST,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -652,6 +654,10 @@ const rules = {
     // own era. Wonder era = the era of its unlock (tech or civic); a civ's era
     // = the highest era among its completed techs/civics — the SAME scale.
     wonderTourismBase: WONDER_TOURISM_BASE,
+    // B-25 (#72): the CULTURE VICTORY thresholds (GS values — see the
+    // constants' comment in src/data/rivals.ts for the source).
+    tourismPerVisitorPerCiv: TOURISM_PER_VISITOR_PER_CIV,
+    culturePerDomesticTourist: CULTURE_PER_DOMESTIC_TOURIST,
     techEra: techList.map((t) => Math.max(0, ERAS.indexOf(t.era))),
     civicEra: civicList.map((c) => Math.max(0, ERAS.indexOf(c.era))),
     warMinTurns: RIVAL_WAR_MIN_TURNS,

@@ -18,7 +18,7 @@ import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival } from './rivals';
 import { expirePlayerRoutes } from './trade';
-import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY } from '../data/rivals';
+import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, governorPicks, governorTitles } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { FEATURES } from '../data/features';
@@ -970,8 +970,70 @@ export function endTurn(state: GameState): void {
   // no freeze). Precedence space > domination > religion > score; 5 = the
   // player's religion wins, 6 = a rival religion wins (defeat).
   const rel = religiousVictor(state);
-  state.gameOver = spaceWon || dom >= 0 || rel >= 0 || state.turn > TURN_LIMIT;
-  state.victoryType = spaceWon ? state.victoryType : dom >= 0 ? 2 : rel >= 0 ? (rel === 0 ? 5 : 6) : state.gameOver ? 1 : 0;
+  // B-25 (#72): CULTURE victory, checked LAST of the real conditions —
+  // precedence space > domination > religion > culture > score. 7 = the
+  // player wins on tourism, 8 = a rival does (defeat).
+  const cul = rel >= 0 ? -1 : cultureVictor(state);
+  state.gameOver = spaceWon || dom >= 0 || rel >= 0 || cul >= 0 || state.turn > TURN_LIMIT;
+  state.victoryType = spaceWon
+    ? state.victoryType
+    : dom >= 0
+      ? 2
+      : rel >= 0
+        ? rel === 0
+          ? 5
+          : 6
+        : cul >= 0
+          ? cul === 0
+            ? 7
+            : 8
+          : state.gameOver
+            ? 1
+            : 0;
+}
+
+/**
+ * B-25 (#72): the CULTURE victory. Real Civ 6 (Gathering Storm) counts two
+ * populations — DOMESTIC tourists, which a civ attracts from its own lifetime
+ * CULTURE, and VISITING tourists, which it attracts from other civs with its
+ * lifetime TOURISM — and a civ wins the moment its visiting tourists exceed
+ * EVERY other civ's domestic tourists.
+ *
+ * Both counts floor to whole tourists, so this is integer-exact and zero-draw.
+ * The divisor carries the number of civs because tourism in real Civ 6 is
+ * accrued per foreign civ; this engine banks ONE lifetime tourism figure per
+ * civ, so the per-civ divisor is applied to the total instead — the same
+ * threshold, without per-pair bookkeeping the engines do not have.
+ *
+ * Returns the winning unified civ id (0 player, r+1 rival r), or -1. A civ
+ * with NO cities cannot win (a dead civ attracts nobody); the ascending scan
+ * breaks ties toward the lowest id, and the > comparison means two civs can
+ * never both qualify against each other.
+ */
+function cultureVictor(state: GameState): number {
+  const nCivs = 1 + state.rivals.length;
+  const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
+  const alive = [state.cities.length > 0, ...state.rivals.map((rv) => rv.cities.length > 0)];
+  const tourism = [state.tourismTotal ?? 0, ...state.rivals.map((rv) => rv.tourism ?? 0)];
+  const culture = [state.cultureTotal, ...state.rivals.map((rv) => rv.cultureTotal ?? 0)];
+  // Milli-rounded before the floor: culture is a non-dyadic float accumulator,
+  // so a sub-milli drift must not move a tourist count across engines (the
+  // GS bankruptcy-test convention).
+  const domestic = culture.map((c) => Math.floor(Math.round(c * 1000) / 1000 / CULTURE_PER_DOMESTIC_TOURIST));
+  const visiting = tourism.map((t) => Math.floor(t / visitDiv));
+  for (let c = 0; c < nCivs; c++) {
+    if (!alive[c]) continue;
+    let all = true;
+    for (let o = 0; o < nCivs; o++) {
+      if (o === c) continue;
+      if (visiting[c] <= domestic[o]) {
+        all = false;
+        break;
+      }
+    }
+    if (all) return c;
+  }
+  return -1;
 }
 
 /**

@@ -131,6 +131,18 @@ export const AGE_PRESSURE = [0.5, 1.0, 1.5];
  *  RESIDUALS: establishment turns, promotions, non-loyalty abilities. */
 export const GOV_CIVICS_PER_TITLE = 10;
 export const GOV_MAX_TITLES = 5;
+/**
+ * B-25 (#72): the CULTURE VICTORY constants, verified against the Gathering
+ * Storm rules (civilization.fandom.com "Tourism (Civ6)"):
+ *   visiting tourists = lifetime tourism / (nCivs * 200)
+ *   domestic tourists = lifetime culture / 100
+ * and a civ wins once its VISITING tourists exceed EVERY other civ's DOMESTIC
+ * tourists. The 200 is the Rise-and-Fall-onward value (it was 150 in vanilla),
+ * so it is the right one for the GS ruleset this repo models.
+ */
+export const TOURISM_PER_VISITOR_PER_CIV = 200;
+export const CULTURE_PER_DOMESTIC_TOURIST = 100;
+
 /** B-24 (#71): dedications granted on a HEROIC age (Dark -> Golden). Real
  * Civ 6 grants three; every other transition grants one. */
 /**

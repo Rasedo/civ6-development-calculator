@@ -397,6 +397,7 @@ _MUTABLE = [
     "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
     "gw_writing", "gw_music", "rc_gw_writing", "rc_gw_music",  # B-20: Great Works per-city counts
     "tourism_total", "r_tourism",  # B-20 (#71): cumulative TOURISM, player + per rival
+    "r_culture",  # B-25 (#72): per-rival LIFETIME culture (the player's culture_total twin)
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
     "district_pillaged",  # B-32: raided-dark districts (tile plane, reclaim-safe)
@@ -1041,6 +1042,9 @@ class BatchSim:
         # wonder's own era. Wonder era comes from its unlock; a civ's era is
         # the highest era among its completed techs/civics (the same scale).
         self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
+        # B-25 (#72): CULTURE VICTORY thresholds (GS values, exported).
+        self._tourism_per_visitor = int(rr.get("tourismPerVisitorPerCiv", 200))
+        self._culture_per_tourist = int(rr.get("culturePerDomesticTourist", 100))
         self._tech_era = torch.tensor(rr.get("techEra", []) or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
         _wera = (rules.wonders or {}).get("eras", []) or [0]
@@ -1049,6 +1053,10 @@ class BatchSim:
         # `RivalCiv.tourism` twins). Integer, zero-draw.
         self.tourism_total = torch.zeros(B, dtype=torch.long, device=device)
         self.r_tourism = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # B-25 (#72): per-rival LIFETIME culture. float64 like r_faith — it
+        # banks the same per-turn `cul_sum` that feeds r_civic_prog, which
+        # civic completions SPEND, so a separate total is required.
+        self.r_culture = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.gw_writing = torch.zeros(B, C, dtype=torch.long, device=device)  # AMPHITHEATER slots used, per player city
         self.gw_music = torch.zeros(B, C, dtype=torch.long, device=device)    # MUSEUM slots used, per player city
         self.rc_gw_writing = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -8078,6 +8086,43 @@ class BatchSim:
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
+    def _culture_victor(self) -> torch.Tensor:
+        """B-25 (#72), the TS `cultureVictor` mirror: [B] the lowest unified civ
+        id (0 player, r+1 rival r) whose VISITING tourists exceed EVERY other
+        civ's DOMESTIC tourists; -1 none.
+
+        visiting = lifetime tourism // (nCivs * TOURISM_PER_VISITOR_PER_CIV)
+        domestic = lifetime culture // CULTURE_PER_DOMESTIC_TOURIST
+
+        Both floor to whole tourists, so the comparison is integer-exact and
+        zero-draw. Culture is milli-rounded BEFORE the floor (the bankruptcy
+        convention) so a sub-milli float drift cannot move a tourist count.
+        A cityless civ cannot win."""
+        B, dev = self.B, self.device
+        n_civs = 1 + self.R
+        vis_div = n_civs * self._tourism_per_visitor
+        alive = [self.alive.any(dim=1)]
+        tour = [self.tourism_total]
+        cul = [self.culture_total]
+        for r in range(self.R):
+            alive.append(self.rc_alive[:, r].any(dim=1))
+            tour.append(self.r_tourism[:, r])
+            cul.append(self.r_culture[:, r])
+        visiting = [torch.div(t.long(), vis_div, rounding_mode="floor") for t in tour]
+        domestic = [
+            torch.div(js_round(c * 1000).long(), 1000 * self._culture_per_tourist, rounding_mode="floor")
+            for c in cul
+        ]
+        winner = torch.full((B,), -1, dtype=torch.long, device=dev)
+        for c in range(n_civs):
+            ok = alive[c]
+            for o in range(n_civs):
+                if o == c:
+                    continue
+                ok = ok & (visiting[c] > domestic[o])
+            winner = torch.where((winner < 0) & ok, torch.full_like(winner, c), winner)
+        return winner
+
     def _rcy_globals(self) -> dict:
         """D-2: the r-independent planes that _rival_city_yields and
         _rival_border_growth used to rebuild per (r, j) call (~144×/turn
@@ -12496,6 +12541,10 @@ class BatchSim:
             picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
             self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])
+            # B-25 (#72): LIFETIME culture — the TS `rival.cultureTotal` twin,
+            # at the same position (immediately after civicProgress takes the
+            # same sum). Zero-draw.
+            self.r_culture[:, r] = torch.where(active, self.r_culture[:, r] + cul_sum, self.r_culture[:, r])
             for _ in range(RESEARCH_LOOPS):
                 curc = self.r_cur_civic[:, r]
                 cost_c = self._eff_cost(
@@ -14150,10 +14199,15 @@ class BatchSim:
         # the prior recompute.
         space_won = (self.victory_type == 3) | (self.victory_type == 4)  # B-25
         rel = self._religious_victor()  # B6-S3: on the follow set spread just flipped
-        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25 + B6-S3
-        # precedence space > domination > religion (5 player / 6 rival) > score
+        # B-25 (#72): CULTURE victory, evaluated only where religion did not
+        # already win — the TS `rel >= 0 ? -1 : cultureVictor(state)` twin, so
+        # the precedence is space > domination > religion > culture > score.
+        cul = torch.where(rel >= 0, torch.full_like(rel, -1), self._culture_victor())
+        self.game_over = space_won | (dom >= 0) | (rel >= 0) | (cul >= 0) | (self.turn > self.rules.turn_limit)  # GV-2/GV-3 + B-25 + B6-S3
+        # precedence space > domination > religion (5/6) > culture (7/8) > score
         rel_vt = torch.where(rel == 0, torch.full_like(rel, 5), torch.full_like(rel, 6))
-        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))))  # GV-4/GV-3 + B-25 + B6-S3
+        cul_vt = torch.where(cul == 0, torch.full_like(cul, 7), torch.full_like(cul, 8))
+        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))  # GV-4/GV-3 + B-25 + B6-S3
         # D-1: leader() (a full empire+rival score pass) only matters where a
         # game just ENDED — torch.where evaluated it eagerly every turn and
         # threw it away. Winner stays -1 for running games either way.
@@ -14253,6 +14307,10 @@ class BatchSim:
                 # — the same hole `rFaith` just closed. Sum of (followed+1)
                 # over LIVE cities: any single-city change moves it.
                 torch.where(live, ((self.rc_followed[:, r] + 1) * self.rc_alive[:, r].long()).sum(dim=1).to(self.dtype), zero),
+                # B-25 (#72): rival LIFETIME CULTURE (appended LAST). Traced
+                # from the day it lands, the way #71 traced tourism — an
+                # untraced accumulator is exactly how the rFaith divergence hid.
+                torch.where(live, js_round(self.r_culture[:, r] * 1000).to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

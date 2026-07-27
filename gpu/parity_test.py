@@ -25,7 +25,7 @@ HEAD = [
     "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought", "imp", "leader", "gameOver", "winner", "victoryType", "playerAge", "tourism",
 ]
 PER_CS = ["envoys", "csPop", "quest"]
-PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore", "rrWarMask", "rAge", "rTourism", "rFaith", "rFollowedSum"]
+PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore", "rrWarMask", "rAge", "rTourism", "rFaith", "rFollowedSum", "rCulture"]
 PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty", "followed"]
 
 
@@ -45,7 +45,7 @@ def columns(n_cities: int, n_cs: int, n_rivals: int) -> tuple[list[str], torch.T
         atol += [0.0, 0.0, 0.0]
     for r in range(n_rivals):
         cols += [f"{name}{r}" for name in PER_RIVAL]
-        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0.0]  # +rrWarMask (A-19/B-33) +rAge (int, B-24) +rTourism (int, B-20 #71)
+        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0]  # +rrWarMask (A-19/B-33) +rAge (int, B-24) +rTourism (int, B-20 #71) +rCulture (float, B-25 #72)
     for c in range(n_cities):
         cols += [f"{name}{c}" for name in PER_CITY]
         atol += [0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 2.0, 0.0]  # +followed (int, B-18)

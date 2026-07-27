@@ -459,6 +459,12 @@ export interface RivalCiv {
   warWeariness?: number;
   /** B-20 (#71): this rival's cumulative TOURISM (the player's twin). */
   tourism?: number;
+  /** B-25 (#72): this rival's cumulative LIFETIME CULTURE — the twin of the
+   *  player's `cultureTotal`. Real Civ 6 derives DOMESTIC TOURISTS from
+   *  lifetime culture, so the Culture victory cannot be judged without it;
+   *  `research.civicProgress` is spent down by every completed civic and is
+   *  therefore NOT a lifetime total. */
+  cultureTotal?: number;
   /** B-25: this civ's completed space-race project ids (chain progress). */
   spaceProjects?: string[];
   /** AUDIT A-11/A-12b: this civ's trade routes — `from` is always an own

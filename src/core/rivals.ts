@@ -3172,6 +3172,11 @@ export function rivalPhase(state: GameState): void {
     }
     if (!rsr.tech && availableTechsIn(rsr).length === 0) rsr.techProgress = Math.min(rsr.techProgress, 0);
     rsr.civicProgress += culSum;
+    // B-25 (#72): LIFETIME culture — the same per-turn sum, banked separately
+    // because civicProgress is SPENT by every completed civic. Real Civ 6
+    // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
+    // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
+    rival.cultureTotal = (rival.cultureTotal ?? 0) + culSum;
     // P5/S1 (C-12): net gold — city upkeep already netted per city; unit
     // upkeep and the GV-5 bankruptcy rule mirror the player's exactly
     // (milli-rounded test; disband the priciest-upkeep unit, tie → lowest

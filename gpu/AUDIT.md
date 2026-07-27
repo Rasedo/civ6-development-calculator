@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 84.75 | **96%** |
+| B fidelity | 88 | 85.05 | **97%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **186.75** | **98%** |
-| Open chapters only (A+B) | 129 | 124.75 | **97%** |
+| **Overall (incl. closed)** | **191** | **187.05** | **98%** |
+| Open chapters only (A+B) | 129 | 125.05 | **97%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -367,6 +367,12 @@ Per-item weights (done% in parens where partial):
   Moved to the matching position.
   STILL OPEN in B-20: relics, artifacts, National Parks, the Printing
   doubling, Great Works of ART and archaeology. B-20 -> 85%.
+  #72 MEASUREMENT — these residuals now have a NUMBER on them. With only
+  Great Works (writing/music), Seaside Resorts and wonders feeding it,
+  lifetime tourism reaches at most 7 VISITING tourists over 250 turns while
+  lifetime culture yields up to 97 DOMESTIC ones, so B-25's culture victory
+  is unreachable by a factor of ~14. Closing the tourism residuals is what
+  would make that condition live rather than merely correct.
   COVERAGE: with wonders in, rival tourism is non-zero in 23 of the 24 gate
   games (max 7137) — well exercised. The PLAYER's is non-zero in only 1
   (the scripted player rarely builds wonders or Great Works), so the player
@@ -381,6 +387,10 @@ Per-item weights (done% in parens where partial):
   camp-spawn escalation remain in B-26, and cliffs are the larger of the two
   by a wide margin (a new edge property touching mapgen, movement and
   adjacency).
+- B-25 CULTURE VICTORY (2026-07-27, #72). B-25 3 (80% -> 90% — the culture
+  win lands on both engines, with per-rival lifetime culture as its traced
+  substrate; see the body entry). Delta +0.30 on B. Diplomatic victory is the
+  remaining named condition and is blocked on the World Congress (B-22).
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -1307,9 +1317,39 @@ gap; likewise GS disasters are modeled minus sea-level rise
   set, victoryType 5 (player religion) / 6 (rival religion, defeat),
   precedence space > domination > religion > score; gate-unreachable
   at 250t, poke-pinned (`tests/religious-victory.test.ts` + the
-  `religion2` battery lane). STILL OPEN: a player project-production
-  path (victoryType 3 can only be preserved, not produced, on the
-  GPU), and Culture/Diplomatic victories (systems absent).
+  `religion2` battery lane).
+  **CULTURE victory LANDED (2026-07-27, #72).** Real Civ 6 (Gathering
+  Storm, verified against the Civilopedia/wiki "Tourism" pages) scores two
+  tourist populations: VISITING tourists from a civ's lifetime TOURISM
+  (divided by nCivs x 200 — the Rise-and-Fall-onward value; vanilla's 150
+  is the number the older community write-ups quote) and DOMESTIC tourists
+  from its lifetime CULTURE (divided by 100). A civ wins the moment its
+  visiting tourists exceed EVERY other civ's domestic tourists.
+  victoryType 7 (player win) / 8 (rival win = defeat); precedence is now
+  space > domination > religion > CULTURE > score, and the culture check is
+  evaluated only where religion did not already win (`cultureVictor` /
+  `_culture_victor`, the identical endTurn position in both engines).
+  Both counts FLOOR to whole tourists, so the comparison is integer-exact
+  and zero-draw; culture is milli-rounded before the floor (the bankruptcy
+  convention) so sub-milli float drift cannot move a tourist count.
+  SUBSTRATE: the missing half was per-rival LIFETIME CULTURE —
+  `RivalCiv.cultureTotal` / GPU `r_culture` (in _MUTABLE), banking the same
+  per-turn `culSum` that feeds `civicProgress`, which every completed civic
+  SPENDS and which is therefore not a lifetime total. Added to the PER_RIVAL
+  trace (`rCulture`, float x1000 tol 2) the day it landed, so parity proves
+  the accumulator: green at 0.0 milli on the first pass.
+  MEASURED GATE-UNREACHABLE (not guessed): across the 24 scripted seeds at
+  250 turns the BEST any civ manages is a gap of -12 — visiting tourists
+  peak at 7 while domestic reach 97. The cause is a real fidelity gap, not
+  a tuning one: this model's tourism still lacks relics, artifacts,
+  National Parks and Great Works of Art (all B-20 residuals), so the two
+  populations are orders apart. Scripted parity therefore proves only the
+  ACCUMULATOR; the CHECK is pinned by `tests/culture-victory.test.ts` (7
+  pokes) and the new `culture_victory` battery lane (the same 7 semantics
+  on GPU tensors + the _MUTABLE round-trip). B-25 -> 90%.
+  STILL OPEN: a player project-production path (victoryType 3 can only be
+  preserved, not produced, on the GPU), and the DIPLOMATIC victory, which
+  is blocked on the World Congress (a B-22 residual).
 - B-33. **RESOLVED (2026-07-20, task #55 S2/S3; the fidelity face of
   A-19)**: rivals now war, denounce, sue for peace and conquer among
   themselves (see A-19 + B-22 for the machinery). The star topology is
