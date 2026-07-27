@@ -451,12 +451,22 @@ export const APOSTLE_CAP = 1;
  * THE BUG IS THEREFORE UPSTREAM AND IS NOT ABOUT APOSTLES AT ALL: it is
  * rival 0's own religious-unit position, diverging BEFORE t90. The apostle
  * flag merely perturbs the trajectory enough to expose it.
- * NEXT SESSION STARTS HERE: bisect backwards for the first turn at which
- * rival 0's civilian slot 11 (TS: the corresponding missionary) sits on a
- * different tile in the two engines. Log that unit's tile at the top of its
- * own civ's spread pass from ~t80, both engines, and find the first
- * mismatch. Note tile 363 is reached from 407 on the GPU (`t90 r0 u11
- * 407->363`), so start by asking whether TS's unit was ever on 407.
+ * HUNT #15 — BISECTED TO A THREE-TURN WINDOW. Logged rival 0's religious
+ * units on both engines from t78 at the same point (top of the per-unit
+ * spread decision). They are IDENTICAL through t86, unit for unit:
+ *   TS u#30/#31/#39/#44  <->  GPU u5/u6/u11/u14
+ *   t86: TS u#39 @363 c2 tgt362  |  GPU u11 @363 c2 tgt362   (same)
+ * From t87 that unit stops appearing in BOTH logs (so both agree it stopped
+ * acting), yet by t90 the GPU still has it standing on 363 while TS's tile
+ * 363 is EMPTY.
+ * => THE DIVERGENCE IS IN t87-t89, FOR THAT ONE UNIT. Everything before t87
+ * is bit-identical and everything after is consequence.
+ * NEXT SESSION: log that unit's FULL per-turn state (alive, tile, charges,
+ * whether it was in `cand`, and any despawn) for t86-t90 on both engines.
+ * The unit is at 363 with 2 charges and target 362 at d1, so it should
+ * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
+ * relocates it there and the other does not. Prime suspects: the
+ * charge-exhaustion despawn path and the POOL-END slot reuse.
  * OLD (superseded) ARITHMETIC NOTE: from 362 with 4 MP, going via 363 costs
  * 2 then 1 (to 407) then 2 (to 408) = 5, which the "always one step at full
  * MP" rule should still cut short at 407 — yet TS reports the unit AT 408.
@@ -473,7 +483,7 @@ export const APOSTLE_CAP = 1;
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
-export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — root cause LOCATED, see below
+export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — root cause narrowed to t87-t89, see below
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
