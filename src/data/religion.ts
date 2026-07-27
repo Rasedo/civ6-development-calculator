@@ -369,7 +369,22 @@ export const APOSTLE_CAP = 1;
  * So during turn 91's WALK, from the SAME start tile 362 toward the SAME
  * target, TS advances to 408 (d4->d1, ~3 tiles) and the GPU only to 406
  * (d4->d3, 1 tile). Everything before that walk is bit-identical.
- * PRIME SUSPECT: the walk's neighbour TIE-BREAK. Both engines step to the
+ * NEIGHBOUR ORDER IS *NOT* IT (checked statically, no run needed):
+ * `neighbor_table` (engine.py) lists even rows [(1,0),(0,-1),(-1,-1),(-1,0),
+ * (-1,1),(0,1)] and odd rows [(1,0),(1,-1),(0,-1),(-1,0),(0,1),(1,1)] — both
+ * are E, NE, NW, W, SW, SE, the SAME order as TS's AXIAL_DIRS. The two
+ * tie-break identically. (engine.py's warning about `self.neigh` order refers
+ * to the riverMask bit order, which is a different table.)
+ * REMAINING SUSPECTS for the 362->408 vs 362->406 walk, now that ordering,
+ * the target, the distance and the start tile are all identical:
+ *  - the STEP-LEGALITY predicate: TS calls `tileFreeForUnit` (terrain +
+ *    stacking + the B-17 block) where the GPU uses `passable & ~_blocked_for`.
+ *    A neighbour one accepts and the other rejects would reroute the unit.
+ *  - the "always take one step at full MP" rule: TS compares against
+ *    `UNITS[type].moves` (base, aura EXCLUDED) while the GPU compares against
+ *    `_p_moves + v_aura_mp` (aura INCLUDED). Inert while no rival general
+ *    exists (measured: 0 rival generals in-gate) but a REAL latent to fix.
+ * OLD PRIME SUSPECT (refuted): the walk's neighbour TIE-BREAK. Both engines step to the
  * neighbour with the lowest distance to the target, ties by direction order —
  * TS iterates `neighbors(map, at)`, the GPU `self.neigh` + `arange6`. If those
  * two orders differ, equidistant neighbours are chosen differently and the
