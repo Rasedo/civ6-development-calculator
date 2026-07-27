@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 31.8 | **78%** |
-| B fidelity | 88 | 82.7 | **94%** |
+| A symmetry | 41 | 31.9 | **78%** |
+| B fidelity | 88 | 83.0 | **94%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **176.5** | **92%** |
-| Open chapters only (A+B) | 129 | 114.5 | **89%** |
+| **Overall (incl. closed)** | **191** | **176.9** | **93%** |
+| Open chapters only (A+B) | 129 | 114.9 | **89%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -313,6 +313,24 @@ Per-item weights (done% in parens where partial):
   _eff_yields, so the appeal-gold had to be added to all three.
   Remaining B-27 tail: FORT (needs a Military Engineer unit) and the
   post-tech-tree improvements.
+- #71 FLAG SWEEP (2026-07-27): five of the six inert `_LIVE` flags are now
+  ON, each flipped and gated INDIVIDUALLY. A-5r 2 (100% outside #50 —
+  scripted rival tile purchase LIVE; the PLAYER's buyTile verb rides #50);
+  B-26 3 (90% — the scout-then-raid opener LIVE; cliffs and naval barbs
+  remain); B-24 3 (80% — dedication payouts LIVE; the named Golden-Age
+  catalog, dark-age policies and governor establishment/promotions remain);
+  B-8 stays 100% outside #50 (the admiral war-march was its last inert
+  residual and is now live). The city-attack religion adder (#71 DEBT-2)
+  is live at all six sites.
+  ONE REAL ENGINE BUG in the sweep — A-5r: TS BREAKS out of the per-city
+  loop when the first city WITH a candidate is unaffordable; the GPU
+  CONTINUED to the next city and bought a cheaper tile nine turns early
+  (seed 9158 t157, ~98 gold). Two other recorded blockers were STALE and
+  closed by re-verification (ADMIRAL_MARCH's seed-9287 split and the city
+  religion adder's rollout reds both predate #71 batch 1's naval-march and
+  DEBT-2 GPU work). APOSTLE_BUY_LIVE remains OFF with a full hunt log in
+  its comment — its recorded rationale was also wrong, and the true split
+  is a downstream religious-unit LIFECYCLE drift, not a buy-timing one.
   ARITHMETIC NOTE: batch 1's header re-add put B at 81.8; re-summing
   from these per-item weights gives 81.63. The 0.2 over-claim is
   corrected here — the FOURTH time this table has drifted from its own
