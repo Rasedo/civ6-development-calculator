@@ -336,12 +336,19 @@ export const APOSTLE_CAP = 1;
  * tiles with identical charges. It is the WALK that differs by two tiles.
  * rc4 is a knife-edge city (religion 1 vs 2 pressure 53 vs 54), which is why a
  * single lump flips it and why the checksum then OSCILLATES.
+ * BOTH #71 MOVEMENT CHANGES ARE CLEARED as the cause:
+ *  - B-17 (the Encampment block): there is NO live Encampment anywhere on the
+ *    map at that point (`encamp_hp > 0` count is 0), so the block cannot fire.
+ *  - B-23 (the road discount): bisected directly. With the road-to-road
+ *    movement discount disabled in BOTH engines (roads still laid), the
+ *    divergence persists and merely moves EARLIER, to t84. Roads are not it.
  * NEXT STEP: log that one unit's per-turn walk on both engines for seed 9183
- * t88-t92 — start tile, MP, each step and the cost paid. The walk pays
- * `moveCostInto` + `riverCharge` and consults `tileFreeForUnit`, all three of
- * which this round CHANGED (B-23 roads, B-17 the Encampment block), so those
- * are the first things to check even though both are parity-green with this
- * flag off.
+ * t88-t92 — start tile, MP left, each candidate step, the cost paid and the
+ * stop reason. The walk's remaining inputs are the neighbour ordering, the
+ * `tileFreeForUnit` stacking rules and the MP schedule; one of those lets the
+ * GPU stop two tiles short. Note the unit STARTS on a roaded tile (362), so
+ * check the first step's cost specifically even though the discount is
+ * cleared as the root cause.
  */
 export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — see the hunt log below
 
