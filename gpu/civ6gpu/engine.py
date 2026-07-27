@@ -394,6 +394,7 @@ _MUTABLE = [
     "enh_claimed", "r_enhancer", "r_enhancer_done",  # B-18: enhancer race
     "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
     "gw_writing", "gw_music", "rc_gw_writing", "rc_gw_music",  # B-20: Great Works per-city counts
+    "tourism_total", "r_tourism",  # B-20 (#71): cumulative TOURISM, player + per rival
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
     "district_pillaged",  # B-32: raided-dark districts (tile plane, reclaim-safe)
@@ -1021,6 +1022,13 @@ class BatchSim:
         self._gw_works = int(rr.get("gwWorksPerPerson", 2))
         self._gw_w_cul = float(rr.get("gwWritingCulture", 2))
         self._gw_m_cul = float(rr.get("gwMusicCulture", 4))
+        # B-20 (#71): TOURISM per Great Work — GS pairs it with culture.
+        self._gw_w_tour = int(rr.get("gwWritingTourism", 2))
+        self._gw_m_tour = int(rr.get("gwMusicTourism", 4))
+        # B-20 (#71): cumulative TOURISM (the `state.tourismTotal` /
+        # `RivalCiv.tourism` twins). Integer, zero-draw.
+        self.tourism_total = torch.zeros(B, dtype=torch.long, device=device)
+        self.r_tourism = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         self.gw_writing = torch.zeros(B, C, dtype=torch.long, device=device)  # AMPHITHEATER slots used, per player city
         self.gw_music = torch.zeros(B, C, dtype=torch.long, device=device)    # MUSEUM slots used, per player city
         self.rc_gw_writing = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
@@ -2873,6 +2881,26 @@ class BatchSim:
             self.unit_naval[self.v_type] | self.v_emb,
         )
         self.v_aura_mp = (v_hit & v_ok).long() * self._gen_aura_mp
+
+    def _tourism_of(self, gw_w: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor) -> torch.Tensor:
+        """[B] — B-20 (#71): a civ's per-turn TOURISM, the `playerTourism` /
+        `rivalTourism` twin. Great Works pay the GS values that pair tourism
+        with culture; every OWNED unpillaged SEASIDE RESORT pays its tile's
+        APPEAL (floored at 0), attributed by tile ownership rather than by
+        worked-tile assignment so the seats cannot drift on citizen placement.
+        `gw_w`/`gw_m` are the civ's per-city Great Work counts, `alive` the
+        matching per-city alive mask, `own` a [B, T] tile-ownership mask."""
+        # ALIVE-masked: TS iterates `state.cities` / `rival.cities`, which a
+        # captured or razed city has already left. Summing every column would
+        # keep paying tourism for a city the civ no longer owns — the exact
+        # off-script red this arrived with (seed 9105 t144, +4 = one music
+        # work of a lost city).
+        t = self._gw_w_tour * (gw_w * alive.long()).sum(dim=1) + self._gw_m_tour * (gw_m * alive.long()).sum(dim=1)
+        if self.SEASIDE >= 0:
+            live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
+            if bool(live.any()):
+                t = t + (self._tile_appeal().clamp(min=0) * live.long()).sum(dim=1)
+        return t
 
     def _seaside_ok(self) -> torch.Tensor:
         """[B, T] bool — B-27 (#71): where a SEASIDE RESORT may be built, the
@@ -11993,6 +12021,10 @@ class BatchSim:
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
             self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] + gold_sum, self.r_treasury[:, r])  # VP-G1
             self.r_faith[:, r] = torch.where(active, self.r_faith[:, r] + faith_sum, self.r_faith[:, r])  # P5/S5 (C-17)
+            # B-20 (#71): TOURISM — the TS `rival.tourism` twin, at the same
+            # position (right beside the faith accumulator).
+            _tour_r = self._tourism_of(self.rc_gw_writing[:, r], self.rc_gw_music[:, r], self.rc_alive[:, r], self.rival_at == r)
+            self.r_tourism[:, r] = torch.where(active, self.r_tourism[:, r] + _tour_r, self.r_tourism[:, r])
             # P5/S1 (C-12): unit upkeep + the GV-5 bankruptcy rule, mirroring
             # the player's exactly (milli-rounded test; disband the
             # priciest-upkeep unit, tie → lowest slot = spawn order; no
@@ -13380,6 +13412,12 @@ class BatchSim:
         self.treasury = self.treasury + gold_add
         self.science_total = self.science_total + sci_add
         self.culture_total = self.culture_total + cul_add
+        # B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level,
+        # right after the city loop and BEFORE the loyalty collapses, exactly
+        # where TS puts it.
+        self.tourism_total = self.tourism_total + self._tourism_of(
+            self.gw_writing, self.gw_music, self.alive, self.owner >= 0
+        )
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------
         self._apply_loyalty_and_flips(tier_fresh, pop_loyal)
@@ -13726,6 +13764,7 @@ class BatchSim:
             self.winner.to(self.dtype),  # GV-2/GV-3 winner
             self.victory_type.to(self.dtype),  # GV-4/GV-3 victoryType
             self.civ_age[:, 0].to(self.dtype),  # B-24 S2: the player's Age (compared)
+            self.tourism_total.to(self.dtype),  # B-20 (#71): cumulative TOURISM
         ]
         for s in range(self.S):
             cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)
@@ -13773,6 +13812,7 @@ class BatchSim:
                 # their boundary-assigned age — both engines assign ages to
                 # EVERY civ at the boundary, dead ones included.
                 torch.where(live, self.civ_age[:, r + 1].to(self.dtype), zero),
+                torch.where(live, self.r_tourism[:, r].to(self.dtype), zero),  # B-20 (#71): rival TOURISM (appended LAST)
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

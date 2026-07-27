@@ -64,6 +64,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     dom >= 0 ? dom : state.gameOver ? leader : -1, // GV-2/GV-3 winner
     state.victoryType ?? 0, // GV-4/GV-3 victoryType
     state.civAges?.[0] ?? 1, // B-24 S2: the player's Age (compared)
+    state.tourismTotal ?? 0, // B-20 (#71): cumulative TOURISM (integer)
   ];
   for (let s = 0; s < csMax; s++) {
     // Keyed by id (== the GPU's static slot), NOT array position: a captured
@@ -80,7 +81,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age (B-24 S2)
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age (B-24 S2) +tourism (B-20 #71)
       continue;
     }
     row.push(
@@ -117,6 +118,8 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       (rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0),
       // B-24 S2: this rival's Age (0 Dark / 1 Normal / 2 Golden, compared).
       state.civAges?.[rival.id + 1] ?? 1,
+      // B-20 (#71): this rival's cumulative TOURISM (appended LAST).
+      rival.tourism ?? 0,
     );
   }
   for (let c = 0; c < cMax; c++) {
@@ -142,14 +145,14 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
 
 /** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
 export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
-  // Must match traceRow's column order EXACTLY. HEAD is 23: the 18 base cols
-  // + GV leader/gameOver/winner/victoryType + playerAge (all integer, B-24
-  // S2). Each rival is 16: the 12 base + treasury/rGScore (both float ×1000,
-  // tol 2) + rrWarMask + age (int). A stale tol silently shifts every later
+  // Must match traceRow's column order EXACTLY. HEAD is 24: the 18 base cols
+  // + GV leader/gameOver/winner/victoryType + playerAge + TOURISM (all
+  // integer; B-24 S2 and B-20 #71). Each rival is 17: the 12 base +
+  // treasury/rGScore (both float ×1000, tol 2) + rrWarMask + age + tourism. A stale tol silently shifts every later
   // column's tolerance — keep them in lockstep.
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
   return tol;
 }

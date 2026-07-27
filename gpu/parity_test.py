@@ -22,10 +22,10 @@ from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
 HEAD = [
     "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
-    "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought", "imp", "leader", "gameOver", "winner", "victoryType", "playerAge",
+    "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought", "imp", "leader", "gameOver", "winner", "victoryType", "playerAge", "tourism",
 ]
 PER_CS = ["envoys", "csPop", "quest"]
-PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore", "rrWarMask", "rAge"]
+PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore", "rrWarMask", "rAge", "rTourism"]
 PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty", "followed"]
 
 
@@ -39,13 +39,13 @@ def columns(n_cities: int, n_cs: int, n_rivals: int) -> tuple[list[str], torch.T
     turn over turn); the drift check below catches those regardless.
     """
     cols = list(HEAD)
-    atol = [0.0] * 5 + [2.0] * 4 + [0.0] * 14  # +leader/gameOver/winner/victoryType (int, GV-1/2/3) +playerAge (int, B-24)
+    atol = [0.0] * 5 + [2.0] * 4 + [0.0] * 15  # +leader/gameOver/winner/victoryType (int, GV-1/2/3) +playerAge (int, B-24) +tourism (int, B-20 #71)
     for s in range(n_cs):
         cols += [f"{name}{s}" for name in PER_CS]
         atol += [0.0, 0.0, 0.0]
     for r in range(n_rivals):
         cols += [f"{name}{r}" for name in PER_RIVAL]
-        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0]  # +rrWarMask (A-19/B-33) +rAge (int, B-24)
+        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 0.0]  # +rrWarMask (A-19/B-33) +rAge (int, B-24) +rTourism (int, B-20 #71)
     for c in range(n_cities):
         cols += [f"{name}{c}" for name in PER_CITY]
         atol += [0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 2.0, 0.0]  # +followed (int, B-18)

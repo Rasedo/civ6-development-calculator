@@ -17,7 +17,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { SPECIALIST_YIELDS, greatWorkCulture } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
 import {
@@ -393,6 +393,42 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
     }
   }
   return n;
+}
+
+/**
+ * B-20 (#71): a civ's per-turn TOURISM. Great Works pay the Gathering Storm
+ * values that pair tourism with culture (writing 2, music 4); a SEASIDE RESORT
+ * pays the APPEAL of its tile — the same number as its gold, per the
+ * Civilopedia. Attributed by tile OWNERSHIP rather than by worked-tile
+ * assignment, so the two seats cannot drift on citizen placement.
+ *
+ * RESIDUALS (recorded on B-20): wonders (2 + 1 per era advanced past the
+ * wonder's own era — needs a wonder->era mapping, derivable from
+ * requiresTech's era), relics, artifacts and National Parks; none of those
+ * systems exist here yet. The Culture VICTORY itself rides B-25.
+ */
+function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
+  let t = 0;
+  for (const tile of state.map.tiles) {
+    if (tile.improvement !== 'SEASIDE_RESORT' || tile.pillaged || !owns(tile)) continue;
+    t += Math.max(0, tileAppeal(state.map, tile));
+  }
+  return t;
+}
+
+export function playerTourism(state: GameState): number {
+  let t = 0;
+  for (const c of state.cities) t += greatWorkTourism(c);
+  return t + resortTourism(state, (tile) => tile.cityId !== -1);
+}
+
+export function rivalTourism(
+  state: GameState,
+  rival: { id: number; cities: { greatWorksWriting?: number; greatWorksMusic?: number }[] },
+): number {
+  let t = 0;
+  for (const rc of rival.cities) t += greatWorkTourism(rc);
+  return t + resortTourism(state, (tile) => tile.rivalId === rival.id);
 }
 
 export function computeCityStats(

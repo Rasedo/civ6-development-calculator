@@ -168,6 +168,22 @@ export const GW_WRITING_BUILDING = 'AMPHITHEATER';
 export const GW_MUSIC_BUILDING = 'MUSEUM';
 export const WORKS_PER_PERSON = 2;
 export const SLOTS_PER_BUILDING = 2;
+/**
+ * B-20 (#71, 2026-07-27): TOURISM per Great Work. Sourced (Gathering Storm,
+ * the ruleset this model follows — the same source as the music CULTURE
+ * value): GS pairs a Great Work's tourism with its culture, so Writing pays
+ * 2 Culture AND 2 Tourism and the higher-value Music work pays 4 and 4. The
+ * Printing doubling (Writing 2 -> 4) is NOT modeled: no such tech effect
+ * exists in this tree.
+ */
+export const GW_WRITING_TOURISM = 2;
+export const GW_MUSIC_TOURISM = 4;
+
+/** B-20 (#71): the per-turn TOURISM a city's Great Works generate. */
+export function greatWorkTourism(city: { greatWorksWriting?: number; greatWorksMusic?: number }): number {
+  return GW_WRITING_TOURISM * (city.greatWorksWriting ?? 0) + GW_MUSIC_TOURISM * (city.greatWorksMusic ?? 0);
+}
+
 export const GW_WRITING_CULTURE = 2;
 export const GW_MUSIC_CULTURE = 4;
 /** Classes whose people carry Great Works (vs. the instant-lump classes). */

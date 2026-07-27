@@ -59,7 +59,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, rivalTourism } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -3084,6 +3084,10 @@ export function rivalPhase(state: GameState): void {
     // id; no refund).
     rival.treasury = (rival.treasury ?? 0) + goldSum;
     rival.faith = (rival.faith ?? 0) + faithSum; // P5/S5 (C-17)
+    // B-20 (#71): TOURISM — the player's twin, accumulated once per turn at
+    // the civ level (Great Works + owned Seaside Resorts, each worth its
+    // tile's appeal). Zero-draw, integer-only.
+    rival.tourism = (rival.tourism ?? 0) + rivalTourism(state, rival);
     rival.treasury -= state.units.reduce(
       (s, u) => s + (u.owner === 'rival' && u.civId === rival.id ? UNITS[u.type]?.maintenance ?? 0 : 0),
       0,

@@ -7,7 +7,7 @@
 import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin, hexDistance } from './hex';
-import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
+import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots, playerTourism } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
@@ -891,6 +891,11 @@ export function endTurn(state: GameState): void {
     turnScience += stats.total.science;
     turnCulture += stats.total.culture;
   }
+
+  // B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level, right
+  // after the city loop, so the GPU mirrors at the same position. Great Works
+  // plus every owned Seaside Resort (worth its tile's appeal).
+  state.tourismTotal = (state.tourismTotal ?? 0) + playerTourism(state);
 
   // Loyalty collapses resolve after the city loop (they mutate the list).
   for (const city of defectors) flipCityToRival(state, city);

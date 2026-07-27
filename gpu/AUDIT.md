@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 33.9 | **83%** |
-| B fidelity | 88 | 83.0 | **94%** |
+| B fidelity | 88 | 83.2 | **95%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **178.9** | **94%** |
-| Open chapters only (A+B) | 129 | 116.9 | **91%** |
+| **Overall (incl. closed)** | **191** | **179.1** | **94%** |
+| Open chapters only (A+B) | 129 | 117.1 | **91%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -332,6 +332,30 @@ Per-item weights (done% in parens where partial):
   DEBT-2 GPU work). APOSTLE_BUY_LIVE remains OFF with a full hunt log in
   its comment — its recorded rationale was also wrong, and the true split
   is a downstream religious-unit LIFECYCLE drift, not a buy-timing one.
+- B-20 TOURISM SUBSTRATE (2026-07-27). TOURISM now exists on both engines
+  and is TRACED, so parity proves it: a per-civ cumulative accumulator
+  (`state.tourismTotal` / `RivalCiv.tourism`; GPU `tourism_total` /
+  `r_tourism`, both in _MUTABLE), fed by GREAT WORKS at the sourced
+  Gathering-Storm values that pair tourism with culture (writing 2, music 4)
+  and by SEASIDE RESORTS, each worth its tile's APPEAL. Accumulated ONCE per
+  turn at the civ level at the same position in both engines (right after
+  the city loop, BEFORE the great-people advance), attributed by tile
+  OWNERSHIP rather than worked-tile assignment so the seats cannot drift on
+  citizen placement. Zero-draw, integer-only. This is the shared blocker
+  inside B-20, B-25 and B-27, so it unblocks all three.
+  HUNT (off-script only): the GPU summed Great Works over EVERY city column
+  while TS iterates `state.cities` — a captured city kept paying tourism
+  forever (seed 9105 t144, +4 = one music work of a lost city). Alive-masked
+  on both seats. It surfaced only in the rollout because the scripted player
+  never loses a city; culture stayed green throughout, which is what
+  identified the counts as correct and pointed at the sum itself.
+  STILL OPEN in B-20: wonders (2 + 1 per era advanced past the wonder's own
+  era — needs a wonder->era mapping, derivable from `requiresTech`'s era
+  string), relics, artifacts, National Parks, the Printing doubling, Great
+  Works of ART and archaeology. B-20 -> 80%.
+  COVERAGE IS THIN and recorded as such: tourism is non-zero in only 2 of
+  the 24 gate games (Great Works are rare on script and a Seaside Resort
+  needs Radio), so the poke lanes and the rollout are what exercise it.
   ARITHMETIC NOTE: batch 1's header re-add put B at 81.8; re-summing
   from these per-item weights gives 81.63. The 0.2 over-claim is
   corrected here — the FOURTH time this table has drifted from its own

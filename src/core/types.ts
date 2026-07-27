@@ -274,6 +274,10 @@ export interface GameState {
   /** B-23 (#71): have roads reached the CLASSICAL tier (bridges)? Latched true
    *  at the first era boundary; a road-to-road step then pays no river charge. */
   roadBridges?: boolean;
+  /** B-20 (#71): the player's cumulative TOURISM. Fed by Great Works and
+   *  Seaside Resorts; wonders/relics/artifacts/National Parks are recorded
+   *  residuals, and the Culture VICTORY itself rides B-25. */
+  tourismTotal?: number;
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
@@ -445,6 +449,8 @@ export interface RivalCiv {
   /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
    *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
   warWeariness?: number;
+  /** B-20 (#71): this rival's cumulative TOURISM (the player's twin). */
+  tourism?: number;
   /** B-25: this civ's completed space-race project ids (chain progress). */
   spaceProjects?: string[];
   /** AUDIT A-11/A-12b: this civ's trade routes — `from` is always an own
