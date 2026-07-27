@@ -4809,7 +4809,26 @@ class BatchSim:
             & (self.owner.gather(1, rep_t) >= 0)
             & (self.pillaged.gather(1, rep_t) | self.district_pillaged.gather(1, rep_t))
         ).unsqueeze(2)
-        return torch.cat([move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols, dim=2)
+        # A-21 (#50, 2026-07-27): 24 = PLAYER PILLAGE. A military unit standing
+        # on an ENEMY tile (an at-war rival's or a city-state's) with a live
+        # improvement, or a complete non-centre unpillaged district.
+        _pt = self.p_tile.clamp(min=0)
+        _rv_t = self.rival_at.gather(1, _pt)
+        _enemy = ((_rv_t >= 0) & self.r_atwar.gather(1, _rv_t.clamp(min=0))) | (self.cs_at.gather(1, _pt) >= 0)
+        _has_imp = (self.improvement.gather(1, _pt) >= 0) & ~self.pillaged.gather(1, _pt)
+        _has_dis = (
+            (self.district.gather(1, _pt) >= 0)
+            & self.district_complete.gather(1, _pt)
+            & ~self.district_pillaged.gather(1, _pt)
+            & (self.center_at.gather(1, _pt) < 0)
+            & (self.rvcity_at.gather(1, _pt) < 0)
+        )
+        pillage = (
+            self.p_alive & (self._p_combat[self.p_type] > 0) & _enemy & (_has_imp | _has_dis)
+        ).unsqueeze(2)
+        return torch.cat(
+            [move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols + [pillage], dim=2
+        )
 
     def rival_slot_map(self, r: int) -> torch.Tensor:
         """[B, P_MAX] the v-slot index behind each rival-r unit row (slot
@@ -6040,6 +6059,38 @@ class BatchSim:
             if self._builder_idx >= 0:
                 hc0 = here.clamp(min=0)
                 ftr_t = self.tile_ftr.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                # A-21 (#50): 24 = PILLAGE — the playerPillage twin. Improvement
+                # first, else a complete non-centre district (the B-32 order);
+                # PILLAGE_HEAL improvements heal +25; the turn is spent.
+                _rvp = self.rival_at.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                _en = ((_rvp >= 0) & self.r_atwar.gather(1, _rvp.clamp(min=0).unsqueeze(1)).squeeze(1)) | (
+                    self.cs_at.gather(1, hc0.unsqueeze(1)).squeeze(1) >= 0
+                )
+                _hi = (self.improvement.gather(1, hc0.unsqueeze(1)).squeeze(1) >= 0) & ~self.pillaged.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                _hd = (
+                    (self.district.gather(1, hc0.unsqueeze(1)).squeeze(1) >= 0)
+                    & self.district_complete.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                    & ~self.district_pillaged.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                    & (self.center_at.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.rvcity_at.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
+                )
+                ok_pl = (a == 24) & self.p_alive[:, p] & (self._p_combat[self.p_type[:, p]] > 0) & _en & (_hi | _hd)
+                if bool(ok_pl.any()):
+                    _pi = ok_pl & _hi
+                    if bool(_pi.any()):
+                        _r3 = _pi.nonzero(as_tuple=True)[0]
+                        self.pillaged[_r3, hc0[_r3]] = True
+                        _heal = self._imp_heals[self.improvement[_r3, hc0[_r3]].clamp(min=0)]
+                        _cap = self.rules.combat.get("unitHp", 100)
+                        self.p_hp[_r3, p] = torch.where(
+                            _heal, (self.p_hp[_r3, p] + 25).clamp(max=_cap), self.p_hp[_r3, p]
+                        )
+                    _pd = ok_pl & ~_hi & _hd
+                    if bool(_pd.any()):
+                        _r4 = _pd.nonzero(as_tuple=True)[0]
+                        self.district_pillaged[_r4, hc0[_r4]] = True
+                    self.p_acted[:, p] = self.p_acted[:, p] | ok_pl
+                    self._eff_version += 1
                 # A-18 (#50): 18-23 = place a RESOURCE improvement (or the
                 # Seaside Resort) on the builder's tile — the builderImprove
                 # twin, re-validated here exactly as the mask computed it.

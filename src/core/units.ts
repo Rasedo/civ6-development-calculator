@@ -10,6 +10,7 @@ import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
+import { PILLAGE_HEAL_IMPROVEMENTS } from './combat'; // A-21 (#50): the shared heal set
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
@@ -747,6 +748,42 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
 
 /** Repair a pillaged improvement or district (no charge, ends the builder's
  * turn). B-32: districts join the same repair, mirroring improvement repair. */
+/**
+ * A-21 (#50, 2026-07-27): the PLAYER PILLAGE verb. Pillaging existed only on
+ * the hostile side (`hostileUnitAct` step 2 for barbarians and at-war rivals),
+ * so rivals wrecked player improvements while the player could only answer by
+ * killing units or taking cities — the asymmetry A-21 recorded.
+ *
+ * Mirrors the hostile rule exactly: a MILITARY unit standing on an ENEMY tile
+ * pillages the improvement first, else a COMPLETE non-CITY_CENTER unpillaged
+ * district (the B-32 order); a PILLAGE_HEAL_IMPROVEMENTS target heals +25
+ * (capped at UNIT_HP); the turn is spent. Enemy = an at-war rival's tile or a
+ * city-state's; the player never pillages its own.
+ */
+export function playerPillage(state: GameState, unitId: number): RuleResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit || unit.owner !== 'player') return no('No such player unit.');
+  if (unitDomain(unit.type) !== 'military') return no('Only military units pillage.');
+  if (unit.movesLeft <= 0) return no('No movement left.');
+  const tile = state.map.tiles[unit.tileIndex];
+  const enemy =
+    (tile.rivalId !== undefined && (state.rivals.find((r) => r.id === tile.rivalId)?.atWar ?? false)) ||
+    tile.csId !== undefined;
+  if (!enemy) return no('Not an enemy tile.');
+  if (tile.improvement && !tile.pillaged) {
+    tile.pillaged = true;
+    if (PILLAGE_HEAL_IMPROVEMENTS.has(tile.improvement)) unit.hp = Math.min(UNIT_HP, unit.hp + 25);
+    unit.movesLeft = 0;
+    return ok;
+  }
+  if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete && !tile.districtPillaged) {
+    tile.districtPillaged = true; // B-32
+    unit.movesLeft = 0;
+    return ok;
+  }
+  return no('Nothing to pillage here.');
+}
+
 export function builderRepair(state: GameState, unitId: number): RuleResult {
   const { unit, err } = builderOn(state, unitId);
   if (err) return err;

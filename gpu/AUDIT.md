@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 36.0 | **88%** |
+| A symmetry | 41 | 38.0 | **93%** |
 | B fidelity | 88 | 83.6 | **95%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **181.6** | **95%** |
-| Open chapters only (A+B) | 129 | 119.6 | **93%** |
+| **Overall (incl. closed)** | **191** | **183.6** | **96%** |
+| Open chapters only (A+B) | 129 | 121.6 | **94%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -224,6 +224,7 @@ Per-item weights (done% in parens where partial):
   palace-relocation residuals), A-11 4 (done — A-12b closed the CS
   residual; the GPU player-route note rides A-18/#50),
   A-23 2 (RESOLVED — 2026-07-27, per-city worked-tile scan),
+  A-21 2 (RESOLVED — 2026-07-27, player pillage verb),
   A-18 3 (70% — 2026-07-27: player REPAIR + resource-improvement RL verbs
   landed, 17->24 action columns; the CS-attack column is BLOCKED on a
   missing player<->CS war state, and the P8 re-baseline is owner-deferred),
@@ -613,7 +614,18 @@ untagged halves of tagged items stay Fable/main-session work.
 - A-20. RESOLVED (2026-07-13, task #54): rival cities heal the flat +20
   when unbesieged (the 15/5 war split was a local invention), one
   source both engines (`CITY_HEAL_PER_TURN` / `cityHealPerTurn`).
-- A-21 (new). The player has no pillage verb at all: pillaging exists
+- A-21. **RESOLVED (2026-07-27).** The PLAYER PILLAGE verb exists on both
+  engines — action column 24, and a new `playerPillage` (units.ts), since TS
+  had NO player-pillage function at all. It mirrors the hostile rule exactly:
+  a MILITARY unit on an ENEMY tile (an at-war rival's or a city-state's)
+  pillages the improvement first, else a COMPLETE non-CITY_CENTER unpillaged
+  district (the B-32 order); a PILLAGE_HEAL_IMPROVEMENTS target heals +25
+  capped at unitHp; the turn is spent. GPU mask + apply share the same
+  predicate and the existing `_imp_heals` table, so the two seats cannot
+  drift. Gates: scripted parity 24x250 0.0 milli, FORCED compaction 0.0
+  milli, rollout 72/72 (the verb IS sampled off-script), vitest 389/389, all
+  30 poke lanes, BATTERY OK 663s.
+  Original entry — the gap this closed: the player had no pillage verb: pillaging exists
   only on the hostile side (`hostileUnitAct` step 2 (combat.ts) /
   `_rival_unit_war_act` (engine.py) for at-war rivals, plus
   barbarians), there is no TS player-pillage function, and

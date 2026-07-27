@@ -33,7 +33,7 @@ import {
   serialize,
   deserialize,
 } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove, builderRemoveFeature, builderRepair } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove, builderRemoveFeature, builderRepair, playerPillage } from '../src/core/units';
 import { meleeAttack, rangedAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import { canPlaceDistrict } from '../src/core/rules';
@@ -156,6 +156,11 @@ for (const game of roll.games) {
         fail(`turn ${state.turn}: no player unit at tile ${tile} (civ ${civ})`);
         bad = true;
         break;
+      }
+      if (a === 24) {
+        // A-21 (#50): PILLAGE the tile underfoot. Soft-fail like the builds.
+        playerPillage(state, unit.id);
+        continue;
       }
       if (a >= 18) {
         // A-18 (#50): resource improvements + SEASIDE_RESORT, columns 18+.
