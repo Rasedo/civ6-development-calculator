@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 33.9 | **83%** |
-| B fidelity | 88 | 83.2 | **95%** |
+| B fidelity | 88 | 83.5 | **95%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **179.1** | **94%** |
-| Open chapters only (A+B) | 129 | 117.1 | **91%** |
+| **Overall (incl. closed)** | **191** | **179.4** | **94%** |
+| Open chapters only (A+B) | 129 | 117.4 | **91%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -349,13 +349,23 @@ Per-item weights (done% in parens where partial):
   on both seats. It surfaced only in the rollout because the scripted player
   never loses a city; culture stayed green throughout, which is what
   identified the counts as correct and pointed at the sum itself.
-  STILL OPEN in B-20: wonders (2 + 1 per era advanced past the wonder's own
-  era — needs a wonder->era mapping, derivable from `requiresTech`'s era
-  string), relics, artifacts, National Parks, the Printing doubling, Great
-  Works of ART and archaeology. B-20 -> 80%.
-  COVERAGE IS THIN and recorded as such: tourism is non-zero in only 2 of
-  the 24 gate games (Great Works are rare on script and a Seaside Resort
-  needs Radio), so the poke lanes and the rollout are what exercise it.
+  WONDERS LANDED (same day, second slice): every COMPLETED wonder a civ owns
+  pays `wonderTourismBase` (2) + 1 per era it has advanced PAST the wonder's
+  own era — the real Civ 6 rule. A wonder's era is the era of its UNLOCK
+  (tech or civic); a civ's era is the HIGHEST era among its completed
+  techs/civics, so both sit on the SAME scale (`civEraIndex`/`_civ_era`,
+  exported `techEra`/`civicEra`/`wonders.eras`).
+  SECOND HUNT: POSITION IS LOAD-BEARING. TS accumulates rival tourism AFTER
+  this turn's TECH completions but BEFORE any civic completes; the GPU
+  accumulated one step early, so the wonder term read a stale ERA and lost
+  exactly one era-past point per wonder (seed 9014 t112, a constant +1/+2).
+  Moved to the matching position.
+  STILL OPEN in B-20: relics, artifacts, National Parks, the Printing
+  doubling, Great Works of ART and archaeology. B-20 -> 85%.
+  COVERAGE: with wonders in, rival tourism is non-zero in 23 of the 24 gate
+  games (max 7137) — well exercised. The PLAYER's is non-zero in only 1
+  (the scripted player rarely builds wonders or Great Works), so the player
+  side rides the rollout.
   ARITHMETIC NOTE: batch 1's header re-add put B at 81.8; re-summing
   from these per-item weights gives 81.63. The 0.2 over-claim is
   corrected here — the FOURTH time this table has drifted from its own

@@ -10,6 +10,10 @@ import { hasFreshWater, isCoastalLand, isImpassable } from './query';
 import { tileYields, cityDistrictYields, cityBuildingYields, regionalEffects, localBuildingAmenities, pillagedDistrictTypes } from './yields';
 import { getModifiers, makeYieldCtx, withFollowerBelief, followerReligionForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier } from './appeal';
+import { TECHS, ERAS } from '../data/techs'; // B-20 (#71): wonder/civ era scale
+import { CIVICS } from '../data/civics';
+/** B-20 (#71): base tourism every completed wonder pays (real Civ 6). */
+export const WONDER_TOURISM_BASE = 2;
 import { cityTradeYields } from './trade';
 import { hasRiver } from './query';
 import { revealAround } from './fog';
@@ -407,6 +411,50 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
  * requiresTech's era), relics, artifacts and National Parks; none of those
  * systems exist here yet. The Culture VICTORY itself rides B-25.
  */
+/**
+ * B-20 (#71): a civ's ERA INDEX — the highest era among its completed techs
+ * and civics (real Civ 6 advances a civ's era with its research). Used only
+ * by wonder tourism, which pays "1 for each era you have advanced PAST the
+ * era in which that wonder was first available", so wonder era and civ era
+ * must be measured on the SAME scale. 0 (Ancient) when nothing is done.
+ */
+export function civEraIndex(techIds: readonly string[], civicIds: readonly string[]): number {
+  let e = 0;
+  for (const id of techIds) {
+    const i = ERAS.indexOf(TECHS[id]?.era);
+    if (i > e) e = i;
+  }
+  for (const id of civicIds) {
+    const i = ERAS.indexOf(CIVICS[id]?.era);
+    if (i > e) e = i;
+  }
+  return e;
+}
+
+/** B-20 (#71): the era a built wonder FIRST became available — the era of its
+ *  unlock (tech or civic). Ancient when it has neither. */
+export function wonderEraIndex(id: string): number {
+  const def = BUILT_WONDERS[id];
+  if (!def) return 0;
+  if (def.requiresTech) return Math.max(0, ERAS.indexOf(TECHS[def.requiresTech]?.era));
+  if (def.requiresCivic) return Math.max(0, ERAS.indexOf(CIVICS[def.requiresCivic]?.era));
+  return 0;
+}
+
+/**
+ * B-20 (#71): the per-turn TOURISM a civ's COMPLETED wonders generate. Real
+ * Civ 6: each wonder is worth 2 Tourism plus 1 for every era the owner has
+ * advanced past the wonder's own era.
+ */
+function wonderTourism(state: GameState, era: number, owns: (t: Tile) => boolean): number {
+  let t = 0;
+  for (const tile of state.map.tiles) {
+    if (!tile.builtWonder || !tile.builtWonderComplete || !owns(tile)) continue;
+    t += WONDER_TOURISM_BASE + Math.max(0, era - wonderEraIndex(tile.builtWonder));
+  }
+  return t;
+}
+
 function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   let t = 0;
   for (const tile of state.map.tiles) {
@@ -419,16 +467,24 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
 export function playerTourism(state: GameState): number {
   let t = 0;
   for (const c of state.cities) t += greatWorkTourism(c);
-  return t + resortTourism(state, (tile) => tile.cityId !== -1);
+  const owns = (tile: Tile) => tile.cityId !== -1;
+  const era = civEraIndex(state.research.techs, state.research.civics);
+  return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
 }
 
 export function rivalTourism(
   state: GameState,
-  rival: { id: number; cities: { greatWorksWriting?: number; greatWorksMusic?: number }[] },
+  rival: {
+    id: number;
+    cities: { greatWorksWriting?: number; greatWorksMusic?: number }[];
+    research: { techs: string[]; civics: string[] };
+  },
 ): number {
   let t = 0;
   for (const rc of rival.cities) t += greatWorkTourism(rc);
-  return t + resortTourism(state, (tile) => tile.rivalId === rival.id);
+  const owns = (tile: Tile) => tile.rivalId === rival.id;
+  const era = civEraIndex(rival.research.techs, rival.research.civics);
+  return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
 }
 
 export function computeCityStats(

@@ -1025,6 +1025,14 @@ class BatchSim:
         # B-20 (#71): TOURISM per Great Work — GS pairs it with culture.
         self._gw_w_tour = int(rr.get("gwWritingTourism", 2))
         self._gw_m_tour = int(rr.get("gwMusicTourism", 4))
+        # B-20 (#71): WONDER tourism — base + 1 per era advanced PAST the
+        # wonder's own era. Wonder era comes from its unlock; a civ's era is
+        # the highest era among its completed techs/civics (the same scale).
+        self._wonder_tour_base = int(rr.get("wonderTourismBase", 2))
+        self._tech_era = torch.tensor(rr.get("techEra", []) or [0], dtype=torch.long, device=device)
+        self._civic_era = torch.tensor(rr.get("civicEra", []) or [0], dtype=torch.long, device=device)
+        _wera = (rules.wonders or {}).get("eras", []) or [0]
+        self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
         # B-20 (#71): cumulative TOURISM (the `state.tourismTotal` /
         # `RivalCiv.tourism` twins). Integer, zero-draw.
         self.tourism_total = torch.zeros(B, dtype=torch.long, device=device)
@@ -2882,7 +2890,19 @@ class BatchSim:
         )
         self.v_aura_mp = (v_hit & v_ok).long() * self._gen_aura_mp
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor) -> torch.Tensor:
+    def _civ_era(self, techs: torch.Tensor, civics: torch.Tensor) -> torch.Tensor:
+        """[B] — B-20 (#71): the `civEraIndex` twin. The HIGHEST era among a
+        civ's completed techs and civics; 0 (Ancient) when nothing is done."""
+        nt = min(techs.shape[1], self._tech_era.numel())
+        nc = min(civics.shape[1], self._civic_era.numel())
+        e = torch.zeros(techs.shape[0], dtype=torch.long, device=self.device)
+        if nt:
+            e = torch.maximum(e, (techs[:, :nt].long() * self._tech_era[:nt]).max(dim=1).values)
+        if nc:
+            e = torch.maximum(e, (civics[:, :nc].long() * self._civic_era[:nc]).max(dim=1).values)
+        return e
+
+    def _tourism_of(self, gw_w: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor) -> torch.Tensor:
         """[B] — B-20 (#71): a civ's per-turn TOURISM, the `playerTourism` /
         `rivalTourism` twin. Great Works pay the GS values that pair tourism
         with culture; every OWNED unpillaged SEASIDE RESORT pays its tile's
@@ -2896,6 +2916,13 @@ class BatchSim:
         # off-script red this arrived with (seed 9105 t144, +4 = one music
         # work of a lost city).
         t = self._gw_w_tour * (gw_w * alive.long()).sum(dim=1) + self._gw_m_tour * (gw_m * alive.long()).sum(dim=1)
+        # WONDERS: base + eras advanced past each wonder's own era.
+        w_live = (self.built_wonder >= 0) & self.built_wonder_complete & own
+        if bool(w_live.any()):
+            w_era = self._wonder_era[self.built_wonder.clamp(min=0, max=max(self._wonder_era.numel() - 1, 0))]
+            t = t + (
+                (self._wonder_tour_base + (era.unsqueeze(1) - w_era).clamp(min=0)) * w_live.long()
+            ).sum(dim=1)
         if self.SEASIDE >= 0:
             live = (self.improvement == self.SEASIDE) & ~self.pillaged & own
             if bool(live.any()):
@@ -12021,10 +12048,6 @@ class BatchSim:
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
             self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] + gold_sum, self.r_treasury[:, r])  # VP-G1
             self.r_faith[:, r] = torch.where(active, self.r_faith[:, r] + faith_sum, self.r_faith[:, r])  # P5/S5 (C-17)
-            # B-20 (#71): TOURISM — the TS `rival.tourism` twin, at the same
-            # position (right beside the faith accumulator).
-            _tour_r = self._tourism_of(self.rc_gw_writing[:, r], self.rc_gw_music[:, r], self.rc_alive[:, r], self.rival_at == r)
-            self.r_tourism[:, r] = torch.where(active, self.r_tourism[:, r] + _tour_r, self.r_tourism[:, r])
             # P5/S1 (C-12): unit upkeep + the GV-5 bankruptcy rule, mirroring
             # the player's exactly (milli-rounded test; disband the
             # priciest-upkeep unit, tie → lowest slot = spawn order; no
@@ -12067,6 +12090,19 @@ class BatchSim:
                 self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             no_t = active & (self.r_cur_tech[:, r] == -1) & ~self._available_mask(self.r_techs[:, r], self._prereq_t).any(dim=1)
             self.r_tech_prog[:, r] = torch.where(no_t, torch.minimum(self.r_tech_prog[:, r], torch.zeros_like(self.r_tech_prog[:, r])), self.r_tech_prog[:, r])
+            # B-20 (#71): TOURISM — the TS `rival.tourism` twin. POSITION IS
+            # LOAD-BEARING: TS accumulates AFTER this turn's TECH completions
+            # but BEFORE any civic completes, and the wonder term reads the
+            # civ's ERA off completed research — so accumulating a step early
+            # cost exactly one era-past point per wonder (seed 9014 t112).
+            _tour_r = self._tourism_of(
+                self.rc_gw_writing[:, r],
+                self.rc_gw_music[:, r],
+                self.rc_alive[:, r],
+                self.rival_at == r,
+                self._civ_era(self.r_techs[:, r], self.r_civics[:, r]),
+            )
+            self.r_tourism[:, r] = torch.where(active, self.r_tourism[:, r] + _tour_r, self.r_tourism[:, r])
             picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
             self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])
@@ -13416,7 +13452,7 @@ class BatchSim:
         # right after the city loop and BEFORE the loyalty collapses, exactly
         # where TS puts it.
         self.tourism_total = self.tourism_total + self._tourism_of(
-            self.gw_writing, self.gw_music, self.alive, self.owner >= 0
+            self.gw_writing, self.gw_music, self.alive, self.owner >= 0, self._civ_era(self.techs, self.civics)
         )
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------

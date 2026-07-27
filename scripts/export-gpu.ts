@@ -110,7 +110,7 @@ import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
 import { makeYieldCtx } from '../src/core/effects';
 import { tileYields, districtAdjacency } from '../src/core/yields';
-import { tileYieldsForCenter, cityMaintenance } from '../src/core/city';
+import { tileYieldsForCenter, cityMaintenance, WONDER_TOURISM_BASE } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow } from './gpu-trace';
 import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
@@ -123,7 +123,7 @@ import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
-import { TECHS } from '../src/data/techs';
+import { TECHS, ERAS } from '../src/data/techs'; // B-20 (#71): era scale
 import { CIVICS } from '../src/data/civics';
 import { GOVERNMENTS, POLICIES, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../src/data/policies';
 import { RESOURCES } from '../src/data/resources';
@@ -644,6 +644,12 @@ const rules = {
     gwMusicCulture: GW_MUSIC_CULTURE,
     gwWritingTourism: GW_WRITING_TOURISM, // B-20 (#71): tourism per Great Work
     gwMusicTourism: GW_MUSIC_TOURISM,
+    // B-20 (#71): WONDER tourism = base + 1 per era advanced PAST the wonder's
+    // own era. Wonder era = the era of its unlock (tech or civic); a civ's era
+    // = the highest era among its completed techs/civics — the SAME scale.
+    wonderTourismBase: WONDER_TOURISM_BASE,
+    techEra: techList.map((t) => Math.max(0, ERAS.indexOf(t.era))),
+    civicEra: civicList.map((c) => Math.max(0, ERAS.indexOf(c.era))),
     warMinTurns: RIVAL_WAR_MIN_TURNS,
     // A-19/B-33 (S2): pairwise rival↔rival DoW/peace gates (zero-draw).
     rrDowProximity: RR_DOW_PROXIMITY,
@@ -767,6 +773,15 @@ const rules = {
   // regionalAmenities (Colosseum) ships but its district is unplaceable
   // in scope. Costs are already speed-scaled in the data file.
   wonders: {
+    // B-20 (#71): the era each wonder first became available (its unlock's
+    // era), parallel to `rows` — the GPU indexes it by wonder index.
+    eras: Object.values(BUILT_WONDERS).map((w) =>
+      w.requiresTech
+        ? Math.max(0, ERAS.indexOf(TECHS[w.requiresTech]?.era))
+        : w.requiresCivic
+        ? Math.max(0, ERAS.indexOf(CIVICS[w.requiresCivic]?.era))
+        : 0,
+    ),
     rows: Object.values(BUILT_WONDERS).map((w) => ({
       cost: w.cost,
       // -1 = no requirement; -3 = requires a tech/civic ABSENT from the
