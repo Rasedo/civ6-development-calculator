@@ -105,6 +105,7 @@ import {
   DEDICATION_FAITH,
   DEDICATION_ERA_SCORE,
   DEDICATION_PAYOUTS_LIVE,
+  RR_ALLY_MIN_PEACE,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -571,7 +572,7 @@ const rules = {
     // S3: governors — stateless greedy loyalty anchors.
     govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
     govMaxTitles: GOV_MAX_TITLES,
-    rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, heroicDedications: HEROIC_DEDICATIONS, dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
+    rrAllyMinPeace: RR_ALLY_MIN_PEACE, rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, heroicDedications: HEROIC_DEDICATIONS, dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the

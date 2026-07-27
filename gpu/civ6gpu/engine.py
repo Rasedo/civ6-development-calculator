@@ -379,7 +379,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -640,6 +640,9 @@ class BatchSim:
         # exists), so no exporter load. _MUTABLE for snapshot/restore.
         self.rr_warkind = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
         self.rr_denounced = torch.full((B, r_pad, r_pad), -1, dtype=torch.long, device=device)
+        # B-22 (2026-07-27): rival<->rival ALLIANCES, symmetric. Allies never
+        # declare war on each other; a denouncement or a war breaks it.
+        self.rr_allied = torch.zeros_like(self.rr_denounced, dtype=torch.bool)
         # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
         # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
         # Integer, zero-draw event hooks only; resets at every eraLength
@@ -653,6 +656,7 @@ class BatchSim:
             for c, v in enumerate(esi[: 1 + r_pad]):
                 self.era_score[b, c] = int(v)
         _er = rules.eras
+        self._rr_ally_min_peace = int((rules.rivals.get("eras") or {}).get("rrAllyMinPeace", 30))  # B-22
         self._era_len = int(_er.get("length", 50))
         self._era_pts = {k: int(_er.get(k, d)) for k, d in (("found", 2), ("conquer", 3), ("wonder", 3), ("pantheon", 1), ("religion", 2), ("gp", 1))}
         # B-24 S2: per-civ Age (0 Dark / 1 Normal / 2 Golden), assigned at each
@@ -10936,6 +10940,28 @@ class BatchSim:
                     self.rr_denounced[:, a, b] = torch.where(
                         denounce, torch.full_like(self.rr_denounced[:, a, b], int(self.turn)), self.rr_denounced[:, a, b]
                     )
+                    # B-22: a denouncement BREAKS the alliance, both sides.
+                    self.rr_allied[:, a, b] = self.rr_allied[:, a, b] & ~denounce
+                    self.rr_allied[:, b, a] = self.rr_allied[:, b, a] & ~denounce
+        # B-22 (2026-07-27): ALLIANCE FORMATION — the TS twin, right after the
+        # denounce pass so a fresh grudge cannot be allied over the same turn.
+        # A pair allies once at PEACE for rrAllyMinPeace turns with NO
+        # denouncement either way. Written symmetrically and only from the
+        # LOWER id, so scan order cannot matter. Zero-draw.
+        if int(self.turn) >= self._rr_ally_min_peace:
+            for a in range(self.R):
+                for b in range(a + 1, self.R):
+                    form = (
+                        alive_civ[:, a]
+                        & alive_civ[:, b]
+                        & ~self.rr_war[:, a, b]
+                        & ~self.rr_allied[:, a, b]
+                        & (self.rr_denounced[:, a, b] < 0)
+                        & (self.rr_denounced[:, b, a] < 0)
+                    )
+                    if bool(form.any()):
+                        self.rr_allied[:, a, b] = self.rr_allied[:, a, b] | form
+                        self.rr_allied[:, b, a] = self.rr_allied[:, b, a] | form
 
     def _rival_rival_declare_wars(self) -> None:
         """A-19/B-33 (S2): pairwise rival↔rival auto-DoW — ZERO-DRAW. Phase-top
@@ -10976,6 +11002,7 @@ class BatchSim:
                     # threshold — it would sue out the SAME turn (mirror of the
                     # TS `rj.warWeariness > RR_PEACE_WW` guard).
                     & (ww[:, b] <= peace_ww)
+                    & ~self.rr_allied[:, a, b]  # B-22: allies never declare
                 )
                 if bool(declare.any()):
                     self.rr_war[:, a, b] = self.rr_war[:, a, b] | declare

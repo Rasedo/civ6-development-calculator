@@ -446,6 +446,10 @@ export interface RivalCiv {
    *  A war a→b is FORMAL iff `denouncedTurn[b]` exists and `turn - it >=
    *  RR_FORMAL_MIN_TURNS` at declaration. Sparse object, empty at t0. */
   denouncedTurn?: Record<number, number>;
+  /** B-22 (2026-07-27): rival-ids this civ is ALLIED with. Symmetric by
+   *  construction (both sides written), broken by a denouncement or a war.
+   *  Allies never declare war on each other. Empty at t0. */
+  alliedRivals?: number[];
   /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
    *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
   warWeariness?: number;

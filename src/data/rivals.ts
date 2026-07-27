@@ -169,6 +169,16 @@ export const GOVERNOR_LOYALTY = 8;
 /** B-22 (task #55 S3): a rival↔rival war is FORMAL iff the aggressor denounced
  *  the target at least this many turns before declaring; otherwise SURPRISE. */
 export const RR_FORMAL_MIN_TURNS = 5;
+
+/**
+ * B-22 (2026-07-27): ALLIANCES on the rival<->rival axis. Real Civ 6 requires a
+ * Declaration of Friendship first and then an Alliance, and ALLIES CANNOT
+ * DECLARE WAR ON EACH OTHER — that last rule is what this models. The
+ * friendship prerequisite is stylized as "at peace for RR_ALLY_MIN_PEACE turns
+ * with NO denouncement in either direction"; a denouncement or a war breaks it
+ * immediately. Zero-draw and symmetric, exactly like `atWarRivals`.
+ */
+export const RR_ALLY_MIN_PEACE = 30;
 /** Empire-wide amenity penalty (≥0) for a weariness accumulator value. */
 export function warWearinessPenalty(weariness: number): number {
   return Math.floor(Math.min(weariness, WAR_WEARINESS_CAP) / WAR_WEARINESS_PER_AMENITY);

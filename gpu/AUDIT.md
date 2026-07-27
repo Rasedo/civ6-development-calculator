@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 83.6 | **95%** |
+| B fidelity | 88 | 84.1 | **96%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **185.6** | **97%** |
-| Open chapters only (A+B) | 129 | 123.6 | **96%** |
+| **Overall (incl. closed)** | **191** | **186.1** | **97%** |
+| Open chapters only (A+B) | 129 | 124.1 | **96%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -262,7 +262,7 @@ Per-item weights (done% in parens where partial):
   routes (rival→player, TS player→rival; intl leg gate-unreachable,
   poke-pinned); Trader unit/roads remain).
 - B meta: B-25 3 (80% — religious victory landed; player project
-  path + Culture/Diplomatic victories open); B-22 3 (50% — task #55
+  path + Culture/Diplomatic victories open); B-22 3 (65% — alliances 2026-07-27; task #55
   S3: denouncement grudge + FORMAL/SURPRISE warKind + ww ×2/×1
   differential; alliances/World Congress/warmonger/peace-terms open);
   B-24 3 (70% — #68: era score + Ages + loyalty modulation +
@@ -1182,8 +1182,21 @@ gap; likewise GS disasters are modeled minus sea-level rise
   a target already past RR_PEACE_WW (it would sue out the same turn).
   In-gate: 3 denouncements, 41 FORMAL / 0 SURPRISE scripted DoWs, 38
   peace firings; SURPRISE ×2 manifests off-script (rollout-proven).
-  STILL OPEN: alliances, World Congress, warmonger cost, peace deals
-  with terms, a player-side denounce/grievance verb.
+  **ALLIANCES LANDED (2026-07-27).** Real Civ 6 gates an Alliance behind a
+  Declaration of Friendship, and ALLIES CANNOT DECLARE WAR ON EACH OTHER —
+  that last rule is what this models. `RivalCiv.alliedRivals` / GPU
+  `rr_allied` [B,R,R] (in _MUTABLE), symmetric like `atWarRivals`/`rr_war`.
+  A pair allies once it has been at PEACE for `rrAllyMinPeace` (30) turns
+  with NO denouncement in either direction — the stylized stand-in for the
+  friendship prerequisite — and a denouncement or a war breaks it on both
+  sides. Formation runs immediately AFTER the denounce pass so a fresh grudge
+  cannot be allied over on the same turn, and writes only from the LOWER id
+  so scan order cannot matter. Zero-draw. The DoW gate gained
+  `~rr_allied[a, b]`. NOT vacuous: alliances form in 12 of the 24 gate games.
+  Gates: scripted parity 24x250 0.0 milli, FORCED compaction 0.0 milli,
+  rollout 72/72, vitest 389/389, all 30 poke lanes, BATTERY OK 702s.
+  STILL OPEN: World Congress, warmonger cost, peace deals with terms, a
+  player-side denounce/grievance verb.
 - B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
   serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
   hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw

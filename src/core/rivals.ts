@@ -102,6 +102,7 @@ import {
   GOVERNOR_LOYALTY,
   RIVAL_TILE_BUY_LIVE,
   ADMIRAL_MARCH_LIVE,
+  RR_ALLY_MIN_PEACE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
@@ -447,9 +448,39 @@ function rivalRivalDenounce(state: GameState): void {
       if (rivalRivalProximity(state, ri, rj) > RR_DOW_PROXIMITY) continue;
       if (!(si > rivalStrength(state, rj))) continue;
       stamps[rj.id] = state.turn;
+      // B-22 (2026-07-27): a denouncement BREAKS an alliance, both sides.
+      breakAlliance(ri, rj);
       state.eventLog.push(`${ri.name} denounces ${rj.name}.`);
     }
   }
+  // B-22 (2026-07-27): ALLIANCE FORMATION, right after the denounce pass so a
+  // fresh grudge cannot be allied over on the same turn. Zero-draw and fully
+  // deterministic: a pair allies once it has been at PEACE for
+  // RR_ALLY_MIN_PEACE turns with NO denouncement in either direction. That
+  // stands in for real Civ 6's Declaration-of-Friendship prerequisite. Written
+  // symmetrically, and only ever from the LOWER id so the scan order cannot
+  // matter.
+  for (let a = 0; a < state.rivals.length; a++) {
+    const ri = state.rivals[a];
+    if (ri.cities.length === 0) continue;
+    for (let b = a + 1; b < state.rivals.length; b++) {
+      const rj = state.rivals[b];
+      if (rj.cities.length === 0) continue;
+      if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
+      if ((ri.alliedRivals ?? []).includes(rj.id)) continue;
+      if (ri.denouncedTurn?.[rj.id] !== undefined || rj.denouncedTurn?.[ri.id] !== undefined) continue;
+      if (state.turn < RR_ALLY_MIN_PEACE) continue;
+      (ri.alliedRivals ??= []).push(rj.id);
+      (rj.alliedRivals ??= []).push(ri.id);
+      state.eventLog.push(`${ri.name} and ${rj.name} form an alliance.`);
+    }
+  }
+}
+
+/** B-22: drop a rival↔rival alliance on BOTH sides (denouncement or war). */
+function breakAlliance(ri: RivalCiv, rj: RivalCiv): void {
+  if (ri.alliedRivals) ri.alliedRivals = ri.alliedRivals.filter((x) => x !== rj.id);
+  if (rj.alliedRivals) rj.alliedRivals = rj.alliedRivals.filter((x) => x !== ri.id);
 }
 
 function rivalRivalDeclareWars(state: GameState): void {
@@ -475,6 +506,8 @@ function rivalRivalDeclareWars(state: GameState): void {
       // S3 magnitude reshuffle's declare/peace thrash (surfaced a dormant S2
       // war-act divergence — the pair matrix was inert in S1). Zero-draw.
       if ((rj.warWeariness ?? 0) > RR_PEACE_WW) continue;
+      // B-22 (2026-07-27): ALLIES NEVER DECLARE ON EACH OTHER (real Civ 6).
+      if ((ri.alliedRivals ?? []).includes(rj.id)) continue;
       setRivalWar(state, ri.id + 1, rj.id + 1, true);
       // B-22 (S3): FORMAL iff the aggressor denounced this target ≥ the min turns
       // earlier; else SURPRISE (the default). Deterministic — no draws.
