@@ -55,7 +55,7 @@ import {
   LEVY_GOLD_COST,
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GW_WRITING_CULTURE, GW_MUSIC_CULTURE, GW_WRITING_TOURISM, GW_MUSIC_TOURISM } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_WRITING_BUILDING, GW_MUSIC_BUILDING, SLOTS_PER_BUILDING, WORKS_PER_PERSON, GW_WRITING_CULTURE, GW_MUSIC_CULTURE, GW_WRITING_TOURISM, GW_MUSIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -996,6 +996,13 @@ const rules = {
   // (-1 = none); adjacency `src` indexes ADJ_SRC (static: mountain/rainforest/
   // woods/reef/naturalWonder/river/seaResource; dynamic: builtWonder/district/
   // cityCenter/harbor/mineOrQuarry). Cost is flat in this model.
+  // A-22 (2026-07-27): the SPECIALIST yield per district, parallel to
+  // `districts` — 6 columns in YIELD_KEYS order, all-zero for a district with
+  // no specialist row. The GPU merges these into its worked-tile ranking so
+  // rivals assign specialists exactly as TS does.
+  specialistYields: PLACEABLE_DISTRICTS.map((id) =>
+    YIELD_KEYS.map((k) => (SPECIALIST_YIELDS as any)[id]?.[k] ?? 0),
+  ),
   districts: PLACEABLE_DISTRICTS.map((id, idx) => {
     const d = DISTRICTS[id];
     return {

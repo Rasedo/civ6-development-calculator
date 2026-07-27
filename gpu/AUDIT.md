@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 38.0 | **93%** |
+| A symmetry | 41 | 40.0 | **98%** |
 | B fidelity | 88 | 83.6 | **95%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **183.6** | **96%** |
-| Open chapters only (A+B) | 129 | 121.6 | **94%** |
+| **Overall (incl. closed)** | **191** | **185.6** | **97%** |
+| Open chapters only (A+B) | 129 | 123.6 | **96%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -225,6 +225,7 @@ Per-item weights (done% in parens where partial):
   residual; the GPU player-route note rides A-18/#50),
   A-23 2 (RESOLVED — 2026-07-27, per-city worked-tile scan),
   A-21 2 (RESOLVED — 2026-07-27, player pillage verb),
+  A-22 2 (RESOLVED — 2026-07-27, rival specialists + GPU model),
   A-18 3 (70% — 2026-07-27: player REPAIR + resource-improvement RL verbs
   landed, 17->24 action columns; the CS-attack column is BLOCKED on a
   missing player<->CS war state, and the P8 re-baseline is owner-deferred),
@@ -634,7 +635,27 @@ untagged halves of tagged items stay Fable/main-session work.
   `PILLAGE_HEAL_IMPROVEMENTS` heal); the player can only respond by
   killing units or taking cities. Natural batch with the A-18 mask
   work.
-- A-22 (new). Specialists are player-only on the TS side:
+- A-22. **RESOLVED (2026-07-27).** Rivals now assign SPECIALISTS, and the GPU
+  models them. Rule (real Civ 6 auto-assigns citizens wherever the yield is
+  best): ONE merged ranking of workable TILES and open SPECIALIST SLOTS,
+  scored by the same `tileScore` 'balanced' weighting, top `population` taken
+  — exactly equivalent to "take a specialist when it beats the tile it would
+  displace", and trivially mirrorable. Slots per district = that city's
+  buildings belonging to it, with the district registered, COMPLETE and
+  unpillaged (B-32). Ties go to TILES, because a slot's tie index (>= T)
+  always loses in `score * 1e6 - tileIndex`.
+  TWO TIE-BREAKS had to be aligned, and both were caught by the gate:
+  (a) TS sorted equal-scoring slots by the city's BUILD order while the GPU
+  used catalog order — CAMPUS science 2 and HOLY_SITE faith 2 score
+  identically under focus_base, so the two engines picked different
+  specialists (seed 9261 t99: GPU +tech/score, -faith). TS now sorts on the
+  district's index in PLACEABLE_DISTRICTS, the exporter's canonical order.
+  (b) the batched `_rival_city_yields_all` needed the same merge as the per-j
+  path or the score/trace column drifted from the accumulators.
+  New export: `specialistYields` [nD, 6] parallel to the districts catalog.
+  Gates: scripted parity 24x250 0.0 milli, FORCED compaction 0.0 milli,
+  rollout 72/72, vitest 389/389, all 30 poke lanes, BATTERY OK 732s.
+  Original entry — the gap this closed: specialists were player-only:
   `setSpecialists` (game.ts) + `citySpecialistSlots`/
   `effectiveSpecialists` (city.ts) feed `SPECIALIST_YIELDS` into
   `computeCityStats`, but `rivalCityYields` (rivals.ts) never reads

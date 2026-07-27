@@ -16,6 +16,7 @@ import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlo
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
+import { emptyYields } from './types'; // A-22: rival specialist yields
 import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION } from './trade';
 import { isSuzerain, rivalIsSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
@@ -30,7 +31,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
-import { GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, placeGreatWorks, greatWorkCulture } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import {
@@ -67,7 +68,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from './units';
 import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
-import { DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
+import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import {
   RIVAL_LEADERS,
   RIVAL_MAX_CITIES,
@@ -1768,7 +1769,45 @@ export function rivalCityYields(
       return { y, index: t.index, score: tileScore(y, 'balanced') };
     })
     .sort((a, b) => b.score - a.score || a.index - b.index);
-  const worked = ranked.slice(0, rc.population);
+  // AUDIT A-22 (2026-07-27): RIVAL SPECIALISTS. Specialists were player-only —
+  // `rivalCityYields` never read `RivalCity.specialists` and no rival
+  // assignment path existed, so a rival's district buildings gave it nothing a
+  // citizen could work. Rivals now assign the way real Civ 6 auto-assigns:
+  // citizens go wherever the yield is best. Modeled as ONE merged ranking —
+  // workable TILES and open SPECIALIST SLOTS scored by the same `tileScore`
+  // 'balanced' weighting, sorted together, top `population` taken. That is
+  // exactly equivalent to "take a specialist when it beats the tile it would
+  // displace", and it is trivially mirrorable: the GPU appends the same slot
+  // entries to the same key array before its topk. Zero-draw. Ties go to
+  // TILES (slots sort after every tile).
+  const specSlots: { y: Yields; score: number; di: number }[] = [];
+  for (const d of rc.districts) {
+    const sy = SPECIALIST_YIELDS[d.type];
+    if (!sy) continue;
+    const dt = state.map.tiles[d.tileIndex];
+    if (!dt.districtComplete || dt.districtPillaged) continue; // B-32
+    const n = rc.buildings.filter((b) => BUILDINGS[b]?.district === d.type).length;
+    const y = { ...emptyYields(), ...sy } as Yields;
+    const sc = tileScore(y, 'balanced');
+    // Tie key = the district's index in PLACEABLE_DISTRICTS, the SAME canonical
+    // order the exporter uses — otherwise equal-scoring slots (CAMPUS science 2
+    // vs HOLY_SITE faith 2 both score 2 under focus_base) would break ties by
+    // this city's build order in TS and by catalog order on the GPU.
+    const di = PLACEABLE_DISTRICTS.indexOf(d.type);
+    for (let k = 0; k < n; k++) specSlots.push({ y, score: sc, di });
+  }
+  specSlots.sort((a, b) => b.score - a.score || a.di - b.di);
+  const merged: { y: Yields; score: number; tie: number; index: number }[] = ranked.map((r) => ({
+    y: r.y,
+    score: r.score,
+    tie: r.index,
+    index: r.index,
+  }));
+  const tieBase = state.map.tiles.length;
+  // A SPECIALIST has no tile, so index -1 — the Petra scan below skips it.
+  specSlots.forEach((sl, k) => merged.push({ y: sl.y, score: sl.score, tie: tieBase + k, index: -1 }));
+  merged.sort((a, b) => b.score - a.score || a.tie - b.tie);
+  const worked = merged.slice(0, rc.population);
   const centerY = tileYieldsForCenter(ctx, center);
   const total = { ...centerY };
   for (const w of worked) {
@@ -1784,6 +1823,7 @@ export function rivalCityYields(
   // ranks without it; the center never qualifies, it carries CITY_CENTER).
   if (rcWonders.some((d) => d.effects?.petraDesert)) {
     for (const w of worked) {
+      if (w.index < 0) continue; // A-22: specialists work no tile
       const t = state.map.tiles[w.index];
       if (t.terrain === 'DESERT' && t.feature !== 'FLOODPLAINS' && !t.district) {
         total.food += 2;

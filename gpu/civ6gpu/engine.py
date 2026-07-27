@@ -114,6 +114,7 @@ class Rules:
     projects: dict  # A-14: {rows: [{d, y, g}], yieldFraction, gppFraction} in data order
     wonders: dict  # A-4: {rows: [{cost, ut, uc, cy, growAll, petra, mult, adjD, adjR}], fpFid} in data order
     improvements: dict  # phase 6a: FARM food/housing, builder roster idx, hillFarms civic
+    specialist_yields: list  # A-22: per-district specialist yields [nD, 6]
     districts: list  # D1: catalog [{id, idx, cost, adjYield, adjacency, housing, ...}] — inert until placed
     governments: list  # A-7r: [{id, tier, unlockCivic, slots:[m,e,d,w], cityYields[6], capitalYields[6]}] table order
     policies: list  # A-7r: [{id, kind, unlockCivic, cityYields[6], capitalYields[6]}] table order
@@ -190,6 +191,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         projects=r.get("projects", {}),
         wonders=r.get("wonders", {}),
         improvements=r.get("improvements", {}),
+        specialist_yields=r.get("specialistYields", []),
         districts=r.get("districts", []),
         governments=r.get("governments", []),
         policies=r.get("policies", []),
@@ -1109,6 +1111,12 @@ class BatchSim:
         # = FISHING_BOATS on sea resources, unreachable in both engines).
         irows = imp.get("rows", [])
         nI = max(len(ids), 1)
+        # A-22 (2026-07-27): per-district SPECIALIST yields [nD, 6], parallel
+        # to the districts catalog (all-zero where a district has no row).
+        _sy = list(rules.specialist_yields or [])
+        if not _sy:
+            _sy = [[0.0] * 6] * max(len(rules.districts), 1)
+        self._spec_yields = torch.tensor(_sy, dtype=dtype, device=device)  # [nD, 6]
         self._imp_yields = torch.zeros(nI, 6, dtype=dtype, device=device)
         self._imp_housing = torch.zeros(nI, dtype=dtype, device=device)
         self._imp_unlock = torch.full((nI,), -1, dtype=torch.long, device=device)
@@ -3625,7 +3633,18 @@ class BatchSim:
         # topk picks the identical set in the identical order.
         key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         top_vals, top_idx = key.topk(M, dim=2)
-        take = (torch.arange(M, device=self.device).view(1, 1, M) < self.rc_pop[:, r].unsqueeze(2)) & (top_vals > -1e17)
+        # A-22: the batched twin of the specialist merge — same predicate,
+        # applied per city column so the two paths cannot drift.
+        _ns_all = torch.zeros(B, RC, dtype=torch.long, device=self.device)
+        _sa_all = torch.zeros(B, RC, 6, dtype=torch.float64, device=self.device)
+        for _j in range(RC):
+            _n1, _a1 = self._rc_specialists(r, _j, top_vals[:, _j], self.rc_pop[:, r, _j])
+            _ns_all[:, _j] = _n1
+            _sa_all[:, _j] = _a1
+        take = (
+            torch.arange(M, device=self.device).view(1, 1, M)
+            < (self.rc_pop[:, r] - _ns_all).clamp(min=0).unsqueeze(2)
+        ) & (top_vals > -1e17)
         f_sel = f.gather(2, top_idx) * take.double()
         p_sel = p.gather(2, top_idx) * take.double()
         sc = gat(ty_oth[:, :, 3]).double()
@@ -3654,19 +3673,19 @@ class BatchSim:
             c_go = c_go + featC[:, :, 2]
             c_fa = c_fa + featC[:, :, 5]
         if self._dyadic_fp:
-            food = cf + f_sel.sum(dim=2)
-            prod = cp + p_sel.sum(dim=2)
-            sci = c_sc + sc_sel.sum(dim=2)
-            cul = c_cu + cu_sel.sum(dim=2)
-            gold = c_go + go_sel.sum(dim=2)  # VP-G1
-            faith = c_fa + fa_sel.sum(dim=2)  # GV-1a
+            food = cf + f_sel.sum(dim=2) + _sa_all[:, :, 0]
+            prod = cp + p_sel.sum(dim=2) + _sa_all[:, :, 1]
+            sci = c_sc + sc_sel.sum(dim=2) + _sa_all[:, :, 3]
+            cul = c_cu + cu_sel.sum(dim=2) + _sa_all[:, :, 4]
+            gold = c_go + go_sel.sum(dim=2) + _sa_all[:, :, 2]  # VP-G1
+            faith = c_fa + fa_sel.sum(dim=2) + _sa_all[:, :, 5]  # GV-1a
         else:
-            food = cf.clone()
-            prod = cp.clone()
-            sci = c_sc.clone()
-            gold = c_go.clone()  # VP-G1 (per-j quirk kept: no worked-tile tail)
-            faith = c_fa.clone()  # GV-1a (per-j quirk kept: no worked-tile tail)
-            cul = c_cu.clone()
+            food = cf + _sa_all[:, :, 0]
+            prod = cp + _sa_all[:, :, 1]
+            sci = c_sc + _sa_all[:, :, 3]
+            gold = c_go + _sa_all[:, :, 2]  # VP-G1
+            faith = c_fa + _sa_all[:, :, 5]  # GV-1a
+            cul = c_cu + _sa_all[:, :, 4]
             for m in range(M):  # sequential adds mirror the per-j (TS) loop's rounding
                 food = food + f_sel[:, :, m]
                 prod = prod + p_sel[:, :, m]
@@ -8306,6 +8325,49 @@ class BatchSim:
         breq = self._b_req_district  # [NB]
         return pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
 
+    def _rc_specialists(self, r: int, j: int, top_vals: torch.Tensor, pop: torch.Tensor):
+        """A-22: (nSpec [B], yields [B, 6]) for rival r's city j.
+
+        Open slots per district = that city's buildings belonging to it, and
+        the district must be registered, COMPLETE and unpillaged (B-32). Each
+        slot is scored with the same `focus_base` weighting the tile ranking
+        uses, so the two are directly comparable; slots are consumed in
+        score-descending district order (ties by district index), exactly the
+        order TS sorts them in."""
+        nD = self._spec_yields.shape[0]
+        B, dev = self.B, self.device
+        nspec = torch.zeros(B, dtype=torch.long, device=dev)
+        add = torch.zeros(B, 6, dtype=torch.float64, device=dev)
+        if nD == 0 or self.rc_bldg.shape[3] == 0:
+            return nspec, add
+        w = self.rules_dev.focus_base.double()
+        sc_d = (self._spec_yields.double() * w.view(1, 6)).sum(dim=1)  # [nD]
+        dt = self.rc_dist_tile[:, r, j]  # [B, nD]
+        live = (
+            (dt >= 0)
+            & self.district_complete.gather(1, dt.clamp(min=0))
+            & ~self.district_pillaged.gather(1, dt.clamp(min=0))
+        )
+        nb = self.rc_bldg.shape[3]
+        req = self._b_req_district[:nb]
+        order = sorted(range(nD), key=lambda d: (-float(sc_d[d]), d))
+        kkm = top_vals.shape[1]
+        for d in order:
+            if float(sc_d[d]) <= 0.0:
+                continue
+            cnt = (self.rc_bldg[:, r, j] & (req == d).unsqueeze(0)).sum(dim=1) * live[:, d].long()
+            if not bool((cnt > 0).any()):
+                continue
+            for _k in range(int(cnt.max().item())):
+                idx = (pop - nspec - 1).clamp(min=0, max=max(kkm - 1, 0))
+                t_key = top_vals.gather(1, idx.unsqueeze(1)).squeeze(1)
+                # no tile left to displace -> that slot's rival is -1e18
+                t_key = torch.where((pop - nspec - 1) < 0, torch.full_like(t_key, -1e18), t_key)
+                cond = (_k < cnt) & (nspec < pop) & ((sc_d[d] * 1e6 - float(self.T)) > t_key)
+                nspec = nspec + cond.long()
+                add = add + cond.double().unsqueeze(1) * self._spec_yields[d].double().unsqueeze(0)
+        return nspec, add
+
     def _rival_city_yields(self, r: int, j: int, mask: torch.Tensor, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors rivalCityYields (C1-B1: the REAL citizen path under
         defaultModifiers). Candidates = owned, citizen-workable (water yes,
@@ -8384,7 +8446,15 @@ class BatchSim:
         key = torch.where(valid, s * 1e6 - tiles.double(), torch.tensor(-1e18, dtype=torch.float64, device=self.device))
         kk = M  # C1-B5b-iii: the pop cap is retired — pops can exceed the old 12
         top_vals, top_idx = key.topk(kk, dim=1)
-        take = (torch.arange(kk, device=self.device).unsqueeze(0) < self.rc_pop[:, r, j].unsqueeze(1)) & (top_vals > -1e17)
+        # A-22 (2026-07-27): RIVAL SPECIALISTS. TS merges open specialist slots
+        # into the SAME ranking as the tiles and takes the top `population`.
+        # Equivalent (and cheaper here): count how many slots outrank the tile
+        # they would displace, shrink the tile take by that many, and add their
+        # yields. Ties go to TILES because a slot's tie index (>= T) always
+        # exceeds any tile index in `s * 1e6 - tileIndex`.
+        _pop_j = self.rc_pop[:, r, j]
+        _nspec, _spec_add = self._rc_specialists(r, j, top_vals, _pop_j)
+        take = (torch.arange(kk, device=self.device).unsqueeze(0) < (_pop_j - _nspec).clamp(min=0).unsqueeze(1)) & (top_vals > -1e17)
         f_sel = f.gather(1, top_idx) * take.double()
         p_sel = p.gather(1, top_idx) * take.double()
         # C1-B3a: science/culture columns ride the same selection (static
@@ -8436,13 +8506,20 @@ class BatchSim:
             cul = c_cu + cu_sel.sum(dim=1)
             gold = c_go + go_sel.sum(dim=1)  # VP-G1
             faith = c_fa + fa_sel.sum(dim=1)  # GV-1a
+            # A-22: the specialists that displaced tiles pay their yields.
+            food = food + _spec_add[:, 0]
+            prod = prod + _spec_add[:, 1]
+            gold = gold + _spec_add[:, 2]
+            sci = sci + _spec_add[:, 3]
+            cul = cul + _spec_add[:, 4]
+            faith = faith + _spec_add[:, 5]
         else:
-            food = cf.clone()
-            prod = cp.clone()
-            sci = c_sc.clone()
-            gold = c_go.clone()  # VP-G1
-            faith = c_fa.clone()  # GV-1a
-            cul = c_cu.clone()
+            food = cf + _spec_add[:, 0]
+            prod = cp + _spec_add[:, 1]
+            sci = c_sc + _spec_add[:, 3]
+            gold = c_go + _spec_add[:, 2]  # VP-G1
+            faith = c_fa + _spec_add[:, 5]  # GV-1a
+            cul = c_cu + _spec_add[:, 4]
             for m in range(kk):  # sequential adds mirror the TS loop's rounding
                 food = food + f_sel[:, m]
                 prod = prod + p_sel[:, m]
