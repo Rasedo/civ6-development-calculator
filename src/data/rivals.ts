@@ -148,7 +148,7 @@ export const RIVAL_TILE_BUY_LIVE = false;
 /** B-8 (#71): the rival ADMIRAL war-march switch, landed INERT — a marching
  * admiral is a CIVILIAN and capturable (B-31) where a parked one is not, and
  * the engines diverged on it (seed 9287 t235). Flip when its hunt lands. */
-export const ADMIRAL_MARCH_LIVE = false;
+export const ADMIRAL_MARCH_LIVE = true; // #71: LIVE — hunted 2026-07-27
 
 /** B-24 (#71): the dedication PAYOUT switch, landed INERT. The substrate —
  * prevAges (the Heroic-age test) and the dedication COUNT — is live and
