@@ -466,6 +466,25 @@ export const APOSTLE_CAP = 1;
  * The unit is at 363 with 2 charges and target 362 at d1, so it should
  * SPREAD at t86 and drop to 1 charge — check whether one engine despawns or
  * relocates it there and the other does not.
+ * HUNT #17 — PINNED TO A SINGLE TURN. Dumping rival 0's religious units
+ * every turn (seed 9183, all of them, not just those eligible to act):
+ *   TS  t84 [#39@363c2 #44@629c3]
+ *       t85 [#39@367c2 #44@631c3]
+ *       t86 [#39@363c2 #44@542c3]
+ *       t87 [#44@453c3 #47@629c3]      <-- #39 IS GONE
+ * So TS REMOVES #39 during turn 86, while it still shows TWO charges at the
+ * start of that turn; the GPU keeps the same unit (slot 11) standing on 363
+ * through t90, where it blocks rival 1 and starts the whole cascade.
+ * THE QUESTION IS NOW EXACTLY ONE TURN WIDE: what removes #39 in TS during
+ * t86? It has 2 charges, so a single spread leaves 1 and cannot disband it.
+ * Candidates, in order: (a) it spends its LAST charge somewhere else in the
+ * turn (a second spread path, or the missionary-spend site at rivals.ts:1299
+ * as opposed to the spread site at :1463 — there are TWO charge-decrement
+ * sites and only one was ever compared), (b) the bankruptcy disband
+ * (maintenance is 0, so unlikely), (c) capture/kill. Instrument
+ * `disbandUnit` for that unit id and print the CALLER.
+ * (a) is the strongest lead: TWO decrement sites exist in TS and this hunt
+ * has only ever looked at one of them.
  * DESPAWN PATHS INSPECTED (hunt #16) AND THEY LOOK EQUIVALENT, so do not
  * assume this: TS does `u.charges -= 1; if (u.charges <= 0) disbandUnit(...)`
  * and the GPU does `v_charges -= 1; dead = sp & (v_charges <= 0)` then clears
@@ -493,7 +512,7 @@ export const APOSTLE_CAP = 1;
  * neighbour, its distance to 453 and its move cost — and compare the ORDER.
  * This is a single probe on one tile and should end the hunt.
  */
-export const APOSTLE_BUY_LIVE = false; // #71: STILL INERT — root cause narrowed to t87-t89, see below
+export const APOSTLE_BUY_LIVE = false; // #71: INERT — divergence pinned to ONE TURN, see below
 
 /**
  * B-18 (#71): THEOLOGICAL COMBAT. Sourced shape — only an Apostle may
