@@ -4769,7 +4769,47 @@ class BatchSim:
         ft_unlocked = self.techs.gather(1, ftu_t) & (self.tile_ftu.gather(1, tc) >= 0)
         not_stripped = ~self.feat_stripped.gather(1, tc)
         chop = (here_ok & (ftr_t > 0) & ft_unlocked & not_stripped).unsqueeze(2)
-        return torch.cat([move, attack, hold, build_f, build_m, build_l, chop], dim=2)
+        # A-18 (#50, 2026-07-27): 17 = builder REPAIR. `builderRepair` (units.ts)
+        # has always existed and the RIVAL seat has used it since A-13; the
+        # PLAYER had no way to call it. A builder standing on an OWNED tile
+        # whose improvement or district is pillaged. No charge is spent (the
+        # rival path's rule) — the turn is.
+        # A-18 (#50): 18-23 = the RESOURCE improvements + SEASIDE_RESORT.
+        # `builderImprove` already validates any id through validImprovements —
+        # only the mask never offered them, so the player farmed while rivals
+        # placed the whole roster (the asymmetry A-18 recorded).
+        _res_cols = []
+        if self.improvements_on and self._builder_idx >= 0:
+            _tc2 = self.p_tile.clamp(min=0)
+            _base = (
+                self.p_alive
+                & (self.p_type == self._builder_idx)
+                & (self.p_charges > 0)
+                & (self.owner.gather(1, _tc2) >= 0)
+                & (self.center_at.gather(1, _tc2) < 0)
+                & (self.improvement.gather(1, _tc2) < 0)
+                & (self.district.gather(1, _tc2) < 0)
+                & (self.built_wonder.gather(1, _tc2) < 0)
+            )
+            _rq = self.res_imp.gather(1, _tc2)  # required improvement idx, -1 = none
+            for _k in range(3, self._imp_unlock.numel()):
+                _ut = int(self._imp_unlock[_k])
+                _unl = self.techs[:, _ut].unsqueeze(1) if _ut >= 0 else torch.ones(B, 1, dtype=torch.bool, device=dev)
+                if self.SEASIDE >= 0 and _k == self.SEASIDE:
+                    _ok = _base & self._seaside_ok().gather(1, _tc2) & _unl
+                else:
+                    _ok = _base & (_rq == _k) & _unl
+                _res_cols.append(_ok.unsqueeze(2))
+        else:
+            _res_cols = []
+        rep_t = self.p_tile.clamp(min=0)
+        repair = (
+            self.p_alive
+            & (self.p_type == self._builder_idx if self._builder_idx >= 0 else torch.zeros_like(self.p_alive))
+            & (self.owner.gather(1, rep_t) >= 0)
+            & (self.pillaged.gather(1, rep_t) | self.district_pillaged.gather(1, rep_t))
+        ).unsqueeze(2)
+        return torch.cat([move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols, dim=2)
 
     def rival_slot_map(self, r: int) -> torch.Tensor:
         """[B, P_MAX] the v-slot index behind each rival-r unit row (slot
@@ -6000,6 +6040,61 @@ class BatchSim:
             if self._builder_idx >= 0:
                 hc0 = here.clamp(min=0)
                 ftr_t = self.tile_ftr.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                # A-18 (#50): 18-23 = place a RESOURCE improvement (or the
+                # Seaside Resort) on the builder's tile — the builderImprove
+                # twin, re-validated here exactly as the mask computed it.
+                if self.improvements_on and self._builder_idx >= 0:
+                    _rq2 = self.res_imp.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                    _b2 = (
+                        self.p_alive[:, p]
+                        & (self.p_type[:, p] == self._builder_idx)
+                        & (self.p_charges[:, p] > 0)
+                        & (self.owner.gather(1, hc0.unsqueeze(1)).squeeze(1) >= 0)
+                        & (self.center_at.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
+                        & (self.improvement.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
+                        & (self.district.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
+                        & (self.built_wonder.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
+                    )
+                    for _k in range(3, self._imp_unlock.numel()):
+                        _ut2 = int(self._imp_unlock[_k])
+                        _unl2 = self.techs[:, _ut2] if _ut2 >= 0 else torch.ones_like(_b2)
+                        if self.SEASIDE >= 0 and _k == self.SEASIDE:
+                            _valid = self._seaside_ok().gather(1, hc0.unsqueeze(1)).squeeze(1)
+                        else:
+                            _valid = _rq2 == _k
+                        _ok2 = (a == (18 + _k - 3)) & _b2 & _valid & _unl2
+                        if bool(_ok2.any()):
+                            _r2 = _ok2.nonzero(as_tuple=True)[0]
+                            self.improvement[_r2, hc0[_r2]] = _k
+                            self.p_charges[:, p] = torch.where(_ok2, self.p_charges[:, p] - 1, self.p_charges[:, p])
+                            _gone = _ok2 & (self.p_charges[:, p] <= 0)
+                            if bool(_gone.any()):
+                                _g2 = _gone.nonzero(as_tuple=True)[0]
+                                self.pciv_at[_g2, self.p_tile[_g2, p]] = -1
+                                self.p_alive[:, p] = self.p_alive[:, p] & ~_gone
+                            self._eff_version += 1
+                # A-18 (#50): 17 = builder REPAIR — the `builderRepair` twin.
+                # Clears a pillaged IMPROVEMENT first, else a pillaged DISTRICT
+                # (the TS order), spends the turn, costs NO charge.
+                ok_rp = (
+                    (a == 17)
+                    & self.p_alive[:, p]
+                    & (self.p_type[:, p] == self._builder_idx)
+                    & (self.owner.gather(1, hc0.unsqueeze(1)).squeeze(1) >= 0)
+                    & (
+                        self.pillaged.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                        | self.district_pillaged.gather(1, hc0.unsqueeze(1)).squeeze(1)
+                    )
+                )
+                if bool(ok_rp.any()):
+                    rr_ = ok_rp.nonzero(as_tuple=True)[0]
+                    tt_ = hc0[rr_]
+                    _imp = self.pillaged[rr_, tt_]
+                    self.pillaged[rr_[_imp], tt_[_imp]] = False
+                    _dis = ~_imp & self.district_pillaged[rr_, tt_]
+                    self.district_pillaged[rr_[_dis], tt_[_dis]] = False
+                    self.p_acted[:, p] = self.p_acted[:, p] | ok_rp
+                    self._eff_version += 1
                 ftu_t = self.tile_ftu.gather(1, hc0.unsqueeze(1)).squeeze(1)
                 unlocked = (ftu_t >= 0) & self.techs.gather(1, ftu_t.clamp(min=0).unsqueeze(1)).squeeze(1)
                 ok_c = (

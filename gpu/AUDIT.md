@@ -25,14 +25,14 @@ stage that moves an item.
 
 | Chapter | Weight | Done | % |
 |---|---|---|---|
-| A symmetry | 41 | 33.9 | **83%** |
-| B fidelity | 88 | 83.5 | **95%** |
+| A symmetry | 41 | 36.0 | **88%** |
+| B fidelity | 88 | 83.6 | **95%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **179.4** | **94%** |
-| Open chapters only (A+B) | 129 | 117.4 | **91%** |
+| **Overall (incl. closed)** | **191** | **181.6** | **95%** |
+| Open chapters only (A+B) | 129 | 119.6 | **93%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -224,6 +224,9 @@ Per-item weights (done% in parens where partial):
   palace-relocation residuals), A-11 4 (done — A-12b closed the CS
   residual; the GPU player-route note rides A-18/#50),
   A-23 2 (RESOLVED — 2026-07-27, per-city worked-tile scan),
+  A-18 3 (70% — 2026-07-27: player REPAIR + resource-improvement RL verbs
+  landed, 17->24 action columns; the CS-attack column is BLOCKED on a
+  missing player<->CS war state, and the P8 re-baseline is owner-deferred),
   A-12 4 (RESOLVED — ROUND B8 slice L closed the levy + zero-draw
   quest deferrals; 2-step levy ladder + UI-only player levy are
   recorded residuals), A-17 4 (done — #41 stage 1), A-18 3,
@@ -532,8 +535,46 @@ untagged halves of tagged items stay Fable/main-session work.
   persistent-rc-id keyed), fixing per-city border adjacency and exact
   capture/transfer tile sets; residual civ-level worked-tile scan
   split out as A-23.
-- A-18. RL action surface (deliberately batched with the P8
-  re-baseline, one item — task #50): `unit_action_mask` (engine.py)
+- A-18. RL action surface. **CS-ATTACK COLUMN: ATTEMPTED 2026-07-27 AND
+  FOUND BLOCKED — it is NOT merely a missing mask column.** I added it to
+  both engines (GPU: city-state centres joined the 6-11 attack columns; TS:
+  a `csPlayer` arm in `attackTargets`) and scripted parity stayed green, but
+  it breaks a DELIBERATE, TESTED invariant: `tests/deeper.test.ts`
+  "autopilot target lists never include peaceful city-states" asserts on
+  `attackTargets` ITSELF. Since this model has NO player<->city-state war
+  state, EVERY city-state is permanently peaceful, so there is no condition
+  under which the player may legitimately be offered the attack — even
+  though `meleeAttack`'s csTarget path accepts a player attacker (that
+  permissiveness is the anomaly, not the missing column). Off-script the
+  random policy took the new verb immediately: 13 rollout failures.
+  PREREQUISITE, now the real A-18 blocker: a player<->CS hostility notion
+  (a war/grievance flag, or reusing the A-12b suzerain-contest rule from the
+  other seat). Until that exists the column must stay off. The OTHER A-18
+  verbs (player builder REPAIR, resource improvements) carry no such
+  dependency and are still open as normal work.
+  **THE OTHER TWO VERBS ARE LANDED (2026-07-27, owner-unblocked; the P8
+  re-baseline deliberately NOT run — "we are not finished with changing
+  engine"):** the RL action space grew from 17 to 24 columns.
+   - 17 = PLAYER BUILDER REPAIR. `builderRepair` (units.ts) had existed with
+     no caller since the rival seat got it in A-13. Mask: a builder on an
+     OWNED tile whose improvement or district is pillaged. Apply: clears a
+     pillaged IMPROVEMENT first, else a pillaged DISTRICT (the TS order),
+     spends the turn, costs NO charge. Decoded in replay-gpu.ts.
+   - 18-23 = the RESOURCE improvements + SEASIDE_RESORT (QUARRY, PASTURE,
+     CAMP, PLANTATION, OIL_WELL, SEASIDE_RESORT). `builderImprove` already
+     validated ANY id through validImprovements — only the mask never offered
+     them, which is why the player farmed while rivals placed the whole
+     roster. Mask/apply key on the exported `res_imp` per-tile requirement
+     plus the improvement's unlock tech, with SEASIDE_RESORT on `_seaside_ok`.
+   FISHING_BOATS: the #69 note resolves itself — it is not in IMPROVEMENT_IDS,
+   so `res_imp` is -1 on sea-resource tiles and the verb can never offer it.
+   The -9 luxreq bake stays parity-safe, exactly as predicted.
+   Gates: scripted parity 24x250 0.0 milli, FORCED compaction 0.0 milli,
+   rollout REPLAY PARITY OK 72 games (the new verbs ARE sampled off-script —
+   the rollout draws from the mask width), vitest 389/389, all 30 poke lanes,
+   BATTERY OK 556s. Coverage note: column 17 fires readily; 18-23 need a
+   builder standing on a resource tile and are correspondingly rare.
+  Original entry (deliberately batched with the P8 re-baseline — task #50): `unit_action_mask` (engine.py)
   offers move/melee/hold/FARM/MINE/LUMBER_MILL/chop only — no
   CS-center attack column though the engine verb exists
   (`meleeAttack`'s `csTarget` path), no PLAYER builder repair verb

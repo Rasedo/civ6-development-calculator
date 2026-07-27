@@ -33,7 +33,7 @@ import {
   serialize,
   deserialize,
 } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove, builderRemoveFeature } from '../src/core/units';
+import { queueUnit, walkPath, builderImprove, builderRemoveFeature, builderRepair } from '../src/core/units';
 import { meleeAttack, rangedAttack } from '../src/core/combat';
 import { assignEnvoy } from '../src/core/cityStates';
 import { canPlaceDistrict } from '../src/core/rules';
@@ -156,6 +156,23 @@ for (const game of roll.games) {
         fail(`turn ${state.turn}: no player unit at tile ${tile} (civ ${civ})`);
         bad = true;
         break;
+      }
+      if (a >= 18) {
+        // A-18 (#50): resource improvements + SEASIDE_RESORT, columns 18+.
+        // builderImprove validates through validImprovements, so an invalid
+        // pick soft-fails exactly as the GPU's re-validation does.
+        const RES_IDS = ['QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT'] as const;
+        const rid = RES_IDS[a - 18];
+        if (rid) builderImprove(state, unit.id, rid);
+        continue;
+      }
+      if (a === 17) {
+        // A-18 (#50): the PLAYER builder REPAIR verb — the rival seat has had
+        // it since A-13 (`_rival_builder_actions`) while the player's
+        // `builderRepair` existed with no way to call it. Soft-fail like the
+        // builds; the GPU re-validates identically.
+        builderRepair(state, unit.id);
+        continue;
       }
       if (a === 16) {
         // V-H1: chop the feature under the builder (soft-fail like builds).
