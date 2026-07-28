@@ -1,6 +1,17 @@
 /**
  * World wonders (base-game subset whose effects fit the modeled systems).
  * One per world; they occupy a tile like a district. Costs/effects are
+ * #78 SOURCING SWEEP (2026-07-28), spot-checked against the GS CIVILOPEDIA by
+ * direct fetch: PYRAMIDS 220 Production and GREAT_LIBRARY 400 Production are
+ * both CORRECT as written. The remaining wonder COSTS are not individually
+ * fetched, and the EFFECTS are not swept at all — NARROWED marker.
+ *
+ * SOURCED RESIDUAL noticed in the same pass: the real GREAT_LIBRARY carries
+ * "+2 Great Works of Writing slots" on top of its yields. This model has no
+ * per-WONDER Great Work slot channel (slots come from buildings only — see
+ * GW_BUILDINGS in data/greatPeople.ts), so a wonder that adds slots is
+ * unmodeled. Recorded, not fixed.
+ *
  * eyeballed base Civ 6; a few unlock techs are stand-ins where the real
  * unlock isn't in our compact tree (noted inline).
  */

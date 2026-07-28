@@ -580,6 +580,15 @@ Per-item weights (done% in parens where partial):
   TWO stand (Arena 1->2, Stadium 2->1, both Civilopedia-fetched) plus Crater
   Lake 4->5 (now fetch-confirmed); TWO were WRONG and are reverted (Camp,
   Coal), both taken from search summaries.
+  **SLICE 16 - src/data/builtWonders.ts (2026-07-28, #78).** Spot-checked by
+  direct Civilopedia fetch: PYRAMIDS 220 Production and GREAT_LIBRARY 400
+  Production both CORRECT as written. Remaining wonder COSTS not individually
+  fetched and the EFFECTS not swept at all - NARROWED marker.
+  SOURCED RESIDUAL noticed in the pass: the real GREAT_LIBRARY carries "+2
+  Great Works of Writing slots". This model has no per-WONDER Great Work slot
+  channel (slots come from BUILDINGS only, GW_BUILDINGS in data/greatPeople.ts),
+  so a wonder granting slots is unmodeled. Recorded, not fixed - it would need
+  the slot lookup to sum building AND wonder sources on both engines.
   **SLICE 15 - luxury resources + LUXURY_AMENITY_CITIES (2026-07-28, #78).**
   Spot-checked against the GS Civilopedia by direct fetch: WINE (+1 Food /
   +1 Gold) and COTTON (+3 Gold) both correct as written. Both entries also read
