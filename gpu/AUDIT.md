@@ -607,6 +607,23 @@ Per-item weights (done% in parens where partial):
   THE LESSON, twice over: reproduce on the EXACT state, never an approximation.
   Both failed reconstructions this session omitted something the original
   trajectory contained — here my own wrong Camp constant.
+  **LOCALIZED IMMEDIATELY (2026-07-28): it is an ERA SCORE award, not a yield.**
+  logdiff on the reproduction puts the FIRST divergence at turn 112 with exactly
+  ONE differing field, on rival 0's trace row:
+      112 RT0  GPU: ... ers21 ...
+               TS : ... ers23 ...
+  Every other field at that turn is identical — ncity7 pop31 treas-305800
+  fai1007200 ntech24 nciv19 war0 ww7 rrw0 rrk0 age1 terr:78 wterr:5 tsum:45729
+  rsc:403987. So the two engines award rival 0 a DIFFERENT ERA SCORE (GPU 21,
+  TS 23, a 2-point gap), and that propagates through Ages into the score column
+  137 turns later as the 2.85 rGScore1 gap.
+  THIS IS A DIFFERENT ROOT CAUSE FROM THE ENVOY CASE — nothing to do with the
+  ownership-blind attack predicate. Era score is the B-24 event ladder
+  (`rules.eras`: found / conquer / wonder / pantheon / religion / gp), so the
+  question is which EVENT one engine credits and the other does not, or credits
+  at a different value. GPU is LOWER by 2, so TS awarded something extra.
+  NEXT STEP: resume the reproduction from the t105 checkpoint with per-event
+  era-score logging on both seats and compare the award stream around t112.
   **#78 (2026-07-28) - the epsilon tie-break bug, FOUND AND FIXED, but it is
   NOT the cause of this gap.** The GPU broke worked-tile ties by perturbing
   the score (`score - tc * 1e-9`) in self.dtype, where TS sorts
