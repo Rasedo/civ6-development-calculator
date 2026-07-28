@@ -1,7 +1,23 @@
 /**
- * Rival civilization flavor + pacing constants (all eyeballed). Rivals are
- * scripted: real cities/units/territory on the map, with real production
- * queues, research, housing and border culture underneath.
+ * Rival civilization flavor + pacing constants. Rivals are scripted: real
+ * cities/units/territory on the map, with real production queues, research,
+ * housing and border culture underneath.
+ *
+ * #78 SOURCING SWEEP (2026-07-28): the header used to say "all eyeballed",
+ * which is no longer true — a large fraction of this file is now SOURCED
+ * against Civ 6, each with its citation at the definition:
+ *   RELIC_BUILDING / RELIC_SLOTS_PER_BUILDING / RELIC_FAITH / RELIC_TOURISM
+ *   TOURISM_PER_VISITOR_PER_CIV / CULTURE_PER_DOMESTIC_TOURIST
+ *   DIPLO_FAVOR_PER_SUZERAIN
+ *   CONGRESS_INTERVAL / CONGRESS_MIN_ERA / DVP_PER_RESOLUTION /
+ *   DIPLO_VICTORY_POINTS
+ *   DEDICATIONS / DED_EVENT_SCORE
+ *
+ * STILL EYEBALLED (the narrowed marker): the rival PACING/flavour numbers —
+ * aggression, settle cadence, the ERA_* thresholds (which are
+ * evidence-pinned to this model's own measured distribution rather than to
+ * Civ 6), the RR_* war/denounce/warmonger magnitudes, and the governor
+ * constants. Those are deliberate model tuning, not Civ 6 values.
  */
 
 import { GAME_SPEED } from './constants';

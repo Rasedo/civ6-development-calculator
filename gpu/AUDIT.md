@@ -553,6 +553,16 @@ Per-item weights (done% in parens where partial):
   sourced individually, so the file keeps a NARROWED marker.
   That makes FOUR files with real errors out of eight swept — the class is not
   a formality.
+  **SLICE 13 - src/data/rivals.ts header (2026-07-28, #78).** The header said
+  "all eyeballed", which this session made FALSE: relics, the culture-victory
+  thresholds, diplomatic favor, the World Congress constants and the dedication
+  catalog were all sourced into this file with citations at their definitions.
+  Header corrected to list what IS sourced and narrow the marker to what is
+  genuinely still model tuning - rival pacing/aggression, the ERA_* thresholds
+  (evidence-pinned to this model's OWN measured distribution, not to Civ 6),
+  the RR_* war/denounce/warmonger magnitudes and the governor constants. Same
+  class of find as slice 12's stale religion header: a blanket marker that is
+  wrong in BOTH directions hides real sourcing and invites false confidence.
   **SLICE 12 - src/data/religion.ts (2026-07-28, #78).** VERIFIED CORRECT:
   PANTHEON_FAITH_COST = 25 (Standard speed) and RELIGION_PRESSURE_RANGE = 10
   tiles. Also caught a STALE HEADER: it claimed "spread/pressure isn't
