@@ -738,8 +738,31 @@ Per-item weights (done% in parens where partial):
    * ZOC halt after the first step (GPU `_in_enemy_zoc(dest, r_atwar, ...)` vs
      TS `inEnemyZoc`), which would zero the GPU's remaining movement;
    * the TS top-of-loop guard `hexDistance(here, home) <= 3 -> return`.
-  NEXT STEP: resume rng 2026006119 from the t210 checkpoint with per-step
-  logging of mp/cost/tgt/zoc for that unit, and compare against the TS patrol.
+  **RESUME + TRACE DONE (2026-07-28) — and it eliminated the obvious suspect.**
+  Resumed from the t210 full-batch checkpoint (12 turns, seconds) and CONFIRMED
+  the resume is faithful: the resumed statelog reproduces `218 RU1 739 t2 =
+  1 hp100 a1` exactly. Batch row for rng 2026006119 is 41; checkpoints are
+  FULL-BATCH and named by the FIRST rng (gpu_2026006078_t*.pt), which is why no
+  file carries the hunted rng in its name.
+  THE PATROL LOOP IS NOT THE MOVER. With a trace on the rival patrol
+  (engine.py ~7810, the `skey = d_nb*8 + arange6` loop) the unit shows
+  `cur=740 tgt=739 d_cur=1 d_best=0 cost=1.0 mp=2.0 moving=False mv=False` —
+  i.e. the patrol DECLINED to move it, and its target was 739, one step away.
+  Yet the unit still ends the turn on 739. So a SECOND rival-unit mover did it:
+  the action/verb path at engine.py ~5085, which writes `v_tile[rows_, sc]` =
+  tgt directly, sets v_acted and calls _clear_camp_at.
+  THIS REFRAMES THE WHOLE CANDIDATE LIST ABOVE: cost, tie-break, ZOC and the
+  <=3-from-home guard all belong to the PATROL, which is not the code that
+  moved this unit. They are not ruled out for other divergences but they are
+  not this one.
+  NEXT STEP: find the TS twin of the ACTION path (not rivalPatrol) and compare
+  its target selection for this unit at t218 — GPU sends it to 739, TS to 738,
+  and 738 is not adjacent to 740, so TS reaches it in two steps while the GPU
+  arrives at its target in one and stops.
+  THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
+  81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
+  present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
+  do not delete it without re-deriving the state.
   **CONSOLIDATED HUNT STATE for BOTH score latents (2026-07-28, #78).** Two
   independent yield-touching changes each turned the PLAIN rollout red in a
   SCORE column while scripted parity stayed at 0.0 milli:
