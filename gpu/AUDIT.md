@@ -558,6 +558,25 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  **THE 1.0 GAP IS NOT THE ENVOY BONUS - IT IS A DOWNSTREAM TILE PICK
+  (2026-07-28, #78).** Decisive arithmetic, no rollout needed. BALANCED_WEIGHTS
+  are food 1, production 2, gold 1, science 1.5, culture 1.5, faith 0.75, and
+  the score is `pop*3 + sum(weight * yield)`. A gap of EXACTLY 1.0 can
+  therefore only be ONE GOLD or ONE FOOD - never science (1.5), culture (1.5),
+  production (2) or faith (0.75), and never pop (multiples of 3).
+  CS_TYPE_YIELD maps trade->gold and NOTHING to food. Trade is the ONE type
+  whose value the per-type patch does NOT change (it stays 2). So the extra
+  1.0 CANNOT be the envoy bonus term itself.
+  CONCLUSION: the envoy change shifts city yields, which shifts the GREEDY
+  CITIZEN/TILE ASSIGNMENT, and the two engines then disagree about which tile
+  a city works - a 1-food or 1-gold tile. That is a PRE-EXISTING tie-break
+  latent in the worked-tile pick, exposed by ANY yield-touching change, which
+  is exactly why TWO unrelated corrections (combat strengths, envoy values)
+  both surfaced small score-only gaps off-script while scripted parity stayed
+  at 0.0 milli.
+  NEXT STEP for the bisect: resume seed 9170 rng 2026006119 near t220 with
+  per-city WORKED-TILE logging and compare the picks, rather than chasing the
+  envoy/score terms - they are downstream symptoms, not the cause.
   **CACHE THEORY REFUTED (2026-07-28, #78).** The per-type envoy patch was
   re-applied ON TOP of the cache fix and the plain rollout re-run: the red
   reproduces IDENTICALLY - seed 9170 rng 2026006119, turn 220, HEAD column 8,
