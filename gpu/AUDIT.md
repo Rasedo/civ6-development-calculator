@@ -1312,12 +1312,43 @@ Per-item weights (done% in parens where partial):
   single `gpClass: 'ARTIST'` modelled. The RATES (~11% of invested production
   each, 15% production -> Culture) remain unconfirmed, so the slice still
   cannot be implemented under verify-before-implement.
-  APPEAL TERMS: still UNVERIFIED after four slug shapes (concept_appeal,
-  concept_appeal_of_a_tile, concept_appeal_tile, plus Fandom's HTTP 402).
-  `concepts/*` is simply not indexed on civilopedia.net. They stay unsourced
-  rather than being written up off a search summary — the failure mode this
-  whole class exists to avoid (search summaries scored 1/3 this session against
-  Civilopedia's 2/2, and the wrong Camp constant shipped from one).
+  **APPEAL: NOW SOURCED (2026-07-28) — the owner supplied the working URLs.**
+  My slugs were missing the LOCALE segment: the concept lives at
+  `/en-US/gathering-storm/concepts/cities_11/`, and projects under
+  `/en-US/gathering-storm/wonders/project_enhance_district_theater/`. Worth
+  remembering — every earlier 404 in this sweep may have been the same omission.
+  CIVILOPEDIA (GS) gives: +4 if the tile is ON a Mountain; +2 each adjacent
+  Natural Wonder; +1 each adjacent Holy Site / Theater Square / Entertainment
+  Complex / wonder; +1 each adjacent Mountain, Coast, Woods or Oasis; +1 if the
+  tile is on a River or Lake; +1 each Chateau and Sphinx; -1 each adjacent
+  Industrial Zone / Encampment / Airport / Spaceport; -1 each adjacent
+  Rainforest / Marsh / Floodplain; -1 each adjacent pillaged tile; -1 each
+  adjacent Mine / Quarry / Oil Well / Offshore Oil Rig / Airstrip.
+  **DIFFED AGAINST core/appeal.ts — FIVE GAPS AND ONE OUTRIGHT BUG:**
+   1. MISSING +1 for an adjacent OASIS (queued item 1).
+   2. MISSING +1 when the tile itself is ON a River or Lake (queued item 1).
+      The model instead credits an adjacent LAKE, which the source assigns to
+      the ON-tile term, not adjacency.
+   3. MISSING -1 for adjacent FLOODPLAINS (the model penalises only
+      Rainforest/Marsh).
+   4. MISSING -1 for an adjacent PILLAGED tile.
+   5. MISSING the fixed Breathtaking base for MOUNTAIN and NATURAL WONDER tiles
+      (queued item 2).
+   6. **`appealTier` BOUNDARIES ARE OFF BY ONE.** Source: Average is -1 to 1,
+      Uninviting -3 to -2. Model: `appeal >= 0` -> Average and `appeal >= -2` ->
+      Uninviting. So appeal -1 is misclassified Uninviting and -3 misclassified
+      Disgusting. This is a live defect, not a missing term: it changes
+      Neighborhood HOUSING, and housing feeds growth.
+  SOURCE CONFLICT, recorded rather than resolved: the Civilopedia says "+4 if
+  the tile is on a Mountain" (ADDITIVE), while the fandom GS article says
+  mountain tiles have a fixed base of 4 and natural wonders 5, "unaffected by
+  surrounding features". Those differ once anything adjacent would modify the
+  tile. Decide against real Civ 6 behaviour before implementing.
+  FESTIVAL: the project page resolves under `/en-US/.../wonders/` but still
+  gives only prose — "a small amount of Great Writer, Great Artist, and Great
+  Musician points" — confirming the MULTI-CLASS principle (as does the Theater
+  Square district entry: +1 of each per turn) while leaving the RATES
+  unsourced. Still not implementable.
   WHY NONE OF THEM EVER TRIPPED A GATE: every error preserved the government's
   TOTAL slot count and only got the composition wrong — a Wildcard standing in
   for a Diplomatic slot, or a Military for a Wildcard. Slot COUNT is what any
