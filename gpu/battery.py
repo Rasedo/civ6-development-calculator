@@ -2,7 +2,7 @@
 
     python gpu/battery.py             # everything an ENGINE stage must pass
     python gpu/battery.py --full      # + the slow MPC quality benchmarks
-    python gpu/battery.py --no-eval   # skip the two 50-episode baselines
+    python gpu/battery.py --eval      # + the two 50-episode RL baselines (P8 only)
 
 Stage 0 (serial, everything depends on it): tsc type gate + fixture
 export (P5: the vite build artifact feeds no gate; vitest runs in a
@@ -35,7 +35,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
-NO_EVAL = "--no-eval" in sys.argv
+# EVALS ARE OFF BY DEFAULT (#78). Owner directive 2026-07-10: no per-stage
+# eval re-baselining during engine development — "commit on battery green
+# WITHOUT running gpu/eval.py", with ONE baseline pass when the engine
+# settles, right before P8 training. Across the whole P1-P5 campaign the
+# parity gates caught every real problem first; the baseline never
+# independently caught one. They were also the largest cost in the battery,
+# so running them per-stage paid a lot for parked work. `--no-eval` is still
+# accepted and is now a no-op, since it describes the default.
+EVAL = "--eval" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
 
 # Poke pool (#78): 4 workers x OMP 2 = 8 threads, up from the old serial lane's
@@ -234,12 +242,12 @@ def main() -> int:
                 ("gpu-gate", [py, "gpu/rollout.py", "--shards", "4", "--pipeline-replay"], 4),
             ]
             + (
-                []
-                if NO_EVAL
-                else [
+                [
                     ("eval-random", [py, "gpu/eval.py", "--policy", "random", "--episodes", "50"], 8),
                     ("eval-scripted", [py, "gpu/eval.py", "--policy", "scripted", "--episodes", "50"], 8),
                 ]
+                if EVAL
+                else []
             ),
         ]
         # BAIL-FAST ORDERING (#78). The poke group is ONE lane on purpose: at
