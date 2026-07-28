@@ -1,8 +1,20 @@
 /**
- * Religion: pantheons, follower/founder beliefs and worship buildings
- * (base-game inspired, eyeballed values; spread/pressure isn't modeled —
- * once founded, all of your cities follow your religion, so "followers"
- * means your total population).
+ * Religion: pantheons, follower/founder beliefs and worship buildings.
+ *
+ * #78 SOURCING SWEEP (2026-07-28). VERIFIED CORRECT against the Civ 6 sources:
+ * PANTHEON_FAITH_COST = 25 (25 Faith on Standard speed) and
+ * RELIGION_PRESSURE_RANGE = 10 (a dominant religion pressures cities within
+ * 10 tiles).
+ *
+ * NARROWED MARKER — still model stylizations, not Civ 6 values, and each is
+ * labelled at its own definition: SPREAD_PRESSURE, MISSIONARY_CAP and
+ * APOSTLE_CAP (real Civ 6 caps neither unit and varies charges by Holy Site
+ * building), and the individual BELIEF magnitudes.
+ *
+ * NOTE: the old header claimed "spread/pressure isn't modeled — once founded,
+ * all of your cities follow your religion". That is STALE: B6-S2/B-18 landed
+ * real per-city pressure, missionaries, apostles and theological combat on both
+ * engines, and #76 made religious predominance a victory condition.
  */
 
 import type { GreatPersonClass, ResourceCategory, Yields } from '../core/types';

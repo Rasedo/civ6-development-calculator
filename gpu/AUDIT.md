@@ -553,6 +553,15 @@ Per-item weights (done% in parens where partial):
   sourced individually, so the file keeps a NARROWED marker.
   That makes FOUR files with real errors out of eight swept — the class is not
   a formality.
+  **SLICE 12 - src/data/religion.ts (2026-07-28, #78).** VERIFIED CORRECT:
+  PANTHEON_FAITH_COST = 25 (Standard speed) and RELIGION_PRESSURE_RANGE = 10
+  tiles. Also caught a STALE HEADER: it claimed "spread/pressure isn't
+  modeled - once founded, all of your cities follow your religion", which
+  B6-S2/B-18 refuted long ago (real per-city pressure, missionaries, apostles
+  and theological combat ship on both engines, and #76 made religious
+  predominance a victory condition). Corrected. NARROWED marker kept for
+  SPREAD_PRESSURE / MISSIONARY_CAP / APOSTLE_CAP and the belief magnitudes -
+  those are model stylizations, not Civ 6 values.
   **SLICE 11 - src/data/boosts.ts (2026-07-28, #78).** BOOST_FRACTION = 0.4
   VERIFIED CORRECT for the GS ruleset: boosts gave 50% in vanilla and were cut
   to 40% in Rise and Fall, which GS kept. Worth recording because 0.5 is the
