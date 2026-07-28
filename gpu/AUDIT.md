@@ -652,10 +652,24 @@ Per-item weights (done% in parens where partial):
   unfounded at t112, which is exactly where the arithmetic demanded its +2.
   So the question moves UPSTREAM to the eligibility gate rather than the draw:
       rdue = active & ~done & pantheon_done & (prophets > 0) & has_holy_site
-  One of those four flips earlier on the GPU. NEXT STEP: log all four components
-  per turn on both seats from ~t90 and find which one leads — most likely the
-  holy-site completion or the prophet count, since pantheon_done is itself an
-  era-score event and would have shown in the trace.
+  **TRACED (2026-07-28): the GPU founds at t78, gated by the PROPHET.**
+      t76-77  pantheon=True hs=True prophets=0  -> rdue=False
+      t78     prophets=1                        -> rdue=True ropen=True -> FOUNDS
+      t79     done=True, claimed 1 -> 2
+  TS founds at t112 (the arithmetic pins that turn): a ~34-turn gap, gated on
+  the rival PROPHET arriving.
+  AND THIS RESOLVES THE APPARENT CONTRADICTION — if the GPU awarded at t78, why
+  were both era scores 18 at t111? Because era score RESETS at an Age boundary
+  (both read 0 at t150 and t200). The GPU's +2 landed in an EARLIER age and was
+  wiped; TS's +2 at t112 lands in the live age and survives. The same event
+  credited in DIFFERENT AGES leaves a permanent 2-point gap — which is why this
+  never looked like a missing award and why the trace showed agreement right up
+  to t111.
+  NEXT STEP, now narrow: compare rival PROPHET acquisition — `r_prophets` on the
+  GPU against whatever TS gates its religion branch on — and find why rival 0 has
+  a prophet at t78 on one seat and ~t112 on the other (faith rate, prophet cost,
+  or the claim condition). WHICH ENGINE IS RIGHT is open and must be decided
+  against real Civ 6: a 34-turn swing in the first religion is large either way.
   PROBE FLAW to fix next pass: the TS probe filters on `rival.id === 0` but NOT
   on the game, and the replay walks all 72 — so its lines are not attributable
   to seed 9235 alone. The conclusion rests on the row-filtered GPU probe plus the
