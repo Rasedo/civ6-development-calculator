@@ -972,6 +972,26 @@ Per-item weights (done% in parens where partial):
   covers one, even though both engines carry the same full-MP-always-steps rule.
   That step accounting is what puts the units in different places to begin with.
   Reproduction preserved at `.claude/hunt-envoy`; still byte-identical.
+  **THE FIX WAS BUILT AND MEASURED (2026-07-28) — IT WIPES THE PLAYER IN 3+
+  GATE SEEDS, so it is a GATE DECISION, not a patch. Reverted; tree green.**
+  Symmetric shape, both seats: TS restricts the arm NAMED `playerCity` (which
+  matched ANY CITY_CENTER tile) to actual player cities via
+  `state.cities.some(c => c.centerIndex === t.index)`; the GPU drops the blind
+  `| (rvcity_at >= 0)`, leaving `(center_at >= 0) & hp`, with hostile rival
+  centres on the existing `enemy_rc & d == 1 & ~rngd` line — the exact mirror of
+  TS's `rivalVsRivalCity`. (This also explains the earlier 13-failure attempt:
+  that version used `enemy_rc` at FULL RANGE, widening GPU ranged targeting
+  beyond TS's melee-only rule. Not evidence against the fix.)
+  tsc clean, but the fixture EXPORT throws: seed 9014 loses every player city by
+  t250, then 9105, then 9132 — three of 24 and still climbing when I stopped.
+  THE CAUSE IS WHAT THE FIX REVEALS: rival units used to FREEZE THEMSELVES
+  beside any city, so unfreezing them is a large AI buff and the player no
+  longer survives. **The gate's survivability partly depended on the bug.**
+  Landing it means re-picking a meaningful fraction of the seed set, which
+  changes what the gate measures and breaks comparability with every historical
+  number. FOR RL THIS MATTERS MORE THAN FOR THE GATE: the training world
+  currently contains crippled opponents — a policy trained against frozen
+  rivals learns against an enemy that does not fight.
   (Superseded hypothesis, kept as a record of what was ruled out: within-turn
   ORDER of founding vs unit acts. REFUTED — both engines found cities BEFORE
   units act: GPU `_rival_try_found` at 7494/11951/12416 precedes the unit
