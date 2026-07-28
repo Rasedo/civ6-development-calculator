@@ -507,6 +507,16 @@ Per-item weights (done% in parens where partial):
   gate. That is the opposite of slice 1's Camp, which 16 of 24 seeds exercised
   — and it is exactly why this class needs sourcing rather than testing.
   16 marked files remain.
+  **SLICE 3 ATTEMPTED, NOT LANDED — src/data/constants.ts (2026-07-28, #78).**
+  The water-availability HOUSING constants (fresh 5 / coastal 3 / none 2, with
+  the Aqueduct bringing a non-fresh city to 6) were the target. A search
+  returned a DIFFERENT framing (+3 / +1 / +0, apparently deltas over a base
+  rather than totals) and both authoritative pages were unavailable. The values
+  were therefore LEFT UNCHANGED and the file stays marked. Recorded because the
+  non-change is the point: changing a live constant on ambiguous evidence is
+  the same failure this class exists to fix, only faster. The next pass should
+  source these from the Civilopedia "Housing" concept or the game files, not
+  from a search summary.
 - #74 SMALLS (2026-07-27). B-20 3 (92% -> 95% — the PRINTING writing-tourism
   doubling, measured reachable in 9/24 player seeds + 46 rival civs) and B-22 4
   (50% -> 60% — the PLAYER's grievance twin + the gang-up consequence, measured
