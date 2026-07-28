@@ -1338,7 +1338,11 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // unlocks (QUARRY/PASTURE/CAMP/PLANTATION/OIL_WELL; resource tiles offer
     // exactly the resource's improvement). Water improvements are
     // unreachable — a land builder can never stand on the tile.
-    const options = !bt.improvement ? validImprovementsIn(bt, vopts) : [];
+    // B-27 (#78): pass the ACTING unit's type so a MILITARY_ENGINEER is offered
+    // the FORT and a plain Builder is not. Inert today — nothing produces an
+    // engineer yet (the remaining B-27 tail) — but it keeps the placement path
+    // correct rather than leaving a second thing to remember when it lands.
+    const options = !bt.improvement ? validImprovementsIn(bt, { ...vopts, builder: u.type }) : [];
     if (options.length > 0) {
       let bestImp = options[0];
       let bestGain = -Infinity;
