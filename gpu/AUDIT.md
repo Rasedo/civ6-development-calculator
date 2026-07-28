@@ -553,6 +553,45 @@ Per-item weights (done% in parens where partial):
   sourced individually, so the file keeps a NARROWED marker.
   That makes FOUR files with real errors out of eight swept — the class is not
   a formality.
+  **SLICE 9 — src/data/units.ts COMBAT STRENGTHS: FIVE ERRORS FOUND, CHANGE
+  REVERTED PENDING A HUNT (2026-07-28, #78).** Checked against a Civ 6
+  unit-stat reference. FIVE combat strengths are WRONG in this model:
+    SWORDSMAN   36 should be 35
+    PIKEMAN     41 should be 45
+    CROSSBOWMAN 15 should be 30   (its MELEE strength; ranged 40 is right)
+    KNIGHT      48 should be 50
+    GALLEY      30 should be 25
+  Verified CORRECT: Scout 10, Warrior 20, Slinger 5/15, Archer 15/25, Spearman
+  25, Horseman 36, Musketman 55, Quadrireme 20/25, and every movement value.
+  These feed `damageRoll` directly and are the most load-bearing constants in
+  the model for an RL agent's combat decisions — the Crossbowman's melee is
+  wrong by 2x.
+  WHY IT IS NOT LANDED. Applying the five corrections produced TWO downstream
+  effects and one RED gate:
+   (a) EXPECTED: the hostile world gets genuinely stronger, and index 6's seed
+       9079 loses every player city before t250. Root-caused, and a
+       SEED_OVERRIDES entry (6: 9080, verified to survive at healthy size) is
+       the sanctioned fix — that part is fine.
+   (b) EXPECTED: tests/strategic-resources.test.ts hard-coded `>= 36` for the
+       Swordsman. The right repair is to read `UNITS.SWORDSMAN.combat` from the
+       roster, not to patch the literal — a stale literal asserting a wrong
+       value is the same failure as the wrong constant, with a green test
+       defending it.
+   (c) THE BLOCKER: the battery's gpu-gate (PLAIN rollout) went RED at
+       **seed 9235, turn 249, column 72 = rGScore1** — rival 1's empire score,
+       TS 188400 vs GPU 191250, a 2.85-point gap. Scripted parity was green at
+       0.0 milli and the FORCED-COMPACTION rollout passed; only the plain
+       rollout reaches it, so it is configuration-dependent and may be a
+       PRE-EXISTING latent that the stronger units merely made reachable.
+  LEAD FOR THE HUNT: TS `spawnUnit` updates `bestMeleeCS` for any unit with
+  `combat > 0 && !ranged` — which INCLUDES a naval GALLEY. The Galley's combat
+  is one of the five values that moved (30 -> 25), and bestMeleeCS feeds city
+  defense strength, which feeds combat outcomes, which feeds empire score.
+  Check whether the GPU's `best_melee` applies the same non-ranged-only rule to
+  NAVAL units, and whether it reads the roster table or the 9-entry BARB table
+  for a Galley (the id appears in BOTH).
+  The change is REVERTED so the tree stays green; the sourced numbers are
+  recorded here so the next round starts from them.
   10 marked files remain; constants.ts, projects.ts, resources.ts,
   cityStates.ts, appeal.ts and wonders.ts carry NARROWED markers (swept parts cited in place, unswept
   parts named). SIX slices in, the pattern is settled: THREE files had real
