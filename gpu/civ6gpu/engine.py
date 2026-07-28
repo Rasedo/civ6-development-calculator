@@ -627,6 +627,10 @@ class BatchSim:
         # subtracts exactly it. Dynamic terms are applied in _tile_appeal.
         self.appeal_base = torch.tensor([[int(t.get("ap", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.appeal_feat = torch.tensor([[int(t.get("apf", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # #78: the ON-TILE appeal terms (mountain +4, river/lake +1). These are
+        # NOT neighbour contributions, so they are added to the tile's OWN appeal
+        # after the neighbour gather rather than folded into appeal_base.
+        self.appeal_self = torch.tensor([[int(t.get("aps", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.r_alive = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # static: placed at creation
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
@@ -1287,9 +1291,11 @@ class BatchSim:
         ]
         self._nbhd_didx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "NEIGHBORHOOD"), -1)
         # appealTier thresholds -> Neighborhood housing (real Civ 6, sourced):
-        # >=4 Breathtaking 6, >=2 Charming 5, >=0 Average 4, >=-2 Uninviting 3,
+        # >=4 Breathtaking 6, >=2 Charming 5, >=-1 Average 4, >=-3 Uninviting 3,
         # else Disgusting 2.
-        self._appeal_cuts = [(4, 6), (2, 5), (0, 4), (-2, 3)]
+        # #78: bands were OFF BY ONE. Real Civ 6: Breathtaking >=4, Charming
+        # 2..3, Average -1..1, Uninviting -3..-2, Disgusting <=-4.
+        self._appeal_cuts = [(4, 6), (2, 5), (-1, 4), (-3, 3)]
         self._appeal_floor = 2
         self._encamp_si = next((si for si, (di, _ut, _uc, _plc) in enumerate(self._scaffold) if di == self._encamp_didx), -1)
         self._campus_active = bool(sc.get("active", 0))  # scaffold master on/off (mirrors exporter SCRIPTED_CAMPUS)
@@ -3108,9 +3114,16 @@ class BatchSim:
             for _d in self._appeal_bad_dist:
                 bad_d |= self.district == _d
             contrib = contrib - bad_d.long()
+        # #78: "-1 each adjacent pillaged tile" — dynamic, so it joins contrib
+        # rather than the exported static plane.
+        contrib = contrib - self.pillaged.long()
         nb = self.neigh
         nbc = nb.clamp(min=0)
         out = (contrib[:, nbc] * (nb >= 0).unsqueeze(0).long()).sum(dim=2)  # [B, T]
+        # #78: the ON-TILE terms (mountain +4, river/lake +1) are the tile's
+        # OWN appeal, not a neighbour contribution, so they are added AFTER the
+        # gather. Mirrors the two leading lines of tileAppeal in core/appeal.ts.
+        out = out + self.appeal_self
         self._appeal_cache = (self._eff_version, out)
         return out
 

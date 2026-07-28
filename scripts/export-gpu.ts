@@ -173,7 +173,18 @@ const LUXURY_IDS = Object.values(RESOURCES)
   .filter((r) => r.category === 'luxury')
   .map((r) => r.id);
 
-const N_SEEDS = Number(process.argv[2] ?? 24);
+// #78 (2026-07-28, OWNER DECISION): the gate seed set is TEMPORARILY 12, down
+// from 24, to halve the development loop — the #47 attack-target fix roughly
+// DOUBLED the battery wall (687s -> 1434s on an idle box) because unfrozen
+// rivals actually fight.
+//
+// **RESTORE THIS TO 24 BEFORE THE FINAL HUNT.** The owner's explicit plan is to
+// unshrink "closer to the end of development when we start the last hunt". A
+// smaller fixed set is not a smaller sample of the same thing: seeds are never
+// resampled, so any divergence only the dropped seeds reach goes from "caught
+// eventually" to "NEVER caught". Both score latents hunted this session
+// (envoy seed 9170, rGScore1 seed 9235) were single-seed reds.
+const N_SEEDS = Number(process.argv[2] ?? 12);
 const N_TURNS = Number(process.argv[3] ?? 250); // #56: scripted horizon 100→250 (survival heuristics H1/H2 keep the seeds alive)
 const N_EXTRA = Number(process.argv[4] ?? 5); // candidate sites beyond the capital
 const SETTLER_POP_GATE = 2; // capital waits for pop 2 before training a settler
@@ -1482,9 +1493,23 @@ for (let s = 0; s < N_SEEDS; s++) {
         if (t.terrain === 'COAST' || t.terrain === 'LAKE') a += 1;
         if (t.feature === 'WOODS') a += 1;
         if (t.feature === 'RAINFOREST' || t.feature === 'MARSH') a -= 1;
+        // #78: sourced additions — an adjacent OASIS is +1 and an adjacent
+        // FLOODPLAINS is -1. Both are FEATURES, so both also belong in `apf`
+        // below so a chop subtracts exactly the right amount.
+        if (t.feature === 'OASIS') a += 1;
+        if (t.feature === 'FLOODPLAINS') a -= 1;
         return a;
       })(),
-      apf: t.feature === 'WOODS' ? 1 : t.feature === 'RAINFOREST' || t.feature === 'MARSH' ? -1 : 0,
+      apf:
+        t.feature === 'WOODS' || t.feature === 'OASIS'
+          ? 1
+          : t.feature === 'RAINFOREST' || t.feature === 'MARSH' || t.feature === 'FLOODPLAINS'
+            ? -1
+            : 0,
+      // #78: the two ON-TILE appeal terms, which are NOT neighbour
+      // contributions and so cannot ride `ap`: "+4 if the tile is on a
+      // Mountain" and "+1 if the tile is on a River or Lake".
+      aps: (isMountain(t) ? 4 : 0) + ((t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0),
       // AUDIT A-8: river-edge crossing bits for the rival MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
       // the same order riverMask bits use — so bit d = crossing toward

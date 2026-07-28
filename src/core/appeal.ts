@@ -27,13 +27,26 @@ import { isMountain } from './query';
 
 export function tileAppeal(map: GameMap, tile: Tile): number {
   let appeal = 0;
+  // B-27 (#78): "+4 if the tile is on a Mountain" — an ON-TILE term, not
+  // adjacency. See the SOURCE CONFLICT note in the file header: the Civilopedia
+  // states it additively (implemented here), while the fandom GS article calls
+  // mountains a FIXED 4 unaffected by surroundings. The two differ only when a
+  // neighbour would also contribute, and both land Breathtaking either way,
+  // so the additive in-game wording is taken as primary.
+  if (isMountain(tile)) appeal += 4;
+  // "+1 if the tile is on a River or Lake" — again ON-TILE. The model
+  // previously credited an ADJACENT lake, which the source assigns here.
+  if (tile.riverMask !== 0 || tile.terrain === 'LAKE') appeal += 1;
   for (const n of neighbors(map, tile)) {
     if (n.wonder) appeal += 2;
     if (n.builtWonder && n.builtWonderComplete) appeal += 1;
     if (n.feature === 'WOODS') appeal += 1;
     if (isMountain(n) && !n.wonder) appeal += 1;
     if (n.terrain === 'COAST' || n.terrain === 'LAKE') appeal += 1;
+    if (n.feature === 'OASIS') appeal += 1; // #78: sourced, was missing
     if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
+    if (n.feature === 'FLOODPLAINS') appeal -= 1; // #78: sourced, was missing
+    if (n.pillaged) appeal -= 1; // #78: "-1 each adjacent pillaged tile"
     if (n.improvement === 'MINE' || n.improvement === 'QUARRY' || n.improvement === 'OIL_WELL') appeal -= 1;
     if (n.district === 'INDUSTRIAL_ZONE' || n.district === 'ENCAMPMENT') appeal -= 1;
   }
@@ -47,9 +60,14 @@ export interface AppealTier {
 }
 
 export function appealTier(appeal: number): AppealTier {
+  // #78: the BANDS were off by one. Real Civ 6: Breathtaking >= 4, Charming
+  // 2..3, Average -1..1, Uninviting -3..-2, Disgusting <= -4. This used to read
+  // `>= 0` for Average and `>= -2` for Uninviting, so appeal -1 was
+  // misclassified Uninviting and -3 Disgusting — a live defect, not a missing
+  // term, because the tier drives Neighborhood HOUSING and housing feeds growth.
   if (appeal >= 4) return { name: 'Breathtaking', housing: 6 };
   if (appeal >= 2) return { name: 'Charming', housing: 5 };
-  if (appeal >= 0) return { name: 'Average', housing: 4 };
-  if (appeal >= -2) return { name: 'Uninviting', housing: 3 };
+  if (appeal >= -1) return { name: 'Average', housing: 4 };
+  if (appeal >= -3) return { name: 'Uninviting', housing: 3 };
   return { name: 'Disgusting', housing: 2 };
 }
