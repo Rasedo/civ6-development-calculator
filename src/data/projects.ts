@@ -1,8 +1,24 @@
 /**
- * District projects (base Civ 6 set, eyeballed numbers). Repeatable
- * production sinks: on completion they grant a lump of their yield plus
- * great-person points of the matching class. Cost scales with research
- * progress like districts (locked in when queued).
+ * District projects (base Civ 6 set). Repeatable production sinks: on
+ * completion they grant a lump of their yield plus great-person points of the
+ * matching class. Cost scales with research progress like districts (locked in
+ * when queued).
+ *
+ * #78 SOURCING SWEEP (2026-07-28). The district -> yield -> GP-class mapping was
+ * checked against the Civilopedia project entries and is CORRECT as written for
+ * Campus Research Grants (science / Great Scientist), Holy Site Prayers (faith /
+ * Great Prophet), Commercial Hub Investment (gold / Great Merchant), Harbor
+ * Shipping (gold / Great Admiral) and Encampment Training (no yield / Great
+ * General).
+ *
+ * ONE SOURCED DEVIATION, recorded not fixed: the THEATER SQUARE FESTIVAL grants
+ * Great WRITER, Great ARTIST **and** Great MUSICIAN points in real Civ 6 (each
+ * ~11% of the production invested, Standard speed), converting 15% of the
+ * city's production to Culture. This model awards the ARTIST class alone,
+ * because `gpClass` is a single field. Fixing it means widening ProjectDef to a
+ * class LIST and mirroring the multi-class award on the GPU — a behavioural
+ * change to GP earn timing that needs its own gated round. The rate and the
+ * class list are recorded here so that round does not have to re-derive them.
  */
 
 import type { DistrictId, GreatPersonClass, YieldKey } from '../core/types';

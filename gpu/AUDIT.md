@@ -506,7 +506,20 @@ Per-item weights (done% in parens where partial):
   here is trivially true and this correction rests on the SOURCE, not on any
   gate. That is the opposite of slice 1's Camp, which 16 of 24 seeds exercised
   — and it is exactly why this class needs sourcing rather than testing.
-  15 marked files remain (constants.ts keeps a narrowed marker — only its water-housing block is swept).
+  **SLICE 4 — src/data/projects.ts (2026-07-28, #78).** The district -> yield ->
+  GP-class mapping checked against the Civilopedia project entries. FIVE of six
+  correct as written (Campus/science/Scientist, Holy Site/faith/Prophet,
+  Commercial Hub/gold/Merchant, Harbor/gold/Admiral, Encampment/-/General).
+  ONE SOURCED DEVIATION, recorded not fixed: the THEATER SQUARE FESTIVAL grants
+  Great WRITER, ARTIST **and** MUSICIAN points in real Civ 6 (each ~11% of the
+  production invested, Standard speed) and converts 15% of the city's production
+  to Culture; this model awards ARTIST alone because `gpClass` is a single
+  field. Widening it to a class LIST and mirroring the multi-class award on the
+  GPU is a behavioural change to GP earn timing and needs its own gated round —
+  the rate and the class list are now recorded in the file so that round does
+  not re-derive them.
+  14 marked files remain (constants.ts and projects.ts keep NARROWED markers —
+  the swept parts are cited in place, the unswept parts named).
   **SLICE 3 DONE — src/data/constants.ts water-housing (2026-07-28, #78).**
   RESOLVED AS VERIFIED-CORRECT. The first search returned a confusing framing
   (+3 / +1 / +0, deltas rather than totals) and the authoritative pages were
