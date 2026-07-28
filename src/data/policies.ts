@@ -206,7 +206,9 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
  * re-checking every government's slot list against the Civilopedia (ten
  * entries) and re-gating, so it is its own round.
  *
- * The individual POLICY CARD effects are NOT swept — NARROWED marker.
+ * POLICY CARDS, spot-checked: URBAN_PLANNING is "+1 Production in all cities"
+ * in an ECONOMIC slot — this model's text, effect AND slot type all match.
+ * The remaining card effects are NOT individually fetched; NARROWED marker.
  */
 export interface GovernmentDef {
   id: string;

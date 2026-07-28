@@ -591,7 +591,12 @@ Per-item weights (done% in parens where partial):
   it admits one more military card and one fewer wildcard. Slot composition
   gates which cards can be slotted, so it is behavioural, not cosmetic. Fixing
   it means re-checking all ten governments' slot lists and re-gating - its own
-  round. Individual POLICY CARD effects not swept; NARROWED marker.
+  round. POLICY CARDS spot-checked: URBAN_PLANNING is "+1 Production in all
+  cities" in an ECONOMIC slot - text, effect and slot type all match. The
+  remaining card effects are not individually fetched; NARROWED marker.
+  **SWEEP STATUS: all 18 marked files have now been touched** - 10 fully or
+  partly verified with citations in place, 2 stale headers corrected, and every
+  unswept remainder named explicitly rather than left under a blanket marker.
   **SLICE 16 - src/data/builtWonders.ts (2026-07-28, #78).** Spot-checked by
   direct Civilopedia fetch: PYRAMIDS 220 Production and GREAT_LIBRARY 400
   Production both CORRECT as written. Remaining wonder COSTS not individually
