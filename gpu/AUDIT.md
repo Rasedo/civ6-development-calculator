@@ -26,13 +26,13 @@ stage that moves an item.
 | Chapter | Weight | Done | % |
 |---|---|---|---|
 | A symmetry | 41 | 40.0 | **98%** |
-| B fidelity | 88 | 86.96 | **99%** |
+| B fidelity | 88 | 87.11 | **99%** |
 | C order/slot latents (closed) | 30 | 30 | 100% |
 | D perf (closed) | 15 | 15 | 100% |
 | E docs (closed) | 6 | 6 | 100% |
 | G parity latents (closed) | 11 | 11 | 100% |
-| **Overall (incl. closed)** | **191** | **188.96** | **99%** |
-| Open chapters only (A+B) | 129 | 126.96 | **98%** |
+| **Overall (incl. closed)** | **191** | **189.11** | **99%** |
+| Open chapters only (A+B) | 129 | 127.11 | **99%** |
 
 (#71 RESIDUALS close-out, 2026-07-26 — table re-summed from per-item
 weights. A-5r 95%→97% and A-9 95%→97% (machinery landed both engines,
@@ -494,6 +494,9 @@ Per-item weights (done% in parens where partial):
   favor vote and Diplomatic Victory Points; measured at 5-6 sessions/seed and
   102 DVP awarded) and B-25 3 (90% -> 97% — the DIPLOMATIC victory closes the
   last named victory condition). Delta +0.60 +0.21 = +0.81 on B.
+- #77 NAMED DEDICATIONS (2026-07-28). B-24 3 (80% -> 85% — the named catalog
+  and its event-keyed DARK/NORMAL faces, 4 of 12 dedications, 8 event sites;
+  measured at 199 payouts with the Age distribution unmoved). Delta +0.15 on B.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant
@@ -1480,13 +1483,43 @@ gap; likewise GS disasters are modeled minus sea-level rise
   order ties; titles = civics/10 cap 5) both engines. Coverage:
   `governors` battery lane (7 pokes incl. the gate-unreachable
   player-Golden axis) + tests/governors.test.ts. STILL OPEN
-  (owner-confirmed list): the DEDICATION system entirely — Golden
-  Age bonuses (Monumentality etc.), the Normal/Dark dedication that
-  converts to extra era-score accrual, and the HEROIC Age (Dark→
-  Golden grants THREE dedications; substrate = a prevAge column);
-  dark-age policies; governor establishment turns, promotions and
-  non-loyalty abilities; per-civ tech-era drift (eras are fixed
-  50-turn windows).
+  (owner-confirmed list, as of #71): the DEDICATION system, dark-age
+  policies, governor establishment/promotions, per-civ tech-era drift.
+  **NAMED DEDICATION CATALOG LANDED (2026-07-28, #77).** #71 modeled
+  dedications as a COUNT with a FLAT per-turn payout. Real Civ 6 has each
+  civ commit to a NAMED dedication per era, and every dedication has TWO
+  faces: a DARK/NORMAL face paying ERA SCORE off a specific EVENT (the
+  climb-out) and a GOLDEN face paying a standing bonus instead. Verified
+  against the GS Civilopedia "Dedications" concept.
+  FOUR dedications land — the ones whose EVENT already exists as a hook on
+  both engines: 0 MONUMENTALITY (+1 per specialty DISTRICT completed),
+  1 FREE_INQUIRY (+1 per EUREKA), 2 PEN_BRUSH_AND_VOICE (+1 per
+  INSPIRATION), 3 EXODUS_OF_THE_EVANGELISTS (+2 per city CONVERTED).
+  `DEDICATIONS` / `DED_EVENT_SCORE` + `dedicationEvent()`; GPU `ded_picks`
+  [B, 1+R, 3] (in _MUTABLE) + `_dedication_event`. Eight event sites wired,
+  four per seat: district completion, eureka, inspiration, conversion.
+  THE PICK is a stateless deterministic ROUND-ROBIN over the catalog keyed
+  on (era + civ + slot) — real Civ 6 lets the player choose, there is no
+  chooser on either seat, and a roll would break the zero-draw contract.
+  A HEROIC age takes three consecutive entries. Recorded stylization.
+  THE GOLDEN FACE keeps #71's flat faith: the named Golden bonuses
+  (Monumentality's faith purchases, Free Inquiry's eureka overflow, ...)
+  need machinery this round does not build, and inventing substitutes is
+  exactly what verify-before-implement forbids. Recorded residual.
+  MEASURED, and the measurement mattered: the event faces fire 199 times
+  across the 24 seeds (123 Monumentality, 50 Exodus, 24 inspirations, 2
+  eurekas) — so this is live, not inert. The Age distribution is
+  BYTE-IDENTICAL to the pre-#77 baseline (Dark/Normal/Golden 16.7/22.8/60.6%),
+  measured by running the previous commit's engine over the same seeds: no
+  civ crossed a threshold, so the evidence-pinned ERA_DARK_T/ERA_GOLDEN_T
+  need NO re-pinning. Parity green at 0.0 milli on the first pass.
+  Poke lane: tests/governors.test.ts (5 dedication cases — the matching
+  event only, EXODUS's double rate, the Golden-age silence, the Heroic
+  double-pay, and a civ with no commitments).
+  B-24 -> 85%. STILL OPEN: the other eight catalog entries (four of which
+  need spies / air units / artifacts / Giant Death Robots), the named
+  GOLDEN bonuses, dark-age policies, governor establishment/promotions,
+  and per-civ tech-era drift.
 - B-25 (re-scoped 2026-07-17, Round B2). LANDED: Science victory — a
   6-step space-race project chain gated on late techs, `victoryType` 3
   (player win) / 4 (rival completion = defeat) in `endTurn`; Campus is

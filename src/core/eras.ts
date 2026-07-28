@@ -1,5 +1,5 @@
 import type { GameState } from './types';
-import { ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE } from '../data/rivals';
+import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
 // B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
@@ -41,8 +41,38 @@ export function eraBoundary(state: GameState): void {
     prev[c] = was;
     ages[c] = now;
     ded[c] = was === 0 && now === 2 ? HEROIC_DEDICATIONS : 1;
+    // B-24 (#77): commit to NAMED dedications. Real Civ 6 lets each civ pick;
+    // there is no chooser on either seat and a roll would break the zero-draw
+    // contract, so the pick is a STATELESS ROUND-ROBIN over the catalog keyed
+    // on the era index — deterministic, identical on both engines, and it
+    // exercises every dedication in turn rather than pinning one forever.
+    // A HEROIC age takes the next `ded[c]` catalog entries (three).
+    const era = Math.floor(state.turn / ERA_LENGTH);
+    const picks = (state.dedicationPicks ??= []);
+    picks[c] = Array.from({ length: ded[c] }, (_, k) => (era + c + k) % DEDICATIONS.length);
   }
   state.eraScore = [];
+}
+
+/**
+ * B-24 (#77): the DARK/NORMAL face of a civ's committed dedications — era score
+ * paid off a specific EVENT. Real Civ 6's climb-out dedications pay in era
+ * score, and each names its own trigger; a GOLDEN age pays a standing bonus
+ * instead and so earns nothing here.
+ *
+ * `kind` is a catalog index (DED_MONUMENTALITY, ...). Every matching committed
+ * dedication pays, so a HEROIC age holding the same dedication twice pays
+ * twice. Zero-draw, integer-only; both engines call this at the same event
+ * sites.
+ */
+export function dedicationEvent(state: GameState, civ: number, kind: number): void {
+  if (!DEDICATION_PAYOUTS_LIVE) return;
+  if ((state.civAges?.[civ] ?? 1) === 2) return; // a GOLDEN age takes bonuses, not era score
+  const picks = state.dedicationPicks?.[civ];
+  if (!picks) return;
+  let n = 0;
+  for (const p of picks) if (p === kind) n++;
+  if (n > 0) addEraScore(state, civ, n * DED_EVENT_SCORE[kind]);
 }
 
 /** B-24 (#71): true when this civ's CURRENT age is a HEROIC age — it entered

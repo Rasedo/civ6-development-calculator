@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { dedicationEvent } from '../src/core/eras';
+import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../src/data/rivals';
 import { makeState, tileAtCoords } from './helpers';
 import { rivalPhase } from '../src/core/rivals';
 import {
@@ -204,5 +206,57 @@ describe('governors / era score (#68 B-24)', () => {
     // the +8 lands on exactly the weakest city; the stronger one is unchanged
     expect(titled.weak - control.weak).toBeCloseTo(GOVERNOR_LOYALTY, 9);
     expect(titled.strong - control.strong).toBeCloseTo(0, 9);
+  });
+});
+
+describe('B-24 named dedications (#77)', () => {
+  // Real Civ 6: each civ commits to a NAMED dedication per era, and every
+  // dedication has TWO faces — a DARK/NORMAL face paying ERA SCORE off a
+  // specific EVENT, and a GOLDEN face paying a standing bonus instead. #71
+  // modeled only a COUNT with a flat payout; #77 adds the catalog and the
+  // event faces. MEASURED live: 199 payouts fire across the 24 scripted seeds
+  // (123 Monumentality, 50 Exodus, 24 inspirations, 2 eurekas), and the Age
+  // distribution is byte-identical to before, so no civ crossed a threshold.
+  const base = () => ({
+    civAges: [1, 1],
+    dedicationPicks: [[DED_MONUMENTALITY], [DED_EXODUS]],
+    eraScore: [0, 0],
+    rivals: [{}],
+  }) as unknown as GameState;
+
+  it('pays the committed dedication on its own event only', () => {
+    const st = base();
+    dedicationEvent(st, 0, DED_MONUMENTALITY);
+    expect(st.eraScore![0]).toBe(DED_EVENT_SCORE[DED_MONUMENTALITY]);
+    dedicationEvent(st, 0, DED_EXODUS); // not committed by civ 0
+    expect(st.eraScore![0]).toBe(DED_EVENT_SCORE[DED_MONUMENTALITY]);
+  });
+
+  it('EXODUS pays double, the sourced rate', () => {
+    const st = base();
+    dedicationEvent(st, 1, DED_EXODUS);
+    expect(st.eraScore![1]).toBe(2);
+    expect(DED_EVENT_SCORE[DED_EXODUS]).toBe(2);
+  });
+
+  it('a GOLDEN age takes bonuses, not era score', () => {
+    const st = base();
+    st.civAges = [2, 1];
+    dedicationEvent(st, 0, DED_MONUMENTALITY);
+    expect(st.eraScore![0] ?? 0).toBe(0);
+  });
+
+  it('a HEROIC age holding the same dedication twice pays twice', () => {
+    const st = base();
+    st.dedicationPicks = [[DED_MONUMENTALITY, DED_MONUMENTALITY, DED_EXODUS], [DED_EXODUS]];
+    dedicationEvent(st, 0, DED_MONUMENTALITY);
+    expect(st.eraScore![0]).toBe(2 * DED_EVENT_SCORE[DED_MONUMENTALITY]);
+  });
+
+  it('a civ with no commitments earns nothing', () => {
+    const st = base();
+    st.dedicationPicks = [];
+    dedicationEvent(st, 0, DED_MONUMENTALITY);
+    expect(st.eraScore![0] ?? 0).toBe(0);
   });
 });

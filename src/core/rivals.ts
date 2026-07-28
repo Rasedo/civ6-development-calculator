@@ -110,8 +110,9 @@ import {
   CONGRESS_INTERVAL,
   CONGRESS_MIN_ERA,
   DVP_PER_RESOLUTION,
+  DED_MONUMENTALITY,
 } from '../data/rivals';
-import { addEraScore, agePressureFactor, governorPicks, governorTitles } from './eras';
+import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
 
 const ok: RuleResult = { ok: true };
@@ -3043,6 +3044,8 @@ export function rivalPhase(state: GameState): void {
           else if (q.kind === 'district') {
             const dt = state.map.tiles[q.tileIndex];
             dt.districtComplete = true;
+            // B-24 (#77): MONUMENTALITY — the player-seat twin.
+            if (dt.district !== 'CITY_CENTER') dedicationEvent(state, civOfRival(rival.id), DED_MONUMENTALITY);
             if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP; // B-17 (#71)
           }
           else if (q.kind === 'building') {

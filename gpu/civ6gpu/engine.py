@@ -379,7 +379,7 @@ _MUTABLE = [
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "congress_sessions", "diplo_points", "r_diplo_points", "era_score", "civ_age", "prev_age", "dedications", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "congress_sessions", "diplo_points", "r_diplo_points", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
@@ -664,6 +664,9 @@ class BatchSim:
         # foundings accrue pre-export). INERT in S1 (nothing reads it — Ages
         # land S2). _MUTABLE for snapshot/restore.
         self.era_score = torch.zeros(B, 1 + r_pad, dtype=torch.long, device=device)
+        # B-24 (#77): the NAMED dedications each civ committed this era —
+        # catalog indices, HEROIC_DEDICATIONS wide; -1 = slot unused.
+        self.ded_picks = torch.full((B, 1 + r_pad, max(int(rules.eras.get("heroicDedications", 3)), 1)), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
             esi = f.get("eraScoreInit", [])
             for c, v in enumerate(esi[: 1 + r_pad]):
@@ -702,6 +705,9 @@ class BatchSim:
         self._tile_buy_live = bool(_er.get("rivalTileBuyLive", False))  # A-5r (#71): inert until the gold-ladder hunt lands
         self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))  # B-24 (#71): substrate live, payouts inert
         self._heroic_ded = int(_er.get("heroicDedications", 3))
+        # B-24 (#77): the NAMED dedication catalog — per-kind event era score.
+        self._ded_event_score = [int(x) for x in _er.get("dedEventScore", [1, 1, 1, 2])]
+        self._n_ded = len(self._ded_event_score)
         self._ded_faith = int(_er.get("dedicationFaith", 2))
         self._ded_era = int(_er.get("dedicationEraScore", 1))
         self._gov_loy = float(_er.get("governorLoyalty", 8))
@@ -2702,7 +2708,15 @@ class BatchSim:
         self.city_pressure = torch.where(self.alive.unsqueeze(2), self.city_pressure + add_pc.long(), torch.zeros_like(self.city_pressure))
         tot_pc = self.city_pressure.sum(dim=2)
         best_pc = self.city_pressure.argmax(dim=2)  # ties -> lowest id
+        # B-24 (#77): EXODUS OF THE EVANGELISTS pays era score each time a city
+        # CONVERTS to a civ's religion — the religion's OWNER earns it. Compare
+        # against the PRE-flip follow set, exactly like the TS `wasFollowed`.
+        _was_pc = self.city_followed.clone()
         self.city_followed = torch.where(self.alive & (tot_pc > 0), best_pc, torch.full_like(best_pc, -1))
+        for _g in range(self._O):
+            _conv = (self.city_followed == _g) & (_was_pc != _g) & self.alive
+            if bool(_conv.any()):
+                self._dedication_event(_g, 3, _conv.any(dim=1))
         # --- rival cities [B, r_pad, rc_pad] -------------------------------
         if self.R > 0:
             rcc = self.rc_center.clamp(min=0)  # [B, R, RC]
@@ -2711,7 +2725,12 @@ class BatchSim:
             self.rc_pressure = torch.where(self.rc_alive.unsqueeze(3), self.rc_pressure + add_rc.long(), torch.zeros_like(self.rc_pressure))
             tot_rc = self.rc_pressure.sum(dim=3)
             best_rc = self.rc_pressure.argmax(dim=3)
+            _was_rc = self.rc_followed.clone()
             self.rc_followed = torch.where(self.rc_alive & (tot_rc > 0), best_rc, torch.full_like(best_rc, -1))
+            for _g in range(self._O):  # B-24 (#77): EXODUS, the rival-city twin
+                _convr = (self.rc_followed == _g) & (_was_rc != _g) & self.rc_alive
+                if bool(_convr.any()):
+                    self._dedication_event(_g, 3, _convr.reshape(B, -1).any(dim=1))
 
     def _rel_combat_planes(self) -> tuple[torch.Tensor, torch.Tensor]:
         """B6-S1: (near3, terr) — [B, O, T] bool planes for the enhancer combat
@@ -4297,9 +4316,16 @@ class BatchSim:
             else:
                 continue
             if row["target"] == "tech":
+                # B-24 (#77): FREE INQUIRY pays era score per EUREKA — fire on
+                # the rows where the boost NEWLY lands (the TS `newly` twin).
+                _new_t = pred & ~self.techs[:, row["idx"]] & ~self.tech_boosted[:, row["idx"]]
                 self.tech_boosted[:, row["idx"]] |= pred & ~self.techs[:, row["idx"]]
+                self._dedication_event(0, 1, _new_t)
             else:
+                # B-24 (#77): PEN BRUSH AND VOICE pays era score per INSPIRATION.
+                _new_c = pred & ~self.civics[:, row["idx"]] & ~self.civic_boosted[:, row["idx"]]
                 self.civic_boosted[:, row["idx"]] |= pred & ~self.civics[:, row["idx"]]
+                self._dedication_event(0, 2, _new_c)
 
     def _detect_rival_boosts(self, r: int, active: torch.Tensor) -> None:
         """AUDIT A-3: detectRivalBoosts — the same condition rows evaluated
@@ -4357,9 +4383,13 @@ class BatchSim:
                 continue
             hit = active & pred
             if row["target"] == "tech":
+                _new_rt = hit & ~self.r_techs[:, r, row["idx"]] & ~self.r_tech_boosted[:, r, row["idx"]]
                 self.r_tech_boosted[:, r, row["idx"]] |= hit & ~self.r_techs[:, r, row["idx"]]
+                self._dedication_event(r + 1, 1, _new_rt)  # B-24 (#77): rival EUREKA
             else:
+                _new_rc = hit & ~self.r_civics[:, r, row["idx"]] & ~self.r_civic_boosted[:, r, row["idx"]]
                 self.r_civic_boosted[:, r, row["idx"]] |= hit & ~self.r_civics[:, r, row["idx"]]
+                self._dedication_event(r + 1, 2, _new_rc)  # B-24 (#77): rival INSPIRATION
 
     # --- barbarians (phase 4a) ----------------------------------------------------
 
@@ -8272,6 +8302,20 @@ class BatchSim:
             okr = self.rc_alive[:, r].any(dim=1) & (self.r_diplo_points[:, r] >= self._dvp_win)
             winner = torch.where((winner < 0) & okr, torch.full_like(winner, r + 1), winner)
         return winner
+
+    def _dedication_event(self, civ: int, kind: int, mask: torch.Tensor) -> None:
+        """B-24 (#77), the TS `dedicationEvent` mirror: the DARK/NORMAL face of
+        a civ's committed dedications pays ERA SCORE off a specific EVENT. A
+        GOLDEN age takes a standing bonus instead and earns nothing here.
+        Every MATCHING committed dedication pays, so a HEROIC age holding the
+        same one twice pays twice. `mask` [B] selects the rows where the event
+        fired. Zero-draw."""
+        if not self._ded_payouts_live or not bool(mask.any()):
+            return
+        n = (self.ded_picks[:, civ] == kind).sum(dim=1)  # [B]
+        pay = mask & (self.civ_age[:, civ] != 2) & (n > 0)
+        if bool(pay.any()):
+            self.era_score[:, civ] = self.era_score[:, civ] + pay.long() * n * self._ded_event_score[kind]
 
     def _culture_victor(self) -> torch.Tensor:
         """B-25 (#72), the TS `cultureVictor` mirror: [B] the lowest unified civ
@@ -12315,6 +12359,10 @@ class BatchSim:
                             dtile = self.rc_qtile[:, r, j]
                             _dt = dtile[dr].clamp(min=0)
                             self.district_complete[dr, _dt] = True
+                            # B-24 (#77): MONUMENTALITY, the rival twin.
+                            _monr = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                            _monr[dr] = True
+                            self._dedication_event(r + 1, 0, _monr)
                             # B-17 (#71): a completed ENCAMPMENT musters its garrison.
                             _enc = self.district[dr, _dt] == self._encamp_didx
                             self.encamp_hp[dr, _dt] = torch.where(
@@ -13993,6 +14041,11 @@ class BatchSim:
                 db_ = made_district.nonzero(as_tuple=True)[0]
                 _dt = self.q_dtile[db_, col[db_]].clamp(min=0)
                 self.district_complete[db_, _dt] = True
+                # B-24 (#77): MONUMENTALITY pays era score per SPECIALTY
+                # district completed (a city centre is never queued here).
+                _mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _mon[db_] = True
+                self._dedication_event(0, 0, _mon)
                 # B-17 (#71): a completed ENCAMPMENT musters its garrison.
                 _enc = self.district[db_, _dt] == self._encamp_didx
                 self.encamp_hp[db_, _dt] = torch.where(
@@ -14395,6 +14448,19 @@ class BatchSim:
                 torch.full_like(self.dedications, self._heroic_ded),
                 torch.ones_like(self.dedications),
             )
+            # B-24 (#77): commit to NAMED dedications — the TS stateless
+            # round-robin twin: catalog index (era + civ + k) % N, taking
+            # `dedications[c]` entries (three on a Heroic age).
+            _era_i = int(self.turn // self._era_len)
+            self.ded_picks[:] = -1
+            for _c in range(1 + self.R):
+                for _k in range(self.ded_picks.shape[2]):
+                    _take = self.dedications[:, _c] > _k
+                    self.ded_picks[:, _c, _k] = torch.where(
+                        _take,
+                        torch.full_like(self.ded_picks[:, _c, _k], (_era_i + _c + _k) % self._n_ded),
+                        torch.full_like(self.ded_picks[:, _c, _k], -1),
+                    )
             self.era_score[:] = 0
         # B-22 (#76): the WORLD CONGRESS convenes on the same post-increment
         # turn number the era boundary uses — the TS position exactly.

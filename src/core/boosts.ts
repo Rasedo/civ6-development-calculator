@@ -1,9 +1,12 @@
 /** Evaluation of eureka/inspiration conditions against the game state. */
 
+import { dedicationEvent } from './eras';
+import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/rivals';
 import type { GameState, ResearchState, RivalCiv } from './types';
 import { neighbors } from './hex';
 import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
 import { DISTRICTS } from '../data/districts';
+import { TECHS } from '../data/techs';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand } from './query';
 
@@ -87,6 +90,10 @@ export function detectBoosts(state: GameState): string[] {
     if (state.research.techs.includes(id) || state.research.civics.includes(id)) continue;
     if (checkSatisfied(state, def.check)) {
       state.research.boosted.push(id);
+      // B-24 (#77): FREE INQUIRY pays era score per EUREKA, PEN BRUSH AND
+      // VOICE per INSPIRATION — a tech boost is a eureka, a civic boost an
+      // inspiration.
+      dedicationEvent(state, 0, TECHS[id] ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE);
       newly.push(id);
     }
   }
@@ -174,6 +181,10 @@ export function detectRivalBoosts(state: GameState, rival: RivalCiv): void {
     if (!def.check) continue;
     if (rsr.boosted.includes(id)) continue;
     if (rsr.techs.includes(id) || rsr.civics.includes(id)) continue;
-    if (rivalCheckSatisfied(state, rival, def.check)) rsr.boosted.push(id);
+    if (rivalCheckSatisfied(state, rival, def.check)) {
+      rsr.boosted.push(id);
+      // B-24 (#77): the rival twin of the player's eureka/inspiration hooks.
+      dedicationEvent(state, rival.id + 1, TECHS[id] ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE);
+    }
   }
 }

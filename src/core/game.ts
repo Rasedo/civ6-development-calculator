@@ -18,8 +18,8 @@ import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTurn, playerSuzerainCount, worldCongress } from './rivals';
 import { expirePlayerRoutes } from './trade';
-import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS } from '../data/rivals';
-import { addEraScore, eraBoundary, applyDedications, governorPicks, governorTitles } from './eras';
+import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
+import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -827,6 +827,9 @@ export function endTurn(state: GameState): void {
         if (item.kind === 'district') {
           const dt = state.map.tiles[item.tileIndex];
           dt.districtComplete = true;
+          // B-24 (#77): MONUMENTALITY pays era score per SPECIALTY district
+          // completed (the city centre is not one).
+          if (dt.district !== 'CITY_CENTER') dedicationEvent(state, 0, DED_MONUMENTALITY);
           // B-17 (#71): a completed ENCAMPMENT musters its garrison.
           if (dt.district === 'ENCAMPMENT') dt.encampHp = ENCAMPMENT_HP;
         } else if (item.kind === 'wonder') {
@@ -1241,7 +1244,11 @@ function spreadReligiousPressure(state: GameState): void {
         best = g;
       }
     }
+    // B-24 (#77): EXODUS OF THE EVANGELISTS pays era score each time a city
+    // CONVERTS to a civ's religion — the religion's OWNER earns it.
+    const wasFollowed = city.followedReligion ?? -1;
     city.followedReligion = best >= 0 ? best : null;
+    if (best >= 0 && best !== wasFollowed) dedicationEvent(state, best, DED_EXODUS);
   }
 }
 

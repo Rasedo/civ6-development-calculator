@@ -212,6 +212,37 @@ export const ADMIRAL_MARCH_LIVE = true; // #71: LIVE — hunted 2026-07-27
  * parity-exact; only the per-turn faith / era-score payouts are gated, because
  * they feed rival faith and therefore purchases, and the engines diverged on a
  * downstream rival unit (seed 9287 t235). Flip when its hunt lands. */
+/**
+ * B-24 (#77): the NAMED DEDICATION CATALOG. #71 landed dedications as a COUNT
+ * with a flat payout; real Civ 6 has each civ commit to a NAMED dedication per
+ * era, and every dedication has TWO faces — a DARK/NORMAL face that pays ERA
+ * SCORE off specific EVENTS (the climb-out) and a GOLDEN face that pays a
+ * standing bonus instead.
+ *
+ * Verified against the Gathering Storm Civilopedia's "Dedications" concept.
+ * The four modeled here are the ones whose EVENT already exists as a hook on
+ * both engines; the rest of the catalog (To Arms!, Hic Sunt Dracones, Reform
+ * the Coinage, Heartbeat of Steam, and the four that need spies / air units /
+ * artifacts / Giant Death Robots) stays a recorded B-24 residual.
+ *
+ *   0 MONUMENTALITY       +1 era score per specialty DISTRICT completed
+ *   1 FREE_INQUIRY        +1 era score per EUREKA (tech boost) triggered
+ *   2 PEN_BRUSH_AND_VOICE +1 era score per INSPIRATION (civic boost) triggered
+ *   3 EXODUS_OF_THE_EVANGELISTS  +2 era score per city converted to your religion
+ *
+ * The GOLDEN face keeps #71's flat faith for now — the named Golden bonuses
+ * (Monumentality's faith purchases, Free Inquiry's eureka overflow, ...) need
+ * machinery this round does not build, and inventing substitutes would be the
+ * fabrication the verify-before-implement rule exists to prevent. Recorded.
+ */
+export const DEDICATIONS = ['MONUMENTALITY', 'FREE_INQUIRY', 'PEN_BRUSH_AND_VOICE', 'EXODUS_OF_THE_EVANGELISTS'] as const;
+export const DED_MONUMENTALITY = 0;
+export const DED_FREE_INQUIRY = 1;
+export const DED_PEN_BRUSH_AND_VOICE = 2;
+export const DED_EXODUS = 3;
+/** Era score each dedication's DARK/NORMAL face pays per triggering event. */
+export const DED_EVENT_SCORE = [1, 1, 1, 2] as const;
+
 export const DEDICATION_PAYOUTS_LIVE = true; // #71: LIVE — hunted 2026-07-26
 
 export const HEROIC_DEDICATIONS = 3;

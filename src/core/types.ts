@@ -276,6 +276,9 @@ export interface GameState {
   /** B-24 (#71): dedications each civ committed this era — 1 normally,
    * HEROIC_DEDICATIONS on a Heroic age. */
   dedications?: number[];
+  /** B-24 (#77): the NAMED dedications each civ committed to this era —
+   *  catalog indices, `dedications[c]` of them (three on a Heroic age). */
+  dedicationPicks?: number[][];
   /** B-23 (#71): have roads reached the CLASSICAL tier (bridges)? Latched true
    *  at the first era boundary; a road-to-road step then pays no river charge. */
   roadBridges?: boolean;
