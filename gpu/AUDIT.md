@@ -602,6 +602,15 @@ Per-item weights (done% in parens where partial):
   milli = 2.85 points — large enough to be a term, not drift); and whatever
   the plain rollout reaches at seed 9235 t249 that the forced-compaction
   rollout does not.
+  **USE CHECKPOINTS FOR THIS HUNT - I did not, and that was the process error.**
+  The gate NAMES the turn (seed 9235, t249), so the procedure is: re-run that
+  one rng UNSHARDED with `--ckpt` (rollout.py writes checkpoints only when
+  `args.shard is None`, so every 4-shard run - including the battery's own
+  gpu-gate lane - produces NONE), then `gpu/ckptdiff.py --rng` to bracket, then
+  resume from the nearest earlier checkpoint WITH logging. Do NOT re-run a full
+  `--log` rollout plus a 72-game TS replay: that is the ~40-minute mistake made
+  on the B-26 naval-barb hunt earlier in this same session, for a divergence
+  the gate had already localised to a turn.
   The change is REVERTED so the tree stays green; the sourced numbers are
   recorded here so the next round starts from them.
   10 marked files remain; constants.ts, projects.ts, resources.ts,
