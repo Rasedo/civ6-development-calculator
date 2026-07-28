@@ -518,8 +518,17 @@ Per-item weights (done% in parens where partial):
   GPU is a behavioural change to GP earn timing and needs its own gated round —
   the rate and the class list are now recorded in the file so that round does
   not re-derive them.
-  14 marked files remain (constants.ts and projects.ts keep NARROWED markers —
-  the swept parts are cited in place, the unswept parts named).
+  **SLICE 5 — src/data/resources.ts BONUS rows (2026-07-28, #78).** All seven
+  bonus-resource yields VERIFIED CORRECT against the wiki resource list (Wheat,
+  Rice, Cattle, Sheep, Bananas +1 Food; Stone, Deer +1 Production). No change.
+  ONE SOURCED RESIDUAL found in the pass: real Civ 6 gives RICE and WHEAT an
+  ADDITIONAL +1 Food when the city has a working WATER MILL. This model gates
+  the Water Mill on a river and pays its own flat +1 food/+1 production but not
+  the per-resource bonus. Recorded, not fixed — a yield change needing its own
+  gated round with the term at the same position on both engines. The LUXURY and
+  STRATEGIC rows are NOT yet swept.
+  13 marked files remain; constants.ts, projects.ts and resources.ts carry
+  NARROWED markers (swept parts cited in place, unswept parts named).
   **SLICE 3 DONE — src/data/constants.ts water-housing (2026-07-28, #78).**
   RESOLVED AS VERIFIED-CORRECT. The first search returned a confusing framing
   (+3 / +1 / +0, deltas rather than totals) and the authoritative pages were

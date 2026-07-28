@@ -1,7 +1,20 @@
 /**
- * Map resources (a curated base-game subset). Values are close to base
- * Civ 6 but eyeballed in places — adjust freely, everything downstream is
- * data-driven. `improvement` is the improvement that works the resource.
+ * Map resources (a curated base-game subset). `improvement` is the improvement
+ * that works the resource.
+ *
+ * #78 SOURCING SWEEP (2026-07-28): the BONUS-resource yields were checked
+ * against the Civilization wiki resource list and are ALL CORRECT as written —
+ * Wheat, Rice, Cattle, Sheep and Bananas at +1 Food, Stone and Deer at
+ * +1 Production. No change was needed.
+ *
+ * ONE SOURCED RESIDUAL found in the same pass: real Civ 6 gives RICE and WHEAT
+ * an ADDITIONAL +1 Food when the city has a working WATER MILL. This model
+ * gates the Water Mill on a river (`special === 'WATER_MILL'`) and pays its own
+ * flat +1 food/+1 production, but does NOT pay the per-resource rice/wheat
+ * bonus. Recorded rather than fixed: it is a yield change needing its own gated
+ * round, and both engines would have to add the term at the same position.
+ *
+ * The LUXURY and STRATEGIC rows below are NOT yet swept.
  */
 
 import type { Elevation, ImprovementId, ResourceCategory, TerrainId, YieldKey, Yields } from '../core/types';
