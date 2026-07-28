@@ -7128,6 +7128,7 @@ class BatchSim:
                 self.cs_quest[rows, s] = 0
                 self.cs_quest_issued[rows, s] = self.turn
                 self.cs_envoys[rows, s] += int(r.get("questEnvoys", 1))
+                self._eff_version += 1  # #78 HUNT: quest envoys move capital yields too
             # Issue on cooldown (mirrors issueQuest, 2 draws): DRAW 1 picks the
             # askable district (0=CAMPUS); buildDistrict is an option only if the
             # player has NOT already completed that district (only CAMPUS is
@@ -13562,6 +13563,11 @@ class BatchSim:
                     pick = key.argmin(dim=1)
                     rows = can.nonzero(as_tuple=True)[0]
                     self.cs_envoys[rows, pick[rows]] += 1
+                    # #78 HUNT: an envoy crossing the 1/3/6 thresholds changes
+                    # the CAPITAL's yields, which are cached on _eff_version.
+                    # Neither increment site bumped it, so the capital could
+                    # keep serving pre-crossing yields.
+                    self._eff_version += 1
                     self.envoys_avail = self.envoys_avail - can.long()
             else:
                 e_act = envoy.to(torch.long)

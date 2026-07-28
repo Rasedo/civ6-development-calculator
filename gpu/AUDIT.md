@@ -558,6 +558,17 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  **CACHE-INVALIDATION FIX LANDED (2026-07-28, #78).** `self._eff_version += 1`
+  added at BOTH `cs_envoys` increment sites. Battery OK (720s, 78 checks),
+  scripted parity 0.0 milli. It is behaviour-NEUTRAL in both gates, which is
+  itself informative: the SCRIPTED policy never hits the stale window, so this
+  bug could only ever have shown up off-script - exactly the profile of the
+  envoy red. Landed on its own merit regardless of the hunt: a derived cache
+  that is not invalidated by a write which changes it is a defect whether or
+  not a current test reaches it.
+  THE THEORY IS NOT YET CONFIRMED. Proving it needs the per-type envoy patch
+  re-applied ON TOP of this fix and the plain rollout re-run; if seed 9170 t220
+  then goes green, the cache was the cause.
   **LEADING THEORY for the envoy red, found by inspection (2026-07-28, #78):
   a STALE YIELD CACHE on envoy assignment.** The GPU caches city yields keyed
   on `_eff_version`, and the CAPITAL envoy bonus is part of that computation.
