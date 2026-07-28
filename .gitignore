@@ -20,3 +20,4 @@ gpu/runs/
 .idea/
 .claude/HANDOFF.md
 .claude/scratchpad/
+.claude/hunt-*/
