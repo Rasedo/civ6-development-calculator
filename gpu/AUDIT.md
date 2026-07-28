@@ -845,9 +845,13 @@ Per-item weights (done% in parens where partial):
   class of gap parity can never catch. Four sites exist for this mechanic
   (TS player DONE, GPU player DONE, TS rival, GPU rival); the rival pair is
   queued.
-  REACHABILITY UNMEASURED: whether any gate seed actually works a farm-improved
-  bonus resource in a city holding a Water Mill has not been checked, so parity
-  green here may be vacuous. Measure before treating this as verified.
+  REACHABILITY MEASURED (3 seeds, 250 turns): 1 of 11 alive cities holds a
+  Water Mill, and 4 farm-improved bonus tiles are OWNED by player cities (6
+  exist on the maps at all). So the mechanic is reachable in principle but the
+  coverage is THIN, and whether that one city works one of those four tiles is
+  not established — parity green here is weak evidence, not proof. A poke lane
+  that constructs the configuration directly is the right guard; queued with
+  the rival-side pair.
   **GREAT LIBRARY, VERIFIED (2026-07-28, #78).** Direct Civilopedia fetch
   confirms the queued claim exactly: "+2 Great Works of Writing slots", on top
   of +2 Science, +1 Great Scientist point, +1 Great Writer point and +1000
