@@ -667,10 +667,24 @@ Per-item weights (done% in parens where partial):
   agreement through t111; +3 GPU vs +5 TS at t112; the gap persists to t120 and
   is wiped by an Age reset (both 0 at t150); and the GPU's gate trace itself is
   sound (pantheon + holy site ready by t76, prophet at t78, founds t78/79).
-  NEXT STEP: instrument the era-score AWARD SITES — every `addEraScore` in TS and
-  every `era_score[...] +=` on the GPU — filtered to the LOGGED GAME and rival 0
-  at t112, printing the EVENT KIND. Name the award instead of inferring it from a
-  delta. The GPU row filter (batch row 56) is right; TS needs a game filter.
+  **TS's AWARD STREAM, NAMED (2026-07-28)** — addEraScore re-instrumented WITH
+  the game filter (`__cbLog` is defined only for the logged game), rival 0:
+      t110 +1 -> 17 | t111 +1 -> 18 | t111 +2 -> 20 | t111 +2 -> 22 |
+      t112 +1 -> 23 | t113 +1 -> 24
+  That also explains the statelog sampling: it reads 18 at t111 and 23 at t112
+  because the two +2s land AFTER the t111 snapshot (18+2+2+1 = 23).
+  So TS credits **TWO 2-POINT EVENTS** between the t111 and t112 snapshots while
+  the GPU gains only +3 in the same interval. The ladder's only 2-pointers are
+  FOUND and RELIGION, so TS is crediting two foundings, or a founding plus a
+  religion.
+  THE CONTRADICTION TO CHASE: `ncity` is 7 on BOTH engines at t112 — if TS
+  founded two cities at t111 the counts should differ, and they do not.
+  Candidates: a founding immediately undone (razed/lost) that keeps its era
+  score; a double-award on a single event; or a 2-point path not yet enumerated.
+  NEXT STEP: the same probe GPU-side, filtered to batch row 56 and rival 0 for
+  t110-114, tagging each `era_score[..., r + 1] +=` with its event kind. Compare
+  the two NAMED streams — do not infer from deltas again, which is exactly what
+  produced the retracted religion narrative.
   (Superseded account follows.)
   **TRACED (2026-07-28): the GPU founds at t78, gated by the PROPHET.**
       t76-77  pantheon=True hs=True prophets=0  -> rdue=False
