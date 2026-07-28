@@ -812,6 +812,18 @@ Per-item weights (done% in parens where partial):
   asymmetry changes nothing in this game and is NOT the cause. It remains a
   genuine defect worth its own slice: real Civ 6 lets ANY civ's military unit
   clear a camp, so TS is the engine in the wrong here, not the GPU.
+  **LANDED (2026-07-28).** walkPath's player-only inline clear is replaced by
+  `clearCampFor(state, unit, nextIndex)`, which no-ops for barbarians and
+  credits the right treasury (player -> state.treasury, rival -> that rival's).
+  revealAround/claimGoodyHut stay player-only. Unlike the attack-target fix,
+  this one lands cleanly: export throws no wiped-player seed, scripted parity
+  24x250 0.0 milli, vitest 431/431.
+  SIDE-CATCH worth keeping: the hunt WORKTREE under `.claude/` was polluting the
+  main `npm test` run — vitest's include glob does not respect .gitignore, so it
+  collected the worktree's copy of tests/ and ran it against the worktree's
+  PATCHED source (4 spurious failures, all in its citystates.test.ts). That
+  would have turned the battery's vitest lane red for reasons unrelated to the
+  tree under test. vite.config.ts now excludes `**/.claude/**` permanently.
   **TRAP RE-HIT (memory rule 5): a `--resume-t` run OVERWRITES
   gpu/fixtures/gpu_statelog.txt** with a partial starting at the resume turn.
   Running logdiff afterwards compared a 2757-line resume fragment against a full

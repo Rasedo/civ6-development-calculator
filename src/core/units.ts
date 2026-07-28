@@ -9,6 +9,7 @@ import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from 
 import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
 import { isTechComplete } from './effects';
+import { clearCampFor } from './combat';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat'; // A-21 (#50): the shared heal set
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
@@ -453,13 +454,14 @@ export function walkPath(state: GameState, unit: Unit): void {
     if (unit.owner === 'player') {
       revealAround(state, nextIndex);
       claimGoodyHut(state, unit);
-      // Player units clear barbarian camps by entering them (+50 gold).
-      const camp = state.barbCamps.indexOf(nextIndex);
-      if (camp >= 0) {
-        state.barbCamps.splice(camp, 1);
-        state.treasury += 50;
-      }
     }
+    // AUDIT #78: ANY non-barbarian unit clears a camp by entering it, not just
+    // the player's. walkPath kept a player-only inline copy while this file's
+    // own peace `patrol` already called clearCampFor — so a rival WAR MARCH
+    // over a camp left it standing in TS and razed it on the GPU, which has
+    // always cleared for the marching civ. clearCampFor no-ops for barbarians
+    // and credits the correct treasury (player -> state, rival -> that rival).
+    clearCampFor(state, unit, nextIndex);
     // B-3 ZOC: entering a tile adjacent to a hostile MILITARY unit ends
     // movement (the enter cost is already paid above, then movesLeft:=0).
     // The path persists — a queued move resumes next turn.
