@@ -948,9 +948,30 @@ Per-item weights (done% in parens where partial):
   The difference must be in how each treats the tile the unit STANDS ON versus
   adjacent (the GPU scan carries an explicit `d_all >= 1`), in the range test,
   or in which tile the unit occupies when each engine runs its scan.
-  NEXT STEP: instrument TS's `attackTargets` for this unit at the divergent turn
-  and print its candidate list. Three successive hypotheses have now been
-  refuted by measurement; reading the source has a poor record on this one.
+  **DONE, AND IT SETTLES THE ROOT CAUSE (2026-07-28).** TS's candidate list was
+  instrumented, and so was the road network on both sides:
+      GPU: road738=False road739=True road740=True bridged=True
+      TS:  road738=false road739=true  road740=true
+  IDENTICAL. Every cost input agrees between the engines — roads, the river mask
+  (rm=14, bit 3 = West set), the direction convention (both dir 3) and the
+  terrain term (tmove=0) — so both correctly charge 1.0 for 740->739
+  (road-to-road, river waived) and 4.0 for 739->738 (no road on the far end).
+  The road-waiver hypothesis is therefore dead too.
+  With every cost input equal, the only asymmetry left is POSITIONAL: the GPU's
+  unit ENDS a turn on 739, adjacent to its own city on 740, and the
+  ownership-blind predicate then freezes it there permanently (tgt_tile=740,
+  rvcity_at=1, attack=True, march=False, repeating every later turn). TS's unit
+  is never sitting on 739 at a turn start in this game, so its equally blind
+  predicate never fires.
+  THAT TS IS EQUALLY BLIND IS OBSERVED, NOT INFERRED: in another game of the
+  same replay, `[TS] t215 u171 at=739 targets=[740]` — a TS unit adjacent to its
+  OWN city, selecting it as a target, frozen exactly as the GPU is. Task #47 is
+  therefore the correct fix, on both engines.
+  THE ONE UNEXPLAINED DETAIL, for the next session: TS's u1 is logged at 740 at
+  t217 and at 738 at t218, covering two tiles across that boundary where the GPU
+  covers one, even though both engines carry the same full-MP-always-steps rule.
+  That step accounting is what puts the units in different places to begin with.
+  Reproduction preserved at `.claude/hunt-envoy`; still byte-identical.
   (Superseded hypothesis, kept as a record of what was ruled out: within-turn
   ORDER of founding vs unit acts. REFUTED — both engines found cities BEFORE
   units act: GPU `_rival_try_found` at 7494/11951/12416 precedes the unit
