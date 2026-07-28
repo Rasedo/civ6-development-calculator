@@ -469,7 +469,38 @@ def poke_float32_dtype(rules, path):
     assert sim._b_local_f.dtype == torch.float32, "walk-dtype local-building mask must follow the sim dtype"
     assert sim._b_regional.dtype == torch.bool and sim._b_worship.dtype == torch.bool, "regional/worship masks are bool"
     # the walk reg_y/reg_am blocks fired during the 30 steps without a crash
-    print("  h float32 dtype OK (30 turns, reg_y/reg_am + masks consistent, no dtype crash)")
+
+    # #78 REGRESSION: the f32 build must WORK THE SAME TILES as the f64 build.
+    # The tie-breaks (worked-tile pick, _auto_pick) run on a forced-f64 key
+    # because an index epsilon of 1e-9 sits below the f32 ULP of a score around
+    # 40 and rounds away entirely — leaving topk to resolve exact ties by its
+    # own order, i.e. the HIGHEST index where TS takes the lowest. That bug was
+    # invisible to every gate (all f64) and corrupted only the f32 RL lanes.
+    # Real tile scores are separated by halves, far above f32 noise (~4e-6), so
+    # identical picks must produce city yields equal well inside 1e-3; a single
+    # swapped tile moves a yield by >= 0.5.
+    # Asserted on INTEGER state only: it is exactly comparable across dtypes
+    # (float accumulators carry legitimate f32 noise), and a swapped tile feeds
+    # straight into growth and build timing, so pop/techs move with it.
+    #
+    # REACHABILITY, MEASURED — not assumed. At the 30 turns above this poke
+    # already ran, f32 and f64 agree EVEN WITH THE BUG PRESENT, so asserting
+    # there would have been decoration. Re-reverting the fix and sweeping
+    # fixtures x turn counts found the divergence appears at 120 turns: with
+    # the bug, seed9002 diverges in pop and seed9014 in pop AND techs; with the
+    # fix, seed9014 goes fully clean. That flip is what this lane asserts.
+    # seed9002 STILL diverges in pop after the fix — a SEPARATE f32/f64
+    # divergence source, recorded in AUDIT and deliberately not asserted here.
+    # Fixture chosen by sorted index, per the de-hardcoding convention (a
+    # by-name pin broke two lanes once already when SEED_OVERRIDES moved).
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    reach = str(paths[1] if len(paths) > 1 else paths[0])
+    a32 = build(rules, reach, steps=120, dtype=torch.float32)
+    a64 = build(rules, reach, steps=120, dtype=torch.float64)
+    for name in ("pop", "alive", "techs", "civics"):
+        x, y = getattr(a32, name), getattr(a64, name)
+        assert torch.equal(x, y), f"f32/f64 divergence in `{name}` — dtype-dependent tie-break regressed?\n  f32 {x.tolist()}\n  f64 {y.tolist()}"
+    print("  h float32 dtype OK (30t masks consistent; 120t f32 integer state == f64 on a REACHING fixture — tie-breaks dtype-immune)")
 
 
 def main() -> None:

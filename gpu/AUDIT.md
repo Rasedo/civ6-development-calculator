@@ -558,29 +558,46 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
-  **ROOT-CAUSE CANDIDATE FOUND BY INSPECTION (2026-07-28, #78): the GPU's
-  worked-tile tie-break is an EPSILON HACK.** engine.py, the citizen pick:
-      score = score - tc.to(self.dtype) * 1e-9   # tie: lowest index first
-  TS (core/city.ts) instead sorts `b.score - a.score || a.index - b.index` -
-  an EXACT score comparison, then index. The GPU PERTURBS the score by up to
-  tile_index * 1e-9 (~1.1e-6 on a 44x26 map). Any two candidate tiles whose
-  true scores differ by LESS than that perturbation - ordinary float
-  association, not a real tie - are REORDERED BY INDEX on the GPU while TS
-  keeps the true ordering. The citizen then works a different tile, and the
-  1-food / 1-gold difference propagates into the score columns.
-  THIS FITS EVERY OBSERVATION: it fires only when a yield change nudges two
-  tiles into the sub-epsilon window (hence two unrelated corrections waking
-  it), it is invisible to scripted parity (whose tile scores never land in
-  that window), and it produces exactly a ONE-TILE yield difference.
-  THE REPO ALREADY KNOWS THIS LESSON ELSEWHERE: `governorPicks` ranks on
-  QUANTIZED MILLI values, commented "ranking on raw f64 would be
-  float-association-fragile across engines" (the B-29 quantization lesson).
-  The worked-tile pick never got the same treatment.
-  PROPOSED FIX (its own gated round): rank on a QUANTIZED score - round to
-  milli like governorPicks - and break exact ties by index with an integer
-  composite key, instead of perturbing the score. Both engines must quantize
-  identically. Verify against the reliable reproduction (re-apply the envoy
-  patch; seed 9170 rng 2026006119 t220 must go green).
+  **#78 (2026-07-28) - the epsilon tie-break bug, FOUND AND FIXED, but it is
+  NOT the cause of this gap.** The GPU broke worked-tile ties by perturbing
+  the score (`score - tc * 1e-9`) in self.dtype, where TS sorts
+  `b.score - a.score || a.index - b.index` - exact score, then lowest index.
+  MEASURED, not reasoned: in f64 the epsilon survives and the lowest index
+  wins, matching TS; in f32 the epsilon is BELOW the ULP of a score around 40
+  (~4e-6), rounds away completely, and topk then resolves exact ties by its
+  own unspecified order - taking the HIGHEST index. The tie-break was
+  silently INVERTED in every f32 lane.
+  BLAST RADIUS IS THE RL PATH, NOT THE GATES. The f64 lanes (scripted parity,
+  rollout, the battery's parity lane) were always correct, which is why no
+  gate ever saw it. f32 is used by eval.py, behavior_probe.py, gen_targets.py
+  and duel_eval.py - the environment P8 will TRAIN in. An agent trained there
+  would have worked different tiles than the spec, permanently and invisibly.
+  This is the wrong-constant failure mode one level down: a gate-green
+  divergence that only the RL target ever experiences.
+  THE SAME BUG SAT IN `_auto_pick` (a 1e-6 epsilon on tech/civic costs of
+  several thousand beakers - even further below the f32 ULP), so equal-cost
+  techs resolved by argmin order instead of table order in those lanes.
+  FIX, both sites: force the tie-break key to f64 (`.double()`), exactly as
+  the rival twin `_rival_city_yields_all` already does. f64 lanes are
+  arithmetically unchanged - `.double()` is a no-op on an f64 tensor - so no
+  gate number can move; the f32 lanes now behave like f64.
+  THIS DOES NOT EXPLAIN THE ENVOY GAP, which is an f64 divergence. Ruled out
+  by the same measurement: in f64 the construct orders exactly as TS unless
+  two tiles' true scores differ by a NONZERO amount under ~1.1e-6, and Civ
+  tile scores move in halves. The hunt below stands.
+  REACHABILITY, MEASURED (the gate-reachability rule). At 30 turns the f32
+  poke lane agrees with f64 EVEN WITH THE BUG PRESENT, so the obvious
+  assertion there would have been decoration. Sweeping fixtures x turn counts
+  with the fix reverted put the divergence at 120 turns: seed9002 diverges in
+  pop, seed9014 in pop AND techs. With the fix, seed9014 goes fully clean —
+  that flip is the proof the bug was LIVE and the fix repairs it, and it is
+  what the poke lane now asserts.
+  **RESIDUAL, OPEN: seed9002 STILL diverges in `pop` at 120 turns after the
+  fix.** So a SECOND dtype-dependent divergence source exists beyond these two
+  tie-breaks. It may be benign — f32 rounding legitimately flipping a growth
+  threshold is expected and is NOT a bug — but it is unproven either way and
+  is deliberately NOT asserted by the lane. Next step: bisect seed9002's f32
+  vs f64 city food/growth around the first differing turn.
   **THE 1.0 GAP IS NOT THE ENVOY BONUS - IT IS A DOWNSTREAM TILE PICK
   (2026-07-28, #78).** Decisive arithmetic, no rollout needed. BALANCED_WEIGHTS
   are food 1, production 2, gold 1, science 1.5, culture 1.5, faith 0.75, and

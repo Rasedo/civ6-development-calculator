@@ -1951,9 +1951,13 @@ class BatchSim:
         """Cheapest-available (effective cost, tie = table order), where cur == -1."""
         avail = self._available_mask(done, prereq)
         eff = self._eff_cost(cost.unsqueeze(0).expand_as(avail), boosted)
-        key = torch.where(avail, eff, torch.tensor(float("inf"), dtype=self.dtype, device=self.device))
-        # stable tie-break on index: add a tiny index epsilon
-        key = key + torch.arange(key.shape[1], device=self.device, dtype=self.dtype) * 1e-6
+        key = torch.where(avail, eff, torch.tensor(float("inf"), dtype=self.dtype, device=self.device)).double()
+        # stable tie-break on index: add a tiny index epsilon. #78: FORCED f64
+        # for the same reason as the worked-tile pick — a 1e-6 epsilon is below
+        # the f32 ULP of a several-thousand-beaker cost, so on self.dtype=f32 it
+        # rounded away and equal-cost techs/civics resolved by argmin's own
+        # order instead of table order. f64 lanes are unchanged.
+        key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
         best = key.argmin(dim=1)
         has = avail.any(dim=1)
         return torch.where((cur == -1) & has, best, cur)
@@ -3193,8 +3197,19 @@ class BatchSim:
             # tile here while TS worked a real one.
             & (self.built_wonder.gather(1, tcf).reshape(B, C, M) < 0)
         )  # [B, C, M]
-        score = torch.where(cand, tile_score.gather(1, tcf).reshape(B, C, M), torch.tensor(-1e18, dtype=self.dtype, device=dev))
-        score = score - tc.to(self.dtype) * 1e-9  # tie: lowest index first
+        # #78: the tie-break runs in FORCED f64, like the rival twin
+        # (_rival_city_yields_all builds its key with an explicit .double()).
+        # Riding self.dtype silently BROKE this in the f32 lanes: an index
+        # epsilon of 1e-9 is far below the f32 ULP of a score around 40
+        # (~4e-6), so it rounded away completely and topk resolved exact ties
+        # by its own unspecified order — picking the HIGHEST index where TS
+        # (city.ts, `b.score - a.score || a.index - b.index`) takes the
+        # lowest. f64 lanes are arithmetically unchanged by this (.double()
+        # is a no-op on an f64 tensor), so no gate number moves; the f32 RL
+        # path (eval.py / behavior_probe.py / gen_targets.py / duel_eval.py)
+        # stops working different tiles than the spec.
+        score = torch.where(cand, tile_score.gather(1, tcf).reshape(B, C, M).double(), torch.tensor(-1e18, dtype=torch.float64, device=dev))
+        score = score - tc.double() * 1e-9  # tie: lowest index first
         k = min(max(int(self.pop.max().item()), 1), M)
         top_scores, top_idx = score.topk(k, dim=2)
         take = (torch.arange(k, device=dev).view(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)
