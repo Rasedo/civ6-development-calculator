@@ -4,8 +4,9 @@
  * (src/core/rules.ts) gates each on unlocks.improvements plus the hillFarms civic
  * for hill farms. Sandbox mode is the exception — it bypasses all research gating.
  * Yields are base Civ 6 values (pre-tech-boost). #78 sourced every value in
- * this file against the Civilization wiki's GS improvement data; the CAMP gold
- * was the one error (2 -> 1). No `eyeballed`/`approximate` markers remain here.
+ * this file against the Gathering Storm CIVILOPEDIA. Every value was already
+ * correct; the CAMP was briefly "corrected" to 1 from a search summary and has
+ * been restored to its sourced 2. No `eyeballed`/`approximate` markers remain.
  */
 
 import type { ImprovementId, Yields } from '../core/types';
@@ -76,13 +77,17 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'CAMP',
     name: 'Camp',
     code: 'Ca',
-    // #78 SOURCING SWEEP (2026-07-28): was `gold: 2 // approximate`, and the
-    // approximation was WRONG. Real Civ 6 (Gathering Storm) gives a Camp
-    // +1 Gold and +0.5 Housing — verified against the Civilization wiki's
-    // "Camp (Civ6)" page and its GS improvement-values module. Plantation
-    // (+2 gold), Pasture (+1 production) and Quarry (+1 production) were
-    // re-verified in the same pass and are correct as written.
-    yields: { gold: 1 },
+    // #78 SOURCING SWEEP, CORRECTED TWICE (2026-07-28). This value was
+    // ORIGINALLY 2 with an "approximate" marker. Slice 1 changed it to 1 on
+    // the strength of a web-SEARCH SUMMARY — and that was WRONG. The
+    // Gathering Storm CIVILOPEDIA entry for the Camp reads "+2 Gold" and
+    // "+0.5 Housing", so the original 2 was right all along and is restored.
+    // The marker is cleared because the value is now sourced from the
+    // Civilopedia itself rather than from a summary of search results.
+    // NOT MODELED (recorded): the Camp also gains +1 Food and +1 Production
+    // with the MERCANTILISM civic, and a further +2 Gold with SYNTHETIC
+    // MATERIALS. This model pays the base yield only.
+    yields: { gold: 2 },
     housing: 0.5,
     resourceOnly: true,
     description: 'Deer, furs, ivory or truffles.',

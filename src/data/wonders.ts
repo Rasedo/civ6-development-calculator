@@ -4,9 +4,20 @@
  * passable ones are workable with the yields below. Holy Sites get +2 faith
  * adjacency from any adjacent natural wonder (see districts.ts).
  *
- * #78 SOURCING SWEEP (2026-07-28): CRATER_LAKE corrected (faith 4 -> 5) and
- * DEAD_SEA re-verified correct. The remaining ten wonders' yields are NOT yet
- * sourced individually — this file keeps a NARROWED marker.
+ * #78 SOURCING SWEEP (2026-07-28), all against the GS CIVILOPEDIA directly:
+ *   CRATER_LAKE  corrected faith 4 -> 5 ("+5 Faith, +1 Science") — CONFIRMED
+ *   DEAD_SEA     +2 Faith / +2 Culture — correct as written
+ *   PANTANAL     +2 Food / +2 Culture — correct as written
+ *
+ * ONE SOURCED DEVIATION, recorded not fixed — YOSEMITE. Real Civ 6 makes it
+ * IMPASSABLE and gives "+1 Gold, +1 Food, and +1 Science to ADJACENT tiles".
+ * This model has it `impassable: false` paying `{ gold: 1, science: 1 }` on
+ * its OWN tile, so it differs in three ways at once: passability, the
+ * own-tile-vs-adjacent channel, and a missing +1 Food. That is a mechanic
+ * change (natural wonders would need an adjacency yield channel, the way Holy
+ * Sites already have one), not a constant tweak — it needs its own round.
+ *
+ * The remaining eight wonders are NOT yet sourced individually; NARROWED marker.
  */
 
 import type { TerrainId, Yields } from '../core/types';

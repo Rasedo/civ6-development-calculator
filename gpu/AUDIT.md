@@ -483,16 +483,31 @@ Per-item weights (done% in parens where partial):
   The natural shape is a per-file sourcing sweep (cite or correct each marked
   value), cheapest first: buildings/improvements/projects are small tables with
   well-documented Civ 6 values; builtWonders and policies are the large ones.
-  **SLICE 1 DONE — src/data/improvements.ts (2026-07-28, #78).** Every yield in
-  the file was checked against the Civilization wiki's Gathering Storm
-  improvement data. ONE was wrong: CAMP paid `gold: 2 // approximate`; real
-  Civ 6 gives a Camp **+1 Gold** and +0.5 Housing. Corrected. Plantation
-  (+2 gold), Pasture (+1 production) and Quarry (+1 production) re-verified and
-  correct as written; no `eyeballed`/`approximate` markers remain in the file.
-  THIS IS THE CLASS'S CASE IN POINT: 23 Camps stand at t250 across 16 of the 24
-  seeds, so the wrong constant was actively skewing two-thirds of the gate
-  games — and it had passed every gate forever, because parity only proves the
-  two engines agree.
+  **SLICE 1 — src/data/improvements.ts: RETRACTED AND CORRECTED
+  (2026-07-28, #78).** The original entry claimed CAMP's `gold: 2` was wrong
+  and "corrected" it to 1, citing a web-SEARCH SUMMARY, and presented it as
+  this class's headline result ("23 Camps at t250 across 16 of 24 seeds, the
+  wrong constant was skewing two-thirds of the gate"). **THAT WAS THE ERROR.**
+  The Gathering Storm CIVILOPEDIA entry for the Camp reads "+2 Gold" and
+  "+0.5 Housing". The repo's original 2 was right; the sweep broke a correct
+  constant and shipped the break as a success story. Restored to 2, now
+  sourced from the Civilopedia rather than a summary.
+  Re-verified in the same pass and correct as written: Plantation (+2 gold),
+  Pasture (+1 production), Quarry (+1 production), Farm, Mine, Lumber Mill,
+  Fishing Boats, Oil Well. NOT MODELED (recorded): the Camp gains +1 Food and
+  +1 Production with MERCANTILISM and a further +2 Gold with SYNTHETIC
+  MATERIALS; this model pays the base yield only.
+  THE REAL LESSON, which outranks the slice: a WebSearch result is a SUMMARY
+  over hits, not a source. Of the four VALUE CHANGES this sweep made, the two
+  taken from search summaries (CAMP, and COAL production 2 -> 1+1) were WRONG
+  and are both reverted; the two taken from a direct Civilopedia FETCH (Arena,
+  Stadium) were right; one summary-sourced change (Crater Lake +5 faith) was
+  later confirmed right by fetch but was unverified when shipped. Primary
+  fetches 2/2, summaries 1/3. The COAL summary had pattern-filled
+  "+1 Production and +1 Food" from the NITER row directly above it.
+  Slice 3 had ALREADY established the correct behaviour — it refused to change
+  three housing constants on ambiguous search evidence — and the sweep then did
+  the forbidden thing twice anyway. Recorded in memory `source-of-truth`.
   **SLICE 2 DONE — src/data/buildings.ts (2026-07-28, #78).** TWO errors, both
   verified directly against the Gathering Storm Civilopedia building entries:
   ARENA amenities 1 -> **2** ("+1 Culture", "+2 Amenities from entertainment" —
@@ -551,8 +566,20 @@ Per-item weights (done% in parens where partial):
   (Civilization wiki, "Crater Lake (Civ6)"). Corrected. DEAD_SEA (+2 culture /
   +2 faith) re-verified and correct. The other ten natural wonders are NOT yet
   sourced individually, so the file keeps a NARROWED marker.
-  That makes FOUR files with real errors out of eight swept — the class is not
-  a formality.
+  **SLICE 8 RE-VERIFIED BY DIRECT FETCH (2026-07-28).** CRATER_LAKE's +5 Faith
+  / +1 Science is CONFIRMED by the GS Civilopedia (it had been changed on a
+  search summary). DEAD_SEA (+2 Faith / +2 Culture) and PANTANAL (+2 Food /
+  +2 Culture) also confirmed correct as written.
+  ONE SOURCED DEVIATION recorded in the same pass — YOSEMITE: real Civ 6 makes
+  it IMPASSABLE and gives +1 Gold / +1 Food / +1 Science to ADJACENT tiles,
+  where this model has it passable paying gold+science on its OWN tile. Three
+  differences at once (passability, the own-tile-vs-adjacent channel, a missing
+  +1 Food), so it is a mechanic change needing an adjacency yield channel for
+  natural wonders — its own round, not a constant tweak.
+  CORRECTED TALLY after the retraction above: of the sweep's value changes,
+  TWO stand (Arena 1->2, Stadium 2->1, both Civilopedia-fetched) plus Crater
+  Lake 4->5 (now fetch-confirmed); TWO were WRONG and are reverted (Camp,
+  Coal), both taken from search summaries.
   **SLICE 13 - src/data/rivals.ts header (2026-07-28, #78).** The header said
   "all eyeballed", which this session made FALSE: relics, the culture-victory
   thresholds, diplomatic favor, the World Congress constants and the dedication
