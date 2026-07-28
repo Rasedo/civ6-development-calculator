@@ -1960,6 +1960,21 @@ export function rivalCityYields(
       }
     }
   }
+  // AUDIT #78 — WATER MILL, the rival twin of city.ts's waterMillBonus:
+  // "Bonus resources improved by Farms gain +1 Food each" (GS Civilopedia).
+  // POST-selection over the worked set like the Petra block above. Rivals do
+  // build Water Mills (their buildability path carries the river check), and
+  // they track buildings, so withholding this would deviate from Civ 6 in a
+  // way NO gate could see — both engines would simply agree with each other.
+  if (rc.buildings.includes('WATER_MILL')) {
+    for (const w of worked) {
+      if (w.index < 0) continue; // A-22: specialists work no tile
+      const t = state.map.tiles[w.index];
+      if (t.improvement !== 'FARM' || !t.resource) continue;
+      const r = RESOURCES[t.resource];
+      if (r?.category === 'bonus' && r.improvement === 'FARM') total.food += 1;
+    }
+  }
   // C1-B5b-iii: the B3 research→production stand-in is RETIRED — real
   // mines carry rival production now (owner boosts included via ctx).
   // C1-B4b: COMPLETED districts add floor(adjacency) into their yield

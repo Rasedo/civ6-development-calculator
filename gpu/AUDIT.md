@@ -836,15 +836,16 @@ Per-item weights (done% in parens where partial):
   building exists), and `res_cat`, the per-tile resource CATEGORY plane that
   export-gpu.ts has emitted as `res` all along and no engine ever consumed.
   Gates: tsc clean, scripted parity 24x250 0.0 milli.
-  **RIVAL SIDE NOT IMPLEMENTED — a RECORDED deviation, not an oversight.** TS
-  rival cities do track buildings and DO model per-tile wonder bonuses
-  (rivals.ts petraDesert), and rivals do build Water Mills (the WATER_MILL
-  river check appears in their buildability path), so a faithful model owes
-  them this bonus too. Neither engine applies it, so they agree with each other
-  and parity stays green — the deviation is from CIV 6, which is exactly the
-  class of gap parity can never catch. Four sites exist for this mechanic
-  (TS player DONE, GPU player DONE, TS rival, GPU rival); the rival pair is
-  queued.
+  **RIVAL SIDE NOW IMPLEMENTED TOO (2026-07-28) — all four sites done.**
+  rivals.ts mirrors city.ts's waterMillBonus post-selection over the worked
+  set, next to its Petra block; the GPU mirrors it in BOTH rival twins,
+  _rival_city_yields_all (batched) and _rival_city_yields (per-j), kept
+  structurally identical so column j stays bit-identical between them.
+  This was worth doing rather than recording as a deviation precisely BECAUSE
+  no gate could ever have caught it: withholding the bonus from rivals leaves
+  the two engines agreeing with each other, so parity stays green while both
+  deviate from Civ 6 together. Gates: tsc clean, vitest 431/431, parity 24x250
+  0.0 milli with rivals live.
   REACHABILITY MEASURED (3 seeds, 250 turns): 1 of 11 alive cities holds a
   Water Mill, and 4 farm-improved bonus tiles are OWNED by player cities (6
   exist on the maps at all). So the mechanic is reachable in principle but the

@@ -3848,6 +3848,19 @@ class BatchSim:
                 food = food + 2.0 * nq
                 gold = gold + 2.0 * nq
                 prod = prod + nq
+        # AUDIT #78 — WATER MILL, rival twin of the player term and of
+        # rivals.ts: farm-improved BONUS resources gain +1 food, POST-selection
+        # over the worked set like Petra above.
+        wm_r = self.rc_bldg[:, r][:, :, rd.b_farmbonus]  # [B, RC, n]
+        if wm_r.numel() and bool(wm_r.any()):
+            has_wm = wm_r.any(dim=2)  # [B, RC]
+            sel_t = tc3.gather(2, top_idx).reshape(B, RC * M)
+            elig = (
+                (self.improvement.gather(1, sel_t) == self.FARM)
+                & (self.res_cat.gather(1, sel_t) == 1)
+                & (self.res_imp.gather(1, sel_t) == self.FARM)
+            ).reshape(B, RC, M) & take
+            food = food + (elig & has_wm.unsqueeze(2)).sum(dim=2).double()
         # C1-B4b: completed-district floored adjacency. State is frozen here
         # (post-step), so ONE _adj_district_count serves every j — the per-j
         # calls returned this same tensor each time.
@@ -8932,6 +8945,20 @@ class BatchSim:
                 food = food + 2.0 * nq
                 gold = gold + 2.0 * nq
                 prod = prod + nq
+        # AUDIT #78 — WATER MILL, the per-j twin of the batched term (and of
+        # rivals.ts): farm-improved BONUS resources gain +1 food, POST-selection
+        # over the worked set like Petra above. Kept structurally identical to
+        # _rival_city_yields_all's version so column j stays bit-identical.
+        wm_p = self.rc_bldg[:, r, j][:, rd.b_farmbonus]  # [B, n]
+        if wm_p.numel() and bool(wm_p.any()):
+            has_wm = wm_p.any(dim=1)  # [B]
+            sel_t = tc.gather(1, top_idx)  # [B, kk]
+            elig = (
+                (self.improvement.gather(1, sel_t) == self.FARM)
+                & (self.res_cat.gather(1, sel_t) == 1)
+                & (self.res_imp.gather(1, sel_t) == self.FARM)
+            ) & take
+            food = food + (elig & has_wm.unsqueeze(1)).sum(dim=1).double()
         # C1-B3b: the research stand-in reads the REAL tree (retires at B5)
         # C1-B4b: COMPLETED districts add floor(adjacency) into their yield
         # column (rival cityDistrictYields under empty modifiers; gold/faith
