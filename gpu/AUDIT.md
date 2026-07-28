@@ -714,10 +714,27 @@ Per-item weights (done% in parens where partial):
   WHAT STILL STANDS: the divergence is in the DEDICATION award — the GPU's event
   site fires +2 at t111 and every 2-pointer around t111 on both seats is a
   dedication. WHICH path diverges, and why, is NOT established.
-  NEXT STEP: hook every era_score write in ONE place on the GPU (mirroring the
-  TS addEraScore hook), then compare `dedications[civ]` and `civ_age[civ]`
-  between engines at t111 — a count or age mismatch in the per-turn term is the
-  leading suspect, since the event table is shared exported data.
+  **ANSWERED (2026-07-28) — it is a CONVERSION COUNT, not the era-score system.**
+  State comparison at the per-turn dedication probe, row 56 / civ 1:
+      t108-111  GPU dedications=1 age=1 perTurnEs=1, eraScore 14,15,16,17
+                TS  IDENTICAL on every field
+      t112      GPU eraScore=20 (+3)   |   TS eraScore=22 (+5)
+  So the per-turn term is byte-identical on both seats. The divergence is wholly
+  in the EVENT-keyed awards between those probes:
+      GPU: +1 per-turn, then ONE event +2            = +3
+      TS : +1 per-turn, then TWO events +2, +2       = +5
+  `DED_EVENT_SCORE = [1,1,1,2]`, kind 3 = EXODUS_OF_THE_EVANGELISTS, "+2 per city
+  CONVERTED" (#77). A +2 award is one converted city, so **at t111 TS credits TWO
+  city conversions and the GPU credits ONE.**
+  THAT MOVES THE HUNT OUT OF B-24 ENTIRELY AND INTO RELIGIOUS SPREAD (B-18): the
+  engines disagree on how many cities flip to rival 0's religion that turn.
+  Era score, Age and the 2.85 gap at t249 all follow from the one extra flip.
+  The dedication and era-score paths are EXONERATED — do not touch them.
+  NEXT STEP: compare the conversion events at t111 — which cities flip on each
+  seat, and the pressure/threshold deciding it.
+  METHOD: this is the first probe in the sequence to produce a clean answer, and
+  the only one that compared STATE at a fixed point instead of enumerating call
+  sites. Three earlier attempts failed by enumeration.
   (Superseded account follows.)
   **TRACED (2026-07-28): the GPU founds at t78, gated by the PROPHET.**
       t76-77  pantheon=True hs=True prophets=0  -> rdue=False
