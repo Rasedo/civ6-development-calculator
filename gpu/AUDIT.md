@@ -558,6 +558,26 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  **CACHE THEORY REFUTED (2026-07-28, #78).** The per-type envoy patch was
+  re-applied ON TOP of the cache fix and the plain rollout re-run: the red
+  reproduces IDENTICALLY - seed 9170 rng 2026006119, turn 220, HEAD column 8,
+  TS 118677 vs GPU 119677. Same seed, same turn, same values. So the stale
+  yield cache was NOT the cause (the fix stays: it is a real defect regardless).
+  THE UPSIDE: the reproduction is DETERMINISTIC AND EXACT, which is what a
+  checkpointed bisect needs. Recipe: re-apply the per-type envoy patch (seven
+  wiring sites, listed above), export, then run rng 2026006119 UNSHARDED with
+  `--ckpt` and bracket with `gpu/ckptdiff.py --rng`.
+  RULED OUT so far for this case, each verified:
+   * all THREE GPU sites and all THREE TS sites are wired to the per-type
+     value - grep shows no flat `capitalBonus` literal remains in either engine;
+   * the type->index mapping is consistent: the exporter writes
+     `CITY_STATE_TYPES.indexOf(cs.type)` and `capitalBonusByType` is
+     `CITY_STATE_TYPES.map(...)`, so a scientific CS cannot pick up trade's 2;
+   * a stale `_eff_version` yield cache on envoy assignment (this entry).
+  THE SHAPE IS STILL THE SHARPEST CLUE: GPU is HIGHER by EXACTLY 1.0 in a
+  score that sums `pop*N + weighted yields`, i.e. ONE yield, ONE city, weight 1
+  - and only off-script. Something makes the GPU credit the old +2 (or an extra
+  +1) for one city-state in one city on one turn onward.
   **CACHE-INVALIDATION FIX LANDED (2026-07-28, #78).** `self._eff_version += 1`
   added at BOTH `cs_envoys` increment sites. Battery OK (720s, 78 checks),
   scripted parity 0.0 milli. It is behaviour-NEUTRAL in both gates, which is
