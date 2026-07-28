@@ -546,8 +546,15 @@ Per-item weights (done% in parens where partial):
   this model has neither term (it credits LAKE by terrain only); (2) a tile that
   IS a mountain or natural wonder is BREATHTAKING BY DEFAULT in real Civ 6,
   where this model scores every tile purely from adjacency.
-  11 marked files remain; constants.ts, projects.ts, resources.ts,
-  cityStates.ts and appeal.ts carry NARROWED markers (swept parts cited in place, unswept
+  **SLICE 8 — src/data/wonders.ts (2026-07-28, #78).** ONE REAL ERROR:
+  CRATER_LAKE paid `faith: 4`; real Civ 6 gives it **5 Faith and 1 Science**
+  (Civilization wiki, "Crater Lake (Civ6)"). Corrected. DEAD_SEA (+2 culture /
+  +2 faith) re-verified and correct. The other ten natural wonders are NOT yet
+  sourced individually, so the file keeps a NARROWED marker.
+  That makes FOUR files with real errors out of eight swept — the class is not
+  a formality.
+  10 marked files remain; constants.ts, projects.ts, resources.ts,
+  cityStates.ts, appeal.ts and wonders.ts carry NARROWED markers (swept parts cited in place, unswept
   parts named). SIX slices in, the pattern is settled: THREE files had real
   errors (improvements, buildings, cityStates), THREE were correct as written
   (constants water-housing, projects mapping, resources bonus rows), and every

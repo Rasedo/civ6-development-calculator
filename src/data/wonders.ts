@@ -1,8 +1,12 @@
 /**
- * Natural wonders (a recognizable base-game subset). Values eyeballed close
- * to Civ 6. Wonder tiles can never be improved, districted or settled;
+ * Natural wonders (a recognizable base-game subset). Wonder tiles can never be
+ * improved, districted or settled;
  * passable ones are workable with the yields below. Holy Sites get +2 faith
  * adjacency from any adjacent natural wonder (see districts.ts).
+ *
+ * #78 SOURCING SWEEP (2026-07-28): CRATER_LAKE corrected (faith 4 -> 5) and
+ * DEAD_SEA re-verified correct. The remaining ten wonders' yields are NOT yet
+ * sourced individually — this file keeps a NARROWED marker.
  */
 
 import type { TerrainId, Yields } from '../core/types';
@@ -42,7 +46,10 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     size: 1,
     impassable: false,
     becomesTerrain: 'LAKE',
-    tileYields: { science: 1, faith: 4 },
+    // #78 SOURCING SWEEP (2026-07-28): faith 4 -> 5. Real Civ 6 Crater Lake
+    // yields 5 Faith and 1 Science on its tile (Civilization wiki, "Crater
+    // Lake (Civ6)"). Dead Sea (+2 culture / +2 faith) re-verified and correct.
+    tileYields: { science: 1, faith: 5 },
     spawn: { terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], inland: true, maxLat: 0.85 },
     color: '#7fd4e8',
   },
