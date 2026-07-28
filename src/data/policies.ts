@@ -234,9 +234,16 @@ const W = 'wildcard' as const;
 export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
   [
     G('CHIEFDOM', 'Chiefdom', 0, [M, E], {}, 'The starting government.'),
-    G('AUTOCRACY', 'Autocracy', 1, [M, M, E, D], { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 } },
+    // Slots sourced from the Gathering Storm Civilopedia (#78): 1 Military,
+    // 1 Economic, 1 Diplomatic, 1 Wildcard. Was [M, M, E, D] — the same TOTAL
+    // of 4, which is why no gate ever caught the wrong composition.
+    G('AUTOCRACY', 'Autocracy', 1, [M, E, D, W], { capitalYields: { food: 1, production: 1, gold: 1, science: 1, culture: 1, faith: 1 } },
       '+1 to all yields in the capital.'),
-    G('OLIGARCHY', 'Oligarchy', 1, [M, E, D, W], {},
+    // Civilopedia (#78): 2 Military, 1 Economic, 1 Wildcard and NO Diplomatic
+    // slot. Was [M, E, D, W] — same total of 4, wrong composition.
+    // Its inherent "+4 Combat Strength to land melee, anti-cavalry and naval
+    // melee" stays unmodeled and is recorded in AUDIT.
+    G('OLIGARCHY', 'Oligarchy', 1, [M, M, E, W], {},
       'Combat bonuses (not modeled in this calculator).'),
     G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W], { amenitiesAll: 1 },
       '+1 amenity in all cities.'),
@@ -246,7 +253,10 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
     // military card and one fewer wildcard, which gates what can be slotted.
     G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingAll: 1 },
       '+1 housing in all cities.'),
-    G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, W, W], { yieldMult: { gold: 1.1 } },
+    // Civilopedia (#78): 1 Military, 2 Economic, 2 Diplomatic, 1 Wildcard.
+    // Was [M, E, E, D, W, W] — same total of 6, a Wildcard standing in for a
+    // Diplomatic slot.
+    G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, D, W], { yieldMult: { gold: 1.1 } },
       '+10% gold in all cities.'),
     G('THEOCRACY', 'Theocracy', 2, [M, M, E, E, D, W], { yieldMult: { faith: 1.1 } },
       '+10% faith in all cities.'),

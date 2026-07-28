@@ -800,8 +800,41 @@ Per-item weights (done% in parens where partial):
   gates which cards can be slotted, so it is behavioural, not cosmetic. Fixing
   it means re-checking all ten governments' slot lists and re-gating - its own
   round. **MONARCHY'S SLOTS ARE NOW FIXED** (2026-07-28): 3M/1E/1D/1W ->
-  2M/1E/1D/2W, the Civilopedia composition. Battery OK. The other nine
-  governments' slot lists are still unfetched.
+  2M/1E/1D/2W, the Civilopedia composition. Battery OK.
+  **ALL TEN GOVERNMENTS NOW VERIFIED (2026-07-28, #78)** by direct Civilopedia
+  fetch, with the three disputed ones re-fetched asking for the slot section
+  VERBATIM rather than a paraphrase. THREE MORE WERE WRONG:
+      AUTOCRACY          [M,M,E,D]      -> [M,E,D,W]        1M/1E/1D/1W
+      OLIGARCHY          [M,E,D,W]      -> [M,M,E,W]        2M/1E/0D/1W
+      MERCHANT_REPUBLIC  [M,E,E,D,W,W]  -> [M,E,E,D,D,W]    1M/2E/2D/1W
+  Correct as written: CHIEFDOM 1M/1E, CLASSICAL_REPUBLIC 0M/2E/1D/1W,
+  THEOCRACY 2M/2E/1D/1W, DEMOCRACY 1M/3E/2D/2W, COMMUNISM 3M/3E/1D/1W,
+  FASCISM 4M/1E/1D/2W.
+  **WATER MILL, VERIFIED AND STILL UNIMPLEMENTED (2026-07-28, #78).** The
+  queued brief said "rice/wheat +1 food". The Civilopedia says something
+  BROADER: "Bonus resources improved by Farms gain +1 Food each" — a general
+  rule over farm-improved bonus resources, not a two-resource special case.
+  In the CURRENT catalog those are exactly WHEAT and RICE (resources.ts has no
+  Maize), so the two readings coincide TODAY and diverge the moment a third
+  farm bonus resource is added. Implement the general form
+  (category === 'bonus' && improvement === 'FARM'), not the named pair.
+  Base +1 Food/+1 Production and the river-adjacency requirement are already
+  correct; the resource bonus is NOT implemented on either engine — buildings.ts
+  carries only `yields: { food: 1, production: 1 }` and `special: 'WATER_MILL'`,
+  whose sole meaning today is the river buildability gate. This is a YIELDS-PATH
+  slice on both engines, not a constant edit, so it is queued rather than
+  folded into the government batch.
+  WHY NONE OF THEM EVER TRIPPED A GATE: every error preserved the government's
+  TOTAL slot count and only got the composition wrong — a Wildcard standing in
+  for a Diplomatic slot, or a Military for a Wildcard. Slot COUNT is what any
+  structural check would compare; slot TYPE is what gates which cards may be
+  slotted. This is the wrong-constant class in its purest form.
+  TWO INHERENT BONUSES NOTED AS UNMODELED while fetching (recorded, not
+  silently folded in): OLIGARCHY's "+4 Combat Strength to land melee,
+  anti-cavalry and naval melee units", and CLASSICAL_REPUBLIC's "+1 Housing"
+  (the +1 Amenity half IS modeled via amenitiesAll). AUTOCRACY's real bonus is
+  per Government-Plaza/Diplomatic-Quarter/Palace building; the code's flat +1
+  all-yields-in-capital is a standing approximation of the Palace term.
   POLICY CARDS spot-checked: URBAN_PLANNING is "+1 Production in all
   cities" in an ECONOMIC slot - text, effect and slot type all match. The
   remaining card effects are not individually fetched; NARROWED marker.
