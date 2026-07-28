@@ -132,7 +132,9 @@ export const HOUSING_NO_WATER = 2;
 export const AQUEDUCT_FRESH_BONUS = 2;
 export const AQUEDUCT_NO_FRESH_TOTAL = 6;
 
-/** Each unique improved luxury gives +1 amenity to this many neediest cities. */
+/** Each unique improved luxury gives +1 amenity to this many neediest cities.
+ *  #78 SOURCING SWEEP (2026-07-28): VERIFIED CORRECT — the GS Civilopedia's
+ *  luxury entries read "+4 Amenities (1 per city)", so 4 is the real spread. */
 export const LUXURY_AMENITY_CITIES = 4;
 
 /** Range (tiles from the district) of regional building effects. */

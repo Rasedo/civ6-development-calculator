@@ -580,6 +580,12 @@ Per-item weights (done% in parens where partial):
   TWO stand (Arena 1->2, Stadium 2->1, both Civilopedia-fetched) plus Crater
   Lake 4->5 (now fetch-confirmed); TWO were WRONG and are reverted (Camp,
   Coal), both taken from search summaries.
+  **SLICE 15 - luxury resources + LUXURY_AMENITY_CITIES (2026-07-28, #78).**
+  Spot-checked against the GS Civilopedia by direct fetch: WINE (+1 Food /
+  +1 Gold) and COTTON (+3 Gold) both correct as written. Both entries also read
+  "+4 Amenities (1 per city)", which VERIFIES `LUXURY_AMENITY_CITIES = 4` in
+  data/constants.ts — a third value confirmed, in a different file, off the same
+  two fetches. Ten luxury rows remain individually unfetched; NARROWED marker.
   **SLICE 13 - src/data/rivals.ts header (2026-07-28, #78).** The header said
   "all eyeballed", which this session made FALSE: relics, the culture-victory
   thresholds, diplomatic favor, the World Congress constants and the dedication
