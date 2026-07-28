@@ -542,6 +542,27 @@ Per-item weights (done% in parens where partial):
   the per-resource bonus. Recorded, not fixed — a yield change needing its own
   gated round with the term at the same position on both engines. The LUXURY and
   STRATEGIC rows are NOT yet swept.
+  **REPRODUCTION ATTEMPTED - THE RECONSTRUCTION WAS WRONG (2026-07-28, #78).**
+  The worktree at `.claude/hunt78` (base e56e988 + the five combat strengths +
+  SEED_OVERRIDES 6: 9080) was exported and run through a full plain rollout:
+  **REPLAY PARITY OK, 72/72 - the rGScore1 red does NOT reproduce.**
+  WHY THE RECONSTRUCTION MISSED IT: the original red battery ran BEFORE the
+  Camp retraction, so that tree ALSO carried the erroneous `CAMP gold: 1`. Camp
+  gold feeds rival city yields, which feed rivalEmpireScore - so my own wrong
+  constant was part of the trajectory that reached the divergence, and a
+  reconstruction without it reaches a different world entirely.
+  WHAT THIS MEANS: the rGScore1 divergence is a LATENT that needed a specific
+  trajectory to expose, and BOTH known ways of reaching it are now gone (the
+  Camp value is corrected, and the Monarchy slot fix shifted trajectories
+  again). It is NOT fixed and NOT currently reachable. The reproduction recipe
+  recorded earlier is WRONG and would send the next hunt down a dead end -
+  corrected here, which is the point of recording it.
+  The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  THE ENVOY CASE IS THE LIVE ONE. Its red (player score, seed 9170 t220, gap
+  EXACTLY 1.0) was produced on a tree with the Camp value already CORRECT, so
+  it is reproducible by simply re-applying the per-type envoy patch (seven
+  wiring sites, all recorded above). That is the reproduction the next hunt
+  should use - not this worktree.
   **CONSOLIDATED HUNT STATE for BOTH score latents (2026-07-28, #78).** Two
   independent yield-touching changes each turned the PLAIN rollout red in a
   SCORE column while scripted parity stayed at 0.0 milli:
