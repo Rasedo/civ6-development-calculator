@@ -100,9 +100,17 @@ const rawList: BuildingDef[] = [
   { id: 'MILITARY_ACADEMY', name: 'Military Academy', district: 'ENCAMPMENT', cost: 355, requiresAny: ['ARMORY'], yields: { production: 3 }, housing: 1, maintenance: 2, trainXp: 15 },
 
   // --- Entertainment Complex ----------------------------------------------------------
-  { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 135, amenities: 1, yields: { culture: 1 }, maintenance: 1 }, // P4/D-24: real Arena also gives +1 culture
+  // #78 SOURCING SWEEP (2026-07-28): amenities 1 -> 2. The GS Civilopedia's
+  // Arena entry reads "+1 Culture" and "+2 Amenities from entertainment"; the
+  // culture was already right, the amenity count was not.
+  { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 135, amenities: 2, yields: { culture: 1 }, maintenance: 1 },
   { id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 405, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2 },
-  { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 600, requiresAny: ['ZOO'], amenities: 2, regional: true, maintenance: 3 }, // amenity amount approximate
+  // #78 SOURCING SWEEP (2026-07-28): amenities 2 (approximate) -> 1, the GS
+  // Civilopedia's base value ("+1 Amenity from entertainment"). The further
+  // "+2 Amenities additionally when POWERED" is NOT modeled — no power system
+  // exists in either engine — and is recorded as a residual rather than folded
+  // into the base, which is what the old 2 effectively did.
+  { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 600, requiresAny: ['ZOO'], amenities: 1, regional: true, maintenance: 3 },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));
