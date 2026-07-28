@@ -590,6 +590,23 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  **REPRODUCED AT LAST (2026-07-28) — the recipe above is WRONG; here is the
+  right one.** e56e988 sits AFTER the Camp retraction, which is exactly why it
+  reaches a different world. The correct base is **61c1e66**, the commit that
+  recorded "5 errors found, change REVERTED pending a hunt": like 81bb972 for
+  the envoy case its tree IS the code that produced the red, and it still
+  carries the erroneous `CAMP gold: 1`.
+      git worktree add <dir> 61c1e66 --detach
+      git diff 8eddd91~1 8eddd91 -- src/data/units.ts | git apply   # 5 strengths
+      SEED_OVERRIDES 6: 9080          (9079 is wiped by the stronger world)
+      npx vite-node scripts/export-gpu.ts
+      python gpu/rollout.py --shards 4 --pipeline-replay
+  gives, byte-exact:
+      seed 9235 rng 2026006134: turn 249: column 72  TS=188400 GPU=191250
+  i.e. the 2850-milli = 2.85 gap. Worktree preserved at `.claude/hunt-rg`.
+  THE LESSON, twice over: reproduce on the EXACT state, never an approximation.
+  Both failed reconstructions this session omitted something the original
+  trajectory contained — here my own wrong Camp constant.
   **#78 (2026-07-28) - the epsilon tie-break bug, FOUND AND FIXED, but it is
   NOT the cause of this gap.** The GPU broke worked-tile ties by perturbing
   the score (`score - tc * 1e-9`) in self.dtype, where TS sorts
