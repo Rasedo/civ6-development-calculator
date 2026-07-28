@@ -640,9 +640,26 @@ Per-item weights (done% in parens where partial):
   A count and a set diverge the moment their exclusion sets differ, and TS
   carries an exclusion a bare count cannot represent. That shifts the founding
   turn -> the era score -> the Age -> the 2.85 rGScore1 gap at t249.
-  NOT PROVEN YET. NEXT STEP: log both availability tests at t112 in the
-  reproduction (`.claude/hunt-rg`, still byte-identical) — TS's followers/founders
-  list lengths against the GPU's claimed_f_n / claimed_o_n and the pool sizes.
+  **COUNT-vs-SET REFUTED BY MEASUREMENT (2026-07-28).** Both seats instrumented:
+      GPU (row 56) t108-115: claimed_f_n=2 claimed_o_n=2 fPool=9 oPool=8
+                             rdue=False ropen=False done=True
+      TS  same window:       followers=8 founders=7 claimed=2 done=false
+  The belief POOLS gate neither engine — TS has 8 followers and 7 founders free
+  and both agree 2 beliefs are claimed. The count-vs-set difference is real in
+  the code but is not what diverges here.
+  **WHAT DIFFERS IS THE FOUNDING TURN.** The GPU already has
+  `r_religion_done=True` at t108 (founded BEFORE the window); TS is still
+  unfounded at t112, which is exactly where the arithmetic demanded its +2.
+  So the question moves UPSTREAM to the eligibility gate rather than the draw:
+      rdue = active & ~done & pantheon_done & (prophets > 0) & has_holy_site
+  One of those four flips earlier on the GPU. NEXT STEP: log all four components
+  per turn on both seats from ~t90 and find which one leads — most likely the
+  holy-site completion or the prophet count, since pantheon_done is itself an
+  era-score event and would have shown in the trace.
+  PROBE FLAW to fix next pass: the TS probe filters on `rival.id === 0` but NOT
+  on the game, and the replay walks all 72 — so its lines are not attributable
+  to seed 9235 alone. The conclusion rests on the row-filtered GPU probe plus the
+  era-score arithmetic.
   **#78 (2026-07-28) - the epsilon tie-break bug, FOUND AND FIXED, but it is
   NOT the cause of this gap.** The GPU broke worked-tile ties by perturbing
   the score (`score - tc * 1e-9`) in self.dtype, where TS sorts
