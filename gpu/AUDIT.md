@@ -818,12 +818,34 @@ Per-item weights (done% in parens where partial):
   TS log and reported a bogus "FIRST DIVERGENCE at turn 2" with the GPU absent
   everywhere. The replay's own verdict line is the trustworthy signal after a
   resume; logdiff needs a FRESH full GPU run.
-  NEXT STEP: the walk's halt conditions are still the open question — compare
-  `moveCostInto + riverCharge` against the GPU's `1 + _terr + _riv`, and TS's
-  path-following (`unit.path`, precomputed) against the GPU's GREEDY
-  strictly-closer step (`d_best < d_cur`). A greedy walker halts at a local
-  minimum where a path-follower keeps going, which is exactly the shape of
-  one-step-versus-two-steps.
+  **THE TS TWIN IS `hostileUnitAct` (core/combat.ts), NOT `walkPath`** — walkPath
+  is never called from rivals.ts at all; the GPU comment cites it only for the
+  COST formula. hostileUnitAct DOES call `clearCampFor`, which is exactly why
+  patching walkPath's camp clear changed nothing. Its halt conditions map onto
+  the GPU's cleanly: `marchOnto` <-> `has_imp`, `stepD >= 1` <-> `d_best >= 1`,
+  `movesLeft < cost && movesLeft < full` <-> `(mp >= cost) | (mp >= full_mp)`.
+  **LEADING HYPOTHESIS (2026-07-28): the GPU never RE-TARGETS within a turn, so
+  a unit standing ON its target freezes.** Traced inside war_act's own bounds
+  (anchored by line, not by a text pattern):
+      [WAR] t210 v1  cur=740 tgt=740 d_cur=0 d_best=1 mv=False
+      [WAR] t211 v41 cur=739 tgt=739 d_cur=0 d_best=1 mv=False
+  `tgt` EQUALS `cur` in every line and `d_cur` is 0. Tiles 740 and 739 are both
+  barbarian CAMPS, so the camp a unit occupies is the target it selected. With
+  d_cur = 0 no neighbour can satisfy `d_best < d_cur`, so the walk refuses to
+  move at all. The GPU computes `tgt` ONCE before the walk loop; TS's
+  hostileUnitAct re-scans for a target on each call and keeps marching. That
+  predicts exactly the observed shape: the GPU takes one step onto a camp and
+  stops for the turn, TS clears one and walks on to the next (740 -> 739 -> 738).
+  NOT YET PROVEN. The test: make the GPU re-select `tgt` after each step (or
+  after a camp clear) and re-run the replay; if seed 9170 t220 goes green, the
+  hypothesis holds. Care is needed on draw-order parity — re-targeting must not
+  consume RNG the TS side does not.
+  OPEN COUNTER-EVIDENCE, recorded honestly: the differ tags the t217 move
+  `war/walk`, but the [WAR] print inside that same loop emits NO line at t217
+  (its lines stop at t213). Both instruments cannot be right. Resolve that
+  before building on the hypothesis — most likely the walk `break`s before the
+  print on the turn the move happens, which would mean the move comes from an
+  earlier statement in the same function rather than the traced loop.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
