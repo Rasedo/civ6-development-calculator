@@ -2,8 +2,17 @@
  * Eurekas (techs) and inspirations (civics): one-time 40% research boosts.
  * Conditions that our systems can observe are auto-detected each turn
  * (declarative `check`); the rest (war, trade, religion, other civs…) are
- * honest manual toggles in the research panel. Texts are Civ 6's where the
- * condition survived translation, eyeballed otherwise.
+ * honest manual toggles in the research panel.
+ *
+ * #78 SOURCING SWEEP (2026-07-28): BOOST_FRACTION = 0.4 is VERIFIED CORRECT for
+ * the Gathering Storm ruleset this repo models. Boosts gave 50% in vanilla and
+ * were reduced to 40% in Rise and Fall, which GS kept — so the value is right
+ * AND the reason it is 0.4 rather than 0.5 is now recorded, which matters
+ * because 0.5 is the number most older guides quote.
+ *
+ * The individual boost CONDITION TEXTS remain a NARROWED marker: they are
+ * Civ 6's where the condition survived translation and paraphrased otherwise,
+ * and have not been checked line by line.
  */
 
 import type { DistrictId, GreatPersonClass, ImprovementId } from '../core/types';

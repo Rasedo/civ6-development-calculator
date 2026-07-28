@@ -553,6 +553,12 @@ Per-item weights (done% in parens where partial):
   sourced individually, so the file keeps a NARROWED marker.
   That makes FOUR files with real errors out of eight swept — the class is not
   a formality.
+  **SLICE 11 - src/data/boosts.ts (2026-07-28, #78).** BOOST_FRACTION = 0.4
+  VERIFIED CORRECT for the GS ruleset: boosts gave 50% in vanilla and were cut
+  to 40% in Rise and Fall, which GS kept. Worth recording because 0.5 is the
+  number most older guides quote, so a future "correction" toward 50% would be
+  a regression. The individual boost CONDITION TEXTS keep a narrowed marker -
+  not checked line by line.
   **SLICE 10 - src/core/combat.ts damage formula (2026-07-28, #78).** The BASE
   and EXPONENT are VERIFIED EXACT against the reverse-engineered Civ 6 formula
   (damage = 30 * e^(strengthDiff / 25) * random): base 30 matches, and
