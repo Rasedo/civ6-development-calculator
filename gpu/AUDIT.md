@@ -651,72 +651,36 @@ Per-item weights (done% in parens where partial):
   "reliably between 24 and 36" - and 30 x [0.75, 1.25] = [22.5, 37.5] while
   30 x [0.8, 1.2] = [24, 36] exactly. The repo's existing 0.8-1.2 is the
   internally consistent reading, so it stands. Recorded, not flipped.
-  **SLICE 9 — src/data/units.ts COMBAT STRENGTHS: FIVE ERRORS FOUND, CHANGE
-  REVERTED PENDING A HUNT (2026-07-28, #78).** Checked against a Civ 6
-  unit-stat reference. FIVE combat strengths are WRONG in this model:
-    SWORDSMAN   36 should be 35
-    PIKEMAN     41 should be 45
-    CROSSBOWMAN 15 should be 30   (its MELEE strength; ranged 40 is right)
-    KNIGHT      48 should be 50
-    GALLEY      30 should be 25
-  Verified CORRECT: Scout 10, Warrior 20, Slinger 5/15, Archer 15/25, Spearman
-  25, Horseman 36, Musketman 55, Quadrireme 20/25, and every movement value.
-  These feed `damageRoll` directly and are the most load-bearing constants in
-  the model for an RL agent's combat decisions — the Crossbowman's melee is
-  wrong by 2x.
-  WHY IT IS NOT LANDED. Applying the five corrections produced TWO downstream
-  effects and one RED gate:
-   (a) EXPECTED: the hostile world gets genuinely stronger, and index 6's seed
-       9079 loses every player city before t250. Root-caused, and a
-       SEED_OVERRIDES entry (6: 9080, verified to survive at healthy size) is
-       the sanctioned fix — that part is fine.
-   (b) EXPECTED: tests/strategic-resources.test.ts hard-coded `>= 36` for the
-       Swordsman. The right repair is to read `UNITS.SWORDSMAN.combat` from the
-       roster, not to patch the literal — a stale literal asserting a wrong
-       value is the same failure as the wrong constant, with a green test
-       defending it.
-   (c) THE BLOCKER: the battery's gpu-gate (PLAIN rollout) went RED at
-       **seed 9235, turn 249, column 72 = rGScore1** — rival 1's empire score,
-       TS 188400 vs GPU 191250, a 2.85-point gap. Scripted parity was green at
-       0.0 milli and the FORCED-COMPACTION rollout passed; only the plain
-       rollout reaches it, so it is configuration-dependent and may be a
-       PRE-EXISTING latent that the stronger units merely made reachable.
-  LEAD CHECKED AND REFUTED (same session) — recorded so the next hunt does not
-  re-walk it. The theory was that TS `spawnUnit` updates `bestMeleeCS` for any
-  `combat > 0 && !ranged` unit (which INCLUDES a naval GALLEY, one of the five
-  values that moved) while the GPU might differ. VERIFIED SYMMETRIC:
-   * the GPU gates on `_p_rng_str[type] == 0` — the same non-ranged rule, with
-     no naval exclusion on either side;
-   * both read `_p_combat`, the ROSTER table, not the 9-entry barb table;
-   * both are MONOTONIC maxima — `best_melee` at engine.py `torch.maximum` in
-     `_spawn_player`, and `r_best_melee` likewise in the rival spawn path
-     (so a rival's tracker is NOT frozen at its fixture init, which was the
-     other half of the theory).
-  The only asymmetry found is benign: TS also requires `combat > 0` where the
-  GPU does not, which admits combat-0 civilians into a `max()` that ignores
-  them.
-  SO THE DIVERGENCE IS ELSEWHERE. Next candidates, in order: the empire-score
-  formula's own inputs (rGScore is a ×1000 float, tol 2, and the gap is 2850
-  milli = 2.85 points — large enough to be a term, not drift); and whatever
-  the plain rollout reaches at seed 9235 t249 that the forced-compaction
-  rollout does not.
-  **USE CHECKPOINTS FOR THIS HUNT - I did not, and that was the process error.**
-  The gate NAMES the turn (seed 9235, t249), so the procedure is: re-run that
-  one rng UNSHARDED with `--ckpt` (rollout.py writes checkpoints only when
-  `args.shard is None`, so every 4-shard run - including the battery's own
-  gpu-gate lane - produces NONE), then `gpu/ckptdiff.py --rng` to bracket, then
-  resume from the nearest earlier checkpoint WITH logging. Do NOT re-run a full
-  `--log` rollout plus a 72-game TS replay: that is the ~40-minute mistake made
-  on the B-26 naval-barb hunt earlier in this same session, for a divergence
-  the gate had already localised to a turn.
-  The change is REVERTED so the tree stays green; the sourced numbers are
-  recorded here so the next round starts from them.
-  10 marked files remain; constants.ts, projects.ts, resources.ts,
-  cityStates.ts, appeal.ts and wonders.ts carry NARROWED markers (swept parts cited in place, unswept
-  parts named). SIX slices in, the pattern is settled: THREE files had real
-  errors (improvements, buildings, cityStates), THREE were correct as written
-  (constants water-housing, projects mapping, resources bonus rows), and every
-  pass leaves a CITATION whether or not it leaves a diff.
+  **SLICE 9 LANDED - src/data/units.ts COMBAT STRENGTHS (2026-07-28, #78).**
+  FIVE corrections: SWORDSMAN 36->35, PIKEMAN 41->45, CROSSBOWMAN melee 15->30,
+  KNIGHT 48->50, GALLEY 30->25. Verified CORRECT: Scout 10, Warrior 20, Slinger
+  5/15, Archer 15/25, Spearman 25, Horseman 36, Musketman 55, Quadrireme 20/25
+  and every movement value. These feed `damageRoll` directly - the Crossbowman's
+  melee was wrong by 2x.
+  THREE FOLLOW-ONS, all resolved: (a) the stronger hostile world wipes index 6's
+  seed 9079 before t250, so SEED_OVERRIDES 6: 9080 (verified to survive);
+  (b) strategic-resources.test.ts hard-coded `>= 36` and now reads
+  `UNITS.SWORDSMAN.combat` from the roster; (c) TWO POKE LANES hard-coded the
+  FILENAME seed9079.json and broke when the override moved index 6 -
+  domination_test and bankruptcy_test, both now resolving BY POSITION. General
+  hazard: a SEED_OVERRIDES entry silently breaks anything pinned to a fixture
+  FILENAME, which the override block's own comments do not warn about.
+  WAR WEARINESS IS NOW TRACED (compared PER_RIVAL column `rWarWeariness`). It
+  feeds the amenity tier, the tier scales city yields, and rivalEmpireScore is
+  pop*3 + weighted yields - so an untraced weariness divergence could only
+  surface as an unexplained rGScore gap. Same hole rFaith had before #71.
+  **THE rGScore1 LATENT IS MASKED, NOT ROOT-CAUSED.** The blocker (seed 9235
+  t249, TS 188400 vs GPU 191250) no longer reproduces, but the only change
+  between the red run and the green one is the MONARCHY slot fix, which alters
+  which cards rivals slot and therefore every downstream trajectory. Seed 9235
+  simply no longer reaches the diverging state. A green gate is NOT evidence
+  the bug is gone; it can resurface on any change that shifts trajectories.
+  WHAT THE HUNT ESTABLISHED, so the next attempt starts narrower: the
+  bestMeleeCS theory is REFUTED (both engines gate on non-ranged, read the
+  ROSTER table, update monotonically on spawn); `rivalEmpireScore` is
+  pop*3 + weighted city YIELDS and every traced input was GREEN at the
+  divergent turn, so the gap enters through a YIELD term, not a count; the
+  prime suspect is the AMENITY TIER via war weariness - now traced.
   **SLICE 3 DONE — src/data/constants.ts water-housing (2026-07-28, #78).**
   RESOLVED AS VERIFIED-CORRECT. The first search returned a confusing framing
   (+3 / +1 / +0, deltas rather than totals) and the authoritative pages were
