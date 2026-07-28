@@ -1066,11 +1066,24 @@ Per-item weights (done% in parens where partial):
   SEED CHURN, as predicted: 3 of 24 re-picked (9014 -> 9015, 9132 -> 9133,
   9301 -> 9302 at indices 1, 10, 23) — the wiped-player class, both engines
   agreeing on the collapse. Fewer than the 5 the broader shape needed.
-  PERF NOTE for the idle-box baseline: the battery wall went 687s -> 1434s on an
-  IDLE box, with mcts-search 457s -> 844s, parity ~650s -> 1340s and gpu-gate
-  ~594s -> 1380s. Unfrozen rivals fight, field more units and simulate slower.
-  That is a real cost of correctness, not contention, and it roughly DOUBLES the
-  gate — it should be measured deliberately rather than mistaken for noise.
+  **IDLE-BOX BASELINE (2026-07-28, #40) — replaces every earlier timing.**
+      battery WALL 1434s (~= its slowest lane, gpu-gate)
+      lanes IN BATTERY: gpu-gate 1380 | parity 1340 | mcts-search 844 |
+                        mcts-plan 501 | gumbel 404 | religion2 135 | naval 119
+      parity STANDALONE, idle: 435s
+  TWO CORRECTIONS THIS MEASUREMENT FORCED:
+   * IN-BATTERY LANE TIMES ARE CONTENDED, NOT LANE COSTS — parity is 1340s
+     inside the battery and 435s standalone on the SAME idle box, ~3x. The
+     battery overlaps ~41 lanes and its wall is the slowest one, so quoting a
+     lane time as "what that gate costs" is wrong (I did exactly that when
+     reasoning about the eval and mcts lanes earlier).
+   * `parity_test.py` HAS NO `--seeds` FLAG. It prints `len(fixtures)` and
+     ignores the argument: `--seeds 12` ran 431s against `--seeds 24` at 435s
+     and both printed "24 seeds". The recorded guidance "281s@24 / 159s@12, use
+     12 for the inner loop" describes a knob that does not exist.
+  THE WALL DOUBLED (687s -> 1434s) BECAUSE OF THE #47 FIX, not the machine:
+  unfrozen rivals march and fight, so more units live and every turn costs more.
+  A real price of correctness and the new floor.
   **STILL OPEN, and CHEAPER than first recorded: the NEUTRAL-RIVAL case.** A
   rival can still target the city of a rival it is at PEACE with, freezing the
   same way. I called this a wide change; it is not. The hostility state is
