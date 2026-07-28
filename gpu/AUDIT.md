@@ -864,6 +864,31 @@ Per-item weights (done% in parens where partial):
   capacity. Implementing it means a second, additive wonder-slot channel
   threaded through the capacity computation on BOTH engines — a real slice,
   correctly queued rather than faked with a data edit.
+  **DESIGN SETTLED (2026-07-28), so the next pass executes rather than
+  re-derives.** The constraint that shapes it: `placeGreatWorks` is
+  deliberately MAP-FREE (data/greatPeople.ts takes only cities), but wonder
+  COMPLETENESS lives on the tile (`builtWonderComplete`), so the extra slots
+  cannot be derived inside it. Do NOT pass the map in — that would drag map
+  types into the data layer.
+  TS: add `GW_WONDER_SLOTS = { GREAT_LIBRARY: [2, 0, 0] }` (per-kind, writing
+  first) beside GW_SLOTS; give `placeGreatWorks` an optional
+  `extra?: (city) => number` argument; replace the current
+  `if (!c.buildings.includes(building)) continue` + `GW_SLOTS[kind] - used`
+  with a capacity of `(has building ? GW_SLOTS[kind] : 0) + extra(c)` and skip
+  only when capacity <= used. NOTE the semantic change this encodes: a wonder
+  alone can then hold works with no Amphitheater present, which is correct for
+  Civ 6 and is the whole point of the channel.
+  Callers compute `extra` because they hold the map: game.ts:1155 over
+  `completedWonders(state, city)`, rivals.ts:910 over `rc.wonders` filtered by
+  `state.map.tiles[w.tileIndex].builtWonderComplete` (the same filter its Petra
+  block already uses).
+  GPU: the rival capacity is `cap = self.rc_bldg[:, r, :, bcol].long() * nslots`
+  (engine.py ~2599); add the wonder term from `rc_wonder` + built_wonder_complete
+  against a new per-wonder slot table exported alongside the existing wonder
+  rows, and mirror it in the player path.
+  GATE NOTE: the Theater-Square line is nearly unbuilt in-gate, so expect this
+  to be gate-unreachable and needing a poke lane rather than parity to prove
+  it — the same situation as the #71 Great Works re-key.
   APPEAL TERMS: still UNVERIFIED. The Civilopedia appeal concept page 404s
   under both slugs tried (concept_appeal, concept_appeal_of_a_tile), so the
   two queued appeal terms stay unsourced rather than being written up off a
