@@ -38,6 +38,20 @@ FULL = "--full" in sys.argv
 NO_EVAL = "--no-eval" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
 
+# Measured poke-lane wall times (seconds), used ONLY to order the serial poke
+# group cheapest-first so bail-fast surfaces a red sooner. Values from this
+# box's battery logs; a stale entry costs ordering quality, never correctness.
+POKE_COST = {
+    "great_works": 2.7, "religion_gp": 3.2, "government": 3.3, "builder_gain": 3.4,
+    "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
+    "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "cs_verbs": 6.6,
+    "cs_bonus": 7.9, "rival_purchase": 9.2, "rc_registry": 12.4, "controlled": 13.8,
+    "combat_mod": 17.1, "ranged": 18.5, "duel": 20.6, "occupancy": 21.0,
+    "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
+    "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
+    "naval": 53.7, "gumbel": 75.6, "districts": 87.9,
+}
+
 results: list[tuple[str, float, int]] = []
 lock = threading.Lock()
 failed = threading.Event()
@@ -180,6 +194,21 @@ def main() -> int:
                 ]
             ),
         ]
+        # BAIL-FAST ORDERING (#78). The poke group is ONE lane on purpose: at
+        # ~348s serial it is nowhere near the critical path (parity ~650s,
+        # gpu-gate ~594s, eval ~1650s), so splitting it could not shorten the
+        # wall — it would only steal cores from the lanes that set it.
+        # But bail-fast made TIME-TO-FIRST-FAILURE matter, and list order alone
+        # decides that: the #78 red sat behind ~177s of slower pokes before
+        # `government` (3.3s) reported. Running the cheap ones first surfaces
+        # most reds in seconds at zero CPU cost. Times are measured medians;
+        # unknown/new lanes default mid-pack so they are neither starved nor
+        # promoted. Pokes are independent processes over read-only fixtures,
+        # so order carries no semantics.
+        for L in lanes:
+            if len(L) > 5:  # only the cpu self-test group is this long
+                L.sort(key=lambda s: POKE_COST.get(s[0], 30.0))
+
         threads = [threading.Thread(target=lane, args=(l,)) for l in lanes]
         for th in threads:
             th.start()
