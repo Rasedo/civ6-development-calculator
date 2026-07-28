@@ -542,6 +542,34 @@ Per-item weights (done% in parens where partial):
   the per-resource bonus. Recorded, not fixed — a yield change needing its own
   gated round with the term at the same position on both engines. The LUXURY and
   STRATEGIC rows are NOT yet swept.
+  **CONSOLIDATED HUNT STATE for BOTH score latents (2026-07-28, #78).** Two
+  independent yield-touching changes each turned the PLAIN rollout red in a
+  SCORE column while scripted parity stayed at 0.0 milli:
+    five combat strengths -> rGScore1, seed 9235 t249, gap 2.85
+    per-type envoy bonus  -> player score, seed 9170 t220, gap EXACTLY 1.0
+  Both scores are `pop * N + sum(weighted city YIELDS)` (empireScore /
+  rivalEmpireScore in core/empirePlanner.ts). A gap of exactly 1.0 therefore
+  means ONE yield off by ONE in ONE city at weight 1 - for the envoy case, the
+  capital's science, i.e. the envoy bonus itself.
+  RULED OUT so far, each verified not guessed:
+   * bestMeleeCS asymmetry - both engines gate on non-ranged, read the ROSTER
+     table, and update monotonically on spawn;
+   * a missed flat `capitalBonus` site - grep shows none remain in either
+     engine after the seven-site wiring;
+   * a STALE DERIVED TENSOR on GPU (`_cs_capbonus` cached at __init__ from
+     `cs_type`) going stale across the rollout's per-game reset() - `cs_type`
+     is NOT in _MUTABLE, so it is static and the cache cannot drift.
+  STILL OPEN as the leading theory: the gap enters through a YIELD TERM that
+  only the off-script policy reaches, and the two cases share one cause. War
+  weariness is now a compared column (`rWarWeariness`) so it will name itself
+  if it is involved - though the envoy case makes it less likely, since the
+  PLAYER score diverged with no rival war in play.
+  A REPRODUCTION WORKTREE is staged at `.claude/hunt78` (base e56e988, the
+  commit before the Monarchy slot fix, plus only the five combat strengths and
+  SEED_OVERRIDES 6: 9080) - the exact red state for the rGScore1 case. Next
+  step there: export, plain rollout to confirm, then a CHECKPOINTED single-rng
+  run (`--ckpt`, unsharded - sharded runs write none) and ckptdiff to bracket
+  the first divergent turn.
   **ENVOY 1-BONUS FIX ATTEMPTED AND REVERTED (2026-07-28, #78).** The per-type
   correction was BUILT on both seats - CS_CAPITAL_BONUS_BY_TYPE (trade 2, rest
   1), wired through FOUR TS sites (player csEnvoyBonuses, rival
