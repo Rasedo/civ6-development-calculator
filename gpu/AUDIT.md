@@ -480,10 +480,19 @@ Per-item weights (done% in parens where partial):
   off by 2 changes what an RL agent learns to value just as surely as a wrong
   rule does. This is the same structural blind spot the verify-before-implement
   directive was written for, applied to numbers instead of behaviours.
-  NOT SCOPED HERE — recorded so it is not re-derived. The natural shape is a
-  per-file sourcing sweep (cite or correct each marked value), cheapest first:
-  buildings/improvements/projects are small tables with well-documented Civ 6
-  values; builtWonders and policies are the large ones.
+  The natural shape is a per-file sourcing sweep (cite or correct each marked
+  value), cheapest first: buildings/improvements/projects are small tables with
+  well-documented Civ 6 values; builtWonders and policies are the large ones.
+  **SLICE 1 DONE — src/data/improvements.ts (2026-07-28, #78).** Every yield in
+  the file was checked against the Civilization wiki's Gathering Storm
+  improvement data. ONE was wrong: CAMP paid `gold: 2 // approximate`; real
+  Civ 6 gives a Camp **+1 Gold** and +0.5 Housing. Corrected. Plantation
+  (+2 gold), Pasture (+1 production) and Quarry (+1 production) re-verified and
+  correct as written; no `eyeballed`/`approximate` markers remain in the file.
+  THIS IS THE CLASS'S CASE IN POINT: 23 Camps stand at t250 across 16 of the 24
+  seeds, so the wrong constant was actively skewing two-thirds of the gate
+  games — and it had passed every gate forever, because parity only proves the
+  two engines agree. 17 marked files remain.
 - #74 SMALLS (2026-07-27). B-20 3 (92% -> 95% — the PRINTING writing-tourism
   doubling, measured reachable in 9/24 player seeds + 46 rival civs) and B-22 4
   (50% -> 60% — the PLAYER's grievance twin + the gang-up consequence, measured
@@ -497,6 +506,9 @@ Per-item weights (done% in parens where partial):
 - #77 NAMED DEDICATIONS (2026-07-28). B-24 3 (80% -> 85% — the named catalog
   and its event-keyed DARK/NORMAL faces, 4 of 12 dedications, 8 event sites;
   measured at 199 payouts with the Age distribution unmoved). Delta +0.15 on B.
+- #78 SOURCING SWEEP slice 1 (2026-07-28). improvements.ts fully sourced; CAMP
+  gold 2 -> 1 (the wiki's GS value). Not an A/B weight item — it is the new
+  UNSOURCED DATA VALUES class, 1 of 18 files done.
 - E: closed — E-16 RESOLVED by owner decision 2026-07-18 (AGENT_PROMPT.md
   archived to docs/archive/ instead of refreshed); the E-sweep was 5 done.
 - G-9 2 (RESOLVED — #70: "the capital is always city column 0", a dormant

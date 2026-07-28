@@ -3,7 +3,9 @@
  * one of its finite charges, and only where research allows: validImprovementsIn
  * (src/core/rules.ts) gates each on unlocks.improvements plus the hillFarms civic
  * for hill farms. Sandbox mode is the exception — it bypasses all research gating.
- * Yields are base Civ 6 values (pre-tech-boost), eyeballed where noted.
+ * Yields are base Civ 6 values (pre-tech-boost). #78 sourced every value in
+ * this file against the Civilization wiki's GS improvement data; the CAMP gold
+ * was the one error (2 -> 1). No `eyeballed`/`approximate` markers remain here.
  */
 
 import type { ImprovementId, Yields } from '../core/types';
@@ -74,7 +76,13 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     id: 'CAMP',
     name: 'Camp',
     code: 'Ca',
-    yields: { gold: 2 }, // approximate
+    // #78 SOURCING SWEEP (2026-07-28): was `gold: 2 // approximate`, and the
+    // approximation was WRONG. Real Civ 6 (Gathering Storm) gives a Camp
+    // +1 Gold and +0.5 Housing — verified against the Civilization wiki's
+    // "Camp (Civ6)" page and its GS improvement-values module. Plantation
+    // (+2 gold), Pasture (+1 production) and Quarry (+1 production) were
+    // re-verified in the same pass and are correct as written.
+    yields: { gold: 1 },
     housing: 0.5,
     resourceOnly: true,
     description: 'Deer, furs, ivory or truffles.',
