@@ -755,10 +755,33 @@ Per-item weights (done% in parens where partial):
   <=3-from-home guard all belong to the PATROL, which is not the code that
   moved this unit. They are not ruled out for other divergences but they are
   not this one.
-  NEXT STEP: find the TS twin of the ACTION path (not rivalPatrol) and compare
-  its target selection for this unit at t218 — GPU sends it to 739, TS to 738,
-  and 738 is not adjacent to 740, so TS reaches it in two steps while the GPU
-  arrives at its target in one and stops.
+  **PHASE HUNT (2026-07-28): FOUR of the five rival movement phases are now
+  ELIMINATED for this unit, by trace, not by reading.**
+   * `_rival_builder_actions` — traced: reads `moving=False`. It is the BUILDER
+     phase and the unit is a WARRIOR, so it was never a candidate; my first
+     trace went here by mistake and the `moving=False` it reported meant
+     nothing.
+   * `_apply_rival_unit_actions` — ruled out structurally: it gates on
+     `controlled[:, r]`, and rollout.json's action stream is PLAYER-only
+     (`{"t": 223, "u": [[731, 3, 0]]}`), so rivals are scripted in this run.
+   * `_rival_unit_peace_act` — traced: at t217 it fires only for v50
+     (`mp=4.0`, `roam=False`), never for the 2-move warrior.
+   * `_rival_unit_war_act` — traced: fires t210-t213 only, for units sitting at
+     `d_cur=0` (already on target, hence `moving=False`), and NOTHING at t218.
+  THE DISPATCH EXPLAINS THE SPLIT (engine.py ~13040/13062): the war act runs for
+  `atw_any`, the peace act for `active & ~atw_any`. Rival 1 is at war at
+  t210-213 and at peace by t217, so the two traces cover different turns — and
+  neither covers t218, when the unit actually moves 740 -> 739.
+  SO A FIFTH PATH MOVES IT. Leading candidate: an ATTACK-then-ADVANCE, i.e. the
+  warrior kills a barbarian on 739 and advances onto the cleared camp, rather
+  than making a walking move at all. That fits the evidence that no walk-phase
+  trace fires, and it fits the tiles: 739 and 738 are BOTH barbarian camps.
+  NEXT STEP: trace the advance-after-combat sites (the melee advance and
+  `_attack_encampment`) rather than the walk loops, and compare against the TS
+  attack/advance twin. Note that the B-26 round already found FOUR bugs in this
+  exact family (land-plane spawn probe, `adv_terr = land_ok` in melee advance,
+  an ungated civilian-kill advance, a missing `~naval` fortify gate), so an
+  advance-path asymmetry here is a priori likely.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
