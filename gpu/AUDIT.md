@@ -622,8 +622,27 @@ Per-item weights (done% in parens where partial):
   (`rules.eras`: found / conquer / wonder / pantheon / religion / gp), so the
   question is which EVENT one engine credits and the other does not, or credits
   at a different value. GPU is LOWER by 2, so TS awarded something extra.
-  NEXT STEP: resume the reproduction from the t105 checkpoint with per-event
-  era-score logging on both seats and compare the award stream around t112.
+  **NARROWED TO RELIGION FOUNDING (2026-07-28) — a COUNT vs a SET.**
+  Per-turn era score for rival 0, straight from the two statelogs:
+      t111 GPU 18 / TS 18 (agree) | t112 GPU 21 / TS 23 | t113 22/24 | t120 34/36
+  So at t112 the GPU awards +3 and TS awards +5 — ONE EXTRA 2-POINT EVENT on the
+  TS side, and the gap persists until the age reset zeroes both. The ladder has
+  exactly two 2-pointers (FOUND 2, RELIGION 2) and `ncity` is 7 on BOTH sides at
+  t112, so nothing was founded. That leaves RELIGION.
+  Both engines award ERA_SCORE_RELIGION at the founding moment, so the question
+  is WHEN the religion is founded, and the two gates are not the same test:
+   * TS (core/rivals.ts ~975-990) builds real lists and requires
+     `followers.length > 0 && founders.length > 0`, filtering on
+     `id !== state.religion.founder && !claimedBeliefs.includes(id)` — it
+     excludes claimed beliefs AND THE PLAYER'S OWN FOUNDER BELIEF.
+   * GPU (engine.py ~13078) gates on COUNTS:
+     `ropen = rdue & (claimed_f_n < followerPool 8) & (claimed_o_n < founderPool 8)`.
+  A count and a set diverge the moment their exclusion sets differ, and TS
+  carries an exclusion a bare count cannot represent. That shifts the founding
+  turn -> the era score -> the Age -> the 2.85 rGScore1 gap at t249.
+  NOT PROVEN YET. NEXT STEP: log both availability tests at t112 in the
+  reproduction (`.claude/hunt-rg`, still byte-identical) — TS's followers/founders
+  list lengths against the GPU's claimed_f_n / claimed_o_n and the pool sizes.
   **#78 (2026-07-28) - the epsilon tie-break bug, FOUND AND FIXED, but it is
   NOT the cause of this gap.** The GPU broke worked-tile ties by perturbing
   the score (`score - tc * 1e-9`) in self.dtype, where TS sorts
