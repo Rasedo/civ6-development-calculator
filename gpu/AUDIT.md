@@ -824,6 +824,30 @@ Per-item weights (done% in parens where partial):
   whose sole meaning today is the river buildability gate. This is a YIELDS-PATH
   slice on both engines, not a constant edit, so it is queued rather than
   folded into the government batch.
+  **IMPLEMENTED PLAYER-SIDE (2026-07-28, #78).** city.ts gains a waterMillBonus
+  applied POST-selection over the worked set, exactly like the neighbouring
+  petraBonus; the GPU mirrors it in the player worked-tile block next to the
+  Petra and farm-adjacency terms. Modelled GENERALLY — bonus category AND the
+  resource's own required improvement is FARM — so a third farm bonus resource
+  is picked up automatically instead of a hardcoded rice/wheat pair.
+  Two new plumbing pieces: an explicit `farmBonusFood` building flag (NOT the
+  existing `river` flag, which selects the same building today but means
+  "requires a river city" and would diverge the moment another river-gated
+  building exists), and `res_cat`, the per-tile resource CATEGORY plane that
+  export-gpu.ts has emitted as `res` all along and no engine ever consumed.
+  Gates: tsc clean, scripted parity 24x250 0.0 milli.
+  **RIVAL SIDE NOT IMPLEMENTED — a RECORDED deviation, not an oversight.** TS
+  rival cities do track buildings and DO model per-tile wonder bonuses
+  (rivals.ts petraDesert), and rivals do build Water Mills (the WATER_MILL
+  river check appears in their buildability path), so a faithful model owes
+  them this bonus too. Neither engine applies it, so they agree with each other
+  and parity stays green — the deviation is from CIV 6, which is exactly the
+  class of gap parity can never catch. Four sites exist for this mechanic
+  (TS player DONE, GPU player DONE, TS rival, GPU rival); the rival pair is
+  queued.
+  REACHABILITY UNMEASURED: whether any gate seed actually works a farm-improved
+  bonus resource in a city holding a Water Mill has not been checked, so parity
+  green here may be vacuous. Measure before treating this as verified.
   **GREAT LIBRARY, VERIFIED (2026-07-28, #78).** Direct Civilopedia fetch
   confirms the queued claim exactly: "+2 Great Works of Writing slots", on top
   of +2 Science, +1 Great Scientist point, +1 Great Writer point and +1000

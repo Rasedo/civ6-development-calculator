@@ -131,6 +131,7 @@ class Rules:
     b_amenities: torch.Tensor
     b_maintenance: torch.Tensor
     b_river: torch.Tensor  # bool
+    b_farmbonus: torch.Tensor  # bool — #78 Water Mill: farm-improved BONUS resources gain +1 food
     b_unlock: torch.Tensor  # tech index or -1
     b_unlock_civic: torch.Tensor  # civic index or -1 (Temple/Amphitheater/… gate on a civic, not a tech)
     b_req_district: torch.Tensor  # required district idx (-1 = City Center / none)
@@ -208,6 +209,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_amenities=torch.tensor([b["amenities"] for b in B], dtype=torch.float64),
         b_maintenance=torch.tensor([b["maintenance"] for b in B], dtype=torch.float64),
         b_river=torch.tensor([b["river"] for b in B], dtype=torch.bool),
+        b_farmbonus=torch.tensor([b.get("farmBonusFood", 0) for b in B], dtype=torch.bool),
         b_unlock=torch.tensor([b["unlockTech"] for b in B], dtype=torch.long),
         b_unlock_civic=torch.tensor([b.get("unlockCivic", -1) for b in B], dtype=torch.long),
         b_req_district=torch.tensor([b.get("reqDistrict", -1) for b in B], dtype=torch.long),
@@ -1181,6 +1183,10 @@ class BatchSim:
         self.res_imp = torch.tensor(
             [[t.get("rq", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device
         )
+        # #78: exported all along as `res` (1 bonus / 2 strategic / 3 luxury,
+        # 0 none) but never consumed. Static — a tile's resource CATEGORY never
+        # changes — so it is a constant plane like res_imp, not _MUTABLE state.
+        self.res_cat = torch.tensor([[t.get("res", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.farm_flat = torch.tensor([[t.get("fa_f", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.farm_hill = torch.tensor([[t.get("fa_h", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.mine_ok = torch.tensor([[t.get("mi", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -3222,6 +3228,25 @@ class BatchSim:
         fadj_w = (fadj.unsqueeze(1).expand(B, C, T).gather(2, top_tile) * take.to(self.dtype)).sum(dim=2)  # [B, C]
         worked_y = worked_y.clone()
         worked_y[:, :, 0] = worked_y[:, :, 0] + fadj_w
+
+        # AUDIT #78 — WATER MILL: "Bonus resources improved by Farms gain +1
+        # Food each" (Gathering Storm Civilopedia). POST-selection over the
+        # worked set, exactly like the Petra and farm-adjacency terms above,
+        # mirroring city.ts's waterMillBonus. Modelled GENERALLY (bonus
+        # category + the resource's own required improvement is FARM) rather
+        # than as a named rice/wheat pair, so a third farm bonus resource picks
+        # it up automatically. The city CENTER never qualifies — it carries no
+        # improvement — which is why it needs no separate term here.
+        wm_city = self.buildings[:, :, rd.b_farmbonus]  # [B, C, n] -> any()
+        if wm_city.numel() and bool(wm_city.any()):
+            has_wm = wm_city.any(dim=2)  # [B, C]
+            elig = (
+                (self.improvement == self.FARM)
+                & (self.res_cat == 1)  # bonus category
+                & (self.res_imp == self.FARM)  # ...whose improvement IS the farm
+            )  # [B, T]
+            wm_w = (elig.unsqueeze(1).expand(B, C, T).gather(2, top_tile) & take).to(self.dtype).sum(dim=2)
+            worked_y[:, :, 0] = worked_y[:, :, 0] + wm_w * has_wm.to(self.dtype)
 
         # D-10: walk-scoped sub-term cache. The step() walk's guard-triggered
         # recomputes (lux is not None — the frozen luxMap path) mostly fire on

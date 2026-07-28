@@ -523,10 +523,27 @@ export function computeCityStats(
       addYields(tiles, { food: 2, gold: 2, production: 1 });
     }
   };
+  // AUDIT #78 — WATER MILL, sourced from the Gathering Storm Civilopedia:
+  // "Bonus resources improved by Farms gain +1 Food each." Modelled in its
+  // GENERAL form, not as a named rice/wheat pair: the queued brief said
+  // "rice/wheat", which happens to be the same set today only because
+  // resources.ts carries no Maize, and would silently drift the moment a third
+  // farm bonus resource is added.
+  // Per-CITY, so it cannot ride ctx.mods like farmAdjTier (a research-wide
+  // modifier) — tileYields has no idea which city works the tile. Applied over
+  // the worked set exactly like petraBonus above.
+  const hasWaterMill = city.buildings.includes('WATER_MILL');
+  const waterMillBonus = (t: Tile) => {
+    if (!hasWaterMill || t.improvement !== 'FARM' || !t.resource) return;
+    const r = RESOURCES[t.resource];
+    if (r?.category === 'bonus' && r.improvement === 'FARM') tiles.food += 1;
+  };
   petraBonus(center);
+  waterMillBonus(center);
   for (const i of worked) {
     addYields(tiles, tileYields(ctx, map.tiles[i]));
     petraBonus(map.tiles[i]);
+    waterMillBonus(map.tiles[i]);
   }
 
   // --- districts & buildings -------------------------------------------------

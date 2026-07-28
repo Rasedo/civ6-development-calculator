@@ -1106,6 +1106,11 @@ const rules = {
     // buildings (Market/Bank/Stock Exchange) are upkeep-free, like cost-0 ones.
     maintenance: b.cost === 0 ? 0 : b.maintenance !== undefined ? b.maintenance : b.worship || b.district === 'COMMERCIAL_HUB' ? 0 : b.cost >= 500 ? 3 : b.cost >= 190 ? 2 : 1, // P4/D-13 mirror
     river: b.special === 'WATER_MILL',
+    // AUDIT #78: the Water Mill's "Bonus resources improved by Farms gain +1
+    // Food each". Deliberately NOT reusing `river` above, which happens to
+    // select the same building today but means "requires a river city" — the
+    // two would diverge the moment another river-gated building is added.
+    farmBonusFood: b.special === 'WATER_MILL',
     unlockTech: buildingUnlockTech.get(b.id) ?? -1,
     unlockCivic: buildingUnlockCivic.get(b.id) ?? -1,
     // District buildings are gated (mirrors availableBuildings) on the city
