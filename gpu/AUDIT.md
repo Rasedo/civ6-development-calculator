@@ -776,12 +776,33 @@ Per-item weights (done% in parens where partial):
   warrior kills a barbarian on 739 and advances onto the cleared camp, rather
   than making a walking move at all. That fits the evidence that no walk-phase
   trace fires, and it fits the tiles: 739 and 738 are BOTH barbarian camps.
-  NEXT STEP: trace the advance-after-combat sites (the melee advance and
-  `_attack_encampment`) rather than the walk loops, and compare against the TS
-  attack/advance twin. Note that the B-26 round already found FOUR bugs in this
-  exact family (land-plane spawn probe, `adv_terr = land_ok` in melee advance,
-  an ungated civilian-kill advance, a missing `~naval` fortify gate), so an
-  advance-path asymmetry here is a priori likely.
+  **MOVER IDENTIFIED (2026-07-28): `_rival_unit_war_act`'s WALK, at t217.**
+  A phase-boundary DIFFER settled it where five rounds of hand-placed traces had
+  not: snapshot every rival unit's tile for the batch row, compare after each
+  phase, print what changed.
+      [h78] t217 AFTER general:   {50: (740, 692), 66: (741, 693)}
+      [h78] t217 AFTER war/walk:  {1: (740, 739)}
+      [h78] t218 AFTER builder:   {78: (None, 740)}
+  So rival unit v1 walks 740 -> 739 during the WAR MARCH on turn 217 and stops;
+  the advance-after-combat path never fires (its trace produced ZERO lines).
+  TWO TRAPS THIS EXPOSED, both of which cost rounds:
+   * a hand-placed trace on the `mv = (... has_imp ... mp >= cost)` pattern went
+     into the BARBARIAN walk, not the rival war walk — the two loops are
+     textually near-identical and `str.replace(..., 1)` takes the first. The
+     trace then printed plausible-looking lines from the wrong loop. The DIFFER
+     has no such failure mode; use it FIRST next time.
+   * the statelog is keyed by TILE, not unit: v1 vacates 740 at t217 and a
+     DIFFERENT unit, v78, SPAWNS on 740 at t218. Reading the log naively makes
+     it look like one unit stood still. Any TS-side comparison must key on unit
+     identity.
+  STATE: GPU walks 740 -> 739 (one step) and halts; TS ends on 738, which is not
+  adjacent to 740, so TS took two steps. Both tiles are barbarian camps.
+  NEXT STEP: read the TS WAR-MARCH twin — NOT `rivalPatrol`, which is the PEACE
+  patrol I already compared and which does not run for a rival at war — and
+  compare its per-step halt conditions (cost, ZOC after the camp clear, the
+  strict-progress test) against the GPU walk's
+  `mv = roam & (best < 1e9) & (d_best < d_cur) & (has_imp | d_best >= 1) &
+  ((mp >= cost) | (mp >= full_mp))` plus its post-step ZOC zeroing.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
