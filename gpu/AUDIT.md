@@ -681,10 +681,28 @@ Per-item weights (done% in parens where partial):
   founded two cities at t111 the counts should differ, and they do not.
   Candidates: a founding immediately undone (razed/lost) that keeps its era
   score; a double-award on a single event; or a 2-point path not yet enumerated.
-  NEXT STEP: the same probe GPU-side, filtered to batch row 56 and rival 0 for
-  t110-114, tagging each `era_score[..., r + 1] +=` with its event kind. Compare
-  the two NAMED streams — do not infer from deltas again, which is exactly what
-  produced the retracted religion narrative.
+  **LOCALIZED (2026-07-28): it is the B-24 DEDICATION award, and the two engines
+  run DIFFERENT FORMULAS.** GPU named stream (row 56, rival 0):
+      t111 dedication 18->20 | t115 dedication 24->26 | t116 gp 27->28 |
+      t116 dedication 28->30
+  Every 2-point award around t111 on BOTH seats is a DEDICATION — retiring the
+  last of the FOUND/RELIGION reasoning.
+   * TS `core/eras.ts dedicationEraScore`: gated on age !== 2 (not Golden),
+     returns `DEDICATION_ERA_SCORE (1) * dedications[civ]` — a PER-TURN
+     climb-out bonus scaled by the civ's dedication COUNT.
+   * GPU `engine.py ~8318`: `era_score[:, civ] += pay * n * _ded_event_score[kind]`
+     with `DED_EVENT_SCORE = [1, 1, 1, 2]` — an EVENT-KEYED payout scaled by the
+     dedication KIND.
+  Both emit +2 here by different routes (a count of 2 vs a kind score of 2), so
+  they agree by coincidence until count and kind-score part — exactly the shape
+  of a latent that hides for a hundred turns then leaves a permanent gap.
+  WHICH IS RIGHT IS UNDECIDED and must not be settled by mirroring. #77 landed
+  the event-keyed dedication catalog, so the GPU may be the newer intent and TS
+  the stale seat — or the two are meant to COEXIST (a per-turn climb-out AND an
+  event payout), in which case one engine is missing a term rather than
+  disagreeing on one. Read the #77 entry and the Civ 6 rule first.
+  NEXT STEP: diff the two dedication paths end to end and establish whether they
+  are meant to be the same award at all.
   (Superseded account follows.)
   **TRACED (2026-07-28): the GPU founds at t78, gated by the PROPHET.**
       t76-77  pantheon=True hs=True prophets=0  -> rdue=False
