@@ -891,12 +891,39 @@ Per-item weights (done% in parens where partial):
   and resolves; an attack that repeats forever against an unchanging board is a
   target the scan believes in and the resolver cannot act on. Meanwhile TS finds
   no target at all and marches to 738.
-  NEXT STEP: print the attack branch's CHOSEN TILE and what the GPU thinks
-  occupies it (player unit / city / district / CS centre / enemy-rival city),
-  then compare with TS's `attackTargets(state, unit)` for the same unit and
-  turn. The suspicion is a target-eligibility mask that admits a tile the
-  resolver then declines — the unit burns its action every turn and never
-  marches, which is exactly the observed freeze.
+  **THE TARGET IS THE CIV'S OWN CITY (2026-07-28).**
+      t218 v1 here=739 attack=True march=False | tgt_tile=740 center_at=-1 rvcity_at=1 hp=True rng=1
+  Tile 740 — the tile the unit VACATED at t217 — carries `rvcity_at=1`, a city
+  belonging to rival 1, the unit's OWN civ. (The differ's
+  `t218 AFTER builder: {78: (None, 740)}` is that city's first unit spawning.)
+  So a rival unit targets its own city, the resolver refuses, `attack` stays
+  true, `march` is suppressed, and the unit freezes from t218 to the end.
+  THE PREDICATE IS OWNERSHIP-BLIND IN BOTH ENGINES. GPU:
+  `((center_at >= 0) | (rvcity_at >= 0)) & hp` — once hostile to the PLAYER,
+  every centre in range counts, including its own and those of rivals it is at
+  PEACE with. TS is the same by construction: `combat.ts:768`
+  `playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range`,
+  with no owner test at all. The in-code comment calls this a "quirk" to mirror;
+  that is the wrong conclusion. A unit attacking its own city and freezing
+  forever is not a Civ 6 rule, it is a missing hostility check — and mirroring
+  it keeps the gates green while BOTH engines drift from Civ 6, the one class
+  parity structurally cannot catch.
+  **FIXING ONLY THE GPU WAS TRIED AND IS WRONG — MEASURED.** Replacing the term
+  with `((center_at >= 0) & hp) | enemy_rc | units_pl` (enemy_rc = not mine AND
+  at war, applied at full range so ranged bombardment survives) took the gate
+  from 1 failure to **13**, adding e.g. seed 9118 t46 column 43. The correction
+  is right for Civ 6 but must land on BOTH engines in one slice, or the GPU
+  simply stops matching TS everywhere the blind predicate fires. Queued.
+  ALSO CORRECTED: my earlier claim that "TS does not do this" was wrong. TS does
+  it generally — the 13 failures prove it — it merely did NOT fire in seed 9170
+  at t218. That asymmetry is now the live question.
+  **NEW LEADING HYPOTHESIS: within-turn ORDER of rival city founding vs rival
+  unit actions.** If the GPU founds the city on 740 BEFORE its units act while TS
+  acts units first, then at t218 the GPU's unit sees a centre on 740 and freezes
+  while TS's unit sees open ground and marches to 738 — matching the observed
+  split exactly, and explaining why the blind predicate fires in one engine only
+  on this turn. NEXT STEP: compare the rival-phase ordering (found -> act vs
+  act -> found) in `_rival_phase` against rivals.ts's rivalPhase.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
