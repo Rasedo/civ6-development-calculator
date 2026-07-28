@@ -189,6 +189,25 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
 
 // ---------------------------------------------------------------------------
 
+/**
+ * #78 SOURCING SWEEP (2026-07-28), by direct GS Civilopedia fetch.
+ *
+ * VERIFIED: MONARCHY is tier 2 and its entry reads "2 Diplomatic Favor per
+ * turn" — which validates B-22/#75's whole favor chain end to end, since that
+ * mechanic pays favor equal to the government TIER. Chiefdom at tier 0 paying
+ * nothing is consistent with the same rule.
+ *
+ * ONE SOURCED DEVIATION, recorded not fixed: the real Monarchy's POLICY SLOTS
+ * are 2 Military / 1 Economic / 1 Diplomatic / 2 Wildcard. This model gives it
+ * 3 Military / 1 Economic / 1 Diplomatic / 1 Wildcard — the same TOTAL of six,
+ * but a different composition, so it admits one more military card and one
+ * fewer wildcard. Slot composition gates which cards can be slotted at all, so
+ * this is a real behavioural difference, not cosmetic. Fixing it means
+ * re-checking every government's slot list against the Civilopedia (ten
+ * entries) and re-gating, so it is its own round.
+ *
+ * The individual POLICY CARD effects are NOT swept — NARROWED marker.
+ */
 export interface GovernmentDef {
   id: string;
   name: string;

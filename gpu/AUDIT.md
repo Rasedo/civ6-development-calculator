@@ -580,6 +580,18 @@ Per-item weights (done% in parens where partial):
   TWO stand (Arena 1->2, Stadium 2->1, both Civilopedia-fetched) plus Crater
   Lake 4->5 (now fetch-confirmed); TWO were WRONG and are reverted (Camp,
   Coal), both taken from search summaries.
+  **SLICE 17 - src/data/policies.ts government tiers (2026-07-28, #78).**
+  VERIFIED by direct Civilopedia fetch: MONARCHY is tier 2 and its entry reads
+  "2 Diplomatic Favor per turn" - which validates B-22/#75's favor chain END TO
+  END, since that mechanic pays favor equal to the government TIER (and
+  Chiefdom at tier 0 paying nothing follows the same rule).
+  ONE SOURCED DEVIATION recorded: the real Monarchy's POLICY SLOTS are
+  2 Military / 1 Economic / 1 Diplomatic / 2 Wildcard; this model gives it
+  3 Military / 1 Economic / 1 Diplomatic / 1 Wildcard - same TOTAL of six, but
+  it admits one more military card and one fewer wildcard. Slot composition
+  gates which cards can be slotted, so it is behavioural, not cosmetic. Fixing
+  it means re-checking all ten governments' slot lists and re-gating - its own
+  round. Individual POLICY CARD effects not swept; NARROWED marker.
   **SLICE 16 - src/data/builtWonders.ts (2026-07-28, #78).** Spot-checked by
   direct Civilopedia fetch: PYRAMIDS 220 Production and GREAT_LIBRARY 400
   Production both CORRECT as written. Remaining wonder COSTS not individually
