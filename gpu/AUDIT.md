@@ -824,6 +824,21 @@ Per-item weights (done% in parens where partial):
   whose sole meaning today is the river buildability gate. This is a YIELDS-PATH
   slice on both engines, not a constant edit, so it is queued rather than
   folded into the government batch.
+  **GREAT LIBRARY, VERIFIED (2026-07-28, #78).** Direct Civilopedia fetch
+  confirms the queued claim exactly: "+2 Great Works of Writing slots", on top
+  of +2 Science, +1 Great Scientist point, +1 Great Writer point and +1000
+  Tourism from Rock Concerts, at 400 Production (cost already correct).
+  The blocker is confirmed ARCHITECTURAL, not a data gap: slots come from
+  GW_BUILDINGS in data/greatPeople.ts, a fixed one-building-per-kind table
+  (AMPHITHEATER/MUSEUM/BROADCAST_CENTER with GW_SLOTS [2,3,1]) keyed off
+  `city.buildings.includes(building)`. A WONDER has no way to contribute
+  capacity. Implementing it means a second, additive wonder-slot channel
+  threaded through the capacity computation on BOTH engines — a real slice,
+  correctly queued rather than faked with a data edit.
+  APPEAL TERMS: still UNVERIFIED. The Civilopedia appeal concept page 404s
+  under both slugs tried (concept_appeal, concept_appeal_of_a_tile), so the
+  two queued appeal terms stay unsourced rather than being written up off a
+  search summary — the failure mode this whole class exists to avoid.
   WHY NONE OF THEM EVER TRIPPED A GATE: every error preserved the government's
   TOTAL slot count and only got the composition wrong — a Wildcard standing in
   for a Diplomatic slot, or a Military for a Wildcard. Slot COUNT is what any
