@@ -598,6 +598,16 @@ Per-item weights (done% in parens where partial):
   threshold is expected and is NOT a bug — but it is unproven either way and
   is deliberately NOT asserted by the lane. Next step: bisect seed9002's f32
   vs f64 city food/growth around the first differing turn.
+  GATE: BATTERY OK, every lane green. The f64 lanes landed exactly on their
+  historical baselines (parity 650.1s vs ~650, gpu-gate 593.6s vs ~594),
+  confirming by MEASUREMENT what the fix predicted by construction: forcing
+  the key to f64 costs those lanes nothing. The 3760s wall was eval-random
+  1653s + eval-scripted 1473s. That pattern superficially indicts the change
+  (they are the f32 lanes it touches) but the arithmetic refutes it: the
+  .double() sits AFTER the gather, on ~11k elements, sub-second in total
+  across a run. Most likely the historical ~584s battery figures were
+  --no-eval, plus machine contention. UNRESOLVED and cheap to settle with one
+  uncontended eval.py run — worth doing before P8, which trains in f32.
   **THE 1.0 GAP IS NOT THE ENVOY BONUS - IT IS A DOWNSTREAM TILE PICK
   (2026-07-28, #78).** Decisive arithmetic, no rollout needed. BALANCED_WEIGHTS
   are food 1, production 2, gold 1, science 1.5, culture 1.5, faith 0.75, and
