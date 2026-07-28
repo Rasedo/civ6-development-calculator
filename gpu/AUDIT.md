@@ -917,13 +917,34 @@ Per-item weights (done% in parens where partial):
   ALSO CORRECTED: my earlier claim that "TS does not do this" was wrong. TS does
   it generally — the 13 failures prove it — it merely did NOT fire in seed 9170
   at t218. That asymmetry is now the live question.
-  **NEW LEADING HYPOTHESIS: within-turn ORDER of rival city founding vs rival
-  unit actions.** If the GPU founds the city on 740 BEFORE its units act while TS
-  acts units first, then at t218 the GPU's unit sees a centre on 740 and freezes
-  while TS's unit sees open ground and marches to 738 — matching the observed
-  split exactly, and explaining why the blind predicate fires in one engine only
-  on this turn. NEXT STEP: compare the rival-phase ordering (found -> act vs
-  act -> found) in `_rival_phase` against rivals.ts's rivalPhase.
+  **ROOT CAUSE CONFIRMED (2026-07-28): the own-city target SUPPRESSES the march.**
+  The river was a red herring. Tile 739's real mask is `rm=14` (bits 1,2,3), so
+  bit 3 = West IS set — there genuinely is a river on the 739->738 edge and the
+  GPU's cost=4.0 is CORRECT. (The confusion came from reading `riv`, a boolean
+  `hasRiver`, as the six-bit mask; the mask key is `rm`.)
+  THE CHAIN, entirely from traces:
+    t217  both engines step 740 -> 739 (cost 1.0), then both CORRECTLY refuse
+          the second step: mp 2.0 < cost 4.0 and 2.0 < full 3.0.
+    t218  both hold FULL MP (3.0), and both engines carry the same "a unit at
+          full MP may always take one step" rule (GPU `mp >= full_mp`, TS
+          `movesLeft < full`). TS applies it, pays the river, reaches 738.
+          The GPU never reaches its march: the attack scan finds the civ's OWN
+          city on 740 at d=1, so `attack=True` and
+          `march = act & ~attack & ...` is False. The unit is stranded on 739
+          for the rest of the game.
+  So the ownership-blind predicate is the ROOT CAUSE, not an aftermath, and not
+  the movement cost. The fix is task #47 and must land on BOTH engines together
+  — a GPU-only correction measured 13 gate failures against a baseline of 1.
+  STILL OPEN, the only remaining gap: TS's predicate is equally blind
+  (combat.ts:768), so why does it not fire on 740 at t218? Most likely the city
+  on 740 exists in the GPU at t218 but NOT YET in TS, which would put the true
+  first divergence UPSTREAM at the founding turn. NEXT STEP: compare the rival
+  city-founding turn for tile 740 between the engines.
+  (Superseded hypothesis, kept as a record of what was ruled out: within-turn
+  ORDER of founding vs unit acts. REFUTED — both engines found cities BEFORE
+  units act: GPU `_rival_try_found` at 7494/11951/12416 precedes the unit
+  dispatch at 12888/13068/13091; TS `tryFoundCity` at 2659/3043 precedes the
+  unit loop at 3341.)
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
