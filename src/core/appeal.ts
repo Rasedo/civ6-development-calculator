@@ -1,6 +1,24 @@
 /**
- * Tile appeal (eyeballed Civ 6): natural wonders and greenery raise it,
- * heavy industry and jungle/marsh lower it. Drives Neighborhood housing.
+ * Tile appeal: natural wonders and greenery raise it, heavy industry and
+ * jungle/marsh lower it. Drives Neighborhood housing, and (since #71/#73) the
+ * Seaside Resort's gold and tourism.
+ *
+ * #78 SOURCING SWEEP (2026-07-28), verified against the Civilization wiki's
+ * Appeal page. Every term below is CORRECT as written: an adjacent NATURAL
+ * WONDER is +2, an adjacent MOUNTAIN / WOODS / COAST or LAKE is +1, and an
+ * adjacent RAINFOREST, MARSH, MINE, QUARRY, OIL WELL, INDUSTRIAL ZONE or
+ * ENCAMPMENT is -1. The modifiers are cumulative, as here.
+ *
+ * TWO SOURCED GAPS, recorded not fixed (each is an appeal change that moves
+ * Neighborhood housing AND Seaside Resort yields, so it needs its own gated
+ * round on both engines):
+ *  1. An adjacent OASIS gives +1 in real Civ 6; this model has no oasis term.
+ *     Adjacent RIVERS also give +1 — the model credits LAKE by terrain but not
+ *     a river edge.
+ *  2. A tile that IS a MOUNTAIN or a NATURAL WONDER is BREATHTAKING by default
+ *     in real Civ 6, irrespective of its neighbours. This model scores every
+ *     tile purely from adjacency, so such a tile only reaches Breathtaking if
+ *     its own neighbours happen to add up.
  */
 
 import type { GameMap, Tile } from './types';

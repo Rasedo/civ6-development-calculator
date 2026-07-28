@@ -537,8 +537,17 @@ Per-item weights (done% in parens where partial):
   change needing its own gated round on both engines, and it interacts with the
   existing B-21 note (the real 3-/6-envoy steps also key on the district's
   BUILDING TIERS, already recorded there as a degraded channel).
-  12 marked files remain; constants.ts, projects.ts, resources.ts and
-  cityStates.ts carry NARROWED markers (swept parts cited in place, unswept
+  **SLICE 7 — src/core/appeal.ts (2026-07-28, #78).** Every appeal term VERIFIED
+  CORRECT against the wiki's Appeal page (adjacent natural wonder +2; mountain /
+  woods / coast / lake +1; rainforest, marsh, mine, quarry, oil well, industrial
+  zone, encampment -1; cumulative). TWO SOURCED GAPS, recorded not fixed — each
+  moves Neighborhood housing AND Seaside Resort yields, so each needs its own
+  gated round: (1) an adjacent OASIS gives +1 and adjacent RIVERS give +1, and
+  this model has neither term (it credits LAKE by terrain only); (2) a tile that
+  IS a mountain or natural wonder is BREATHTAKING BY DEFAULT in real Civ 6,
+  where this model scores every tile purely from adjacency.
+  11 marked files remain; constants.ts, projects.ts, resources.ts,
+  cityStates.ts and appeal.ts carry NARROWED markers (swept parts cited in place, unswept
   parts named). SIX slices in, the pattern is settled: THREE files had real
   errors (improvements, buildings, cityStates), THREE were correct as written
   (constants water-housing, projects mapping, resources bonus rows), and every
