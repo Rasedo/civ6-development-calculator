@@ -591,7 +591,10 @@ Per-item weights (done% in parens where partial):
   it admits one more military card and one fewer wildcard. Slot composition
   gates which cards can be slotted, so it is behavioural, not cosmetic. Fixing
   it means re-checking all ten governments' slot lists and re-gating - its own
-  round. POLICY CARDS spot-checked: URBAN_PLANNING is "+1 Production in all
+  round. **MONARCHY'S SLOTS ARE NOW FIXED** (2026-07-28): 3M/1E/1D/1W ->
+  2M/1E/1D/2W, the Civilopedia composition. Battery OK. The other nine
+  governments' slot lists are still unfetched.
+  POLICY CARDS spot-checked: URBAN_PLANNING is "+1 Production in all
   cities" in an ECONOMIC slot - text, effect and slot type all match. The
   remaining card effects are not individually fetched; NARROWED marker.
   **SWEEP STATUS: all 18 marked files have now been touched** - 10 fully or

@@ -197,14 +197,11 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
  * mechanic pays favor equal to the government TIER. Chiefdom at tier 0 paying
  * nothing is consistent with the same rule.
  *
- * ONE SOURCED DEVIATION, recorded not fixed: the real Monarchy's POLICY SLOTS
- * are 2 Military / 1 Economic / 1 Diplomatic / 2 Wildcard. This model gives it
- * 3 Military / 1 Economic / 1 Diplomatic / 1 Wildcard — the same TOTAL of six,
- * but a different composition, so it admits one more military card and one
- * fewer wildcard. Slot composition gates which cards can be slotted at all, so
- * this is a real behavioural difference, not cosmetic. Fixing it means
- * re-checking every government's slot list against the Civilopedia (ten
- * entries) and re-gating, so it is its own round.
+ * MONARCHY's slots are CORRECTED here to the Civilopedia's 2 Military /
+ * 1 Economic / 1 Diplomatic / 2 Wildcard (they were 3M/1E/1D/1W — same total
+ * of six, but one extra military card and one fewer wildcard, which gates what
+ * can be slotted). The OTHER NINE governments' slot lists are NOT yet fetched
+ * and remain a recorded residual.
  *
  * POLICY CARDS, spot-checked: URBAN_PLANNING is "+1 Production in all cities"
  * in an ECONOMIC slot — this model's text, effect AND slot type all match.
@@ -243,7 +240,11 @@ export const GOVERNMENTS: Record<string, GovernmentDef> = Object.fromEntries(
       'Combat bonuses (not modeled in this calculator).'),
     G('CLASSICAL_REPUBLIC', 'Classical Republic', 1, [E, E, D, W], { amenitiesAll: 1 },
       '+1 amenity in all cities.'),
-    G('MONARCHY', 'Monarchy', 2, [M, M, M, E, D, W], { housingAll: 1 },
+    // #78 (2026-07-28): slots corrected 3M/1E/1D/1W -> 2M/1E/1D/2W. The GS
+    // Civilopedia's Monarchy entry lists 2 Military, 1 Economic, 1 Diplomatic
+    // and 2 Wildcard. Same total of six, but the old split admitted one extra
+    // military card and one fewer wildcard, which gates what can be slotted.
+    G('MONARCHY', 'Monarchy', 2, [M, M, E, D, W, W], { housingAll: 1 },
       '+1 housing in all cities.'),
     G('MERCHANT_REPUBLIC', 'Merchant Republic', 2, [M, E, E, D, W, W], { yieldMult: { gold: 1.1 } },
       '+10% gold in all cities.'),
