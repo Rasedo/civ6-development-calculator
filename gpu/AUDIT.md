@@ -652,6 +652,26 @@ Per-item weights (done% in parens where partial):
   unfounded at t112, which is exactly where the arithmetic demanded its +2.
   So the question moves UPSTREAM to the eligibility gate rather than the draw:
       rdue = active & ~done & pantheon_done & (prophets > 0) & has_holy_site
+  **RETRACTED (2026-07-28): the religion narrative below is WRONG.** Rival 0's
+  era score in both statelogs reads t76 3/3, t77 3/3, t78 3/3, **t79 6/6 (+3 on
+  BOTH)**, t80 7/7, t110 17/17 — the two engines agree unbroken from t76 to t111,
+  so TS founds its religion at ~t79 exactly as the GPU does. The religion timing
+  does NOT diverge and the different-Ages story is false.
+  TWO METHOD ERRORS produced it, both mine: (1) the TS probe filtered on
+  `rival.id === 0` but NOT on the GAME, and the replay walks all 72 — its
+  `done=false` lines at t112 were from other games, a flaw I had ALREADY recorded
+  one commit earlier and then reasoned from anyway; (2) I assumed a 2-point gap
+  must be ONE 2-point event, when two 1-pointers (GP, pantheon, dedication) give
+  the same delta — that is what made RELIGION look like the only candidate.
+  WHAT SURVIVES, all measured: first divergence t112 (GPU 21 / TS 23); exact
+  agreement through t111; +3 GPU vs +5 TS at t112; the gap persists to t120 and
+  is wiped by an Age reset (both 0 at t150); and the GPU's gate trace itself is
+  sound (pantheon + holy site ready by t76, prophet at t78, founds t78/79).
+  NEXT STEP: instrument the era-score AWARD SITES — every `addEraScore` in TS and
+  every `era_score[...] +=` on the GPU — filtered to the LOGGED GAME and rival 0
+  at t112, printing the EVENT KIND. Name the award instead of inferring it from a
+  delta. The GPU row filter (batch row 56) is right; TS needs a game filter.
+  (Superseded account follows.)
   **TRACED (2026-07-28): the GPU founds at t78, gated by the PROPHET.**
       t76-77  pantheon=True hs=True prophets=0  -> rdue=False
       t78     prophets=1                        -> rdue=True ropen=True -> FOUNDS
