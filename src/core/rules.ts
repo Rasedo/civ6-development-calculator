@@ -82,7 +82,19 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
  */
 export function validImprovementsIn(
   tile: Tile,
-  opts: { unlocks: Unlocks | null; ownsTile: (t: Tile) => boolean; map?: GameMap },
+  opts: {
+    unlocks: Unlocks | null;
+    ownsTile: (t: Tile) => boolean;
+    map?: GameMap;
+    /**
+     * B-27 (#78): the unit TYPE proposing the improvement. This validator was
+     * unit-agnostic because every improvement before the FORT could be built by
+     * any Builder — the FORT is the first that cannot (Military Engineer only).
+     * Callers that pass nothing keep the old behaviour and simply never see the
+     * FORT offered, which is a safe default rather than a silent rule change.
+     */
+    builder?: string;
+  },
 ): ImprovementId[] {
   if (!opts.ownsTile(tile)) return []; // must be inside the owner's borders
   // A-8 gate-catch (rng 2026006080 t246): builtWonder tiles are PAVED — an
@@ -115,6 +127,11 @@ export function validImprovementsIn(
     out.push('FARM');
   }
   if (unlocked('MINE') && hills && tile.feature === null) out.push('MINE');
+  // B-27 (#78) FORT — Military Engineer only, and only on open ground. Real
+  // Civ 6 allows it on any passable land tile the owner holds; the district /
+  // wonder / impassable paves are already refused above, and a resource tile
+  // returns early with its own improvement, so nothing more is needed here.
+  if (unlocked('FORT') && opts.builder === 'MILITARY_ENGINEER') out.push('FORT');
   if (unlocked('LUMBER_MILL') && tile.feature === 'WOODS') out.push('LUMBER_MILL');
   // B-27 (#71) SEASIDE RESORT — real Civ 6: a FLAT COASTAL Grassland/Plains/
   // Desert tile with BREATHTAKING appeal (>= 4). Needs the map (coast

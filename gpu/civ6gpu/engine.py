@@ -1143,6 +1143,7 @@ class BatchSim:
         self.LUMBER = ids.index("LUMBER_MILL") if "LUMBER_MILL" in ids else -1
         # B-27 (#71): the Seaside Resort (appended LAST in IMPROVEMENT_IDS).
         self.SEASIDE = ids.index("SEASIDE_RESORT") if "SEASIDE_RESORT" in ids else -1
+        self.FORT = ids.index("FORT") if "FORT" in ids else -1  # B-27 (#78)
         # P4/D-20: food improvements heal their pillager (combat.ts
         # PILLAGE_HEAL_IMPROVEMENTS); indexed by improvement code.
         heal_names = ("FARM", "PASTURE", "CAMP", "PLANTATION", "FISHING_BOATS")
@@ -5979,7 +5980,7 @@ class BatchSim:
                 # the base def_cs so the embarked override below drops it (like B-7
                 # support), exactly matching TS defenderCS.
                 v_lvl5 = torch.where(is_b, torch.zeros_like(is_b, dtype=torch.long), self._xp_lvl_bonus(self.v_xp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)))
-                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3 + v_lvl5  # B-5 + B-4
+                def_cs = torch.where(is_b, b_cs, v_cs) + self._tdef_g(tc) + torch.where(is_b, b_fy, v_fy) * 3 + v_lvl5  # B-5 + B-4
                 # #45/B-6: an EMBARKED rival defender overrides to a flat CS —
                 # no terrain/fortify (and no support below). Barbs never embark.
                 v_embd = self.v_emb.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1) & ~is_b
@@ -6072,7 +6073,7 @@ class BatchSim:
                 # B-4: rival defender veterancy (barbs none), dropped by the
                 # embarked override below (like B-7 support).
                 v_lvl5 = torch.where(is_b, torch.zeros_like(is_b, dtype=torch.long), self._xp_lvl_bonus(self.v_xp.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)))
-                def_cs = torch.where(is_b, b_cs, v_cs) + self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1) + torch.where(is_b, b_fy, v_fy) * 3 + v_lvl5  # B-5 + B-4
+                def_cs = torch.where(is_b, b_cs, v_cs) + self._tdef_g(tc) + torch.where(is_b, b_fy, v_fy) * 3 + v_lvl5  # B-5 + B-4
                 # #45/B-6: embarked rival defender → flat CS, no terrain/support.
                 v_embd = self.v_emb.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1) & ~is_b
                 def_cs = torch.where(v_embd, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
@@ -6126,7 +6127,7 @@ class BatchSim:
             r_civ = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & rvc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd
             if bool(r_civ.any()):
                 atk_rs = self._p_rng_str[self.p_type[:, p]]
-                def_cs = self.tdef.gather(1, tc.unsqueeze(1)).squeeze(1).to(atk_rs.dtype)  # civilian combat 0 + terrain
+                def_cs = self._tdef_g(tc).to(atk_rs.dtype)  # civilian combat 0 + terrain
                 # #45/B-6: an embarked lone civilian defends at the flat CS (TS
                 # defenderCS applies the override to any defender, civilian too).
                 civ_embd = self.v_emb.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -6972,7 +6973,7 @@ class BatchSim:
                 d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
                 # B-4: only a rival MILITARY target (is_rmil) carries veterancy.
                 def_xp = torch.where(is_rmil, self._xp_lvl_bonus(self.v_xp[bidx, m_slot.clamp(min=0)]), torch.zeros_like(tt))
-                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt] + def_xp  # + B-4
+                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self._tdef_i(bidx, tt) + def_xp  # + B-4
                 # #45/B-6: an embarked rival target (military/civilian; barbs
                 # never embark) → flat CS, no terrain (and no support below).
                 d_emb = (self.v_emb[bidx, m_slot.clamp(min=0)] & is_rmil) | (self.v_emb[bidx, c_slot.clamp(min=0)] & is_rciv)
@@ -7069,7 +7070,7 @@ class BatchSim:
                 d_cs_rmil = self._p_combat[self.v_type[bidx, m_slot.clamp(min=0)]]
                 d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
                 def_xp = torch.where(is_rmil, self._xp_lvl_bonus(self.v_xp[bidx, m_slot.clamp(min=0)]), torch.zeros_like(tt))
-                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self.tdef[bidx, tt] + def_xp
+                def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_rmil, d_cs_rmil, d_cs_rciv)) + self._tdef_i(bidx, tt) + def_xp
                 d_emb = (self.v_emb[bidx, m_slot.clamp(min=0)] & is_rmil) | (self.v_emb[bidx, c_slot.clamp(min=0)] & is_rciv)
                 def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 gar = (self.pmil_at[bidx, ctr] >= 0).long()  # cityDefenseStrength garrison +5
@@ -9774,7 +9775,7 @@ class BatchSim:
                     self._xp_lvl_bonus(self.p_xp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)),
                 ),
             )
-            def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort + def_xp  # B-5 + B-4
+            def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self._tdef_g(ttc) + def_fort + def_xp  # B-5 + B-4
             # #45/B-6: an EMBARKED defender (player p_emb, or rival v_emb — barbs
             # never embark) overrides to a flat CS, no terrain/fortify/support.
             d_emb = (self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) & ~def_is_barb & ~def_is_rv) | (self.v_emb.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1) & def_is_rv)
@@ -10113,6 +10114,26 @@ class BatchSim:
                 # the conqueror is the attacker's civ; no +40 plunder (v1 rival-
                 # vs-rival). transfer runs per-row (loyalty-flip machinery reuse).
                 self._transfer_rc_to_rc(b, int(civ[b]), int(slot[b]), int(atk_civ[b]))
+
+    def _tdef_g(self, tiles: torch.Tensor) -> torch.Tensor:
+        """[B] terrain defence at `tiles`, INCLUDING a live FORT (+4).
+
+        B-27 (#78): TS's `terrainDefense` reads `tile.improvement` LIVE, so the
+        fort bonus cannot be baked into the static `tdef` plane — a fort is
+        built, pillaged and replaced mid-game, and the chop/found paths rewrite
+        `tdef` from hills alone, which would silently erase it.
+        """
+        d = self.tdef.gather(1, tiles.unsqueeze(1)).squeeze(1)
+        if self.FORT >= 0:
+            d = d + 4 * (self.improvement.gather(1, tiles.unsqueeze(1)).squeeze(1) == self.FORT).long()
+        return d
+
+    def _tdef_i(self, bidx: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """The advanced-indexing twin of _tdef_g (same rule, same +4)."""
+        d = self.tdef[bidx, tiles]
+        if self.FORT >= 0:
+            d = d + 4 * (self.improvement[bidx, tiles] == self.FORT).long()
+        return d
 
     def _in_enemy_zoc(self, dest: torch.Tensor, atwar: torch.Tensor, mover_civ: torch.Tensor | None = None) -> torch.Tensor:
         """B-3 ZOC (mirrors units.inEnemyZoc for a RIVAL mover): does `dest`
@@ -10786,7 +10807,7 @@ class BatchSim:
                 dm >= 0, self._xp_lvl_bonus(self.p_xp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)),
                 torch.where(def_is_v, self._xp_lvl_bonus(self.v_xp.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)), torch.zeros_like(dm)),
             )
-            def_cs = def_cs + self.tdef.gather(1, ttc.unsqueeze(1)).squeeze(1) + def_fort + def_xp  # B-5 + B-4
+            def_cs = def_cs + self._tdef_g(ttc) + def_fort + def_xp  # B-5 + B-4
             # #45/B-6: an embarked defender (player or rival, military or
             # civilian; barbs never embark) → flat CS, no terrain/fortify/support.
             p_emb_m = self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -12571,7 +12592,7 @@ class BatchSim:
                             d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
                             # B-4: only a player MILITARY target (is_pmil) carries veterancy.
                             def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
-                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self.tdef[bidx, tt] + def_xp  # + B-4
+                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self._tdef_i(bidx, tt) + def_xp  # + B-4
                             # #45/B-6: an embarked player target (military/civilian;
                             # barbs never embark) → flat CS, no terrain (no support).
                             d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
@@ -12662,7 +12683,7 @@ class BatchSim:
                             d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
                             d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
                             def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
-                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self.tdef[bidx, tt] + def_xp
+                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self._tdef_i(bidx, tt) + def_xp
                             d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                             gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center

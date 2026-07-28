@@ -288,6 +288,27 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       religiousStrength: 35,
       description: 'Spreads its religion and wins theological combat (3 charges, faith purchase only).',
     }),
+    // AUDIT B-27 (#78): the MILITARY ENGINEER, sourced from the Gathering Storm
+    // Civilopedia — 170 Production, 2 Movement, 2 build charges, prerequisite
+    // tech Military Engineering. APPENDED LAST on purpose: roster order is the
+    // GPU's unit index, so inserting anywhere else renumbers every downstream
+    // unit in both engines AND in every exported fixture.
+    // Its Civ 6 build list is Fort / Airstrip / Missile Silo / Mountain Tunnel /
+    // Reinforced Barricade / Modernized Trap, plus spending a charge to finish
+    // 20% of a Canal, Dam, Aqueduct or Flood Barrier. Only the FORT exists in
+    // this model; the rest are recorded as unmodelled rather than stubbed.
+    U({
+      id: 'MILITARY_ENGINEER',
+      name: 'Military Engineer',
+      code: 'ME',
+      cost: 170,
+      maintenance: 0,
+      moves: 2,
+      combat: 0, // civilian: never garrisons, flanks, supports or fights
+      charges: 2,
+      requiresTech: 'MILITARY_ENGINEERING',
+      description: 'Builds Forts (2 charges).',
+    }),
   ].map((u) => [u.id, u]),
 );
 

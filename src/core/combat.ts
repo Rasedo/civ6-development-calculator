@@ -86,6 +86,18 @@ export function terrainDefense(tile: Tile): number {
   // they don't shelter like woods/rainforest. Marsh stays SLOW to enter
   // (moveCostInto, deliberately unchanged); only its DEFENSE value flips here.
   if (tile.feature === 'MARSH' || tile.feature === 'FLOODPLAINS') d -= 2;
+  // B-27 (#78) FORT, sourced: "Occupying unit receives +4 Defense Strength".
+  // Added HERE because terrainDefense is the single chokepoint every defender
+  // path already routes through, so the bonus reaches melee, ranged and city
+  // defence without touching three call sites.
+  // The entry's other two halves are NOT modelled and are recorded rather than
+  // approximated: the automatic 2 turns of fortification (would need a hook on
+  // every tile-entry site, and fortifyBonus is a separate accumulator), and the
+  // "minor damage + movement depletion to hostile units walking onto this tile"
+  // (neither engine has a tile-enters-damage hook, and the damage number is not
+  // stated, so inventing one is the guessed-constant failure this sweep exists
+  // to catch).
+  if (tile.improvement === 'FORT') d += 4;
   return d;
 }
 

@@ -53,7 +53,9 @@ export type ImprovementId =
   | 'OIL_WELL'
   // B-27 (#71): appended LAST — roster order IS the GPU's improvement index,
   // so inserting anywhere else would renumber every existing improvement.
-  | 'SEASIDE_RESORT';
+  | 'SEASIDE_RESORT'
+  // B-27 (#78): the FORT, appended after SEASIDE_RESORT for the same reason.
+  | 'FORT';
 
 export type DistrictId =
   | 'CITY_CENTER'

@@ -63,7 +63,7 @@ POKE_COST = {
     "combat_mod": 17.1, "ranged": 18.5, "duel": 20.6, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
-    "naval": 53.7, "gumbel": 75.6, "districts": 87.9, "watermill": 12.0,
+    "naval": 53.7, "gumbel": 75.6, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
 }
 
 results: list[tuple[str, float, int]] = []
@@ -228,7 +228,8 @@ def main() -> int:
                 ("trade2", [py, "gpu/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
                 ("geopolitics", [py, "gpu/geopolitics_test.py"], 4),  # #55 A-19/B-33/B-22 per-pair wars + casus belli + rc->rc transfer
                 ("governors", [py, "gpu/governors_test.py"], 4),  # #68/B-24 era-score hooks + Ages loyalty modulation + governor anchors
-                ("watermill", [py, "gpu/watermill_test.py"], 4),  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
+                ("watermill", [py, "gpu/watermill_test.py"], 4),
+                ("fort", [py, "gpu/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
             ],
             # P5: mcts split into its three independent groups, run as three
             # parallel lanes (same assertions/seeds — pure process split).

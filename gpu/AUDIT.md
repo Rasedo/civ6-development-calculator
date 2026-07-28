@@ -317,8 +317,40 @@ Per-item weights (done% in parens where partial):
   built in 1 of the 24 seeds (seed 9066, ~turn 210), which is exactly
   what caught the real bug: the rival yield paths do not share
   _eff_yields, so the appeal-gold had to be added to all three.
-  Remaining B-27 tail: FORT (needs a Military Engineer unit) and the
-  post-tech-tree improvements.
+  **FORT + MILITARY ENGINEER LANDED (2026-07-28, #78).** Both sourced by direct
+  Civilopedia fetch: the FORT is "Occupying unit receives +4 Defense Strength,
+  and automatically gains 2 turns of fortification", built by a Military
+  Engineer, prereq Siege Tactics; the MILITARY ENGINEER is 170 Production,
+  2 Movement, 2 build charges, prereq Military Engineering.
+  BOTH APPENDED LAST, per the index-stability rule stated on the ImprovementId
+  union — roster order IS each engine's index, so inserting anywhere else
+  renumbers every existing improvement/unit and every exported fixture. (I did
+  place FORT mid-list first and moved it; the union's own comment caught it.)
+  `validImprovementsIn` gained an optional `builder` — it was unit-agnostic
+  because every improvement before this one could be built by any Builder, and
+  the FORT is the first that cannot. Callers passing nothing keep the old
+  behaviour and never see the FORT, a safe default rather than a silent change.
+  The +4 goes into `terrainDefense` on the TS side (the single chokepoint every
+  defender path routes through) and, on the GPU, into two new helpers
+  `_tdef_g`/`_tdef_i` replacing all NINE `tdef` read sites. It must be LIVE
+  rather than baked into the static `tdef` plane, because a fort is built,
+  pillaged and replaced mid-game and the chop/found paths rewrite `tdef` from
+  hills alone — which would silently erase a baked-in bonus.
+  TWO HALVES NOT MODELLED, recorded rather than approximated: the automatic
+  2 turns of fortification (needs a hook on every tile-entry site; fortifyBonus
+  is a separate accumulator), and "deals minor damage to and depletes the
+  movement of hostile units walking onto this tile" (no tile-enters-damage hook
+  exists in either engine, and the damage is unquantified — inventing a number
+  is the guessed-constant failure this sweep exists to catch).
+  **GATE REACHABILITY IS ZERO, MEASURED**: across 6 seeds x 250 turns NO
+  Military Engineer is produced and NO fort is placed, so scripted parity is
+  vacuous for this mechanic. It is proven instead by two constructed lanes —
+  tests/fort.test.ts (4 assertions: +4, stacks with hills to 7, no yields,
+  offered to MILITARY_ENGINEER and nobody else) and gpu/fort_test.py (+4 and
+  stacking, both index forms agreeing, and the bonus staying OUT of the static
+  plane so removing the fort removes it). Nothing yet BUILDS an engineer — the
+  production/AI wiring is the remaining B-27 tail, alongside the post-tech-tree
+  improvements.
 - #71 FLAG SWEEP (2026-07-27): five of the six inert `_LIVE` flags are now
   ON, each flipped and gated INDIVIDUALLY. A-5r 2 (100% outside #50 —
   scripted rival tile purchase LIVE; the PLAYER's buyTile verb rides #50);

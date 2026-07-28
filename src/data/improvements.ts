@@ -135,4 +135,23 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
     resourceOnly: false,
     description: 'Flat coastal grassland/plains/desert with Breathtaking appeal. Gold equal to the tile appeal.',
   },
+  // AUDIT B-27 (#78): the FORT, sourced from the Gathering Storm Civilopedia —
+  // "Occupying unit receives +4 Defense Strength, and automatically gains 2
+  // turns of fortification." Built by a MILITARY ENGINEER (never a Builder),
+  // prerequisite tech Siege Tactics. It carries NO yields: its whole effect is
+  // defensive, which is why it is the first improvement here whose value never
+  // shows up in a city's yield sum.
+  // NOT MODELLED, recorded rather than folded in: the "deals minor damage to
+  // and depletes the movement of hostile units walking onto this tile" half —
+  // neither engine has a tile-enters-damage hook, and inventing a number for it
+  // would be exactly the guessed-constant failure this sweep exists to catch.
+  FORT: {
+    id: 'FORT',
+    name: 'Fort',
+    code: 'Ft',
+    yields: {},
+    housing: 0,
+    resourceOnly: false,
+    description: 'Military Engineer only. Occupying unit gets +4 defense strength and 2 turns of fortification.',
+  },
 };
