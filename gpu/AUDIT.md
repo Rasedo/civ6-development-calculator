@@ -703,6 +703,43 @@ Per-item weights (done% in parens where partial):
   it is reproducible by simply re-applying the per-type envoy patch (seven
   wiring sites, all recorded above). That is the reproduction the next hunt
   should use - not this worktree.
+  **ENVOY RED REPRODUCED EXACTLY AND LOCALIZED (2026-07-28, #78) — and the
+  earlier "downstream worked-tile pick" conclusion is WRONG.**
+  METHOD (owner's correction, and it is the reason this worked): reproduce on
+  the EXACT state, never a proxy on HEAD. Worktree at 81bb972 — the commit that
+  recorded the attempt-and-revert, which touched ONLY AUDIT.md, so its tree is
+  byte-identical to the code that produced the red. The patch itself was
+  reverted before committing and is not in git, so it was rebuilt from the spec
+  recorded here (per-type table +1 / trade +2 gold, four TS sites, three GPU
+  sites, exporter key). Confirmation that the rebuild is faithful: tsc clean and
+  scripted parity 0.0 milli, exactly as the original commit reported — and then
+  the replay reproduced the red BYTE-IDENTICALLY:
+      seed 9170 rng 2026006119: turn 220: column 8 TS=118677 GPU=119677
+  FIRST DIVERGENCE IS TURN 218, TWO TURNS EARLIER, AND IT IS NOT A YIELD:
+      218 RU1 738 t2   GPU: (absent)     TS: 1 hp100 a1
+      218 RU1 739 t2   GPU: 1 hp100 a1   TS: (absent)
+  A rival WARRIOR (type 2, moves 2). At t217 BOTH engines have it on tile 740,
+  unacted. At t218 GPU is on 739 and TS on 738. Map width 44, so 738/739/740
+  are consecutive in row 16: 739 is adjacent to 740, 738 is NOT. **TS took TWO
+  steps (740->739->738); the GPU took ONE and stopped.** So the cause is the
+  rival PATROL move budget/step choice, not the envoy bonus and not the
+  citizen worked-tile pick — the score gap at t220 is two turns downstream.
+  BOTH 739 AND 738 ARE BARBARIAN CAMPS (`camp: 1`, desert). Both engines clear a
+  camp by stepping on it (TS clearCampFor, GPU _clear_camp_at) and both loop
+  while movement remains, so neither the camp nor multi-step is the difference.
+  CANDIDATES, none yet confirmed — needs a checkpoint resume with logging:
+   * COST: GPU `1 + _terr + _riv` from _road_terms vs TS
+     `moveCostInto(here, step) + riverCharge(...)`;
+   * TARGET: GPU minimises against `tgt` via pair_dist, TS sorts candidates by
+     hexDistance to `home` — if those differ the engines path to different
+     destinations;
+   * TIE-BREAK: TS `.sort(dist)[0]` is a STABLE sort, so ties fall to
+     `tilesWithin` order; the GPU breaks ties by direction index (`d*8 + dir`);
+   * ZOC halt after the first step (GPU `_in_enemy_zoc(dest, r_atwar, ...)` vs
+     TS `inEnemyZoc`), which would zero the GPU's remaining movement;
+   * the TS top-of-loop guard `hexDistance(here, home) <= 3 -> return`.
+  NEXT STEP: resume rng 2026006119 from the t210 checkpoint with per-step
+  logging of mp/cost/tgt/zoc for that unit, and compare against the TS patrol.
   **CONSOLIDATED HUNT STATE for BOTH score latents (2026-07-28, #78).** Two
   independent yield-touching changes each turned the PLAIN rollout red in a
   SCORE column while scripted parity stayed at 0.0 milli:
