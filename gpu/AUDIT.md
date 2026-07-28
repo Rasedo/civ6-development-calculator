@@ -797,12 +797,33 @@ Per-item weights (done% in parens where partial):
      identity.
   STATE: GPU walks 740 -> 739 (one step) and halts; TS ends on 738, which is not
   adjacent to 740, so TS took two steps. Both tiles are barbarian camps.
-  NEXT STEP: read the TS WAR-MARCH twin — NOT `rivalPatrol`, which is the PEACE
-  patrol I already compared and which does not run for a rival at war — and
-  compare its per-step halt conditions (cost, ZOC after the camp clear, the
-  strict-progress test) against the GPU walk's
-  `mv = roam & (best < 1e9) & (d_best < d_cur) & (has_imp | d_best >= 1) &
-  ((mp >= cost) | (mp >= full_mp))` plus its post-step ZOC zeroing.
+  **A REAL ASYMMETRY FOUND IN THE WAR MARCH — but TESTED AND IT IS NOT THIS
+  BUG.** The TS twin is `walkPath` (core/units.ts), named by the GPU walk's own
+  comment. It clears barbarian camps ONLY for the player:
+      if (unit.owner === 'player') { ... barbCamps.splice(...); treasury += 50 }
+  while the GPU walk calls `_clear_camp_at(mv, dest, civ=self.v_civ[:, v])` for
+  RIVAL units. So a rival war-marching over a camp razes it on the GPU and
+  leaves it standing in TS. TS is also internally inconsistent: its own peace
+  `patrol` already calls `clearCampFor`, which handles any non-barb owner and
+  credits the right treasury — `walkPath` just kept a player-only inline copy.
+  TESTED, NOT ASSUMED: replacing walkPath's inline clear with `clearCampFor` in
+  the reproduction worktree (tsc clean) and re-running the replay gives the
+  IDENTICAL red — `turn 220: column 8 TS=118677 GPU=119677`. So the camp
+  asymmetry changes nothing in this game and is NOT the cause. It remains a
+  genuine defect worth its own slice: real Civ 6 lets ANY civ's military unit
+  clear a camp, so TS is the engine in the wrong here, not the GPU.
+  **TRAP RE-HIT (memory rule 5): a `--resume-t` run OVERWRITES
+  gpu/fixtures/gpu_statelog.txt** with a partial starting at the resume turn.
+  Running logdiff afterwards compared a 2757-line resume fragment against a full
+  TS log and reported a bogus "FIRST DIVERGENCE at turn 2" with the GPU absent
+  everywhere. The replay's own verdict line is the trustworthy signal after a
+  resume; logdiff needs a FRESH full GPU run.
+  NEXT STEP: the walk's halt conditions are still the open question — compare
+  `moveCostInto + riverCharge` against the GPU's `1 + _terr + _riv`, and TS's
+  path-following (`unit.path`, precomputed) against the GPU's GREEDY
+  strictly-closer step (`d_best < d_cur`). A greedy walker halts at a local
+  minimum where a path-follower keeps going, which is exactly the shape of
+  one-step-versus-two-steps.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
