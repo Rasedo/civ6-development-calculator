@@ -1,5 +1,7 @@
 /**
- * Core rule constants and formulas (base Civ 6, eyeballed where noted).
+ * Core rule constants and formulas (base Civ 6). #78 sourced the WATER-HOUSING
+ * block against the wiki and found all five values already correct; the rest of
+ * this file has NOT been swept yet.
  */
 
 export const MAP_SIZES = {
@@ -113,11 +115,20 @@ export function amenityTier(balance: number): AmenityTier {
   return { name: 'Unhappy', growthFactor: 0.7, yieldFactor: 0.9 };
 }
 
-/** Housing from city-site water access. */
+/**
+ * Housing from city-site water access.
+ *
+ * #78 SOURCING SWEEP (2026-07-28): VERIFIED CORRECT against the Civilization
+ * wiki's Housing / Aqueduct pages — real Civ 6 gives 5 Housing for fresh water
+ * (river/lake/oasis), 3 for coastal and 2 for no water, and the Aqueduct raises
+ * a non-fresh city to a TOTAL of 6 (so +4 landlocked, +3 coastal) while adding
+ * a flat +2 to a city that already has fresh water. All five values below
+ * already matched; no change was needed. Recorded so the next sweep does not
+ * re-derive it.
+ */
 export const HOUSING_FRESH_WATER = 5;
 export const HOUSING_COASTAL = 3;
 export const HOUSING_NO_WATER = 2;
-/** Aqueduct: +2 if the city already has fresh water, else raises water housing to 6. */
 export const AQUEDUCT_FRESH_BONUS = 2;
 export const AQUEDUCT_NO_FRESH_TOTAL = 6;
 

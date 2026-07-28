@@ -506,17 +506,18 @@ Per-item weights (done% in parens where partial):
   here is trivially true and this correction rests on the SOURCE, not on any
   gate. That is the opposite of slice 1's Camp, which 16 of 24 seeds exercised
   — and it is exactly why this class needs sourcing rather than testing.
-  16 marked files remain.
-  **SLICE 3 ATTEMPTED, NOT LANDED — src/data/constants.ts (2026-07-28, #78).**
-  The water-availability HOUSING constants (fresh 5 / coastal 3 / none 2, with
-  the Aqueduct bringing a non-fresh city to 6) were the target. A search
-  returned a DIFFERENT framing (+3 / +1 / +0, apparently deltas over a base
-  rather than totals) and both authoritative pages were unavailable. The values
-  were therefore LEFT UNCHANGED and the file stays marked. Recorded because the
-  non-change is the point: changing a live constant on ambiguous evidence is
-  the same failure this class exists to fix, only faster. The next pass should
-  source these from the Civilopedia "Housing" concept or the game files, not
-  from a search summary.
+  15 marked files remain (constants.ts keeps a narrowed marker — only its water-housing block is swept).
+  **SLICE 3 DONE — src/data/constants.ts water-housing (2026-07-28, #78).**
+  RESOLVED AS VERIFIED-CORRECT. The first search returned a confusing framing
+  (+3 / +1 / +0, deltas rather than totals) and the authoritative pages were
+  unavailable, so the values were left alone rather than changed on ambiguous
+  evidence. A second, better-targeted search settled it: real Civ 6 gives
+  5 Housing for fresh water (river/lake/oasis), 3 for coastal, 2 for no water,
+  and the Aqueduct raises a non-fresh city to a TOTAL of 6 (+4 landlocked,
+  +3 coastal) while adding a flat +2 to a fresh-water city. ALL FIVE constants
+  already matched — no change needed, marker cleared, citation recorded in
+  place. A verified-correct outcome IS progress (the G-3 rule); the rest of
+  constants.ts is NOT yet swept.
 - #74 SMALLS (2026-07-27). B-20 3 (92% -> 95% — the PRINTING writing-tourism
   doubling, measured reachable in 9/24 player seeds + 46 rival civs) and B-22 4
   (50% -> 60% — the PLAYER's grievance twin + the gang-up consequence, measured
