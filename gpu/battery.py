@@ -38,7 +38,13 @@ FULL = "--full" in sys.argv
 NO_EVAL = "--no-eval" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
 
-# Measured poke-lane wall times (seconds), used ONLY to order the serial poke
+# Poke pool (#78): 4 workers x OMP 2 = 8 threads, up from the old serial lane's
+# single OMP-4 process. Deliberately small — the box is 24 cores and parity (6)
+# + mcts (3x4) + gpu-gate (4 shards x 4) already claim most of them.
+POKE_WORKERS = 4
+POKE_OMP = 2
+
+# Measured poke-lane wall times (seconds), used ONLY to order the poke
 # group cheapest-first so bail-fast surfaces a red sooner. Values from this
 # box's battery logs; a stale entry costs ordering quality, never correctness.
 POKE_COST = {
@@ -57,7 +63,7 @@ lock = threading.Lock()
 failed = threading.Event()
 
 
-def run(name: str, cmd: list[str], threads: int = 8) -> None:
+def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
     env = os.environ.copy()
     env.setdefault("PYTHONUTF8", "1")
     env["OMP_NUM_THREADS"] = str(threads)
@@ -79,7 +85,7 @@ def run(name: str, cmd: list[str], threads: int = 8) -> None:
             out, err = p.communicate(timeout=1.0)
             break
         except subprocess.TimeoutExpired:
-            if failed.is_set() and not NO_BAIL:
+            if bail and failed.is_set() and not NO_BAIL:
                 p.kill()
                 p.communicate()
                 dt = time.time() - t0
@@ -101,6 +107,48 @@ def run(name: str, cmd: list[str], threads: int = 8) -> None:
             failed.set()
             tail = (p.stdout + "\n" + p.stderr).strip().splitlines()[-15:]
             print("    | " + "\n    | ".join(tail), flush=True)
+
+
+def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads: int) -> None:
+    """Run one lane's steps CONCURRENTLY through a bounded pool.
+
+    #78: the poke group used to run strictly serial (~348s). That was never
+    about safety — rule (7)'s standalone sweep has always run these in
+    parallel, and the #55 round caught three reds in one such pass; no poke
+    test writes a file (checked), they are independent processes over
+    read-only fixtures. It was about not oversubscribing the box.
+
+    Bounded is the point: all 31 at OMP 4 would be 124 threads on 24 cores,
+    and this box has measured evidence that oversubscription starves the
+    critical lanes (6 rollout shards thrash: gpu 282s, parity starved). So a
+    small pool at a lower OMP instead — same total core-seconds, concentrated
+    into a shorter window. The critical path is the ~3720s GPU lane, so a
+    brief squeeze costs it almost nothing, while every poke red now surfaces
+    in one pass instead of one-per-battery-run.
+    """
+    pos = [0]
+    lk = threading.Lock()
+
+    def worker() -> None:
+        while True:
+            with lk:
+                if pos[0] >= len(steps):
+                    return
+                name, cmd, _ = steps[pos[0]]
+                pos[0] += 1
+            # DRAIN, don't bail (#78): a poke failure still sets `failed` and so
+            # still kills the expensive lanes immediately — but the pool itself
+            # runs to completion, because finishing it costs only ~90s and it is
+            # what makes ALL poke reds surface in ONE run. That is precisely
+            # what rule (7)'s standalone parallel sweep existed to provide, so
+            # the sweep is now redundant rather than merely cheaper to skip.
+            run(name, cmd, threads, bail=False)
+
+    ws = [threading.Thread(target=worker) for _ in range(workers)]
+    for w in ws:
+        w.start()
+    for w in ws:
+        w.join()
 
 
 def lane(steps: list[tuple[str, list[str], int]]) -> None:
@@ -209,7 +257,14 @@ def main() -> int:
             if len(L) > 5:  # only the cpu self-test group is this long
                 L.sort(key=lambda s: POKE_COST.get(s[0], 30.0))
 
-        threads = [threading.Thread(target=lane, args=(l,)) for l in lanes]
+        # The poke group runs through the bounded pool; every other lane is
+        # serial as before (they are 1-3 steps and sit on the critical path).
+        threads = [
+            threading.Thread(target=lane_parallel, args=(l, POKE_WORKERS, POKE_OMP))
+            if len(l) > 5
+            else threading.Thread(target=lane, args=(l,))
+            for l in lanes
+        ]
         for th in threads:
             th.start()
         for th in threads:
