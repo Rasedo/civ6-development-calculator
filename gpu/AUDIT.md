@@ -597,25 +597,29 @@ Per-item weights (done% in parens where partial):
   tie-breaks. It may be benign — f32 rounding legitimately flipping a growth
   threshold is expected and is NOT a bug — but it is unproven either way and
   is deliberately NOT asserted by the lane. Next step: bisect seed9002's f32
-  BISECTED (2026-07-28): **first divergence is turn 48 in `u_tile` — unit 1
-  stands on a DIFFERENT TILE in f32 than in f64.** Not a growth-threshold
-  straddle, which was the benign hypothesis: at the turn-55 pop split that
-  the first pass found, food_box is +16.65 against a need of 33 and both
-  dtypes hold pop 3, so the threshold is nowhere near. The pop drop is
-  DOWNSTREAM — by t55 the f32 branch has one more unit alive, and it spends
-  ~49 gold and a citizen on a settler purchase where f64 banks the income.
-  METHOD NOTE: the first bisect watched only pop/alive/techs/civics and
-  walked straight past this — unit state had already parted seven turns
-  earlier. Widening the watched set to u_tile/u_type/u_hp/v_alive/buildings
-  is what pinned it.
-  CLASS: the same one as the tie-break bug above — a ranking decision made on
-  dtype-sensitive floats, where f32 rounding flips a near-tie. It is NOT the
-  same construct (no index epsilon is involved in movement), so it needs its
-  own fix.
-  NEXT STEP: dump unit 1's candidate destination scores at t48 in both dtypes.
-  If f64 shows an exact tie broken one way and f32 shows a rounding-order
-  flip, the movement target selection needs the same hardening the worked-tile
-  pick just got.
+  BISECTED, THEN CLOSED (2026-07-28) — **NOT a second bug; inherent f32
+  behaviour.** The bisect first put the divergence at turn 48 in `u_tile`
+  (unit 1 on a different tile), with the turn-55 pop split downstream of it:
+  at that split food_box is +16.65 against a need of 33 and both dtypes hold
+  pop 3, so the growth threshold is nowhere near — by t55 the f32 branch
+  simply has one more unit alive and buys a settler where f64 banks the gold.
+  THE MEASUREMENT THAT CLOSED IT: f32 and f64 accumulators differ from TURN 1
+  (max |f32-f64| = 2.9e-07 at t1, growing monotonically to ~5e-05 by t48). The
+  two dtypes are different computations from the first turn, so EVERY discrete
+  comparison in the engine — `mp >= cost`, `food >= need`, any score ranking —
+  must eventually land on opposite sides. t48 is just the first boundary the
+  accumulated error crossed. No construct is at fault and nothing to fix.
+  CONSEQUENCE FOR TESTING, and it cost a bad test: **f32-vs-f64 end-to-end
+  equality is NOT an invariant and must never be asserted.** The first version
+  of this poke asserted exactly that at 120 turns; it passed only by where the
+  boundaries happened to fall on one fixture, and it never tested the
+  tie-break at all. Replaced with a CONSTRUCT assert — the tie-break key must
+  be f64 in an f32 build — which is invariant, fixture-independent, needs no
+  reachability measurement, and flips red the moment the .double() is reverted
+  (verified both ways). It also drops two 120-turn builds from the lane.
+  METHOD NOTE: the first bisect watched only pop/alive/techs/civics and walked
+  past the real split, because unit state is not in that set. A bisect is only
+  as good as the fields it compares.
   GATE: BATTERY OK, every lane green. The f64 lanes landed exactly on their
   historical baselines (parity 650.1s vs ~650, gpu-gate 593.6s vs ~594),
   confirming by MEASUREMENT what the fix predicted by construction: forcing

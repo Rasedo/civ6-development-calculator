@@ -3210,6 +3210,7 @@ class BatchSim:
         # stops working different tiles than the spec.
         score = torch.where(cand, tile_score.gather(1, tcf).reshape(B, C, M).double(), torch.tensor(-1e18, dtype=torch.float64, device=dev))
         score = score - tc.double() * 1e-9  # tie: lowest index first
+        self._tiebreak_key_dtype = score.dtype  # #78: what the poke lane asserts
         k = min(max(int(self.pop.max().item()), 1), M)
         top_scores, top_idx = score.topk(k, dim=2)
         take = (torch.arange(k, device=dev).view(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)

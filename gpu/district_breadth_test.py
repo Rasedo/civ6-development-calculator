@@ -483,24 +483,29 @@ def poke_float32_dtype(rules, path):
     # (float accumulators carry legitimate f32 noise), and a swapped tile feeds
     # straight into growth and build timing, so pop/techs move with it.
     #
-    # REACHABILITY, MEASURED — not assumed. At the 30 turns above this poke
-    # already ran, f32 and f64 agree EVEN WITH THE BUG PRESENT, so asserting
-    # there would have been decoration. Re-reverting the fix and sweeping
-    # fixtures x turn counts found the divergence appears at 120 turns: with
-    # the bug, seed9002 diverges in pop and seed9014 in pop AND techs; with the
-    # fix, seed9014 goes fully clean. That flip is what this lane asserts.
-    # seed9002 STILL diverges in pop after the fix — a SEPARATE f32/f64
-    # divergence source, recorded in AUDIT and deliberately not asserted here.
-    # Fixture chosen by sorted index, per the de-hardcoding convention (a
-    # by-name pin broke two lanes once already when SEED_OVERRIDES moved).
-    paths = sorted(FIXTURES.glob("seed*.json"))
-    reach = str(paths[1] if len(paths) > 1 else paths[0])
-    a32 = build(rules, reach, steps=120, dtype=torch.float32)
-    a64 = build(rules, reach, steps=120, dtype=torch.float64)
-    for name in ("pop", "alive", "techs", "civics"):
-        x, y = getattr(a32, name), getattr(a64, name)
-        assert torch.equal(x, y), f"f32/f64 divergence in `{name}` — dtype-dependent tie-break regressed?\n  f32 {x.tolist()}\n  f64 {y.tolist()}"
-    print("  h float32 dtype OK (30t masks consistent; 120t f32 integer state == f64 on a REACHING fixture — tie-breaks dtype-immune)")
+    # #78: the tie-break key must be f64 even in an f32 build. Asserted on the
+    # CONSTRUCT, not on end-to-end agreement, and the difference matters:
+    #
+    # f32 and f64 accumulators diverge from TURN 1 (measured on seed9002: max
+    # |f32-f64| = 2.9e-07 at t1, growing monotonically to ~5e-05 by t48). Every
+    # discrete comparison in the engine — `mp >= cost`, `food >= need`, any
+    # score ranking — therefore lands on opposite sides eventually. f32-vs-f64
+    # end-to-end equality is NOT an invariant and must never be asserted: an
+    # earlier version of this poke asserted exactly that at 120 turns, which
+    # passed only by where the boundaries happened to fall on one fixture.
+    #
+    # What IS invariant is that the tie-break key carries enough precision to
+    # hold the index epsilon. A 1e-9 epsilon sits far below the f32 ULP of a
+    # score around 40 (~4e-6), so on self.dtype=f32 it rounded away completely
+    # and topk resolved exact ties by its own order — taking the HIGHEST index
+    # where TS (`b.score - a.score || a.index - b.index`) takes the lowest.
+    # Reverting the .double() flips this assert immediately, on any fixture,
+    # with no reachability question to measure.
+    assert sim._tiebreak_key_dtype == torch.float64, (
+        f"worked-tile tie-break key is {sim._tiebreak_key_dtype} in an f32 build — "
+        "the index epsilon rounds away below the f32 ULP and ties invert vs TS"
+    )
+    print("  h float32 dtype OK (30 turns, reg_y/reg_am + masks consistent; tie-break key forced f64)")
 
 
 def main() -> None:
