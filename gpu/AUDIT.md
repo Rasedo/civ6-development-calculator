@@ -936,10 +936,21 @@ Per-item weights (done% in parens where partial):
   the movement cost. The fix is task #47 and must land on BOTH engines together
   — a GPU-only correction measured 13 gate failures against a baseline of 1.
   STILL OPEN, the only remaining gap: TS's predicate is equally blind
-  (combat.ts:768), so why does it not fire on 740 at t218? Most likely the city
-  on 740 exists in the GPU at t218 but NOT YET in TS, which would put the true
-  first divergence UPSTREAM at the founding turn. NEXT STEP: compare the rival
-  city-founding turn for tile 740 between the engines.
+  (combat.ts:768), so why does it not fire on 740 at t218?
+  TWO CANDIDATE ANSWERS NOW REFUTED BY MEASUREMENT (2026-07-28):
+   * "the city is founded later in TS" — NO. Both statelogs carry the rival city
+     on tile 740 from TURN 2; it is an INITIAL city, not founded mid-game.
+   * "TS's tile lacks the CITY_CENTER district its predicate keys on" — NO.
+     Initial rivals are built through foundRivalCity (rivals.ts:258-287), which
+     sets `tile.district = 'CITY_CENTER'` (rivals.ts:202).
+  So both engines hold the SAME city on 740 and BOTH predicates are blind —
+  both should select it and freeze — yet TS marches to 738 and the GPU does not.
+  The difference must be in how each treats the tile the unit STANDS ON versus
+  adjacent (the GPU scan carries an explicit `d_all >= 1`), in the range test,
+  or in which tile the unit occupies when each engine runs its scan.
+  NEXT STEP: instrument TS's `attackTargets` for this unit at the divergent turn
+  and print its candidate list. Three successive hypotheses have now been
+  refuted by measurement; reading the source has a poor record on this one.
   (Superseded hypothesis, kept as a record of what was ruled out: within-turn
   ORDER of founding vs unit acts. REFUTED — both engines found cities BEFORE
   units act: GPU `_rival_try_found` at 7494/11951/12416 precedes the unit
