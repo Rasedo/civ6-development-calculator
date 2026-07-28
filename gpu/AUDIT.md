@@ -558,6 +558,29 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  **ROOT-CAUSE CANDIDATE FOUND BY INSPECTION (2026-07-28, #78): the GPU's
+  worked-tile tie-break is an EPSILON HACK.** engine.py, the citizen pick:
+      score = score - tc.to(self.dtype) * 1e-9   # tie: lowest index first
+  TS (core/city.ts) instead sorts `b.score - a.score || a.index - b.index` -
+  an EXACT score comparison, then index. The GPU PERTURBS the score by up to
+  tile_index * 1e-9 (~1.1e-6 on a 44x26 map). Any two candidate tiles whose
+  true scores differ by LESS than that perturbation - ordinary float
+  association, not a real tie - are REORDERED BY INDEX on the GPU while TS
+  keeps the true ordering. The citizen then works a different tile, and the
+  1-food / 1-gold difference propagates into the score columns.
+  THIS FITS EVERY OBSERVATION: it fires only when a yield change nudges two
+  tiles into the sub-epsilon window (hence two unrelated corrections waking
+  it), it is invisible to scripted parity (whose tile scores never land in
+  that window), and it produces exactly a ONE-TILE yield difference.
+  THE REPO ALREADY KNOWS THIS LESSON ELSEWHERE: `governorPicks` ranks on
+  QUANTIZED MILLI values, commented "ranking on raw f64 would be
+  float-association-fragile across engines" (the B-29 quantization lesson).
+  The worked-tile pick never got the same treatment.
+  PROPOSED FIX (its own gated round): rank on a QUANTIZED score - round to
+  milli like governorPicks - and break exact ties by index with an integer
+  composite key, instead of perturbing the score. Both engines must quantize
+  identically. Verify against the reliable reproduction (re-apply the envoy
+  patch; seed 9170 rng 2026006119 t220 must go green).
   **THE 1.0 GAP IS NOT THE ENVOY BONUS - IT IS A DOWNSTREAM TILE PICK
   (2026-07-28, #78).** Decisive arithmetic, no rollout needed. BALANCED_WEIGHTS
   are food 1, production 2, gold 1, science 1.5, culture 1.5, faith 0.75, and
