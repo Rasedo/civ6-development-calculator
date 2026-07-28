@@ -840,12 +840,34 @@ Per-item weights (done% in parens where partial):
   after a camp clear) and re-run the replay; if seed 9170 t220 goes green, the
   hypothesis holds. Care is needed on draw-order parity — re-targeting must not
   consume RNG the TS side does not.
-  OPEN COUNTER-EVIDENCE, recorded honestly: the differ tags the t217 move
-  `war/walk`, but the [WAR] print inside that same loop emits NO line at t217
-  (its lines stop at t213). Both instruments cannot be right. Resolve that
-  before building on the hypothesis — most likely the walk `break`s before the
-  print on the turn the move happens, which would mean the move comes from an
-  earlier statement in the same function rather than the traced loop.
+  **ROOT CAUSE PINNED (2026-07-28): the GPU's march GATE, not its cost.** The
+  counter-evidence above resolved the moment the trace filter was widened from
+  "cur in {738,739,740}" to "this unit, these turns" — the earlier `tgt == cur`
+  lines were units that had ALREADY ARRIVED, i.e. exactly the ones that never
+  move, so the filter was showing only the uninteresting cases:
+      t217 v1 cur=740 dest=739 tgt=734 d_cur=6 cost=1.0 mp=3.0 moving=True  mv=True
+      t218 v1 cur=739 dest=738 tgt=734 d_cur=5 cost=4.0 mp=3.0 moving=False mv=False
+  SO IT IS NOT ONE TURN WITH TWO STEPS — it is TWO TURNS, and the GPU skips the
+  second. Both engines step 740 -> 739 on t217 (cost 1). On t218 the unit holds
+  FULL MP (3.0) and the next step costs 4.0 (a river crossing: +3). The GPU's
+  own budget rule `(mp >= cost) | (mp >= full_mp)` — the "a unit at full MP may
+  always take one step" rule TS states explicitly — WOULD allow it. It does not
+  move because `moving=False`: the march gate (`march & has_tgt`) excluded the
+  unit for that turn. TS's hostileUnitAct marches it and pays the crossing.
+  DATA-MODEL TRAP that cost several wrong deductions here: the tile key `riv` is
+  a BOOLEAN (`hasRiver(t) ? 1 : 0`), while the six-bit edge mask the movement
+  code reads is the separate key `rm` -> `self.river_mask`. Reading `riv` as the
+  mask makes every river look like "bit 0 = East".
+  RULED OUT ALONG THE WAY, each by measurement: the direction convention (GPU
+  `neighbor_table` even-row index 3 = (-1,0) = W, matching TS AXIAL_DIRS[3] = W),
+  the terrain term (`tmove = 0` on all three tiles, so `_terr = 0`), the camp
+  clear (patched and re-run: identical red), and the re-targeting hypothesis
+  (`tgt` is 734 throughout, never the unit's own tile).
+  NEXT STEP: find why `march` is False for this unit on t218 in
+  `_rival_unit_war_act` — it was True on t217 with the same unit, same war, same
+  target — and compare against whatever gate TS applies before its march loop.
+  Then decide which engine is right: a full-MP unit adjacent to a river SHOULD
+  be able to cross in real Civ 6, so the GPU is the likely offender.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
