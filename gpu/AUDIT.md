@@ -876,14 +876,27 @@ Per-item weights (done% in parens where partial):
   tiles), while the GPU saw something attackable there. So the real question is
   no longer about movement rules: **the two engines disagree about what STANDS
   on or near 738 at t218.**
-  NEXT STEP: dump the GPU's chosen attack target for v1 at t218 (the `attack`
-  branch's tile) and compare against TS's `attackTargets(state, unit)` for the
-  same unit and turn. Check specifically whether a BARBARIAN UNIT garrisons 738
-  in one engine and not the other — the camps at 739/738 spawn barbs, and both
-  engines cleared 739's camp on t217 when the unit stepped onto it. If a barb
-  exists in one engine only, the true first divergence is UPSTREAM of t218 and
-  the statelog simply does not carry barb units, which is why logdiff named
-  t218.
+  **THE BARB/CAMP THEORY IS DEAD — and the shape is now a PHANTOM TARGET.**
+  Probing barbarian occupancy and camp survival alongside the gates:
+      t217 v1 here=740 ... march=True  | barb_at 738=-1 739=-1 740=-1 | camp738=False camp739=False
+      t218 v1 here=739 ... attack=True | barb_at 738=-1 739=-1 740=-1 | camp738=False camp739=False
+      t219 v1 here=739 ... attack=True | barb_at 738=-1 739=-1 740=-1 | camp738=False camp739=False
+  There is NO barbarian on 738/739/740 and NO camp on 738/739 from t215 onward —
+  the camps visible in the t0 FIXTURE were cleared long before this window, so
+  every inference above that leaned on "both tiles are camps" was built on
+  stale t0 data rather than live state. Reading fixture tiles as if they were
+  current state is the trap; the camps were real at t0 and gone by t215.
+  THE UNIT IS STUCK: `attack=True` on t218 AND t219, still on 739, HP 100, with
+  nothing dying and no state moving. A genuine attack damages or kills something
+  and resolves; an attack that repeats forever against an unchanging board is a
+  target the scan believes in and the resolver cannot act on. Meanwhile TS finds
+  no target at all and marches to 738.
+  NEXT STEP: print the attack branch's CHOSEN TILE and what the GPU thinks
+  occupies it (player unit / city / district / CS centre / enemy-rival city),
+  then compare with TS's `attackTargets(state, unit)` for the same unit and
+  turn. The suspicion is a target-eligibility mask that admits a tile the
+  resolver then declines — the unit burns its action every turn and never
+  marches, which is exactly the observed freeze.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
