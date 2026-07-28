@@ -597,7 +597,25 @@ Per-item weights (done% in parens where partial):
   tie-breaks. It may be benign — f32 rounding legitimately flipping a growth
   threshold is expected and is NOT a bug — but it is unproven either way and
   is deliberately NOT asserted by the lane. Next step: bisect seed9002's f32
-  vs f64 city food/growth around the first differing turn.
+  BISECTED (2026-07-28): **first divergence is turn 48 in `u_tile` — unit 1
+  stands on a DIFFERENT TILE in f32 than in f64.** Not a growth-threshold
+  straddle, which was the benign hypothesis: at the turn-55 pop split that
+  the first pass found, food_box is +16.65 against a need of 33 and both
+  dtypes hold pop 3, so the threshold is nowhere near. The pop drop is
+  DOWNSTREAM — by t55 the f32 branch has one more unit alive, and it spends
+  ~49 gold and a citizen on a settler purchase where f64 banks the income.
+  METHOD NOTE: the first bisect watched only pop/alive/techs/civics and
+  walked straight past this — unit state had already parted seven turns
+  earlier. Widening the watched set to u_tile/u_type/u_hp/v_alive/buildings
+  is what pinned it.
+  CLASS: the same one as the tie-break bug above — a ranking decision made on
+  dtype-sensitive floats, where f32 rounding flips a near-tie. It is NOT the
+  same construct (no index epsilon is involved in movement), so it needs its
+  own fix.
+  NEXT STEP: dump unit 1's candidate destination scores at t48 in both dtypes.
+  If f64 shows an exact tie broken one way and f32 shows a rounding-order
+  flip, the movement target selection needs the same hardening the worked-tile
+  pick just got.
   GATE: BATTERY OK, every lane green. The f64 lanes landed exactly on their
   historical baselines (parity 650.1s vs ~650, gpu-gate 593.6s vs ~594),
   confirming by MEASUREMENT what the fix predicted by construction: forcing
