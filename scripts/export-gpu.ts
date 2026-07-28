@@ -1216,6 +1216,9 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // covering collapse trajectories, so no coverage is lost. Diagnose a dying
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
+  // #78: the corrected combat strengths make the hostile world stronger and
+  // index 6's default 9079 loses every player city before t250. 9080 survives.
+  6: 9080,
   // #71 FLAG 2 (DEDICATION_PAYOUTS_LIVE, 2026-07-26): with the per-turn
   // dedication payouts LIVE the world is slightly richer for everyone, and
   // index 16's default seed 9209 now loses every player city before t250 —

@@ -38,10 +38,15 @@ def setup(sim, types, tiles, treasury):
 
 def main() -> int:
     rules = load_rules()
-    path = FIXTURES / "seed9079.json"
-    if not path.exists():
+    # #78: was hard-coded to seed9079.json, which a SEED_OVERRIDES entry
+    # replaced (the corrected combat strengths wipe 9079's player before t250).
+    # Resolve by POSITION — this lane only needs "some fixture" — so a future
+    # override cannot break it again. Same fix as domination_test.
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    if not paths:
         print("no fixtures — run `npm run gpu:export` first")
         return 1
+    path = paths[6] if len(paths) > 6 else paths[0]
     ru = rules.units
 
     def uidx(name):

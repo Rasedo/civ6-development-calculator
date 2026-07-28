@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { UNITS } from '../src/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { trainableUnits, queueUnit } from '../src/core/units';
@@ -103,7 +104,7 @@ describe('B-9/B-10 new-unit build path', () => {
     const swords = state.units.filter((u) => u.type === 'SWORDSMAN' && u.owner === 'player');
     expect(swords.length).toBe(1);
     // P4/D-22: strongest melee ever fielded now reflects the Swordsman (combat 36)
-    expect(state.bestMeleeCS).toBeGreaterThanOrEqual(36);
+    expect(state.bestMeleeCS).toBeGreaterThanOrEqual(UNITS.SWORDSMAN.combat);
     expect(state.bestMeleeCS).toBeGreaterThan(before);
   });
 });

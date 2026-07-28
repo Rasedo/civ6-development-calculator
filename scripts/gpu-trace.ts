@@ -85,7 +85,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
     if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age +tourism +faith +followedSum (#71) +cultureTotal (#72) +diploFavor (#75) +diploPoints (#76)
+      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age +tourism +faith +followedSum (#71) +cultureTotal (#72) +diploFavor (#75) +diploPoints (#76)
       continue;
     }
     row.push(
@@ -137,8 +137,13 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
       Math.round((rival.cultureTotal ?? 0) * 1000),
       // B-22 (#75): this rival's cumulative DIPLOMATIC FAVOR (appended LAST).
       rival.diploFavor ?? 0,
-      // B-22 (#76): this rival's Diplomatic Victory Points (appended LAST).
+      // B-22 (#76): this rival's Diplomatic Victory Points.
       rival.diploPoints ?? 0,
+      // B-15 (#78 HUNT): WAR WEARINESS — untraced until now, which is how a
+      // rGScore divergence hid: weariness feeds the amenity tier, the tier
+      // scales city yields, and rivalEmpireScore is pop*3 + weighted yields.
+      // The same hole rFaith had before #71 closed it.
+      rival.warWeariness ?? 0,
     );
   }
   for (let c = 0; c < cMax; c++) {
@@ -173,7 +178,7 @@ export function rowTolerance(cMax: number, csMax: number, rMax: number): number[
   // column's tolerance — keep them in lockstep.
   const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 2, 0, 2, 0, 0);
+  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 2, 0, 2, 0, 0, 0);
   for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
   return tol;
 }

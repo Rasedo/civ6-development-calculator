@@ -14611,6 +14611,10 @@ class BatchSim:
                 torch.where(live, self.r_diplo_favor[:, r].to(self.dtype), zero),
                 # B-22 (#76): rival Diplomatic Victory Points (appended LAST).
                 torch.where(live, self.r_diplo_points[:, r].to(self.dtype), zero),
+                # B-15 (#78 HUNT): rival WAR WEARINESS (appended LAST) — feeds
+                # the amenity tier, which scales city yields, which is what
+                # rGScore sums. Untraced until now.
+                torch.where(live, self.r_war_weariness[:, r].to(self.dtype), zero),
             ]
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):

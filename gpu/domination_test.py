@@ -29,10 +29,16 @@ def dom(sim) -> int:
 
 def main() -> int:
     rules = load_rules()
-    path = FIXTURES / "seed9079.json"
-    if not path.exists():
+    # #78: this lane used to hard-code seed9079.json and broke the moment a
+    # SEED_OVERRIDES entry moved index 6 to another seed (the corrected combat
+    # strengths wipe 9079's player before t250). Resolve the fixture by
+    # POSITION instead — the lane only needs "some 2-rival fixture", not that
+    # specific seed — so a future override cannot break it again.
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    if not paths:
         print("no fixtures — run `npm run gpu:export` first")
         return 1
+    path = paths[6] if len(paths) > 6 else paths[0]
     sim = build(rules, path)
     if sim.R < 2:
         print(f"SKIP domination — fixture has {sim.R} rivals, need >=2")
