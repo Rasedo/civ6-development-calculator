@@ -583,13 +583,25 @@ Per-item weights (done% in parens where partial):
        0.0 milli and the FORCED-COMPACTION rollout passed; only the plain
        rollout reaches it, so it is configuration-dependent and may be a
        PRE-EXISTING latent that the stronger units merely made reachable.
-  LEAD FOR THE HUNT: TS `spawnUnit` updates `bestMeleeCS` for any unit with
-  `combat > 0 && !ranged` — which INCLUDES a naval GALLEY. The Galley's combat
-  is one of the five values that moved (30 -> 25), and bestMeleeCS feeds city
-  defense strength, which feeds combat outcomes, which feeds empire score.
-  Check whether the GPU's `best_melee` applies the same non-ranged-only rule to
-  NAVAL units, and whether it reads the roster table or the 9-entry BARB table
-  for a Galley (the id appears in BOTH).
+  LEAD CHECKED AND REFUTED (same session) — recorded so the next hunt does not
+  re-walk it. The theory was that TS `spawnUnit` updates `bestMeleeCS` for any
+  `combat > 0 && !ranged` unit (which INCLUDES a naval GALLEY, one of the five
+  values that moved) while the GPU might differ. VERIFIED SYMMETRIC:
+   * the GPU gates on `_p_rng_str[type] == 0` — the same non-ranged rule, with
+     no naval exclusion on either side;
+   * both read `_p_combat`, the ROSTER table, not the 9-entry barb table;
+   * both are MONOTONIC maxima — `best_melee` at engine.py `torch.maximum` in
+     `_spawn_player`, and `r_best_melee` likewise in the rival spawn path
+     (so a rival's tracker is NOT frozen at its fixture init, which was the
+     other half of the theory).
+  The only asymmetry found is benign: TS also requires `combat > 0` where the
+  GPU does not, which admits combat-0 civilians into a `max()` that ignores
+  them.
+  SO THE DIVERGENCE IS ELSEWHERE. Next candidates, in order: the empire-score
+  formula's own inputs (rGScore is a ×1000 float, tol 2, and the gap is 2850
+  milli = 2.85 points — large enough to be a term, not drift); and whatever
+  the plain rollout reaches at seed 9235 t249 that the forced-compaction
+  rollout does not.
   The change is REVERTED so the tree stays green; the sourced numbers are
   recorded here so the next round starts from them.
   10 marked files remain; constants.ts, projects.ts, resources.ts,
