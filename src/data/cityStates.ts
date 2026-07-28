@@ -1,9 +1,21 @@
 /**
- * City-state definitions (base Civ 6 envoy system, eyeballed numbers).
- * Envoy bonuses: 1 envoy = +2 type-yield in the capital; 3 envoys = +2 in
- * every city's matching district; 6 envoys = a further +2 per district.
- * Suzerain (3+ envoys, most among majors — trivially you, solo) adds a
- * type-specific perk.
+ * City-state definitions (base Civ 6 envoy system).
+ * Envoy bonuses AS MODELED: 1 envoy = +2 type-yield in the capital; 3 envoys =
+ * +2 in every city's matching district; 6 envoys = a further +2 per district.
+ * Suzerain (3+ envoys, most among majors) adds a type-specific perk.
+ *
+ * #78 SOURCING SWEEP (2026-07-28). Verified against the Civilization wiki's
+ * City-state / Suzerain pages. CORRECT: the SUZERAIN rule (most envoys AND at
+ * least 3) and the 3-/6-envoy THRESHOLDS.
+ *
+ * ONE SOURCED DEVIATION, recorded not fixed: the FIRST envoy grants **+1** of
+ * the city-state's yield in real Civ 6 — not +2 — with TRADE city-states the
+ * lone exception at +2 Gold (and their 3-envoy step at +4 Gold rather than +2).
+ * This model pays a flat +2 for every type at 1 envoy. Correcting it is a yield
+ * change needing its own gated round on both engines, and it interacts with the
+ * B-21 note below (the real 3-/6-envoy steps also key on the district's
+ * BUILDING TIERS, already recorded there as a degraded channel). The exact
+ * numbers are captured here so that round starts from a source.
  */
 
 import type { CityStateType, DistrictId, YieldKey } from '../core/types';

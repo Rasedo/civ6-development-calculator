@@ -527,8 +527,22 @@ Per-item weights (done% in parens where partial):
   the per-resource bonus. Recorded, not fixed — a yield change needing its own
   gated round with the term at the same position on both engines. The LUXURY and
   STRATEGIC rows are NOT yet swept.
-  13 marked files remain; constants.ts, projects.ts and resources.ts carry
-  NARROWED markers (swept parts cited in place, unswept parts named).
+  **SLICE 6 — src/data/cityStates.ts envoy system (2026-07-28, #78).** Verified
+  against the wiki's City-state / Suzerain pages. CORRECT: the SUZERAIN rule
+  (most envoys AND at least 3) and the 3-/6-envoy thresholds.
+  ONE SOURCED DEVIATION, recorded not fixed: the FIRST envoy grants **+1** of
+  the city-state's yield in real Civ 6, not +2, with TRADE city-states the lone
+  exception at +2 Gold (and their 3-envoy step at +4 Gold rather than +2). This
+  model pays a flat +2 for every type at 1 envoy. Correcting it is a yield
+  change needing its own gated round on both engines, and it interacts with the
+  existing B-21 note (the real 3-/6-envoy steps also key on the district's
+  BUILDING TIERS, already recorded there as a degraded channel).
+  12 marked files remain; constants.ts, projects.ts, resources.ts and
+  cityStates.ts carry NARROWED markers (swept parts cited in place, unswept
+  parts named). SIX slices in, the pattern is settled: THREE files had real
+  errors (improvements, buildings, cityStates), THREE were correct as written
+  (constants water-housing, projects mapping, resources bonus rows), and every
+  pass leaves a CITATION whether or not it leaves a diff.
   **SLICE 3 DONE — src/data/constants.ts water-housing (2026-07-28, #78).**
   RESOLVED AS VERIFIED-CORRECT. The first search returned a confusing framing
   (+3 / +1 / +0, deltas rather than totals) and the authoritative pages were
