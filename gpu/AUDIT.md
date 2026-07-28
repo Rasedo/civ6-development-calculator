@@ -696,13 +696,28 @@ Per-item weights (done% in parens where partial):
   Both emit +2 here by different routes (a count of 2 vs a kind score of 2), so
   they agree by coincidence until count and kind-score part — exactly the shape
   of a latent that hides for a hundred turns then leaves a permanent gap.
-  WHICH IS RIGHT IS UNDECIDED and must not be settled by mirroring. #77 landed
-  the event-keyed dedication catalog, so the GPU may be the newer intent and TS
-  the stale seat — or the two are meant to COEXIST (a per-turn climb-out AND an
-  event payout), in which case one engine is missing a term rather than
-  disagreeing on one. Read the #77 entry and the Civ 6 rule first.
-  NEXT STEP: diff the two dedication paths end to end and establish whether they
-  are meant to be the same award at all.
+  **WITHDRAWN (2026-07-28): the "different formulas" claim above is WRONG — my
+  GPU probe missed a site.** BOTH engines carry BOTH paths:
+    per-turn climb-out: TS `dedicationEraScore` (via applyDedications) | GPU
+      ~14626 `_es = where(_gold, 0, dedications * _ded_era)`
+    event-keyed (#77):  TS `dedicationEvent` (boosts.ts, game.ts) | GPU ~8318
+      `era_score[:, civ] += pay * n * _ded_event_score[kind]`
+  I enumerated the GPU sites with the text pattern `era_score[..., r + 1] +=`,
+  and the per-turn site is a WHOLE-TENSOR add (`self.era_score = self.era_score
+  + _es`) that does not match it. So the [GERA] stream was partial while the TS
+  stream (hooked inside addEraScore) was complete — comparing them manufactured
+  the difference.
+  THIRD PATTERN-ENUMERATION MISS THIS SESSION (after the trace planted in the
+  barbarian walk, and the TS probe filtered by rival but not by game). The rule
+  that keeps proving itself: hook the COMMON FUNCTION or diff STATE at
+  boundaries; never enumerate call sites by grep.
+  WHAT STILL STANDS: the divergence is in the DEDICATION award — the GPU's event
+  site fires +2 at t111 and every 2-pointer around t111 on both seats is a
+  dedication. WHICH path diverges, and why, is NOT established.
+  NEXT STEP: hook every era_score write in ONE place on the GPU (mirroring the
+  TS addEraScore hook), then compare `dedications[civ]` and `civ_age[civ]`
+  between engines at t111 — a count or age mismatch in the per-turn term is the
+  leading suspect, since the event table is shared exported data.
   (Superseded account follows.)
   **TRACED (2026-07-28): the GPU founds at t78, gated by the PROPHET.**
       t76-77  pantheon=True hs=True prophets=0  -> rdue=False
