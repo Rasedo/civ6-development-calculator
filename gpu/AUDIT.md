@@ -863,11 +863,27 @@ Per-item weights (done% in parens where partial):
   the terrain term (`tmove = 0` on all three tiles, so `_terr = 0`), the camp
   clear (patched and re-run: identical red), and the re-targeting hypothesis
   (`tgt` is 734 throughout, never the unit's own tile).
-  NEXT STEP: find why `march` is False for this unit on t218 in
-  `_rival_unit_war_act` — it was True on t217 with the same unit, same war, same
-  target — and compare against whatever gate TS applies before its march loop.
-  Then decide which engine is right: a full-MP unit adjacent to a river SHOULD
-  be able to cross in real Civ 6, so the GPU is the likely offender.
+  **WHY `march` IS FALSE, MEASURED (2026-07-28): the GPU ATTACKS instead.**
+  `march = act & ~attack & ~pillage & ~dist_pillage`, and tracing all four gates
+  for this unit gives:
+      t217 v1 here=740 act=True attack=False pillage=False march=True
+      t218 v1 here=739 act=True attack=True  pillage=False march=False
+  So the GPU does not skip the march for movement points or the river cost at
+  all — `attack` PRE-EMPTS `march`. At t218 its attack-target scan finds a
+  target adjacent to 739; TS's does not, and TS walks the unit to 738 instead.
+  THIS INVERTS THE READING OF THE TILES. 738 is a barbarian CAMP, and TS MOVING
+  ONTO it means TS saw that tile as EMPTY (its step filter rejects occupied
+  tiles), while the GPU saw something attackable there. So the real question is
+  no longer about movement rules: **the two engines disagree about what STANDS
+  on or near 738 at t218.**
+  NEXT STEP: dump the GPU's chosen attack target for v1 at t218 (the `attack`
+  branch's tile) and compare against TS's `attackTargets(state, unit)` for the
+  same unit and turn. Check specifically whether a BARBARIAN UNIT garrisons 738
+  in one engine and not the other — the camps at 739/738 spawn barbs, and both
+  engines cleared 739's camp on t217 when the unit stepped onto it. If a barb
+  exists in one engine only, the true first divergence is UPSTREAM of t218 and
+  the statelog simply does not carry barb units, which is why logdiff named
+  t218.
   THE REPRODUCTION IS PRESERVED at `.claude/hunt-envoy` (worktree, detached at
   81bb972, node_modules junctioned, patch applied, fixtures + t210 checkpoints
   present). Unlike the earlier `.claude/hunt78` worktree, this one REPRODUCES —
