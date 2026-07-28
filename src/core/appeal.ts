@@ -26,14 +26,18 @@ import { neighbors } from './hex';
 import { isMountain } from './query';
 
 export function tileAppeal(map: GameMap, tile: Tile): number {
+  // B-27 (#78): a NATURAL WONDER tile is a fixed 5 and a MOUNTAIN tile a fixed
+  // 4, and NEITHER is affected by its neighbours — adjacency does not reach
+  // them at all. (The Civilopedia's terser "+4 if the tile is on a Mountain"
+  // reads as additive; that is the wrong reading. Only BLANKET AURAS —
+  // Eiffel Tower, Golden Gate Bridge, Alvar Aalto, Charles Correa — modify
+  // these, because they overwrite the tile's own property rather than sending
+  // an adjacency signal. None of those are modelled here, so the values are
+  // final; when one is added it must apply ON TOP of these, not through the
+  // neighbour loop.)
+  if (tile.wonder) return 5;
+  if (isMountain(tile)) return 4;
   let appeal = 0;
-  // B-27 (#78): "+4 if the tile is on a Mountain" — an ON-TILE term, not
-  // adjacency. See the SOURCE CONFLICT note in the file header: the Civilopedia
-  // states it additively (implemented here), while the fandom GS article calls
-  // mountains a FIXED 4 unaffected by surroundings. The two differ only when a
-  // neighbour would also contribute, and both land Breathtaking either way,
-  // so the additive in-game wording is taken as primary.
-  if (isMountain(tile)) appeal += 4;
   // "+1 if the tile is on a River or Lake" — again ON-TILE. The model
   // previously credited an ADJACENT lake, which the source assigns here.
   if (tile.riverMask !== 0 || tile.terrain === 'LAKE') appeal += 1;

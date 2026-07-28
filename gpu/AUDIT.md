@@ -1340,11 +1340,26 @@ Per-item weights (done% in parens where partial):
   because the reverse mistake — assuming reachability — is the one this rule
   exists to prevent, and it cuts both ways.
   **SOURCE SWEEP, ROUND 2 (2026-07-28) — one item unblocked, two still not.**
-  YOSEMITE: **SOURCED.** `features/feature_yosemite` resolves (the host indexes
-  natural wonders under `features/`, which is why `wonders/` kept 404ing):
-  "+1 Gold, +1 Food, +1 Science to adjacent tiles", "impassable — units cannot
-  enter this two-tile natural wonder", "+2 Appeal to neighbouring tiles". That
-  is the passability + adjacency channel the queued item needed.
+  YOSEMITE: **SOURCED AND NOW FIXED (2026-07-28).**
+  `features/feature_yosemite` resolves (the host indexes natural wonders under
+  `features/`, which is why `wonders/` kept 404ing): "+1 Gold, +1 Food, +1
+  Science to adjacent tiles", "impassable — units cannot enter this two-tile
+  natural wonder", "+2 Appeal to neighbouring tiles".
+  IMPLEMENTED as `impassable: true` with
+  `adjacentYields: { gold: 1, food: 1, science: 1 }` and no own-tile yield.
+  **THE RECORDED NOTE WAS WRONG about the cost**: it called this a mechanic
+  change needing a new adjacency channel "the way Holy Sites already have one".
+  `adjacentYields` ALREADY EXISTED and five wonders already used it, so this was
+  a data fix, not a round. Worth remembering — a residual's own difficulty
+  estimate can be stale, and this one deterred the work for several rounds.
+  ITS +2 APPEAL NEEDS NOTHING: core/appeal.ts already credits any adjacent
+  natural wonder +2 generically, so Yosemite gets the right appeal by the
+  general rule.
+  REACHABILITY IS UNPROVABLE FROM THE GATE, stated plainly: the fixtures carry
+  `nw` as a BOOLEAN ("is a natural wonder tile"), not a wonder id — 42 such
+  tiles across all 12 seeds — so nothing tells us whether YOSEMITE specifically
+  was rolled onto any map. Parity green therefore does not prove this change.
+  tests/yosemite.test.ts pins the data directly instead.
   FESTIVAL: still unsourced as a PROJECT — `projects/*` is not indexed on that
   host (project_festival and project_theater_square_festival both 404). But the
   DISTRICT entry independently confirms the principle behind the recorded
@@ -1381,11 +1396,21 @@ Per-item weights (done% in parens where partial):
       Uninviting. So appeal -1 is misclassified Uninviting and -3 misclassified
       Disgusting. This is a live defect, not a missing term: it changes
       Neighborhood HOUSING, and housing feeds growth.
-  SOURCE CONFLICT, recorded rather than resolved: the Civilopedia says "+4 if
-  the tile is on a Mountain" (ADDITIVE), while the fandom GS article says
-  mountain tiles have a fixed base of 4 and natural wonders 5, "unaffected by
-  surrounding features". Those differ once anything adjacent would modify the
-  tile. Decide against real Civ 6 behaviour before implementing.
+  **SOURCE CONFLICT RESOLVED (owner, 2026-07-28): the FIXED reading is right.**
+  Natural-wonder tiles are a fixed 5 and mountain tiles a fixed 4, and NEITHER
+  is affected by adjacent tiles at all. The Civilopedia's terser "+4 if the tile
+  is on a Mountain" reads as additive and that reading is WRONG — I implemented
+  it that way first and it had to be corrected.
+  WHAT DOES move them: BLANKET AURAS — the Eiffel Tower, the Golden Gate Bridge,
+  and Great Engineers such as Alvar Aalto and Charles Correa. Those do not send
+  an adjacency signal; they overwrite the tile's own property directly, so a
+  mountain inside the aura's zone has its value raised. None of them are
+  modelled here, so 5 and 4 are final — but when one IS added it must apply ON
+  TOP of the fixed value, never through the neighbour loop.
+  IMPLEMENTED as early returns in `tileAppeal` and, on the GPU, an `apo`
+  override plane (-999 = compute normally) applied after the neighbour gather.
+  tests/yosemite.test.ts pins both against deliberately hostile neighbours (an
+  adjacent Industrial Zone and Marsh must not move a 5 or a 4).
   **FESTIVAL: FULLY SOURCED (2026-07-28, owner-supplied) — and it exposes a
   much bigger constant error than the multi-class gap.**
   Theater Square Festival, per the fandom GS articles: "converting 15% of the

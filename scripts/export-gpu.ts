@@ -1506,10 +1506,15 @@ for (let s = 0; s < N_SEEDS; s++) {
           : t.feature === 'RAINFOREST' || t.feature === 'MARSH' || t.feature === 'FLOODPLAINS'
             ? -1
             : 0,
-      // #78: the two ON-TILE appeal terms, which are NOT neighbour
-      // contributions and so cannot ride `ap`: "+4 if the tile is on a
-      // Mountain" and "+1 if the tile is on a River or Lake".
-      aps: (isMountain(t) ? 4 : 0) + ((t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0),
+      // #78: the ON-TILE appeal term — "+1 if the tile is on a River or Lake".
+      // NOT a neighbour contribution, so it cannot ride `ap`.
+      aps: (t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0,
+      // #78: appeal OVERRIDE. A natural-wonder tile is a fixed 5 and a mountain
+      // tile a fixed 4, neither affected by neighbours; -999 means "no
+      // override, compute normally". Only blanket auras (Eiffel Tower, Golden
+      // Gate Bridge, Alvar Aalto, Charles Correa) would modify these, and none
+      // are modelled.
+      apo: t.wonder ? 5 : isMountain(t) ? 4 : -999,
       // AUDIT A-8: river-edge crossing bits for the rival MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
       // the same order riverMask bits use — so bit d = crossing toward

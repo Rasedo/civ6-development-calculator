@@ -631,6 +631,10 @@ class BatchSim:
         # NOT neighbour contributions, so they are added to the tile's OWN appeal
         # after the neighbour gather rather than folded into appeal_base.
         self.appeal_self = torch.tensor([[int(t.get("aps", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # #78: appeal OVERRIDE — natural wonder 5, mountain 4, neither touched by
+        # adjacency; -999 = compute normally. Mirrors the two early returns in
+        # core/appeal.ts tileAppeal.
+        self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.r_alive = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # static: placed at creation
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
@@ -3124,6 +3128,8 @@ class BatchSim:
         # OWN appeal, not a neighbour contribution, so they are added AFTER the
         # gather. Mirrors the two leading lines of tileAppeal in core/appeal.ts.
         out = out + self.appeal_self
+        # #78: wonder/mountain tiles ignore every term above — fixed 5 and 4.
+        out = torch.where(self.appeal_over > -999, self.appeal_over, out)
         self._appeal_cache = (self._eff_version, out)
         return out
 

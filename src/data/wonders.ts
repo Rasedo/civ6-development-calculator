@@ -9,13 +9,14 @@
  *   DEAD_SEA     +2 Faith / +2 Culture — correct as written
  *   PANTANAL     +2 Food / +2 Culture — correct as written
  *
- * ONE SOURCED DEVIATION, recorded not fixed — YOSEMITE. Real Civ 6 makes it
- * IMPASSABLE and gives "+1 Gold, +1 Food, and +1 Science to ADJACENT tiles".
- * This model has it `impassable: false` paying `{ gold: 1, science: 1 }` on
- * its OWN tile, so it differs in three ways at once: passability, the
- * own-tile-vs-adjacent channel, and a missing +1 Food. That is a mechanic
- * change (natural wonders would need an adjacency yield channel, the way Holy
- * Sites already have one), not a constant tweak — it needs its own round.
+ * YOSEMITE — FIXED (#78, 2026-07-28). It is now `impassable: true` with
+ * `adjacentYields: { gold: 1, food: 1, science: 1 }` and no own-tile yield,
+ * matching the Civilopedia. The old note called this a mechanic change needing
+ * a new adjacency channel; that was wrong — `adjacentYields` already existed
+ * and five wonders already used it, so it was a data fix after all.
+ * Its "+2 Appeal to neighbouring tiles" is NOT modelled: appeal credits any
+ * adjacent natural wonder +2 generically (core/appeal.ts), so Yosemite already
+ * gets the right appeal by the general rule and needs no per-wonder term.
  *
  * The remaining eight wonders are NOT yet sourced individually; NARROWED marker.
  */
@@ -150,8 +151,16 @@ export const WONDERS: Record<string, NaturalWonderDef> = {
     name: 'Yosemite',
     code: 'YO',
     size: 2,
-    impassable: false,
-    tileYields: { gold: 1, science: 1 },
+    // #78 (2026-07-28): sourced from the Civilopedia
+    // (features/feature_yosemite) — "+1 Gold, +1 Food, and +1 Science to
+    // adjacent tiles" and "impassable — units cannot enter this two-tile
+    // natural wonder". Was `impassable: false` paying { gold, science } on its
+    // OWN tile: wrong on passability, wrong channel, and missing the Food.
+    // The recorded note claimed this needed a NEW adjacency channel; it did
+    // not — `adjacentYields` already exists and five other wonders use it.
+    impassable: true,
+    tileYields: {},
+    adjacentYields: { gold: 1, food: 1, science: 1 },
     spawn: { terrains: ['PLAINS', 'TUNDRA', 'GRASSLAND'], minLat: 0.4 },
     color: '#a8c890',
   },
