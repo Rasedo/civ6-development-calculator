@@ -1297,10 +1297,27 @@ Per-item weights (done% in parens where partial):
   exercised and parity green here is real evidence, not vacuous. Recorded
   because the reverse mistake — assuming reachability — is the one this rule
   exists to prevent, and it cuts both ways.
-  APPEAL TERMS: still UNVERIFIED. The Civilopedia appeal concept page 404s
-  under both slugs tried (concept_appeal, concept_appeal_of_a_tile), so the
-  two queued appeal terms stay unsourced rather than being written up off a
-  search summary — the failure mode this whole class exists to avoid.
+  **SOURCE SWEEP, ROUND 2 (2026-07-28) — one item unblocked, two still not.**
+  YOSEMITE: **SOURCED.** `features/feature_yosemite` resolves (the host indexes
+  natural wonders under `features/`, which is why `wonders/` kept 404ing):
+  "+1 Gold, +1 Food, +1 Science to adjacent tiles", "impassable — units cannot
+  enter this two-tile natural wonder", "+2 Appeal to neighbouring tiles". That
+  is the passability + adjacency channel the queued item needed.
+  FESTIVAL: still unsourced as a PROJECT — `projects/*` is not indexed on that
+  host (project_festival and project_theater_square_festival both 404). But the
+  DISTRICT entry independently confirms the principle behind the recorded
+  deviation: the Theater Square reads "+1 Great Writer point per turn. +1 Great
+  Artist point per turn. +1 Great Musician point per turn" — all THREE culture
+  classes, which is what projects.ts says the Festival should award against the
+  single `gpClass: 'ARTIST'` modelled. The RATES (~11% of invested production
+  each, 15% production -> Culture) remain unconfirmed, so the slice still
+  cannot be implemented under verify-before-implement.
+  APPEAL TERMS: still UNVERIFIED after four slug shapes (concept_appeal,
+  concept_appeal_of_a_tile, concept_appeal_tile, plus Fandom's HTTP 402).
+  `concepts/*` is simply not indexed on civilopedia.net. They stay unsourced
+  rather than being written up off a search summary — the failure mode this
+  whole class exists to avoid (search summaries scored 1/3 this session against
+  Civilopedia's 2/2, and the wrong Camp constant shipped from one).
   WHY NONE OF THEM EVER TRIPPED A GATE: every error preserved the government's
   TOTAL slot count and only got the composition wrong — a Wildcard standing in
   for a Diplomatic slot, or a Military for a Wildcard. Slot COUNT is what any
