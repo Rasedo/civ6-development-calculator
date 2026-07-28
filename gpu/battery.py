@@ -36,6 +36,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
 NO_EVAL = "--no-eval" in sys.argv
+NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
 
 results: list[tuple[str, float, int]] = []
 lock = threading.Lock()
@@ -48,7 +49,31 @@ def run(name: str, cmd: list[str], threads: int = 8) -> None:
     env["OMP_NUM_THREADS"] = str(threads)
     env["MKL_NUM_THREADS"] = str(threads)
     t0 = time.time()
-    p = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    # BAIL-FAST (#78): the standing process is to fix and RE-RUN the whole
+    # battery, so once any lane fails every other lane is wasted wall-clock —
+    # and the expensive ones (eval ~1650s, parity ~650s, gpu-gate ~594s) would
+    # otherwise run to completion after the verdict is already known. Poll
+    # instead of blocking so a failure elsewhere can kill this lane now.
+    # `--no-bail` restores the old run-everything behaviour when the full
+    # picture is wanted (e.g. counting how many lanes a change breaks).
+    p = subprocess.Popen(
+        cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8", errors="replace",
+    )
+    while True:
+        try:
+            out, err = p.communicate(timeout=1.0)
+            break
+        except subprocess.TimeoutExpired:
+            if failed.is_set() and not NO_BAIL:
+                p.kill()
+                p.communicate()
+                dt = time.time() - t0
+                with lock:
+                    results.append((name, dt, -3))
+                    print(f"  {name:<14} {dt:6.1f}s  bail  (another lane failed)", flush=True)
+                return
+    p = subprocess.CompletedProcess(cmd, p.returncode, out, err)
     dt = time.time() - t0
     with lock:
         results.append((name, dt, p.returncode))
@@ -164,7 +189,7 @@ def main() -> int:
     wall = time.time() - t0
     print(f"\n{'step':<14} {'time':>7}  status")
     for name, dt, rc in results:
-        print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'FAIL'}")
+        print(f"{name:<14} {dt:6.1f}s  {'ok' if rc == 0 else 'SKIP' if rc == -1 else 'BAIL' if rc == -3 else 'FAIL'}")
     serial = sum(dt for _, dt, _ in results)
     print(f"\nwall {wall:.0f}s (serial-equivalent {serial:.0f}s, {serial / max(wall, 1):.1f}x)")
     if failed.is_set():
