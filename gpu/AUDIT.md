@@ -1344,11 +1344,34 @@ Per-item weights (done% in parens where partial):
   mountain tiles have a fixed base of 4 and natural wonders 5, "unaffected by
   surrounding features". Those differ once anything adjacent would modify the
   tile. Decide against real Civ 6 behaviour before implementing.
-  FESTIVAL: the project page resolves under `/en-US/.../wonders/` but still
-  gives only prose — "a small amount of Great Writer, Great Artist, and Great
-  Musician points" — confirming the MULTI-CLASS principle (as does the Theater
-  Square district entry: +1 of each per turn) while leaving the RATES
-  unsourced. Still not implementable.
+  **FESTIVAL: FULLY SOURCED (2026-07-28, owner-supplied) — and it exposes a
+  much bigger constant error than the multi-class gap.**
+  Theater Square Festival, per the fandom GS articles: "converting 15% of the
+  city's Production output to Culture" while ongoing, and on completion "Great
+  Writer, Great Artist, and Great Musician points EACH equal to approximately
+  11% of the Production invested (on Standard speed)". The exact GPP rule is
+      GPP = D_TYPE * (1 + 7 * DEVELOPMENT_RATIO)
+  with D_TYPE = 5 for the Theater Square Festival (10 for most district
+  projects, 30 for Occult Research) and DEVELOPMENT_RATIO = max(techs unlocked /
+  total techs, civics unlocked / total civics). Documented quirk: the GPP yield
+  does NOT scale with game speed even though the project COST does, so the
+  effective conversion is ~22% on Standard for a Campus project but ~43% on
+  Online and ~15% on Epic. Base cost 25 Production, progressive.
+  **THE MODEL'S CONSTANTS ARE GLOBAL AND ONE IS 5x OFF.** projects.ts carries
+  `PROJECT_YIELD_FRACTION = 0.75` and `PROJECT_GPP_FRACTION = 0.3` for EVERY
+  project. Against the sourced Festival values:
+   * yield: 0.75 vs 0.15 — the culture conversion is FIVE TIMES too generous.
+   * GPP: 0.3 to ONE class vs ~0.11 to EACH of three. The AGGREGATE (~0.33) is
+     nearly right, which is exactly why this never looked anomalous — the
+     distribution is what is wrong, not the total.
+  SCOPE WARNING for whoever implements it: these fractions are shared by all
+  projects, and the real rates are PER PROJECT (the same source puts Campus
+  Research Grants at ~22% of production to GP points on Standard). Changing the
+  globals would silently re-tune every other project, so this needs a per-project
+  table sourced project by project, not a one-line constant edit. The D_TYPE
+  ladder above is the right shape for the GPP half.
+  STILL NOT IMPLEMENTED — it is now a sourcing-complete, DESIGN-pending slice
+  rather than a blocked one.
   WHY NONE OF THEM EVER TRIPPED A GATE: every error preserved the government's
   TOTAL slot count and only got the composition wrong — a Wildcard standing in
   for a Diplomatic slot, or a Military for a Wildcard. Slot COUNT is what any
