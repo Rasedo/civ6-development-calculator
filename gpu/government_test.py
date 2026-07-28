@@ -74,18 +74,34 @@ def main() -> None:
     # 3) + POLITICAL_PHILOSOPHY -> AUTOCRACY (tier 1, table-order tie-break over
     #    OLIGARCHY/CLASSICAL_REPUBLIC): +1 all yields in the capital, URBAN_PLANNING
     #    still slotted in the economic slot, influence tier 1.
+    #    #78: AUTOCRACY's slots are now the SOURCED [M,E,D,W] (Civilopedia:
+    #    1 Military, 1 Economic, 1 Diplomatic, 1 Wildcard) — it was [M,M,E,D],
+    #    the same total of 4 with the composition wrong. That gives it a
+    #    WILDCARD it never used to have, so GOD_KING (economic, E taken by
+    #    URBAN_PLANNING) now legitimately spills into it, exactly as it already
+    #    did under MONARCHY in step 4. The capital therefore reads AUTOCRACY's
+    #    +1 on every yield PLUS GOD_KING's +1 gold / +1 faith on top.
+    #    The old flat "== 1.0 everywhere" encoded the WRONG slot list, so it is
+    #    the expectation that was corrected here, not the gate that was weakened.
     c2 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "POLITICAL_PHILOSOPHY"])
     adopted, has_gov = sim._adopted_gov(c2)
     assert int(adopted[0]) == gov_idx["AUTOCRACY"], "newest tier-1 government, table-order tie-break => AUTOCRACY"
     city_y, cap_y, hous, ymult, _sl, _em = sim._gov_policy_mods(c2)
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING still slotted in AUTOCRACY's economic slot"
     for k in range(6):
-        assert float(cap_y[0, k]) == 1.0, f"AUTOCRACY gives +1 to capital yield column {k}"
+        want = 2.0 if k in (2, 5) else 1.0  # gold, faith carry GOD_KING's wildcard spill
+        assert float(cap_y[0, k]) == want, (
+            f"AUTOCRACY capital yield column {k}: expected {want} "
+            "(+1 all yields, and +1 more on gold/faith from GOD_KING in the wildcard)"
+        )
     assert int(sim._adopted_gov_tier(c2)[0]) == 1, "AUTOCRACY influence tier is 1"
     assert float(hous.abs().sum()) == 0.0, "no housingAll below MONARCHY"
 
     # 4) #46r: MONARCHY (tier 2) -> housingAll +1 AND the wildcard-overflow
-    #    fill: slots [M,M,M,E,D,W]; VETERANCY -> M1, URBAN_PLANNING -> E,
+    #    fill: slots [M,M,E,D,W,W] since #78 (was [M,M,M,E,D,W] when this step
+    #    was written; the Civilopedia composition is 2M/1E/1D/2W and the
+    #    assertions below are unaffected — GOD_KING still finds a W slot);
+    #    VETERANCY -> M1, URBAN_PLANNING -> E,
     #    GOD_KING (economic, E full) spills into the W slot -> +1 gold +1
     #    faith on the capital ON TOP of nothing else (MONARCHY has no
     #    capitalYields). The exact live set the 250t scripted gate reaches
@@ -110,8 +126,17 @@ def main() -> None:
     GOLD2 = 2
     assert abs(float(ymult[0, GOLD2]) - 1.1) < 1e-12, "MERCHANT_REPUBLIC gold ×1.1 (the rng-2026006082 t249 catch)"
     pol_idx = {p["id"]: i for i, p in enumerate(rj["policies"])}
-    assert bool(sl4[0, pol_idx["INSULAE"]]), "INSULAE spills into a Merchant-Republic W slot"
-    assert bool(sl4[0, pol_idx["LAND_SURVEYORS"]]), "LAND_SURVEYORS takes the first W slot"
+    # #78: MERCHANT_REPUBLIC's slots are now the SOURCED [M,E,E,D,D,W]
+    # (Civilopedia: 1M/2E/2D/1W). It was [M,E,E,D,W,W] — same total of 6, with
+    # a Wildcard standing in for a Diplomatic slot. Losing that second W means
+    # the two economic overflows can no longer BOTH spill: LAND_SURVEYORS
+    # (policy table index 81) takes the single W ahead of INSULAE (index 84).
+    # So INSULAE is now correctly squeezed out.
+    assert bool(sl4[0, pol_idx["LAND_SURVEYORS"]]), "LAND_SURVEYORS takes the single W slot"
+    assert not bool(sl4[0, pol_idx["INSULAE"]]), (
+        "INSULAE must NOT be slotted — MERCHANT_REPUBLIC has one Wildcard, not two, "
+        "and LAND_SURVEYORS wins it on table order"
+    )
 
     # 5) #46r: the master switch ships LIVE now — a real sim computes the
     #    mods; forcing the switch off in-memory silences them (the old
