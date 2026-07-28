@@ -542,6 +542,25 @@ Per-item weights (done% in parens where partial):
   the per-resource bonus. Recorded, not fixed — a yield change needing its own
   gated round with the term at the same position on both engines. The LUXURY and
   STRATEGIC rows are NOT yet swept.
+  **ENVOY 1-BONUS FIX ATTEMPTED AND REVERTED (2026-07-28, #78).** The per-type
+  correction was BUILT on both seats - CS_CAPITAL_BONUS_BY_TYPE (trade 2, rest
+  1), wired through FOUR TS sites (player csEnvoyBonuses, rival
+  csRivalEnvoyBonuses, envoyBonusDelta) and THREE GPU sites (the player capital
+  bonus and two rival-seat twins), exported as `capitalBonusByType` indexed by
+  CITY_STATE_TYPES. Scripted parity went GREEN at 0.0 milli and vitest 431/431
+  after de-hardcoding five assertions that asserted the old flat 2.
+  IT IS NOT LANDED: the battery's gpu-gate went RED off-script at seed 9170
+  t220, HEAD column 8 = the PLAYER empire score, TS 118677 vs GPU 119677 - a
+  gap of exactly 1.0, the size of the 2->1 change. No remaining flat
+  `capitalBonus` use exists in either engine (verified by grep), so this is a
+  divergence EXPOSED by the change rather than a missed wiring site.
+  SAME SHAPE as the rGScore1 latent: scripted parity clean, plain rollout red,
+  a small integral gap in a SCORE column that sums weighted yields. TWO
+  independent yield-touching changes have now surfaced a score-only off-script
+  divergence, which points at ONE underlying cause in the score/yield path
+  rather than two coincidences. That is the strongest lead either hunt has.
+  REVERTED so the tree stays green; the sourced values and all seven wiring
+  sites are recorded so the redo does not re-derive them.
   **SLICE 6 — src/data/cityStates.ts envoy system (2026-07-28, #78).** Verified
   against the wiki's City-state / Suzerain pages. CORRECT: the SUZERAIN rule
   (most envoys AND at least 3) and the 3-/6-envoy thresholds.
