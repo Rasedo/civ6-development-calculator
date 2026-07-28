@@ -55,7 +55,7 @@ import {
   LEVY_GOLD_COST,
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -820,6 +820,9 @@ const rules = {
       cy: YIELD_KEYS.map((k) => w.cityYields?.[k] ?? 0),
       growAll: w.effects?.growthAllMult ?? 1,
       petra: w.effects?.petraDesert ? 1 : 0,
+      // AUDIT #78: Great Work slots this wonder grants, per kind
+      // [writing, art, music] — additive with the GW_BUILDINGS slots.
+      gwslots: GW_WONDER_SLOTS[w.id] ?? [0, 0, 0],
       mult: YIELD_KEYS.map((k) => w.effects?.cityYieldMult?.[k] ?? 1),
       // adjacency requirement: -1 none, -2 CITY_CENTER, -3 required but
       // out-of-catalog (never placeable — Colosseum/Ruhr), else the

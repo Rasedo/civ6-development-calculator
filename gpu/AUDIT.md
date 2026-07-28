@@ -853,6 +853,19 @@ Per-item weights (done% in parens where partial):
   not established — parity green here is weak evidence, not proof. A poke lane
   that constructs the configuration directly is the right guard; queued with
   the rival-side pair.
+  **POKE LANE ADDED (2026-07-28): gpu/watermill_test.py**, wired into the
+  battery. It rewrites the tile planes directly — every tile a city owns becomes
+  a FARM carrying a farm-improved BONUS resource — rather than waiting for a
+  seed to wander into the configuration, and asserts the three things the
+  implementation could plausibly get wrong: the bonus is worth exactly +1 food
+  per eligible WORKED tile; it is gated on the BUILDING (a control city without
+  the Water Mill must not move); and it is gated on the RESOURCE, not on the
+  Farm alone (stripping the bonus-resource identity while keeping the Farms
+  returns the city to baseline).
+  The lane earned its place on its FIRST run by failing: the expected delta had
+  to include the Water Mill's own +1 base food, which I had omitted. It now
+  reads that base from rules.b_yields rather than hardcoding it, so a future
+  re-source of the building's yields cannot silently invalidate the lane.
   **GREAT LIBRARY, VERIFIED (2026-07-28, #78).** Direct Civilopedia fetch
   confirms the queued claim exactly: "+2 Great Works of Writing slots", on top
   of +2 Science, +1 Great Scientist point, +1 Great Writer point and +1000
@@ -886,9 +899,28 @@ Per-item weights (done% in parens where partial):
   (engine.py ~2599); add the wonder term from `rc_wonder` + built_wonder_complete
   against a new per-wonder slot table exported alongside the existing wonder
   rows, and mirror it in the player path.
-  GATE NOTE: the Theater-Square line is nearly unbuilt in-gate, so expect this
-  to be gate-unreachable and needing a poke lane rather than parity to prove
-  it — the same situation as the #71 Great Works re-key.
+  **IMPLEMENTED (2026-07-28), all four sites.** greatPeople.ts gains
+  GW_WONDER_SLOTS ({ GREAT_LIBRARY: [2, 0, 0] }) and placeGreatWorks takes an
+  optional `extra(city)` resolver; capacity is now
+  `(has building ? GW_SLOTS[kind] : 0) + extra(c)`, skipping only when capacity
+  <= used. That last part is the real semantic change: a wonder can now hold
+  works in a city with NO Amphitheater, which the old early-return on a missing
+  building could not express. game.ts and rivals.ts supply the resolver because
+  they hold the map (completeness lives on `builtWonderComplete`); GwCity gained
+  an optional `wonders` field so the resolver can read it without dragging map
+  types into the data layer.
+  GPU: a new per-wonder `gwslots` export row -> `_wond_gw` [nW, 3], added to
+  BOTH capacity sites. The rival side reads its rc_wonder registry (same source
+  and completeness test as its Petra block); the PLAYER side has no per-city
+  wonder registry, so it attributes by TILE OWNERSHIP — which is also what makes
+  a captured wonder carry its slots correctly.
+  GATE NOTE — MY PREDICTION WAS WRONG, MEASURED: I expected this to be
+  gate-unreachable like the #71 Great Works re-key, because the Theater-Square
+  line is nearly unbuilt. In fact the GREAT LIBRARY is BUILT 4 TIMES across 6
+  seeds (44 completed wonders of all kinds), so the channel is genuinely
+  exercised and parity green here is real evidence, not vacuous. Recorded
+  because the reverse mistake — assuming reachability — is the one this rule
+  exists to prevent, and it cuts both ways.
   APPEAL TERMS: still UNVERIFIED. The Civilopedia appeal concept page 404s
   under both slugs tried (concept_appeal, concept_appeal_of_a_tile), so the
   two queued appeal terms stay unsourced rather than being written up off a

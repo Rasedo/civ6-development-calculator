@@ -987,6 +987,11 @@ class BatchSim:
             self._wond_mult = torch.tensor([w["mult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             self._wond_petra = torch.tensor([bool(w.get("petra", 0)) for w in self._wond_rows], dtype=torch.bool, device=device)  # [nW]
+            # AUDIT #78: per-wonder Great Work slots [nW, 3] in kind order
+            # (writing, art, music). Additive with the GW_BUILDINGS slots —
+            # before this, capacity came from buildings alone and a wonder
+            # could not contribute any (Great Library: +2 writing).
+            self._wond_gw = torch.tensor([list(w.get("gwslots", [0, 0, 0])) for w in self._wond_rows], dtype=torch.long, device=device)
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # A-13 off-script gate catch (rng 2026006108 t81): foundCity strips
         # ONLY a REMOVABLE feature — an OASIS/FLOODPLAINS center keeps its
@@ -2567,6 +2572,16 @@ class BatchSim:
             return
         used = (self.gw_writing, self.gw_art, self.gw_music)[kind]  # [B, C]
         cap = self.buildings[:, :, bcol].long() * nslots  # [B, C] (a city holds 1 such building max)
+        # AUDIT #78: plus slots granted by COMPLETED WONDERS (Great Library +2
+        # writing), mirroring greatPeople.ts's `extra` resolver. Player wonders
+        # have no per-city registry the way rivals do, so they attribute by TILE
+        # OWNERSHIP — which is also what makes capture carry them correctly.
+        if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
+            wsl = self._wond_gw[:, kind]  # [nW]
+            live_w = (self.built_wonder >= 0) & self.built_wonder_complete  # [B, T]
+            tile_sl = torch.where(live_w, wsl[self.built_wonder.clamp(min=0)], torch.zeros_like(self.built_wonder))
+            for c in range(self.C):
+                cap[:, c] = cap[:, c] + (tile_sl * (self.owner == c).long()).sum(dim=1)
         openc = (cap - used).clamp(min=0) * self.alive.long()  # [B, C] open slots per live city
         W = nworks * can_col.long()  # [B] works to place this earn
         # state.cities array order = city_seq rank (acquisition order).
@@ -2597,6 +2612,16 @@ class BatchSim:
             return
         used = (self.rc_gw_writing, self.rc_gw_art, self.rc_gw_music)[kind][:, r]  # [B, RC]
         cap = self.rc_bldg[:, r, :, bcol].long() * nslots  # [B, RC]
+        # AUDIT #78: plus COMPLETED-WONDER slots, the rival twin of the player
+        # term and of rivals.ts. Rivals DO carry a per-city wonder registry, so
+        # this reads rc_wonder directly instead of going via tile ownership —
+        # the same source and completeness test the Petra block uses.
+        if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
+            wreg = self.rc_wonder[:, r]  # [B, RC, nW]
+            compw = (wreg >= 0) & self.built_wonder_complete.gather(
+                1, wreg.clamp(min=0).reshape(self.B, -1)
+            ).reshape_as(wreg)
+            cap = cap + (compw.long() * self._wond_gw[:, kind].view(1, 1, -1)).sum(dim=2)
         openc = (cap - used).clamp(min=0) * self.rc_alive[:, r].long()  # [B, RC]
         W = nworks * hit.long()  # [B]
         prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order

@@ -174,6 +174,16 @@ export const GW_MUSIC = 2;
 /** Per-kind building, slot count, works per Great Person, culture and tourism. */
 export const GW_BUILDINGS = ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'] as const;
 export const GW_SLOTS = [2, 3, 1] as const;
+/**
+ * AUDIT #78: Great Work slots granted by a completed WONDER, in kind order
+ * [writing, art, music]. Sourced by direct Civilopedia fetch — the Great
+ * Library reads "+2 Great Works of Writing slots" on top of its yields.
+ * Additive with GW_SLOTS: before this, slots came only from GW_BUILDINGS
+ * (one building per kind), so a wonder had no way to contribute capacity.
+ */
+export const GW_WONDER_SLOTS: Record<string, readonly [number, number, number]> = {
+  GREAT_LIBRARY: [2, 0, 0],
+};
 export const GW_WORKS_PER_PERSON = [2, 3, 2] as const;
 export const GW_CULTURE = [2, 2, 4] as const;
 export const GW_TOURISM = [2, 2, 4] as const;
@@ -187,7 +197,13 @@ export const GW_CLASS_KIND: Partial<Record<GreatPersonClass, number>> = {
 /** Classes whose people carry Great Works (vs. the instant-lump classes). */
 export const GW_WORK_CLASSES = new Set<GreatPersonClass>(['WRITER', 'ARTIST', 'MUSICIAN']);
 
-type GwCity = { greatWorksWriting?: number; greatWorksArt?: number; greatWorksMusic?: number };
+type GwCity = {
+  greatWorksWriting?: number;
+  greatWorksArt?: number;
+  greatWorksMusic?: number;
+  /** #78: read only by the caller-supplied wonder-slot resolver. */
+  wonders?: { id: string; tileIndex: number }[];
+};
 
 /** The per-kind slotted count of a city, in kind order. */
 export function gwCount(city: GwCity, kind: number): number {
@@ -285,14 +301,28 @@ export function greatWorkCulture(city: GwCity): number {
  * lowest slot first; the per-city count is bumped. Returns the count of works
  * that found NO slot (the overflow charges that fall back to a lump).
  */
-export function placeGreatWorks(cities: (GwCity & { buildings: string[] })[], kind: number): number {
+export function placeGreatWorks(
+  cities: (GwCity & { buildings: string[] })[],
+  kind: number,
+  /**
+   * AUDIT #78: extra slots this city gets from completed WONDERS, per kind.
+   * Supplied by the caller rather than derived here on purpose — this module
+   * is map-free, and wonder COMPLETENESS lives on the tile
+   * (`builtWonderComplete`), so only a caller holding the map can resolve it.
+   */
+  extra?: (city: GwCity & { buildings: string[] }) => number,
+): number {
   const building = GW_BUILDINGS[kind];
   let remaining: number = GW_WORKS_PER_PERSON[kind];
   for (const c of cities) {
     if (remaining <= 0) break;
-    if (!c.buildings.includes(building)) continue;
+    // Capacity is now the BUILDING's slots plus any wonder's, so a wonder can
+    // hold works in a city with no Amphitheater at all — which is how Civ 6
+    // works and the entire point of the channel. The old shape returned early
+    // on a missing building and could never express that.
+    const cap = (c.buildings.includes(building) ? GW_SLOTS[kind] : 0) + (extra?.(c) ?? 0);
     const used = gwCount(c, kind);
-    const open = GW_SLOTS[kind] - used;
+    const open = cap - used;
     if (open <= 0) continue;
     const take = Math.min(open, remaining);
     gwSet(c, kind, used + take);

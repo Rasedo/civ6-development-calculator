@@ -31,7 +31,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
-import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, GW_CLASS_KIND, placeGreatWorks, greatWorkCulture, placeRelic, relicFaith } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, GW_CLASS_KIND, placeGreatWorks, GW_WONDER_SLOTS, greatWorkCulture, placeRelic, relicFaith } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import {
@@ -907,7 +907,17 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
       // culture/turn each, deferred); overflow charges fall back to the instant
       // culture lump, one per charge. Other classes apply culture instantly.
       if (GW_WORK_CLASSES.has(cls)) {
-        const overflow = placeGreatWorks(rival.cities, GW_CLASS_KIND[cls]!); // #73: per-kind
+        // AUDIT #78: wonder-granted slots (Great Library +2 writing), the
+        // rival twin of game.ts. Same completeness filter this file's Petra
+        // block already uses.
+        const gwKind = GW_CLASS_KIND[cls]!;
+        const rcWonderSlots = (c: { wonders?: { id: string; tileIndex: number }[] }) =>
+          (c.wonders ?? []).reduce(
+            (n, w) =>
+              n + (state.map.tiles[w.tileIndex].builtWonderComplete ? (GW_WONDER_SLOTS[w.id]?.[gwKind] ?? 0) : 0),
+            0,
+          );
+        const overflow = placeGreatWorks(rival.cities, gwKind, rcWonderSlots); // #73: per-kind
         if (fx.culture) rival.research.civicProgress += fx.culture * overflow;
       } else if (fx.culture) {
         rival.research.civicProgress += fx.culture;
