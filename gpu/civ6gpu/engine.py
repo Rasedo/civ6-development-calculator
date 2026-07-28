@@ -10243,7 +10243,18 @@ class BatchSim:
         valid = (
             (d_all >= 1)
             & (d_all <= rng_u.unsqueeze(1))
-            & ((((self.center_at >= 0) | (self.rvcity_at >= 0)) & hp.unsqueeze(1)) | units_pl)
+            # AUDIT #78: exclude the attacker's OWN centre (see combat.ts's
+            # ownCentre). The blind form let a rival select its own capital,
+            # after which the resolver refused the attack while `attack` stayed
+            # True, suppressing `march` and freezing the unit permanently.
+            # Barbs are untouched here (this is the rival path), matching TS.
+            & (
+                (
+                    ((self.center_at >= 0) | ((self.rvcity_at >= 0) & (self.rvcity_at != ac.unsqueeze(1))))
+                    & hp.unsqueeze(1)
+                )
+                | units_pl
+            )
         )
         valid = valid | (enemy_rc & (d_all == 1) & ~rngd.unsqueeze(1))  # A-19/B-33: enemy rival center, melee CAPTURE (vs the no-op quirk above)
         # B-17 (#71): an adjacent LIVE enemy Encampment is a melee target — the

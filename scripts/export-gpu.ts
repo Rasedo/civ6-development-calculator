@@ -1224,67 +1224,17 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // covering collapse trajectories, so no coverage is lost. Diagnose a dying
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
-  // #78: the corrected combat strengths make the hostile world stronger and
-  // index 6's default 9079 loses every player city before t250. 9080 survives.
-  6: 9080,
-  // #71 FLAG 2 (DEDICATION_PAYOUTS_LIVE, 2026-07-26): with the per-turn
-  // dedication payouts LIVE the world is slightly richer for everyone, and
-  // index 16's default seed 9209 now loses every player city before t250 —
-  // the documented wiped-player class above, not a parity fault (the GPU and
-  // TS agree on the collapse; the exporter simply cannot record a dead
-  // player). 9210 survives but only just (1 city, pop 2); 9212 is the healthy
-  // pick at 2 cities, pop 13/8.
-  16: 9212,
-  // A-19/B-33 (task #55 S2, 2026-07-20): rival-rival wars let a rival CONQUER
-  // its neighbour down to a rump (seed 9001 r0 held 13-14 cities off r1). Deep
-  // in that heavily-diverged conquest regime, ONE captured city's identity
-  // desyncs — TS id12/pop6 vs GPU id13/pop3 (all other 12 cities bit-identical;
-  // RNG stream, war state and capture TURNS all align) — a captured-city
-  // registry / loyalty-flip-timing latent in the A-24 family, made reachable by
-  // rival-rival conquest. Not the S2 combat machinery (22/24 seeds bit-exact).
-  // Rerolled; latent recorded on AUDIT.
   0: 9002,
-  2: 9029, // 9027: Rome+Egypt double war t21, capital conquered t36, last city flipped t84
-  // 9028 died in ROUND B3's merged reshuffle (U yields + V civics + X combat
-  // compound): structural collapse by t250 — rerolled again.
-  // #56: NOT an army-fixable death — Egypt war t21, Brightwater defects by
-  // LOYALTY t54 (settled into Egypt's pressure blob), capital conquered t61.
-  // Structural for a passive script with fixed t0 settle sites (the 9027
-  // shape); H1/H2 verified not to help (diagnosed at 250t, 2026-07-17).
-  4: 9054, // 9053: see above
-  // 9157 (index 12) died by t250 in ROUND B5 M2's XP reshuffle (veterancy
-  // shifted the war outcome — the player's last city fell): rerolled to 9158.
+  1: 9015,  // #78/#47: rival units no longer freeze, so the world is harsher
+  2: 9029,
+  4: 9054,
+  6: 9080,
+  10: 9133,  // #78/#47: rival units no longer freeze, so the world is harsher
   12: 9158,
-  // 9131 (index 10) died in B9-R3: the rival PALACE grant (+2p/+5g/+2s/+1c
-  // per capital) and worship buys pushed its already 1-city scripted player
-  // (pop 8 hanging on since B5) over the edge — structural collapse.
-  10: 9132,
-  // 17:9222 and 23:9301 RESTORED for ROUND B10 slice-H (#66) — the G-5 hunt.
-  // These two were rerolled (17:9223, 23:9302) while G-5 was open: a rival's
-  // treasury off by EXACTLY 1 gold (+ score 5.4) on the turn it ACQUIRED a
-  // player city mid-phase (9222 t184 loyalty defect; 9301 t223 war capture of
-  // city 586). ROOT (fixed): transferCityToRival kept EVERY complete district
-  // tile, so a city with duplicate-type districts (two Campuses) handed the
-  // rival more district-adjacency yield than the type-keyed GPU rc_dist_tile
-  // registry — which overwrites to one tile per type — could hold. TS now
-  // dedupes kept districts by type (rivals.ts), matching the GPU registry and
-  // real Civ 6's one-district-per-type invariant. Restored so the class rides
-  // in-gate; both export clean at 250t and the full ladder is 0.0-milli green.
-  17: 9223, // A-19/B-33 (S2, 2026-07-20): same captured-city identity latent as index 0 under rival-rival conquest — rerolled 9222→9223 (was itself the B10 G-5 reroll)
-  23: 9301,
-  // 9196 (index 15) diverged in ROUND B8 slice-K's B-21 re-key reshuffle: the
-  // scripted player CONQUERS a rival city (acquired t7) at ~t240; GPU computes
-  // that captured city's amenity balance as -4 (amen_have 0) vs TS -2, so its
-  // growth factor is 0.70 vs 0.90 → foodBox/pop drift (score by t250). ROOT is
-  // a PRE-EXISTING captured-city amenity latent (the conquered city's
-  // tiles/luxury resources do not feed the GPU empire luxury pool — GPU shows 0
-  // luxuries empire-wide while TS grants the captured luxuries), in the
-  // A-23/A-24 registry family — ORTHOGONAL to B-21 (CS bonuses never touch
-  // food/amenities; this seed's CS channels are culture/faith and cultureBox
-  // matches exactly). Rerolled; latent recorded on AUDIT (new A-25).
-  // A25_G8 S1 (2026-07-20): 9196 RESTORED — the A-25 repro rides in-gate
-  // again for the captured-luxury pool fix (brief gpu/A25_G8.md).
   15: 9196,
+  16: 9212,
+  17: 9223,
+  23: 9302,  // #78/#47: rival units no longer freeze, so the world is harsher
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = seedFor(s);

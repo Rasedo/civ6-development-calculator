@@ -777,7 +777,18 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     );
     // AUDIT A-6: ranged hostiles bombard city-center tiles at their full
     // range (the player's D-23 rule from the other seat); melee keeps d===1.
-    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range;
+    // AUDIT #78: a unit must never target its OWN civ's centre. This arm was
+    // ownership-blind — any CITY_CENTER tile counted while hostileToPlayer — so
+    // a rival at war with the player selected its own capital, meleeAttack then
+    // refused it, and because hostileUnitAct still returns the unit HELD: it
+    // never marched again (seed 9170, a warrior frozen from t218 to the end).
+    // Deliberately narrow: BARBARIANS own no cities, so their targeting is
+    // unchanged, which keeps the barb paths byte-identical across both engines.
+    // The neutral-rival case (targeting a rival one is at PEACE with) is left
+    // as a RECORDED deviation — both engines share it, so it costs no parity.
+    const ownCentre =
+      unit.owner === 'rival' && rivalCityAt(state, t.index)?.rival.id === unit.civId;
+    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range && !ownCentre;
     // P4/D-23: the player's ranged units bombard cities at their full range.
     const cityRange = unit.owner === 'player' ? range : 1;
     const rivalCity =

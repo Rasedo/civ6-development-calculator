@@ -1050,8 +1050,37 @@ Per-item weights (done% in parens where partial):
   covers one, even though both engines carry the same full-MP-always-steps rule.
   That step accounting is what puts the units in different places to begin with.
   Reproduction preserved at `.claude/hunt-envoy`; still byte-identical.
-  **THE FIX WAS BUILT AND MEASURED (2026-07-28) — IT WIPES THE PLAYER IN 3+
-  GATE SEEDS, so it is a GATE DECISION, not a patch. Reverted; tree green.**
+  **LANDED (2026-07-28), owner accepted the seed churn. BATTERY OK 1434s.**
+  Final shape, symmetric and narrow: exclude the centres of the ATTACKER'S OWN
+  civ. TS gains an `ownCentre` test on the playerCity arm; the GPU gains
+  `(rvcity_at >= 0) & (rvcity_at != ac)`. BARBARIANS untouched on both seats —
+  they own no cities and attacking any civ's city is correct for them.
+  TWO EARLIER SHAPES FAILED, BOTH FROM ASYMMETRY, and both symptoms looked like
+  evidence against fixing the bug at all:
+   * GPU-only with `enemy_rc` at FULL range -> 13 rollout failures (it widened
+     GPU ranged targeting past TS's melee-only rule);
+   * BOTH seats restricted to "player cities only" -> scripted parity RED at
+     t31 on an `rng` divergence, because `attackTargets` is shared by
+     BARBARIANS: TS lost ranged-barb targets on rival cities while the GPU's
+     barb path was untouched.
+  SEED CHURN, as predicted: 3 of 24 re-picked (9014 -> 9015, 9132 -> 9133,
+  9301 -> 9302 at indices 1, 10, 23) — the wiped-player class, both engines
+  agreeing on the collapse. Fewer than the 5 the broader shape needed.
+  PERF NOTE for the idle-box baseline: the battery wall went 687s -> 1434s on an
+  IDLE box, with mcts-search 457s -> 844s, parity ~650s -> 1340s and gpu-gate
+  ~594s -> 1380s. Unfrozen rivals fight, field more units and simulate slower.
+  That is a real cost of correctness, not contention, and it roughly DOUBLES the
+  gate — it should be measured deliberately rather than mistaken for noise.
+  **STILL OPEN, and CHEAPER than first recorded: the NEUTRAL-RIVAL case.** A
+  rival can still target the city of a rival it is at PEACE with, freezing the
+  same way. I called this a wide change; it is not. The hostility state is
+  already tracked on both engines — TS has ONE oracle, `unitsHostile`
+  (units.ts:215), covering same-side, barbarian, rival-rival via the A-19/B-33
+  `atWarRivals` per-pair substrate, and rival-player via `atWar`; the GPU has
+  `rr_war` + `r_atwar`, which `enemy_rc` already composes. The genuine gap is
+  CITY-STATES: `unitsHostile` has no owner kind for them, which is why TS routes
+  CS centres through a separate `csWar` arm and the GPU through `cs_suz_t`. So
+  the follow-up is "ask the existing oracle" plus a CS answer, not new state.
   Symmetric shape, both seats: TS restricts the arm NAMED `playerCity` (which
   matched ANY CITY_CENTER tile) to actual player cities via
   `state.cities.some(c => c.centerIndex === t.index)`; the GPU drops the blind

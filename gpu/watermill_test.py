@@ -46,14 +46,24 @@ def main() -> None:
     if not paths:
         print("no fixtures — run `npm run gpu:export` first")
         raise SystemExit(1)
-    sim = build(rules, str(paths[0]))
+    # #78: SCAN for a fixture that still has two live cities at t40 rather than
+    # pinning paths[0]. The #47 attack-target fix unfreezes rival units, and the
+    # harsher world can leave the first seed with a single city — a poke-
+    # isolation assumption broken by a trajectory change, not by the mechanic
+    # under test. Scanning keeps the lane honest across future re-tunings.
+    sim = None
+    for p in paths:
+        cand = build(rules, str(p))
+        if int(cand.alive[0].sum()) >= 2:
+            sim = cand
+            break
+    assert sim is not None, "no fixture has two live cities at t40 — cannot run the control comparison"
 
     wm_cols = sim.rules_dev.b_farmbonus.nonzero().flatten().tolist()
     assert len(wm_cols) == 1, f"expected exactly one farm-bonus building (the Water Mill), got {wm_cols}"
     wm = wm_cols[0]
 
     alive = sim.alive[0].nonzero().flatten().tolist()
-    assert len(alive) >= 2, "need two live cities: one with the building, one control"
     c0, c1 = alive[0], alive[1]
 
     # Make every tile c0 owns an eligible one: FARM improvement carrying a
