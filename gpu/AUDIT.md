@@ -558,6 +558,24 @@ Per-item weights (done% in parens where partial):
   recorded earlier is WRONG and would send the next hunt down a dead end -
   corrected here, which is the point of recording it.
   The `.claude/hunt78` worktree can be removed; it reproduces nothing.
+  **LEADING THEORY for the envoy red, found by inspection (2026-07-28, #78):
+  a STALE YIELD CACHE on envoy assignment.** The GPU caches city yields keyed
+  on `_eff_version`, and the CAPITAL envoy bonus is part of that computation.
+  But NEITHER site that increments `cs_envoys` bumps the version:
+    engine.py ~13564  the per-turn envoy assignment (`cs_envoys[rows, pick] += 1`)
+    engine.py ~7130   the QUEST reward (`cs_envoys[rows, s] += questEnvoys`)
+  So when a city-state crosses the 1/3/6 envoy thresholds, the capital's yields
+  can stay CACHED at their pre-crossing value until some unrelated write bumps
+  the version. That is a PRE-EXISTING bug independent of the envoy magnitude —
+  the per-type change (2 -> 1) merely alters how much a stale cache costs,
+  which is exactly why it surfaced as an off-script score gap of EXACTLY 1.0
+  (one yield, one city, weight 1) rather than as a scripted-parity failure.
+  It also fits the rGScore1 case: both are score columns summing cached yields.
+  NEXT STEP: add `self._eff_version += 1` at BOTH envoy-increment sites, then
+  re-apply the per-type envoy patch and re-run the plain rollout. If the theory
+  holds, seed 9170 t220 goes green WITHOUT touching the envoy values, and the
+  fix should be committed on its own as a cache-invalidation bug BEFORE the
+  per-type correction rides on top.
   THE ENVOY CASE IS THE LIVE ONE. Its red (player score, seed 9170 t220, gap
   EXACTLY 1.0) was produced on a tree with the Camp value already CORRECT, so
   it is reproducible by simply re-applying the per-type envoy patch (seven
