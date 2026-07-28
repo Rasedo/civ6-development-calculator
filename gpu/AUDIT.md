@@ -553,6 +553,17 @@ Per-item weights (done% in parens where partial):
   sourced individually, so the file keeps a NARROWED marker.
   That makes FOUR files with real errors out of eight swept — the class is not
   a formality.
+  **SLICE 10 - src/core/combat.ts damage formula (2026-07-28, #78).** The BASE
+  and EXPONENT are VERIFIED EXACT against the reverse-engineered Civ 6 formula
+  (damage = 30 * e^(strengthDiff / 25) * random): base 30 matches, and
+  `30 * exp(0.04 * q / 10)` with q = round(diff*10) is exp(diff/25) - the same
+  curve, pre-quantized for the GPU exp table. That is the single most
+  load-bearing formula in the model and it is right.
+  The RANDOM RANGE is CONTESTED and deliberately NOT changed: the community
+  formula quotes 0.75-1.25, but the SAME source says equal-strength hits land
+  "reliably between 24 and 36" - and 30 x [0.75, 1.25] = [22.5, 37.5] while
+  30 x [0.8, 1.2] = [24, 36] exactly. The repo's existing 0.8-1.2 is the
+  internally consistent reading, so it stands. Recorded, not flipped.
   **SLICE 9 — src/data/units.ts COMBAT STRENGTHS: FIVE ERRORS FOUND, CHANGE
   REVERTED PENDING A HUNT (2026-07-28, #78).** Checked against a Civ 6
   unit-stat reference. FIVE combat strengths are WRONG in this model:

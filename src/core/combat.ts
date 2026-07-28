@@ -1,5 +1,6 @@
 /**
- * Combat and barbarians (eyeballed Civ 6). Damage uses the classic
+ * Combat and barbarians. #78 sourced the DAMAGE FORMULA (base and exponent
+ * verified exact; the random range is contested — see damageRoll). Damage uses the classic
  * 30·e^(0.04·Δstrength)·rand(0.8–1.2) curve, with +3 defense on
  * hills/woods/rainforest/marsh. Barbarian camps spawn in the wilds, garrison
  * themselves, and send raiders that pillage improvements and batter cities;
@@ -324,6 +325,20 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1): number {
   // P4/D-1: the real Civ 6 random factor is 0.8–1.2 (equal-strength hits
   // land "reliably 24–36"), not the old 0.75–1.25.
+  //
+  // #78 SOURCING SWEEP (2026-07-28). The BASE and the EXPONENT are VERIFIED
+  // EXACT against the reverse-engineered Civ 6 formula
+  // (damage = 30 * e^(strengthDiff / 25) * random): base 30 matches, and
+  // `30 * exp(0.04 * q / 10)` with q = round(diff*10) is exp(0.04*diff) =
+  // exp(diff/25) — the same curve, just pre-quantized for the GPU exp table.
+  //
+  // The RANDOM RANGE is CONTESTED and deliberately NOT changed. The community
+  // formula quotes 0.75–1.25, but the SAME source states equal-strength hits
+  // land "reliably between 24 and 36" — and 30 × [0.75, 1.25] = [22.5, 37.5],
+  // whereas 30 × [0.8, 1.2] = [24, 36] exactly. The repo's 0.8–1.2 is the
+  // internally consistent reading of that evidence, so it stands. Recorded
+  // rather than flipped: changing a live constant on contradictory sources is
+  // the same failure the sourcing sweep exists to fix.
   // B-29: strengthDiff is now a multiple of 0.1 (wounded units subtract
   // hp/10; a river melee subtracts 5). Quantize it to 0.1 granularity so the
   // GPU's exp table — indexed by round(diff·10) — reproduces this exact JS
