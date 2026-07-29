@@ -117,6 +117,7 @@ import {
   DIPLO_VICTORY_POINTS,
   TOURISM_PER_VISITOR_PER_CIV,
   CULTURE_PER_DOMESTIC_TOURIST,
+  RIVAL_ENGINEER_LIVE,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { availableBuildings } from '../src/core/rules';
@@ -1023,6 +1024,10 @@ const rules = {
     mineProd: IMPROVEMENTS.MINE.yields.production ?? 1,
     lumberProd: IMPROVEMENTS.LUMBER_MILL.yields.production ?? 1,
     builderIdx: Object.values(UNITS).findIndex((u) => u.id === 'BUILDER'),
+    // B-27 (#79): the Military Engineer's roster index + the border/war flag,
+    // so the GPU can mirror rivalHasFortJob / the engineer job set.
+    engineerIdx: Object.values(UNITS).findIndex((u) => u.id === 'MILITARY_ENGINEER'),
+    rivalEngineerLive: RIVAL_ENGINEER_LIVE,
     hillFarmsCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'hillFarms')),
     farmAdjCivic: civicList.findIndex((c) => (c.effects ?? []).some((e) => e.kind === 'farmAdjacency')),
     farmAdjTech: techList.findIndex((t) => (t.effects ?? []).some((e) => e.kind === 'farmAdjacency')),

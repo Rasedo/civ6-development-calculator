@@ -353,6 +353,46 @@ Per-item weights (done% in parens where partial):
   improvements.
 
 
+
+  **B-27 CLOSED 2026-07-29 (#79) — THE ENGINEER IS LIVE ON BOTH ENGINES.**
+  `RIVAL_ENGINEER_LIVE = true`; scripted parity 0.0 milli and BATTERY OK 572s
+  with rivals building engineers and placing forts.
+  THE GPU TWIN: an engineer roster index + flag export; `_rival_fort_job_mask`
+  (owned, land, unimproved, un-districted, no natural wonder, FORT-unlocked,
+  ADJACENT to a civ this rival is at war with) used by ALL THREE consumers —
+  the production arm, the per-unit build test and the per-unit walk target,
+  selected per ROW with `torch.where` because a unit slot's type varies across
+  the batch; a production arm mirroring the builder arm; and the engineer
+  routed through the CIVILIAN spawn.
+  THREE REAL BUGS THE HUNT FOUND, each measured, none guessed:
+    1. TS priced the engineer at 61, the GPU at 102 — a constant +41 on the
+       rQCost trace (which sums FRONT-ITEM cost across a civ's cities). Cause:
+       `units.ts`'s `U()` already multiplies every roster cost by GAME_SPEED,
+       so my queue line scaled 102 a SECOND time. The BUILDER arm multiplies
+       legitimately because its base (50 + 4n) is a raw number, not a roster
+       cost. First mismatch seed 9066 t113.
+    2. The GPU spawned a completed engineer through `_spawn_rival` — the
+       MILITARY path — because only the BUILDER was special-cased into
+       `_spawn_rival_civ`. A finished engineer therefore never existed as a
+       charge-carrying civilian, `has_alive_e` stayed false, and the civ
+       re-queued another every few turns (seed 9092: GPU re-queued at t128
+       where TS did not). The MILITARY ENGINEER is a civilian chassis and now
+       spawns like one.
+    3. (from the earlier round) the FORT had no tech unlock at all.
+  METHOD, three probe failures worth remembering: I compared TS logs across 12
+  interleaved games with NO game id and concluded the predicates differed when
+  they matched — the fix is to tag by `state.map.seed` (`state.seed` does not
+  exist, so the tag silently read `undefined` and every grep came back empty,
+  which I nearly read as evidence). I also printed a GPU row unconditionally
+  inside a `for u in cand` loop without gating on `act[row]`, so the trace
+  showed a dead unit with 0 charges. A probe that cannot distinguish "absent"
+  from "not measured" is worse than no probe.
+  THE PRODUCTION RULE REMAINS OWNER-CHOSEN AND AUTHORED, not sourced: at war,
+  one engineer at a time, forting only tiles adjacent to a hostile civ's
+  territory. Real Civ 6 forts chokepoints and no published rule quantifies it.
+  The border clause is load-bearing — without it a FORT is valid on any passable
+  owned land, so a fort job never runs out (87 forts unbounded vs 24 bounded).
+
   **B-27 TAIL, ROUND 2 (2026-07-29, #79) — THE REAL BLOCKER WAS A MISSING TECH
   UNLOCK, not the absent AI policy.** NO TECH EVER UNLOCKED THE FORT. #78 added
   the improvement def, the Military-Engineer-only placement rule, the +4 terrain

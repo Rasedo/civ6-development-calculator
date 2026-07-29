@@ -1163,6 +1163,9 @@ class BatchSim:
         self._mine_prod = float(imp.get("mineProd", 1))       # base MINE production
         self._lumber_prod = float(imp.get("lumberProd", 1))   # LUMBER_MILL production (no tech boost)
         self._builder_idx = int(imp.get("builderIdx", -1))
+        # B-27 (#79): the Military Engineer roster index + the border/war flag.
+        self._eng_idx = int(imp.get("engineerIdx", -1))
+        self._rival_eng_live = bool(imp.get("rivalEngineerLive", False))
         self._hillfarms_civic = int(imp.get("hillFarmsCivic", -1))
         self._farmadj_civic = int(imp.get("farmAdjCivic", -1))  # GS: Feudalism farm-adjacency +1 food
         self._farmadj_tech = int(imp.get("farmAdjTech", -1))    # GS: Replaceable Parts +1 more
@@ -7693,6 +7696,51 @@ class BatchSim:
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)  # B-32: pillaged district = repair job
 
+    def _rival_fort_job_mask(self, r: int, techs: torch.Tensor | None = None) -> torch.Tensor:
+        """B-27 (#79) [B, T]: the MILITARY ENGINEER's job set — the isFortJobTile
+        twin. Owned, LAND, unimproved, un-districted, not a centre, FORT
+        unlocked, and ADJACENT to a tile held by a civ this rival is AT WAR
+        with. ONE mask serves all three consumers (the production arm, the
+        engineer's build-here test and its walk target), exactly as TS uses one
+        predicate — the TS half originally used three different ones and the
+        halves disagreed."""
+        B = self.B
+        dev = self.device
+        if self.FORT < 0 or self._eng_idx < 0:
+            return torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        tk = techs if techs is not None else self.r_techs[:, r]
+        ut = int(self._imp_unlock[self.FORT])
+        unl = tk[:, ut].unsqueeze(1) if ut >= 0 else torch.ones(B, 1, dtype=torch.bool, device=dev)
+        owned = self.rival_at == r
+        base = (
+            owned
+            & unl
+            & self.passable
+            & ~self.water
+            & ~self.nwonder  # validImprovementsIn refuses natural-wonder tiles
+            & (self.improvement < 0)
+            & (self.district < 0)
+            & (self.built_wonder < 0)
+            & (self.rvcity_at < 0)
+        )
+        if not bool(base.any()):
+            return base
+        # hostile territory: the PLAYER's tiles while at war with the player,
+        # plus any rival this one is at war with (the atWarRivals twin).
+        host = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        at_war_pl = self.r_atwar[:, r].unsqueeze(1)
+        host = host | ((self.owner >= 0) & at_war_pl)
+        for r2 in range(self.R):
+            if r2 == r:
+                continue
+            pair = self.rr_war[:, r, r2].unsqueeze(1) if self.rr_war is not None else None
+            if pair is None:
+                continue
+            host = host | ((self.rival_at == r2) & pair)
+        nb = self.neigh.clamp(min=0)
+        adj = (host[:, nb] & (self.neigh >= 0).unsqueeze(0)).any(dim=2)
+        return base & adj
+
     def _spawn_rival_civ(self, mask: torch.Tensor, at_tile: torch.Tensor, civ: int, type_idx: int | None = None, charges: torch.Tensor | None = None) -> torch.Tensor:
         """C1-B5b: spawn a rival CIVILIAN (default BUILDER) — the civilian twin
         of _spawn_rival (rciv blocking; charges seeded from the roster like the
@@ -7745,7 +7793,12 @@ class BatchSim:
         # Its gain is DYNAMIC (gold = tile appeal), filled in per tile below.
         if self.SEASIDE >= 0 and self._seaside_unlock_tech >= 0:
             opts = opts + [(self.SEASIDE, 0.0)]
-        cand = self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx) & (self.v_charges > 0)
+        # B-27 (#79): ENGINEERS act too when the flag is live — the widened TS
+        # filter's twin. Gated on the same flag so both engines flip together.
+        _is_civ_t = self.v_type == self._builder_idx
+        if self._rival_eng_live and self._eng_idx >= 0:
+            _is_civ_t = _is_civ_t | (self.v_type == self._eng_idx)
+        cand = self.v_alive & (self.v_civ == r) & _is_civ_t & (self.v_charges > 0)
         if not bool(cand.any()):
             return
         for u in cand.any(dim=0).nonzero(as_tuple=True)[0].tolist():
@@ -7754,6 +7807,13 @@ class BatchSim:
                 continue
             here = self.v_tile[:, u].clamp(min=0)
             jobm = self._rival_job_mask(r, techs=techs0, civics=civics0)
+            # B-27 (#79): an ENGINEER's job set is the BORDER fort set, not the
+            # civilian one — the isFortJobTile twin. Per-ROW because a slot's
+            # type varies across the batch. ONE mask feeds both the build-here
+            # test and the walk target, matching the TS unification.
+            _eng_row = (self.v_type[:, u] == self._eng_idx) if (self._rival_eng_live and self._eng_idx >= 0) else None
+            if _eng_row is not None and bool(_eng_row.any()):
+                jobm = torch.where(_eng_row.unsqueeze(1), self._rival_fort_job_mask(r, techs=techs0), jobm)
             # A-13: REPAIR first — TS checks bt.pillaged && owns(bt) before
             # any build/walk; no charge is spent, movesLeft goes 0 (v_acted),
             # and the yield change bumps the version.
@@ -7858,6 +7918,12 @@ class BatchSim:
                     better = res_v & (res_g > best_g)
                     pick = torch.where(better, rq_h, pick)
                     best_g = torch.where(better, res_g, best_g)
+                # B-27 (#79): an ENGINEER builds the FORT and nothing else —
+                # validImprovementsIn(builder=ME) returns exactly ['FORT'].
+                # `here_ok` already used the fort mask for these rows, so
+                # reaching here means the tile IS a valid border fort job.
+                if _eng_row is not None and bool(_eng_row.any()) and self.FORT >= 0:
+                    pick = torch.where(_eng_row, torch.full_like(pick, self.FORT), pick)
                 rows = (build & (pick >= 0)).nonzero(as_tuple=True)[0]
                 if len(rows):
                     self.improvement[rows, here[rows]] = pick[rows]
@@ -11907,6 +11973,23 @@ class BatchSim:
                         unit_count = unit_count + want_bd.long()
                         rem = rem & ~want_bd
                         rem_any = bool(rem.any())
+                # B-27 (#79): one MILITARY ENGINEER per civ at a time, only
+                # while a BORDER fort job exists — the rivalHasEngineer +
+                # rivalHasFortJob twin. Sits AFTER the builder arm so economy
+                # work outranks it, exactly like the TS else-if order. Flat
+                # roster cost (no escalator: that curve is the BUILDER's).
+                if self._rival_eng_live and self._eng_idx >= 0 and rem_any:
+                    has_alive_e = (self.v_alive & (self.v_civ == r) & (self.v_type == self._eng_idx)).any(dim=1)
+                    has_q_e = ((self.rc_current[:, r] == self._eng_idx + 1) & self.rc_alive[:, r]).any(dim=1)
+                    want_me = rem & ~(has_alive_e | has_q_e) & self._rival_fort_job_mask(r).any(dim=1) & (unit_count < cap)
+                    if bool(want_me.any()):
+
+                        self.rc_current[:, r, j] = torch.where(want_me, torch.full_like(self.rc_current[:, r, j], self._eng_idx + 1), self.rc_current[:, r, j])
+                        self.rc_cost[:, r, j] = torch.where(want_me, self._p_cost[self._eng_idx].double(), self.rc_cost[:, r, j])
+                        self.rc_progress[:, r, j] = torch.where(want_me, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+                        unit_count = unit_count + want_me.long()
+                        rem = rem & ~want_me
+                        rem_any = bool(rem.any())
                 want_u = rem & (unit_count < cap)
                 if bool(want_u.any()):
                     # A-6: the composition pick — ranged while under-shared,
@@ -12534,6 +12617,19 @@ class BatchSim:
                             self._spawn_rival_civ(is_bldr, self.rc_center[:, r, j], r)
                             self.r_builders_trained[:, r] = self.r_builders_trained[:, r] + is_bldr.long()  # P4/D-10
                         spawn_u = spawn_u & ~is_bldr
+                        # B-27 (#79): the MILITARY ENGINEER is a CIVILIAN chassis
+                        # (charges, no combat) and must spawn through the civilian
+                        # path like the Builder. It previously fell through to
+                        # _spawn_rival (the MILITARY spawn), so a completed
+                        # engineer never existed as a charge-carrying civilian —
+                        # `has_alive_e` stayed false and the civ re-queued another
+                        # every few turns (seed 9092: GPU re-queued at t128 where
+                        # TS did not). Charges come from the roster, like any civ.
+                        if self._rival_eng_live and self._eng_idx >= 0:
+                            is_eng = spawn_u & (cur - 1 == self._eng_idx)
+                            if bool(is_eng.any()):
+                                self._spawn_rival_civ(is_eng, self.rc_center[:, r, j], r, type_idx=self._eng_idx)
+                            spawn_u = spawn_u & ~is_eng
                         if bool(spawn_u.any()):
                             # B-17: a trained military unit inherits city j's Encampment training XP (best tier).
                             xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values

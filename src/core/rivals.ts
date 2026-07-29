@@ -1308,10 +1308,13 @@ function isFortJobTile(state: GameState, rival: RivalCiv, t: Tile, unlocks: Unlo
   });
 }
 
+
 function rivalHasFortJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boolean {
   if (!RIVAL_ENGINEER_LIVE) return false; // #79: OFF until the GPU twin lands
-  if (!rival.atWar && (rival.atWarRivals?.length ?? 0) === 0) return false;
+  const war = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
+  if (!war) return false;
   return state.map.tiles.some((t) => isFortJobTile(state, rival, t, unlocks));
+
 }
 
 /** C1-B5b: any owned LAND tile a rival builder could work right now?
@@ -2649,7 +2652,12 @@ export function rivalPhase(state: GameState): void {
           kind: 'unit',
           unit: 'MILITARY_ENGINEER',
           progress: 0,
-          cost: Math.round((UNITS.MILITARY_ENGINEER?.cost ?? 170) * GAME_SPEED),
+          // #79: UNITS costs are ALREADY x GAME_SPEED at roster construction
+          // (units.ts `U()`), so scaling here again priced the engineer at 61
+          // instead of 102 — a 41-point rQCost divergence from the GPU, which
+          // reads the exported (scaled) cost. The BUILDER arm above multiplies
+          // because ITS base (50 + 4n) is a raw number, not a roster cost.
+          cost: UNITS.MILITARY_ENGINEER?.cost ?? 102,
         });
         unitCount += 1;
       } else if (unitCount < unitCap) {
