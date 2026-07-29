@@ -630,6 +630,9 @@ class BatchSim:
         # columns enumerate AXIAL_DIRS order (E NE NW W SW SE), the same
         # order the mask's bits use: bit d = crossing toward neigh column d.
         self.river_mask = torch.tensor([[int(t.get("rm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # B-26 (#79): CLIFF edge mask — the riverMask twin. Blocks EMBARK and
+        # DISEMBARK across that land/water edge (cities and Harbors excepted).
+        self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # A-9 (#71): per-tile APPEAL contribution (core/appeal.ts tileAppeal
         # sums what each NEIGHBOUR contributes). `ap` = static part + the t0
         # feature term; `ap_feat` isolates that feature term so a chopped tile
@@ -4971,6 +4974,67 @@ class BatchSim:
             return
         rows = okr.nonzero(as_tuple=True)[0]
         self.antiquity[rows, t[rows]] = True
+
+
+
+    def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None) -> torch.Tensor:
+        """B-26 (#79) [B, 6]: per-direction, is the step cur->neighbour a
+        land/water crossing closed by a CLIFF? Applied at STEP-legality level so
+        a walker routes AROUND a cliff instead of halting at it.
+        The mask lives on the LAND tile, so read it there and test the bit
+        pointing at the water side — from the water side that is the opposite
+        direction ((d + 3) % 6). Sourced exceptions: a city centre, and a HARBOR
+        belonging to the mover's OWN civ ("enemy units won't" pass it)."""
+        B, dev = self.B, self.device
+        if not bool(self.cliff_mask.any()):
+            return torch.zeros(B, 6, dtype=torch.bool, device=dev)
+        c = cur.clamp(min=0)
+        nbc = nb6.clamp(min=0)
+        cw = self.water.gather(1, c.unsqueeze(1))            # [B, 1]
+        nw = self.water.gather(1, nbc)                        # [B, 6]
+        trans = (cw != nw) & (nb6 >= 0)
+        if not bool(trans.any()):
+            return torch.zeros(B, 6, dtype=torch.bool, device=dev)
+        dirs = torch.arange(6, device=dev).view(1, 6).expand(B, 6)
+        land = torch.where(cw.expand(B, 6), nbc, c.unsqueeze(1).expand(B, 6))
+        dl = torch.where(cw.expand(B, 6), (dirs + 3) % 6, dirs)
+        bit = ((self.cliff_mask.gather(1, land) >> dl) & 1).bool()
+        free = (self.center_at.gather(1, land) >= 0) | (self.rvcity_at.gather(1, land) >= 0)
+        if self._harbor_idx >= 0 and own is not None:
+            free = free | ((self.district.gather(1, land) == self._harbor_idx) & own.gather(1, land))
+        return trans & bit & ~free
+
+    def _cliff_edge(self, cur: torch.Tensor, dest: torch.Tensor, dir_i, own: torch.Tensor | None = None) -> torch.Tensor:
+        """B-26 (#79) [B] bool: is the step cur->dest a land/water crossing that a
+        CLIFF closes? The `cliffBlocks` twin. The mask lives on the LAND tile, so
+        read it there and test the bit pointing at the water side — from the
+        water side that is the OPPOSITE direction ((d + 3) % 6 on this hex
+        layout). Sourced exceptions: a city centre and a HARBOR ignore cliffs.
+        Cliffs never touch land-to-land steps."""
+        if not bool(self.cliff_mask.any()):
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        c = cur.clamp(min=0)
+        d = dest.clamp(min=0)
+        cw = self.water.gather(1, c.unsqueeze(1)).squeeze(1)
+        dw = self.water.gather(1, d.unsqueeze(1)).squeeze(1)
+        trans = cw != dw
+        if not bool(trans.any()):
+            return torch.zeros_like(trans)
+        land = torch.where(cw, d, c)
+        di = dir_i if torch.is_tensor(dir_i) else torch.full_like(c, int(dir_i))
+        dl = torch.where(cw, (di + 3) % 6, di)
+        bit = ((self.cliff_mask.gather(1, land.unsqueeze(1)).squeeze(1) >> dl) & 1).bool()
+        free = (self.center_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0) | (
+            self.rvcity_at.gather(1, land.unsqueeze(1)).squeeze(1) >= 0
+        )
+        # SOURCED: the Harbor exception is OWNER-ONLY — "when YOUR units use it
+        # they will be able to pass the Cliffs... Enemy units won't." Callers
+        # pass `own` = the tiles this mover's civ holds; without it a Harbor
+        # would be a hole in the wall for the besieger too.
+        if self._harbor_idx >= 0 and own is not None:
+            harbor = self.district.gather(1, land.unsqueeze(1)).squeeze(1) == self._harbor_idx
+            free = free | (harbor & own.gather(1, land.unsqueeze(1)).squeeze(1))
+        return trans & bit & ~free
 
     def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, civ: torch.Tensor | None = None) -> None:
         """A non-barbarian unit entering a camp tile clears it: +50 gold to
@@ -10719,6 +10783,9 @@ class BatchSim:
             else:
                 terr = self.passable.gather(1, nb2c)
             step_ok = (nb2 >= 0) & terr & ~self._blocked_for(nb2, "rmil", civ=self.v_civ[:, v].unsqueeze(1))
+            if self._embark_live:
+                # B-26 (#79): a CLIFF closes the embark/disembark edge.
+                step_ok = step_ok & ~self._cliff_block_dirs(cur, nb2, self.rival_at == self.v_civ[:, v].unsqueeze(1))
             d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)
             skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
             best = skey.min(dim=1).values

@@ -314,6 +314,43 @@ export function fortifyBonus(unit: { fortifyTurns?: number }): number {
  * `allowEmbark` (the war-march v1 surface) and its owner can embark — an
  * enterable water tile. Every non-war-march caller leaves `allowEmbark` false,
  * so land units stay land-only there (inert). */
+
+/**
+ * B-26 (#79): is the land/water edge between `a` and `b` closed by a CLIFF?
+ * The mask lives on the LAND tile (elevated coastline), so read it from
+ * whichever side is land and test the bit pointing at the other.
+ * Exceptions are the sourced ones: a city centre, or a Harbor on the land tile.
+ */
+
+/** B-26 (#79): does this tile belong to the unit's own civ? (the owner-only
+ *  Harbor cliff exception). */
+function tileOwnedByUnitOwner(
+  t: Tile,
+  unit: { owner: Unit['owner']; civId?: number },
+): boolean {
+  if (unit.owner === 'player') return t.cityId !== -1;
+  if (unit.owner === 'rival') return (t.rivalId ?? -1) === (unit.civId ?? -1);
+  return false; // barbarians own nothing
+}
+
+export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { owner: Unit['owner']; civId?: number }): boolean {
+  const land = isWater(a) ? b : a;
+  const water = isWater(a) ? a : b;
+  if (isWater(land) || !isWater(water)) return false; // not a land/water edge
+  if (!land.cliffMask) return false;
+  if (land.district === 'CITY_CENTER') return false; // cities ignore cliffs
+  // SOURCED: "A Harbor may still be built next to Cliffs. When your units use
+  // it, they will be able to pass the Cliffs to embark or disembark. ENEMY
+  // units won't." So the Harbor exception is OWNER-ONLY, not a hole in the wall.
+  if (land.district === 'HARBOR' && unit && tileOwnedByUnitOwner(land, unit)) return false;
+  for (let d = 0; d < 6; d++) {
+    if (neighborTile(state.map, land, d)?.index === water.index) {
+      return (land.cliffMask & (1 << d)) !== 0;
+    }
+  }
+  return false;
+}
+
 export function tileFreeForUnit(
   state: GameState,
   tileIndex: number,
@@ -438,6 +475,17 @@ export function walkPath(state: GameState, unit: Unit): void {
     // Embark/disembark = a land unit crossing the land/water boundary. It costs
     // ALL remaining MP (real Civ 6). Naval units never transition.
     const transition = !naval && isWater(from) !== isWater(to);
+    // B-26 (#79): a CLIFF blocks that transition. Real Civ 6: cliffs are "an
+    // unbreakable barrier to embarking and disembarking" — this is their entire
+    // function and what makes a cliff-ringed city safe from naval invasion.
+    // Sourced exceptions: the LAND tile being a city, and a HARBOR bordering the
+    // cliff ("when your units use it, they will be able to pass the Cliffs").
+    // The Commando promotion also scales cliffs; promotions are unmodelled here
+    // and that is recorded, not approximated.
+    if (transition && cliffBlocks(state, from, to, unit)) {
+      unit.path = null;
+      return;
+    }
     // P4/D-3+D-4 (real Civ 6): entering costs the tile's full cost, +3 for
     // a river crossing, and needs that much MP left — except a unit at full
     // MP may always take one step (paying everything it has). No more

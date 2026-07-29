@@ -2642,6 +2642,43 @@ gap; likewise GS disasters are modeled minus sea-level rise
   clamp — the read-side `warWearinessPenalty` Math.min is
   belt-and-braces). The #55-S3 deferral (G-8) did NOT reproduce at
   cap 32 on a properly-exported tree — full ladder + battery green.
+
+  **B-26 CLIFFS LANDED 2026-07-29 (#79) — the last B-26 residual but one.**
+  Cliffs are a six-bit EDGE mask (`Tile.cliffMask` / GPU `cliff_mask`), the exact
+  shape of `riverMask`, because in real Civ 6 a cliff is a property of the edge
+  between a land tile and a water tile — not of a tile.
+  SOURCED FUNCTION: a cliff is "an unbreakable barrier to embarking and
+  disembarking". That is its WHOLE job, and it is what makes a cliff-ringed city
+  safe from naval invasion. It does NOT block land-to-land movement.
+  EXCEPTIONS, both sourced: a CITY tile ignores cliffs, and a HARBOR passes its
+  OWNER only — "when YOUR units use it, they will be able to pass the Cliffs to
+  embark or disembark. Enemy units won't." The owner clause is load-bearing:
+  without it a Harbor would be a hole in the wall for the besieger too.
+  PLACEMENT — the one authored piece, and deliberately not random: Firaxis does
+  not publish the generator, so cliffs are DERIVED from terrain already
+  generated. ELEVATED COASTLINE IS CLIFF: a HILLS or MOUNTAIN land tile facing a
+  water neighbour carries a cliff on that edge. That reproduces the real thing's
+  defining properties (they hug the coast; they come in chains because hill
+  ranges do; flat beaches stay landable) with zero magic constants and NO extra
+  RNG draw, so the map stream is byte-identical to before.
+  BOTH ENGINES: TS blocks the `transition` step in `walkPath` via `cliffBlocks`;
+  the GPU blocks at per-direction STEP legality (`_cliff_block_dirs`) so a walker
+  routes AROUND a cliff instead of halting at it, which is what the TS pathing
+  does naturally.
+  MEASURED reachable: 101 tiles carry a cliff edge across the 12-seed export
+  (0.7% of tiles), and `embarkState.live` is TRUE, so this is exercised rather
+  than inert.
+  THREE FURTHER RULES CHECKED AND DELIBERATELY NOT IMPLEMENTED — the owner
+  suggested them; the sources do not support them:
+    * cliffs blocking HARBOR CONSTRUCTION — CONTRADICTED outright: "A Harbor may
+      still be built next to Cliffs."
+    * cliffs blocking naval units from ATTACKING a city centre — unsupported;
+      community reports say naval melee CAN attack through cliffs and describe
+      it as possibly a bug, which is not a rule to mirror.
+    * cliffs blocking naval unit CONSTRUCTION — no evidence; the real gate on
+      producing naval units is the city being COASTAL, which is already modelled.
+  STILL OPEN in B-26: camp-spawn escalation only.
+
 - B-26. Map/barbarian fidelity: no cliffs (no such concept in
   data/terrains.ts or core/mapgen.ts). Barb raiders run the A-8 real-MP
   walk (RESOLVED 2026-07-13 task #44; `hostileUnitAct` both engines, GPU

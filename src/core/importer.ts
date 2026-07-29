@@ -72,6 +72,7 @@ function blankTile(index: number, col: number, row: number): Tile {
     resource: null,
     wonder: null,
     riverMask: 0,
+    cliffMask: 0,
     improvement: null,
     district: null,
     districtComplete: false,

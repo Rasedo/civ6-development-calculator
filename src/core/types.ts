@@ -89,6 +89,13 @@ export interface Tile {
   /** World wonder occupying this tile (may be under construction). */
   builtWonder: string | null;
   builtWonderComplete: boolean;
+  /** B-26 (#79): CLIFFS as a six-bit EDGE mask, exactly like `riverMask` — bit
+   *  d is set when the edge toward neighbour direction d carries a cliff. Real
+   *  Civ 6 puts cliffs on the land/water boundary and their whole function is
+   *  to block EMBARK and DISEMBARK across that edge ("an unbreakable barrier to
+   *  embarking and disembarking"), which is what makes a cliff-ringed city
+   *  safe from naval invasion. They do NOT block land-to-land movement. */
+  cliffMask: number;
   /** B-20 (#79): an ANTIQUITY SITE — a dig an Archaeologist can excavate into
    *  an Artifact. Real Civ 6 creates these from pre-Modern events (a razed
    *  barbarian outpost, a unit dying) and reveals them with Natural History. */

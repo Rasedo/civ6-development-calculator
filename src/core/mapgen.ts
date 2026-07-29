@@ -12,6 +12,7 @@ import { fbm } from './noise';
 import { mulberry32, deriveSeed, shuffle, type Rng } from './rng';
 import {
   neighbors,
+  neighborTile,
   tileAt,
   inBounds,
   hexDistance,
@@ -45,6 +46,7 @@ export function generateMap(opts: MapGenOptions): GameMap {
         resource: null,
         wonder: null,
         riverMask: 0,
+        cliffMask: 0,
         improvement: null,
         district: null,
         districtComplete: false,
@@ -243,6 +245,26 @@ export function generateMap(opts: MapGenOptions): GameMap {
       if (neighbors(map, t).some((n) => n.goodyHut)) continue;
       t.goodyHut = true;
       quota--;
+    }
+  }
+
+  // B-26 (#79) CLIFFS. Real Civ 6 puts cliffs on the LAND/WATER boundary, in
+  // chains, and their whole purpose is to block embark/disembark across that
+  // edge. The game does not publish its placement algorithm, so rather than
+  // invent a random one this derives them from the terrain already generated:
+  // ELEVATED COASTLINE is a cliff. A HILLS or MOUNTAIN land tile facing a water
+  // neighbour carries a cliff on that edge — which reproduces the real thing's
+  // defining properties (they hug the coast, they come in chains because hill
+  // ranges do, and flat beaches stay landable) with ZERO magic constants and no
+  // extra RNG draw, so the map stream is untouched.
+  for (const t of map.tiles) {
+    if (TERRAINS[t.terrain].water) continue;
+    if (t.elevation !== 'HILLS' && t.elevation !== 'MOUNTAIN') continue;
+    // direction-indexed: `neighbors()` DROPS off-map entries, so its array
+    // index is not the direction at a map edge — walk d explicitly.
+    for (let d = 0; d < 6; d++) {
+      const n = neighborTile(map, t, d);
+      if (n && TERRAINS[n.terrain as TerrainId].water) t.cliffMask |= 1 << d;
     }
   }
 

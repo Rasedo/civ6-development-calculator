@@ -1539,6 +1539,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       // the same order riverMask bits use — so bit d = crossing toward
       // neighbor column d, both engines.
       rm: t.riverMask ?? 0,
+      cm: t.cliffMask ?? 0, // B-26 (#79): CLIFF edge mask — blocks embark/disembark
       // AUDIT A-13: the resource's own-improvement roster index — resource
       // tiles accept exactly this improvement (validImprovements' resource
       // branch). -1 = no resource; -9 = out of roster (FISHING_BOATS on sea
