@@ -795,6 +795,53 @@ Per-item weights (done% in parens where partial):
   compaction permutes the destination slot, so a relic survives only when the
   destination index is not reclaimed). Only then decide the single faithful rule
   and apply it to BOTH engines together.
+  **FIXED 2026-07-29 (#79) — THREE OMISSIONS OF THE SAME PAIR.** The relic that
+  root-caused rGScore1 was never "carried by the GPU registry" (my earlier
+  reading, now retracted). #73 added `rc_gw_art` and `rc_relics` AFTER the three
+  places that enumerate the per-city work planes by hand, and none was updated:
+
+    1. GPU `_transfer_rc_to_rc` DEST: zeroed `rc_gw_writing`/`rc_gw_music` on the
+       receiving slot and never touched `rc_gw_art`/`rc_relics`. `slot =
+       occ.max() + 1` REUSES indices, so the new city inherited whatever a dead
+       occupant left there. The seed 9235 t249 "GPU has a relic" was a GHOST.
+    2. GPU `_transfer_rc_to_rc` SOURCE: the loser-slot hygiene wiped districts,
+       wonders, buildings, queue and HP but not the four work counts, which is
+       what left the ghost behind for (1) to inherit.
+    3. GPU `_RC_SLOT_FIELDS`: listed writing and music but not art or relics, so
+       a slot COMPACTION left those two behind at the old index — a city could
+       lose its relic or pick up its neighbour's without any transfer at all.
+
+  Plus the TS twin: `transferRivalCityToRival` builds the receiving city from a
+  hand-written literal that B-30 taught to keep districts/buildings/wonders but
+  which never listed the four work counts, so every TS rc->rc flip destroyed
+  them.
+
+  RULE APPLIED (Civ 6 source, not TS): the victor gains control of the Great
+  Works held in a captured city's buildings/districts/wonders — and B-30 already
+  carries the Amphitheater/Museum/Temple that house them, so carrying the counts
+  is the only self-consistent reading. Both engines now carry all four and clear
+  the dead source slot.
+
+  WHY EVERY EXISTING GATE MISSED IT: `relics_test`, `great_works_test` and
+  `rc_registry_test` were all GREEN before the fix — none constructed a transfer
+  or a compaction. `relics_test` now does both, with a planted GHOST value (7) in
+  the receiving slot so "carried" cannot be confused with "inherited the reused
+  slot's leftovers", and asserts membership of all four planes in
+  `_RC_SLOT_FIELDS`. NEGATIVE CONTROL RUN: dropping `rc_gw_art` back out of the
+  tuple makes the lane fail, so the assert is load-bearing. TS twin:
+  `tests/relic-transfer.test.ts`.
+
+  METHOD NOTE, and the fourth reasoning error of this hunt: I measured ONE
+  transfer (relics=1 carried at t249) and generalized to "the registry carries
+  everything", then shipped a 3-path TS fix that turned 1 red into 3. Narrowing
+  to the measured path still left 2. Only reading `_transfer_rc_to_rc` and
+  `_RC_SLOT_FIELDS` line by line produced the actual rule. A further self-
+  inflicted delay: two verification rounds compared the fixed TS against a STALE
+  GPU trace, because `replay-gpu.ts` replays a log that `gpu/rollout.py` must
+  regenerate first — the reds "not moving" was the regeneration missing, not the
+  fix failing.
+  VERIFIED: REPLAY PARITY OK, 72/72 games x 250 turns, 0.0 milli-units — the
+  rGScore1 red is CLOSED on the 24-seed lane that reaches the mechanic.
   GATE REACHABILITY, MEASURED AND SEVERE: with the 12-seed set, `tsc` + 440
   vitest + re-export + scripted parity were ALL GREEN with the broken 3-path fix
   applied (0.0 milli). Seed 9235 is not in the 12-seed set, so the shrunk gate

@@ -9383,7 +9383,26 @@ class BatchSim:
         b30_dist = self.rc_dist_tile[b, r_from, j, :].clone()
         b30_wond = self.rc_wonder[b, r_from, j, :].clone()
         b30_bldg = self.rc_bldg[b, r_from, j, :].clone()
+        # B-20 (#79): GREAT WORKS AND RELICS RIDE WITH THE CITY. Real Civ 6:
+        # the victor gains control of the Great Works held in a captured city's
+        # buildings/districts/wonders, and those buildings (the Amphitheater /
+        # Museum / Temple slots holding them) are exactly what b30_bldg already
+        # carries. Snapshot alongside the B-30 registries, for the same reason.
+        b20_gww = int(self.rc_gw_writing[b, r_from, j])
+        b20_gwa = int(self.rc_gw_art[b, r_from, j])
+        b20_gwm = int(self.rc_gw_music[b, r_from, j])
+        b20_rel = int(self.rc_relics[b, r_from, j])
         self.rc_alive[b, r_from, j] = False
+        # B-20 (#79) SLOT HYGIENE: the dead slot must not keep a work count.
+        # `slot = occ.max() + 1` REUSES indices, and nothing else clears these
+        # four, so a later city landing on this index inherited a DEAD city's
+        # relics. That stale inheritance — not any transfer rule — is what the
+        # rGScore1 hunt measured as "the GPU carries relics": at seed 9235 t249
+        # the receiving slot held a ghost relic worth exactly 2.85 score.
+        self.rc_gw_writing[b, r_from, j] = 0
+        self.rc_gw_art[b, r_from, j] = 0
+        self.rc_gw_music[b, r_from, j] = 0
+        self.rc_relics[b, r_from, j] = 0
         self.rc_is_cap[b, r_from, j] = False  # P7-FULL: identity dies with the slot
         self.rc_dist_tile[b, r_from, j, :] = -1
         self.rc_wonder[b, r_from, j, :] = -1  # A-4 hygiene
@@ -9425,8 +9444,10 @@ class BatchSim:
         self.rc_pop[b, r_to, slot] = max(1, (old_pop * 3) // 4)
         self.rc_growth[b, r_to, slot] = 0
         self.rc_cbox[b, r_to, slot] = 0
-        self.rc_gw_writing[b, r_to, slot] = 0  # B-20: works wiped on rival→rival transfer
-        self.rc_gw_music[b, r_to, slot] = 0
+        self.rc_gw_writing[b, r_to, slot] = b20_gww  # B-20 (#79): works ride with the city
+        self.rc_gw_art[b, r_to, slot] = b20_gwa      # (was: writing/music zeroed, art/relics
+        self.rc_gw_music[b, r_to, slot] = b20_gwm    #  left as whatever the reused slot held)
+        self.rc_relics[b, r_to, slot] = b20_rel
         self.rc_loyalty[b, r_to, slot] = 100.0
         self.rc_acquired[b, r_to, slot] = old_acq
         self.rc_hp[b, r_to, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
@@ -13542,7 +13563,12 @@ class BatchSim:
         "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty",
         "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id", "rc_is_cap", "rc_current", "rc_progress",
         "rc_cost", "rc_qtile", "rc_followed",  # B-18: pressure spread (3D per-slot)
-        "rc_gw_writing", "rc_gw_music",  # B-20: Great Works per-city counts
+        # B-20 (#79): ALL FOUR work counts must ride the compaction permutation.
+        # ART and RELICS were added by #73 after this tuple was written and were
+        # never appended, so a compaction left them behind at the old slot index
+        # — the city lost its relic (or inherited its neighbour's). Same pair,
+        # same cause as the _transfer_rc_to_rc omission above.
+        "rc_gw_writing", "rc_gw_art", "rc_gw_music", "rc_relics",
     )
 
     def _reclaim_rc(self) -> None:

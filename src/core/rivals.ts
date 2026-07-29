@@ -2232,6 +2232,17 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
     districts: rc.districts.map((d) => ({ ...d })),
     wonders: rc.wonders.map((w) => ({ ...w })),
     specialists: {},
+    // B-20 (#79): GREAT WORKS AND RELICS RIDE WITH THE CITY. Real Civ 6: the
+    // victor gains control of the Great Works held in a captured city's
+    // buildings/districts/wonders — and `keptBuildings` above already carries
+    // the Amphitheater/Museum/Temple slots that hold them. This literal
+    // enumerates the new city's fields by hand; B-30 taught it districts,
+    // buildings and wonders, but B-20 added the works later and never came
+    // back, so every TS rc->rc flip destroyed them.
+    greatWorksWriting: rc.greatWorksWriting,
+    greatWorksArt: rc.greatWorksArt,
+    greatWorksMusic: rc.greatWorksMusic,
+    relics: rc.relics,
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };

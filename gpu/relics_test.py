@@ -99,7 +99,83 @@ def main() -> None:
     dead = s2._tourism_of(s2.gw_writing, s2.gw_art, s2.gw_music, s2.alive, s2.owner >= 0, era, s2.relics)
     assert int(dead[0] - base[0]) == 0, "a lost city must stop paying relic tourism"
 
-    print("relics OK — constants, placement, dead-city masking, tourism term, _MUTABLE")
+    # --- 5) #79: the works SURVIVE a transfer and a slot compaction ---------
+    # Both bugs this pins were invisible to every existing lane and to scripted
+    # parity; they surfaced only in the 24-seed replay, as a 2.85 rGScore gap
+    # (one relic = 4 faith x 0.95 amenity x 0.75 score weight). Real Civ 6: the
+    # victor gains the Great Works held in a captured city.
+    #   a. _transfer_rc_to_rc zeroed rc_gw_writing/music on the RECEIVING slot
+    #      and never touched rc_gw_art/rc_relics, so the new city inherited
+    #      whatever the REUSED slot index still held from a dead occupant.
+    #   b. _RC_SLOT_FIELDS listed writing and music but not art or relics, so a
+    #      compaction left those two behind at the old index.
+    s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    if s3.R >= 2 and int(s3.rc_alive[0, 0].sum()) >= 1:
+        j = int(s3.rc_alive[0, 0].nonzero()[0])
+        s3.rc_relics[0, 0, j] = 1
+        s3.rc_gw_art[0, 0, j] = 2
+        s3.rc_gw_writing[0, 0, j] = 3
+        s3.rc_gw_music[0, 0, j] = 1
+        # plant a ghost in the slot the receiver will land on, so "carried"
+        # cannot be confused with "inherited the reused slot's leftovers"
+        occ = s3.rc_alive[0, 1].nonzero().flatten()
+        dest = int(occ.max()) + 1 if len(occ) else 0
+        if dest < s3.RC:
+            s3.rc_relics[0, 1, dest] = 7
+            s3.rc_gw_art[0, 1, dest] = 7
+            s3._transfer_rc_to_rc(0, 0, j, 1)
+            assert int(s3.rc_relics[0, 1, dest]) == 1, (
+                f"the flipped city must carry its ONE relic, got {int(s3.rc_relics[0, 1, dest])} "
+                "(7 means the receiving slot kept a dead city's ghost)"
+            )
+            assert int(s3.rc_gw_art[0, 1, dest]) == 2, "art must ride the transfer"
+            assert int(s3.rc_gw_writing[0, 1, dest]) == 3, "writing must ride the transfer"
+            assert int(s3.rc_gw_music[0, 1, dest]) == 1, "music must ride the transfer"
+            assert int(s3.rc_relics[0, 0, j]) == 0, "the dead source slot must not keep a relic"
+            assert int(s3.rc_gw_art[0, 0, j]) == 0, "the dead source slot must not keep art"
+            print("  #79a works+relics ride the rc->rc transfer, source slot cleared OK")
+
+    # b. compaction must permute ALL FOUR planes with their city.
+    s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
+    for nm in ("rc_gw_writing", "rc_gw_art", "rc_gw_music", "rc_relics"):
+        assert nm in s4._RC_SLOT_FIELDS, f"{nm} missing from _RC_SLOT_FIELDS — compaction drops it"
+    # SCAN for a rival holding two cities rather than assuming fixture 0 does
+    # (the watermill_test lesson: a poke that silently skips proves nothing).
+    # Rivals start on a single capital, so STEP until one has settled a second
+    # city — checking at t0 finds nothing and would skip the case entirely.
+    r_pick = -1
+    for p in paths[:4]:
+        s4 = BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
+        for _ in range(60):
+            s4.step()
+            for r in range(s4.R):
+                if int(s4.rc_alive[0, r].sum()) >= 2:
+                    r_pick = r
+                    break
+            if r_pick >= 0:
+                break
+        if r_pick >= 0:
+            break
+    assert r_pick >= 0, "no fixture reaches a rival with two cities — cannot exercise compaction"
+    if True:
+        live = s4.rc_alive[0, r_pick].nonzero().flatten().tolist()
+        lo, hi = live[0], live[1]
+        s4.rc_relics[0, r_pick, hi] = 5
+        s4.rc_gw_art[0, r_pick, hi] = 4
+        keep_id = int(s4.rc_id[0, r_pick, hi])
+        s4.rc_alive[0, r_pick, lo] = False  # kill the lower slot -> `hi` compacts down
+        s4._reclaim_rc()
+        where = (s4.rc_alive[0, r_pick] & (s4.rc_id[0, r_pick] == keep_id)).nonzero().flatten()
+        assert len(where) == 1, "the surviving city vanished from the registry"
+        k = int(where[0])
+        assert int(s4.rc_relics[0, r_pick, k]) == 5, (
+            f"the relic must follow its city through compaction (slot {hi}->{k}), "
+            f"got {int(s4.rc_relics[0, r_pick, k])}"
+        )
+        assert int(s4.rc_gw_art[0, r_pick, k]) == 4, "art must follow its city through compaction"
+        print("  #79b all four work planes ride the slot compaction OK")
+
+    print("relics OK — constants, placement, dead-city masking, tourism term, _MUTABLE, #79 transfer+compaction")
 
 
 if __name__ == "__main__":
