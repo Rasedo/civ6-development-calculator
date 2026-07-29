@@ -730,8 +730,28 @@ Per-item weights (done% in parens where partial):
   engines disagree on how many cities flip to rival 0's religion that turn.
   Era score, Age and the 2.85 gap at t249 all follow from the one extra flip.
   The dedication and era-score paths are EXONERATED — do not touch them.
-  NEXT STEP: compare the conversion events at t111 — which cities flip on each
-  seat, and the pressure/threshold deciding it.
+  **A REAL MISMATCH WAS FOUND AND FIXED HERE, BUT IT IS NOT THIS BUG.** TS calls
+  `dedicationEvent` once per OCCURRENCE (game.ts:1261 sits inside the per-city
+  loop); the GPU's `_dedication_event` took a bool MASK [B], so N occurrences in
+  one turn paid ONCE, and the two conversion sites collapsed explicitly with
+  `.any(dim=1)`. It now takes a COUNT and the conversion sites pass `.sum(dim=1)`,
+  matching #77's sourced "+2 PER CITY converted". Battery OK 491s.
+  GATE-UNREACHABLE: parity is 0.0 milli both BEFORE and AFTER, so the scripted
+  gate never reaches a multi-conversion turn. The fix rests on the TS-vs-GPU
+  code comparison and #77's wording, not on any gate.
+  **IT DOES NOT FIX rGScore1** — applying it in the reproduction leaves the red
+  BYTE-IDENTICAL (TS=188400 GPU=191250), i.e. GPU behaviour in that game did not
+  move at all.
+  MY REASONING ERROR, the THIRD of this shape in this hunt: I saw a +2 award and
+  concluded "one converted city, since DED_EVENT_SCORE[3] = 2". The payment is
+  `n * score`, so +2 is equally a score-1 dedication (kind 0/1/2) held TWICE in a
+  Heroic age. I measured the award VALUE and assumed the KIND.
+  STILL OPEN. What holds: first divergence t112; GPU +3 vs TS +5 between the
+  t111/t112 probes; per-turn dedication terms identical on both seats; the extra
+  award is EVENT-keyed. What is NOT established: which KIND, hence which event.
+  NEXT STEP: print the KIND and `n` at the GPU award site and at the matching TS
+  call for civ 1 at t111 — NAME the dedication instead of inferring it from its
+  score.
   METHOD: this is the first probe in the sequence to produce a clean answer, and
   the only one that compared STATE at a fixed point instead of enumerating call
   sites. Three earlier attempts failed by enumeration.

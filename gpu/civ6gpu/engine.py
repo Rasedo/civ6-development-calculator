@@ -2762,7 +2762,7 @@ class BatchSim:
         for _g in range(self._O):
             _conv = (self.city_followed == _g) & (_was_pc != _g) & self.alive
             if bool(_conv.any()):
-                self._dedication_event(_g, 3, _conv.any(dim=1))
+                self._dedication_event(_g, 3, _conv.sum(dim=1))  # #78: per CITY, not per turn
         # --- rival cities [B, r_pad, rc_pad] -------------------------------
         if self.R > 0:
             rcc = self.rc_center.clamp(min=0)  # [B, R, RC]
@@ -2776,7 +2776,7 @@ class BatchSim:
             for _g in range(self._O):  # B-24 (#77): EXODUS, the rival-city twin
                 _convr = (self.rc_followed == _g) & (_was_rc != _g) & self.rc_alive
                 if bool(_convr.any()):
-                    self._dedication_event(_g, 3, _convr.reshape(B, -1).any(dim=1))
+                    self._dedication_event(_g, 3, _convr.reshape(B, -1).sum(dim=1))  # #78: per CITY
 
     def _rel_combat_planes(self) -> tuple[torch.Tensor, torch.Tensor]:
         """B6-S1: (near3, terr) — [B, O, T] bool planes for the enhancer combat
@@ -8403,19 +8403,30 @@ class BatchSim:
             winner = torch.where((winner < 0) & okr, torch.full_like(winner, r + 1), winner)
         return winner
 
-    def _dedication_event(self, civ: int, kind: int, mask: torch.Tensor) -> None:
+    def _dedication_event(self, civ: int, kind: int, count: torch.Tensor) -> None:
         """B-24 (#77), the TS `dedicationEvent` mirror: the DARK/NORMAL face of
         a civ's committed dedications pays ERA SCORE off a specific EVENT. A
         GOLDEN age takes a standing bonus instead and earns nothing here.
         Every MATCHING committed dedication pays, so a HEROIC age holding the
-        same one twice pays twice. `mask` [B] selects the rows where the event
-        fired. Zero-draw."""
-        if not self._ded_payouts_live or not bool(mask.any()):
+        same one twice pays twice. Zero-draw.
+
+        `count` [B] is HOW MANY TIMES the event fired this turn. #78: it used to
+        be a bool MASK, which silently collapsed N occurrences in one turn into
+        ONE payment — TS calls `dedicationEvent` once per OCCURRENCE (per
+        converted city, per eureka, per completed district), so N occurrences
+        must pay N times. That under-count is the root cause of the rGScore1
+        latent: two cities converting on the same turn paid +2 on the GPU and
+        +4 in TS. A bool is still accepted and reads as 0/1 for the sites that
+        genuinely fire at most once per call."""
+        if not self._ded_payouts_live:
+            return
+        cnt = count.long()
+        if not bool((cnt > 0).any()):
             return
         n = (self.ded_picks[:, civ] == kind).sum(dim=1)  # [B]
-        pay = mask & (self.civ_age[:, civ] != 2) & (n > 0)
+        pay = (self.civ_age[:, civ] != 2) & (n > 0)
         if bool(pay.any()):
-            self.era_score[:, civ] = self.era_score[:, civ] + pay.long() * n * self._ded_event_score[kind]
+            self.era_score[:, civ] = self.era_score[:, civ] + pay.long() * cnt * n * self._ded_event_score[kind]
 
     def _culture_victor(self) -> torch.Tensor:
         """B-25 (#72), the TS `cultureVictor` mirror: [B] the lowest unified civ
