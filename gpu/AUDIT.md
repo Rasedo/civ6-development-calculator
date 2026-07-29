@@ -1101,6 +1101,51 @@ Per-item weights (done% in parens where partial):
   VERIFIED: REPLAY PARITY OK, 72/72 games x 250 turns, 0.0 milli-units — the
   rGScore1 red is CLOSED on the 24-seed lane that reaches the mechanic.
 
+
+  **#50 PLAYER<->CITY-STATE PEACE LANDED 2026-07-29 (#79), owner request.**
+  #45 shipped `cs.atWar` as deliberately ONE-WAY and recorded "any peace-making
+  path back" as not modelled; this closes it, with the rules taken from the Civ 6
+  wiki rather than invented:
+    * peace may be offered only **10 turns** after a war begins.
+      `PEACE_MIN_WAR_TURNS` was **8** — corrected to 10, and the same floor now
+      governs city-states, so the player<->rival timing shifts too.
+    * a city-state "will always accept an offer of peace without preconditions",
+      so `sueForPeaceWithCityState` is a COOLDOWN and no acceptance roll.
+    * a city-state is dragged into its SUZERAIN's wars and CANNOT make separate
+      peace — it "automatically gets peace when you stop being at war with their
+      suzerain or them switching", and "making peace with a civ always forces
+      peace with all city states they are suzerain of".
+  So the verb REFUSES while a suzerain rival is still at war, and `makePeace` —
+  the single choke point both `sueForPeace` and the AI peace path route through —
+  clears `cs.atWar` for every city-state that rival is suzerain of.
+  THE FOUR PAIRINGS, MEASURED: player<->rival EXISTS (`sueForPeace`);
+  rival<->rival EXISTS (`rivalRivalMakePeace`, war-weariness driven — my own task
+  note called this PARTIAL, which was wrong); player<->CS NOW EXISTS;
+  rival<->CS has no separate state at all — it rides A-12b
+  join-the-suzerain's-war off the rival<->player war and ends when that ends.
+  GPU: no mirror written, and none is needed YET — the GPU has no way to ENTER a
+  city-state war (`cs_atwar` is read by the attack mask but nothing sets it; no
+  declare verb exists there), so a forced-peace mirror would be inert code. It
+  lands with the GPU declare verb, not before.
+  STILL OPEN from B-22: peace deals WITH TERMS, and whether peace should clear or
+  decay grievances.
+
+  **BATTERY SCOPE CORRECTED (2026-07-29, owner directive).** The engine's ONLY
+  snapshot/restore coverage lived inside `gpu/mcts_test.py`, named for the RL
+  feature it was written for rather than what it tests. It now lives in
+  `gpu/snapshot_restore_test.py`, and the four RL lanes — mcts-snap, mcts-search,
+  mcts-plan, gumbel — are OUT of the battery: they are search-QUALITY properties
+  that move when mcts.py changes and never when the engine does.
+  MEASURED: battery wall **498s -> 367s (-26%)**, and the freed cores sped the
+  rest — parity 460 -> 338s, gpu-gate 458 -> 344s.
+  A CLAIM OF MINE, CORRECTED: I said that lane caught a missed `_MUTABLE`
+  registration. It did NOT — it only verified that planes ALREADY registered
+  round-trip, proven by unregistering `artifacts` and watching it pass. The new
+  file asserts the property I had claimed: EVERY tensor a step mutates must be
+  registered. Negative control fires (unregistering `builders_trained` trips it
+  by name). Its limit is written into the file: it only catches planes that
+  mutate in the sampled window, so a not-yet-reachable plane still slips through.
+
 - **#49 NEUTRAL-RIVAL TARGETING — FIXED 2026-07-29 (#79).** The #78 attack-target
   fix excluded only the attacker's OWN capital, which left the neutral case
   live: while `hostileToPlayer`, a rival still selected the centre of a rival it

@@ -377,7 +377,7 @@ _MUTABLE = [
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_atwar",  # A-18 (#79): player<->CS war
+    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_atwar", "cs_war_turns",  # A-18 (#79): player<->CS war
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
@@ -568,6 +568,9 @@ class BatchSim:
         # Peace is the default; a city-state is a separate player you must
         # DECLARE on, and the attack mask/resolver both read this.
         self.cs_atwar = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # #50 (#79): turns since the player declared — the csWarTurns twin,
+        # gating when peace may be offered (PEACE_MIN_WAR_TURNS).
+        self.cs_war_turns = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         self.influence = torch.zeros(B, dtype=dtype, device=device)
         self.envoys_avail = torch.zeros(B, dtype=torch.long, device=device)
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
@@ -7259,6 +7262,9 @@ class BatchSim:
         empty) → cosmetic growth every 12 turns."""
         if self.S == 0:
             return
+        # #50 (#79): tick the player<->city-state war clock FIRST, exactly where
+        # cityStatePhase does — before meeting/influence/envoys.
+        self.cs_war_turns = self.cs_war_turns + self.cs_atwar.long()
         r = self.rules.cs
         B = self.B
         self.cs_met = self.cs_met | self.cs_alive

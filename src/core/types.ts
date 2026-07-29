@@ -618,6 +618,9 @@ export interface CityState {
    *  resolver (meleeAttack), so a peaceful city-state can be neither offered to
    *  the autopilot nor struck by a UI/RL order. Absent = at peace. */
   atWar?: boolean;
+  /** #50 (#79): turns elapsed since the player declared on this city-state —
+   *  the `RivalCiv.warTurns` twin, gating when peace may be offered. */
+  csWarTurns?: number;
   /** Siege hit points; absent = full (CS_MAX_HP). */
   hp?: number;
   /** Turn of the player's last militaristic levy here (cooldown). */

@@ -4,21 +4,19 @@
     python gpu/mcts_test.py            # fast: engine-facing invariants (~1 min)
     python gpu/mcts_test.py --full     # + M2a closed-loop MPC quality benchmarks (~9 min)
 
-Fast mode proves everything the ENGINE is responsible for (snapshot/restore
-bit-exactness, step-after-restore determinism, searches are eval-only and
-deterministic, search >= greedy). --full adds the closed-loop MPC-vs-scripted
-score benchmarks — search-QUALITY properties that only move when mcts.py
-changes, so engine stages don't pay their ~8 minutes.
+RL SEARCH QUALITY ONLY. The engine-facing invariants that used to live here
+(snapshot/restore bit-exactness and step-after-restore determinism) now have
+their own descriptively-named lane, gpu/snapshot_restore_test.py, which the
+battery runs; they are the ENGINE's properties and were only ever here for
+historical reasons.
 
-Two properties, both eval-only (never perturb the parity-checked forward model):
+What remains is search quality, which moves when mcts.py changes and NOT when
+the engine does, so engine stages do not run it:
 
-  1. snapshot / restore round-trips the FULL mutable state (every _MUTABLE tensor
-     incl. the RNG stream + the turn counter) bit-exactly, and a step taken after
-     a restore reproduces the same next state (determinism).
-
-  2. search_production is deterministic, leaves the sim's state bit-identical, and
-     its horizon-15 choice's rollout value never trails the myopic (horizon-0)
-     greedy choice — and beats it outright on at least one seed.
+  - search_production is deterministic, leaves the sim's state bit-identical, and
+    its horizon-15 choice's rollout value never trails the myopic (horizon-0)
+    greedy choice — and beats it outright on at least one seed.
+  - --full adds the closed-loop MPC-vs-scripted score benchmarks.
 """
 
 from __future__ import annotations
@@ -52,33 +50,6 @@ def advance_to_decision(sim):
             break
         sim.step()
     return int(sim.production_mask()[0, 0].sum())
-
-
-def test_snapshot_restore(rules, paths):
-    sim = BatchSim([load_fixture(p) for p in paths[:4]], rules, device="cpu", dtype=torch.float64)
-    for _ in range(30):
-        sim.step()
-    snap = sim.snapshot()
-    before = sim.empire_score().clone()
-    for _ in range(10):
-        sim.step()
-    assert not torch.equal(before, sim.empire_score()), "advance didn't change state (vacuous)"
-    sim.restore(snap)
-    drift = [k for k in _MUTABLE if not torch.equal(getattr(sim, k), snap["mut"][k])]
-    assert not drift, f"restore not bit-exact for: {drift}"
-    assert sim.turn == snap["turn"], "turn not restored"
-    assert torch.equal(sim.empire_score(), before), "empire_score not restored"
-
-    # determinism: two steps from the same restored state must match bit-for-bit.
-    sim.restore(snap)
-    sim.step()
-    a = {k: getattr(sim, k).clone() for k in _MUTABLE}
-    sim.restore(snap)
-    sim.step()
-    nd = [k for k in _MUTABLE if not torch.equal(a[k], getattr(sim, k))]
-    assert not nd, f"step-after-restore nondeterministic for: {nd}"
-    print(f"snapshot/restore bit-exact across {len(_MUTABLE)} mutable tensors + turn; "
-          f"step-after-restore deterministic")
 
 
 def test_search(rules, paths, full=True):
@@ -214,8 +185,6 @@ def main():
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run gpu:export` first"
-    if part in (None, "snapshot"):
-        test_snapshot_restore(rules, paths)
     if part in (None, "search"):
         test_search(rules, paths[:12] if full else paths[:6], full=full)
     if part in (None, "planning"):

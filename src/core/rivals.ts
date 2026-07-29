@@ -593,6 +593,20 @@ function makePeace(state: GameState, rival: RivalCiv): void {
   rival.atWar = false;
   rival.warTurns = 0;
   rival.peaceTurns = 0;
+  // #50 (#79) SOURCED: "making peace with a civ always forces peace with all
+  // city-states they are suzerain of", and a city-state "automatically gets
+  // peace when you stop being at war with their suzerain". A city-state is
+  // dragged into its suzerain's wars and cannot leave one on its own terms, so
+  // this is the ONLY way out of a suzerain-driven war — see
+  // sueForPeaceWithCityState, which refuses while the suzerain is still hostile.
+  // Placed in makePeace, not sueForPeace, so the AI peace path gets it too.
+  for (const cs of state.cityStates ?? []) {
+    if (cs.atWar && rivalIsSuzerain(cs, rival.id)) {
+      cs.atWar = false;
+      cs.csWarTurns = 0;
+      state.eventLog.push(`${cs.name} makes peace alongside its suzerain.`);
+    }
+  }
   state.eventLog.push(`Peace with ${rival.name}.`);
 }
 

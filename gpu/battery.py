@@ -9,14 +9,13 @@ export (P5: the vite build artifact feeds no gate; vitest runs in a
 lane). Then the lanes run concurrently on the measured bottleneck split:
 
     vitest+parity : the TS suite, then the 24-seed scripted gate
-    cputests      : purchase/war/ranged/gumbel/... self-tests (CPU f64)
-    mcts x3       : snapshot | search | planning as separate processes
+    cputests      : purchase/war/ranged/snapshot/... self-tests (CPU f64)
                     (same assertions/seeds — pure process split)
     gpu           : rollout --shards 4 --pipeline-replay (P3 sharding;
                     P5: each shard's TS replay runs as the shard lands,
                     hiding the serial replay tail), then the evals
 
-Wall-clock is stage0 + the slowest lane, with mcts_test's MPC
+Wall-clock is stage0 + the slowest lane, with the RL search/MPC
 benchmarks (search-quality, not engine-facing) behind --full.
 
 Each step's OMP thread count is capped so three torch processes don't
@@ -48,7 +47,7 @@ NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
 
 # Poke pool (#78): 4 workers x OMP 2 = 8 threads, up from the old serial lane's
 # single OMP-4 process. Deliberately small — the box is 24 cores and parity (6)
-# + mcts (3x4) + gpu-gate (4 shards x 4) already claim most of them.
+# + gpu-gate (4 shards x 4) already claim most of them.
 POKE_WORKERS = 4
 POKE_OMP = 2
 
@@ -63,8 +62,8 @@ POKE_COST = {
     "combat_mod": 17.1, "ranged": 18.5, "duel": 20.6, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
-    "naval": 53.7, "gumbel": 75.6, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
-    "festival": 4.0, "cs_war": 6.0,
+    "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
+    "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0,
 }
 
 results: list[tuple[str, float, int]] = []
@@ -190,8 +189,7 @@ def main() -> int:
             break
 
     if not failed.is_set():
-        print("lanes (parallel): vitest+parity | cpu self-tests | mcts x3 parts | gpu rollout(sharded, replay pipelined)/evals", flush=True)
-        mcts = [py, "gpu/mcts_test.py"] + (["--full"] if FULL else [])
+        print("lanes (parallel): vitest+parity | cpu self-tests | gpu rollout(sharded, replay pipelined)/evals", flush=True)
         lanes = [
             [
                 ("vitest", [npm, "test"], 8),
@@ -211,7 +209,6 @@ def main() -> int:
                 ("government", [py, "gpu/government_test.py"], 4),
                 ("controlled", [py, "gpu/controlled_test.py"], 4),
                 ("duel", [py, "gpu/duel_test.py"], 4),
-                ("gumbel", [py, "gpu/gumbel_test.py"], 4),
                 ("religion_gp", [py, "gpu/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "gpu/war_weariness_test.py"], 4),
                 ("space_race", [py, "gpu/space_race_test.py"], 4),
@@ -219,6 +216,7 @@ def main() -> int:
                 ("relics", [py, "gpu/relics_test.py"], 4),  # B-20 (#73): martyr relics — temple slots, faith + tourism
                 ("festival", [py, "gpu/festival_test.py"], 4),  # #79: Festival pays THREE GP classes at 0.11 (gate-unreachable)
                 ("cs_war", [py, "gpu/cs_war_test.py"], 4),  # A-18 (#79): player<->CS war gates the attack mask
+                ("snapshot", [py, "gpu/snapshot_restore_test.py"], 4),  # ENGINE: _MUTABLE round-trip + step determinism (the ONLY coverage; parity never restores)
                 ("naval", [py, "gpu/naval_test.py"], 4),  # #45/B-6 gate-unreachable naval surfaces
                 ("districts", [py, "gpu/district_breadth_test.py"], 4),  # B9/A-9 catalog-breadth surfaces
                 ("rc_registry", [py, "gpu/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency
@@ -234,11 +232,6 @@ def main() -> int:
                 ("watermill", [py, "gpu/watermill_test.py"], 4),
                 ("fort", [py, "gpu/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
             ],
-            # P5: mcts split into its three independent groups, run as three
-            # parallel lanes (same assertions/seeds — pure process split).
-            [("mcts-snap", mcts + ["--part", "snapshot"], 4)],
-            [("mcts-search", mcts + ["--part", "search"], 4)],
-            [("mcts-plan", mcts + ["--part", "planning"], 4)],
             [
                 # P3→P5: sharded rollout (4 procs × OMP 4 — measured best on
                 # this 24-CPU box; 6 shards THRASH: gpu 282s, parity starved);
@@ -292,7 +285,7 @@ def main() -> int:
     if failed.is_set():
         print("BATTERY FAILED")
         return 1
-    print("BATTERY OK" + (" (fast mcts; --full for MPC benchmarks)" if not FULL else ""))
+    print("BATTERY OK")
     return 0
 
 

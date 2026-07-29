@@ -54,7 +54,11 @@ export const RIVAL_SETTLER_COST = (cities: number) =>
 /** Auto-peace becomes possible after this many war turns. */
 export const RIVAL_WAR_MIN_TURNS = 14;
 /** The player may sue for peace after this many war turns. */
-export const PEACE_MIN_WAR_TURNS = 8;
+// #50 (#79) SOURCED: real Civ 6 allows peace only once **10** turns have passed
+// since the war began (the leaders action panel unlocks the offer then). Was 8.
+// The same floor governs the player<->city-state peace added in #50, so both
+// pairings read this one constant.
+export const PEACE_MIN_WAR_TURNS = 10;
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
 export const RIVAL_CITY_MAX_HP = 200;
 

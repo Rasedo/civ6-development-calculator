@@ -13,6 +13,7 @@ import { isWater, isImpassable, hasFreshWater } from './query';
 import { nextRandom } from './rand';
 import { isExplored } from './fog';
 import type { RuleResult } from './rules';
+import { PEACE_MIN_WAR_TURNS } from '../data/rivals';
 import { TERRAINS } from '../data/terrains';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -316,6 +317,41 @@ export function declareWarOnCityState(state: GameState, csId: number): RuleResul
   return { ok: true };
 }
 
+/**
+ * #50 (#79): SUE FOR PEACE with a city-state. SOURCED: real Civ 6 unlocks the
+ * offer once 10 turns have passed since the war began, and a city-state
+ * "will always accept an offer of peace without preconditions" — so there is no
+ * acceptance roll here, only the cooldown. Peace resets the counter, so a
+ * re-declaration must wait out the floor again.
+ *
+ * This is the return path `declareWarOnCityState` deliberately lacked when #45
+ * landed the war state; the AUDIT entry there recorded "any peace-making path
+ * back" as not modelled, and this closes it.
+ */
+export function sueForPeaceWithCityState(state: GameState, csId: number): RuleResult {
+  const cs = (state.cityStates ?? []).find((c) => c.id === csId);
+  if (!cs) return { ok: false, reason: 'No such city-state.' };
+  if (!cs.atWar) return { ok: false, reason: 'Not at war.' };
+  // #50 (#79) SOURCED: a city-state is dragged into its SUZERAIN's wars and
+  // cannot make separate peace while that war runs — "city states automatically
+  // get peace when you either stop being at war with their suzerain or them
+  // switching". So refuse here; the way out is peace with the suzerain (which
+  // makePeace then forces onto every city-state it is suzerain of) or the
+  // suzerainty changing hands.
+  const suz = (state.rivals ?? []).find((rv) => rv.atWar && rivalIsSuzerain(cs, rv.id));
+  if (suz) {
+    return { ok: false, reason: `${cs.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
+  }
+  const waited = cs.csWarTurns ?? 0;
+  if (waited < PEACE_MIN_WAR_TURNS) {
+    return { ok: false, reason: `Too soon — they will not talk for another ${PEACE_MIN_WAR_TURNS - waited} turns.` };
+  }
+  cs.atWar = false;
+  cs.csWarTurns = 0;
+  state.eventLog.push(`You have made peace with ${cs.name}.`);
+  return { ok: true };
+}
+
 export function questLabel(quest: CityStateQuest): string {
   switch (quest.kind) {
     case 'clearCamp':
@@ -329,6 +365,12 @@ export function questLabel(quest: CityStateQuest): string {
 
 export function cityStatePhase(state: GameState): void {
   if (state.cityStates.length === 0) return;
+
+  // #50 (#79): tick the player<->city-state war clock — the RivalCiv.warTurns
+  // twin. Peace unlocks at PEACE_MIN_WAR_TURNS.
+  for (const cs of state.cityStates) {
+    if (cs.atWar) cs.csWarTurns = (cs.csWarTurns ?? 0) + 1;
+  }
 
   // Meeting: fog lifted near their center (or fog off entirely).
   for (const cs of state.cityStates) {
