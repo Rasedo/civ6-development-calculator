@@ -880,6 +880,37 @@ Per-item weights (done% in parens where partial):
   fix failing.
   VERIFIED: REPLAY PARITY OK, 72/72 games x 250 turns, 0.0 milli-units — the
   rGScore1 red is CLOSED on the 24-seed lane that reaches the mechanic.
+
+- **#49 NEUTRAL-RIVAL TARGETING — FIXED 2026-07-29 (#79).** The #78 attack-target
+  fix excluded only the attacker's OWN capital, which left the neutral case
+  live: while `hostileToPlayer`, a rival still selected the centre of a rival it
+  was at PEACE with, `meleeAttack`'s `rivalTarget` refused it (that path gates on
+  `civsAtWar`), `attack` stayed true, `march` was suppressed, and the unit froze
+  — the identical failure shape, one seat over. Both engines carried it, and the
+  GPU comment documented it as the "no-op quirk".
+  FIX: the arm is now the player-city arm it always claimed to be. TS excludes
+  ANY rival centre for a rival attacker (`foreignCentre`, which subsumes the old
+  `ownCentre`); the GPU drops the `rvcity_at` clause entirely, leaving
+  `center_at >= 0` (player centres only). Legitimate rival-vs-rival capture is
+  untouched — it arrives through `rivalVsRivalCity` / `enemy_rc & d==1 & melee`,
+  which correctly require `civsAtWar` and melee adjacency.
+  CITY-STATES ARE NOT PART OF THIS, MEASURED: the task note suspected them, but
+  an unconquered city-state's centre tile carries NO `CITY_CENTER` district —
+  that district is written only on player founding (game.ts), rival founding
+  (rivals.ts) and CS CAPTURE (combat.ts), by which point the tile belongs to a
+  real city. City-states were never reachable through this arm; the `csWar` arm
+  owns that path and is unchanged.
+  Barbarians are untouched by construction (both guards key on
+  `owner === 'rival'` / the rival act path), keeping the barb paths
+  byte-identical — the same deliberate narrowness as #78.
+  GATE REACHABILITY, MEASURED: **197** rival-acts across the 12-seed 250-turn
+  gate had a foreign rival centre as a newly-excluded target, i.e. 197 acts that
+  previously froze now march. Note what parity does and does not prove here:
+  both engines changed together, so scripted parity stayed 0.0 milli — the gate
+  shows AGREEMENT, never invariance, and never agreement with real Civ 6.
+  Gates: tsc clean, vitest 443/443, re-export, scripted parity 0.0 milli,
+  BATTERY OK 587s.
+
   GATE REACHABILITY, MEASURED AND SEVERE: with the 12-seed set, `tsc` + 440
   vitest + re-export + scripted parity were ALL GREEN with the broken 3-path fix
   applied (0.0 milli). Seed 9235 is not in the 12-seed set, so the shrunk gate

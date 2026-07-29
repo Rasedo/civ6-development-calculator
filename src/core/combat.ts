@@ -786,9 +786,20 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // unchanged, which keeps the barb paths byte-identical across both engines.
     // The neutral-rival case (targeting a rival one is at PEACE with) is left
     // as a RECORDED deviation — both engines share it, so it costs no parity.
-    const ownCentre =
-      unit.owner === 'rival' && rivalCityAt(state, t.index)?.rival.id === unit.civId;
-    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range && !ownCentre;
+    // #79 (#49): widened from ownCentre to ANY rival centre. Excluding only the
+    // attacker's OWN capital left the NEUTRAL-rival case live: a rival at war
+    // with the player still selected a rival centre it was at PEACE with, and
+    // meleeAttack's rivalTarget refuses that (it gates on civsAtWar), so the
+    // unit HELD and never marched — the identical freeze #78 fixed one case of.
+    // The legitimate rival-vs-rival capture is unaffected: it comes in through
+    // `rivalVsRivalCity` below (melee, d===1, civsAtWar), not through this arm.
+    // MEASURED: an unconquered city-state's centre tile carries NO CITY_CENTER
+    // district (it is set only on player/rival founding and on CS capture), so
+    // city-states were never reachable here — the csWar arm owns that path.
+    // Barbarians are untouched (the guard is `owner === 'rival'`), keeping the
+    // barb paths byte-identical across both engines.
+    const foreignCentre = unit.owner === 'rival' && rivalCityAt(state, t.index) !== undefined;
+    const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range && !foreignCentre;
     // P4/D-23: the player's ranged units bombard cities at their full range.
     const cityRange = unit.owner === 'player' ? range : 1;
     const rivalCity =

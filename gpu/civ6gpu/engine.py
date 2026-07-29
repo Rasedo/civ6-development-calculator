@@ -10301,7 +10301,17 @@ class BatchSim:
             # Barbs are untouched here (this is the rival path), matching TS.
             & (
                 (
-                    ((self.center_at >= 0) | ((self.rvcity_at >= 0) & (self.rvcity_at != ac.unsqueeze(1))))
+                    # #79 (#49): the rvcity_at arm is GONE. It let an at-war
+                    # rival select ANY other rival's centre at full range —
+                    # including one it was at PEACE with — which the resolver
+                    # then refuses, so the unit HELD and never marched (the
+                    # same freeze #78 fixed for the attacker's own capital).
+                    # Legitimate rival-vs-rival capture still arrives below via
+                    # `enemy_rc & d==1 & melee`. center_at is player centres
+                    # only; an unconquered city-state has no CITY_CENTER
+                    # district in TS either, so this is now the player-city arm
+                    # it always claimed to be.
+                    (self.center_at >= 0)
                     & hp.unsqueeze(1)
                 )
                 | units_pl
