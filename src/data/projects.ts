@@ -30,8 +30,17 @@ export interface ProjectDef {
   district: DistrictId;
   /** Yield granted on completion (fraction of production cost). */
   yield: YieldKey | null;
-  /** Great-person class receiving points on completion. */
+  /** Great-person class receiving points on completion. Kept as the PRIMARY
+   *  class (and the GPU export's single `g` column) for index stability; read
+   *  `gpClassesOf(p)` for the full list. */
   gpClass: GreatPersonClass | null;
+  /** #79: the FULL class list. Real Civ 6 pays the Theater Square Festival's
+   *  points to Great Writer, Great Artist AND Great Musician; every other
+   *  district project pays a single class. Omitted = [gpClass]. */
+  gpClasses?: GreatPersonClass[];
+  /** #79: per-class GPP fraction of the production invested. Omitted =
+   *  PROJECT_GPP_FRACTION. */
+  gppFraction?: number;
   description: string;
   // --- B-25 space race (science victory) ------------------------------------
   /** Gating tech that must be researched before this project is available. */
@@ -64,7 +73,15 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       district: 'THEATER_SQUARE',
       yield: 'culture',
       gpClass: 'ARTIST',
-      description: 'Convert production into culture and Great Artist points.',
+      // #79: the Festival is the ONE multi-class project. Its D_TYPE is 5 where
+      // every other district project's is 10, which is exactly why each of its
+      // three classes gets ~11% where a single-class project's one class gets
+      // ~22%. Sourced from the Civilopedia entry ("a small amount of Great
+      // Writer, Great Artist, and Great Musician points") and the wiki's
+      // per-project rates.
+      gpClasses: ['WRITER', 'ARTIST', 'MUSICIAN'],
+      gppFraction: 0.11,
+      description: 'Convert production into culture and Great Writer/Artist/Musician points.',
     }),
     P({
       id: 'PRAYERS',
@@ -121,7 +138,25 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
 /** Space-race projects in chain order (B-25). */
 export const SPACE_PROJECTS: ProjectDef[] = Object.values(PROJECTS).filter((p) => p.space);
 
-/** Yield granted on completion = production cost × this. */
-export const PROJECT_YIELD_FRACTION = 0.75;
-/** Great-person points granted on completion = production cost × this. */
-export const PROJECT_GPP_FRACTION = 0.3;
+/** Yield granted on completion = production cost × this.
+ *  #79, SOURCED: real Civ 6 converts **15%** of the city's production output to
+ *  the district's yield while the project runs — confirmed identically for
+ *  Campus Research Grants (Science), Holy Site Prayers (Faith) and the Theater
+ *  Square Festival (Culture), so the rate is uniform and needs no per-project
+ *  table. We grant the equivalent lump on completion; total production invested
+ *  equals the cost, so the totals agree. Was 0.75, which was five times real. */
+export const PROJECT_YIELD_FRACTION = 0.15;
+/** Great-person points granted on completion = production cost × this, PER
+ *  CLASS. #79, SOURCED: a standard district project (D_TYPE 10) pays ~22% to
+ *  its single class. The Festival (D_TYPE 5) overrides this with 0.11 paid to
+ *  EACH of its three classes. Was 0.3. */
+export const PROJECT_GPP_FRACTION = 0.22;
+
+/** #79: the classes a completed project pays, and the per-class rate. */
+export function gpClassesOf(p: ProjectDef): GreatPersonClass[] {
+  if (p.gpClasses) return p.gpClasses;
+  return p.gpClass ? [p.gpClass] : [];
+}
+export function gppFractionOf(p: ProjectDef): number {
+  return p.gppFraction ?? PROJECT_GPP_FRACTION;
+}

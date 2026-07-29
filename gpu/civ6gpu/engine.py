@@ -963,8 +963,8 @@ class BatchSim:
         # A-14: rival projects — rows {d: district idx, y: yield col, g: GP class}
         _pj = rules.projects or {}
         self._proj_rows = list(_pj.get("rows", []))
-        self._proj_yf = float(_pj.get("yieldFraction", 0.75))
-        self._proj_gf = float(_pj.get("gppFraction", 0.3))
+        self._proj_yf = float(_pj.get("yieldFraction", 0.15))
+        self._proj_gf = float(_pj.get("gppFraction", 0.22))
         # B-25 (Round B3, Slice W): the space-race chain. Space rows carry
         # sp/vic flags (+ rt tech gate, rp previous-step link) and sit LAST in
         # the projects table (chain order). The rival greedy pick resolves to a
@@ -12585,7 +12585,6 @@ class BatchSim:
                             if bool(done_p.any()):
                                 pi_done = (cur - 1 - self.NU - nS_b4 - NBc).clamp(min=0)
                                 amt_y = js_round(cost_locked * self._proj_yf)
-                                amt_g = js_round(cost_locked * self._proj_gf)
                                 for pi_, prow in enumerate(self._proj_rows):
                                     hitp = done_p & (pi_done == pi_)
                                     if not bool(hitp.any()):
@@ -12599,9 +12598,19 @@ class BatchSim:
                                         self.r_treasury[:, r] = torch.where(hitp, self.r_treasury[:, r] + amt_y, self.r_treasury[:, r])
                                     elif y_i == 5:
                                         self.r_faith[:, r] = torch.where(hitp, self.r_faith[:, r] + amt_y, self.r_faith[:, r])
-                                    g_i = int(prow.get("g", -1))
-                                    if 0 <= g_i < self.r_gpp.shape[2]:
-                                        self.r_gpp[:, r, g_i] = torch.where(hitp, self.r_gpp[:, r, g_i] + amt_g, self.r_gpp[:, r, g_i])
+                                    # #79: pay EVERY listed class at THIS row's
+                                    # rate — the Festival pays Writer/Artist/
+                                    # Musician at 0.11 each, every other project
+                                    # one class at 0.22. `gs`/`gf` fall back to
+                                    # the legacy single `g` + global fraction.
+                                    amt_g = js_round(cost_locked * float(prow.get("gf", self._proj_gf)))
+                                    g_list = prow.get("gs")
+                                    if not g_list:
+                                        g_one = int(prow.get("g", -1))
+                                        g_list = [g_one] if g_one >= 0 else []
+                                    for g_i in (int(x) for x in g_list):
+                                        if 0 <= g_i < self.r_gpp.shape[2]:
+                                            self.r_gpp[:, r, g_i] = torch.where(hitp, self.r_gpp[:, r, g_i] + amt_g, self.r_gpp[:, r, g_i])
                                     # B-25: a rival completing a space-race step
                                     # records chain progress (space_done, civ
                                     # r+1); completing the VICTORY step ends the

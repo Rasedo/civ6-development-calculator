@@ -565,6 +565,44 @@ Per-item weights (done% in parens where partial):
   GPU is a behavioural change to GP earn timing and needs its own gated round —
   the rate and the class list are now recorded in the file so that round does
   not re-derive them.
+
+- **B-19/#39 PROJECT RATES — FIXED 2026-07-29 (#79).** The last Festival
+  residual is closed, and the sourcing sweep's recorded numbers were re-verified
+  against the Civilopedia/wiki rather than trusted from this file:
+    * `PROJECT_YIELD_FRACTION` 0.75 -> **0.15**. Real Civ 6 converts 15% of the
+      city's production to the district's yield. CONFIRMED IDENTICAL for Campus
+      Research Grants (Science), Holy Site Prayers (Faith) and the Theater
+      Square Festival (Culture), so the rate is UNIFORM — the "per-project
+      table" the residual called for is not needed for yield. The old 0.75 was
+      five times real.
+    * `PROJECT_GPP_FRACTION` 0.3 -> **0.22** for a single-class project.
+    * The THEATER SQUARE FESTIVAL now pays Great WRITER, ARTIST **and**
+      MUSICIAN **0.11 each** via new `gpClasses`/`gppFraction` overrides on
+      ProjectDef. This is not arbitrary: the Festival's D_TYPE is 5 where every
+      other district project's is 10, which is exactly the 11-vs-22 split.
+  `gpClass` is retained as the primary class and the GPU keeps its single `g`
+  column for INDEX STABILITY; the new `gs` (class list) and `gf` (per-row rate)
+  columns are additive, and the GPU falls back to `g`/the global fraction when
+  they are absent.
+  GATE REACHABILITY, MEASURED: over the 12-seed 250-turn gate the rivals
+  complete **51** Campus Research Grants and **7** Holy Site Prayers and
+  **ZERO** Festivals. So scripted parity genuinely covers the YIELD-fraction
+  change (58 completions, both engines moving together at 0.0 milli) but cannot
+  reach the multi-class award at all. New poke lanes construct it directly:
+  `gpu/festival_test.py` (exported table + a planted rival completion paying
+  11 to each of the three classes and nothing elsewhere, with a guard that the
+  Festival rate never equals the single-class rate) and a TS twin in
+  `tests/economy.test.ts` that measures against a CONTROL turn, because a
+  Theater Square accrues +1 to each of those classes per turn on its own.
+  ONE TEST CORRECTED, not silenced: `economy.test.ts` "Encampment Training
+  grants only general points" asserted the treasury delta was
+  `< cost * PROJECT_YIELD_FRACTION`. That bound only passed because the
+  fraction was 0.75 — at the sourced 0.15 the bound (2.4) falls BELOW ordinary
+  city gold income (4.25), so it was testing the constant's size, not the
+  project. It now asserts the real invariant (TRAINING carries no yield by
+  construction; no other GP class moves).
+  Gates: tsc clean, vitest 443/443, re-export, scripted parity 0.0 milli,
+  BATTERY OK 523s.
   **SLICE 5 — src/data/resources.ts BONUS rows (2026-07-28, #78).** All seven
   bonus-resource yields VERIFIED CORRECT against the wiki resource list (Wheat,
   Rice, Cattle, Sheep, Bananas +1 Food; Stone, Deer +1 Production). No change.

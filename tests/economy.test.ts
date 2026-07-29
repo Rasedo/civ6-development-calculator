@@ -18,7 +18,7 @@ import {
 } from '../src/core/game';
 import { spawnUnit, builderRemoveFeature, builderHarvest } from '../src/core/units';
 import { chopValue, chopGrant, harvestGrant } from '../src/core/economy';
-import { PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
 import type { City, DistrictId, GameState } from '../src/core/types';
 
 function foundAt(state: GameState, col: number, row: number): City {
@@ -234,13 +234,57 @@ describe('district projects', () => {
     queueProject(state, city.id, 'TRAINING');
     const cost = itemCost(city.queue[0]);
     city.queue[0].progress = cost;
-    const goldBefore = state.treasury;
     endTurn(state);
     expect(state.greatPeople.points.GENERAL ?? 0).toBeGreaterThanOrEqual(
       Math.round(cost * PROJECT_GPP_FRACTION),
     );
-    // No yield lump: treasury only moved by regular city gold.
-    expect(state.treasury - goldBefore).toBeLessThan(cost * PROJECT_YIELD_FRACTION);
+    // No yield lump. #79: this used to compare the treasury delta against
+    // `cost * PROJECT_YIELD_FRACTION`, which only passed because that fraction
+    // was 0.75 — five times the real Civ 6 rate. At the sourced 0.15 the bound
+    // (2.4) falls BELOW ordinary city gold income (4.25), so it tested the
+    // constant's size rather than the project's behaviour. Assert the actual
+    // invariant instead: TRAINING carries no yield by construction, and no
+    // other GP class moves.
+    expect(PROJECTS.TRAINING.yield).toBeNull();
+    expect(state.greatPeople.points.SCIENTIST ?? 0).toBe(0);
+    expect(state.greatPeople.points.ARTIST ?? 0).toBe(0);
+  });
+
+  // #79: the Festival is the ONE multi-class project. Real Civ 6 pays Great
+  // Writer, Great Artist AND Great Musician ~11% each (its D_TYPE is 5, where
+  // every other district project's is 10 and pays one class ~22%). MEASURED
+  // gate-unreachable: the 12-seed scripted gate completes 51 Campus Research
+  // Grants and 7 Holy Site Prayers but ZERO Festivals, so parity cannot see
+  // this. GPU twin: gpu/festival_test.py.
+  it('the Theater Square Festival pays Writer, Artist and Musician alike', () => {
+    // A Theater Square accrues +1 Writer/Artist/Musician per turn on its own,
+    // so measure the project's contribution against a CONTROL that runs the
+    // same turn with no project queued.
+    const control = makeState();
+    const cc = foundAt(control, 5, 5);
+    addDistrict(control, cc, 'THEATER_SQUARE', 6, 5);
+    endTurn(control);
+    const base = control.greatPeople.points.WRITER ?? 0;
+
+    const state = makeState();
+    const city = foundAt(state, 5, 5);
+    addDistrict(state, city, 'THEATER_SQUARE', 6, 5);
+    const r = queueProject(state, city.id, 'FESTIVAL');
+    expect(r.ok).toBe(true);
+    const cost = itemCost(city.queue[0]);
+    city.queue[0].progress = cost;
+    endTurn(state);
+
+    const each = Math.round(cost * 0.11);
+    expect(each).toBeGreaterThan(0);
+    expect((state.greatPeople.points.WRITER ?? 0) - base).toBe(each);
+    expect((state.greatPeople.points.ARTIST ?? 0) - base).toBe(each);
+    expect((state.greatPeople.points.MUSICIAN ?? 0) - base).toBe(each);
+    // ... at the Festival's OWN rate, not the single-class 22%
+    expect(each).not.toBe(Math.round(cost * PROJECT_GPP_FRACTION));
+    // ... and no unrelated class is paid
+    expect(state.greatPeople.points.SCIENTIST ?? 0).toBe(0);
+    expect(state.greatPeople.points.PROPHET ?? 0).toBe(0);
   });
 
   it('are refused in sandbox mode', () => {

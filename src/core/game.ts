@@ -31,7 +31,7 @@ import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN } from '../data/religion';
-import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, type ProjectDef } from '../data/projects';
+import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
 import { tileClaimed, civOfRival } from './civs';
@@ -429,10 +429,15 @@ function completeProject(state: GameState, city: City, projectId: string, cost: 
     applyLumpYield(state, city.centerIndex, { key: def.yield, amount });
     state.eventLog.push(`${city.name} completed ${def.name}: +${amount} ${def.yield}.`);
   }
-  if (def.gpClass) {
-    const pts = Math.round(cost * PROJECT_GPP_FRACTION);
-    state.greatPeople.points[def.gpClass] = (state.greatPeople.points[def.gpClass] ?? 0) + pts;
-    if (!def.yield) state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${def.gpClass} points.`);
+  // #79: pay EVERY class the project lists (the Festival pays three), each at
+  // the project's own rate. Single-class projects are unchanged in shape.
+  const classes = gpClassesOf(def);
+  if (classes.length) {
+    const pts = Math.round(cost * gppFractionOf(def));
+    for (const gc of classes) {
+      state.greatPeople.points[gc] = (state.greatPeople.points[gc] ?? 0) + pts;
+    }
+    if (!def.yield) state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${classes.join('/')} points.`);
   }
 }
 

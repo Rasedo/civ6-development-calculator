@@ -64,6 +64,7 @@ POKE_COST = {
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
     "naval": 53.7, "gumbel": 75.6, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
+    "festival": 4.0,
 }
 
 results: list[tuple[str, float, int]] = []
@@ -216,6 +217,7 @@ def main() -> int:
                 ("space_race", [py, "gpu/space_race_test.py"], 4),
                 ("culture_victory", [py, "gpu/culture_victory_test.py"], 4),  # B-25 (#72): the gate-unreachable culture win
                 ("relics", [py, "gpu/relics_test.py"], 4),  # B-20 (#73): martyr relics — temple slots, faith + tourism
+                ("festival", [py, "gpu/festival_test.py"], 4),  # #79: Festival pays THREE GP classes at 0.11 (gate-unreachable)
                 ("naval", [py, "gpu/naval_test.py"], 4),  # #45/B-6 gate-unreachable naval surfaces
                 ("districts", [py, "gpu/district_breadth_test.py"], 4),  # B9/A-9 catalog-breadth surfaces
                 ("rc_registry", [py, "gpu/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency

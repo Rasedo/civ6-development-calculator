@@ -59,7 +59,7 @@ import {
   embarkState,
   type AmenityTier,
 } from '../data/constants';
-import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../data/projects';
+import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, rivalTourism, civEraIndex } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
@@ -3119,9 +3119,14 @@ export function rivalPhase(state: GameState): void {
               else if (def.yield === 'gold') rival.treasury = (rival.treasury ?? 0) + amount;
               else if (def.yield === 'faith') rival.faith = (rival.faith ?? 0) + amount;
             }
-            if (def?.gpClass) {
-              const pts = Math.round(cost * PROJECT_GPP_FRACTION);
-              rival.gpp[def.gpClass] = (rival.gpp[def.gpClass] ?? 0) + pts;
+            if (def) {
+              // #79: the multi-class twin of completeProject — the Festival
+              // pays Writer/Artist/Musician, everything else one class.
+              const classes = gpClassesOf(def);
+              if (classes.length) {
+                const pts = Math.round(cost * gppFractionOf(def));
+                for (const gc of classes) rival.gpp[gc] = (rival.gpp[gc] ?? 0) + pts;
+              }
             }
           } else {
             const trained = spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);

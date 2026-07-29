@@ -57,7 +57,7 @@ import {
 } from '../src/data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
-import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION } from '../src/data/projects';
+import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, gpClassesOf, gppFractionOf } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../src/core/trade';
 import { SUZERAIN_ENVOYS } from '../src/data/cityStates';
@@ -866,6 +866,10 @@ const rules = {
       d: PLACEABLE_DISTRICTS.indexOf(p.district),
       y: p.yield ? YIELD_KEYS.indexOf(p.yield) : -1,
       g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
+      // #79: the FULL class list + this project's own per-class rate. `g` stays
+      // for index stability; the GPU reads `gs`/`gf` and falls back to `g`.
+      gs: gpClassesOf(p).map((c) => GP_CLASSES.indexOf(c)),
+      gf: gppFractionOf(p),
       sp: p.space ? 1 : 0,
       vic: p.victory ? 1 : 0,
       rt: p.requiresTech ? (techIdx.get(p.requiresTech) ?? -1) : -1,
