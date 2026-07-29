@@ -261,6 +261,26 @@ export const DED_EVENT_SCORE = [1, 1, 1, 2] as const;
 
 export const DEDICATION_PAYOUTS_LIVE = true; // #71: LIVE — hunted 2026-07-26
 
+/**
+ * B-27 (#79): rival MILITARY ENGINEER production. OFF until the GPU twin lands.
+ *
+ * The TS half is complete and MEASURED: with it on, the 12-seed 250-turn gate
+ * produces 49 engineers and places 87 forts (it produced ZERO of either before
+ * the FORT tech-unlock fix, which is the real reason B-27 recorded reachability
+ * as zero). It is held OFF because turning it on WITHOUT the GPU twin would put
+ * scripted parity straight into the red: the GPU needs an engineer roster
+ * index, a border/war fort-job mask, a production arm, and a PER-UNIT job mask
+ * in `_rival_builder_actions` (its mask is currently per-rival and drives both
+ * build-here and walk-to-job).
+ *
+ * The production RULE is owner-chosen, not sourced: at war, one engineer at a
+ * time, forting only tiles adjacent to a hostile civ's territory. Recorded as
+ * authored — real Civ 6's AI forts chokepoints and no published rule quantifies
+ * that. Flipping this flag is a behaviour change on both seats and needs its own
+ * gated round.
+ */
+export const RIVAL_ENGINEER_LIVE = false;
+
 export const HEROIC_DEDICATIONS = 3;
 /** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
  * Monumentality flavour — a Golden age dedicates to a BONUS). */

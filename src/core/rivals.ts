@@ -111,9 +111,10 @@ import {
   CONGRESS_MIN_ERA,
   DVP_PER_RESOLUTION,
   DED_MONUMENTALITY,
+  RIVAL_ENGINEER_LIVE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, civHasStrategic } from './civs';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic } from './civs';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -1275,6 +1276,43 @@ function rivalHasBuilder(state: GameState, rival: RivalCiv): boolean {
   return rival.cities.some((rc) => rc.queue[0]?.kind === 'unit' && rc.queue[0].unit === 'BUILDER');
 }
 
+/** B-27 (#79): does this rival already have a Military Engineer (alive or
+ *  queued)? One at a time, exactly like `rivalHasBuilder`. */
+function rivalHasEngineer(state: GameState, rival: RivalCiv): boolean {
+  if (state.units.some((u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'MILITARY_ENGINEER')) return true;
+  return rival.cities.some((rc) => rc.queue[0]?.kind === 'unit' && rc.queue[0].unit === 'MILITARY_ENGINEER');
+}
+
+/**
+ * B-27 (#79): is there a FORT worth building right now? OWNER-CHOSEN border/war
+ * rule (recorded as authored, not sourced — real Civ 6's AI forts chokepoints,
+ * which no published rule quantifies): the rival must be AT WAR with someone,
+ * and the tile must be its own, unimproved, land, and ADJACENT to territory
+ * held by a civ it is at war with. Without the adjacency clause a fort job
+ * would exist on essentially every owned tile — `validImprovementsIn` allows a
+ * FORT on any passable owned land — and "one engineer while a job exists" would
+ * never terminate.
+ */
+function rivalHasFortJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boolean {
+  if (!RIVAL_ENGINEER_LIVE) return false; // #79: OFF until the GPU twin lands
+  if (!rival.atWar && (rival.atWarRivals?.length ?? 0) === 0) return false;
+  const own = civOfRival(rival.id);
+  const owns = (t: Tile) => tileOwnedByCiv(t, own);
+  const hostile = (t: Tile) => {
+    if (rival.atWar && t.cityId !== -1) return true; // player territory
+    const rc = tileRivalCiv(t);
+    return rc !== null && rc !== own && (rival.atWarRivals?.includes(rivalOfCiv(rc)) ?? false);
+  };
+  return state.map.tiles.some(
+    (t) =>
+      owns(t) &&
+      !isWater(t) &&
+      !t.improvement &&
+      validImprovementsIn(t, { unlocks, ownsTile: owns, map: state.map, builder: 'MILITARY_ENGINEER' }).length > 0 &&
+      neighbors(state.map, t).some(hostile),
+  );
+}
+
 /** C1-B5b: any owned LAND tile a rival builder could work right now?
  * AUDIT A-13: every improvement validImprovementsIn offers under the rival's
  * own unlocks counts (resource improvements included), plus pillaged tiles
@@ -1316,7 +1354,19 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
   const nTiles = state.map.tiles.length;
   for (const u of [...state.units]) {
     // unit civId = RAW rival id; tile ownership = unified civ space
-    if (u.owner !== 'rival' || u.civId !== rival.id || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
+    // B-27 (#79): the filter was `u.type !== 'BUILDER'`, which skipped a
+    // Military Engineer outright — so the "pass the ACTING unit's type" comment
+    // below described a path no engineer could enter. Any charge-carrying rival
+    // civilian now acts; validImprovementsIn gates WHAT each may build.
+    // GATED on the same flag as production (#79). MEASURED: this filter is
+    // NOT inert — a CONTROLLED rival trains from the full roster, so random
+    // rollout games really do hand a rival a Military Engineer. Admitting it
+    // here while the GPU still skips it (its filter is `v_type ==
+    // _builder_idx`) diverged the off-script gate at seed 9118 t213 (barbs
+    // TS=7 GPU=6). So the acting path is reachable TODAY and the GPU twin is
+    // mandatory, not optional.
+    const civilian = u.type === 'BUILDER' || (RIVAL_ENGINEER_LIVE && u.type === 'MILITARY_ENGINEER');
+    if (u.owner !== 'rival' || u.civId !== rival.id || !civilian || (u.charges ?? 0) <= 0) continue;
     const bt = state.map.tiles[u.tileIndex];
     // AUDIT A-13: REPAIR first — standing on an owned pillaged tile clears
     // the flag with builderRepair's exact semantics (no charge, the turn is
@@ -2570,6 +2620,23 @@ export function rivalPhase(state: GameState): void {
           unit: 'BUILDER',
           progress: 0,
           cost: Math.round((50 + 4 * (rival.buildersTrained ?? 0)) * GAME_SPEED),
+        });
+        unitCount += 1;
+      } else if (
+        !rivalHasEngineer(state, rival) &&
+        rivalHasFortJob(state, rival, rivalUnlocks) &&
+        unitCount < unitCap
+      ) {
+        // B-27 (#79): one Military Engineer at a time, only while at war and
+        // only while a BORDER fort job exists (owner-chosen rule — see
+        // rivalHasFortJob). Sits after the builder arm so economy work always
+        // outranks it. Flat roster cost, no escalation: the engineer has no
+        // trained-counter twin (that curve is the BUILDER's P4/D-10 rule).
+        rc.queue.push({
+          kind: 'unit',
+          unit: 'MILITARY_ENGINEER',
+          progress: 0,
+          cost: Math.round((UNITS.MILITARY_ENGINEER?.cost ?? 170) * GAME_SPEED),
         });
         unitCount += 1;
       } else if (unitCount < unitCap) {

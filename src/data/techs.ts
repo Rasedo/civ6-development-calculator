@@ -141,6 +141,17 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
     T('MILITARY_ENGINEERING', 'Military Engineering', 'Medieval', 335, ['CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'ARMORY' },
+      // B-27 (#79): the FORT was added in #78 with its improvement def, its
+      // Military-Engineer-only placement rule, its +4 terrain defence and two
+      // constructed test lanes — but NO tech ever unlocked it, so
+      // `unlocks.improvements` never contained it and `unlocked('FORT')` was
+      // true only in sandbox. Neither seat could build one. MEASURED: across
+      // the 12-seed gate the rival production arm was reached 526 times (325 of
+      // them at war) and `fortUnlocked` was false on EVERY one. This — not the
+      // absent production policy — is why B-27 recorded reachability as zero.
+      // Real Civ 6 unlocks the Fort with Military Engineering, the same tech
+      // that trains the Military Engineer.
+      { kind: 'unlockImprovement', improvement: 'FORT' },
     ]),
     T('EDUCATION', 'Education', 'Medieval', 335, ['APPRENTICESHIP', 'MATHEMATICS'], [
       { kind: 'unlockBuilding', building: 'UNIVERSITY' },

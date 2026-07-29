@@ -105,6 +105,21 @@ export function validImprovementsIn(
   const unlocks = opts.unlocks;
   const unlocked = (imp: ImprovementId) => !unlocks || unlocks.improvements.has(imp);
 
+  // B-27 (#79): a MILITARY ENGINEER builds ONLY military improvements. Its
+  // sourced Civ 6 build list is Fort / Airstrip / Missile Silo / Mountain
+  // Tunnel / Reinforced Barricade / Modernized Trap (plus spending a charge on
+  // a Canal/Dam/Aqueduct/Flood Barrier) — no Farm, Mine, Camp or Plantation.
+  // Only the FORT of that list exists in this model. Before this guard the
+  // validator fell through to the civilian rules and would have offered an
+  // engineer a Farm, and — because FORT carries `yields: {}` and therefore
+  // scores a flat 0 delta — the best-delta chooser would have picked the Farm
+  // every time, so an engineer could never have built the one thing it exists
+  // to build. Resource tiles return their own improvement below, which an
+  // engineer must not get either, so this sits ABOVE that early return.
+  if (opts.builder === 'MILITARY_ENGINEER') {
+    if (isWater(tile) || !unlocked('FORT')) return [];
+    return tile.improvement ? [] : ['FORT'];
+  }
   if (tile.resource) {
     // A tile with a resource only accepts the improvement that works it.
     const imp = RESOURCES[tile.resource].improvement;
@@ -131,7 +146,6 @@ export function validImprovementsIn(
   // Civ 6 allows it on any passable land tile the owner holds; the district /
   // wonder / impassable paves are already refused above, and a resource tile
   // returns early with its own improvement, so nothing more is needed here.
-  if (unlocked('FORT') && opts.builder === 'MILITARY_ENGINEER') out.push('FORT');
   if (unlocked('LUMBER_MILL') && tile.feature === 'WOODS') out.push('LUMBER_MILL');
   // B-27 (#71) SEASIDE RESORT — real Civ 6: a FLAT COASTAL Grassland/Plains/
   // Desert tile with BREATHTAKING appeal (>= 4). Needs the map (coast

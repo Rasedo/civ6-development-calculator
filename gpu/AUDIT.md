@@ -352,6 +352,53 @@ Per-item weights (done% in parens where partial):
   production/AI wiring is the remaining B-27 tail, alongside the post-tech-tree
   improvements.
 
+
+  **B-27 TAIL, ROUND 2 (2026-07-29, #79) — THE REAL BLOCKER WAS A MISSING TECH
+  UNLOCK, not the absent AI policy.** NO TECH EVER UNLOCKED THE FORT. #78 added
+  the improvement def, the Military-Engineer-only placement rule, the +4 terrain
+  defence and two constructed lanes, but never an `unlockImprovement` effect, so
+  `unlocks.improvements` never contained FORT and `unlocked('FORT')` was true
+  only in SANDBOX. Neither seat could build one, ever.
+  MEASURED before the fix: the rival production arm was reached 526 times across
+  the 12-seed 250-turn gate (325 of them at war) and `fortUnlocked` was FALSE on
+  every single one. That — not "nothing produces an engineer" — is why #78
+  recorded reachability as zero. FIXED: MILITARY_ENGINEERING now carries
+  `unlockImprovement: FORT`, the same tech that trains the engineer (real Civ 6).
+  MEASURED after: 254 reaches with the Fort unlocked, **49 engineers queued and
+  87 forts placed** with the production rule enabled.
+  ALSO FIXED: `validImprovementsIn` now returns FORT *and only FORT* to a
+  MILITARY_ENGINEER. Previously an engineer fell through to the civilian rules
+  and would have been offered a Farm — and since FORT carries `yields: {}` and
+  scores a flat 0 delta, the rival's best-delta chooser would have picked the
+  Farm every time, so an engineer could never have built the one thing it
+  exists for. Its sourced Civ 6 build list has no civilian improvements.
+  PRODUCTION IS BUILT BUT HELD OFF behind `RIVAL_ENGINEER_LIVE = false`
+  (src/data/rivals.ts), the repo's standard flag convention. The rule is
+  OWNER-CHOSEN and recorded as AUTHORED, not sourced: at war, one engineer at a
+  time, forting only tiles adjacent to a hostile civ's territory. The adjacency
+  clause is load-bearing — `validImprovementsIn` allows a FORT on any passable
+  owned land, so without it a "fort job" exists on essentially every tile and
+  "one engineer while a job exists" never terminates.
+  WHY THE FLAG, MEASURED THE HARD WAY: the acting-path filter is NOT inert. Both
+  engines skipped engineers in their civilian loops (TS `u.type !== 'BUILDER'`,
+  GPU `v_type == self._builder_idx`), so the #78 comment claiming an engineer is
+  offered the FORT described a path no engineer could enter. Admitting engineers
+  on the TS side alone turned the off-script gate RED at seed 9118 t213 (barbs
+  TS=7 GPU=6) — because a CONTROLLED rival trains from the full roster, so random
+  rollout games really do hand a rival an engineer. The acting path is therefore
+  reachable TODAY, and the GPU twin is MANDATORY, not optional. The filter is
+  gated on the same flag.
+  REMAINING FOR THE FLIP (one gated round): GPU engineer roster index, a
+  border/war fort-job mask, a production arm mirroring the builder arm at
+  engine.py's "one BUILDER per civ at a time", and a PER-UNIT job mask in
+  `_rival_builder_actions` — its mask is per-rival today and drives both
+  build-here and walk-to-job.
+  METHOD NOTE (owner catch, 2026-07-29): I diagnosed this by re-running the
+  WHOLE 4-shard rollout twice (~8 min each) to watch ONE game diverge. The
+  changes were TS-only, so the GPU rollout was reusable and `replay-gpu.ts`
+  alone reproduced it in ~3 min; the file-level bisect then took two more replay
+  runs and no GPU work at all. When a change is one-sided, re-run only that side.
+
   **B-27 TAIL ANALYSED 2026-07-29 (#79) — NOT SHIPPED, and here is exactly why.**
   The engineer half of B-27 is two separate blockers, not one, and the second
   needs an OWNER DECISION rather than more implementation.
