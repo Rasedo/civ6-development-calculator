@@ -6,7 +6,7 @@
  * units raid like barbarians, and cities can be conquered.
  */
 
-import type { City, CityState, CityStateQuest, DistrictId, GameState, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
+import type { City, CityState, CityStateQuest, DistrictId, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
@@ -1293,24 +1293,25 @@ function rivalHasEngineer(state: GameState, rival: RivalCiv): boolean {
  * FORT on any passable owned land — and "one engineer while a job exists" would
  * never terminate.
  */
+function isFortJobTile(state: GameState, rival: RivalCiv, t: Tile, unlocks: Unlocks): boolean {
+  const own = civOfRival(rival.id);
+  const owns = (x: Tile) => tileOwnedByCiv(x, own);
+  if (!owns(t) || isWater(t) || t.improvement) return false;
+  if (validImprovementsIn(t, { unlocks, ownsTile: owns, map: state.map, builder: 'MILITARY_ENGINEER' }).length === 0) {
+    return false;
+  }
+  // the BORDER clause — the whole point of the owner-chosen rule
+  return neighbors(state.map, t).some((n) => {
+    if (rival.atWar && n.cityId !== -1) return true; // player territory
+    const rc = tileRivalCiv(n);
+    return rc !== null && rc !== own && (rival.atWarRivals?.includes(rivalOfCiv(rc)) ?? false);
+  });
+}
+
 function rivalHasFortJob(state: GameState, rival: RivalCiv, unlocks: Unlocks): boolean {
   if (!RIVAL_ENGINEER_LIVE) return false; // #79: OFF until the GPU twin lands
   if (!rival.atWar && (rival.atWarRivals?.length ?? 0) === 0) return false;
-  const own = civOfRival(rival.id);
-  const owns = (t: Tile) => tileOwnedByCiv(t, own);
-  const hostile = (t: Tile) => {
-    if (rival.atWar && t.cityId !== -1) return true; // player territory
-    const rc = tileRivalCiv(t);
-    return rc !== null && rc !== own && (rival.atWarRivals?.includes(rivalOfCiv(rc)) ?? false);
-  };
-  return state.map.tiles.some(
-    (t) =>
-      owns(t) &&
-      !isWater(t) &&
-      !t.improvement &&
-      validImprovementsIn(t, { unlocks, ownsTile: owns, map: state.map, builder: 'MILITARY_ENGINEER' }).length > 0 &&
-      neighbors(state.map, t).some(hostile),
-  );
+  return state.map.tiles.some((t) => isFortJobTile(state, rival, t, unlocks));
 }
 
 /** C1-B5b: any owned LAND tile a rival builder could work right now?
@@ -1392,7 +1393,17 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // the FORT and a plain Builder is not. Inert today — nothing produces an
     // engineer yet (the remaining B-27 tail) — but it keeps the placement path
     // correct rather than leaving a second thing to remember when it lands.
-    const options = !bt.improvement ? validImprovementsIn(bt, { ...vopts, builder: u.type }) : [];
+    // B-27 (#79): an ENGINEER's job set is the BORDER fort set, not the
+    // civilian one. Production is gated on border adjacency (rivalHasFortJob),
+    // so placement and the walk target must use the SAME predicate or the unit
+    // would fort wherever it happened to stand and walk toward FARM jobs — the
+    // two halves of the owner-chosen rule would disagree.
+    const isEng = u.type === 'MILITARY_ENGINEER';
+    const options = bt.improvement
+      ? []
+      : isEng
+      ? (isFortJobTile(state, rival, bt, unlocks) ? (['FORT'] as ImprovementId[]) : [])
+      : validImprovementsIn(bt, { ...vopts, builder: u.type });
     if (options.length > 0) {
       let bestImp = options[0];
       let bestGain = -Infinity;
@@ -1422,7 +1433,9 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     let bestKey = Infinity;
     for (const t of state.map.tiles) {
       if (!owns(t) || isWater(t)) continue;
-      const isJob = t.pillaged || t.districtPillaged || (!t.improvement && validImprovementsIn(t, vopts).length > 0); // B-32
+      const isJob = isEng
+        ? isFortJobTile(state, rival, t, unlocks) // #79: engineers walk to BORDER fort jobs only
+        : t.pillaged || t.districtPillaged || (!t.improvement && validImprovementsIn(t, vopts).length > 0); // B-32
       if (!isJob) continue;
       const key = hexDistance(bt.col, bt.row, t.col, t.row) * (nTiles + 1) + t.index;
       if (key < bestKey) {
