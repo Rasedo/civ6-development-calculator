@@ -15039,6 +15039,39 @@ class BatchSim:
 
     # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 
+    # #51/S0.1: the trace column NAMES, block by block, mirroring the four
+    # tables in scripts/gpu-trace.ts. gpu/parity_test.py asserts this engine's
+    # expanded list is IDENTICAL to the one shipped in rules.trace before it
+    # compares a single value, and keys tolerance by name. trace_row() asserts
+    # its own per-block column COUNTS against these, so a column added to one
+    # and not the other cannot ship.
+    _TRACE_HEAD = [
+        "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
+        "score", "rng", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
+        "fertility", "droughtTiles", "improvements", "leader", "gameOver", "winner",
+        "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions",
+        "diploPoints",
+    ]
+    _TRACE_PER_CS = ["envoys", "pop", "questKind"]
+    _TRACE_PER_RIVAL = [
+        "nCities", "popSum", "nUnits", "atWar", "nTechs", "nCivics", "techProg", "civicProg",
+        "qProgSum", "qCostSum", "nDistricts", "nBuildings", "treasury", "rGScore", "rrWarMask",
+        "age", "tourism", "faith", "followedSum", "cultureTotal", "diploFavor", "diploPoints",
+        "warWeariness",
+    ]
+    _TRACE_PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty", "followed"]
+
+    def trace_columns(self) -> list[str]:
+        """Names for every column trace_row() emits, in order."""
+        names = list(self._TRACE_HEAD)
+        for s in range(self.S):
+            names += [f"cs{s}.{n}" for n in self._TRACE_PER_CS]
+        for r in range(self.R):
+            names += [f"r{r}.{n}" for n in self._TRACE_PER_RIVAL]
+        for c in range(self.C):
+            names += [f"c{c}.{n}" for n in self._TRACE_PER_CITY]
+        return names
+
     def trace_row(self) -> torch.Tensor:
         # perf: each civ's empire score is needed by BOTH leader() (GV-1) and
         # its own trace column — compute once and reuse (was a 2-3x recompute
@@ -15076,6 +15109,7 @@ class BatchSim:
             self.congress_sessions.to(self.dtype),  # B-22 (#76): Congress sessions held
             self.diplo_points.to(self.dtype),  # B-22 (#76): Diplomatic Victory Points
         ]
+        assert len(cols) == len(self._TRACE_HEAD), f"trace head {len(cols)} cols vs {len(self._TRACE_HEAD)} names"
         for s in range(self.S):
             cs_live = self.cs_alive[:, s].to(self.dtype)  # V-CS: a captured CS traces as zeros (TS: removed from the list)
             cols += [
@@ -15083,6 +15117,7 @@ class BatchSim:
                 self.cs_pop[:, s].to(self.dtype) * cs_live,
                 self.cs_quest[:, s].to(self.dtype) * cs_live,
             ]
+        assert len(cols) == len(self._TRACE_HEAD) + self.S * len(self._TRACE_PER_CS), "trace per-CS block width vs names"
         for r in range(self.R):
             live = self.r_alive[:, r]
             zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
@@ -15147,6 +15182,7 @@ class BatchSim:
                 # rGScore sums. Untraced until now.
                 torch.where(live, self.r_war_weariness[:, r].to(self.dtype), zero),
             ]
+        assert len(cols) == len(self._TRACE_HEAD) + self.S * len(self._TRACE_PER_CS) + self.R * len(self._TRACE_PER_RIVAL), "trace per-rival block width vs names"
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
         for c in range(self.C):
             live = self.alive[:, c]
@@ -15170,4 +15206,5 @@ class BatchSim:
                 torch.where(live, js_round(self.loyalty[:, c] * 1000), zero),
                 torch.where(live, self.city_followed[:, c].to(self.dtype), zero),  # B-18: followed religion id (-1 none, dead slot 0)
             ]
+        assert len(cols) == len(self.trace_columns()), f"trace row {len(cols)} cols vs {len(self.trace_columns())} names"
         return torch.stack(cols, dim=1)

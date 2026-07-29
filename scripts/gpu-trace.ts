@@ -3,24 +3,26 @@
  * (export-gpu.ts) and the rollout replayer (replay-gpu.ts). One source of
  * truth on the TS side; gpu/civ6gpu/engine.py trace_row() mirrors it.
  *
- * Row layout:
- *   head — [turn, techs, civics, settlers, nCities, treasury·ms,
- *           science·ms, culture·ms, score·ms, rngState, nCamps, nBarbs,
- *           nPlayerUnits, envoysAvailable, influence]
- *   per city-state slot (csMax) — [envoys, pop, questKind+1]
- *   per rival slot (rMax) — [nCities, popSum, nUnits, atWar, nTechs,
- *           nCivics, techProg·ms, civicProg·ms, ΣqueueProg·ms, ΣqueueCost·ms,
- *           nDistricts, nBuildings, treasury·ms, rGScore·ms, rrWarMask]
- *   per city slot (cMax) — [pop, ownedTiles, buildings, tilesAcquired,
- *           foodBox·ms, cultureBox·ms, cityHp, loyalty·ms, followedReligion]
+ * Every column is ONE entry in one of the four tables below — `{name, tol,
+ * get}` — and both the row and the name/tolerance vectors are generated from
+ * them. Nothing is positional any more, so a new column cannot silently shift
+ * a later column's tolerance (the failure mode the old hand-maintained `tol`
+ * literal had: its own comment claimed "HEAD is 24 ... HEAD is 25 now" while
+ * the real width was 28).
  *
- * City slots are keyed by FOUNDING ORDER via `cityIds` (append new ids as
- * cities appear; once cMax ids exist, a new id REUSES the first dead
- * column — mirroring the GPU's first-free-hole slot) — not by position in
- * state.cities, which compacts when a city flips to a rival. A missing id
- * renders as zeros, exactly like a dead GPU slot. rngState stays the
- * strongest signal: any divergence in the number or order of draws fails
- * the very next row.
+ * `tol`: 0 = exact integer, 2 = ×1000-encoded float.
+ *
+ * Column NAMES are the cross-engine contract: gpu/parity_test.py asserts the
+ * TS list (shipped in rules.trace) and BatchSim.trace_columns() are identical
+ * before it compares a single value, and applies tolerance BY NAME.
+ *
+ * Slot columns render a dead/absent slot by calling `get` with `undefined`,
+ * which must yield 0 — mirroring the GPU's zero-filled dead slot. City slots
+ * are keyed by FOUNDING ORDER via `cityIds` (append new ids as cities appear;
+ * once cMax ids exist a new id REUSES the first dead column, mirroring the
+ * GPU's first-free-hole slot) — not by position in state.cities, which
+ * compacts when a city flips to a rival. rngState stays the strongest signal:
+ * any divergence in the number or order of draws fails the very next row.
  */
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
@@ -29,7 +31,150 @@ import { getCityHp } from '../src/core/combat';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
-import type { GameState } from '../src/core/types';
+import type { City, CityState, GameState, RivalCiv } from '../src/core/types';
+
+/** Row-scoped values shared by several head columns (computed once per row). */
+type HeadCtx = { leader: number; dom: number };
+
+export type TraceCol<T> = { name: string; tol: 0 | 2; get(state: GameState, x: T): number };
+
+const HEAD_COLS: TraceCol<HeadCtx>[] = [
+  { name: 'turn', tol: 0, get: (s) => s.turn },
+  { name: 'techs', tol: 0, get: (s) => s.research.techs.length },
+  { name: 'civics', tol: 0, get: (s) => s.research.civics.length },
+  { name: 'settlers', tol: 0, get: (s) => s.settlers },
+  { name: 'nCities', tol: 0, get: (s) => s.cities.length },
+  { name: 'treasury', tol: 2, get: (s) => Math.round(s.treasury * 1000) },
+  { name: 'science', tol: 2, get: (s) => Math.round(s.scienceTotal * 1000) },
+  { name: 'culture', tol: 2, get: (s) => Math.round(s.cultureTotal * 1000) },
+  { name: 'score', tol: 2, get: (s) => Math.round(empireScore(s, 'balanced') * 1000) },
+  { name: 'rng', tol: 0, get: (s) => s.rngState >>> 0 },
+  { name: 'nCamps', tol: 0, get: (s) => s.barbCamps.length },
+  { name: 'nBarbs', tol: 0, get: (s) => s.units.filter((u) => u.owner === 'barbarian').length },
+  { name: 'nPlayerUnits', tol: 0, get: (s) => s.units.filter((u) => u.owner === 'player').length },
+  { name: 'envoysAvail', tol: 0, get: (s) => s.envoysAvailable },
+  { name: 'influence', tol: 0, get: (s) => s.influencePoints },
+  { name: 'fertility', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + t.fertility, 0) },
+  { name: 'droughtTiles', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + (t.droughtTurns > 0 ? 1 : 0), 0) },
+  { name: 'improvements', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0) },
+  { name: 'leader', tol: 0, get: (_s, c) => c.leader }, // GV-1
+  { name: 'gameOver', tol: 0, get: (s) => (s.gameOver ? 1 : 0) }, // GV-2
+  { name: 'winner', tol: 0, get: (s, c) => (c.dom >= 0 ? c.dom : s.gameOver ? c.leader : -1) }, // GV-2/GV-3
+  { name: 'victoryType', tol: 0, get: (s) => s.victoryType ?? 0 }, // GV-4/GV-3
+  { name: 'playerAge', tol: 0, get: (s) => s.civAges?.[0] ?? 1 }, // B-24 S2
+  { name: 'tourism', tol: 0, get: (s) => s.tourismTotal ?? 0 }, // B-20 (#71)
+  { name: 'warmonger', tol: 0, get: (s) => s.warmonger ?? 0 }, // B-22 (#74)
+  { name: 'diploFavor', tol: 0, get: (s) => s.diploFavor ?? 0 }, // B-22 (#75)
+  { name: 'congressSessions', tol: 0, get: (s) => s.congressSessions ?? 0 }, // B-22 (#76)
+  { name: 'diploPoints', tol: 0, get: (s) => s.diploPoints ?? 0 }, // B-22 (#76)
+];
+
+// Keyed by id (== the GPU's static slot), NOT array position: a captured
+// city-state leaves the list (V-CS), and positional indexing would shift every
+// later slot's columns.
+const PER_CS_COLS: TraceCol<CityState | undefined>[] = [
+  { name: 'envoys', tol: 0, get: (_s, cs) => cs?.envoys ?? 0 },
+  { name: 'pop', tol: 0, get: (_s, cs) => cs?.population ?? 0 },
+  {
+    name: 'questKind',
+    tol: 0,
+    get: (_s, cs) => (cs?.quest ? { clearCamp: 1, sendTradeRoute: 2, buildDistrict: 3 }[cs.quest.kind] : 0),
+  },
+];
+
+const PER_RIVAL_COLS: TraceCol<RivalCiv | undefined>[] = [
+  { name: 'nCities', tol: 0, get: (_s, r) => r?.cities.length ?? 0 },
+  { name: 'popSum', tol: 0, get: (_s, r) => r?.cities.reduce((n, rc) => n + rc.population, 0) ?? 0 },
+  {
+    name: 'nUnits',
+    tol: 0,
+    get: (s, r) => (r ? s.units.filter((u) => u.owner === 'rival' && u.civId === r.id).length : 0),
+  },
+  { name: 'atWar', tol: 0, get: (_s, r) => (r?.atWar ? 1 : 0) },
+  { name: 'nTechs', tol: 0, get: (_s, r) => r?.research.techs.length ?? 0 },
+  { name: 'nCivics', tol: 0, get: (_s, r) => r?.research.civics.length ?? 0 },
+  { name: 'techProg', tol: 2, get: (_s, r) => (r ? Math.round(r.research.techProgress * 1000) : 0) },
+  { name: 'civicProg', tol: 2, get: (_s, r) => (r ? Math.round(r.research.civicProgress * 1000) : 0) },
+  // C1-B2: the pooled stocks died — trace the queues instead (Σ front-item
+  // progress and Σ front-item cost across the civ's cities).
+  {
+    name: 'qProgSum',
+    tol: 2,
+    get: (_s, r) => (r ? Math.round(r.cities.reduce((n, rc) => n + (rc.queue[0]?.progress ?? 0), 0) * 1000) : 0),
+  },
+  {
+    name: 'qCostSum',
+    tol: 2,
+    get: (_s, r) =>
+      r
+        ? Math.round(
+            r.cities.reduce((n, rc) => {
+              const q = rc.queue[0];
+              if (!q) return n;
+              // P4/D-10: unit items may LOCK a cost (escalated builders) — price
+              // the lock first, exactly like the completion check does.
+              // A-4: wonder items carry NO cost field — price from the catalog
+              // (the D-10 lesson AGAIN: every new queue-cost mechanic must
+              // update BOTH trace harnesses in the same stage).
+              return n + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? q.cost ?? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : q.kind === 'wonder' ? BUILT_WONDERS[q.wonder]?.cost ?? 0 : 0);
+            }, 0) * 1000,
+          )
+        : 0,
+  },
+  // C1-B4: COMPLETED rival districts (queued ones pave but don't count).
+  {
+    name: 'nDistricts',
+    tol: 0,
+    get: (s, r) =>
+      r
+        ? r.cities.reduce(
+            (n, rc) => n + rc.districts.filter((d) => d.type !== 'CITY_CENTER' && s.map.tiles[d.tileIndex].districtComplete).length,
+            0,
+          )
+        : 0,
+  },
+  { name: 'nBuildings', tol: 0, get: (_s, r) => r?.cities.reduce((n, rc) => n + rc.buildings.length, 0) ?? 0 },
+  { name: 'treasury', tol: 2, get: (_s, r) => (r ? Math.round((r.treasury ?? 0) * 1000) : 0) }, // VP-G1
+  { name: 'rGScore', tol: 2, get: (s, r) => (r ? Math.round(rivalEmpireScore(s, r) * 1000) : 0) }, // GV-1
+  // A-19/B-33 (S2): per-pair war bitmask over rival ids (bit i set = at war
+  // with rival i). The (0, r+1) player pair rides the atWar column above.
+  { name: 'rrWarMask', tol: 0, get: (_s, r) => (r?.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0) },
+  // B-24 S2: this rival's Age (0 Dark / 1 Normal / 2 Golden, compared).
+  { name: 'age', tol: 0, get: (s, r) => (r ? s.civAges?.[r.id + 1] ?? 1 : 0) },
+  // B-20 (#71): this rival's cumulative TOURISM.
+  { name: 'tourism', tol: 0, get: (_s, r) => r?.tourism ?? 0 },
+  // #71 COVERAGE: rival FAITH — untraced until then, which let a +2.0 faith
+  // divergence hide behind five green gates.
+  { name: 'faith', tol: 2, get: (_s, r) => (r ? Math.round((r.faith ?? 0) * 1000) : 0) },
+  // #71 COVERAGE: checksum of this rival's cities' followed religion — only
+  // PLAYER cities have a `followed` column, so a rival city converting on a
+  // different turn was invisible.
+  { name: 'followedSum', tol: 0, get: (_s, r) => r?.cities.reduce((m, rc) => m + ((rc.followedReligion ?? -1) + 1), 0) ?? 0 },
+  // B-25 (#72): this rival's LIFETIME CULTURE — the domestic-tourist
+  // substrate. Traced so parity proves the accumulator itself.
+  { name: 'cultureTotal', tol: 2, get: (_s, r) => (r ? Math.round((r.cultureTotal ?? 0) * 1000) : 0) },
+  // B-22 (#75): this rival's cumulative DIPLOMATIC FAVOR.
+  { name: 'diploFavor', tol: 0, get: (_s, r) => r?.diploFavor ?? 0 },
+  // B-22 (#76): this rival's Diplomatic Victory Points.
+  { name: 'diploPoints', tol: 0, get: (_s, r) => r?.diploPoints ?? 0 },
+  // B-15 (#78 HUNT): WAR WEARINESS — untraced until then, which is how an
+  // rGScore divergence hid: weariness feeds the amenity tier, the tier scales
+  // city yields, and rivalEmpireScore is pop*3 + weighted yields.
+  { name: 'warWeariness', tol: 0, get: (_s, r) => r?.warWeariness ?? 0 },
+];
+
+const PER_CITY_COLS: TraceCol<City | undefined>[] = [
+  { name: 'pop', tol: 0, get: (_s, c) => c?.population ?? 0 },
+  { name: 'owned', tol: 0, get: (s, c) => (c ? s.map.tiles.filter((x) => x.cityId === c.id).length : 0) },
+  { name: 'bldgs', tol: 0, get: (_s, c) => c?.buildings.length ?? 0 },
+  { name: 'acquired', tol: 0, get: (_s, c) => c?.tilesAcquired ?? 0 },
+  { name: 'foodBox', tol: 2, get: (_s, c) => (c ? Math.round(c.foodBox * 1000) : 0) },
+  { name: 'cultureBox', tol: 2, get: (_s, c) => (c ? Math.round(c.cultureBox * 1000) : 0) },
+  { name: 'hp', tol: 0, get: (s, c) => (c ? getCityHp(s, c.id) : 0) },
+  { name: 'loyalty', tol: 2, get: (_s, c) => (c ? Math.round((c.loyalty ?? 100) * 1000) : 0) },
+  // B-18: the pressure-spread followed-religion id (-1 = none, 0 = dead slot)
+  { name: 'followed', tol: 0, get: (_s, c) => (c ? c.followedReligion ?? -1 : 0) },
+];
 
 export function traceRow(state: GameState, cityIds: number[], cMax: number, csMax: number, rMax: number): number[] {
   // GV-1: current score-leader as a unified civ id (0 player, r+1 rival); ties -> lowest id
@@ -39,146 +184,45 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     const rs = rivalEmpireScore(state, rv);
     if (rs > leaderBest) { leaderBest = rs; leader = rv.id + 1; }
   }
-  const dom = dominationWinner(state); // GV-3
-  const row = [
-    state.turn,
-    state.research.techs.length,
-    state.research.civics.length,
-    state.settlers,
-    state.cities.length,
-    Math.round(state.treasury * 1000),
-    Math.round(state.scienceTotal * 1000),
-    Math.round(state.cultureTotal * 1000),
-    Math.round(empireScore(state, 'balanced') * 1000),
-    state.rngState >>> 0,
-    state.barbCamps.length,
-    state.units.filter((u) => u.owner === 'barbarian').length,
-    state.units.filter((u) => u.owner === 'player').length,
-    state.envoysAvailable,
-    state.influencePoints,
-    state.map.tiles.reduce((n, t) => n + t.fertility, 0),
-    state.map.tiles.reduce((n, t) => n + (t.droughtTurns > 0 ? 1 : 0), 0),
-    state.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0),
-    leader, // GV-1
-    state.gameOver ? 1 : 0, // GV-2
-    dom >= 0 ? dom : state.gameOver ? leader : -1, // GV-2/GV-3 winner
-    state.victoryType ?? 0, // GV-4/GV-3 victoryType
-    state.civAges?.[0] ?? 1, // B-24 S2: the player's Age (compared)
-    state.tourismTotal ?? 0, // B-20 (#71): cumulative TOURISM (integer)
-    state.warmonger ?? 0, // B-22 (#74): the player's GRIEVANCES (integer)
-    state.diploFavor ?? 0, // B-22 (#75): cumulative DIPLOMATIC FAVOR (integer)
-    state.congressSessions ?? 0, // B-22 (#76): World Congress sessions held
-    state.diploPoints ?? 0, // B-22 (#76): Diplomatic Victory Points
-  ];
+  const ctx: HeadCtx = { leader, dom: dominationWinner(state) }; // GV-3
+  const row = HEAD_COLS.map((col) => col.get(state, ctx));
   for (let s = 0; s < csMax; s++) {
-    // Keyed by id (== the GPU's static slot), NOT array position: a captured
-    // city-state leaves the list (V-CS), and positional indexing would shift
-    // every later slot's columns.
     const cs = state.cityStates.find((c) => c.id === s);
-    if (!cs) {
-      row.push(0, 0, 0);
-      continue;
-    }
-    const kind = cs.quest ? { clearCamp: 1, sendTradeRoute: 2, buildDistrict: 3 }[cs.quest.kind] : 0;
-    row.push(cs.envoys, cs.population, kind);
+    for (const col of PER_CS_COLS) row.push(col.get(state, cs));
   }
   for (let r = 0; r < rMax; r++) {
     const rival = state.rivals[r];
-    if (!rival) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // +age +tourism +faith +followedSum (#71) +cultureTotal (#72) +diploFavor (#75) +diploPoints (#76)
-      continue;
-    }
-    row.push(
-      rival.cities.length,
-      rival.cities.reduce((s, rc) => s + rc.population, 0),
-      state.units.filter((u) => u.owner === 'rival' && u.civId === rival.id).length,
-      rival.atWar ? 1 : 0,
-      rival.research.techs.length,
-      rival.research.civics.length,
-      Math.round(rival.research.techProgress * 1000),
-      Math.round(rival.research.civicProgress * 1000),
-      // C1-B2: the pooled stocks died — trace the queues instead (Σ front-item
-      // progress and Σ front-item cost across the civ's cities).
-      Math.round(rival.cities.reduce((s2, rc) => s2 + (rc.queue[0]?.progress ?? 0), 0) * 1000),
-      Math.round(
-        rival.cities.reduce((s2, rc) => {
-          const q = rc.queue[0];
-          if (!q) return s2;
-          // P4/D-10: unit items may LOCK a cost (escalated builders) — price
-          // the lock first, exactly like the completion check does.
-          // A-4: wonder items carry NO cost field — price from the catalog
-          // (the D-10 lesson AGAIN: every new queue-cost mechanic must
-          // update BOTH trace harnesses in the same stage).
-          return s2 + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? q.cost ?? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : q.kind === 'wonder' ? BUILT_WONDERS[q.wonder]?.cost ?? 0 : 0);
-        }, 0) * 1000,
-      ),
-      // C1-B4: COMPLETED rival districts (queued ones pave but don't count).
-      rival.cities.reduce((s2, rc) => s2 + rc.districts.filter((d) => d.type !== 'CITY_CENTER' && state.map.tiles[d.tileIndex].districtComplete).length, 0),
-      rival.cities.reduce((s2, rc) => s2 + rc.buildings.length, 0),
-      Math.round((rival.treasury ?? 0) * 1000), // VP-G1
-      Math.round(rivalEmpireScore(state, rival) * 1000), // GV-1
-      // A-19/B-33 (S2): per-pair war bitmask over rival ids (bit i set = at war
-      // with rival i). The (0, r+1) player pair rides the atWar column above.
-      (rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0),
-      // B-24 S2: this rival's Age (0 Dark / 1 Normal / 2 Golden, compared).
-      state.civAges?.[rival.id + 1] ?? 1,
-      // B-20 (#71): this rival's cumulative TOURISM (appended LAST).
-      rival.tourism ?? 0,
-      // #71 COVERAGE: rival FAITH — untraced until now, which let a +2.0
-      // faith divergence hide behind five green gates.
-      Math.round((rival.faith ?? 0) * 1000),
-      // #71 COVERAGE: checksum of this rival's cities' followed religion —
-      // only PLAYER cities have a `followed` column, so a rival city
-      // converting on a different turn was invisible.
-      rival.cities.reduce((m, rc) => m + ((rc.followedReligion ?? -1) + 1), 0),
-      // B-25 (#72): this rival's LIFETIME CULTURE (appended LAST) — the
-      // domestic-tourist substrate. Traced so parity proves the accumulator
-      // itself, the way #71 traced tourism.
-      Math.round((rival.cultureTotal ?? 0) * 1000),
-      // B-22 (#75): this rival's cumulative DIPLOMATIC FAVOR (appended LAST).
-      rival.diploFavor ?? 0,
-      // B-22 (#76): this rival's Diplomatic Victory Points.
-      rival.diploPoints ?? 0,
-      // B-15 (#78 HUNT): WAR WEARINESS — untraced until now, which is how a
-      // rGScore divergence hid: weariness feeds the amenity tier, the tier
-      // scales city yields, and rivalEmpireScore is pop*3 + weighted yields.
-      // The same hole rFaith had before #71 closed it.
-      rival.warWeariness ?? 0,
-    );
+    for (const col of PER_RIVAL_COLS) row.push(col.get(state, rival));
   }
   for (let c = 0; c < cMax; c++) {
     const city = state.cities.find((x) => x.id === cityIds[c]);
-    if (!city) {
-      row.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
-      continue;
-    }
-    row.push(
-      city.population,
-      state.map.tiles.filter((x) => x.cityId === city.id).length,
-      city.buildings.length,
-      city.tilesAcquired,
-      Math.round(city.foodBox * 1000),
-      Math.round(city.cultureBox * 1000),
-      getCityHp(state, city.id),
-      Math.round((city.loyalty ?? 100) * 1000),
-      city.followedReligion ?? -1, // B-18: the pressure-spread followed-religion id (-1 = none)
-    );
+    for (const col of PER_CITY_COLS) row.push(col.get(state, city));
   }
   return row;
 }
 
-/** Per-column tolerance: 0 = exact integer, 2 = ×1000-encoded float. */
-export function rowTolerance(cMax: number, csMax: number, rMax: number): number[] {
-  // Must match traceRow's column order EXACTLY. HEAD is 24: the 18 base cols
-  // + GV leader/gameOver/winner/victoryType + playerAge + TOURISM + WARMONGER
-  // (all integer; B-24 S2, B-20 #71, B-22 #74). HEAD is 25 now. Each rival is 19: the 12 base +
-  // treasury/rGScore (both float ×1000, tol 2) + rrWarMask + age + tourism
-  // + faith (float ×1000, tol 2) + followedSum + cultureTotal (float ×1000,
-  // tol 2, B-25 #72) = 20. A stale tol silently shifts every later
-  // column's tolerance — keep them in lockstep.
-  const tol = [0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  for (let s = 0; s < csMax; s++) tol.push(0, 0, 0);
-  for (let r = 0; r < rMax; r++) tol.push(0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 2, 0, 2, 0, 0, 0);
-  for (let c = 0; c < cMax; c++) tol.push(0, 0, 0, 0, 2, 2, 0, 2, 0); // +followedReligion (int, B-18)
-  return tol;
+/**
+ * The name and tolerance vectors for a row of the same shape. Names are the
+ * cross-engine contract — BatchSim.trace_columns() must return this exact list
+ * and gpu/parity_test.py asserts it before comparing anything.
+ */
+export function traceColumnTables(): {
+  head: { name: string; tol: number }[];
+  perCs: { name: string; tol: number }[];
+  perRival: { name: string; tol: number }[];
+  perCity: { name: string; tol: number }[];
+} {
+  const strip = (t: TraceCol<any>[]) => t.map((c) => ({ name: c.name, tol: c.tol }));
+  return { head: strip(HEAD_COLS), perCs: strip(PER_CS_COLS), perRival: strip(PER_RIVAL_COLS), perCity: strip(PER_CITY_COLS) };
+}
+
+export function traceColumns(cMax: number, csMax: number, rMax: number): { names: string[]; tol: number[] } {
+  const names: string[] = [];
+  const tol: number[] = [];
+  const push = (n: string, t: number) => { names.push(n); tol.push(t); };
+  for (const col of HEAD_COLS) push(col.name, col.tol);
+  for (let s = 0; s < csMax; s++) for (const col of PER_CS_COLS) push(`cs${s}.${col.name}`, col.tol);
+  for (let r = 0; r < rMax; r++) for (const col of PER_RIVAL_COLS) push(`r${r}.${col.name}`, col.tol);
+  for (let c = 0; c < cMax; c++) for (const col of PER_CITY_COLS) push(`c${c}.${col.name}`, col.tol);
+  return { names, tol };
 }

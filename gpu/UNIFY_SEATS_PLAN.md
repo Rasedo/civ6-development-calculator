@@ -100,6 +100,23 @@ These are invariants, not preferences. A stage that violates one without an expl
 
 **Never** chain a green gate then a battery — the battery contains the gate. After a behaviour round's re-export, sweep all poke lanes **standalone** before the battery (the poke group serial-aborts).
 
+### How to actually check "fixtures byte-identical" (corrected at S0.1)
+
+`gpu/fixtures/` **is not tracked by git** (`git ls-files gpu/fixtures/` is empty — they are generated artifacts). So `git diff --stat gpu/fixtures/seed*.json`, which this plan originally prescribed, is **vacuously empty for every change** and proves nothing. It would have passed a stage that corrupted every fixture. Twenty-odd stages below say "byte-identical"; they all mean this procedure:
+
+```sh
+npx vite-node scripts/export-gpu.ts            # with your change applied
+md5sum gpu/fixtures/seed*.json | sort > /tmp/hash_new.txt
+git stash push -q src/ scripts/ gpu/civ6gpu/engine.py gpu/parity_test.py
+npx vite-node scripts/export-gpu.ts            # baseline, from the last commit
+md5sum gpu/fixtures/seed*.json | sort > /tmp/hash_base.txt
+git stash pop -q
+diff /tmp/hash_base.txt /tmp/hash_new.txt      # empty = byte-identical
+npx vite-node scripts/export-gpu.ts            # leave the tree exporting YOUR code
+```
+
+The last re-export is not optional: `git stash pop` restores the source but the fixtures on disk are still the baseline's, and parity would then run your engine against the wrong reference. A vacuous pass is the failure mode this whole plan exists to avoid — see the `REPLAY VACUOUS` guard in `scripts/replay-gpu.ts` for the same lesson already learned once.
+
 ---
 
 ## 3. The target shape (end state, for reference)
@@ -389,7 +406,7 @@ Everything below was read this session. Start with the file that has no dependen
 
 5. **`scripts/replay-gpu.ts`** — lines 42/108 as above.
 
-**Gate for S0.1:** `npx tsc --noEmit` → `npx vitest run` → `npm run gpu:export` and confirm `git diff --stat gpu/fixtures/seed*.json` is **empty** (only `rules.json` moved) → `python gpu/parity_test.py` (PARITY OK) → `python gpu/rollout.py` + `npx tsx scripts/replay-gpu.ts` → `python gpu/battery.py`.
+**Gate for S0.1:** `npx tsc --noEmit` → `npx vitest run` → re-export and confirm the seed fixtures are **byte-identical** by the hash procedure in section 2 (only `rules.json` moves — it gains the `trace` key). `git diff` on `gpu/fixtures/` is VACUOUS; the fixtures are untracked → `python gpu/parity_test.py` (PARITY OK) → `python gpu/rollout.py` + `npx tsx scripts/replay-gpu.ts` → `python gpu/battery.py`.
 
 **If `seed*.json` moves at S0.1, stop.** The table refactor changed a value; find it before doing anything else. That is the whole reason this stage exists.
 

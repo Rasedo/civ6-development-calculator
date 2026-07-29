@@ -129,7 +129,7 @@ import { makeYieldCtx } from '../src/core/effects';
 import { tileYields, districtAdjacency } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance, WONDER_TOURISM_BASE } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
-import { traceRow } from './gpu-trace';
+import { traceRow, traceColumnTables } from './gpu-trace';
 import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
@@ -531,6 +531,11 @@ const rules = {
   // rival r (array index == rival.id, asserted at export) is civ r+1.
   // City-states and barbarians stay outside the numbering.
   civs: { player: 0, rivalBase: 1 },
+  // #51/S0.1: the trace column NAMES + tolerances, per block. gpu/parity_test.py
+  // expands these against the fixture's own cMax/csMax/rMax, asserts the result
+  // matches BatchSim.trace_columns() exactly, and applies tolerance BY NAME —
+  // so a new column can never silently shift a later column's tolerance.
+  trace: traceColumnTables(),
   // Mirrors districtCostIn() — rivals pay it from THEIR research counts
   // (C1-B4). P4/D-8: floor(base·(1+scale·max(tech%, civic%)));
   // P4/D-15: the 54 base speed-scales like every production cost.

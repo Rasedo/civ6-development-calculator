@@ -39,7 +39,7 @@ import { assignEnvoy } from '../src/core/cityStates';
 import { canPlaceDistrict } from '../src/core/rules';
 import { districtAdjacency } from '../src/core/yields';
 import { neighborTile } from '../src/core/hex';
-import { traceRow, rowTolerance } from './gpu-trace';
+import { traceRow, traceColumns } from './gpu-trace';
 import { UNITS } from '../src/data/units';
 import type { DistrictId } from '../src/core/types';
 import { tsStateLines } from './statelog';
@@ -105,7 +105,7 @@ for (const game of roll.games) {
   const C = game.sites.length;
   const csMax = roll.csMax ?? 0;
   const rMax = roll.rMax ?? 0;
-  const tol = rowTolerance(C, csMax, rMax);
+  const tol = traceColumns(C, csMax, rMax).tol;
   const byTurn = new Map(game.actions.map((a) => [a.t, a]));
   let cityIds: number[] = state.cities.map((x) => x.id);
   // §F resume: continue this game from its checkpoint (deserialized state

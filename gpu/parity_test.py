@@ -12,6 +12,7 @@ print the first divergent turn and column.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -20,35 +21,50 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
-HEAD = [
-    "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
-    "score", "rng", "camps", "barbs", "punits", "envoysAvail", "influence", "fert", "drought", "imp", "leader", "gameOver", "winner", "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions", "diploPoints",
-]
-PER_CS = ["envoys", "csPop", "quest"]
-PER_RIVAL = ["rCities", "rPop", "rUnits", "atWar", "rNTechs", "rNCivics", "rTechProg", "rCivicProg", "rQProg", "rQCost", "rNDist", "rNBldg", "rGold", "rGScore", "rrWarMask", "rAge", "rTourism", "rFaith", "rFollowedSum", "rCulture", "rDiploFavor", "rDiploPoints", "rWarWeariness"]
-PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty", "followed"]
+def columns(sim, rj: dict) -> tuple[list[str], torch.Tensor]:
+    """Column names and per-column tolerances, from ONE source per engine.
 
+    #51/S0.1: names and tolerances are no longer maintained here. TS ships its
+    four column tables in `rules.trace` (scripts/gpu-trace.ts) and this expands
+    them against the fixture's own dimensions; the engine builds the same list
+    in BatchSim.trace_columns(). The two are asserted IDENTICAL before a single
+    value is compared, and tolerance is applied BY NAME — so adding a column to
+    one engine and not the other fails loudly here instead of silently shifting
+    every later column's tolerance (the old hand-maintained `atol` literal drifted
+    from its own comment: it claimed HEAD was 24, then 25, while it was 28).
 
-def columns(n_cities: int, n_cs: int, n_rivals: int) -> tuple[list[str], torch.Tensor]:
-    """Column names and per-column tolerances.
-
-    Integer state must match exactly. Float accumulators (encoded ×1000)
-    get a ±2 milli-unit budget: IEEE addition isn't associative, so batched
-    sums can differ from the TS engine's sequential adds by ~1 ulp — which
-    occasionally crosses the rounding boundary. Real logic bugs DRIFT (grow
-    turn over turn); the drift check below catches those regardless.
+    Integer state must match exactly. Float accumulators (encoded ×1000) get a
+    ±2 milli-unit budget: IEEE addition isn't associative, so batched sums can
+    differ from the TS engine's sequential adds by ~1 ulp — which occasionally
+    crosses the rounding boundary. Real logic bugs DRIFT (grow turn over turn);
+    the drift check below catches those regardless.
     """
-    cols = list(HEAD)
-    atol = [0.0] * 5 + [2.0] * 4 + [0.0] * 19  # +leader/gameOver/winner/victoryType (int, GV-1/2/3) +playerAge (int, B-24) +tourism (int, B-20 #71) +warmonger (int, B-22 #74)
-    for s in range(n_cs):
-        cols += [f"{name}{s}" for name in PER_CS]
-        atol += [0.0, 0.0, 0.0]
-    for r in range(n_rivals):
-        cols += [f"{name}{r}" for name in PER_RIVAL]
-        atol += [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 0.0, 0.0]  # +rrWarMask (A-19/B-33) +rAge (int, B-24) +rTourism (int, B-20 #71) +rCulture (float, B-25 #72)
-    for c in range(n_cities):
-        cols += [f"{name}{c}" for name in PER_CITY]
-        atol += [0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 0.0, 2.0, 0.0]  # +followed (int, B-18)
+    tr = rj["trace"]
+    cols: list[str] = []
+    atol: list[float] = []
+
+    def add(prefix: str, table: list[dict]) -> None:
+        for e in table:
+            cols.append(f"{prefix}{e['name']}")
+            atol.append(float(e["tol"]))
+
+    add("", tr["head"])
+    for s in range(sim.S):
+        add(f"cs{s}.", tr["perCs"])
+    for r in range(sim.R):
+        add(f"r{r}.", tr["perRival"])
+    for c in range(sim.C):
+        add(f"c{c}.", tr["perCity"])
+
+    gpu_cols = sim.trace_columns()
+    if cols != gpu_cols:
+        if len(cols) != len(gpu_cols):
+            raise AssertionError(
+                f"trace WIDTH disagrees: rules.trace expands to {len(cols)} columns, "
+                f"BatchSim.trace_columns() gives {len(gpu_cols)} — a column was added to one engine only"
+            )
+        bad = [(i, a, b) for i, (a, b) in enumerate(zip(cols, gpu_cols)) if a != b]
+        raise AssertionError(f"trace NAMES disagree at {len(bad)} column(s); first 5: {bad[:5]}")
     return cols, torch.tensor(atol, dtype=torch.float64)
 
 
@@ -60,7 +76,8 @@ def main() -> int:
         return 1
     fixtures = [load_fixture(p) for p in paths]
     sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
-    cols, atol = columns(sim.C, sim.S, sim.R)
+    rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
+    cols, atol = columns(sim, rj)
     float_cols = [i for i, a in enumerate(atol.tolist()) if a > 0]
 
     n_turns = len(fixtures[0]["trace"])
