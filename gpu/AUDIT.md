@@ -229,6 +229,40 @@ Per-item weights (done% in parens where partial):
   A-18 3 (70% — 2026-07-27: player REPAIR + resource-improvement RL verbs
   landed, 17->24 action columns; the CS-attack column is BLOCKED on a
   missing player<->CS war state, and the P8 re-baseline is owner-deferred),
+
+  **A-18 CS-ATTACK COLUMN UNBLOCKED 2026-07-29 (#79).** The residual said the
+  column was blocked on "a missing player<->CS war state". That is exactly
+  right, and the reason is an INVARIANT, not an oversight: `attackTargets` must
+  never offer a PEACEFUL city-state (tests/deeper.test.ts "autopilot target
+  lists never include peaceful city-states"), so an unconditional arm is
+  forbidden — while `meleeAttack`'s csTarget accepted ANY city-state for a
+  player attacker. Mask and resolver disagreed, and only a war state can
+  reconcile them.
+  SHIPPED: `CityState.atWar` + the GPU `cs_atwar` plane (peace by default,
+  _MUTABLE-registered, snapshot round-trip), `declareWarOnCityState()`, and BOTH
+  consumers gated on it — the TS mask arm (player, melee, adjacent, declared),
+  the TS resolver, and the GPU `unit_action_mask` attack columns 6-11.
+  FAITHFULNESS: real Civ 6 treats a city-state as a separate player you must
+  declare on; peace is the default. TWO WRONG TURNS TAKEN AND CORRECTED FIRST:
+  (1) restricting player sieges to SUZERAIN-DRAGGED wars (the A-12b mirror,
+  using only existing state) — refuted by the conquest test, because Civ 6
+  plainly allows declaring on a city-state directly; (2) making the mask
+  unconditional to match the resolver — refuted by the peaceful-city-state
+  invariant above. The war state is the only reading that satisfies both.
+  NOT MODELLED, recorded rather than approximated: the diplomatic consequences
+  of the declaration (grievances/warmonger with other civs, the suzerain's
+  reaction) and any peace-making path back — declaring is one-way here.
+  GATE REACHABILITY: zero by construction — the scripted policy picks only from
+  `attackTargets` and never declares, so no city-state is ever at war in-gate
+  and scripted parity is 0.0 milli before and after. Proven instead by
+  gpu/cs_war_test.py (plane + peace-default + round-trip; peaceful centre hidden
+  from the mask, declared centre revealed) and two TS assertions in
+  tests/deeper.test.ts (the resolver refuses a peaceful target; the mask gains
+  the centre after a declaration).
+  A-18's other half (player REPAIR + resource-improvement RL verbs, 17->24
+  action columns) landed 2026-07-27. The remaining A-18 tail is the P8
+  re-baseline, which is owner-deferred.
+
   A-12 4 (RESOLVED — ROUND B8 slice L closed the levy + zero-draw
   quest deferrals; 2-step levy ladder + UI-only player levy are
   recorded residuals), A-17 4 (done — #41 stage 1), A-18 3,

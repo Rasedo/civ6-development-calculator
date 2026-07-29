@@ -13,6 +13,7 @@ import {
 import { barbarianPhase, meleeAttack, attackTargets } from '../src/core/combat';
 import { spawnUnit } from '../src/core/units';
 import { CS_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST } from '../src/data/cityStates';
+import { declareWarOnCityState } from '../src/core/cityStates';
 import type { CityState, CityStateType, GameState, RivalCity, RivalCiv } from '../src/core/types';
 
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
@@ -170,6 +171,11 @@ describe('city-state conquest and levies', () => {
     attacker.tileIndex = adj.index;
     attacker.movesLeft = 2;
 
+    // A-18 (#79): a city-state is a separate player — you must DECLARE first.
+    // Peace is the default, and the resolver now refuses a peaceful target.
+    expect(meleeAttack(state, attacker.id, cs.centerIndex).ok).toBe(false);
+    expect(declareWarOnCityState(state, cs.id).ok).toBe(true);
+
     const r = meleeAttack(state, attacker.id, cs.centerIndex);
     expect(r.ok).toBe(true);
     expect(state.cityStates.length).toBe(0);
@@ -188,6 +194,11 @@ describe('city-state conquest and levies', () => {
     unit.tileIndex = adj.index;
     unit.movesLeft = 2;
     expect(attackTargets(state, unit)).not.toContain(cs.centerIndex);
+    // A-18 (#79): ... and DOES once war is declared — the mask column the
+    // A-18 residual was blocked on. The peaceful case above is the invariant
+    // that made a war state necessary rather than an unconditional arm.
+    expect(declareWarOnCityState(state, cs.id).ok).toBe(true);
+    expect(attackTargets(state, unit)).toContain(cs.centerIndex);
   });
 
   it('suzerains levy militaristic troops for gold, on a cooldown', () => {

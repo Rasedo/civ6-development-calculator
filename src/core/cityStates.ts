@@ -295,6 +295,27 @@ function issueQuest(state: GameState, cs: CityState): CityStateQuest | null {
   return options[Math.floor(nextRandom(state) * options.length)];
 }
 
+/**
+ * A-18 (#79): DECLARE WAR on a city-state. Real Civ 6 treats a city-state as a
+ * separate player: you must declare before you can attack it, and peace is the
+ * default. This is the verb the CS-attack mask column was blocked on — without
+ * it `attackTargets` could never legally offer a city-state centre, because
+ * offering a PEACEFUL one is exactly what the autopilot invariant forbids.
+ *
+ * NOT MODELLED, recorded rather than approximated: the diplomatic consequences
+ * (grievances/warmonger penalties with other civs, the suzerain's reaction) and
+ * any peace-making path back. Declaring is one-way here.
+ */
+export function declareWarOnCityState(state: GameState, csId: number): RuleResult {
+  const cs = (state.cityStates ?? []).find((c) => c.id === csId);
+  if (!cs) return { ok: false, reason: 'No such city-state.' };
+  if (!cs.met) return { ok: false, reason: 'You have not met this city-state.' };
+  if (cs.atWar) return { ok: false, reason: 'Already at war.' };
+  cs.atWar = true;
+  state.eventLog.push(`You have declared war on ${cs.name}!`);
+  return { ok: true };
+}
+
 export function questLabel(quest: CityStateQuest): string {
   switch (quest.kind) {
     case 'clearCamp':

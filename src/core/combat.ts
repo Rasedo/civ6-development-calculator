@@ -550,7 +550,11 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   const csTarget = (() => {
     const cs = cityStateAt(state, targetIndex);
     if (!cs || cs.centerIndex !== targetIndex) return undefined;
-    if (attacker.owner === 'player') return cs;
+    // A-18 (#79): a city-state is a separate player — the PLAYER must have
+    // DECLARED war before striking it. This used to accept ANY city-state, so
+    // a UI/RL order could siege a civ we were at peace with while
+    // attackTargets (correctly) never offered one. Both sides now read cs.atWar.
+    if (attacker.owner === 'player') return cs.atWar ? cs : undefined;
     // A-12b join-the-suzerain's-war: an AT-WAR rival may siege a CS whose
     // suzerain is the player (attackTargets applies the same gate).
     if (attacker.owner === 'rival') {
@@ -834,7 +838,16 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // only way to open its tile. Ranged-vs-district stays out of scope
     // (recorded residual), matching the ranged-vs-rival-city scope-out.
     const encampTarget = d === 1 && !def.ranged && encampmentBlocks(state, t, unit);
-    if (hasEnemy || playerCity || rivalCity || rivalVsRivalCity || csWar || encampTarget) out.push(t.index);
+    // A-18 (#79): the CS-attack MASK column, unblocked by cs.atWar. The
+    // autopilot invariant ("target lists never include PEACEFUL city-states")
+    // is preserved by construction — only a DECLARED war offers the centre.
+    // Melee + adjacent, the same shape as the rival-seat csWar arm above.
+    const csPlayerWar =
+      unit.owner === 'player' &&
+      d === 1 &&
+      !def.ranged &&
+      state.cityStates.some((c) => c.centerIndex === t.index && c.atWar);
+    if (hasEnemy || playerCity || rivalCity || rivalVsRivalCity || csWar || csPlayerWar || encampTarget) out.push(t.index);
   }
   return out;
 }

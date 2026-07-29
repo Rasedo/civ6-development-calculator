@@ -377,7 +377,7 @@ _MUTABLE = [
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at",
+    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_atwar",  # A-18 (#79): player<->CS war
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence", "envoys_avail",
     "rival_at", "rc_tile_id", "rvcity_at", "rv_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
@@ -562,6 +562,10 @@ class BatchSim:
         self.cs_last_levy = torch.full((B, s_pad), -self._levy_cooldown, dtype=torch.long, device=device)
         # V-CS: siege hit points (attackCityState) — TS `cs.hp ?? CS_MAX_HP`.
         self.cs_hp = torch.full((B, s_pad), int(rules.cs.get("maxHp", 150)), dtype=torch.long, device=device)
+        # A-18 (#79): the player<->city-state war state (CityState.atWar twin).
+        # Peace is the default; a city-state is a separate player you must
+        # DECLARE on, and the attack mask/resolver both read this.
+        self.cs_atwar = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         self.influence = torch.zeros(B, dtype=dtype, device=device)
         self.envoys_avail = torch.zeros(B, dtype=torch.long, device=device)
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
@@ -4974,7 +4978,13 @@ class BatchSim:
         can_fight = (self._p_combat[self.p_type] > 0).unsqueeze(2)
         # P4/D-23: rangedAttack bombards cities too — rc_war is a target for
         # every fighter now (CS centers stay a tracked mask follow-up).
-        attack = on_map & (barb | rv_war | rc_war) & can_fight & alive
+        # A-18 (#79): city-state centres join the mask once the PLAYER has
+        # DECLARED war (cs_atwar) — the column the A-18 residual was blocked
+        # on. Gating on the war state is what preserves the autopilot
+        # invariant that a PEACEFUL city-state is never offered as a target.
+        csn = self.cs_at.gather(1, nbc)
+        cs_war = ((csn >= 0) & self.cs_atwar.gather(1, csn.clamp(min=0))).reshape(B, P_MAX, 6)
+        attack = on_map & (barb | rv_war | rc_war | cs_war) & can_fight & alive
         hold = self.p_alive.unsqueeze(2)
         # 13/14/15: build FARM / MINE / LUMBER_MILL — a builder with charges
         # standing on an owned, unimproved, non-center tile where that

@@ -605,6 +605,12 @@ export interface CityState {
   quest: CityStateQuest | null;
   /** Turn the current quest was issued (for reissue pacing). */
   questIssuedTurn: number;
+  /** A-18 (#79): is the PLAYER at war with this city-state? Real Civ 6 makes
+   *  a city-state a separate player you must DECLARE on before attacking; this
+   *  is that state. It gates both the attack MASK (attackTargets) and the
+   *  resolver (meleeAttack), so a peaceful city-state can be neither offered to
+   *  the autopilot nor struck by a UI/RL order. Absent = at peace. */
+  atWar?: boolean;
   /** Siege hit points; absent = full (CS_MAX_HP). */
   hp?: number;
   /** Turn of the player's last militaristic levy here (cooldown). */
