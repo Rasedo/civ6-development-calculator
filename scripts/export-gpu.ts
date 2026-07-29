@@ -130,6 +130,7 @@ import { tileYields, districtAdjacency } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance, WONDER_TOURISM_BASE } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow, traceColumnTables } from './gpu-trace';
+import { unitActionNames } from './gpu-actions';
 import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
@@ -536,6 +537,10 @@ const rules = {
   // matches BatchSim.trace_columns() exactly, and applies tolerance BY NAME —
   // so a new column can never silently shift a later column's tolerance.
   trace: traceColumnTables(),
+  // #51/S0.3: the UNIT ACTION enum (index = position). Both engines dispatch by
+  // NAME off this list instead of hardcoded column numbers — the collision that
+  // bound PILLAGE to the FORT column and left the real pillage column dead.
+  actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
   // Mirrors districtCostIn() — rivals pay it from THEIR research counts
   // (C1-B4). P4/D-8: floor(base·(1+scale·max(tech%, civic%)));
   // P4/D-15: the 54 base speed-scales like every production cost.

@@ -40,6 +40,7 @@ import { canPlaceDistrict } from '../src/core/rules';
 import { districtAdjacency } from '../src/core/yields';
 import { neighborTile } from '../src/core/hex';
 import { traceRow, traceColumns } from './gpu-trace';
+import { unitActionIndex } from './gpu-actions';
 import { UNITS } from '../src/data/units';
 import type { DistrictId } from '../src/core/types';
 import { tsStateLines } from './statelog';
@@ -55,6 +56,14 @@ const CKPT_DIR = 'gpu/fixtures/ckpt';
 if (CKPT_K > 0) mkdirSync(CKPT_DIR, { recursive: true });
 
 const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
+// #51/S0.3: the unit-action enum, read from the rules the GPU itself loaded, so
+// the replay ladder can never drift from the mask's column order. The old
+// hardcoded ladder had PILLAGE on 24 (the FORT column) and no handler at all
+// for the real pillage column or for FORT.
+const RULES_IMP: string[] = JSON.parse(readFileSync('gpu/fixtures/rules.json', 'utf8')).improvements.ids;
+const A = unitActionIndex(RULES_IMP);
+const RES_START = 18;
+
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
   height: number;
@@ -157,21 +166,21 @@ for (const game of roll.games) {
         bad = true;
         break;
       }
-      if (a === 24) {
+      if (a === A.PILLAGE) {
         // A-21 (#50): PILLAGE the tile underfoot. Soft-fail like the builds.
         playerPillage(state, unit.id);
         continue;
       }
-      if (a >= 18) {
-        // A-18 (#50): resource improvements + SEASIDE_RESORT, columns 18+.
-        // builderImprove validates through validImprovements, so an invalid
-        // pick soft-fails exactly as the GPU's re-validation does.
-        const RES_IDS = ['QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT'] as const;
-        const rid = RES_IDS[a - 18];
-        if (rid) builderImprove(state, unit.id, rid);
+      if (a >= RES_START) {
+        // A-18 (#50): every non-dedicated improvement gets a column from 18 up,
+        // in roster order — INCLUDING the ones appended later (SEASIDE_RESORT,
+        // FORT). builderImprove validates through validImprovements, so an
+        // invalid pick soft-fails exactly as the GPU's re-validation does.
+        const rid = RULES_IMP[a - RES_START + 3];
+        if (rid) builderImprove(state, unit.id, rid as Parameters<typeof builderImprove>[2]);
         continue;
       }
-      if (a === 17) {
+      if (a === A.REPAIR) {
         // A-18 (#50): the PLAYER builder REPAIR verb — the rival seat has had
         // it since A-13 (`_rival_builder_actions`) while the player's
         // `builderRepair` existed with no way to call it. Soft-fail like the
@@ -179,7 +188,7 @@ for (const game of roll.games) {
         builderRepair(state, unit.id);
         continue;
       }
-      if (a === 16) {
+      if (a === A.CHOP) {
         // V-H1: chop the feature under the builder (soft-fail like builds).
         builderRemoveFeature(state, unit.id);
         continue;

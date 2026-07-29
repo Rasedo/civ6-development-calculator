@@ -26,7 +26,18 @@ import torch
 
 from .engine import BatchSim, Rules, P_MAX
 
-N_UNIT_ACTS = 17  # keep in sync with the unit head (train_ppo); 16 = V-H1 chop
+def n_unit_acts(rules: Rules) -> int:
+    """#51/S0.3: the unit head's width, from the SHIPPED enum — never a literal.
+
+    This was `N_UNIT_ACTS = 17` on both sides while the real mask has been 26
+    wide since the resource-improvement columns landed, so building a Policy
+    against the live env raised a size mismatch. No battery lane exercised the
+    trainer, which is why a 9-column gap sat in a green tree.
+    """
+    names = (rules.actions or {}).get("unit", [])
+    if not names:
+        raise ValueError("rules.actions.unit missing - re-export (npm run gpu:export)")
+    return len(names)
 from .rng import hash_keys
 
 _M32 = (1 << 32) - 1

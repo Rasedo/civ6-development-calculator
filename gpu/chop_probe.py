@@ -14,7 +14,6 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
-from civ6gpu.env import N_UNIT_ACTS
 
 TARGET = int(sys.argv[1]) if len(sys.argv) > 1 else 2026006099
 

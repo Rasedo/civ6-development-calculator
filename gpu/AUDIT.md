@@ -2390,9 +2390,38 @@ untagged halves of tagged items stay Fable/main-session work.
 - A-20. RESOLVED (2026-07-13, task #54): rival cities heal the flat +20
   when unbesieged (the 15/5 war split was a local invention), one
   source both engines (`CITY_HEAL_PER_TURN` / `cityHealPerTurn`).
-- A-21. **RESOLVED (2026-07-27).** The PLAYER PILLAGE verb exists on both
-  engines — action column 24, and a new `playerPillage` (units.ts), since TS
-  had NO player-pillage function at all. It mirrors the hostile rule exactly:
+- A-21. **RESOLVED (2026-07-27), SILENTLY BROKEN BY #78, RE-FIXED 2026-07-29
+  (#51/S0.3).** The PLAYER PILLAGE verb exists on both engines — a new
+  `playerPillage` (units.ts), since TS had NO player-pillage function at all.
+
+  **THE REGRESSION, and why it is the sharpest lesson in this file.** A-21
+  shipped correctly with pillage on action column 24, the column after the last
+  resource improvement. Then #78 appended FORT to `IMPROVEMENT_IDS`. Appending
+  is the SAFE operation for a roster — an improvement's own index never moves —
+  but the unit-action layout is computed DOWNSTREAM of the roster's LENGTH, so
+  FORT took column 24 and pushed pillage to 25. Nothing was keyed by name, so:
+    * `_apply_unit_actions` kept dispatching pillage on `a == 24`, now the FORT
+      column, and `a == 24` became DOUBLE-BOUND (pillage AND build-FORT);
+    * the mask's real pillage column (25) was dispatched by NEITHER engine;
+    * `replay-gpu.ts` read 24 as pillage and its 6-entry `RES_IDS` had no FORT.
+  Net effect: **a shipped verb became a total no-op on both engines**, and the
+  rollout stayed green for two rounds because both engines no-op'd identically.
+  The FORT half never diverged only because FORT's gate reachability is zero.
+  "Append LAST is safe" holds for the roster's own indices; it does NOT hold for
+  any layout derived from the roster's LENGTH. Those must be keyed by NAME.
+
+  **THE FIX (#51/S0.3):** `scripts/gpu-actions.ts` owns the enum, derives the
+  improvement block from the roster, and always puts PILLAGE last; the exporter
+  ships it as `rules.actions.unit`; the engine dispatches through `_A_PILLAGE`/
+  `_A_CHOP`/`_A_REPAIR`/`_A_IMP`, `unit_action_mask` asserts its width equals
+  the enum's, and `replay-gpu.ts` indexes by name. New battery lane
+  `unit_head` pins mask width == enum width == RL head width and asserts
+  PILLAGE shares no column with any BUILD verb.
+  MEASURED live again: **14 pillages across the 36-game rollout**, replay-clean
+  (it was 0 executions on both engines before this fix). `BUILD_FORT` is still 0
+  — reachability zero, exactly as #78 recorded.
+
+  Original A-21 resolution notes follow. It mirrors the hostile rule exactly:
   a MILITARY unit on an ENEMY tile (an at-war rival's or a city-state's)
   pillages the improvement first, else a COMPLETE non-CITY_CENTER unpillaged
   district (the B-32 order); a PILLAGE_HEAL_IMPROVEMENTS target heals +25

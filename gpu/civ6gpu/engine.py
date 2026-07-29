@@ -152,6 +152,7 @@ class Rules:
     war_weariness: dict  # B-15: {perTurn, decay, perAmenity, cap} — flat amenity drag at war
     trade: dict  # A-11: {marketBidx, lighthouseBidx, foreignTradeCidx, capWonderWidx, range} — rival trade capacity/route anchors
     eras: dict  # B-24: {length, found, conquer, wonder, pantheon, religion, gp} — era-score events (S2 adds age thresholds)
+    actions: dict  # #51/S0.3: {unit: [name, ...]} — the unit-action enum, index = mask column
 
 
 def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
@@ -230,6 +231,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         war_weariness=r.get("warWeariness", {"perTurn": 1, "decay": 4, "perAmenity": 4, "cap": 24}),
         trade=r.get("trade", {}),
         eras=r.get("eras", {}),
+        actions=r.get("actions", {}),
     )
 
 
@@ -1173,6 +1175,27 @@ class BatchSim:
         ids = imp.get("ids", [])
         self.improvements_on = bool(ids)
         self._imp_ids = list(ids)  # A-13: roster names (statelog TI lines)
+        # #51/S0.3: the unit-action enum, shipped by scripts/gpu-actions.ts.
+        # Every dispatch indexes BY NAME; the old hardcoded column numbers had
+        # already collided (PILLAGE was bound to the FORT column, and the real
+        # pillage column was dispatched by neither engine).
+        self._act_names = list((rules.actions or {}).get("unit", []))
+        self._act = {n: i for i, n in enumerate(self._act_names)}
+        if self._act_names:
+            _want = 13 + len(ids) + 3  # 6 move + 6 attack + hold + every improvement + chop + repair + pillage
+            assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
+            self._A_CHOP = self._act["CHOP"]
+            self._A_REPAIR = self._act["REPAIR"]
+            self._A_PILLAGE = self._act["PILLAGE"]
+            # column for BUILD_<improvement>, indexed by improvement roster index
+            self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
+        else:
+            # No enum shipped (a stale rules.json): keep the legacy layout so
+            # nothing crashes, but this is the configuration whose hardcoded
+            # numbers collided — re-export.
+            self._A_CHOP, self._A_REPAIR = 16, 17
+            self._A_PILLAGE = 13 + len(ids) + 2
+            self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
         self.QUARRY = ids.index("QUARRY") if "QUARRY" in ids else -1  # A-9 (#71): appeal -1
@@ -5268,9 +5291,17 @@ class BatchSim:
         pillage = (
             self.p_alive & (self._p_combat[self.p_type] > 0) & _enemy & (_has_imp | _has_dis)
         ).unsqueeze(2)
-        return torch.cat(
+        out = torch.cat(
             [move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols + [pillage], dim=2
         )
+        # #51/S0.3: the mask's width IS the enum's length, or a dispatch is
+        # reading the wrong column. `_res_cols` is empty when improvements are
+        # off, which legitimately shortens the row — only assert when they are on.
+        if self._act_names and self.improvements_on and self._builder_idx >= 0:
+            assert out.shape[-1] == len(self._act_names), (
+                f"unit_action_mask is {out.shape[-1]} wide but the enum has {len(self._act_names)} entries"
+            )
+        return out
 
     def rival_slot_map(self, r: int) -> torch.Tensor:
         """[B, P_MAX] the v-slot index behind each rival-r unit row (slot
@@ -5432,7 +5463,7 @@ class BatchSim:
             unlocked_c = (ftu_c >= 0) & self.r_techs[:, r, :].gather(1, ftu_c.clamp(min=0).unsqueeze(1)).squeeze(1)
             chp = (
                 act
-                & (a == 16)
+                & (a == self._A_CHOP)
                 & is_civ
                 & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
                 & (ftr_c > 0)
@@ -6523,7 +6554,7 @@ class BatchSim:
                     & (self.center_at.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
                     & (self.rvcity_at.gather(1, hc0.unsqueeze(1)).squeeze(1) < 0)
                 )
-                ok_pl = (a == 24) & self.p_alive[:, p] & (self._p_combat[self.p_type[:, p]] > 0) & _en & (_hi | _hd)
+                ok_pl = (a == self._A_PILLAGE) & self.p_alive[:, p] & (self._p_combat[self.p_type[:, p]] > 0) & _en & (_hi | _hd)
                 if bool(ok_pl.any()):
                     _pi = ok_pl & _hi
                     if bool(_pi.any()):
@@ -6562,7 +6593,7 @@ class BatchSim:
                             _valid = self._seaside_ok().gather(1, hc0.unsqueeze(1)).squeeze(1)
                         else:
                             _valid = _rq2 == _k
-                        _ok2 = (a == (18 + _k - 3)) & _b2 & _valid & _unl2
+                        _ok2 = (a == self._A_IMP[_k]) & _b2 & _valid & _unl2
                         if bool(_ok2.any()):
                             _r2 = _ok2.nonzero(as_tuple=True)[0]
                             self.improvement[_r2, hc0[_r2]] = _k
@@ -6577,7 +6608,7 @@ class BatchSim:
                 # Clears a pillaged IMPROVEMENT first, else a pillaged DISTRICT
                 # (the TS order), spends the turn, costs NO charge.
                 ok_rp = (
-                    (a == 17)
+                    (a == self._A_REPAIR)
                     & self.p_alive[:, p]
                     & (self.p_type[:, p] == self._builder_idx)
                     & (self.owner.gather(1, hc0.unsqueeze(1)).squeeze(1) >= 0)
@@ -6598,7 +6629,7 @@ class BatchSim:
                 ftu_t = self.tile_ftu.gather(1, hc0.unsqueeze(1)).squeeze(1)
                 unlocked = (ftu_t >= 0) & self.techs.gather(1, ftu_t.clamp(min=0).unsqueeze(1)).squeeze(1)
                 ok_c = (
-                    (a == 16)
+                    (a == self._A_CHOP)
                     & self.p_alive[:, p]
                     & (self.p_type[:, p] == self._builder_idx)
                     & (self.p_charges[:, p] > 0)

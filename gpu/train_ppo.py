@@ -50,7 +50,9 @@ from civ6gpu import BatchEnv, DuelEnv, load_rules, load_fixture, FIXTURES
 from civ6gpu.engine import P_MAX
 from civ6gpu.env import UNIT_FEATURES
 
-N_UNIT_ACTS = 17  # 0-5 move, 6-11 attack, 12 hold, 13/14/15 build FARM/MINE/LUMBER_MILL, 16 chop (V-H1)
+# #51/S0.3: the unit-action width comes from the exported enum (env.n_unit_acts),
+# not a literal. The old `17` here and in env.py disagreed with the real 26-wide
+# mask; nothing caught it because no battery lane builds a Policy.
 NEG = -1e9
 
 
@@ -89,7 +91,7 @@ class Policy(nn.Module):
         self.uproj = _layer(nn.Linear(hidden, uhidden), 2**0.5)
         self.umlp = nn.Sequential(
             _layer(nn.Linear(uhidden + UNIT_FEATURES, uhidden), 2**0.5), nn.Tanh(),
-            _layer(nn.Linear(uhidden, N_UNIT_ACTS), 0.01),
+            _layer(nn.Linear(uhidden, dims["UA"]), 0.01),
         )
 
     def forward(self, obs: torch.Tensor, ufeat: torch.Tensor) -> dict[str, torch.Tensor]:
@@ -302,6 +304,9 @@ def main() -> None:
         "NC": m0["civic"].shape[1],
         "S": m0["envoy"].shape[1],
         "W": m0.get("war", torch.zeros(1, 0)).shape[1],
+        # #51/S0.3: the unit head's width comes from the LIVE mask, like every
+        # other head — it was a hardcoded 17 against a 26-wide mask.
+        "UA": m0["units"].shape[-1],
     }
     policy = Policy(env.obs_size, dims, hidden=args.hidden).to(dev)
     opt = torch.optim.Adam(policy.parameters(), lr=args.lr, eps=1e-5)
@@ -382,7 +387,7 @@ def main() -> None:
         "m_production": torch.zeros(T, B, dims["C"], dims["AP"], dtype=torch.bool, device=dev),
         "m_tech": torch.zeros(T, B, dims["NT"], dtype=torch.bool, device=dev),
         "m_civic": torch.zeros(T, B, dims["NC"], dtype=torch.bool, device=dev),
-        "m_units": torch.zeros(T, B, P_MAX, N_UNIT_ACTS, dtype=torch.bool, device=dev),
+        "m_units": torch.zeros(T, B, P_MAX, dims["UA"], dtype=torch.bool, device=dev),
         "m_envoy": torch.zeros(T, B, dims["S"], dtype=torch.bool, device=dev),
         "m_war": torch.zeros(T, B, dims.get("W", 0), dtype=torch.bool, device=dev),
         "a_production": torch.zeros(T, B, dims["C"], dtype=torch.long, device=dev),
