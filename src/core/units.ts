@@ -8,7 +8,8 @@ import type { GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from './hex';
 import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
-import { isTechComplete } from './effects';
+import { isTechComplete, isCivicComplete } from './effects';
+import { ARTIFACT_BUILDING, ARTIFACT_SLOTS } from '../data/greatPeople';
 import { clearCampFor } from './combat';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat'; // A-21 (#50): the shared heal set
@@ -18,7 +19,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV } from './civs';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv } from './civs';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -536,6 +537,19 @@ export function trainableUnits(
     // Great-Person claim, never trained/purchased on any seat (sandbox too).
     if (d.spawnOnly) return false;
     if (d.requiresTech && !state.sandbox && !isTechComplete(state, d.requiresTech)) return false;
+    // B-20 (#79): the CIVIC gate (Archaeologist / Natural History), the exact
+    // twin of the tech gate above and equally sandbox-exempt.
+    if (d.requiresCivic && !state.sandbox && !isCivicComplete(state, d.requiresCivic)) return false;
+    // B-20 (#79): an ARCHAEOLOGIST may only be trained where its city's
+    // ARCHAEOLOGICAL MUSEUM still has a FREE artifact slot — the real Civ 6
+    // rule, and the reason its charge count equals the free slots. Without a
+    // museum the unit has nowhere to put what it digs up.
+    if (d.id === 'ARCHAEOLOGIST' && !state.sandbox) {
+      if (!city) return false;
+      const held = state.cities.find((c) => c.centerIndex === city.centerIndex);
+      const has = (held?.buildings ?? []).includes(ARTIFACT_BUILDING);
+      if (!has || (held?.artifacts ?? 0) >= ARTIFACT_SLOTS) return false;
+    }
     // AUDIT B-9: strategic-resource access gates build AND purchase (purchaseUnit
     // funnels through here). Data-driven off UnitDef.requiresResource; the player
     // is civ 0. Sandbox ignores the gate, like the tech gate above.
@@ -543,6 +557,37 @@ export function trainableUnits(
     if (d.naval) return !!city && cityNavalCapable(state, city);
     return true;
   });
+}
+
+/**
+ * B-20 (#79): EXCAVATE an Antiquity Site into an Artifact. The Archaeologist
+ * must stand on a site, hold a charge, and the tile must be the player's own or
+ * unclaimed — real Civ 6 additionally allows a rival's territory under OPEN
+ * BORDERS, which this model has no concept of and which is recorded rather than
+ * approximated. The artifact lands in the LOWEST-id own city that has an
+ * ARCHAEOLOGICAL MUSEUM with a free slot (the placeRelic ordering), and the dig
+ * is consumed. With no free slot anywhere the excavation is refused rather than
+ * silently losing the find.
+ */
+export function archaeologistExcavate(state: GameState, unitId: number): RuleResult {
+  const unit = state.units.find((u) => u.id === unitId);
+  if (!unit || unit.owner !== 'player') return no('No such unit.');
+  if (unit.type !== 'ARCHAEOLOGIST') return no('Only an Archaeologist can excavate.');
+  if ((unit.charges ?? 0) <= 0) return no('No charges left.');
+  const tile = state.map.tiles[unit.tileIndex];
+  if (!tile?.antiquity) return no('No antiquity site here.');
+  if (tileRivalCiv(tile) !== null || (tile.csId ?? -1) !== -1) {
+    return no('That dig lies in foreign territory.');
+  }
+  const home = state.cities
+    .filter((c) => c.buildings.includes(ARTIFACT_BUILDING) && (c.artifacts ?? 0) < ARTIFACT_SLOTS)
+    .sort((a, b) => a.id - b.id)[0];
+  if (!home) return no('No Archaeological Museum has a free artifact slot.');
+  home.artifacts = (home.artifacts ?? 0) + 1;
+  tile.antiquity = false;
+  spendCharge(state, unit);
+  state.eventLog.push(`An Artifact was excavated and displayed in ${home.name}.`);
+  return ok;
 }
 
 export function queueUnit(state: GameState, cityId: number, unitType: string): RuleResult {

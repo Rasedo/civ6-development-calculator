@@ -11,6 +11,8 @@
 import type { City, CityState, DistrictId, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
+import { civEraIndex } from './city';
+import { MODERN_ERA_INDEX } from '../data/techs';
 import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { CS_MAX_HP } from '../data/cityStates';
@@ -55,6 +57,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   const camp = state.barbCamps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbCamps.splice(camp, 1);
+  markAntiquitySite(state, tileIndex); // B-20 (#79): a razed outpost leaves a dig
   if (unit.owner === 'player') {
     state.treasury += CAMP_CLEAR_REWARD;
   } else {
@@ -385,7 +388,24 @@ export function getCityHp(state: GameState, cityId: number): number {
 }
 
 function killUnit(state: GameState, unit: Unit): void {
+  markAntiquitySite(state, unit.tileIndex); // B-20 (#79): a death leaves a dig
   disbandUnit(state, unit.id);
+}
+
+/**
+ * B-20 (#79): stamp an ANTIQUITY SITE. Real Civ 6 creates these from PRE-MODERN
+ * events — razing a barbarian outpost, or a unit dying — and they are what an
+ * Archaeologist excavates into an Artifact. Both events already exist here, so
+ * this needs no invented placement rule and no map-generation pass.
+ * The era gate is the sourced part: sites stop being created once the world
+ * reaches the MODERN era (ERAS index 5).
+ * A tile already carrying a site does not stack — one dig per tile, like Civ 6.
+ */
+export function markAntiquitySite(state: GameState, tileIndex: number): void {
+  const t = state.map.tiles[tileIndex];
+  if (!t || t.antiquity || isWater(t) || t.district || t.builtWonder) return;
+  if (civEraIndex(state.research.techs, state.research.civics) >= MODERN_ERA_INDEX) return;
+  t.antiquity = true;
 }
 
 /** Sack: population and gold loss, improvements around the center pillaged. */

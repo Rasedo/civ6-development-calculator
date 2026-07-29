@@ -73,9 +73,8 @@ const rawList: BuildingDef[] = [
 
   // --- Theater Square ----------------------------------------------------------
   { id: 'AMPHITHEATER', name: 'Amphitheater', district: 'THEATER_SQUARE', cost: 135, yields: { culture: 2 }, maintenance: 1 },
-  { id: 'MUSEUM', name: 'Museum', district: 'THEATER_SQUARE', cost: 265, requiresAny: ['AMPHITHEATER'], yields: { culture: 2 }, maintenance: 2 },
+  { id: 'MUSEUM', name: 'Museum', district: 'THEATER_SQUARE', cost: 265, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['ARCHAEOLOGICAL_MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
   { id: 'BROADCAST_CENTER', name: 'Broadcast Center', district: 'THEATER_SQUARE', cost: 525, requiresAny: ['MUSEUM'], yields: { culture: 4 }, maintenance: 3 },
-
   // --- Commercial Hub ----------------------------------------------------------
   { id: 'MARKET', name: 'Market', district: 'COMMERCIAL_HUB', cost: 105, yields: { gold: 3 }, maintenance: 0 },
   { id: 'BANK', name: 'Bank', district: 'COMMERCIAL_HUB', cost: 265, requiresAny: ['MARKET'], yields: { gold: 5 }, maintenance: 0 },
@@ -111,6 +110,14 @@ const rawList: BuildingDef[] = [
   // exists in either engine — and is recorded as a residual rather than folded
   // into the base, which is what the old 2 effectively did.
   { id: 'STADIUM', name: 'Stadium', district: 'ENTERTAINMENT_COMPLEX', cost: 600, requiresAny: ['ZOO'], amenities: 1, regional: true, maintenance: 3 },
+
+  // B-20 (#79) ARCHAEOLOGICAL MUSEUM — in real Civ 6 the Theater Square offers
+  // the ART MUSEUM or the ARCHAEOLOGICAL MUSEUM as a choice; same district,
+  // same cost, 3 ARTIFACT slots instead of 3 art slots. APPENDED LAST on
+  // purpose: roster order IS the GPU's building index, so inserting it beside
+  // the other Theater Square rows would renumber every downstream building in
+  // both engines and in every exported fixture.
+  { id: 'ARCHAEOLOGICAL_MUSEUM', name: 'Archaeological Museum', district: 'THEATER_SQUARE', cost: 265, requiresAny: ['AMPHITHEATER'], exclusiveWith: ['MUSEUM'], yields: { culture: 2 }, maintenance: 2 },
 ];
 
 const list: BuildingDef[] = rawList.map((b) => ({ ...b, cost: Math.round(b.cost * GAME_SPEED) }));

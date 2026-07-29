@@ -89,6 +89,10 @@ export interface Tile {
   /** World wonder occupying this tile (may be under construction). */
   builtWonder: string | null;
   builtWonderComplete: boolean;
+  /** B-20 (#79): an ANTIQUITY SITE — a dig an Archaeologist can excavate into
+   *  an Artifact. Real Civ 6 creates these from pre-Modern events (a razed
+   *  barbarian outpost, a unit dying) and reveals them with Natural History. */
+  antiquity?: boolean;
   /** Pillaged improvement (yields nothing until a builder repairs it). */
   pillaged: boolean;
   /** AUDIT B-32: pillaged district (a complete, non-CITY_CENTER district whose
@@ -233,6 +237,9 @@ export interface City {
   /** B-20 (#73): RELICS held in this city's TEMPLE slot (cap 1). Each pays
    *  +4 faith and +8 tourism — the densest tourism source in real Civ 6. */
   relics?: number;
+  /** B-20 (#79): ARTIFACTS excavated from Antiquity Sites, held in this city's
+   *  ARCHAEOLOGICAL MUSEUM (3 slots). +3 Culture and +3 Tourism each. */
+  artifacts?: number;
 }
 
 /** Empire research progress (one tech + one civic at a time, like Civ 6). */

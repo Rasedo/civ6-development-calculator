@@ -398,7 +398,9 @@ _MUTABLE = [
     "enh_claimed", "r_enhancer", "r_enhancer_done",  # B-18: enhancer race
     "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
     "gw_writing", "gw_art", "gw_music", "rc_gw_writing", "rc_gw_art", "rc_gw_music",  # B-20: Great Works per-city counts (#73: ART is a real kind)
-    "relics", "rc_relics",  # B-20 (#73): RELICS per city (TEMPLE slot, 4 faith + 8 tourism)
+    # B-20: RELICS per city (#73, TEMPLE slot, 4 faith + 8 tourism) and
+    # ARTIFACTS + ANTIQUITY SITES (#79, Archaeological Museum, 3 culture + 3 tourism)
+    "relics", "rc_relics", "artifacts", "rc_artifacts", "antiquity",
     "tourism_total", "r_tourism",  # B-20 (#71): cumulative TOURISM, player + per rival
     "r_culture",  # B-25 (#72): per-rival LIFETIME culture (the player's culture_total twin)
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
@@ -1078,6 +1080,12 @@ class BatchSim:
         self._gw_slots_k = [int(x) for x in rr.get("gwSlotsByKind", [2, 3, 1])]
         self._gw_works_k = [int(x) for x in rr.get("gwWorksByKind", [2, 3, 2])]
         # B-20 (#73): RELICS — TEMPLE slot, 4 faith + 8 tourism (GS values).
+        # B-20 (#79): ARTIFACTS — the relic plumbing's twin.
+        self._modern_era_index = int(rr.get("modernEraIndex", 5))
+        self._artifact_bidx = int(rr.get("artifactBidx", -1))
+        self._artifact_slots = int(rr.get("artifactSlots", 3))
+        self._artifact_culture = int(rr.get("artifactCulture", 3))
+        self._artifact_tourism = int(rr.get("artifactTourism", 3))
         self._relic_bidx = int(rr.get("relicBidx", -1))
         self._relic_slots = int(rr.get("relicSlots", 1))
         self._relic_faith = int(rr.get("relicFaith", 4))
@@ -1115,7 +1123,13 @@ class BatchSim:
         self.rc_gw_music = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         # B-20 (#73): RELICS, per city, held in the TEMPLE's single slot.
         self.relics = torch.zeros(B, C, dtype=torch.long, device=device)
+        self.artifacts = torch.zeros(B, C, dtype=torch.long, device=device)  # B-20 (#79)
+        # B-20 (#79): ANTIQUITY SITES — the markAntiquitySite twin. Created by
+        # PRE-MODERN events (a razed camp, a unit death) and excavated into
+        # Artifacts by an Archaeologist.
+        self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
         self.rc_relics = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
+        self.rc_artifacts = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)  # B-20 (#79)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off5 = tiles_within_offsets(5).to(device)  # P5/S4: rival border growth radius (= player BORDER_MAX_RADIUS)
@@ -1696,6 +1710,9 @@ class BatchSim:
         # gate. Read at the war-march passability composition.
         self.unit_naval = torch.tensor([bool(u.get("naval", 0)) for u in ru], dtype=torch.bool, device=device)
         self._p_tech = torch.tensor([u["requiresTech"] for u in ru], dtype=torch.long, device=device)
+        # B-20 (#79): the Archaeologist's CIVIC gate + its ARTIFACT-slot rule.
+        self._p_civic = torch.tensor([u.get("requiresCivic", -1) for u in ru], dtype=torch.long, device=device)
+        self._p_needs_slot = torch.tensor([bool(u.get("needsArtifactSlot", 0)) for u in ru], dtype=torch.bool, device=device)
         # AUDIT B-9: per-roster strategic-resource requirement (index into the
         # resource list the tile res_id plane uses; -1 = ungated). _res_unit_pairs
         # caches (unit_idx, res_idx) for the access scan — empty when the roster
@@ -4232,7 +4249,10 @@ class BatchSim:
             unit_ok = unit_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate
             unit_ok = unit_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: trainableUnits' faithOnly filter (MISSIONARY never queues)
             unit_ok = unit_ok & ~self._p_spawn_only.view(1, -1)  # B7-G (B-8): spawn-only filter (GENERAL/ADMIRAL never queue)
-            unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1)
+            # B-20 (#79): the Archaeologist's civic + artifact-slot gates. The
+            # slot rule is PER-CITY, so it joins after the [B, NU] -> [B, C, NU]
+            # expansion rather than collapsing unit_ok's rank early.
+            unit_col = unit_ok.unsqueeze(1).expand(-1, C, -1) & self._p_civic_slot_ok(True)
             if bool(self.unit_naval.any()):
                 # #45/B-6: the controlled/RL player builds NO naval (mirrors the
                 # controlled rival's rival_masks ladder and the scripted player's
@@ -4297,6 +4317,7 @@ class BatchSim:
                 u_ok = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                     1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
                 )
+                u_ok = u_ok & self._p_civic_slot_ok(False)  # B-20 (#79): civic gate
                 u_ok = u_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate (purchase)
                 u_ok = u_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: faith-only never gold-buys (trainableUnits mirror)
                 u_ok = u_ok & ~self._p_spawn_only.view(1, -1)  # B7-G (B-8): spawn-only never gold-buys (trainableUnits mirror)
@@ -4924,6 +4945,30 @@ class BatchSim:
         )
         self.best_melee = torch.maximum(self.best_melee, melee_cs)
 
+
+    def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
+        """B-20 (#79): the markAntiquitySite twin — stamp an ANTIQUITY SITE on
+        `tile` for the rows in `mask`. Real Civ 6 creates these from PRE-MODERN
+        events (a razed barbarian outpost, a unit dying), so the era gate is the
+        sourced part; a tile already carrying a dig does not stack, and water,
+        districts and wonder tiles are refused exactly as TS refuses them."""
+        if not bool(mask.any()):
+            return
+        t = tile.clamp(min=0)
+        era = self._civ_era(self.techs, self.civics)  # [B] the player's era
+        okr = (
+            mask
+            & (tile >= 0)
+            & (era < self._modern_era_index)
+            & ~self.water.gather(1, t.unsqueeze(1)).squeeze(1)
+            & (self.district.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
+            & (self.built_wonder.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
+        )
+        if not bool(okr.any()):
+            return
+        rows = okr.nonzero(as_tuple=True)[0]
+        self.antiquity[rows, t[rows]] = True
+
     def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, civ: torch.Tensor | None = None) -> None:
         """A non-barbarian unit entering a camp tile clears it: +50 gold to
         ITS civ (P5/S7 C-3 — rivals bank it too; pass civ=[B] rival ids) and
@@ -4933,6 +4978,7 @@ class BatchSim:
         hit = mask & (self.camp_tile == tile.unsqueeze(1)).any(dim=1)
         if not bool(hit.any()):
             return
+        self._mark_antiquity(hit, tile)  # B-20 (#79): a razed outpost leaves a dig
         reward = self.rules.combat.get("campClearReward", 50)
         for b in hit.nonzero(as_tuple=True)[0].tolist():
             row = self.camp_tile[b]
@@ -4946,6 +4992,30 @@ class BatchSim:
                 self.r_treasury[b, int(civ[b])] += float(reward)
 
     # --- player unit actions (phase 4b) ---------------------------------------
+
+
+    def _p_civic_slot_ok(self, per_city: bool) -> torch.Tensor:
+        """B-20 (#79): the Archaeologist's two extra trainableUnits gates —
+        the CIVIC unlock (Natural History) and the ARTIFACT-SLOT rule (its city
+        must hold an ARCHAEOLOGICAL MUSEUM with a free slot). Returns [B, NU]
+        when per_city is False, else [B, C, NU]. Without these the GPU offered
+        an ARCHAEOLOGIST at t18 with no civic and no museum and the TS replay
+        refused the order — an off-script gate red, not a scripted-parity one."""
+        B, dev = self.B, self.device
+        civ_ok = (self._p_civic.unsqueeze(0) < 0) | self.civics.gather(
+            1, self._p_civic.clamp(min=0).unsqueeze(0).expand(B, -1)
+        )  # [B, NU]
+        if not per_city:
+            return civ_ok
+        C = self.C
+        need = self._p_needs_slot.view(1, 1, -1)  # [1, 1, NU]
+        if self._artifact_bidx < 0:
+            room = torch.zeros(B, C, 1, dtype=torch.bool, device=dev)
+        else:
+            room = (
+                self.buildings[:, :, self._artifact_bidx] & (self.artifacts < self._artifact_slots)
+            ).unsqueeze(2)  # [B, C, 1]
+        return civ_ok.unsqueeze(1) & (~need | room)
 
     def unit_action_mask(self) -> torch.Tensor:
         """[B, P_MAX, 16] valid orders per player unit: 0–5 step to that
@@ -9468,6 +9538,7 @@ class BatchSim:
         b20_gwa = int(self.rc_gw_art[b, r_from, j])
         b20_gwm = int(self.rc_gw_music[b, r_from, j])
         b20_rel = int(self.rc_relics[b, r_from, j])
+        b20_art = int(self.rc_artifacts[b, r_from, j])  # B-20 (#79)
         self.rc_alive[b, r_from, j] = False
         # B-20 (#79) SLOT HYGIENE: the dead slot must not keep a work count.
         # `slot = occ.max() + 1` REUSES indices, and nothing else clears these
@@ -9479,6 +9550,7 @@ class BatchSim:
         self.rc_gw_art[b, r_from, j] = 0
         self.rc_gw_music[b, r_from, j] = 0
         self.rc_relics[b, r_from, j] = 0
+        self.rc_artifacts[b, r_from, j] = 0
         self.rc_is_cap[b, r_from, j] = False  # P7-FULL: identity dies with the slot
         self.rc_dist_tile[b, r_from, j, :] = -1
         self.rc_wonder[b, r_from, j, :] = -1  # A-4 hygiene
@@ -9524,6 +9596,7 @@ class BatchSim:
         self.rc_gw_art[b, r_to, slot] = b20_gwa      # (was: writing/music zeroed, art/relics
         self.rc_gw_music[b, r_to, slot] = b20_gwm    #  left as whatever the reused slot held)
         self.rc_relics[b, r_to, slot] = b20_rel
+        self.rc_artifacts[b, r_to, slot] = b20_art
         self.rc_loyalty[b, r_to, slot] = 100.0
         self.rc_acquired[b, r_to, slot] = old_acq
         self.rc_hp[b, r_to, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
@@ -13693,7 +13766,7 @@ class BatchSim:
         # never appended, so a compaction left them behind at the old slot index
         # — the city lost its relic (or inherited its neighbour's). Same pair,
         # same cause as the _transfer_rc_to_rc omission above.
-        "rc_gw_writing", "rc_gw_art", "rc_gw_music", "rc_relics",
+        "rc_gw_writing", "rc_gw_art", "rc_gw_music", "rc_relics", "rc_artifacts",
     )
 
     def _reclaim_rc(self) -> None:

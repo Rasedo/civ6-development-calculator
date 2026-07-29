@@ -141,6 +141,14 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     ]),
     C('HUMANISM', 'Humanism', 'Renaissance', 540, ['MEDIEVAL_FAIRES'], [
       { kind: 'unlockBuilding', building: 'MUSEUM' },
+      // B-20 (#79): real Civ 6 unlocks BOTH museums with Humanism — the Art
+      // Museum and the Archaeological Museum are the same choice point. Without
+      // this the new building had NO unlock at all, so TS's
+      // `unlocks.buildings` never held it while the GPU read unlockTech -1 as
+      // "always available" and built it — the identical shape to the FORT bug
+      // in #41, and it showed up as a treasury/culture divergence at seed 9029
+      // t193 rather than as anything mentioning museums.
+      { kind: 'unlockBuilding', building: 'ARCHAEOLOGICAL_MUSEUM' },
       { kind: 'unlockPolicy', policy: 'GRAND_OPERA' },
     ]),
     C('ENLIGHTENMENT', 'The Enlightenment', 'Renaissance', 655, ['HUMANISM'], [

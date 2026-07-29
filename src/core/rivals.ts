@@ -31,7 +31,7 @@ import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
-import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, GW_CLASS_KIND, placeGreatWorks, GW_WONDER_SLOTS, greatWorkCulture, placeRelic, relicFaith } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, GW_CLASS_KIND, placeGreatWorks, GW_WONDER_SLOTS, greatWorkCulture, placeRelic, relicFaith, artifactCulture } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
 import {
@@ -2111,6 +2111,7 @@ export function rivalCityYields(
   // buildings-tier position, pre-tier like the player's (city.ts).
   total.culture += greatWorkCulture(rc);
   total.faith += relicFaith(rc); // B-20 (#73): relics pay faith, the city.ts twin position
+  total.culture += artifactCulture(rc); // B-20 (#79): artifacts pay culture, the city.ts twin
   // A-4: wonder flat city yields + the belief faithPerWonder (city.ts:435-437
   // positions — pre-tier, with the buildings).
   for (const wd of rcWonders) {
@@ -2309,6 +2310,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
     greatWorksArt: rc.greatWorksArt,
     greatWorksMusic: rc.greatWorksMusic,
     relics: rc.relics,
+    artifacts: rc.artifacts, // B-20 (#79): artifacts ride the flip too
     hp: Math.round(RIVAL_CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };

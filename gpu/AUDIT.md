@@ -636,6 +636,55 @@ Per-item weights (done% in parens where partial):
   46 rival civs by t250. Poke-pinned in tests/great-works.test.ts (doubles
   writing, leaves art/music and all culture untouched).
   B-20 RESIDUALS NOW: artifacts, National Parks and archaeology. B-20 -> 95%.
+
+  **B-20 ARTIFACTS + ARCHAEOLOGY LANDED 2026-07-29 (#79).** The fifth Great
+  Work kind, sourced from the Civilization wiki (Archaeologist / Archaeological
+  Museum / Antiquity Site / Great Work pages):
+    * an ARTIFACT pays +3 Culture and +3 Tourism;
+    * an ARCHAEOLOGICAL MUSEUM holds 3 artifact slots and is the ART MUSEUM's
+      MUTUALLY EXCLUSIVE sibling — a Theater Square takes one or the other, and
+      BOTH unlock on HUMANISM;
+    * the ARCHAEOLOGIST costs 195, carries 3 charges, unlocks on the NATURAL
+      HISTORY civic, and may only be trained where its city's museum still has a
+      free slot;
+    * ANTIQUITY SITES are created by PRE-MODERN events — a razed barbarian
+      outpost, or a unit dying — both of which both engines already raise, so
+      this needed no invented placement rule and no map-generation pass.
+  SHIPPED BOTH SEATS: `CityState`-style `artifacts` counts (player + rival),
+  `Tile.antiquity` / the GPU `antiquity` plane, `markAntiquitySite` and its
+  `_mark_antiquity` twin on the camp-clear path, `archaeologistExcavate`, the
+  artifact culture/tourism terms beside the relic ones, and `requiresCivic` as a
+  first-class unit gate. Artifacts ride a city TRANSFER and the slot COMPACTION
+  from day one — `rc_artifacts` is in `_RC_SLOT_FIELDS` and in the
+  `_transfer_rc_to_rc` snapshot/clear/carry — because #38 proved that omitting
+  exactly that is how a work count silently leaks between cities.
+  MEASURED reachable: NATURAL_HISTORY is researched by 21 of 24 rival civs and 1
+  of 12 player seeds by t250, so this is exercised in-gate rather than sitting
+  past the horizon like the space race.
+  TWO BUGS THIS ROUND FOUND, both the SAME SHAPE as #41's FORT:
+    1. the new BUILDING had no unlock at all, so TS's `unlocks.buildings` never
+       held it while the GPU read `unlockTech = -1` as "always available" and
+       built it — surfacing as a treasury/culture divergence at seed 9029 t193
+       that mentioned no museum anywhere. Fixed by unlocking both museums on
+       Humanism, which is also what real Civ 6 does.
+    2. the new UNIT's civic + free-slot gates existed only in TS
+       (`trainableUnits`), so the GPU offered an ARCHAEOLOGIST at t18 with
+       neither, and the off-script replay refused the order — a gpu-gate red,
+       invisible to scripted parity. Fixed with `_p_civic_slot_ok` on both the
+       per-city production mask and the purchase mask.
+  METHOD NOTE: one "PARITY OK" in this round was measured against STALE
+  fixtures, because `npx vite-node scripts/export-gpu.ts >/dev/null && parity`
+  swallowed a ReferenceError in the exporter and the `&&` still ran parity on
+  the previous fixtures. Never chain the export into the gate with its output
+  discarded — read the export's own tail line.
+  NOT MODELLED, recorded rather than approximated: THEMING bonuses (three
+  same-era artifacts by different civs double the building's tourism),
+  SHIPWRECKS (no water excavation), trading works between civs, and OPEN
+  BORDERS (an Archaeologist here may dig only in own or unclaimed territory).
+  Rival AI does not yet build Archaeologists — the same production-wiring tail
+  the Military Engineer had, and the reason artifacts are player-seat-only so
+  far. B-20 RESIDUALS NOW: National Parks, plus that rival wiring.
+
   #72 MEASUREMENT — these residuals now have a NUMBER on them. With only
   Great Works (writing/music), Seaside Resorts and wonders feeding it,
   lifetime tourism reaches at most 7 VISITING tourists over 250 turns while

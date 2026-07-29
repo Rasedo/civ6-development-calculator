@@ -55,7 +55,7 @@ import {
   LEVY_GOLD_COST,
   LEVY_COOLDOWN,
 } from '../src/data/cityStates';
-import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
+import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, SPECIALIST_YIELDS } from '../src/data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../src/data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, gpClassesOf, gppFractionOf } from '../src/data/projects';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -136,7 +136,7 @@ import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
-import { TECHS, ERAS } from '../src/data/techs'; // B-20 (#71): era scale
+import { TECHS, ERAS, MODERN_ERA_INDEX } from '../src/data/techs'; // B-20 (#71): era scale
 import { CIVICS } from '../src/data/civics';
 import { GOVERNMENTS, POLICIES, GOVERNMENTS_ADOPTION_LIVE, type SlotKind } from '../src/data/policies';
 import { RESOURCES } from '../src/data/resources';
@@ -675,6 +675,12 @@ const rules = {
     // 8 tourism each (GS values). Created when an APOSTLE dies in theological
     // combat; see the RELIC_* comment in src/data/greatPeople.ts for the
     // Martyr-promotion deviation and the reachability measurement.
+    // B-20 (#79): artifacts — the relic plumbing's twin.
+    artifactBidx: buildingIdx.get(ARTIFACT_BUILDING) ?? -1,
+    artifactSlots: ARTIFACT_SLOTS,
+    artifactCulture: ARTIFACT_CULTURE,
+    artifactTourism: ARTIFACT_TOURISM,
+    modernEraIndex: MODERN_ERA_INDEX,
     relicBidx: buildingIdx.get(RELIC_BUILDING) ?? -1,
     relicSlots: RELIC_SLOTS_PER_BUILDING,
     relicFaith: RELIC_FAITH,
@@ -972,6 +978,10 @@ const rules = {
     civilian: u.charges !== undefined ? 1 : 0,
     charges: u.charges ?? 0,
     requiresTech: u.requiresTech ? techIdx.get(u.requiresTech) ?? -1 : -1,
+    // B-20 (#79): the CIVIC gate (Archaeologist / Natural History) and the
+    // ARTIFACT-slot rule, so the GPU can refuse what trainableUnits refuses.
+    requiresCivic: u.requiresCivic ? civicIdx.get(u.requiresCivic) ?? -1 : -1,
+    needsArtifactSlot: u.id === 'ARCHAEOLOGIST' ? 1 : 0,
     // AUDIT B-9: strategic-resource ACCESS gate — index into RESOURCE_IDS (the
     // same order the tile `rid` plane uses), or -1 = ungated. The GPU joins it
     // with the per-tile `rq`/res_imp plane to gate build+purchase per civ.

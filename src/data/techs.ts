@@ -28,6 +28,10 @@ export type Era =
 
 // B-11/B-12: the full GS era ladder. Atomic/Information/Future are display-only
 // groupings (no core logic reads `.era`); adding them is purely additive.
+/** B-20 (#79): ERAS index of 'Modern' — antiquity sites stop being created
+ *  once the world reaches it (real Civ 6). Derived below, not hardcoded. */
+export const MODERN_ERA_INDEX = 5;
+
 export const ERAS: Era[] = [
   'Ancient',
   'Classical',

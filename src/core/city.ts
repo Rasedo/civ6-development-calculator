@@ -21,7 +21,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, GW_PRINTING_TECH } from '../data/greatPeople';
+import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
 import {
@@ -468,7 +468,7 @@ export function playerTourism(state: GameState): number {
   let t = 0;
   // B-20 (#74): PRINTING doubles Great Work of Writing tourism.
   const printing = state.research.techs.includes(GW_PRINTING_TECH);
-  for (const c of state.cities) t += greatWorkTourism(c, printing) + relicTourism(c); // B-20 (#73): relics
+  for (const c of state.cities) t += greatWorkTourism(c, printing) + relicTourism(c) + artifactTourism(c); // B-20 (#73) relics, (#79) artifacts
   const owns = (tile: Tile) => tile.cityId !== -1;
   const era = civEraIndex(state.research.techs, state.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
@@ -478,13 +478,13 @@ export function rivalTourism(
   state: GameState,
   rival: {
     id: number;
-    cities: { greatWorksWriting?: number; greatWorksMusic?: number; relics?: number }[];
+    cities: { greatWorksWriting?: number; greatWorksMusic?: number; relics?: number; artifacts?: number }[];
     research: { techs: string[]; civics: string[] };
   },
 ): number {
   let t = 0;
   const printing = rival.research.techs.includes(GW_PRINTING_TECH); // B-20 (#74)
-  for (const rc of rival.cities) t += greatWorkTourism(rc, printing) + relicTourism(rc); // B-20 (#73): relics
+  for (const rc of rival.cities) t += greatWorkTourism(rc, printing) + relicTourism(rc) + artifactTourism(rc); // B-20 (#73) relics, (#79) artifacts
   const owns = (tile: Tile) => tile.rivalId === rival.id;
   const era = civEraIndex(rival.research.techs, rival.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
@@ -566,6 +566,7 @@ export function computeCityStats(
   // every building yield), but NOT the district buildingYieldMult (which
   // cityBuildingYields already applied to the building's own yields).
   buildings.culture += greatWorkCulture(city);
+  buildings.culture += artifactCulture(city); // B-20 (#79): +3 culture per artifact
   // B-20 (#73): RELICS pay FAITH (4 each), in the same buildings bucket and at
   // the same position — a relic is a Great Work held in the Temple's slot.
   buildings.faith += relicFaith(city);

@@ -137,7 +137,7 @@ def main() -> None:
 
     # b. compaction must permute ALL FOUR planes with their city.
     s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    for nm in ("rc_gw_writing", "rc_gw_art", "rc_gw_music", "rc_relics"):
+    for nm in ("rc_gw_writing", "rc_gw_art", "rc_gw_music", "rc_relics", "rc_artifacts"):
         assert nm in s4._RC_SLOT_FIELDS, f"{nm} missing from _RC_SLOT_FIELDS — compaction drops it"
     # SCAN for a rival holding two cities rather than assuming fixture 0 does
     # (the watermill_test lesson: a poke that silently skips proves nothing).

@@ -22,6 +22,9 @@ export interface UnitDef {
   /** Builder charges (improvements/chops); undefined for non-builders. */
   charges?: number;
   requiresTech?: string;
+  /** B-20 (#79): CIVIC gate — the Archaeologist unlocks on Natural History, not
+   *  on a tech. Same shape as requiresTech; trainableUnits checks both. */
+  requiresCivic?: string;
   /** AUDIT B-9: strategic-resource ACCESS gate — a resource id (data/resources)
    * this unit needs to BUILD or PURCHASE. Access = an owned territory tile with
    * the resource AND its completed, unpillaged matching improvement
@@ -308,6 +311,23 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 2,
       requiresTech: 'MILITARY_ENGINEERING',
       description: 'Builds Forts (2 charges).',
+    }),
+    // B-20 (#79): the ARCHAEOLOGIST, sourced from the Civ 6 wiki — 3 charges,
+    // unlocked by the NATURAL HISTORY civic, and trainable only in a city whose
+    // ARCHAEOLOGICAL MUSEUM still has a free artifact slot (that slot rule is
+    // enforced in trainableUnits, not here, because it is per-CITY). APPENDED
+    // LAST for the same index-stability reason as the Military Engineer above.
+    U({
+      id: 'ARCHAEOLOGIST',
+      name: 'Archaeologist',
+      code: 'Ar',
+      cost: 195,
+      maintenance: 0,
+      moves: 2,
+      combat: 0, // civilian
+      charges: 3,
+      requiresCivic: 'NATURAL_HISTORY',
+      description: 'Excavates Antiquity Sites into Artifacts (3 charges).',
     }),
   ].map((u) => [u.id, u]),
 );

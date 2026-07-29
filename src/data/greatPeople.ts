@@ -173,6 +173,41 @@ export const GW_MUSIC = 2;
 
 /** Per-kind building, slot count, works per Great Person, culture and tourism. */
 export const GW_BUILDINGS = ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'] as const;
+
+/**
+ * B-20 (#79) ARTIFACTS — the fifth Great Work kind, sourced from the
+ * Civilization wiki (Archaeologist / Archaeological Museum / Antiquity Site
+ * pages):
+ *   - an ARTIFACT pays +3 Culture and +3 Tourism;
+ *   - an ARCHAEOLOGICAL MUSEUM holds 3 artifact slots;
+ *   - the ARCHAEOLOGIST is unlocked by the NATURAL HISTORY civic, carries 3
+ *     charges, and may only be trained in a city whose Archaeological Museum
+ *     still has a free slot;
+ *   - ANTIQUITY SITES appear once Natural History is in, and are created by
+ *     events before the Modern era — razing a barbarian outpost, or a unit
+ *     dying — both of which this engine already raises.
+ * MEASURED reachable: NATURAL_HISTORY is researched by 21 of 24 rival civs and
+ * 1 of 12 player seeds by t250, so this is exercised in-gate (mostly rival-side)
+ * rather than sitting past the horizon like the space race.
+ * NOT MODELLED, recorded: THEMING bonuses (three same-era artifacts by
+ * different civs double the building's tourism) and Shipwrecks (no water
+ * excavation), and trading works between civs.
+ */
+export const ARTIFACT_BUILDING = 'ARCHAEOLOGICAL_MUSEUM';
+export const ARTIFACT_SLOTS = 3;
+export const ARTIFACT_CULTURE = 3;
+export const ARTIFACT_TOURISM = 3;
+export const ARCHAEOLOGIST_CHARGES = 3;
+export const ARCHAEOLOGIST_CIVIC = 'NATURAL_HISTORY';
+
+/** B-20 (#79): culture from a city's artifacts. */
+export function artifactCulture(city: { artifacts?: number }): number {
+  return (city.artifacts ?? 0) * ARTIFACT_CULTURE;
+}
+/** B-20 (#79): tourism from a city's artifacts. */
+export function artifactTourism(city: { artifacts?: number }): number {
+  return (city.artifacts ?? 0) * ARTIFACT_TOURISM;
+}
 export const GW_SLOTS = [2, 3, 1] as const;
 /**
  * AUDIT #78: Great Work slots granted by a completed WONDER, in kind order
