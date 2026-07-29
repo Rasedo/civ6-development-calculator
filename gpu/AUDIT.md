@@ -351,6 +351,56 @@ Per-item weights (done% in parens where partial):
   plane so removing the fort removes it). Nothing yet BUILDS an engineer — the
   production/AI wiring is the remaining B-27 tail, alongside the post-tech-tree
   improvements.
+
+  **B-27 TAIL ANALYSED 2026-07-29 (#79) — NOT SHIPPED, and here is exactly why.**
+  The engineer half of B-27 is two separate blockers, not one, and the second
+  needs an OWNER DECISION rather than more implementation.
+
+  BLOCKER 1 (a real latent, measured): the Military Engineer is already
+  TRAINABLE — `trainableUnits` applies no exclusion, so the player can queue it
+  once MILITARY_ENGINEERING lands. But NEITHER engine can ever ACT with one:
+    * TS `rivalBuilderActions` filters `u.type !== 'BUILDER'`.
+    * GPU `_rival_builder_actions` filters `v_type == self._builder_idx`.
+  So the B-27 comment at rivals.ts ("pass the ACTING unit's type so a
+  MILITARY_ENGINEER is offered the FORT") describes a path no engineer can
+  enter. Both engines share the omission, so it costs NO parity — it is a claim
+  the code does not honour, not a divergence.
+  I fixed the TS filter, then REVERTED it. Fixing TS alone creates a latent
+  asymmetry (TS engineer places a Fort, GPU cannot), and the GPU twin is not
+  cheap: its rival option list has no FORT entry at all, and `_rival_job_mask`
+  is PER-RIVAL, not per-unit, while driving both "can I build here" and the
+  walk-toward-nearest-job pathing. A unit-type-dependent job mask is a real
+  restructure of a hot, heavily-gated path — and it would be entirely INERT
+  until blocker 2 is resolved, so it buys nothing on its own.
+
+  BLOCKER 2 (the owner decision): there is no non-invented production rule.
+  The obvious move is to mirror the builder policy — `rivalHasBuilder` (one at
+  a time) + `rivalHasJob` (data-driven off validImprovementsIn). MEASURED, that
+  does NOT transfer: `rules.ts` offers FORT on ANY passable owned land tile the
+  engineer stands on, with no terrain restriction ("real Civ 6 allows it on any
+  passable land tile the owner holds"). So a "fort job" essentially never runs
+  out, and "one engineer at a time while a job exists" produces engineers
+  FOREVER and forts every otherwise-unimprovable tile. FORT also has
+  `yields: {}`, so the rival's best-delta chooser scores it 0 — it wins only on
+  tiles no yield improvement is valid for, which is precisely the "cover the
+  wasteland in forts" outcome.
+  Real Civ 6 AI builds few forts, at chokepoints. Encoding that means inventing
+  a bound (how many? how close to a border? only at war?) — the guessed-constant
+  failure this sweep exists to catch, and the reason the Fort's two unmodelled
+  halves were recorded rather than approximated in the first place.
+  WHAT IS NEEDED: a decision on the production rule. Candidates, none sourced —
+    (a) cap at one engineer per civ per era, only while at war;
+    (b) only fort tiles adjacent to a hostile civ's territory;
+    (c) leave rival production OFF and reach the mechanic through the RL action
+        space instead (the player seat, #45/A-18), so the agent learns when to
+        fort and no heuristic is authored at all.
+  (c) is the cheapest and the only one that invents nothing, but it leaves
+  scripted-gate reachability at ZERO permanently, which must then be recorded
+  as an accepted, permanent gap rather than a temporary one.
+  UNTIL THEN B-27's fort MECHANIC remains proven by construction only —
+  tests/fort.test.ts and gpu/fort_test.py — with production unreachable, which
+  is the status quo this note makes precise rather than changes.
+
 - #71 FLAG SWEEP (2026-07-27): five of the six inert `_LIVE` flags are now
   ON, each flipped and gated INDIVIDUALLY. A-5r 2 (100% outside #50 —
   scripted rival tile purchase LIVE; the PLAYER's buyTile verb rides #50);
