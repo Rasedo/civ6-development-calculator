@@ -21,6 +21,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { goldenCulturePerDistrict } from './eras';
 import { SPECIALIST_YIELDS, greatWorkCulture, greatWorkTourism, relicFaith, relicTourism, artifactCulture, artifactTourism, GW_PRINTING_TECH } from '../data/greatPeople';
 import { warWearinessPenalty } from '../data/rivals';
 import { RESOURCES } from '../data/resources';
@@ -567,6 +568,8 @@ export function computeCityStats(
   // cityBuildingYields already applied to the building's own yields).
   buildings.culture += greatWorkCulture(city);
   buildings.culture += artifactCulture(city); // B-20 (#79): +3 culture per artifact
+  // B-24 (#79): golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district.
+  buildings.culture += goldenCulturePerDistrict(state, 0) * completedDistrictCount(state, city, true);
   // B-20 (#73): RELICS pay FAITH (4 each), in the same buildings bucket and at
   // the same position — a relic is a Great Work held in the Temple's slot.
   buildings.faith += relicFaith(city);

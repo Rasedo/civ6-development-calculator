@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from './helpers';
-import { cliffBlocks } from '../src/core/units';
+import { cliffBlocks, cliffBlocksStep } from '../src/core/units';
 import { neighborTile } from '../src/core/hex';
 import type { Tile } from '../src/core/types';
 
@@ -69,5 +69,33 @@ describe('B-26: cliffs block embark and disembark', () => {
     const { state, land, sea } = setup();
     land.cliffMask = 0;
     expect(cliffBlocks(state, land, sea, { owner: 'player' })).toBe(false);
+  });
+
+  // #79 REGRESSION. The rule was correct but reached only ONE of the movers:
+  // TS applied it in the player's walkPath alone, while the GPU applied it in
+  // its rival war-march alone — DISJOINT sets. A rival musketman therefore
+  // embarked over a cliff on TS and not on the GPU (off-script gate, seed 9015
+  // t198: TS moved 360->316 onto water, the GPU held). Scripted parity was
+  // green throughout; only the rollout reached a cliff edge with a rival on it.
+  describe('cliffBlocksStep: the step-level rule every mover shares', () => {
+    it('blocks a land unit crossing a cliff edge, both directions', () => {
+      const { state, land, sea } = setup();
+      const u = { type: 'MUSKETMAN', owner: 'rival' as const, civId: 0 };
+      expect(cliffBlocksStep(state, land, sea, u)).toBe(true); // embark
+      expect(cliffBlocksStep(state, sea, land, u)).toBe(true); // disembark
+    });
+
+    it('ignores a non-transition and exempts naval movers', () => {
+      const { state, land, sea } = setup();
+      const inland = tileAtCoords(state.map, 6, 6);
+      // land->land is never a cliff question
+      expect(cliffBlocksStep(state, land, inland, { type: 'MUSKETMAN', owner: 'player' })).toBe(false);
+      // a naval unit never transitions, so the cliff cannot gate it
+      expect(cliffBlocksStep(state, land, sea, { type: 'GALLEY', owner: 'player' })).toBe(false);
+    });
+
+    // The BEHAVIOURAL half of this regression — a rival war-march refusing a
+    // cliffed embark — lives in tests/naval-embark.test.ts, where the march
+    // harness already exists.
   });
 });

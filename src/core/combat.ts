@@ -35,6 +35,7 @@ import {
   encampmentIntact,
   encampmentBlocks,
   crossesRiver,
+  cliffBlocksStep,
 } from './units';
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
@@ -1345,7 +1346,16 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     const naval = !!UNITS[unit.type]?.naval;
     const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     const step = neighbors(map, at)
-      .filter((n) => tileFreeForUnit(state, n.index, unit, allowEmbark))
+      .filter(
+        (n) =>
+          tileFreeForUnit(state, n.index, unit, allowEmbark) &&
+          // B-26 (#79): a CLIFF closes the embark/disembark edge for the
+          // war-march too — the GPU's _rival_unit_war_act has always masked it
+          // out of step_ok, and TS did not, so a rival musketman walked over a
+          // cliff onto water in the off-script gate (seed 9015, t198).
+          // Filtered as a CANDIDATE (not a halt) so the march routes around it.
+          !cliffBlocksStep(state, at, n, unit),
+      )
       .sort(
         (a, b) =>
           hexDistance(a.col, a.row, target!.col, target!.row) -

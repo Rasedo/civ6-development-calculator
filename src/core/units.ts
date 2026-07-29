@@ -351,6 +351,32 @@ export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { owner: 
   return false;
 }
 
+/**
+ * B-26 (#79): is this ONE step an embark/disembark closed by a cliff?
+ *
+ * Every mover asks the same question, so it lives in one place: a cliff only
+ * ever gates a LAND↔WATER transition, and naval units never transition at all.
+ * Before this, `cliffBlocks` had a single caller (the player's walkPath) while
+ * the rival war-march and the rival patrol crossed cliffs freely — and the GPU
+ * had the mirror-image hole (its rival war-march blocked, nothing else did), so
+ * the two engines applied the rule to DISJOINT sets of units and a rival
+ * musketman embarked over a cliff on one engine but not the other.
+ *
+ * Callers must filter this at CANDIDATE level, not use it as a halt: a walker
+ * routes AROUND a cliff to its next-best neighbour (the GPU's step_ok mask).
+ * (#51 still owes us ONE mover; this at least makes the RULE single-sourced.)
+ */
+export function cliffBlocksStep(
+  state: GameState,
+  from: Tile,
+  to: Tile,
+  unit: { type: string; owner: Unit['owner']; civId?: number },
+): boolean {
+  if (UNITS[unit.type]?.naval) return false; // naval movers never transition
+  if (isWater(from) === isWater(to)) return false; // not a land/water crossing
+  return cliffBlocks(state, from, to, unit);
+}
+
 export function tileFreeForUnit(
   state: GameState,
   tileIndex: number,
@@ -482,7 +508,7 @@ export function walkPath(state: GameState, unit: Unit): void {
     // cliff ("when your units use it, they will be able to pass the Cliffs").
     // The Commando promotion also scales cliffs; promotions are unmodelled here
     // and that is recorded, not approximated.
-    if (transition && cliffBlocks(state, from, to, unit)) {
+    if (cliffBlocksStep(state, from, to, unit)) {
       unit.path = null;
       return;
     }

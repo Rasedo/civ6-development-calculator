@@ -1,5 +1,5 @@
 import type { GameState } from './types';
-import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE } from '../data/rivals';
+import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
 // B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
@@ -100,6 +100,65 @@ export function dedicationEraScore(state: GameState, civ: number): number {
   const age = state.civAges?.[civ] ?? 1;
   if (age === 2) return 0;
   return DEDICATION_ERA_SCORE * (state.dedications?.[civ] ?? 1);
+}
+
+/**
+ * B-24 (#79): the GOLDEN-AGE face of a dedication — the standing bonus that
+ * replaces the Dark/Normal era-score payout. SOURCED from the Civ 6 dedication
+ * catalog:
+ *   MONUMENTALITY        +2 Movement for all BUILDERS. (Faith-purchase of
+ *                        civilians and the 30% purchase discount: NOT modelled.)
+ *   FREE_INQUIRY         Eurekas provide an ADDITIONAL 10% of technology cost.
+ *                        (Commercial Hub/Harbor gold adjacency also giving
+ *                        Science: NOT modelled.)
+ *   PEN_BRUSH_AND_VOICE  Inspirations provide an ADDITIONAL 10% of civic cost,
+ *                        and each city gains +1 Culture per SPECIALTY district.
+ *   EXODUS               +2 Movement for MISSIONARIES/APOSTLES and +4 Great
+ *                        Prophet points per turn. (+2 charges on newly trained
+ *                        ones: NOT modelled.)
+ */
+export function goldenDedication(state: GameState, civ: number, kind: number): boolean {
+  if (civ < 0) return false; // B-24 (#79): BARBARIANS hold no dedications
+  if ((state.civAges?.[civ] ?? 1) !== 2) return false;
+  const picks = state.dedicationPicks?.[civ];
+  return !!picks && picks.includes(kind);
+}
+
+/**
+ * B-24 (#79): the MOVEMENT halves of MONUMENTALITY (+2 Builders) and EXODUS
+ * (+2 Missionaries/Apostles) are DEFERRED TO THE SEAT UNIFICATION (task #51,
+ * gpu/UNIFY_SEATS_PLAN.md Round 5), not abandoned.
+ *
+ * They were implemented on both engines and hunted hard. Scripted parity went
+ * green once `spawnUnit` was included (TS wrote `movesLeft: def.moves` with no
+ * bonus while the GPU recomputes full MP at walk time), but the OFF-SCRIPT gate
+ * still diverged on the `rng` DRAW COUNT at seed 9015 t199 — and that is a
+ * symptom of the model split itself, not of a missed call site:
+ *   TS keeps movement points as STATE, written at THREE sites (spawnUnit,
+ *   refreshUnits, rivalPhase's re-reset) and spent down by walkPath;
+ *   the GPU keeps NO movement state and recomputes `full_mp` inside every
+ *   walker, and its PLAYER pool has no MP counter at all (`p_acted` is a bool,
+ *   and `unit_action_mask` has no movement-cost term).
+ * Any MP modifier therefore has to be mirrored across two structurally
+ * different models, which is precisely what Round 5 removes. Re-land both
+ * bonuses there, where one seat model makes them a single edit.
+ * The four NON-movement golden effects below are parity-clean and stay.
+ */
+
+/** B-24 (#79): EXODUS golden — +4 Great Prophet points per turn. */
+export function goldenProphetPoints(state: GameState, civ: number): number {
+  return goldenDedication(state, civ, DED_EXODUS) ? 4 : 0;
+}
+
+/** B-24 (#79): a Eureka (FREE_INQUIRY) or Inspiration (PEN_BRUSH_AND_VOICE)
+ *  refunds an EXTRA 10% on top of BOOST_FRACTION. Techs read the first. */
+export function goldenBoostBonus(state: GameState, civ: number, civic: boolean): number {
+  return goldenDedication(state, civ, civic ? DED_PEN_BRUSH_AND_VOICE : DED_FREE_INQUIRY) ? 0.1 : 0;
+}
+
+/** B-24 (#79): PEN_BRUSH_AND_VOICE golden — +1 Culture per SPECIALTY district. */
+export function goldenCulturePerDistrict(state: GameState, civ: number): number {
+  return goldenDedication(state, civ, DED_PEN_BRUSH_AND_VOICE) ? 1 : 0;
 }
 
 /** The loyalty-pressure factor the SOURCE civ's age grants its pop-pressure

@@ -14,8 +14,15 @@ export { BOOST_FRACTION };
 
 /** AUDIT A-3: the eureka/inspiration discount, scoped to any civ's
  * research state (the player's effectiveResearchCost delegates here). */
-export function effectiveResearchCostIn(rsr: ResearchState, id: string, baseCost: number): number {
-  return rsr.boosted.includes(id) ? Math.round(baseCost * (1 - BOOST_FRACTION)) : baseCost;
+export function effectiveResearchCostIn(
+  rsr: ResearchState,
+  id: string,
+  baseCost: number,
+  goldenExtra = 0, // B-24 (#79): FREE_INQUIRY (techs) / PEN_BRUSH_AND_VOICE (civics)
+): number {
+  return rsr.boosted.includes(id)
+    ? Math.round(baseCost * (1 - BOOST_FRACTION - goldenExtra))
+    : baseCost;
 }
 
 function checkSatisfied(state: GameState, check: BoostCheck): boolean {

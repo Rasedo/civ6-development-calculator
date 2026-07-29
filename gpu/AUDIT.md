@@ -2661,10 +2661,36 @@ gap; likewise GS disasters are modeled minus sea-level rise
   defining properties (they hug the coast; they come in chains because hill
   ranges do; flat beaches stay landable) with zero magic constants and NO extra
   RNG draw, so the map stream is byte-identical to before.
-  BOTH ENGINES: TS blocks the `transition` step in `walkPath` via `cliffBlocks`;
-  the GPU blocks at per-direction STEP legality (`_cliff_block_dirs`) so a walker
-  routes AROUND a cliff instead of halting at it, which is what the TS pathing
-  does naturally.
+  BOTH ENGINES, and the SCOPE is the load-bearing part (see the 2026-07-29 fix
+  below): every mover that can cross land/water consults the rule, at CANDIDATE
+  level, so a walker routes AROUND a cliff instead of halting at it. TS asks
+  `cliffBlocksStep` (the shared wrapper over `cliffBlocks`: naval movers and
+  non-transitions exit early) from `walkPath`, from the `hostileUnitAct`
+  war-march and from the rival patrol in `rivalUnitActions`; the GPU masks
+  `_cliff_block_dirs` out of `step_ok`/`free` in both `_rival_unit_war_act` and
+  `_rival_unit_peace_act`.
+
+  **SCOPE BUG, found and fixed 2026-07-29 (#79).** As first landed the rule was
+  correct but reached ONE mover per engine, and they were DIFFERENT movers: TS
+  applied it only in the player's `walkPath`, the GPU only in
+  `_rival_unit_war_act`. The two engines therefore enforced cliffs on DISJOINT
+  sets of units, and a rival musketman embarked over a cliff on TS while the GPU
+  held it ashore — off-script gate, seed 9015, turn 198 (tile 360 is land with
+  `cliff_mask` bit 1 set toward tile 316, which is water). The `rng` column
+  diverged one turn later, at t199, as a downstream draw-count effect.
+  WHY THE GATES MISSED IT: scripted parity was green throughout and the fixtures
+  do not move — the scripted policy never puts a rival on a cliff edge. Only the
+  36-game rollout reaches one. This is the [[gate-reachability]] lesson again: a
+  green scripted gate is not evidence a new rule is enforced anywhere.
+  WHY THE BISECT LIED: disabling a golden dedication changes the GPU's whole
+  trajectory, so "all golden effects off -> REPLAY PARITY OK" looked like the
+  dedications caused the divergence. They did not; they only steered the games
+  into (or away from) the cliff edge. Toggling a feature that moves the
+  trajectory is not a bisect of the CAUSE.
+  STILL ASYMMETRIC, recorded for #51: the GPU player pool never embarks at all
+  (`p_emb` is written only on spawn and on capture, never by a walker) while
+  TS's `walkPath` embarks freely. Consistent today only because the GPU policy
+  never offers a water step for the player to take, so TS never replays one.
   MEASURED reachable: 101 tiles carry a cliff edge across the 12-seed export
   (0.7% of tiles), and `embarkState.live` is TRUE, so this is exercised rather
   than inert.
@@ -3206,6 +3232,41 @@ gap; likewise GS disasters are modeled minus sea-level rise
   Poke lane: tests/governors.test.ts (5 dedication cases — the matching
   event only, EXODUS's double rate, the Golden-age silence, the Heroic
   double-pay, and a civ with no commitments).
+
+  **B-24 GOLDEN-AGE DEDICATION BONUSES LANDED 2026-07-29 (#79).** A Golden age
+  trades the Dark/Normal era-score payout for a standing bonus; those bonuses
+  existed nowhere. All four dedications this model carries now have their golden
+  face, sourced from the Civ 6 dedication catalog (three of the four were also
+  confirmed by an independent wiki search before the catalog was supplied):
+    * MONUMENTALITY        +2 Movement for BUILDERS.
+    * EXODUS               +2 Movement for MISSIONARIES/APOSTLES, and +4 Great
+                           PROPHET points per turn.
+    * FREE_INQUIRY         Eurekas refund an ADDITIONAL 10% of TECH cost.
+    * PEN_BRUSH_AND_VOICE  Inspirations refund an additional 10% of CIVIC cost,
+                           and every city gains +1 Culture per SPECIALTY district.
+  NOT modelled and recorded: faith-purchase of civilians and the 30% purchase
+  discount (Monumentality), +2 charges on new religious units (Exodus), and the
+  Commercial Hub/Harbor gold-adjacency-also-gives-Science clause (Free Inquiry).
+  THE HUNT — three asymmetries, each found by bisecting effect-by-effect:
+    1. THE AUTO-PICK RE-PICK SITES. The discount changes WHICH item is cheapest,
+       and TS's `autoPickResearch` sorts by `effectiveResearchCost`. The GPU had
+       the bonus on its first `_auto_pick` but NOT on the two re-pick sites that
+       fire after a completion, so at seed 9002 t159 TS took EDUCATION (boosted,
+       201 -> 101 golden) while the GPU took SHIPBUILDING (120): the golden
+       discount flips the order, and only one engine saw it.
+    2. `spawnUnit` SET `movesLeft: def.moves` WITH NO BONUS. The GPU recomputes
+       full MP at WALK time and therefore granted it immediately, so a fresh
+       Builder/Missionary walked further on the GPU on its spawn turn. This is
+       the SHARED site — it is why the builder half and the exodus half each
+       diverged on their own (seed 9118 t121 `imp`; seed 9105 t85 `rQProg1`).
+    3. `refreshUnits` computes `full` WITHOUT a trailing semicolon, so a sweep
+       that matched the semicolon form silently skipped it — and that line is
+       both the movesLeft reset AND the "spent no MP" heal-gate reference.
+  METHOD: TS freezes a unit's MP as STATE (spawn -> refreshUnits -> rivalPhase
+  reset) while the GPU keeps none and recomputes at every walk. Any bonus to
+  movement must therefore be added at EVERY TS site that writes movesLeft, not
+  just the walkers. That asymmetry is the general lesson, not a one-off.
+
   B-24 -> 85%. STILL OPEN: the other eight catalog entries (four of which
   need spies / air units / artifacts / Giant Death Robots), the named
   GOLDEN bonuses, dark-age policies, governor establishment/promotions,

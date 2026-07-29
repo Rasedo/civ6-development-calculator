@@ -10,7 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, Improvemen
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, unitDomain, encampmentIntact, encampmentBlocks, riverCharge, layTradeRoad } from './units';
+import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, unitDomain, encampmentIntact, encampmentBlocks, riverCharge, layTradeRoad, cliffBlocksStep } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
@@ -1061,7 +1061,16 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
     if (hexDistance(here.col, here.row, home.col, home.row) <= 3) return;
     const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     const step = tilesWithin(state.map, here.col, here.row, 1)
-      .filter((t) => t.index !== here.index && passOk(t) && unitsAt(state, t.index).length === 0)
+      .filter(
+        (t) =>
+          t.index !== here.index &&
+          passOk(t) &&
+          unitsAt(state, t.index).length === 0 &&
+          // B-26 (#79): the patrol obeys cliffs like every other mover. At
+          // peace only an already-embarked unit crosses at all, so this is the
+          // DISEMBARK side of the same wall (GPU: _rival_unit_peace_act).
+          !cliffBlocksStep(state, here, t, unit),
+      )
       .sort(
         (a, b) =>
           hexDistance(a.col, a.row, home.col, home.row) - hexDistance(b.col, b.row, home.col, home.row),

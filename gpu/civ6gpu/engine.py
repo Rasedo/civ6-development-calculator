@@ -725,7 +725,12 @@ class BatchSim:
         self._gov_per = int(_er.get("govCivicsPerTitle", 10))
         self._gov_max = int(_er.get("govMaxTitles", 5))
         self._tile_buy_live = bool(_er.get("rivalTileBuyLive", False))  # A-5r (#71): inert until the gold-ladder hunt lands
-        self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))  # B-24 (#71): substrate live, payouts inert
+        self._ded_payouts_live = bool(_er.get("dedicationPayoutsLive", False))
+        # B-24 (#79): catalog indices for the golden-age faces.
+        self._ded_monumentality = int(_er.get("dedMonumentality", 0))
+        self._ded_free_inquiry = int(_er.get("dedFreeInquiry", 1))
+        self._ded_pen_brush = int(_er.get("dedPenBrush", 2))
+        self._ded_exodus = int(_er.get("dedExodus", 3))  # B-24 (#71): substrate live, payouts inert
         self._heroic_ded = int(_er.get("heroicDedications", 3))
         # B-24 (#77): the NAMED dedication catalog — per-kind event era score.
         self._ded_event_score = [int(x) for x in _er.get("dedEventScore", [1, 1, 1, 2])]
@@ -1996,13 +2001,24 @@ class BatchSim:
         missing = (prereq.unsqueeze(0) & ~done.unsqueeze(1)).any(dim=2)
         return ~done & ~missing
 
-    def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor) -> torch.Tensor:
-        return torch.where(boosted, js_round(cost * (1 - self.rules.boost_fraction)), cost)  # Math.round is half-up
+    def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor, golden_civ=None, is_civic: bool = False) -> torch.Tensor:
+        # B-24 (#79): a GOLDEN Free Inquiry (techs) or Pen, Brush and Voice
+        # (civics) makes a boost refund an EXTRA 10% of the item's cost. Callers
+        # that pass no civ keep the base behaviour exactly.
+        frac = self.rules.boost_fraction
+        if golden_civ is not None:
+            g = self._golden_ded(golden_civ, self._ded_pen_brush if is_civic else self._ded_free_inquiry)
+            extra = g.to(cost.dtype).view(-1, *((1,) * (cost.dim() - 1))) * 0.1
+            return torch.where(boosted, js_round(cost * (1 - frac - extra)), cost)
+        return torch.where(boosted, js_round(cost * (1 - frac)), cost)  # Math.round is half-up
 
-    def _auto_pick(self, cur, done, boosted, cost, prereq):
-        """Cheapest-available (effective cost, tie = table order), where cur == -1."""
+    def _auto_pick(self, cur, done, boosted, cost, prereq, golden_civ=None, is_civic: bool = False):
+        """Cheapest-available (effective cost, tie = table order), where cur == -1.
+        B-24 (#79): the key is the DISCOUNTED cost, so a golden Free Inquiry /
+        Pen-Brush-and-Voice changes which item is picked — TS's autoPickResearch
+        sorts by `effectiveResearchCost`, which carries the same bonus."""
         avail = self._available_mask(done, prereq)
-        eff = self._eff_cost(cost.unsqueeze(0).expand_as(avail), boosted)
+        eff = self._eff_cost(cost.unsqueeze(0).expand_as(avail), boosted, golden_civ, is_civic)
         key = torch.where(avail, eff, torch.tensor(float("inf"), dtype=self.dtype, device=self.device)).double()
         # stable tie-break on index: add a tiny index epsilon. #78: FORCED f64
         # for the same reason as the worked-tile pick — a 1e-6 epsilon is below
@@ -2698,6 +2714,12 @@ class BatchSim:
             in_d = self._b_req_district == d  # [NB] buildings of district d
             bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
             self.player_gp_points[:, cls] = self.player_gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
+        # B-24 (#79): golden EXODUS — +4 Great PROPHET points per turn, civ-wide.
+        if 0 <= self._prophet_cls < self._gp_nc:
+            _ex = self._golden_ded(0, self._ded_exodus)
+            self.player_gp_points[:, self._prophet_cls] = (
+                self.player_gp_points[:, self._prophet_cls] + _ex.to(self.dtype) * 4.0
+            )
         maxN = self._gp_effects.shape[1]
         for _ in range(maxN):  # usually one earn per class per turn; loop covers the roster
             earned = self.gp_earned[:, :nCls]
@@ -3064,7 +3086,7 @@ class BatchSim:
             e = torch.maximum(e, (civics[:, :nc].long() * self._civic_era[:nc]).max(dim=1).values)
         return e
 
-    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None) -> torch.Tensor:
+    def _tourism_of(self, gw_w: torch.Tensor, gw_a: torch.Tensor, gw_m: torch.Tensor, alive: torch.Tensor, own: torch.Tensor, era: torch.Tensor, relics: torch.Tensor | None = None, printing: torch.Tensor | None = None, artifacts: torch.Tensor | None = None) -> torch.Tensor:
         """[B] — B-20 (#71): a civ's per-turn TOURISM, the `playerTourism` /
         `rivalTourism` twin. Great Works pay the GS values that pair tourism
         with culture; every OWNED unpillaged SEASIDE RESORT pays its tile's
@@ -3092,6 +3114,8 @@ class BatchSim:
         # game. ALIVE-masked for the same reason the Great Works are.
         if relics is not None:
             t = t + self._relic_tour * (relics * alive.long()).sum(dim=1)
+        if artifacts is not None:  # B-20 (#79): artifacts pay tourism too
+            t = t + self._artifact_tourism * (artifacts * alive.long()).sum(dim=1)
         # WONDERS: base + eras advanced past each wonder's own era.
         w_live = (self.built_wonder >= 0) & self.built_wonder_complete & own
         if bool(w_live.any()):
@@ -3523,6 +3547,19 @@ class BatchSim:
         # same position (city.ts: buildings.faith += relicFaith right after
         # buildings.culture += greatWorkCulture).
         total[:, :, 5] += self._relic_faith * self.relics.to(self.dtype)
+        # B-20 (#79): ARTIFACTS pay CULTURE beside the works (city.ts position).
+        total[:, :, 4] += self._artifact_culture * self.artifacts.to(self.dtype)
+        # B-24 (#79): golden PEN, BRUSH AND VOICE — +1 Culture per SPECIALTY
+        # district in every city (the completedDistrictCount(specialtyOnly) set).
+        _pb = self._golden_ded(0, self._ded_pen_brush)
+        if bool(_pb.any()):
+            # Reuse `spec_count`, the per-city COMPLETED SPECIALTY district count
+            # B-18's Zen Meditation already computes. It is defined on BOTH
+            # branches of this function (cache hit AND recompute), unlike
+            # `owned_d`, which exists only on the recompute path — reading that
+            # crashed the rollout with an UnboundLocalError while scripted
+            # parity, which always recomputes, stayed green.
+            total[:, :, 4] += _pb.to(self.dtype).unsqueeze(1) * spec_count.to(self.dtype)
 
         # City-state envoy bonuses land on the capital (mods.capitalYields),
         # summed before the amenity multiplier like every other bonus.
@@ -4976,6 +5013,22 @@ class BatchSim:
         self.antiquity[rows, t[rows]] = True
 
 
+
+
+    def _golden_ded(self, civ, kind: int) -> torch.Tensor:
+        """B-24 (#79) [B] bool: is `civ` in a GOLDEN age holding dedication
+        `kind`? The goldenDedication twin. `civ` is a unified civ index — an int
+        when the caller knows it (the per-r rival phases) or a [B] tensor when it
+        varies per row (`_rival_unit_war_act` is keyed by unit SLOT, not civ).
+        A Golden age trades the Dark/Normal era-score payout for the standing
+        bonuses below, so every one of them gates on exactly this."""
+        if torch.is_tensor(civ):
+            c = civ.clamp(min=0)
+            age = self.civ_age.gather(1, c.unsqueeze(1)).squeeze(1)
+            k = self.ded_picks.shape[2]
+            picks = self.ded_picks.gather(1, c.view(-1, 1, 1).expand(-1, 1, k)).squeeze(1)
+            return (age == 2) & (picks == kind).any(dim=1)
+        return (self.civ_age[:, civ] == 2) & (self.ded_picks[:, civ] == kind).any(dim=1)
 
     def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None) -> torch.Tensor:
         """B-26 (#79) [B, 6]: per-direction, is the step cur->neighbour a
@@ -9012,8 +9065,19 @@ class BatchSim:
         add = torch.zeros(B, 6, dtype=torch.float64, device=dev)
         if nD == 0 or self.rc_bldg.shape[3] == 0:
             return nspec, add
-        w = self.rules_dev.focus_base.double()
-        sc_d = (self._spec_yields.double() * w.view(1, 6)).sum(dim=1)  # [nD]
+        # PERF (#79): `sc_d` and the district ORDER depend only on the rules, but
+        # were rebuilt on every call — and this runs ~186x per turn (46k calls
+        # over a 250-turn rollout), so a Python `sorted()` with a lambda was
+        # pure per-call overhead. Cache both; identical values, so bit-exact.
+        cache = getattr(self, "_spec_order_cache", None)
+        if cache is None:
+            w = self.rules_dev.focus_base.double()
+            sc_d = (self._spec_yields.double() * w.view(1, 6)).sum(dim=1)  # [nD]
+            order = sorted(range(nD), key=lambda d: (-float(sc_d[d]), d))
+            order = [d for d in order if float(sc_d[d]) > 0.0]
+            cache = (sc_d, order)
+            self._spec_order_cache = cache
+        sc_d, order = cache
         dt = self.rc_dist_tile[:, r, j]  # [B, nD]
         live = (
             (dt >= 0)
@@ -9022,11 +9086,8 @@ class BatchSim:
         )
         nb = self.rc_bldg.shape[3]
         req = self._b_req_district[:nb]
-        order = sorted(range(nD), key=lambda d: (-float(sc_d[d]), d))
         kkm = top_vals.shape[1]
-        for d in order:
-            if float(sc_d[d]) <= 0.0:
-                continue
+        for d in order:  # pre-filtered to sc_d > 0 by the cache above
             cnt = (self.rc_bldg[:, r, j] & (req == d).unsqueeze(0)).sum(dim=1) * live[:, d].long()
             if not bool((cnt > 0).any()):
                 continue
@@ -11281,6 +11342,15 @@ class BatchSim:
                 & (self.rv_at.gather(1, nbpc) < 0)
                 & (self.rvciv_at.gather(1, nbpc) < 0)  # C1-B5b: TS patrol blocks on ANY unit — builders included
             )
+            if self._embark_live:
+                # B-26 (#79): a CLIFF closes the embark/disembark edge for the
+                # PATROL too, not just the war-march. _cliff_block_dirs is keyed
+                # by CANONICAL direction, but nbp walks PATROL_DIR_PERM order —
+                # permute the mask into patrol order or it gates wrong edges.
+                _cb_p = self._cliff_block_dirs(
+                    curc, self.neigh[curc], self.rival_at == self.v_civ[:, v].unsqueeze(1)
+                )
+                free = free & ~_cb_p[:, PATROL_DIR_PERM]
             d_nb = self.pair_dist[home.unsqueeze(1), nbpc].to(torch.long)
             skey = torch.where(free, d_nb * 8 + arange6, 10**9)
             best = skey.min(dim=1).values
@@ -14610,6 +14680,7 @@ class BatchSim:
             self.gw_writing, self.gw_art, self.gw_music, self.alive, self.owner >= 0, self._civ_era(self.techs, self.civics),
             self.relics,  # B-20 (#73)
             self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,  # B-20 (#74)
+            self.artifacts,  # B-20 (#79)
         )
         # B-22 (#75): DIPLOMATIC FAVOR — government TIER + suzerainties, once
         # per turn at the civ level, the TS twin position.
@@ -14654,13 +14725,14 @@ class BatchSim:
         turn_science = sci_add
         turn_culture = cul_add
         if tech is None:
-            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
+            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t, golden_civ=0)
         self.tech_prog = self.tech_prog + turn_science
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_tech >= 0
             eff = self._eff_cost(
                 rd.t_cost.gather(0, self.cur_tech.clamp(min=0)),
                 self.tech_boosted.gather(1, self.cur_tech.clamp(min=0).unsqueeze(1)).squeeze(1),
+                golden_civ=0,  # B-24 (#79): golden FREE_INQUIRY
             )
             fin = active & (self.tech_prog >= eff)
             if not fin.any():
@@ -14675,20 +14747,21 @@ class BatchSim:
             self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
             self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
             if tech is None:
-                self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t)
+                self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t, golden_civ=0)  # B-24 (#79)
         # Banked progress only drains once the tree is exhausted (mirrors
         # advanceResearch; in manual mode progress banks while undecided).
         no_tech = (self.cur_tech == -1) & ~self._available_mask(self.techs, self._prereq_t).any(dim=1)
         self.tech_prog = torch.where(no_tech, torch.minimum(self.tech_prog, torch.zeros_like(self.tech_prog)), self.tech_prog)
 
         if civic is None:
-            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c, golden_civ=0, is_civic=True)
         self.civic_prog = self.civic_prog + turn_culture
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_civic >= 0
             eff = self._eff_cost(
                 rd.c_cost.gather(0, self.cur_civic.clamp(min=0)),
                 self.civic_boosted.gather(1, self.cur_civic.clamp(min=0).unsqueeze(1)).squeeze(1),
+                golden_civ=0, is_civic=True,  # B-24 (#79): golden PEN_BRUSH
             )
             fin = active & (self.civic_prog >= eff)
             if not fin.any():
@@ -14701,7 +14774,7 @@ class BatchSim:
             self.civic_prog = torch.where(fin, self.civic_prog - eff, self.civic_prog)
             self.cur_civic = torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic)
             if civic is None:
-                self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c)
+                self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c, golden_civ=0, is_civic=True)  # B-24 (#79)
         no_civic = (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
         self.civic_prog = torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog)
 

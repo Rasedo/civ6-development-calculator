@@ -153,6 +153,23 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
     expect(unit.movesLeft).toBe(0); // embark consumed all MP
   });
 
+  // B-26 (#79) REGRESSION: a CLIFF closes the embark edge for the WAR-MARCH,
+  // not just for the player's walkPath. The GPU's _rival_unit_war_act had
+  // always masked cliffs out of step_ok while TS had not, so a rival musketman
+  // embarked over a cliff on TS only — the off-script divergence at seed 9015
+  // t198 (TS moved 360->316 onto water, the GPU held). Scripted parity never
+  // saw it; only the rollout put a rival on a cliff edge.
+  it('LIVE + SHIPBUILDING but CLIFFED: the war-march stays ashore', () => {
+    setEmbarkLive(true);
+    const { state, unit } = marchScenario(['SAILING', 'SHIPBUILDING']);
+    const start = state.map.tiles[unit.tileIndex];
+    start.cliffMask = 0b111111; // wall every land/water edge of the start tile
+    hostileUnitAct(state, unit);
+    expect(unit.embarked).toBeFalsy();
+    expect(isWater(state.map.tiles[unit.tileIndex])).toBe(false);
+    expect(unit.tileIndex).toBe(start.index); // no legal step remained
+  });
+
   it('LIVE but NO SHIPBUILDING: the unit cannot embark and stays ashore', () => {
     setEmbarkLive(true);
     const { state, unit } = marchScenario(['SAILING']); // civilian tech only

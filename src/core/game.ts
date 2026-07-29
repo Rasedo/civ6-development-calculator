@@ -19,7 +19,7 @@ import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTurn, playerSuzerainCount, worldCongress } from './rivals';
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
-import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles } from './eras';
+import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
@@ -42,7 +42,8 @@ export const TURN_LIMIT = 250;
 
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
-  return effectiveResearchCostIn(state.research, id, baseCost); // A-3: shared with the rival loops
+  // B-24 (#79): a GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost.
+  return effectiveResearchCostIn(state.research, id, baseCost, goldenBoostBonus(state, 0, !TECHS[id]));
 }
 
 /**
@@ -1124,6 +1125,7 @@ function religiousVictor(state: GameState): number {
 export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonClass, number> {
   const out = Object.fromEntries(GP_CLASSES.map((c) => [c, 0])) as Record<GreatPersonClass, number>;
   const gppFlat = getModifiers(state).gppFlat;
+  out.PROPHET += goldenProphetPoints(state, 0); // B-24 (#79): golden EXODUS
   for (const city of state.cities) {
     for (const cls of GP_CLASSES) {
       const district = GP_CLASS_DISTRICT[cls];
