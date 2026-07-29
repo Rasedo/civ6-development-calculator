@@ -752,6 +752,55 @@ Per-item weights (done% in parens where partial):
   NEXT STEP: print the KIND and `n` at the GPU award site and at the matching TS
   call for civ 1 at t111 — NAME the dedication instead of inferring it from its
   score.
+  **ROOT-CAUSED 2026-07-29 (#79): rGScore1 IS A LOST RELIC ON A CITY TRANSFER.**
+  The whole 2.85 gap is ONE RELIC (4 faith) in rival 1's SECOND city, which
+  rival 1 acquires on the final turn. Measured, not inferred — at t250 the two
+  engines agree on that city's pop and on five of six yields and differ only in
+  faith:
+      TS  r1 city5   pop=4 F=13 P=12.35 G=15.2 S=6.65 C=1.9 Fa=14.2500 relics=0
+      GPU r1 cityj1  pop=4 F=13 P=12.35 G=15.2 S=6.65 C=1.9 Fa=18.0500 relics=1
+  4 faith x 0.95 (global amenity factor) = 3.80 faith; x 0.75 (the faith score
+  weight) = 2.85 = the exact rGScore1 gap. `rGScore` is `rivalEmpireScore`, a
+  DERIVED weighted sum recomputed per turn, so nothing accumulates — the gap
+  appears the instant the city changes hands and not before.
+  WHY t249 IS THE FIRST RED: the trace row labelled t249 is emitted when
+  `self.turn == 250`, and rival 1 goes from 1 city to 2 exactly there. Every
+  earlier turn agrees; `replay-gpu.ts` breaks at the first bad turn.
+  MECHANISM: TS enumerates the new city's fields by hand in its three transfer
+  constructors (`rivals.ts` defected / flipped, `combat.ts` captured) and never
+  lists `relics` / `greatWorksWriting` / `greatWorksArt` / `greatWorksMusic` —
+  B-30 taught those literals to keep districts/buildings/wonders, but B-20 added
+  the works later and never revisited them. The GPU keeps `rc_relics` and
+  `rc_gw_*` as per-city PLANES moved by the transfer registry. Registry vs
+  hand-written literal — the same asymmetry class as [[new-class-invariant-sweep]].
+  CIV 6 SOURCE: the victor gains control of the Great Works held in a captured
+  city's buildings/districts/wonders (the Palace's are the exception, and TS
+  already drops PALACE). So carrying them is the FAITHFUL direction and the GPU
+  is the closer engine here — TS is the wrong one, per the source-of-truth rule
+  that we do NOT reflexively mirror TS.
+  **THE NAIVE FIX IS WRONG AND IS NOT SHIPPED — REVERTED.** Adding all four
+  counts to all three constructors traded 1 red for 3 (seed 9105 t139
+  rCivicProg1, seed 9235 t229 rGScore0, seed 9301 t213 rGScore0). Narrowing to
+  ONLY the measured rc->rc flip path still left 2 reds — seed 9235 t229 gap 2.70
+  (= 4 x 0.90 x 0.75) and seed 9301 t213 gap 2.85 — both again EXACTLY one
+  relic, but now with **TS higher than the GPU**, the opposite direction from
+  t249. So the GPU does NOT simply carry relics across every rc->rc flip; its
+  effective rule is narrower and is NOT yet characterized.
+  MY REASONING ERROR, the FOURTH of this shape in this hunt: I measured ONE
+  transfer path (relics=1 carried at t249) and generalized to three, then to
+  "the registry carries everything". The measurement covered one path only.
+  NEXT STEP: characterize the GPU side FIRST — probe `rc_relics` for the source
+  and destination slot across every rc->rc flip in seeds 9235/9301, and find
+  which flips preserve it and which zero it (candidate: `_reclaim_rc`
+  compaction permutes the destination slot, so a relic survives only when the
+  destination index is not reclaimed). Only then decide the single faithful rule
+  and apply it to BOTH engines together.
+  GATE REACHABILITY, MEASURED AND SEVERE: with the 12-seed set, `tsc` + 440
+  vitest + re-export + scripted parity were ALL GREEN with the broken 3-path fix
+  applied (0.0 milli). Seed 9235 is not in the 12-seed set, so the shrunk gate
+  cannot see this mechanic at all and would have shipped the regression. The
+  24-seed `replay-gpu.ts` reproduction is the ONLY lane that catches it — one
+  more reason [[seed-set-shrunk]] must be restored to 24 before the final hunt.
   METHOD: this is the first probe in the sequence to produce a clean answer, and
   the only one that compared STATE at a fixed point instead of enumerating call
   sites. Three earlier attempts failed by enumeration.
