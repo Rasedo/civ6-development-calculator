@@ -10842,6 +10842,38 @@ class BatchSim:
             d = d + 4 * (self.improvement[bidx, tiles] == self.FORT).long()
         return d
 
+    def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
+        """unitsHostile over a PLANE of seats — [B, T] bool.
+
+        #51/S3.4b: the ONE hostility question, asked of a whole map at once.
+        `a_seat` is the asker (int, or [B, 1]/[B] tensor); `b_plane` [B, T]
+        holds the other party's seat, -1 for nobody.
+
+        A barbarian is hostile to every non-barbarian and vice versa; two
+        barbarians are not hostile; otherwise it is civsAtWar, which today
+        still means r_atwar for a player pair and rr_war for a rival pair.
+        S4.3 replaces both with one symmetric matrix and this becomes a
+        single gather.
+        """
+        B, rcap = self.B, max(self.R - 1, 0)
+        a = a_seat if torch.is_tensor(a_seat) else torch.full(
+            (B, 1), a_seat, dtype=torch.long, device=self.device
+        )
+        a = a.reshape(B, 1)
+        valid = b_plane >= 0
+        a_barb, b_barb = a == BARB_SEAT, b_plane == BARB_SEAT
+        # exactly one side barbarian -> hostile; both -> not
+        barb_pair = a_barb ^ b_barb
+        # player pair: one side is seat 0, the other a rival
+        pl_rv = ((a == 0) & (b_plane > 0) & ~b_barb) | ((b_plane == 0) & (a > 0) & ~a_barb)
+        rv_idx = torch.where(a == 0, b_plane - 1, a - 1).clamp(min=0, max=rcap).expand_as(b_plane)
+        war_pl = self.r_atwar.gather(1, rv_idx)
+        # rival pair
+        rv_rv = (a > 0) & ~a_barb & (b_plane > 0) & ~b_barb & (a != b_plane)
+        bidx = torch.arange(B, device=self.device).unsqueeze(1)
+        war_rr = self.rr_war[bidx, (a - 1).clamp(min=0, max=rcap), (b_plane - 1).clamp(min=0, max=rcap)]
+        return valid & (barb_pair | (pl_rv & war_pl) | (rv_rv & war_rr))
+
     def _in_enemy_zoc(self, dest: torch.Tensor, seat) -> torch.Tensor:
         """B-3 ZOC (mirrors units.inEnemyZoc): does `dest` sit adjacent to a
         MILITARY unit hostile to a mover of `seat`? [B] -> [B].
@@ -10857,32 +10889,15 @@ class BatchSim:
         non-barbarian and vice versa; otherwise it is civsAtWar(seat, other).
 
         #45/B-6: EMBARKED military exert NO ZOC (barbarians never embark)."""
-        pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
-        rmil_exert = (self.rv_at >= 0) & ~self.v_emb.gather(1, self.rv_at.clamp(min=0))
-        barb_here = self.barb_at >= 0
-
-        if not torch.is_tensor(seat) and seat == BARB_SEAT:
-            # A barb is hostile to every non-barb, and to no other barb.
-            hostmil = pmil_exert | rmil_exert
-            dn = self.neigh[dest.clamp(min=0)]
-            return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
-
-        # A civ mover: barbarians always exert; the player and other rivals
-        # exert only while at war with this seat.
-        mover_civ = seat - 1 if torch.is_tensor(seat) else torch.full(
-            (self.B,), seat - 1, dtype=torch.long, device=self.device
-        )
-        atwar = self.r_atwar.gather(1, mover_civ.clamp(min=0).unsqueeze(1)).squeeze(1)
-        hostmil = barb_here | (pmil_exert & atwar.unsqueeze(1))
-        rmil_civ = torch.where(
-            self.rv_at >= 0,
-            self.v_civ.gather(1, self.rv_at.clamp(min=0)),
-            torch.full_like(self.rv_at, -1),
-        )  # [B, T]
-        mc = mover_civ.clamp(min=0).unsqueeze(1)  # [B, 1]
-        bidxT = torch.arange(self.B, device=self.device).unsqueeze(1)
-        war_t = self.rr_war[bidxT, mc, rmil_civ.clamp(min=0)]  # [B, T]
-        hostmil = hostmil | (rmil_exert & (rmil_civ != mover_civ.unsqueeze(1)) & war_t)
+        mil = self.occ_mil
+        here = mil >= 0
+        mslot = mil.clamp(min=0)
+        # Whose military stands on each tile, and does it EXERT? #45/B-6: an
+        # embarked unit exerts no ZOC (barbarians never embark, so the merged
+        # emb plane covers all three pools uniformly).
+        mseat = torch.where(here, self.unit_seat.gather(1, mslot), torch.full_like(mil, -1))
+        exert = here & ~self.unit_emb.gather(1, mslot)
+        hostmil = exert & self._seats_hostile(seat, mseat)
         dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
         return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
 
