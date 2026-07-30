@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT } from './seats';
+import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -524,7 +524,7 @@ export function encampmentDefense(
   // to do with this district. A unit standing on the ENCAMPMENT is fought as a
   // unit instead (the `enemies.length === 0` precedence in meleeAttack), so the
   // district never doubles up with a defender.
-  if (tile.rivalId !== undefined) {
+  if (isRivalSeat(tileSeat(tile))) {
     const rival = state.rivals.find((r) => r.id === tile.rivalId);
     if (!rival) return null;
     return { defCS: Math.max(15, rival.bestMeleeCS ?? 0), k: 'renc' };
@@ -979,7 +979,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
     if ((t.csId ?? -1) === cs.id) {
       t.csId = undefined;
-      if (t.cityId === -1) t.cityId = id;
+      if (!isPlayerSeat(tileSeat(t))) t.cityId = id;
     }
   }
   // #70 HUNT (new G-item): a conquered city-state's centre tile never got its
@@ -1104,7 +1104,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
       t.rivalId = undefined;
       t.rivalCityId = undefined;
-      if (t.cityId === -1) t.cityId = id;
+      if (!isPlayerSeat(tileSeat(t))) t.cityId = id;
     }
   }
   center.cityId = id;
@@ -1175,7 +1175,7 @@ function campCandidates(state: GameState): Tile[] {
   const preferFog = state.fogOfWar && state.explored.length > 0;
   return state.map.tiles.filter((t) => {
     if (isWater(t) || isImpassable(t) || t.wonder || t.district || t.builtWonder) return false;
-    if (t.cityId !== -1 || t.goodyHut) return false;
+    if (isPlayerSeat(tileSeat(t)) || t.goodyHut) return false;
     if (tileForeignTo(t, PLAYER_CIV)) return false;
     if (preferFog && state.explored[t.index] === 1) return false; // camps rise in the fog
     for (const c of state.cities) {
@@ -1232,7 +1232,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // scope (residual) — enemy rival TILES are never a pillage/march target here.
   const atWarWithPlayer =
     isBarbSeat(unit.seat) || (isRivalSeat(unit.seat) && civsAtWar(state, unitSeat(unit), 0));
-  const hereOwned = (here.cityId !== -1 && atWarWithPlayer) || (isBarbSeat(unit.seat) && here.rivalId !== undefined);
+  const hereOwned = (isPlayerSeat(tileSeat(here)) && atWarWithPlayer) || (isBarbSeat(unit.seat) && isRivalSeat(tileSeat(here)));
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
     if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
@@ -1262,7 +1262,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
-    const tOwned = (t.cityId !== -1 && atWarWithPlayer) || (isBarbSeat(unit.seat) && t.rivalId !== undefined);
+    const tOwned = (isPlayerSeat(tileSeat(t)) && atWarWithPlayer) || (isBarbSeat(unit.seat) && isRivalSeat(tileSeat(t)));
     if (!tOwned) continue;
     const impJob = t.improvement !== null && !t.pillaged;
     const distJob =

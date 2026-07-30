@@ -46,7 +46,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV, playerSeat } from './seats';
+import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat } from './seats';
 
 export interface CityStats {
   city: City;
@@ -286,7 +286,7 @@ export function luxuryAmenities(state: GameState): Map<number, number> {
 
   const luxuries = new Set<string>();
   for (const t of state.map.tiles) {
-    if (!t.resource || t.cityId === -1) continue;
+    if (!t.resource || !isPlayerSeat(tileSeat(t))) continue;
     const def = RESOURCES[t.resource];
     if (def.category === 'luxury' && t.improvement === def.improvement) luxuries.add(t.resource);
   }
@@ -319,7 +319,7 @@ export function borderCandidates(state: GameState, city: City): number[] {
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
   for (const t of tilesWithin(state.map, center.col, center.row, BORDER_MAX_RADIUS)) {
-    if (t.cityId !== -1) continue;
+    if (isPlayerSeat(tileSeat(t))) continue;
     if (tileForeignTo(t, PLAYER_CIV)) continue; // foreign territory
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && n.cityId === city.id,
@@ -470,7 +470,7 @@ export function playerTourism(state: GameState): number {
   // B-20 (#74): PRINTING doubles Great Work of Writing tourism.
   const printing = playerSeat(state).research.techs.includes(GW_PRINTING_TECH);
   for (const c of state.cities) t += greatWorkTourism(c, printing) + relicTourism(c) + artifactTourism(c); // B-20 (#73) relics, (#79) artifacts
-  const owns = (tile: Tile) => tile.cityId !== -1;
+  const owns = (tile: Tile) => isPlayerSeat(tileSeat(tile));
   const era = civEraIndex(playerSeat(state).research.techs, playerSeat(state).research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
 }

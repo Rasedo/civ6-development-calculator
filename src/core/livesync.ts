@@ -8,7 +8,7 @@
  */
 
 import type { City, DistrictId, GameState, QueueItem, Tile } from './types';
-import { playerSeat, PLAYER_CIV } from './seats';
+import { playerSeat, PLAYER_CIV, isPlayerSeat, tileSeat } from './seats';
 import { parseCivExport } from './importer';
 import { createGameFromMap, districtCost, settlerCost, projectCost } from './game';
 import { tileIndex, inBounds, tilesWithin, hexDistance } from './hex';
@@ -246,7 +246,7 @@ export function parseLiveSync(text: string): SyncResult {
     center.improvement = null;
     if (center.feature && FEATURES[center.feature].removable) center.feature = null;
     for (const t of tilesWithin(map, center.col, center.row, 1)) {
-      if (t.cityId === -1) t.cityId = id;
+      if (!isPlayerSeat(tileSeat(t))) t.cityId = id;
     }
     center.cityId = id;
     state.cities.push(city);
@@ -269,7 +269,7 @@ export function parseLiveSync(text: string): SyncResult {
   // --- plots: ownership first, then structures ----------------------------------
   for (const [i, delta] of plots) {
     const tile = map.tiles[i];
-    if (delta.owner === localPlayer && tile.cityId === -1) {
+    if (delta.owner === localPlayer && !isPlayerSeat(tileSeat(tile))) {
       const c = nearestCity(tile, 5);
       if (c) tile.cityId = c.id;
     }

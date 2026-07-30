@@ -6,7 +6,7 @@
  */
 
 import type { GameState, Unit } from './types';
-import { playerSeat, isPlayerSeat } from './seats';
+import { playerSeat, isPlayerSeat, tileSeat } from './seats';
 import { tilesWithin, hexDistance } from './hex';
 import { nextRandom } from './rand';
 import { isWater, isImpassable } from './query';
@@ -38,7 +38,7 @@ export function revealAround(state: GameState, tileIndex: number, radius = SIGHT
 export function initFog(state: GameState): void {
   state.explored = new Array(state.map.tiles.length).fill(0);
   for (const t of state.map.tiles) {
-    if (t.cityId !== -1) revealAround(state, t.index, 1);
+    if (isPlayerSeat(tileSeat(t))) revealAround(state, t.index, 1);
   }
   for (const c of state.cities) revealAround(state, c.centerIndex, 3);
   for (const u of state.units) {

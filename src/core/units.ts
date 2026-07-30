@@ -19,7 +19,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, civOfRival } from './seats';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, NO_SEAT } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -257,9 +257,8 @@ export function encampmentIntact(tile: Tile): boolean {
  * (City-states never build Encampments in this model, so `csId` needs no arm.)
  */
 export function tileOwnerSide(tile: Tile): { seat: number } | null {
-  if (tile.rivalId !== undefined) return { seat: civOfRival(tile.rivalId) };
-  if (tile.cityId >= 0) return { seat: PLAYER_CIV };
-  return null;
+  const s = tileSeat(tile);
+  return s === NO_SEAT ? null : { seat: s };
 }
 
 /**
@@ -328,7 +327,7 @@ function tileOwnedByUnitOwner(
   t: Tile,
   unit: { seat: number },
 ): boolean {
-  if (isPlayerSeat(unit.seat)) return t.cityId !== -1;
+  if (isPlayerSeat(unit.seat)) return isPlayerSeat(tileSeat(t));
   if (isRivalSeat(unit.seat)) return (t.rivalId ?? -1) === rivalOfCiv(unit.seat);
   return false; // barbarians own nothing
 }
@@ -652,7 +651,7 @@ export function archaeologistExcavate(state: GameState, unitId: number): RuleRes
   if ((unit.charges ?? 0) <= 0) return no('No charges left.');
   const tile = state.map.tiles[unit.tileIndex];
   if (!tile?.antiquity) return no('No antiquity site here.');
-  if (tileRivalCiv(tile) !== null || (tile.csId ?? -1) !== -1) {
+  if (tileRivalCiv(tile) !== null || isCityStateSeat(tileSeat(tile))) {
     return no('That dig lies in foreign territory.');
   }
   const home = state.cities
@@ -775,11 +774,11 @@ export function refreshUnits(state: GameState): void {
     // units that have never been refreshed.
     const grantedLast = unit.movesFull ?? full;
     if (unit.movesLeft >= grantedLast) {
-      const unowned = tile.cityId === -1 && tile.rivalId === undefined && tile.csId === undefined;
+      const unowned = !isPlayerSeat(tileSeat(tile)) && tile.rivalId === undefined && tile.csId === undefined;
       let heal: number;
       if (isPlayerSeat(unit.seat)) {
-        if (tile.cityId !== -1 && tile.district === 'CITY_CENTER') heal = 20;
-        else if (tile.cityId !== -1) heal = 15;
+        if (isPlayerSeat(tileSeat(tile)) && tile.district === 'CITY_CENTER') heal = 20;
+        else if (isPlayerSeat(tileSeat(tile))) heal = 15;
         else heal = unowned ? 10 : 5;
       } else if (isRivalSeat(unit.seat)) {
         if (tile.rivalId === rivalOfCiv(unit.seat) && tile.district === 'CITY_CENTER') heal = 20;
@@ -888,8 +887,8 @@ export function playerPillage(state: GameState, unitId: number): RuleResult {
   if (unit.movesLeft <= 0) return no('No movement left.');
   const tile = state.map.tiles[unit.tileIndex];
   const enemy =
-    (tile.rivalId !== undefined && (state.rivals.find((r) => r.id === tile.rivalId)?.atWar ?? false)) ||
-    tile.csId !== undefined;
+    (isRivalSeat(tileSeat(tile)) && (state.rivals.find((r) => r.id === tile.rivalId)?.atWar ?? false)) ||
+    isCityStateSeat(tileSeat(tile));
   if (!enemy) return no('Not an enemy tile.');
   if (tile.improvement && !tile.pillaged) {
     tile.pillaged = true;
@@ -949,7 +948,7 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
   const grant = harvestGrant(state, tile);
   if (!grant) {
     return no(
-      tile.cityId === -1
+      !isPlayerSeat(tileSeat(tile))
         ? 'Harvesting only works inside your borders.'
         : 'This resource cannot be harvested (or needs research).',
     );

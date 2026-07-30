@@ -9,7 +9,7 @@
  */
 
 import type { City, GameState, Unit, Yields } from './types';
-import { playerSeat, isPlayerSeat, isBarbSeat, PLAYER_CIV } from './seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, PLAYER_CIV, tileSeat } from './seats';
 import { YIELD_KEYS, emptyYields, addYields } from './types';
 import {
   createGame,
@@ -149,12 +149,12 @@ export interface StepResult {
 
 function autoBuilder(state: GameState, unit: Unit): void {
   const tile = state.map.tiles[unit.tileIndex];
-  if (tile.pillaged && tile.cityId !== -1) {
+  if (tile.pillaged && isPlayerSeat(tileSeat(tile))) {
     builderRepair(state, unit.id);
     return;
   }
   const options = validImprovements(state, tile);
-  if (options.length > 0 && !tile.improvement && tile.cityId !== -1) {
+  if (options.length > 0 && !tile.improvement && isPlayerSeat(tileSeat(tile))) {
     builderImprove(state, unit.id, options[0]);
     return;
   }
@@ -163,7 +163,7 @@ function autoBuilder(state: GameState, unit: Unit): void {
   let best: number | null = null;
   let bestDist = 99;
   for (const t of state.map.tiles) {
-    if (t.cityId === -1) continue;
+    if (!isPlayerSeat(tileSeat(t))) continue;
     const job = (t.pillaged || (!t.improvement && validImprovements(state, t).length > 0));
     if (!job) continue;
     const d = hexDistance(tile.col, tile.row, t.col, t.row);
@@ -852,7 +852,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
   const builders = s.units.filter((u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'civilian').length;
   const military = s.units.filter((u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'military').length;
   const pillaged = s.map.tiles.filter((t) => t.pillaged).length;
-  const owned = s.map.tiles.filter((t) => t.cityId !== -1);
+  const owned = s.map.tiles.filter((t) => isPlayerSeat(tileSeat(t)));
   const improvable = owned.filter((t) => !t.improvement && !t.district && validImprovements(s, t).length > 0).length;
   const exploredFrac =
     s.explored.length > 0 ? s.explored.filter((e) => e === 1).length / s.explored.length : 1;

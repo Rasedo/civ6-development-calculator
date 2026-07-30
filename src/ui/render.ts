@@ -5,7 +5,7 @@
  */
 
 import { hexCenter, cornerOffsets, EDGE_CORNERS, pixelToHex, inBounds, tileIndex, neighborOffset } from '../core/hex';
-import { isBarbSeat, isRivalSeat, rivalOfSeat } from '../core/seats';
+import { isBarbSeat, isRivalSeat, rivalOfSeat, isPlayerSeat, tileSeat } from '../core/seats';
 import type { GameMap, GameState, Tile } from '../core/types';
 import { TERRAINS, MOUNTAIN_COLOR } from '../data/terrains';
 import { RESOURCES, RESOURCE_CATEGORY_COLORS } from '../data/resources';
@@ -186,7 +186,7 @@ export class MapRenderer {
     ctx.strokeStyle = 'rgba(216,181,74,0.6)';
     ctx.lineWidth = 1.4;
     for (const { tile, cx, cy } of visible) {
-      if (tile.cityId === -1) continue;
+      if (!isPlayerSeat(tileSeat(tile))) continue;
       for (let d = 0; d < 6; d++) {
         const [nc, nr] = neighborOffset(tile.col, tile.row, d);
         const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;

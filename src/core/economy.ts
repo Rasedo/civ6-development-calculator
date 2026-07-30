@@ -4,7 +4,7 @@
  * Lives outside game.ts so units.ts can use it without an import cycle.
  */
 
-import { playerSeat } from './seats';
+import { playerSeat, isPlayerSeat, tileSeat } from './seats';
 
 import type { GameState, Tile, YieldKey } from './types';
 import { computeUnlocks } from './effects';
@@ -30,7 +30,7 @@ export function chopGrant(state: GameState, tile: Tile): LumpGrant | null {
   if (!tile.feature) return null;
   const key = FEATURES[tile.feature]?.chopYield;
   if (!key) return null;
-  if (tile.cityId === -1) return null; // outside any city's borders
+  if (!isPlayerSeat(tileSeat(tile))) return null; // outside any city's borders
   return { key, amount: chopValue(state) };
 }
 
@@ -39,7 +39,7 @@ export function harvestGrant(state: GameState, tile: Tile): LumpGrant | null {
   if (!tile.resource) return null;
   const res = RESOURCES[tile.resource];
   if (!res?.harvestYield) return null;
-  if (tile.cityId === -1) return null;
+  if (!isPlayerSeat(tileSeat(tile))) return null;
   // Harvesting needs the tech that works the resource (eyeballed Civ 6 gating).
   if (!state.sandbox && !computeUnlocks(state).improvements.has(res.improvement)) return null;
   return { key: res.harvestYield, amount: chopValue(state) };

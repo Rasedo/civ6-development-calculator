@@ -71,7 +71,7 @@ import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -1260,7 +1260,7 @@ function isFortJobTile(state: GameState, rival: RivalCiv, t: Tile, unlocks: Unlo
   }
   // the BORDER clause — the whole point of the owner-chosen rule
   return neighbors(state.map, t).some((n) => {
-    if (rival.atWar && n.cityId !== -1) return true; // player territory
+    if (rival.atWar && isPlayerSeat(tileSeat(n))) return true; // player territory
     const rc = tileRivalCiv(n);
     return rc !== null && rc !== own && (rival.atWarRivals?.includes(rivalOfCiv(rc)) ?? false);
   });

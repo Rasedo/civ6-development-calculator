@@ -4,7 +4,7 @@
  */
 
 import type { DistrictId, GameState, Tile, YieldKey, Yields } from '../core/types';
-import { playerSeat, isPlayerSeat } from '../core/seats';
+import { playerSeat, isPlayerSeat, tileSeat } from '../core/seats';
 import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
@@ -294,7 +294,7 @@ export function renderTilePanel(
           })
           .join('') +
         '</div>';
-    } else if (tile.cityId === -1 && !terrain.water && !wonder) {
+    } else if (!isPlayerSeat(tileSeat(tile)) && !terrain.water && !wonder) {
       improvementHtml = '<div class="muted">Unclaimed — found a city nearby or grow borders to use this tile.</div>';
     }
   }

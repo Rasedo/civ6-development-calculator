@@ -28,7 +28,7 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat } from '../src/core/seats';
 
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
@@ -1729,7 +1729,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     state.cities.some((c2) => c2.queue.some((q) => q.kind === 'unit' && q.unit === 'BUILDER'));
   const builderJobExists = (): boolean =>
     state.map.tiles.some(
-      (t2) => t2.cityId !== -1 && (t2.pillaged || (!t2.improvement && validImprovements(state, t2).includes('FARM'))),
+      (t2) => isPlayerSeat(tileSeat(t2)) && (t2.pillaged || (!t2.improvement && validImprovements(state, t2).includes('FARM'))),
     );
   // #56 H1: army scaling — alive player military + queued military across all
   // city queues (the per-city else-if loop naturally sees earlier cities'
@@ -1844,7 +1844,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     for (const u of state.units) {
       if (!isPlayerSeat(u.seat) || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
       const btile = state.map.tiles[u.tileIndex];
-      if (btile.pillaged && btile.cityId !== -1) {
+      if (btile.pillaged && isPlayerSeat(tileSeat(btile))) {
         // #56 H2: REPAIR first (the rival A-13 semantics — no charge spent,
         // the turn is; barb raids on player farmland finally get answered).
         btile.pillaged = false;
@@ -1860,7 +1860,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       for (const t of state.map.tiles) {
         // #56 H2: a job is any owned tile that is unimproved-farmable OR
         // pillaged (repair) — must match builderJobExists and the GPU walker.
-        if (t.cityId === -1) continue;
+        if (!isPlayerSeat(tileSeat(t))) continue;
         if (!(t.pillaged || (!t.improvement && validImprovements(state, t).includes('FARM')))) continue;
         const key = hexDistance(btile.col, btile.row, t.col, t.row) * (nTiles + 1) + t.index;
         if (key < bestKey) {

@@ -11,7 +11,7 @@ import { tileYields } from './yields';
 import { fogActive, isExplored } from './fog';
 import { unitsHostile, unitDomain } from './units';
 import { RESOURCES } from '../data/resources';
-import { tileForeignTo, PLAYER_CIV, isPlayerSeat } from './seats';
+import { tileForeignTo, PLAYER_CIV, isPlayerSeat, tileSeat } from './seats';
 
 export const SPATIAL_PLANES = [
   'water',
@@ -75,10 +75,10 @@ export function spatialObservation(state: GameState): Uint8Array {
       else if (cat === 'strategic') out[at(P.strategicResource, i)] = 1;
     }
     if (tile.riverMask !== 0) out[at(P.river, i)] = 1;
-    if (tile.cityId !== -1) out[at(P.ownedMine, i)] = 1;
+    if (isPlayerSeat(tileSeat(tile))) out[at(P.ownedMine, i)] = 1;
     if (tileForeignTo(tile, PLAYER_CIV)) out[at(P.ownedForeign, i)] = 1;
     if (tile.district || tile.builtWonder) {
-      if (tile.cityId !== -1) out[at(P.myDistrict, i)] = 1;
+      if (isPlayerSeat(tileSeat(tile))) out[at(P.myDistrict, i)] = 1;
     }
     if (tile.improvement) out[at(P.improvement, i)] = tile.pillaged ? 2 : 1;
     if (state.barbCamps.includes(i)) out[at(P.hostiles, i)] = 3;

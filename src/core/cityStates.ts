@@ -7,7 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
-import { playerSeat } from './seats';
+import { playerSeat, isPlayerSeat, tileSeat } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -99,7 +99,7 @@ export function placeCityStates(state: GameState, count?: number): void {
       questIssuedTurn: 0,
     };
     for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-      if (t.cityId === -1 && (t.csId ?? -1) === -1) t.csId = cs.id;
+      if (!isPlayerSeat(tileSeat(t)) && (t.csId ?? -1) === -1) t.csId = cs.id;
     }
     tile.csId = cs.id;
     state.cityStates.push(cs);

@@ -1,7 +1,7 @@
 /** Evaluation of eureka/inspiration conditions against the game state. */
 
 import { dedicationEvent } from './eras';
-import { playerSeat } from './seats';
+import { playerSeat, isPlayerSeat, tileSeat } from './seats';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/rivals';
 import type { GameState, ResearchState, RivalCiv } from './types';
 import { neighbors } from './hex';
@@ -75,7 +75,7 @@ function checkSatisfied(state: GameState, check: BoostCheck): boolean {
     case 'nearNaturalWonder':
       return state.map.tiles.some(
         (t) =>
-          t.cityId !== -1 &&
+          isPlayerSeat(tileSeat(t)) &&
           (t.wonder !== null || neighbors(state.map, t).some((n) => n.wonder !== null)),
       );
     case 'policies':
