@@ -36,8 +36,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
-    pantheonClaimed: true,
-    religionFounded: true,
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     ...opts,
   };
   const city: RivalCity = {
@@ -189,7 +188,7 @@ describe('B9-R3 rival WORSHIP faith-buy (rivalPhase)', () => {
    * big faith bank; treasury 0 so no gold building-buy perturbs the run. */
   function buildFounder(): { state: GameState; rival: RivalCiv } {
     const state = makeState();
-    const rival = addRival(state, 6, 6, { religionFounded: true, pantheonClaimed: true, faith: 1000, treasury: 0 });
+    const rival = addRival(state, 6, 6, { religion: { pantheon: 'GOD_OF_THE_SEA', founded: true, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 1000, treasury: 0 });
     const cap = rival.cities[0];
     cap.buildings = ['TEMPLE'];
     const hs = tileAtCoords(state.map, 6, 7);

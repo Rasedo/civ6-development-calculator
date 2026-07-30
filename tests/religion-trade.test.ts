@@ -34,11 +34,11 @@ describe('pantheons', () => {
   it('Fertility Rites boosts growth; Religious Settlements cheapens borders', () => {
     const { state, city } = sandboxCity();
     const before = computeCityStats(state, city);
-    state.religion.pantheon = 'FERTILITY_RITES';
+    playerSeat(state).religion.pantheon = 'FERTILITY_RITES';
     const after = computeCityStats(state, city);
     expect(after.effectiveFoodSurplus).toBeCloseTo(before.effectiveFoodSurplus * 1.1, 5);
 
-    state.religion.pantheon = 'RELIGIOUS_SETTLEMENTS';
+    playerSeat(state).religion.pantheon = 'RELIGIOUS_SETTLEMENTS';
     const cheap = computeCityStats(state, city);
     expect(cheap.border.cost).toBe(Math.round(before.border.cost * 0.85));
   });
@@ -47,7 +47,7 @@ describe('pantheons', () => {
 describe('founding a religion', () => {
   function ready() {
     const { state, city } = sandboxCity();
-    state.religion.pantheon = 'FERTILITY_RITES';
+    playerSeat(state).religion.pantheon = 'FERTILITY_RITES';
     queueDistrict(state, city.id, 'HOLY_SITE', tileAtCoords(state.map, 10, 9).index);
     queueBuilding(state, city.id, 'SHRINE');
     queueBuilding(state, city.id, 'TEMPLE');
@@ -132,7 +132,7 @@ describe('founding a religion', () => {
     state.claimedEnhancers = ['CRUSADE'];
     expect(enhanceReligion(state, 'CRUSADE').ok).toBe(false);
     expect(enhanceReligion(state, 'ITINERANT_PREACHERS').ok).toBe(true);
-    expect(state.religion.enhancer).toBe('ITINERANT_PREACHERS');
+    expect(playerSeat(state).religion.enhancer).toBe('ITINERANT_PREACHERS');
     expect(state.claimedEnhancers).toContain('ITINERANT_PREACHERS');
     // no double-enhance
     expect(enhanceReligion(state, 'HOLY_ORDER').ok).toBe(false);
@@ -200,8 +200,8 @@ describe('religious pressure spread (B-18)', () => {
     const near = foundCity(state, tileAtCoords(state.map, 9, 10).index).city!; // 4 tiles
     const far = foundCity(state, tileAtCoords(state.map, 32, 10).index).city!; // 27 tiles
     // Player founds a religion; the capital's center is the holy tile (id 0).
-    state.religion.founded = true;
-    state.religion.holyTile = cap.centerIndex;
+    playerSeat(state).religion.founded = true;
+    playerSeat(state).religion.holyTile = cap.centerIndex;
 
     endTurn(state);
     expect(cap.followedReligion).toBe(0);

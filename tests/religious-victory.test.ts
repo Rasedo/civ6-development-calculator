@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 
@@ -35,8 +36,8 @@ describe('B6-S3 religious victory', () => {
   it('a rival religion predominant in every civ is a DEFEAT (victoryType 6)', () => {
     const state = newGame(1);
     const rv = state.rivals[0];
-    rv.religionFounded = true;
-    rv.holyTile = rv.cities[0].centerIndex;
+    rv.religion.founded = true;
+    rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);
     endTurn(state);
     expect(state.victoryType).toBe(6);
@@ -45,8 +46,8 @@ describe('B6-S3 religious victory', () => {
 
   it("the player's religion predominant everywhere wins (victoryType 5)", () => {
     const state = newGame(1);
-    state.religion.founded = true;
-    state.religion.holyTile = state.cities[0].centerIndex;
+    playerSeat(state).religion.founded = true;
+    playerSeat(state).religion.holyTile = state.cities[0].centerIndex;
     pressAll(state, 0);
     endTurn(state);
     expect(state.victoryType).toBe(5);
@@ -56,8 +57,8 @@ describe('B6-S3 religious victory', () => {
   it('no victory while any alive civ lacks a >half majority', () => {
     const state = newGame(1);
     const rv = state.rivals[0];
-    rv.religionFounded = true;
-    rv.holyTile = rv.cities[0].centerIndex;
+    rv.religion.founded = true;
+    rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);
     // The player's single city resists: a dominant religion-0 accumulator
     // outweighs any ambient +1 religion-1 pressure this turn's spread adds.
@@ -74,8 +75,8 @@ describe('B6-S3 religious victory', () => {
     // Rival 1 is eliminated: no cities, no units.
     state.rivals[1].cities = [];
     state.units = state.units.filter((u) => !(u.owner === 'rival' && u.civId === state.rivals[1].id));
-    rv.religionFounded = true;
-    rv.holyTile = rv.cities[0].centerIndex;
+    rv.religion.founded = true;
+    rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);
     endTurn(state);
     expect(state.victoryType).toBe(6);

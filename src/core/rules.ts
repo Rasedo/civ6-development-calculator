@@ -17,7 +17,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
-import { tileRivalCiv } from './seats';
+import { tileRivalCiv, playerSeat } from './seats';
 
 export interface RuleResult {
   ok: boolean;
@@ -314,7 +314,7 @@ export function availableBuildings(state: GameState, city: City): BuildingDef[] 
       if (have.has(def.id) || queued.has(def.id)) continue;
       // Worship buildings are outside research: they come from your religion.
       if (def.worship) {
-        if (state.religion?.worship !== def.id) continue;
+        if (playerSeat(state).religion?.worship !== def.id) continue;
       } else if (unlocks && !unlocks.buildings.has(def.id)) {
         continue;
       }

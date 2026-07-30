@@ -288,8 +288,7 @@ export function placeRivals(state: GameState, count?: number): void {
       spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
-      pantheonClaimed: false,
-      religionFounded: false,
+      religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     };
     foundRivalCity(state, rival, tile);
     // P5/S2 gate-catch (a D-22 latent): push BEFORE the starting warrior
@@ -943,48 +942,49 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
   // P5/S5 (C-17): the pantheon costs the player's PANTHEON_FAITH_COST from
   // the rival's own faith stream — the free timed claim died. The pick
   // stays a policy draw from the open pool.
-  if (!rival.pantheonClaimed && (rival.faith ?? 0) >= PANTHEON_FAITH_COST) {
+  if (rival.religion.pantheon === null && (rival.faith ?? 0) >= PANTHEON_FAITH_COST) {
     const open = Object.keys(PANTHEONS).filter(
-      (id) => id !== state.religion.pantheon && !state.claimedPantheons.includes(id),
+      (id) => id !== playerSeat(state).religion.pantheon && !state.claimedPantheons.includes(id),
     );
     if (open.length > 0) {
       rival.faith = (rival.faith ?? 0) - PANTHEON_FAITH_COST;
       const pick = open[Math.floor(nextRandom(state) * open.length)];
       state.claimedPantheons.push(pick);
-      rival.pantheonClaimed = true;
       addEraScore(state, civOfRival(rival.id), ERA_SCORE_PANTHEON); // B-24
-      rival.pantheon = pick; // A-7: identity kept — its effects apply below
+      // S1.2e: setting the id IS the claim — the old `pantheonClaimed` boolean
+      // was written here too and was redundant with it.
+      rival.religion.pantheon = pick; // A-7: identity kept — its effects apply below
       state.eventLog.push(`${rival.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
     }
   }
   // P5/S5 (C-17): religion needs the player's canFoundReligion gates —
   // a pantheon, a completed Holy Site, an earned Prophet (timer died).
   if (
-    !rival.religionFounded &&
-    rival.pantheonClaimed &&
+    !rival.religion.founded &&
+    rival.religion.pantheon !== null &&
     (rival.prophets ?? 0) > 0 &&
     rival.cities.some((rc) =>
       rc.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
     )
   ) {
     const followers = Object.keys(FOLLOWER_BELIEFS).filter(
-      (id) => id !== state.religion.follower && !state.claimedBeliefs.includes(id),
+      (id) => id !== playerSeat(state).religion.follower && !state.claimedBeliefs.includes(id),
     );
     const founders = Object.keys(FOUNDER_BELIEFS).filter(
-      (id) => id !== state.religion.founder && !state.claimedBeliefs.includes(id),
+      (id) => id !== playerSeat(state).religion.founder && !state.claimedBeliefs.includes(id),
     );
     if (followers.length > 0 && founders.length > 0) {
       const fPick = followers[Math.floor(nextRandom(state) * followers.length)];
       const oPick = founders[Math.floor(nextRandom(state) * founders.length)];
       state.claimedBeliefs.push(fPick);
       state.claimedBeliefs.push(oPick);
-      rival.religionFounded = true;
+      rival.religion.founded = true;
       addEraScore(state, civOfRival(rival.id), ERA_SCORE_RELIGION); // B-24
-      rival.followerBelief = fPick; // A-7: identities kept — effects apply
-      rival.founderBelief = oPick;
+      rival.religion.follower = fPick; // A-7: identities kept — effects apply
+      rival.religion.founder = oPick;
       // B-18: freeze the holy tile (the founding civ's capital center) — the
       // source of this religion's pressure spread. Capital always exists.
-      rival.holyTile = (rival.cities.find((rc) => rc.isCapital) ?? rival.cities[0])?.centerIndex ?? null;
+      rival.religion.holyTile = (rival.cities.find((rc) => rc.isCapital) ?? rival.cities[0])?.centerIndex ?? null;
       const name = RELIGION_NAMES[(rival.id + 1) % RELIGION_NAMES.length];
       state.eventLog.push(`${rival.name} founded ${name} — two beliefs left the pool.`);
     }
@@ -994,15 +994,14 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
   // The draw sits AFTER the founder draw with the same UNCONDITIONAL shape the
   // GPU's _next_random(eopen) mirrors — only the outcome gates on pool + state.
   // Effects are all inert this round; the identity applies via getRivalModifiers.
-  if (rival.religionFounded && !rival.enhancerClaimed && (rival.prophets ?? 0) >= 2) {
+  if (rival.religion.founded && rival.religion.enhancer == null && (rival.prophets ?? 0) >= 2) {
     const enhancers = Object.keys(ENHANCER_BELIEFS).filter(
-      (id) => id !== state.religion.enhancer && !(state.claimedEnhancers ?? []).includes(id),
+      (id) => id !== playerSeat(state).religion.enhancer && !(state.claimedEnhancers ?? []).includes(id),
     );
     if (enhancers.length > 0) {
       const ePick = enhancers[Math.floor(nextRandom(state) * enhancers.length)];
       (state.claimedEnhancers ??= []).push(ePick);
-      rival.enhancerClaimed = true;
-      rival.enhancerBelief = ePick; // A-7-style: identity kept — effects apply
+      rival.religion.enhancer = ePick; // A-7-style: identity kept — effects apply
       state.eventLog.push(`${rival.name} enhanced its religion (${ENHANCER_BELIEFS[ePick].name} is taken).`);
     }
   }
@@ -1645,7 +1644,7 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
   const g = state.rivals.indexOf(rival) + 1;
   const nRel = 1 + state.rivals.length;
   const nTiles = state.map.tiles.length;
-  const eb = rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
+  const eb = rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
   const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
   const cities = allCities(state) as City[];
   for (const u of [...state.units]) {
@@ -2201,8 +2200,8 @@ export function rivalCityYields(
     total.production += ry.production;
     // B6-S1 (Messenger of the Gods): extra yields when the DESTINATION city
     // follows this civ's religion — the route-income position, pre-tier.
-    if (rival.enhancerBelief && dest.followedReligion === ownerRel) {
-      const tr = ENHANCER_BELIEFS[rival.enhancerBelief]?.effects.tradeReligionYields;
+    if (rival.religion.enhancer && dest.followedReligion === ownerRel) {
+      const tr = ENHANCER_BELIEFS[rival.religion.enhancer]?.effects.tradeReligionYields;
       if (tr) {
         for (const [k, v] of Object.entries(tr)) total[k as keyof Yields] += v ?? 0;
       }
@@ -2863,7 +2862,7 @@ export function rivalPhase(state: GameState): void {
       // buildingFaithCost (190·GAME_SPEED); FIRST city in array order with a
       // COMPLETE unpillaged Holy Site and the Temple. Faith is a separate
       // currency, so this does not consume the one-gold-purchase slot.
-      if (rival.religionFounded) {
+      if (rival.religion.founded) {
         const wid = WORSHIP_BUILDINGS[(state.rivals.indexOf(rival) + 1) % WORSHIP_BUILDINGS.length];
         const wCost = buildingFaithCost(wid);
         if (goldAffordable(rival.faith ?? 0, wCost)) {
@@ -2886,12 +2885,12 @@ export function rivalPhase(state: GameState): void {
       // a COMPLETE unpillaged Holy Site (real Civ 6's Shrine requirement).
       // Spawns at that city center (no free spot = refund, the spawn-refund
       // convention). SCRIPTURE adds +1 charge at purchase.
-      if (rival.religionFounded) {
+      if (rival.religion.founded) {
         let boughtRelig = false; // B-18 (#71)
         const liveM = state.units.filter(
           (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'MISSIONARY',
         ).length;
-        const eb = rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
+        const eb = rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
         const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
         if (liveM < MISSIONARY_CAP && goldAffordable(rival.faith ?? 0, mCost)) {
           for (const rc of rival.cities) {

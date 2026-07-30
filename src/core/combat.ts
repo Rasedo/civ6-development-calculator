@@ -236,20 +236,21 @@ export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): 
  * unfounded religions, and for unenhanced ones. */
 function unitEnhancer(state: GameState, unit: Unit): BeliefEffects | undefined {
   if (unit.owner === 'player') {
-    return state.religion.founded && state.religion.enhancer ? ENHANCER_BELIEFS[state.religion.enhancer]?.effects : undefined;
+    const rel_239 = playerSeat(state).religion;
+    return rel_239.founded && rel_239.enhancer ? ENHANCER_BELIEFS[rel_239.enhancer]?.effects : undefined;
   }
   if (unit.owner !== 'rival' || unit.civId == null) return undefined; // barbarians have no faith
   const rival = state.rivals.find((rv) => rv.id === unit.civId); // unit.civId = rival.id for rival units
-  return rival?.religionFounded && rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
+  return rival?.religion.founded && rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
 }
 
 /** B6-S1: the religion id of a unit's civ (-1 when none founded). Religion
  * ids are the unified civ space: 0 player, rival.id + 1 for rival units. */
 function unitReligion(state: GameState, unit: Unit): number {
-  if (unit.owner === 'player') return state.religion.founded ? 0 : -1;
+  if (unit.owner === 'player') return playerSeat(state).religion.founded ? 0 : -1;
   if (unit.owner !== 'rival' || unit.civId == null) return -1;
   const rival = state.rivals.find((rv) => rv.id === unit.civId);
-  return rival?.religionFounded ? unit.civId! + 1 : -1;
+  return rival?.religion.founded ? unit.civId! + 1 : -1;
 }
 
 /** B6-S1: the followed religion of the city OWNING this tile (-1 = unowned or

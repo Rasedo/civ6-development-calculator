@@ -43,8 +43,7 @@ function addRival(state: GameState, col: number, row: number, name: string): Riv
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
-    pantheonClaimed: true,
-    religionFounded: true,
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   } as RivalCiv;
   const city: RivalCity = {
     id: rival.nextCityId++,

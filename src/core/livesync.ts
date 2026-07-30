@@ -320,9 +320,9 @@ export function parseLiveSync(text: string): SyncResult {
         city.buildings.push(id);
         // A synced worship building implies the religion choice behind it.
         if (BUILDINGS[id].worship) {
-          state.religion.worship = id;
-          state.religion.founded = true;
-          state.religion.name ??= 'Synced religion';
+          playerSeat(state).religion.worship = id;
+          playerSeat(state).religion.founded = true;
+          playerSeat(state).religion.name ??= 'Synced religion';
         }
       } else {
         skip(report, 'building');
@@ -363,15 +363,15 @@ export function parseLiveSync(text: string): SyncResult {
     let id = b.replace(/^BELIEF_/, '');
     id = BELIEF_ALIASES[id] ?? id;
     if (PANTHEONS[id]) {
-      state.religion.pantheon = id;
+      playerSeat(state).religion.pantheon = id;
     } else if (FOLLOWER_BELIEFS[id]) {
-      state.religion.follower = id;
-      state.religion.founded = true;
-      state.religion.name ??= 'Synced religion';
+      playerSeat(state).religion.follower = id;
+      playerSeat(state).religion.founded = true;
+      playerSeat(state).religion.name ??= 'Synced religion';
     } else if (FOUNDER_BELIEFS[id]) {
-      state.religion.founder = id;
-      state.religion.founded = true;
-      state.religion.name ??= 'Synced religion';
+      playerSeat(state).religion.founder = id;
+      playerSeat(state).religion.founded = true;
+      playerSeat(state).religion.name ??= 'Synced religion';
     } else {
       skip(report, 'belief');
     }

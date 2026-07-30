@@ -113,10 +113,10 @@ describe('live sync parser', () => {
     expect(playerSeat(state).government.policies).toContain('URBAN_PLANNING');
     expect(playerSeat(state).government.policies).toContain('GOD_KING');
     expect(report.skipped['policy']).toBe(1); // the unknown DLC card
-    expect(state.religion.pantheon).toBe('FERTILITY_RITES');
-    expect(state.religion.follower).toBe('WORK_ETHIC');
-    expect(state.religion.founder).toBe('TITHE');
-    expect(state.religion.founded).toBe(true);
+    expect(playerSeat(state).religion.pantheon).toBe('FERTILITY_RITES');
+    expect(playerSeat(state).religion.follower).toBe('WORK_ETHIC');
+    expect(playerSeat(state).religion.founder).toBe('TITHE');
+    expect(playerSeat(state).religion.founded).toBe(true);
     expect(report.skipped['belief']).toBe(1);
   });
 
@@ -176,7 +176,7 @@ describe('live sync parser', () => {
       ]),
     ].join('\n');
     const { state } = parseLiveSync(text);
-    expect(state.religion.founded).toBe(true);
-    expect(state.religion.worship).toBe('GURDWARA');
+    expect(playerSeat(state).religion.founded).toBe(true);
+    expect(playerSeat(state).religion.worship).toBe('GURDWARA');
   });
 });

@@ -52,8 +52,7 @@ function addRival(
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
-    pantheonClaimed: true, // opt out of belief races unless a test opts in
-    religionFounded: true,
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, // opt out of belief races unless a test opts in
     ...opts,
   };
   const city: RivalCity = {
@@ -185,7 +184,7 @@ describe('races', () => {
     // P5/S5 (C-17): the pantheon costs the rival 25 of its OWN faith —
     // the old free timed claim is gone.
     const state = makeState();
-    const rival = addRival(state, 6, 6, { pantheonClaimed: false, faith: 25 });
+    const rival = addRival(state, 6, 6, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 25 });
     rivalPhase(state);
     expect(state.claimedPantheons.length).toBe(1);
     expect(rival.faith ?? 0).toBeLessThan(25); // the claim spent it
@@ -196,7 +195,7 @@ describe('races', () => {
 
   it('a broke rival claims no pantheon', () => {
     const state = makeState();
-    addRival(state, 6, 6, { pantheonClaimed: false, faith: 0 });
+    addRival(state, 6, 6, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 0 });
     state.turn = 30;
     rivalPhase(state);
     expect(state.claimedPantheons.length).toBe(0);

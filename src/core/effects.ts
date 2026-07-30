@@ -260,11 +260,14 @@ export function getModifiers(state: GameState): Modifiers {
   // belief is NO LONGER applied per-civ here — it applies per-CITY keyed on that
   // city's followedReligion (withFollowerBelief in computeCityStats /
   // rivalCityYields). Pantheons + founder + enhancer stay per-civ.
-  applyBeliefEffects(state, mods, state.religion?.pantheon ? PANTHEONS[state.religion.pantheon] : undefined);
-  if (state.religion?.founded) {
-    applyBeliefEffects(state, mods, state.religion.founder ? FOUNDER_BELIEFS[state.religion.founder] : undefined);
+  const rel_263 = playerSeat(state).religion;
+  applyBeliefEffects(state, mods, rel_263?.pantheon ? PANTHEONS[rel_263.pantheon] : undefined);
+  if (playerSeat(state).religion?.founded) {
+    const rel_265 = playerSeat(state).religion;
+    applyBeliefEffects(state, mods, rel_265.founder ? FOUNDER_BELIEFS[rel_265.founder] : undefined);
     // B-18: Enhancer belief (inert effects this round; wired for symmetry).
-    applyBeliefEffects(state, mods, state.religion.enhancer ? ENHANCER_BELIEFS[state.religion.enhancer] : undefined);
+    const rel_267 = playerSeat(state).religion;
+    applyBeliefEffects(state, mods, rel_267.enhancer ? ENHANCER_BELIEFS[rel_267.enhancer] : undefined);
   }
 
   // City-state envoy bonuses
@@ -416,7 +419,7 @@ const rivalModCache = new WeakMap<RivalCiv, { key: string; mods: Modifiers }>();
 export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers {
   let pop = 0;
   for (const c of rival.cities) pop += c.population;
-  const key = `${rival.research.techs.length}:${rival.research.civics.length}:${rival.pantheon ?? ''}:${rival.religionFounded ? 1 : 0}:${rival.founderBelief ?? ''}:${rival.enhancerBelief ?? ''}:${pop}:${rival.cities.length}`;
+  const key = `${rival.research.techs.length}:${rival.research.civics.length}:${rival.religion.pantheon ?? ''}:${rival.religion.founded ? 1 : 0}:${rival.religion.founder ?? ''}:${rival.religion.enhancer ?? ''}:${pop}:${rival.cities.length}`;
   const cached = rivalModCache.get(rival);
   if (cached && cached.key === key) return cached.mods;
 
@@ -425,16 +428,16 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
     followers: pop,
     cities: rival.cities.length,
   };
-  applyBeliefEffects(state, mods, rival.pantheon ? PANTHEONS[rival.pantheon] : undefined, seat);
-  if (rival.religionFounded) {
+  applyBeliefEffects(state, mods, rival.religion.pantheon ? PANTHEONS[rival.religion.pantheon] : undefined, seat);
+  if (rival.religion.founded) {
     // B-18: the FOLLOWER belief moved to the per-CITY followed-religion lookup
     // (withFollowerBelief in rivalCityYields/rivalHousing/rivalAmenityTiers) —
     // it is NO LONGER applied per-civ here. Founder + enhancer stay per-civ.
-    applyBeliefEffects(state, mods, rival.founderBelief ? FOUNDER_BELIEFS[rival.founderBelief] : undefined, seat);
-    // B-18: symmetric with the player (state.religion.enhancer above). Every
+    applyBeliefEffects(state, mods, rival.religion.founder ? FOUNDER_BELIEFS[rival.religion.founder] : undefined, seat);
+    // B-18: symmetric with the player (playerSeat(state).religion.enhancer above). Every
     // enhancer effect is currently inert ({}), so this is byte-identical — the
     // coupling surface is here for when a non-inert enhancer lands.
-    applyBeliefEffects(state, mods, rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief] : undefined, seat);
+    applyBeliefEffects(state, mods, rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer] : undefined, seat);
   }
   if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, rival.research);
   rivalModCache.set(rival, { key, mods });
@@ -457,13 +460,12 @@ export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers 
 export function followerBeliefForReligion(state: GameState, g: number): BeliefDef | undefined {
   if (g < 0) return undefined;
   if (g === PLAYER_CIV) {
-    return state.religion?.founded && state.religion.follower
-      ? FOLLOWER_BELIEFS[state.religion.follower]
-      : undefined;
+    const rel = playerSeat(state).religion;
+    return rel?.founded && rel.follower ? FOLLOWER_BELIEFS[rel.follower] : undefined;
   }
   const rv = state.rivals[g - 1];
-  if (!rv || !rv.religionFounded || !rv.followerBelief) return undefined;
-  return FOLLOWER_BELIEFS[rv.followerBelief];
+  if (!rv || !rv.religion.founded || !rv.religion.follower) return undefined;
+  return FOLLOWER_BELIEFS[rv.religion.follower];
 }
 
 /**

@@ -125,8 +125,8 @@ describe('B-25 culture victory', () => {
     const state = newGame(1);
     const rv = state.rivals[0];
     // Rival religion predominant everywhere → victoryType 6 …
-    rv.religionFounded = true;
-    rv.holyTile = rv.cities[0].centerIndex;
+    rv.religion.founded = true;
+    rv.religion.holyTile = rv.cities[0].centerIndex;
     const all = [...state.cities, ...rv.cities];
     for (const c of all) {
       const pres = new Array(2).fill(0);

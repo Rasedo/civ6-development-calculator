@@ -1,6 +1,7 @@
 /** App entry: wires game state, canvas renderer, panels and input together. */
 
 import './style.css';
+import { playerSeat } from '../src/core/seats';
 import type { DistrictId, GameState } from './core/types';
 import {
   createGame,
@@ -575,7 +576,7 @@ const callbacks: PanelCallbacks = {
   onFoundReligion(choice) {
     const r = foundReligion(state, choice);
     if (!r.ok) showMessage(r.reason!);
-    else showMessage(`${state.religion.name} founded!`);
+    else showMessage(`${playerSeat(state).religion.name} founded!`);
     refresh();
   },
   onAddTradeRoute(from, to) {

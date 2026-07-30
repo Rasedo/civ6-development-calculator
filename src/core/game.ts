@@ -112,7 +112,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     turn: 1,
     sandbox,
     greatPeople: { points: {}, earned: [] },
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null },
     tradeRoutes: [],
     settlers: 0,
     buildersTrained: 0, // P4/D-10
@@ -137,7 +136,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] } }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null } }],
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -1094,7 +1093,7 @@ function religiousVictor(state: GameState): number {
   if (civs.length === 0) return -1;
   const nRel = 1 + state.rivals.length;
   for (let g = 0; g < nRel; g++) {
-    const founded = g === 0 ? !!state.religion?.founded : !!state.rivals[g - 1]?.religionFounded;
+    const founded = g === 0 ? !!playerSeat(state).religion?.founded : !!state.rivals[g - 1]?.religion.founded;
     if (!founded) continue;
     let all = true;
     for (const cs of civs) {
@@ -1212,22 +1211,24 @@ function spreadReligiousPressure(state: GameState): void {
   const R = state.rivals.length;
   const nRel = 1 + R;
   const holy: number[] = new Array(nRel).fill(-1);
-  if (state.religion?.founded && state.religion.holyTile != null && state.religion.holyTile >= 0) {
-    holy[0] = state.religion.holyTile;
+  const rel_1214 = playerSeat(state).religion;
+  if (rel_1214?.founded && rel_1214.holyTile != null && rel_1214.holyTile >= 0) {
+    holy[0] = rel_1214.holyTile;
   }
   for (let i = 0; i < R; i++) {
     const rv = state.rivals[i];
-    if (rv.religionFounded && rv.holyTile != null && rv.holyTile >= 0) holy[i + 1] = rv.holyTile;
+    if (rv.religion.founded && rv.religion.holyTile != null && rv.religion.holyTile >= 0) holy[i + 1] = rv.religion.holyTile;
   }
   if (!holy.some((h) => h >= 0)) return; // no religion exists yet — nothing to spread
   // B6-S1 (Itinerant Preachers): per-religion range — the base radius plus the
   // religion's enhancer pressureRangeBonus (0 when unenhanced).
   const range: number[] = new Array(nRel).fill(RELIGION_PRESSURE_RANGE);
-  if (state.religion.enhancer) {
-    range[0] += ENHANCER_BELIEFS[state.religion.enhancer]?.effects.pressureRangeBonus ?? 0;
+  const pEnh = playerSeat(state).religion.enhancer;
+  if (pEnh) {
+    range[0] += ENHANCER_BELIEFS[pEnh]?.effects.pressureRangeBonus ?? 0;
   }
   for (let i = 0; i < R; i++) {
-    const eb = state.rivals[i].enhancerBelief;
+    const eb = state.rivals[i].religion.enhancer;
     if (eb) range[i + 1] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
   }
   const tiles = state.map.tiles;
@@ -1303,7 +1304,7 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] } },
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null } },
     ...(state.rivals ?? []),
   ];
   playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
@@ -1315,8 +1316,8 @@ export function deserialize(json: string): GameState {
     t.builtWonder ??= null;
     t.builtWonderComplete ??= false;
   }
-  state.religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null };
-  state.religion.enhancer ??= null; // B-18
+  playerSeat(state).religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null };
+  playerSeat(state).religion.enhancer ??= null; // B-18
   state.tradeRoutes ??= [];
   state.settlers ??= 0;
   state.buildersTrained ??= 0; // P4/D-10
@@ -1403,7 +1404,7 @@ export function deserialize(json: string): GameState {
 // ---------------------------------------------------------------------------
 
 export function canChoosePantheon(state: GameState): RuleResult {
-  if (state.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
+  if (playerSeat(state).religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
   if (!state.sandbox && playerSeat(state).faith < PANTHEON_FAITH_COST) {
     return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(playerSeat(state).faith)} banked).` };
   }
@@ -1418,14 +1419,14 @@ export function choosePantheon(state: GameState, beliefId: string): RuleResult {
     return { ok: false, reason: 'A rival civilization already follows that pantheon.' };
   }
   if (!state.sandbox) playerSeat(state).faith -= PANTHEON_FAITH_COST;
-  state.religion.pantheon = beliefId;
+  playerSeat(state).religion.pantheon = beliefId;
   addEraScore(state, 0, ERA_SCORE_PANTHEON); // B-24: player verb — gate-unreachable, TS-only (rival hook mirrors)
   return { ok: true };
 }
 
 export function canFoundReligion(state: GameState): RuleResult {
-  if (state.religion.founded) return { ok: false, reason: 'Religion already founded.' };
-  if (!state.religion.pantheon) return { ok: false, reason: 'Choose a pantheon first.' };
+  if (playerSeat(state).religion.founded) return { ok: false, reason: 'Religion already founded.' };
+  if (!playerSeat(state).religion.pantheon) return { ok: false, reason: 'Choose a pantheon first.' };
   const hasHolySite = state.cities.some((c) =>
     c.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
   );
@@ -1448,14 +1449,14 @@ export function foundReligion(
   if (state.claimedBeliefs.includes(choice.follower) || state.claimedBeliefs.includes(choice.founder)) {
     return { ok: false, reason: 'A rival religion already claimed that belief.' };
   }
-  state.religion.founded = true;
+  playerSeat(state).religion.founded = true;
   addEraScore(state, 0, ERA_SCORE_RELIGION); // B-24: player verb — gate-unreachable, TS-only (rival hook mirrors)
-  state.religion.name = choice.name || RELIGION_NAMES[0];
-  state.religion.follower = choice.follower;
-  state.religion.founder = choice.founder;
-  state.religion.worship = choice.worship;
+  playerSeat(state).religion.name = choice.name || RELIGION_NAMES[0];
+  playerSeat(state).religion.follower = choice.follower;
+  playerSeat(state).religion.founder = choice.founder;
+  playerSeat(state).religion.worship = choice.worship;
   // B-18: freeze the holy tile (the capital's center) — the pressure source.
-  state.religion.holyTile = (state.cities.find((c) => c.isCapital) ?? state.cities[0])?.centerIndex ?? null;
+  playerSeat(state).religion.holyTile = (state.cities.find((c) => c.isCapital) ?? state.cities[0])?.centerIndex ?? null;
   return { ok: true };
 }
 
@@ -1463,8 +1464,8 @@ export function foundReligion(
  * Civ 6 spends a second Great Prophet — modeled here as a SECOND earned
  * Prophet-class great person (the first funds founding). */
 export function canEnhanceReligion(state: GameState): RuleResult {
-  if (!state.religion.founded) return { ok: false, reason: 'Found a religion first.' };
-  if (state.religion.enhancer) return { ok: false, reason: 'Religion already enhanced.' };
+  if (!playerSeat(state).religion.founded) return { ok: false, reason: 'Found a religion first.' };
+  if (playerSeat(state).religion.enhancer) return { ok: false, reason: 'Religion already enhanced.' };
   if (!state.sandbox && greatPeopleEarned(state, 'PROPHET') < 2) {
     return { ok: false, reason: 'Needs a second Great Prophet to enhance.' };
   }
@@ -1483,7 +1484,7 @@ export function enhanceReligion(state: GameState, beliefId: string): RuleResult 
   if (state.claimedEnhancers.includes(beliefId)) {
     return { ok: false, reason: 'A rival religion already claimed that enhancer.' };
   }
-  state.religion.enhancer = beliefId;
+  playerSeat(state).religion.enhancer = beliefId;
   state.claimedEnhancers.push(beliefId);
   return { ok: true };
 }

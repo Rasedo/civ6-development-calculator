@@ -5,6 +5,7 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
+import { playerSeat } from './seats';
 import { hexDistance } from './hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { isCivicComplete } from './effects';
@@ -173,8 +174,9 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       addYields(out, routeYields(state, dest));
       // B6-S1 (Messenger of the Gods): extra yields when the destination city
       // follows the player's religion (religion id 0) — the rival twin's rule.
-      if (state.religion?.founded && state.religion.enhancer && dest.followedReligion === 0) {
-        const tr = ENHANCER_BELIEFS[state.religion.enhancer]?.effects.tradeReligionYields;
+      const relT = playerSeat(state).religion;
+      if (relT?.founded && relT.enhancer && dest.followedReligion === 0) {
+        const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;
         if (tr) addYields(out, tr);
       }
     }

@@ -64,7 +64,7 @@ describe('gold & faith purchases', () => {
     const city = foundAt(state, 5, 5);
     addDistrict(state, city, 'HOLY_SITE', 6, 5);
     city.buildings.push('SHRINE', 'TEMPLE');
-    state.religion.worship = 'CATHEDRAL';
+    playerSeat(state).religion.worship = 'CATHEDRAL';
     const cost = buildingFaithCost('CATHEDRAL');
     playerSeat(state).faith = cost + 3;
     playerSeat(state).treasury = 0;

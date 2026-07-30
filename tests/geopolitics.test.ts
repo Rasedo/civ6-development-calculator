@@ -42,8 +42,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
-    pantheonClaimed: true,
-    religionFounded: true,
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     ...opts,
   };
   const city: RivalCity = {

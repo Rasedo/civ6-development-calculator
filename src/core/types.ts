@@ -321,7 +321,6 @@ export interface GameState {
     /** Ids of great people already earned (in claim order). */
     earned: string[];
   };
-  religion: ReligionState;
   tradeRoutes: TradeRoute[];
   /** Trained settlers waiting to found a city (first city needs none). */
   settlers: number;
@@ -485,6 +484,19 @@ export interface Seat {
    *  single write, which is the precondition for merging `getModifiers` and
    *  `getRivalModifiers` into one function. */
   government: GovernmentState;
+  /**
+   * Pantheon / religion / beliefs (S1.2e). The player already had this record;
+   * a RIVAL kept the SAME information as EIGHT flat fields
+   * (`pantheonClaimed`, `pantheon`, `religionFounded`, `followerBelief`,
+   * `founderBelief`, `enhancerClaimed`, `enhancerBelief`, `holyTile`) and had no
+   * `worship` or `name` at all. One record now.
+   *
+   * The two dropped booleans were REDUNDANT, not lost: `pantheonClaimed` and
+   * `enhancerClaimed` are each written in the same block as the id they guard
+   * and never independently, so `pantheonClaimed === (pantheon !== null)` and
+   * `enhancerClaimed === (enhancer != null)` were already invariants.
+   */
+  religion: ReligionState;
 }
 
 export interface RivalCiv extends Seat {
@@ -538,22 +550,14 @@ export interface RivalCiv extends Seat {
 
   /** Great-person race points per class. */
   gpp: Partial<Record<GreatPersonClass, number>>;
-  pantheonClaimed: boolean;
-  religionFounded: boolean;
   /** AUDIT A-7: the CLAIMED belief identities — effects apply to this civ
    * (previously denial-only: picks joined the global pools and were
    * forgotten). Optional for old saves; unset until claimed/founded. */
-  pantheon?: string | null;
-  followerBelief?: string | null;
-  founderBelief?: string | null;
   /** B-18: the CLAIMED enhancer belief — a second earned Prophet enhances the
    * founded religion, denying an enhancer from the shared pool (like the
    * follower/founder claims). Unset until enhanced. */
-  enhancerClaimed?: boolean;
-  enhancerBelief?: string | null;
   /** B-18: this rival's HOLY tile — its capital center at founding, frozen; the
    * source of its religion's pressure spread (mirror of ReligionState.holyTile). */
-  holyTile?: number | null;
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   /** P5/S5 (C-17): banked faith — the pantheon's consumer. */
   /** P5/S5 (C-16): PROPHET-class great people this civ claimed (religion gate). */

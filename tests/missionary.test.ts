@@ -28,9 +28,9 @@ function newGame(rivals = 1): GameState {
  * the sole faith lever. */
 function makeBuyer(state: GameState) {
   const rv = state.rivals[0];
-  rv.religionFounded = true;
-  rv.pantheonClaimed = true; // skip the 25-faith pantheon drain
-  rv.enhancerClaimed = true; // skip the enhancer claim
+  rv.religion.founded = true;
+  rv.religion.pantheon = 'GOD_OF_THE_SEA'; // claimed — skips the 25-faith drain
+  rv.religion.enhancer = null; // no enhancer claimed
   const rc = rv.cities[0];
   rc.buildings = rc.buildings.filter((b) => b !== 'TEMPLE'); // no worship buy
   if (!rc.buildings.includes('SHRINE')) rc.buildings.push('SHRINE');
@@ -87,7 +87,7 @@ describe('B6-S2 rival missionary chassis', () => {
   it('HOLY_ORDER prices the missionary at 42 faith', () => {
     const buy = newGame();
     const { rv: rvB } = makeBuyer(buy);
-    rvB.enhancerBelief = 'HOLY_ORDER';
+    rvB.religion.enhancer = 'HOLY_ORDER';
     rvB.faith = 200;
     endTurn(buy);
     expect(rivalMissionaries(buy, rvB.id).length).toBe(1);
@@ -95,7 +95,7 @@ describe('B6-S2 rival missionary chassis', () => {
 
     const ctl = newGame();
     const { rv: rvC } = makeBuyer(ctl);
-    rvC.enhancerBelief = 'HOLY_ORDER';
+    rvC.religion.enhancer = 'HOLY_ORDER';
     rvC.faith = 200;
     for (let k = 0; k < 2; k++) {
       const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, 'rival', rvC.id);
@@ -117,7 +117,7 @@ describe('B6-S2 rival missionary chassis', () => {
   it('SCRIPTURE grants the bought missionary 4 charges', () => {
     const state = newGame();
     const { rv } = makeBuyer(state);
-    rv.enhancerBelief = 'SCRIPTURE';
+    rv.religion.enhancer = 'SCRIPTURE';
     rv.faith = 200;
     followAll(state, 1); // no spread target -> the missionary keeps its full charges
     endTurn(state);
@@ -158,7 +158,7 @@ describe('B6-S2 rival missionary chassis', () => {
     {
       const state = newGame();
       const rv = state.rivals[0];
-      rv.enhancerBelief = 'SCRIPTURE';
+      rv.religion.enhancer = 'SCRIPTURE';
       const target = state.cities[0];
       target.followedReligion = 0;
       target.religionPressure = [0, 0];

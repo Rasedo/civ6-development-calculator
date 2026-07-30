@@ -674,7 +674,7 @@ export function renderEmpirePlanPanel(
 // ---------------------------------------------------------------------------
 
 export function renderReligionPanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
-  const rel = state.religion;
+  const rel = playerSeat(state).religion;
   const pantheonOk = canChoosePantheon(state);
   const foundOk = canFoundReligion(state);
 
