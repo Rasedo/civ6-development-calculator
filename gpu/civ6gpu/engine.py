@@ -432,7 +432,7 @@ _MUTABLE = [
     # #51/S3.3: the merged unit pool. The BASES are registered, never the
     # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
     # plane instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb", "unit_seat",
+    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb", "unit_seat", "occ_mil", "occ_civ",
 ]
 
 
@@ -957,6 +957,16 @@ class BatchSim:
         # C1-B5a: rival CIVILIAN occupancy (slot at tile; civ via v_civ) and
         # per-slot build charges — inert until B5b spawns the first builder.
         self.rvciv_at = torch.full((B, T), -1, dtype=torch.long, device=device)
+        # #51/S3.4b: ONE occupancy map per DOMAIN, holding a MERGED-pool slot
+        # (0..767) instead of five maps holding pool-local ones. "Whose unit is
+        # on this tile?" becomes unit_seat.gather(1, occ_*), with no need to
+        # know which of five planes to look in first.
+        #
+        # Maintained ALONGSIDE the five legacy maps and machine-checked against
+        # them every step under CIV6_ALIAS_CHECK=1, exactly as unit_seat was.
+        # Readers flip in the next slice; the legacy maps die with them.
+        self.occ_mil = torch.full((B, T), -1, dtype=torch.long, device=device)
+        self.occ_civ = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -1138,6 +1148,7 @@ class BatchSim:
                     self.v_tile[b, v] = u_["tile"]
                     self.v_hp[b, v] = rules.combat.get("unitHp", 100)
                     self.rv_at[b, u_["tile"]] = v
+                    self.occ_mil[(b, u_['tile'])] = v + P_MAX  # #51/S3.4b
                     self.v_next[b] += 1
         self._gp_costs = torch.tensor(rr.get("gpCosts", [60 * 2**n for n in range(8)]), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
@@ -1976,8 +1987,33 @@ class BatchSim:
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
 
+    def _check_occ_invariant(self) -> None:
+        """#51/S3.4b: the merged occupancy maps must agree with the five they
+        replace. occ_mil holds the MERGED slot of whichever military unit
+        stands on a tile (player 0.., rival 256.., barb 512..), occ_civ the
+        same for civilians. Checked every step under CIV6_ALIAS_CHECK=1 while
+        both representations are live."""
+        p_lo, v_lo, u_lo = self.POOL_LO["p"], self.POOL_LO["v"], self.POOL_LO["u"]
+        neg = torch.full_like(self.occ_mil, -1)
+        want_mil = torch.where(
+            self.barb_at >= 0, self.barb_at + u_lo,
+            torch.where(self.pmil_at >= 0, self.pmil_at + p_lo,
+                        torch.where(self.rv_at >= 0, self.rv_at + v_lo, neg)),
+        )
+        want_civ = torch.where(
+            self.pciv_at >= 0, self.pciv_at + p_lo,
+            torch.where(self.rvciv_at >= 0, self.rvciv_at + v_lo, neg),
+        )
+        if not bool((self.occ_mil == want_mil).all()):
+            bad = int((self.occ_mil != want_mil).sum())
+            raise AssertionError(f"OCC DRIFT: occ_mil disagrees with the legacy military maps on {bad} tile(s)")
+        if not bool((self.occ_civ == want_civ).all()):
+            bad = int((self.occ_civ != want_civ).sum())
+            raise AssertionError(f"OCC DRIFT: occ_civ disagrees with the legacy civilian maps on {bad} tile(s)")
+
     def _check_state_discipline(self) -> None:
         self._check_seat_invariant()
+        self._check_occ_invariant()
         for name, fn in self._aliases.items():
             cur = getattr(self, name)
             want = fn(self)
@@ -5180,6 +5216,7 @@ class BatchSim:
         self.u_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.u_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
         self.barb_at[rows, spot[rows]] = slot
+        self.occ_mil[(rows, spot[rows])] = slot + P_MAX + U_MAX  # #51/S3.4b
         self.next_slot[rows] += 1
 
     def _spawn_player(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, init_xp: torch.Tensor | None = None) -> None:
@@ -5222,9 +5259,11 @@ class BatchSim:
         mil_rows = rows[~civ_rows]
         if len(mil_rows) > 0:
             self.pmil_at[mil_rows, spot[mil_rows]] = self.p_next[mil_rows]
+            self.occ_mil[(mil_rows, spot[mil_rows])] = self.p_next[mil_rows]  # #51/S3.4b
         cv_rows = rows[civ_rows]
         if len(cv_rows) > 0:
             self.pciv_at[cv_rows, spot[cv_rows]] = self.p_next[cv_rows]
+            self.occ_civ[(cv_rows, spot[cv_rows])] = self.p_next[cv_rows]  # #51/S3.4b
         self.p_next[rows] += 1
         # P4/D-22: track the strongest MELEE ever fielded (city defense).
         # Gated on `can` like TS — a no-spot spawn never lands the unit.
@@ -5645,10 +5684,14 @@ class BatchSim:
                     mil_rows = rows_[~is_civ[rows_]]
                     if len(civ_rows):
                         self.rvciv_at[civ_rows, here[civ_rows]] = -1
+                        self.occ_civ[(civ_rows, here[civ_rows])] = -1  # #51/S3.4b
                         self.rvciv_at[civ_rows, tgt[civ_rows]] = sc[civ_rows]
+                        self.occ_civ[(civ_rows, tgt[civ_rows])] = sc[civ_rows] + P_MAX  # #51/S3.4b
                     if len(mil_rows):
                         self.rv_at[mil_rows, here[mil_rows]] = -1
+                        self.occ_mil[(mil_rows, here[mil_rows])] = -1  # #51/S3.4b
                         self.rv_at[mil_rows, tgt[mil_rows]] = sc[mil_rows]
+                        self.occ_mil[(mil_rows, tgt[mil_rows])] = sc[mil_rows] + P_MAX  # #51/S3.4b
                     self.v_tile[rows_, sc[rows_]] = tgt[rows_]
                     self.v_acted[rows_, sc[rows_]] = True  # P4/D-2
                     self._clear_camp_at(ok, tgt, civ=torch.full((B,), r, dtype=torch.long, device=dev))  # P5/S7 (C-3)
@@ -5729,6 +5772,7 @@ class BatchSim:
                     dr = spent_c.nonzero(as_tuple=True)[0]
                     self.v_alive[dr, sc[dr]] = False
                     self.rvciv_at[dr, here[dr]] = -1
+                    self.occ_civ[(dr, here[dr])] = -1  # #51/S3.4b
             bld = act & (a >= 13) & (a < 16) & is_civ
             if bool(bld.any()):
                 tc = here.clamp(min=0)
@@ -5765,6 +5809,7 @@ class BatchSim:
                         dr = spent.nonzero(as_tuple=True)[0]
                         self.v_alive[dr, sc[dr]] = False
                         self.rvciv_at[dr, here[dr]] = -1
+                        self.occ_civ[(dr, here[dr])] = -1  # #51/S3.4b
 
     def _scripted_builder(self) -> None:
         """Scripted-policy builder (phase 6a): each player BUILDER with
@@ -5823,6 +5868,7 @@ class BatchSim:
                 if bool(gone.any()):
                     gr = gone.nonzero(as_tuple=True)[0]
                     self.pciv_at[gr, here[gr]] = -1
+                    self.occ_civ[(gr, here[gr])] = -1  # #51/S3.4b
                     self.p_alive[gr, p] = False
 
             march = act & ~rep & ~build
@@ -5848,7 +5894,9 @@ class BatchSim:
                 dest = nb.gather(1, (best % 8).clamp(max=5).unsqueeze(1)).squeeze(1)
                 rows = move.nonzero(as_tuple=True)[0]
                 self.pciv_at[rows, here[rows]] = -1
+                self.occ_civ[(rows, here[rows])] = -1  # #51/S3.4b
                 self.pciv_at[rows, dest[rows]] = p
+                self.occ_civ[(rows, dest[rows])] = p  # #51/S3.4b
                 self.p_tile[rows, p] = dest[rows]
                 self.p_acted[:, p] = self.p_acted[:, p] | move  # P4/D-2
                 # #46r gate-catch (seed 9170 t160): walkPath clears camps for
@@ -6244,6 +6292,7 @@ class BatchSim:
             dr = died.nonzero(as_tuple=True)[0]
             here_d = self.p_tile[dr, p]
             self.pmil_at[dr, here_d] = -1
+            self.occ_mil[(dr, here_d)] = -1  # #51/S3.4b
             self.p_alive[dr, p] = False
         # P5/S2 gate-catch (seed 9001 t44): TS captureRivalCity fires even
         # when the attacker DIED to the counter (killUnit precedes the
@@ -6401,6 +6450,7 @@ class BatchSim:
                 cap_xp = self.v_xp[kr, ks]  # B-4: read BEFORE despawn (civilian xp 0, but carry it)
                 self.v_alive[kr, ks] = False
                 self.rvciv_at[kr, ct] = -1
+                self.occ_civ[(kr, ct)] = -1  # #51/S3.4b
                 nslot = self.p_next[kr]
                 assert int(nslot.max()) < P_MAX, "player slot pool exhausted — raise P_MAX"
                 self.p_alive[kr, nslot] = True
@@ -6414,6 +6464,7 @@ class BatchSim:
                 self.p_emb[kr, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
                 self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.pciv_at[kr, ct] = nslot
+                self.occ_civ[(kr, ct)] = nslot  # #51/S3.4b
                 self.p_next[kr] += 1
                 self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
                 self.p_acted[:, p] = self.p_acted[:, p] | civk  # P4/D-2: TS meleeAttack spends MP
@@ -6495,9 +6546,9 @@ class BatchSim:
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
                 def_dead = torch.zeros_like(att)
-                for grp, at_map, hp_t, alive_t, slot_t in (
-                    (is_b, self.barb_at, self.u_hp, self.u_alive, bslot),
-                    (~is_b, self.rv_at, self.v_hp, self.v_alive, vslot),
+                for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                    (is_b, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, bslot),
+                    (~is_b, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, vslot),
                 ):
                     g = rows[grp[rows]]
                     if len(g) == 0:
@@ -6507,6 +6558,7 @@ class BatchSim:
                     dead = hp_t[g, ds] <= 0
                     def_dead[g[dead]] = True
                     at_map[g[dead], tc[g[dead]]] = -1
+                    occ_map[g[dead], tc[g[dead]]] = -1  # #51/S3.4b
                     alive_t[g[dead], ds[dead]] = False
                 # B-4: a surviving rival MILITARY defender earns +2 (barbs never
                 # accrue; rv_at is the rival-military map, so no civilian here).
@@ -6521,6 +6573,7 @@ class BatchSim:
                 if bool(atk_dead.any()):
                     ar = atk_dead.nonzero(as_tuple=True)[0]
                     self.pmil_at[ar, here[ar]] = -1
+                    self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
                     self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
                 # Advance into the freed tile (and clear any camp there).
                 # B5-M1 hunt fix: mirror TS tileFreeForUnit's TERRAIN check — a
@@ -6534,8 +6587,10 @@ class BatchSim:
                 if bool(adv.any()):
                     vr = adv.nonzero(as_tuple=True)[0]
                     self.pmil_at[vr, here[vr]] = -1
+                    self.occ_mil[(vr, here[vr])] = -1  # #51/S3.4b
                     self.p_tile[vr, p] = tgt[vr]
                     self.pmil_at[vr, tgt[vr]] = p
+                    self.occ_mil[(vr, tgt[vr])] = p  # #51/S3.4b
                     self._clear_camp_at(adv, tgt)
 
             # --- ranged strike (V-R, same codes 6..11 for ranged units):
@@ -6577,9 +6632,9 @@ class BatchSim:
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 r_def_dead = torch.zeros_like(r_att)
-                for grp, at_map, hp_t, alive_t, slot_t in (
-                    (is_b, self.barb_at, self.u_hp, self.u_alive, bslot),
-                    (~is_b, self.rv_at, self.v_hp, self.v_alive, vslot),
+                for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                    (is_b, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, bslot),
+                    (~is_b, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, vslot),
                 ):
                     g = rows[grp[rows]]
                     if len(g) == 0:
@@ -6589,6 +6644,7 @@ class BatchSim:
                     dead = hp_t[g, ds] <= 0
                     r_def_dead[g[dead]] = True
                     at_map[g[dead], tc[g[dead]]] = -1
+                    occ_map[g[dead], tc[g[dead]]] = -1  # #51/S3.4b
                     alive_t[g[dead], ds[dead]] = False
                 # B-4: a surviving rival MILITARY defender earns +2 (rv_at map).
                 surv_rv = (r_att & ~is_b & ~r_def_dead).nonzero(as_tuple=True)[0]
@@ -6637,6 +6693,7 @@ class BatchSim:
                 dead = self.v_hp[rows, ks] <= 0
                 self.v_alive[rows[dead], ks[dead]] = False
                 self.rvciv_at[rows[dead], tc[rows[dead]]] = -1
+                self.occ_civ[(rows[dead], tc[rows[dead]])] = -1  # #51/S3.4b
                 if bool(dead.any()):
                     self._gen_ver += 1  # B7-G (B-8): the killed civilian may be a general → invalidate the aura plane
                 self.p_acted[:, p] = self.p_acted[:, p] | r_civ
@@ -6679,6 +6736,7 @@ class BatchSim:
                 if bool(atk_dead.any()):
                     ar = atk_dead.nonzero(as_tuple=True)[0]
                     self.pmil_at[ar, here[ar]] = -1
+                    self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
                     self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
                 cap = cs_hit & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
                 if bool(cap.any()):
@@ -6828,6 +6886,7 @@ class BatchSim:
                             if bool(_gone.any()):
                                 _g2 = _gone.nonzero(as_tuple=True)[0]
                                 self.pciv_at[_g2, self.p_tile[_g2, p]] = -1
+                                self.occ_civ[(_g2, self.p_tile[_g2, p])] = -1  # #51/S3.4b
                                 self.p_alive[:, p] = self.p_alive[:, p] & ~_gone
                             self._eff_version += 1
                 # A-18 (#50): 17 = builder REPAIR — the `builderRepair` twin.
@@ -6890,6 +6949,7 @@ class BatchSim:
                     if bool(spent.any()):
                         dr = spent.nonzero(as_tuple=True)[0]
                         self.pciv_at[dr, self.p_tile[dr, p]] = -1
+                        self.occ_civ[(dr, self.p_tile[dr, p])] = -1  # #51/S3.4b
                         self.p_alive[dr, p] = False
 
             if self.improvements_on and self._builder_idx >= 0:
@@ -6927,6 +6987,7 @@ class BatchSim:
                         if bool(gone.any()):
                             gr = gone.nonzero(as_tuple=True)[0]
                             self.pciv_at[gr, here[gr]] = -1
+                            self.occ_civ[(gr, here[gr])] = -1  # #51/S3.4b
                             self.p_alive[:, p] = self.p_alive[:, p] & ~gone
 
             # --- step to a neighbor (0..5) --------------------------------------
@@ -6956,10 +7017,14 @@ class BatchSim:
                 civ_rows = rows[civ[rows]]
                 if len(mil_rows) > 0:
                     self.pmil_at[mil_rows, here[mil_rows]] = -1
+                    self.occ_mil[(mil_rows, here[mil_rows])] = -1  # #51/S3.4b
                     self.pmil_at[mil_rows, tgt[mil_rows]] = p
+                    self.occ_mil[(mil_rows, tgt[mil_rows])] = p  # #51/S3.4b
                 if len(civ_rows) > 0:
                     self.pciv_at[civ_rows, here[civ_rows]] = -1
+                    self.occ_civ[(civ_rows, here[civ_rows])] = -1  # #51/S3.4b
                     self.pciv_at[civ_rows, tgt[civ_rows]] = p
+                    self.occ_civ[(civ_rows, tgt[civ_rows])] = p  # #51/S3.4b
                 self.p_tile[rows, p] = tgt[rows]
                 self.p_acted[:, p] = self.p_acted[:, p] | ok  # P4/D-2: the step spends MP
                 self._clear_camp_at(ok, tgt)  # walkPath clears camps for any player unit
@@ -6991,8 +7056,10 @@ class BatchSim:
         mil = ~vciv
         if bool(mil.any()):
             self.pmil_at[rows[mil], vtile[mil]] = -1
+            self.occ_mil[(rows[mil], vtile[mil])] = -1  # #51/S3.4b
         if bool(vciv.any()):
             self.pciv_at[rows[vciv], vtile[vciv]] = -1
+            self.occ_civ[(rows[vciv], vtile[vciv])] = -1  # #51/S3.4b
         self.p_alive[rows, vslot] = False
 
     def _barbarian_phase(self) -> None:
@@ -7393,7 +7460,9 @@ class BatchSim:
                     break
                 rows = mv.nonzero(as_tuple=True)[0]
                 self.barb_at[rows, cur[rows]] = -1
+                self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.barb_at[rows, dest[rows]] = u
+                self.occ_mil[(rows, dest[rows])] = u + P_MAX + U_MAX  # #51/S3.4b
                 self.u_tile[rows, u] = dest[rows]
                 self.u_acted[rows, u] = True  # P4/D-2
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
@@ -7481,10 +7550,10 @@ class BatchSim:
                 def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                 d = self._damage_roll(strike, atk_cs - def_e, k="pcstk", tile=tt)
                 rows = strike.nonzero(as_tuple=True)[0]
-                for grp, at_map, hp_t, alive_t, slot_t in (
-                    (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
-                    (is_rmil, self.rv_at, self.v_hp, self.v_alive, m_slot),
-                    (is_rciv, self.rvciv_at, self.v_hp, self.v_alive, c_slot),
+                for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                    (is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, b_slot),
+                    (is_rmil, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, m_slot),
+                    (is_rciv, self.rvciv_at, self.occ_civ, self.v_hp, self.v_alive, c_slot),
                 ):
                     g = rows[grp[rows]]
                     if len(g) == 0:
@@ -7493,6 +7562,7 @@ class BatchSim:
                     hp_t[g, ds] -= d[g]
                     dead = hp_t[g, ds] <= 0
                     at_map[g[dead], tt[g[dead]]] = -1
+                    occ_map[g[dead], tt[g[dead]]] = -1  # #51/S3.4b
                     alive_t[g[dead], ds[dead]] = False
                 # B-4: a surviving rival MILITARY defender earns +2 (attacker is
                 # the city — no attacker xp; barb / rival civilian never accrue).
@@ -7567,10 +7637,10 @@ class BatchSim:
                 def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                 d = self._damage_roll(strike, atk_cs - def_e, k="pestk", tile=tt)
                 rows = strike.nonzero(as_tuple=True)[0]
-                for grp, at_map, hp_t, alive_t, slot_t in (
-                    (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
-                    (is_rmil, self.rv_at, self.v_hp, self.v_alive, m_slot),
-                    (is_rciv, self.rvciv_at, self.v_hp, self.v_alive, c_slot),
+                for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                    (is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, b_slot),
+                    (is_rmil, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, m_slot),
+                    (is_rciv, self.rvciv_at, self.occ_civ, self.v_hp, self.v_alive, c_slot),
                 ):
                     g = rows[grp[rows]]
                     if len(g) == 0:
@@ -7579,6 +7649,7 @@ class BatchSim:
                     hp_t[g, ds] -= d[g]
                     dead = hp_t[g, ds] <= 0
                     at_map[g[dead], tt[g[dead]]] = -1
+                    occ_map[g[dead], tt[g[dead]]] = -1  # #51/S3.4b
                     alive_t[g[dead], ds[dead]] = False
                 surv_rm = (strike & is_rmil).nonzero(as_tuple=True)[0]
                 if len(surv_rm) > 0:
@@ -7774,6 +7845,7 @@ class BatchSim:
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = 0  # military; builders (B5b) set their charges
         self.rv_at[rows, spot[rows]] = slot
+        self.occ_mil[(rows, spot[rows])] = slot + P_MAX  # #51/S3.4b
         self.v_next[rows] += 1
         # P4/D-22: the civ's strongest melee ever (city defense); rival
         # military is melee unless the roster type carries ranged strength.
@@ -8234,6 +8306,7 @@ class BatchSim:
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
         self.v_charges[rows, slot] = self._p_charges[ti] if charges is None else charges[rows]
         self.rvciv_at[rows, spot[rows]] = slot
+        self.occ_civ[(rows, spot[rows])] = slot + P_MAX  # #51/S3.4b
         self.v_next[rows] += 1
         return can
 
@@ -8399,6 +8472,7 @@ class BatchSim:
                         dr = spent.nonzero(as_tuple=True)[0]
                         self.v_alive[dr, u] = False
                         self.rvciv_at[dr, here[dr]] = -1
+                        self.occ_civ[(dr, here[dr])] = -1  # #51/S3.4b
                 continue_mask = act & ~build
             else:
                 continue_mask = act
@@ -8445,7 +8519,9 @@ class BatchSim:
                     break
                 rows = mv.nonzero(as_tuple=True)[0]
                 self.rvciv_at[rows, cur[rows]] = -1
+                self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.rvciv_at[rows, dest[rows]] = u
+                self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
                 self.v_tile[rows, u] = dest[rows]
                 self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # P5/S7 (C-3): mirrors walkPath's any-unit clear
@@ -8542,9 +8618,11 @@ class BatchSim:
                 _c = self.rvciv_at[_rws, _t] == _slots
                 if bool(_c.any()):
                     self.rvciv_at[_rws[_c], _t[_c]] = -1
+                    self.occ_civ[(_rws[_c], _t[_c])] = -1  # #51/S3.4b
                 _m = self.rv_at[_rws, _t] == _slots
                 if bool(_m.any()):
                     self.rv_at[_rws[_m], _t[_m]] = -1
+                    self.occ_mil[(_rws[_m], _t[_m])] = -1  # #51/S3.4b
 
             # B-20 (#73): RELICS — an APOSTLE killed in theological combat
             # martyrs and hands its owner a relic. Granted BEFORE the disbands
@@ -8702,6 +8780,7 @@ class BatchSim:
                     dr = dead.nonzero(as_tuple=True)[0]
                     self.v_alive[dr, u] = False
                     self.rvciv_at[dr, here[dr]] = -1
+                    self.occ_civ[(dr, here[dr])] = -1  # #51/S3.4b
             walk = act & ~sp
             if not bool(walk.any()):
                 continue
@@ -8736,7 +8815,9 @@ class BatchSim:
                     break
                 rows = mv.nonzero(as_tuple=True)[0]
                 self.rvciv_at[rows, cur[rows]] = -1
+                self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.rvciv_at[rows, dest[rows]] = u
+                self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
                 self.v_tile[rows, u] = dest[rows]
                 self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
@@ -8825,7 +8906,9 @@ class BatchSim:
                     break
                 rows = mv.nonzero(as_tuple=True)[0]
                 self.rvciv_at[rows, cur[rows]] = -1
+                self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.rvciv_at[rows, dest[rows]] = u
+                self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
                 self.v_tile[rows, u] = dest[rows]
                 self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
@@ -10312,11 +10395,13 @@ class BatchSim:
         roll; the attacker advances into an emptied tile."""
         if atk_kind == "barb":
             a_hp, a_tile, a_at = self.u_hp, self.u_tile, self.barb_at
+            a_occ, a_lo = self.occ_mil, P_MAX + U_MAX  # #51/S3.4b
             a_alive = self.u_alive
             atk_cs_all = self._p_combat[self.u_type[:, u]]
             blocked_side, _bstrict = "barb", False
         else:
             a_hp, a_tile, a_at = self.v_hp, self.v_tile, self.rv_at
+            a_occ, a_lo = self.occ_mil, P_MAX  # #51/S3.4b
             a_alive = self.v_alive
             atk_cs_all = self._p_combat[self.v_type[:, u]]
             blocked_side, _bstrict = "rival", True  # the strict fallthrough, now NAMED
@@ -10411,10 +10496,10 @@ class BatchSim:
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
             def_dead = torch.zeros_like(mil_att)
-            for grp, at_map, hp_t, alive_t in (
-                (~def_is_barb & ~def_is_rv, self.pmil_at, self.p_hp, self.p_alive),
-                (def_is_barb, self.barb_at, self.u_hp, self.u_alive),
-                (def_is_rv, self.rv_at, self.v_hp, self.v_alive),
+            for grp, at_map, occ_map, hp_t, alive_t in (
+                (~def_is_barb & ~def_is_rv, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive),
+                (def_is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive),
+                (def_is_rv, self.rv_at, self.occ_mil, self.v_hp, self.v_alive),
             ):
                 g = rows[grp[rows]]
                 if len(g) == 0:
@@ -10424,6 +10509,7 @@ class BatchSim:
                 dead = hp_t[g, ds] <= 0
                 def_dead[g[dead]] = True
                 at_map[g[dead], ttc[g[dead]]] = -1
+                occ_map[g[dead], ttc[g[dead]]] = -1  # #51/S3.4b
                 alive_t[g[dead], ds[dead]] = False
             # B-4: a rival attacker earns +5 for the attack executed (barbs none);
             # a surviving MILITARY defender earns +2 (player via p_xp / dm, rival
@@ -10444,6 +10530,7 @@ class BatchSim:
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
                 a_at[ar, here[ar]] = -1
+                a_occ[ar, here[ar]] = -1  # #51/S3.4b
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
             # B5-M1 hunt fix: mirror TS tileFreeForUnit's TERRAIN check that
             # _blocked_for (occupancy-only) omits. A LAND attacker (barb, or a
@@ -10484,8 +10571,10 @@ class BatchSim:
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
+                a_occ[vr, here[vr]] = -1  # #51/S3.4b
                 a_tile[vr, u] = ttc[vr]
                 a_at[vr, ttc[vr]] = u
+                a_occ[vr, ttc[vr]] = u + a_lo  # #51/S3.4b
                 if atk_kind == "rival":
                     self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])  # P5/S7 (C-3)
         if bool(civ_att.any()):
@@ -10505,6 +10594,7 @@ class BatchSim:
                 cap_emb = self.p_emb[rows, ds]  # #45/B-6: read BEFORE despawn
                 cap_xp = self.p_xp[rows, ds]  # B-4: read BEFORE despawn (civilian xp 0, but carry it)
                 self.pciv_at[rows, ct] = -1
+                self.occ_civ[(rows, ct)] = -1  # #51/S3.4b
                 self.p_alive[rows, ds] = False
                 nslot = self.v_next[rows]
                 assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
@@ -10521,9 +10611,11 @@ class BatchSim:
                 self.v_emb[rows, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
                 self.v_acted[rows, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
                 self.rvciv_at[rows, ct] = nslot
+                self.occ_civ[(rows, ct)] = nslot + P_MAX  # #51/S3.4b
                 self.v_next[rows] += 1
             else:
                 self.pciv_at[rows, ttc[rows]] = -1
+                self.occ_civ[(rows, ttc[rows])] = -1  # #51/S3.4b
                 self.p_alive[rows, ds] = False
             self._gen_ver += 1  # B7-G (B-8): a captured/killed civilian may be a general → invalidate the aura plane
         if bool(rvciv_att.any()):
@@ -10540,6 +10632,7 @@ class BatchSim:
                 cap_emb = self.v_emb[rows, ds]
                 cap_xp = self.v_xp[rows, ds]
                 self.rvciv_at[rows, ct] = -1
+                self.occ_civ[(rows, ct)] = -1  # #51/S3.4b
                 self.v_alive[rows, ds] = False
                 nslot = self.v_next[rows]
                 assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
@@ -10556,10 +10649,12 @@ class BatchSim:
                 self.v_emb[rows, nslot] = cap_emb
                 self.v_acted[rows, nslot] = True
                 self.rvciv_at[rows, ct] = nslot
+                self.occ_civ[(rows, ct)] = nslot + P_MAX  # #51/S3.4b
                 self.v_next[rows] += 1
             else:
                 # C1-B5b: a barbarian kills a lone rival civilian roll-free.
                 self.rvciv_at[rows, ttc[rows]] = -1
+                self.occ_civ[(rows, ttc[rows])] = -1  # #51/S3.4b
                 self.v_alive[rows, ds] = False
             self._gen_ver += 1  # B7-G (B-8): the killed/captured civilian may be a general → invalidate the aura plane
         # B-31: a captured civilian is NOT killed — its captor does NOT advance
@@ -10585,8 +10680,10 @@ class BatchSim:
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
+                a_occ[vr, here[vr]] = -1  # #51/S3.4b
                 a_tile[vr, u] = ttc[vr]
                 a_at[vr, ttc[vr]] = u
+                a_occ[vr, ttc[vr]] = u + a_lo  # #51/S3.4b
                 if atk_kind == "rival":
                     self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])  # P5/S7 (C-3)
 
@@ -10630,6 +10727,7 @@ class BatchSim:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self.barb_at[dr, self.u_tile[dr, u]] = -1
+            self.occ_mil[(dr, self.u_tile[dr, u])] = -1  # #51/S3.4b
             self.u_alive[:, u] = self.u_alive[:, u] & ~died
         sacked = rows[self.rc_hp[rows, civ[rows], slot[rows]] <= 0]
         if len(sacked) > 0:
@@ -10700,6 +10798,7 @@ class BatchSim:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self.rv_at[dr, self.v_tile[dr, u]] = -1
+            self.occ_mil[(dr, self.v_tile[dr, u])] = -1  # #51/S3.4b
             self.v_alive[:, u] = self.v_alive[:, u] & ~died
         captured = rows[self.rc_hp[rows, civ[rows], slot[rows]] <= 0]
         if len(captured) > 0:
@@ -10967,6 +11066,7 @@ class BatchSim:
                     ar = atk_dead.nonzero(as_tuple=True)[0]
                     self.v_alive[ar, v] = False
                     self.rv_at[ar, hc0[ar]] = -1
+                    self.occ_mil[(ar, hc0[ar])] = -1  # #51/S3.4b
                 cap = cs_att & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
                 if bool(cap.any()):
                     self._capture_city_state_rival(cap.nonzero(as_tuple=True)[0], cs_sc, v)
@@ -11153,7 +11253,9 @@ class BatchSim:
                 break
             rows = mv.nonzero(as_tuple=True)[0]
             self.rv_at[rows, cur[rows]] = -1
+            self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
             self.rv_at[rows, dest[rows]] = v
+            self.occ_mil[(rows, dest[rows])] = v + P_MAX  # #51/S3.4b
             self.v_tile[rows, v] = dest[rows]
             self.v_acted[rows, v] = True  # P4/D-2
             self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
@@ -11182,12 +11284,15 @@ class BatchSim:
         draws exactly twice, in TS's order (damage-to-district, then counter)."""
         if atk_kind == "barb":
             a_hp, a_at, a_tile, a_alive = self.u_hp, self.barb_at, self.u_tile, self.u_alive
+            a_occ, a_lo = self.occ_mil, P_MAX + U_MAX  # #51/S3.4b
             atk_cs = self._p_combat[self.u_type[:, u]]
         elif atk_kind == "player":
             a_hp, a_at, a_tile, a_alive = self.p_hp, self.pmil_at, self.p_tile, self.p_alive
+            a_occ, a_lo = self.occ_mil, 0  # #51/S3.4b
             atk_cs = self._p_combat[self.p_type[:, u]]
         else:
             a_hp, a_at, a_tile, a_alive = self.v_hp, self.rv_at, self.v_tile, self.v_alive
+            a_occ, a_lo = self.occ_mil, P_MAX  # #51/S3.4b
             atk_cs = self._p_combat[self.v_type[:, u]]
         tc = tile.clamp(min=0)
         r_at = self.rival_at.gather(1, tc.unsqueeze(1)).squeeze(1)  # [B] owning rival, else -1
@@ -11243,6 +11348,7 @@ class BatchSim:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             a_at[dr, a_tile[dr, u]] = -1
+            a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
@@ -11250,9 +11356,11 @@ class BatchSim:
         aware defense, city-first rolls, sack at 0 HP."""
         if atk_kind == "barb":
             a_hp, a_at, a_tile, a_alive = self.u_hp, self.barb_at, self.u_tile, self.u_alive
+            a_occ, a_lo = self.occ_mil, P_MAX + U_MAX  # #51/S3.4b
             atk_cs = self._p_combat[self.u_type[:, u]]
         else:
             a_hp, a_at, a_tile, a_alive = self.v_hp, self.rv_at, self.v_tile, self.v_alive
+            a_occ, a_lo = self.occ_mil, P_MAX  # #51/S3.4b
             atk_cs = self._p_combat[self.v_type[:, u]]
         city_max_hp = int(self.rules.combat.get("cityMaxHp", 200))
         sitec = self.site.clamp(min=0)
@@ -11295,6 +11403,7 @@ class BatchSim:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             a_at[dr, a_tile[dr, u]] = -1
+            a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
         sacked_rows = rows[self.city_hp[rows, cs] <= 0]
         # V-W2 symmetric: a RIVAL conqueror TAKES the city (the loyalty-flip
@@ -11494,12 +11603,15 @@ class BatchSim:
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             rows = unit_att.nonzero(as_tuple=True)[0]
-            for grp, at_map, hp_t, alive_t, slot_t in (
-                (dm >= 0, self.pmil_at, self.p_hp, self.p_alive, dm),
-                (def_is_b, self.barb_at, self.u_hp, self.u_alive, db),
-                (def_is_v, self.rv_at, self.v_hp, self.v_alive, dv),
-                (def_is_c, self.pciv_at, self.p_hp, self.p_alive, dc_),
-                (def_is_vc, self.rvciv_at, self.v_hp, self.v_alive, dvc),
+            # #51/S3.4b: the merged map rides this table too. A loop-bound
+            # tuple is exactly the indirection a static "self.MAP[...] = ..."
+            # scan cannot see — the occ invariant is what caught it.
+            for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                (dm >= 0, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive, dm),
+                (def_is_b, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, db),
+                (def_is_v, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, dv),
+                (def_is_c, self.pciv_at, self.occ_civ, self.p_hp, self.p_alive, dc_),
+                (def_is_vc, self.rvciv_at, self.occ_civ, self.v_hp, self.v_alive, dvc),
             ):
                 g = rows[grp[rows]]
                 if len(g) == 0:
@@ -11508,6 +11620,7 @@ class BatchSim:
                 hp_t[g, ds] -= d_def[g]
                 dead = hp_t[g, ds] <= 0
                 at_map[g[dead], ttc[g[dead]]] = -1
+                occ_map[g[dead], ttc[g[dead]]] = -1
                 alive_t[g[dead], ds[dead]] = False
             if bool((unit_att & civ_def).any()):
                 self._gen_ver += 1  # B7-G (B-8): a struck lone civilian may be a general → invalidate the aura plane
@@ -11650,7 +11763,9 @@ class BatchSim:
                 break
             rows = mv.nonzero(as_tuple=True)[0]
             self.rv_at[rows, cur[rows]] = -1
+            self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
             self.rv_at[rows, dest[rows]] = v
+            self.occ_mil[(rows, dest[rows])] = v + P_MAX  # #51/S3.4b
             self.v_tile[rows, v] = dest[rows]
             self.v_acted[rows, v] = True  # P4/D-2
             self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
@@ -13296,10 +13411,10 @@ class BatchSim:
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                             d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
-                            for grp, at_map, hp_t, alive_t, slot_t in (
-                                (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
-                                (is_pmil, self.pmil_at, self.p_hp, self.p_alive, pm_slot),
-                                (is_pciv, self.pciv_at, self.p_hp, self.p_alive, pc_slot),
+                            for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                                (is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, b_slot),
+                                (is_pmil, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive, pm_slot),
+                                (is_pciv, self.pciv_at, self.occ_civ, self.p_hp, self.p_alive, pc_slot),
                             ):
                                 g = rows[grp[rows]]
                                 if len(g) == 0:
@@ -13308,6 +13423,7 @@ class BatchSim:
                                 hp_t[g, ds] -= d[g]
                                 dead = hp_t[g, ds] <= 0
                                 at_map[g[dead], tt[g[dead]]] = -1
+                                occ_map[g[dead], tt[g[dead]]] = -1  # #51/S3.4b
                                 alive_t[g[dead], ds[dead]] = False
                                 if bool(dead.any()):
                                     self._rp_kill_version += 1  # G1: u_alive/p_alive death -> _rival_route_income raided-mask changes for city j+1
@@ -13377,10 +13493,10 @@ class BatchSim:
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                             d = self._damage_roll(strike, atk_cs - def_e, k="restk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
-                            for grp, at_map, hp_t, alive_t, slot_t in (
-                                (is_barb, self.barb_at, self.u_hp, self.u_alive, b_slot),
-                                (is_pmil, self.pmil_at, self.p_hp, self.p_alive, pm_slot),
-                                (is_pciv, self.pciv_at, self.p_hp, self.p_alive, pc_slot),
+                            for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
+                                (is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, b_slot),
+                                (is_pmil, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive, pm_slot),
+                                (is_pciv, self.pciv_at, self.occ_civ, self.p_hp, self.p_alive, pc_slot),
                             ):
                                 g = rows[grp[rows]]
                                 if len(g) == 0:
@@ -13389,6 +13505,7 @@ class BatchSim:
                                 hp_t[g, ds] -= d[g]
                                 dead = hp_t[g, ds] <= 0
                                 at_map[g[dead], tt[g[dead]]] = -1
+                                occ_map[g[dead], tt[g[dead]]] = -1  # #51/S3.4b
                                 alive_t[g[dead], ds[dead]] = False
                                 if bool(dead.any()):
                                     self._rp_kill_version += 1  # G1: death -> raided-mask changes for city j+1
@@ -13526,7 +13643,9 @@ class BatchSim:
                     is_civ_v = self._p_charges[self.v_type[kr, vs]] > 0
                     self.v_alive[kr, vs] = False
                     self.rv_at[kr[~is_civ_v], vt[~is_civ_v]] = -1
+                    self.occ_mil[(kr[~is_civ_v], vt[~is_civ_v])] = -1  # #51/S3.4b
                     self.rvciv_at[kr[is_civ_v], vt[is_civ_v]] = -1
+                    self.occ_civ[(kr[is_civ_v], vt[is_civ_v])] = -1  # #51/S3.4b
             for _ in range(RESEARCH_LOOPS):
                 curt = self.r_cur_tech[:, r]
                 # A-3: boosted techs complete at the player's discounted cost
@@ -14176,6 +14295,16 @@ class BatchSim:
         for m in maps:
             at = getattr(self, m)
             at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
+        # #51/S3.4b: the merged maps hold MERGED slots, so the same inverse
+        # permutation applies only to entries inside THIS pool's range.
+        lo, hi = self.POOL_LO[prefix], self.POOL_HI[prefix]
+        for m in ("occ_mil", "occ_civ"):
+            at = getattr(self, m)
+            mine = (at >= lo) & (at < hi)
+            # gather evaluates EVERY lane, including the ones torch.where
+            # discards, so the index must be clamped to inv's width — a slot
+            # from another pool is out of range by construction.
+            at.copy_(torch.where(mine, inv.gather(1, (at - lo).clamp(min=0, max=inv.shape[1] - 1)) + lo, at))
 
     _RC_SLOT_FIELDS = (
         "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty",
