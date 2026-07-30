@@ -67,6 +67,7 @@ def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> 
     sim.p_fortify[0, slot] = 0
     sim.p_emb[0, slot] = emb
     sim.pmil_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.p_next[0] += 1
     return slot
 
@@ -82,6 +83,7 @@ def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = emb
     sim.rv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_next[0] += 1
     return slot
 
@@ -97,6 +99,7 @@ def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = emb
     sim.rvciv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_next[0] += 1
     return slot
 
@@ -160,6 +163,7 @@ def first_rival_city(sim):
 def neutralize_barbs(sim) -> None:
     sim.u_alive[:] = False
     sim.barb_at[:] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.n_camps[:] = sim.max_camps
     sim.camp_tile[:] = -1
 
@@ -168,6 +172,7 @@ def clear_all_rival_units(sim) -> None:
     sim.v_alive[:] = False
     sim.rv_at[:] = -1
     sim.rvciv_at[:] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
 
 
 # ------------------------------------------------------------------ pokes -----
@@ -234,6 +239,7 @@ def poke_galley_cs(rules, path, GALLEY):
         sim.u_alive[0, u] = False
         if int(sim.barb_at[0, t_]) == u:
             sim.barb_at[0, t_] = -1
+            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.cs_hp[0, s] = 1
     assert bool((~sim.alive[0]).any()), "no free player city slot for the CS capture"
     pop_before = int(sim.cs_pop[0, s])
@@ -474,6 +480,7 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     clear_all_rival_units(sim)
     sim.u_alive[:] = False
     sim.barb_at[:] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.rc_bldg[0, r, j, sim._walls_bidx] = True
     sim.rc_current[0, r] = -1
     sim.rc_progress[0, r] = 0.0
@@ -493,6 +500,7 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     sim.restore(base)
     # drop the ship, put a player WARRIOR on the same tile
     sim.pmil_at[0, tt] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.p_alive[0, gslot] = False
     wslot = place_pmil(sim, tt, WARRIOR, emb=True)
     sim.r_best_melee[0, r] = 20

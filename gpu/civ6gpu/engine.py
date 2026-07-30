@@ -1987,6 +1987,31 @@ class BatchSim:
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
 
+    def rebuild_occ(self) -> None:
+        """#51/S3.4b: recompute occ_mil/occ_civ from the five legacy maps.
+
+        For TEST harnesses that poke the legacy maps directly. A per-poke
+        mirror is not safe for the broad clears — `barb_at[:] = -1` must NOT
+        wipe the player and rival entries that share the merged plane — so
+        pokes rebuild instead of patching. This helper disappears with the
+        legacy maps once every reader has moved.
+        """
+        p_lo, v_lo, u_lo = self.POOL_LO["p"], self.POOL_LO["v"], self.POOL_LO["u"]
+        neg = torch.full_like(self.occ_mil, -1)
+        self.occ_mil.copy_(
+            torch.where(
+                self.barb_at >= 0, self.barb_at + u_lo,
+                torch.where(self.pmil_at >= 0, self.pmil_at + p_lo,
+                            torch.where(self.rv_at >= 0, self.rv_at + v_lo, neg)),
+            )
+        )
+        self.occ_civ.copy_(
+            torch.where(
+                self.pciv_at >= 0, self.pciv_at + p_lo,
+                torch.where(self.rvciv_at >= 0, self.rvciv_at + v_lo, neg),
+            )
+        )
+
     def _check_occ_invariant(self) -> None:
         """#51/S3.4b: the merged occupancy maps must agree with the five they
         replace. occ_mil holds the MERGED slot of whichever military unit
@@ -5101,35 +5126,24 @@ class BatchSim:
         is resolved in Round 7, not smuggled in under a refactor.
         """
         tc = tiles.clamp(min=0)
-        barb_at = self.barb_at.gather(1, tc)
-        pmil_at = self.pmil_at.gather(1, tc)
-        pciv_at = self.pciv_at.gather(1, tc)
-        rv_slot = self.rv_at.gather(1, tc)
-        rvc_slot = self.rvciv_at.gather(1, tc)
+        # #51/S3.4b: two gathers, not five. occ_mil/occ_civ hold a MERGED-pool
+        # slot, so the occupant's owner is one more gather into unit_seat —
+        # no five-way "which plane is it in?" reconstruction.
+        mil_slot = self.occ_mil.gather(1, tc)
+        civ_slot = self.occ_civ.gather(1, tc)
 
         if strict:
-            occupied = (
-                (barb_at >= 0) | (pmil_at >= 0) | (pciv_at >= 0)
-                | (rv_slot >= 0) | (rvc_slot >= 0)
-            )
+            occupied = (mil_slot >= 0) | (civ_slot >= 0)
         else:
             # Whose unit occupies this tile, per DOMAIN, in the absolute seat
             # space (-1 = nobody). At most one military and one civilian can
             # stand here, so each domain has a single owner.
             neg = torch.full_like(tc, -1)
             mil_seat = torch.where(
-                barb_at >= 0,
-                torch.full_like(tc, BARB_SEAT),
-                torch.where(
-                    pmil_at >= 0,
-                    torch.zeros_like(tc),
-                    torch.where(rv_slot >= 0, self.v_seat.gather(1, rv_slot.clamp(min=0)), neg),
-                ),
+                mil_slot >= 0, self.unit_seat.gather(1, mil_slot.clamp(min=0)), neg
             )
             civ_seat = torch.where(
-                pciv_at >= 0,
-                torch.zeros_like(tc),
-                torch.where(rvc_slot >= 0, self.v_seat.gather(1, rvc_slot.clamp(min=0)), neg),
+                civ_slot >= 0, self.unit_seat.gather(1, civ_slot.clamp(min=0)), neg
             )
             # `is_civilian` may be a per-row [B] tensor — the spawn probe
             # decides per GAME whether it is placing a civilian. Normalise to a

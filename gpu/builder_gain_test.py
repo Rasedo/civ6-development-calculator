@@ -64,6 +64,7 @@ def add_builder(sim, r: int, t: int) -> int:
     sim.v_acted[0, slot] = False
     sim.v_fortify[0, slot] = 0
     sim.rvciv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_next[0] += 1
     return slot
 

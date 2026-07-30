@@ -44,6 +44,10 @@ def main() -> None:
     sim.v_hp[0, slot] = 100
     sim.v_charges[0, slot] = 3
     sim.rvciv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    # #51/S3.4b: the merged map is what the predicates read now. A hand-poked
+    # unit must appear in BOTH while the legacy maps still exist.
+    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
 
     tiles = torch.tensor([[t]])
@@ -68,9 +72,12 @@ def main() -> None:
     # snapshot/restore must round-trip the new planes
     snap = sim.snapshot()
     sim.rvciv_at[0, t] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_civ[0, t] = -1
     sim.v_charges[0, slot] = 0
     sim.restore(snap)
     assert int(sim.rvciv_at[0, t]) == slot, "rvciv_at not in snapshot"
+    assert int(sim.occ_civ[0, t]) == slot + sim.POOL_LO["v"], "occ_civ not in snapshot"
     assert int(sim.v_charges[0, slot]) == 3, "v_charges not in snapshot"
 
     # C1-B5b: builders exist organically now — the plane must be POPULATED

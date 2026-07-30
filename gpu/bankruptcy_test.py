@@ -28,11 +28,13 @@ def setup(sim, types, tiles, treasury):
     sim.p_alive[0, :] = False
     sim.pmil_at[0, :] = -1
     sim.pciv_at[0, :] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     for i, (ty, ti) in enumerate(zip(types, tiles)):
         sim.p_alive[0, i] = True
         sim.p_type[0, i] = ty
         sim.p_tile[0, i] = ti
         sim.pmil_at[0, ti] = i
+        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.treasury[0] = treasury
 
 

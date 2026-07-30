@@ -102,6 +102,7 @@ def meet_quota(sim, r: int) -> None:
         sim.v_charges[0, slot] = 0
         sim.v_fortify[0, slot] = 0
         sim.rv_at[0, t] = slot
+        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
         sim.v_next[0] += 1
 
 

@@ -62,6 +62,7 @@ def clear_all_units(sim) -> None:
     sim.rv_at[:] = -1
     sim.rvciv_at[:] = -1
     sim.barb_at[:] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim._gen_ver += 1
 
 
@@ -75,6 +76,7 @@ def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> 
     sim.p_fortify[0, slot] = 0
     sim.p_emb[0, slot] = emb
     sim.pmil_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.p_next[0] += 1
     return slot
 
@@ -89,6 +91,7 @@ def place_pciv(sim, t: int, type_idx: int, hp: int = 100) -> int:
     sim.p_fortify[0, slot] = 0
     sim.p_emb[0, slot] = False
     sim.pciv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.p_next[0] += 1
     sim._gen_ver += 1
     return slot
@@ -105,6 +108,7 @@ def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = emb
     sim.rv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_next[0] += 1
     return slot
 
@@ -120,6 +124,7 @@ def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100) -> int:
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = False
     sim.rvciv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_next[0] += 1
     sim._gen_ver += 1
     return slot

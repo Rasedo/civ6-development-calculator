@@ -120,6 +120,7 @@ def clear_missionaries(sim, r: int) -> None:
         sim.v_alive[0, u] = False
         if int(sim.rvciv_at[0, t]) == u:
             sim.rvciv_at[0, t] = -1
+            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
 
 
 def place_missionary(sim, r: int, t: int, charges: int) -> int:
@@ -133,6 +134,7 @@ def place_missionary(sim, r: int, t: int, charges: int) -> int:
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = False
     sim.rvciv_at[0, t] = slot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_next[0] += 1
     return slot
 
@@ -511,6 +513,7 @@ def poke_messenger_route(rules, rj, path):
     sim.r_atwar[:, r] = False
     sim.u_alive[:] = False
     sim.barb_at[:] = -1  # no raiders suspend the route
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
 
     # two dedicated rival-r cities well apart; a single domestic route between.
     FROM, DEST = 5, 6
@@ -612,11 +615,14 @@ def poke_victor_through_step(rules, rj, path):
             sim.p_alive[:] = False
             sim.pmil_at[:] = -1
             sim.pciv_at[:] = -1
+            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
         sim.v_alive[:] = False
         sim.rv_at[:] = -1
         sim.rvciv_at[:] = -1
+        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
         sim.u_alive[:] = False
         sim.barb_at[:] = -1
+        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
         if sim.R > 0:
             sim.rc_current[:] = -1
             sim.rc_progress[:] = 0.0

@@ -112,6 +112,7 @@ def inject_mil(sim, tiles: list[int], type_idx: int) -> None:
         sim.v_charges[0, slot] = 0
         sim.v_fortify[0, slot] = 0
         sim.rv_at[0, t] = slot
+        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
         sim.v_next[0] += 1
 
 
@@ -122,6 +123,7 @@ def block_spawn(sim) -> None:
     tiles = [ctr] + [int(n) for n in sim.neigh[ctr].tolist() if n >= 0]
     for t in tiles:
         sim.pmil_at[0, t] = 0  # ≥0 blocks the probe; the slot value is never read at peace
+        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
 
 
 def research_tech(sim, key: str) -> int:

@@ -94,6 +94,7 @@ def build_strike_scene(rules, path):
     assert ctr >= 0, "no player capital"
     # clear barbs so the rival unit is the unambiguous nearest hostile
     sim.barb_at[0, :] = -1
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.u_alive[0, :] = False
     sim.n_camps[0] = sim.max_camps[0]
     # an OWNED non-center tile with no district -> plant a complete Encampment
@@ -118,6 +119,7 @@ def build_strike_scene(rules, path):
     # high-combat rival type -> small damage rolls -> survives two strikes
     strong_ty = int(sim._p_combat.argmax())
     sim.rv_at[0, tgt] = vslot
+    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
     sim.v_alive[0, vslot] = True
     sim.v_hp[0, vslot] = 100
     sim.v_type[0, vslot] = strong_ty
