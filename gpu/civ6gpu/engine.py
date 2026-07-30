@@ -247,6 +247,7 @@ def load_fixture(path: Path) -> dict:
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 40  # > tree size: complete all ready techs/civics per turn (TS uses an unbounded while); early-exit keeps it free
 U_MAX = 256  # barbarian/rival unit slots per game (append-only; runtime-asserted).
+BARB_SEAT = 200  # #51/S3.3: the TS seats.ts BARB_SEAT, same absolute seat space
              # Raised 96→256 for horizon-300 (G-S cliff #1): barbs high-water
              # ~160 ever-spawned by t300, rivals ~55. Behavior-preserving at the
              # horizon-100 gate (barb_hi ~33 there, cap never touched; fixtures
@@ -430,7 +431,7 @@ _MUTABLE = [
     # #51/S3.3: the merged unit pool. The BASES are registered, never the
     # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
     # plane instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb",
+    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb", "unit_seat",
 ]
 
 
@@ -915,6 +916,14 @@ class BatchSim:
             ("xp", torch.long),         # B-4: combat experience
             ("charges", torch.long),    # builder/missionary charges
             ("aura_mp", torch.long),    # #70/S3 (B-8): frozen general/admiral +MP
+            # #51/S3.3: the OWNER of whatever sits in this slot, in the SAME
+            # absolute seat space TS uses (0 player, 1..99 rivals, 200 barbs).
+            # Today a unit's owner is implied by which slot RANGE it lives in,
+            # and for a rival additionally by v_civ — so "whose unit is this?"
+            # can only be answered by code that already knows which pool it is
+            # looking at. This makes it a value you can gather and compare.
+            # INERT: maintained and invariant-checked here, consumed by S3.4.
+            ("seat", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -928,6 +937,9 @@ class BatchSim:
                         :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
                     ],
                 )
+        # The player and barbarian ranges have a CONSTANT owner (0 is already
+        # the zero-fill); the rival range is written wherever v_civ is.
+        self.u_seat.fill_(BARB_SEAT)
 
         self.v_civ = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         # #70/S3 (B-8): the general/admiral aura's +1 MP, FROZEN at the
@@ -1115,6 +1127,7 @@ class BatchSim:
                     v = int(self.v_next[b])
                     self.v_alive[b, v] = True
                     self.v_civ[b, v] = rid
+                    self.v_seat[b, v] = rid + 1  # #51/S3.3: seat = civOfRival(civ)
                     self.v_type[b, v] = u_["type"]
                     self.v_tile[b, v] = u_["tile"]
                     self.v_hp[b, v] = rules.combat.get("unitHp", 100)
@@ -1921,7 +1934,30 @@ class BatchSim:
         """Declare `self.<name>` to be a VIEW of `recompute(self)`, forever."""
         self._aliases[name] = recompute
 
+    def _check_seat_invariant(self) -> None:
+        """#51/S3.3: unit_seat must agree with the slot range it sits in.
+
+        It is maintained by hand — constant for the player and barbarian
+        ranges, written beside every v_civ write for rivals — so it can drift
+        the moment someone adds a fourth spawn path. It is INERT until S3.4
+        reads it, which is exactly when a drift would stop being visible and
+        start being a wrong answer to "whose unit is this?". Checked on ALIVE
+        slots only: a dead slot's owner is meaningless, as it already was for
+        v_civ.
+        """
+        al = self.unit_alive
+        seat = self.unit_seat
+        p, v, u = self.POOL_LO["p"], self.POOL_LO["v"], self.POOL_LO["u"]
+        pe, ve, ue = self.POOL_HI["p"], self.POOL_HI["v"], self.POOL_HI["u"]
+        if not bool(((seat[:, p:pe] == 0) | ~al[:, p:pe]).all()):
+            raise AssertionError("SEAT DRIFT: a living PLAYER slot does not carry seat 0")
+        if not bool(((seat[:, v:ve] == self.v_civ + 1) | ~al[:, v:ve]).all()):
+            raise AssertionError("SEAT DRIFT: a living RIVAL slot's seat != civOfRival(v_civ)")
+        if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
+            raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
+
     def _check_state_discipline(self) -> None:
+        self._check_seat_invariant()
         for name, fn in self._aliases.items():
             cur = getattr(self, name)
             want = fn(self)
@@ -7632,6 +7668,7 @@ class BatchSim:
         assert int(slot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
         self.v_alive[rows, slot] = True
         self.v_civ[rows, slot] = civ
+        self.v_seat[rows, slot] = civ + 1  # #51/S3.3: seat = civOfRival(civ)
         self.v_type[rows, slot] = type_idx[rows] if type_idx.dim() > 0 else type_idx
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
@@ -8092,6 +8129,7 @@ class BatchSim:
         ti = self._builder_idx if type_idx is None else type_idx
         self.v_alive[rows, slot] = True
         self.v_civ[rows, slot] = civ
+        self.v_seat[rows, slot] = civ + 1  # #51/S3.3: seat = civOfRival(civ)
         self.v_type[rows, slot] = ti
         self.v_tile[rows, slot] = spot[rows]
         self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
@@ -10375,6 +10413,7 @@ class BatchSim:
                 assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
                 self.v_alive[rows, nslot] = True
                 self.v_civ[rows, nslot] = self.v_civ[rows, u]
+                self.v_seat[rows, nslot] = self.v_seat[rows, u]  # #51/S3.3: the capture carries the seat
                 self.v_type[rows, nslot] = cap_type
                 self.v_tile[rows, nslot] = ct
                 self.v_hp[rows, nslot] = cap_hp
@@ -10409,6 +10448,7 @@ class BatchSim:
                 assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
                 self.v_alive[rows, nslot] = True
                 self.v_civ[rows, nslot] = self.v_civ[rows, u]
+                self.v_seat[rows, nslot] = self.v_seat[rows, u]  # #51/S3.3: the capture carries the seat
                 self.v_type[rows, nslot] = cap_type
                 self.v_tile[rows, nslot] = ct
                 self.v_hp[rows, nslot] = cap_hp
@@ -14007,11 +14047,11 @@ class BatchSim:
         inverse permutation — no semantic rebuild. CIV6_RECLAIM_AT lowers
         the trigger for forced-compaction validation gates."""
         if prefix == "u":
-            fields, counter, maps = ["u_acted", "u_type", "u_tile", "u_hp", "u_fortify"], "next_slot", ["barb_at"]
+            fields, counter, maps = ["u_acted", "u_type", "u_tile", "u_hp", "u_fortify", "u_seat"], "next_slot", ["barb_at"]
         elif prefix == "v":
-            fields, counter, maps = ["v_acted", "v_civ", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify", "v_xp", "v_aura_mp", "v_emb"], "v_next", ["rv_at", "rvciv_at"]
+            fields, counter, maps = ["v_acted", "v_civ", "v_seat", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify", "v_xp", "v_aura_mp", "v_emb"], "v_next", ["rv_at", "rvciv_at"]
         else:
-            fields, counter, maps = ["p_acted", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify", "p_xp", "p_aura_mp", "p_emb"], "p_next", ["pmil_at", "pciv_at"]
+            fields, counter, maps = ["p_acted", "p_seat", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify", "p_xp", "p_aura_mp", "p_emb"], "p_next", ["pmil_at", "pciv_at"]
         alive = getattr(self, f"{prefix}_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept

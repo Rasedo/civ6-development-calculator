@@ -63,7 +63,7 @@ ALLOWED_REBIND: set[str] = set()
 # used the detached tensor; only the runtime data_ptr check saw it.
 _POOL_PLANES = (
     "alive", "acted", "type", "tile", "hp",
-    "fortify", "xp", "charges", "aura_mp", "emb",
+    "fortify", "xp", "charges", "aura_mp", "emb", "seat",
 )
 ALIASED: frozenset[str] = frozenset(
     f"{pre}_{plane}" for pre in ("p", "v", "u") for plane in _POOL_PLANES
