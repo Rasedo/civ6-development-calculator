@@ -83,6 +83,29 @@ export function tileCity(t: Tile): number {
   return t.rivalCityId ?? -1;
 }
 
+/**
+ * Does this tile belong to THIS city? #51/S1.3h: the player asked
+ * `t.cityId === city.id` and a rival asked
+ * `tileOwnedByCiv(t, civOfRival(r.id)) && t.rivalCityId === city.id` — two
+ * spellings of one question, and the player's form could not even express
+ * "which rival's city". One question now.
+ */
+export function tileBelongsTo(t: Tile, city: { seat: number; id: number }): boolean {
+  return tileSeat(t) === city.seat && tileCity(t) === city.id;
+}
+
+/**
+ * The CITY that owns this tile, whichever seat holds it (undefined = unowned,
+ * or owned by a city-state). #51/S1.3h: every caller used to branch
+ * player-vs-rival by hand and look the city up in a different collection.
+ */
+export function cityAtTile(state: GameState, t: Tile): City | RivalCity | undefined {
+  const seat = tileSeat(t);
+  if (seat === NO_SEAT || isCityStateSeat(seat)) return undefined;
+  const id = tileCity(t);
+  return citiesOf(state, seat).find((c) => c.id === id);
+}
+
 /** The rival CIV id claiming this tile, or null (reads only the rival field). */
 export function tileRivalCiv(t: Tile): number | null {
   const s = tileSeat(t);

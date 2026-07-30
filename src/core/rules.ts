@@ -17,7 +17,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
-import { tileRivalCiv, playerSeat, isPlayerSeat, tileSeat, isCityStateSeat } from './seats';
+import { tileRivalCiv, playerSeat, isPlayerSeat, tileSeat, isCityStateSeat, tileBelongsTo } from './seats';
 
 export interface RuleResult {
   ok: boolean;
@@ -275,7 +275,7 @@ export function canPlaceDistrict(
 ): RuleResult {
   return canPlaceDistrictIn(state, city, type, tileIndex, {
     unlocks: gates(state),
-    ownsTile: (t) => t.cityId === city.id,
+    ownsTile: (t) => tileBelongsTo(t, city),
   });
 }
 
@@ -283,7 +283,7 @@ export function districtPlacementTiles(state: GameState, city: City, type: Distr
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
   for (const t of state.map.tiles) {
-    if (t.cityId !== city.id) continue;
+    if (!tileBelongsTo(t, city)) continue;
     if (hexDistance(center.col, center.row, t.col, t.row) > CITY_WORK_RADIUS) continue;
     if (canPlaceDistrict(state, city, type, t.index).ok) out.push(t.index);
   }
@@ -374,7 +374,7 @@ export function canPlaceWonder(
   }
   if (wonderExists(state, wonderId)) return no(`${def.name} already exists in the world.`);
 
-  if (tile.cityId !== city.id) return no('Tile not owned by this city.');
+  if (!tileBelongsTo(tile, city)) return no('Tile not owned by this city.');
   const dist = hexDistance(center.col, center.row, tile.col, tile.row);
   if (dist === 0 || dist > CITY_WORK_RADIUS) return no('Must be within 3 tiles of the city center.');
   if (tile.district || tile.builtWonder) return no('Tile already occupied.');
@@ -419,7 +419,7 @@ export function wonderPlacementTiles(state: GameState, city: City, wonderId: str
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
   for (const t of state.map.tiles) {
-    if (t.cityId !== city.id) continue;
+    if (!tileBelongsTo(t, city)) continue;
     if (hexDistance(center.col, center.row, t.col, t.row) > CITY_WORK_RADIUS) continue;
     if (canPlaceWonder(state, city, wonderId, t.index).ok) out.push(t.index);
   }

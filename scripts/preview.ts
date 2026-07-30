@@ -6,7 +6,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileBelongsTo } from '../src/core/seats';
 import { deflateSync } from 'node:zlib';
 import { generateMap } from '../src/core/mapgen';
 import { makePreviewPng } from './png';
@@ -67,7 +67,7 @@ console.log(`Settled ${city.name} at (${best.col},${best.row})`);
 // improve a few tiles
 let improved = 0;
 for (const t of state.map.tiles) {
-  if (t.cityId !== city.id || improved >= 6) continue;
+  if (!tileBelongsTo(t, city) || improved >= 6) continue;
   const opts = validImprovements(state, t);
   if (opts.length) {
     placeImprovement(state, t.index, opts[0]);
@@ -106,7 +106,7 @@ console.log(`  yields/turn: food ${stats.total.food.toFixed(1)}, prod ${stats.to
   `gold ${stats.total.gold.toFixed(1)}, sci ${stats.total.science.toFixed(1)}, cult ${stats.total.culture.toFixed(1)}`);
 console.log(`  buildings: ${city.buildings.join(', ')}`);
 console.log(`  districts: ${city.districts.map((d) => d.type).join(', ')}`);
-console.log(`  borders: ${state.map.tiles.filter((t) => t.cityId === city.id).length} tiles owned ` +
+console.log(`  borders: ${state.map.tiles.filter((t) => tileBelongsTo(t, city)).length} tiles owned ` +
   `(${city.tilesAcquired} grown culturally)`);
 console.log(`  techs: ${playerSeat(state).research.techs.map((t) => TECHS[t].name).join(', ') || 'none'}`);
 console.log(`  civics: ${playerSeat(state).research.civics.map((c) => CIVICS[c].name).join(', ') || 'none'}`);

@@ -1,7 +1,7 @@
 /** App entry: wires game state, canvas renderer, panels and input together. */
 
 import './style.css';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileBelongsTo } from '../src/core/seats';
 import type { DistrictId, GameState } from './core/types';
 import {
   createGame,
@@ -718,7 +718,7 @@ function refresh(): void {
     const city = state.cities.find((c) => c.id === ui.selectedCityId)!;
     const stats = computeCityStats(state, city);
     cityView = {
-      territory: new Set(state.map.tiles.filter((t) => t.cityId === city.id).map((t) => t.index)),
+      territory: new Set(state.map.tiles.filter((t) => tileBelongsTo(t, city)).map((t) => t.index)),
       worked: new Set(stats.workedTiles),
       locked: new Set(city.lockedTiles),
       centerIndex: city.centerIndex,

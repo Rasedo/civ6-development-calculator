@@ -28,7 +28,7 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo } from '../src/core/seats';
 
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
@@ -1772,7 +1772,7 @@ for (let s = 0; s < N_SEEDS; s++) {
         // AUDIT C-6: bonus-resource tiles are pickable (canPlaceDistrict
         // refuses luxury/strategic; queueDistrict strips the bonus at pave —
         // real Civ 6 placement rules).
-        if (tile.cityId !== cap.id || tile.improvement) continue;
+        if (!tileBelongsTo(tile, cap) || tile.improvement) continue;
         if (!canPlaceDistrict(state, cap, spec.id, tile.index).ok) continue;
         const adj = districtAdjacency(state.map, tile, spec.id);
         if (adj > bestAdj) {

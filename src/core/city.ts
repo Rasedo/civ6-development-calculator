@@ -46,7 +46,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner } from './seats';
+import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner, civOfRival, tileBelongsTo, tileOwnedByCiv } from './seats';
 
 export interface CityStats {
   city: City;
@@ -121,7 +121,7 @@ export function workableTiles(state: GameState, city: City): Tile[] {
   const center = state.map.tiles[city.centerIndex];
   return tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS).filter(
     (t) =>
-      t.cityId === city.id &&
+      tileBelongsTo(t, city) &&
       t.index !== city.centerIndex &&
       !t.district &&
       !t.builtWonder &&
@@ -262,7 +262,7 @@ export function computeHousing(state: GameState, city: City, mods?: Modifiers): 
   }
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
-    if (t.cityId !== city.id || !t.improvement) continue;
+    if (!tileBelongsTo(t, city) || !t.improvement) continue;
     total += IMPROVEMENTS[t.improvement as ImprovementId].housing;
   }
 
@@ -322,7 +322,7 @@ export function borderCandidates(state: GameState, city: City): number[] {
     if (isPlayerSeat(tileSeat(t))) continue;
     if (tileForeignTo(t, PLAYER_CIV)) continue; // foreign territory
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
-      (n) => n.index !== t.index && n.cityId === city.id,
+      (n) => n.index !== t.index && tileBelongsTo(n, city),
     );
     if (adjOwn) out.push(t.index);
   }
@@ -486,7 +486,7 @@ export function rivalTourism(
   let t = 0;
   const printing = rival.research.techs.includes(GW_PRINTING_TECH); // B-20 (#74)
   for (const rc of rival.cities) t += greatWorkTourism(rc, printing) + relicTourism(rc) + artifactTourism(rc); // B-20 (#73) relics, (#79) artifacts
-  const owns = (tile: Tile) => tile.rivalId === rival.id;
+  const owns = (tile: Tile) => tileOwnedByCiv(tile, civOfRival(rival.id));
   const era = civEraIndex(rival.research.techs, rival.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
 }

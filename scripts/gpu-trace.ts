@@ -27,7 +27,7 @@
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { dominationWinner } from '../src/core/game';
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileBelongsTo } from '../src/core/seats';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -231,7 +231,7 @@ const PER_RIVAL_CITY_COLS: TraceCol<{ rival: RivalCiv; rc: RivalCity } | undefin
 
 const PER_CITY_COLS: TraceCol<City | undefined>[] = [
   { name: 'pop', tol: 0, get: (_s, c) => c?.population ?? 0 },
-  { name: 'owned', tol: 0, get: (s, c) => (c ? s.map.tiles.filter((x) => x.cityId === c.id).length : 0) },
+  { name: 'owned', tol: 0, get: (s, c) => (c ? s.map.tiles.filter((x) => tileBelongsTo(x, c)).length : 0) },
   { name: 'bldgs', tol: 0, get: (_s, c) => c?.buildings.length ?? 0 },
   { name: 'acquired', tol: 0, get: (_s, c) => c?.tilesAcquired ?? 0 },
   { name: 'foodBox', tol: 2, get: (_s, c) => (c ? Math.round(c.foodBox * 1000) : 0) },

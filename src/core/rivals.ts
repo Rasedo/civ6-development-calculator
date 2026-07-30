@@ -71,7 +71,7 @@ import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -695,7 +695,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   // city's districts (adjacency yields AND the trace count) match the GPU.
   const keptByType = new Map<DistrictId, number>();
   for (const t of state.map.tiles) {
-    if (t.cityId === city.id && t.district !== null && t.districtComplete) {
+    if (tileBelongsTo(t, city) && t.district !== null && t.districtComplete) {
       keptByType.set(t.district, t.index); // ascending scan → last (highest) wins, mirroring the GPU registry overwrite
     }
   }
@@ -749,7 +749,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
  * Water, impassables and natural wonders are all claimable, exactly like
  * borderCandidates. A-17: adjacency is PER-CITY via the rivalCityId tile
  * registry — a rival city can no longer claim across a sibling's frontier,
- * exactly like the player's n.cityId === city.id check. */
+ * exactly like the player's tileBelongsTo(n, city) check. */
 function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity): number | null {
   const center = state.map.tiles[city.centerIndex];
   const ctx = { map: state.map, mods: getRivalModifiers(state, rival) };  // A-7: belief tile yields rank candidates too
@@ -757,7 +757,7 @@ function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity)
   for (const t of tilesWithin(state.map, center.col, center.row, 5)) {
     if (tileOwned(t)) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
-      (n) => n.index !== t.index && tileOwnedByCiv(n, civOfRival(rival.id)) && n.rivalCityId === city.id,
+      (n) => n.index !== t.index && tileBelongsTo(n, city),
     );
     if (!adjOwn) continue;
     const y = tileYields(ctx, t);
@@ -1046,12 +1046,12 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
  */
 function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity, unlocks: Unlocks): boolean {
   // A-24: a district sits on a tile owned by THIS city (the player's
-  // canPlaceDistrict uses `t.cityId === city.id`). Restrict the picker AND the
+  // canPlaceDistrict uses `tileBelongsTo(t, city)`). Restrict the picker AND the
   // ownsTile validity check to this rc's A-17 registry (rivalCityId === rc.id) —
   // a sibling's registered tile is NOT a valid site, keeping .districts and the
   // registry mutually consistent (was civ-level, so overlapping frontiers could
   // pave a sibling's tile — seed 9118).
-  const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === rc.id;
+  const owns = (t: Tile) => tileBelongsTo(t, rc);
   for (const { id } of SCAFFOLD_DISTRICTS) {
     let best = -1;
     let bestAdj = -1;
@@ -1172,7 +1172,7 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
         // A-24: per-city ownership, mirroring canPlaceWonder's `tile.cityId ===
         // city.id` — the wonder tile registers to THIS rc (rivalCityId), not
         // merely the civ. Same coherence fix as tryQueueRivalDistrict.
-        if (!tileOwnedByCiv(t, civ) || t.rivalCityId !== rc.id || t.index === rc.centerIndex) return false;
+        if (!tileOwnedByCiv(t, civ) || !tileBelongsTo(t, rc) || t.index === rc.centerIndex) return false;
         if (t.district || t.builtWonder || t.wonder) return false;
         if (isImpassable(t)) return false;
         if (t.resource && RESOURCES[t.resource].category !== 'bonus') return false;
@@ -1915,12 +1915,12 @@ export function rivalCityYields(
     .filter(
       (t) =>
         // AUDIT A-23 (2026-07-27): PER-CITY, not civ-level. The player's
-        // workableTiles keys on `t.cityId === city.id`; the rival twin now
+        // workableTiles keys on `tileBelongsTo(t, city)`; the rival twin now
         // keys on the A-17 registry the same way, so two adjacent rival
         // cities can no longer BOTH work the same civ tile — a
         // double-count the player is structurally incapable of.
         tileOwnedByCiv(t, civOfRival(rival.id)) &&
-        t.rivalCityId === rc.id &&
+        tileBelongsTo(t, rc) &&
         t.index !== rc.centerIndex &&
         !t.district &&
         !t.builtWonder &&
@@ -2227,7 +2227,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
   // A-17: exactly the flipping city's tiles re-tag (registry scan) — the old
   // work-radius sweep both leaked its outer ring and stole sibling frontage.
   for (const t of state.map.tiles) {
-    if (tileOwnedByCiv(t, civOfRival(from.id)) && t.rivalCityId === rc.id) {
+    if (tileBelongsTo(t, rc)) {
       setTileOwner(t, civOfRival(to.id), to.nextCityId); // the rc pushed below
     }
   }
@@ -2288,7 +2288,7 @@ export function assertRivalRegistryCoherent(state: GameState): void {
     for (const rc of rival.cities) {
       const check = (kind: string, tileIndex: number, type: string) => {
         const t = state.map.tiles[tileIndex];
-        if (t.rivalCityId !== rc.id || !tileOwnedByCiv(t, civ)) {
+        if (!tileBelongsTo(t, rc) || !tileOwnedByCiv(t, civ)) {
           throw new Error(
             `A-24 registry incoherence: rival=${rival.id} rc.id=${rc.id} ${kind}=${type} ` +
               `tile=${tileIndex} rivalCityId=${t.rivalCityId} rivalId=${t.rivalId} turn=${state.turn}`,

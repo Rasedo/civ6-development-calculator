@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState } from './seats';
+import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -257,14 +257,7 @@ function unitReligion(state: GameState, unit: Unit): number {
  * following nothing). Player tiles via tile.cityId; rival tiles via the A-17
  * per-city registry (tile.rivalCityId). */
 function tileFollowedReligion(state: GameState, tile: Tile): number {
-  if (tile.cityId >= 0) {
-    return state.cities.find((c) => c.id === tile.cityId)?.followedReligion ?? -1;
-  }
-  if (tile.rivalId != null && tile.rivalId >= 0 && tile.rivalCityId != null) {
-    const rv = state.rivals.find((r) => r.id === tile.rivalId);
-    return rv?.cities.find((rc) => rc.id === tile.rivalCityId)?.followedReligion ?? -1;
-  }
-  return -1;
+  return cityAtTile(state, tile)?.followedReligion ?? -1;
 }
 
 /** B6-S1: is any city (player or rival) following religion g within
@@ -977,7 +970,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   }
   const id = state.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-    if ((t.csId ?? -1) === cs.id) {
+    if (tileSeat(t) === seatOfCityState(cs.id)) {
       // the player keeps its own claim where it has one, else takes the tile
       setTileOwner(t, PLAYER_CIV, isPlayerSeat(tileSeat(t)) ? tileCity(t) : id);
     }
@@ -1038,7 +1031,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
   }
   const id = rival.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-    if ((t.csId ?? -1) === cs.id) {
+    if (tileSeat(t) === seatOfCityState(cs.id)) {
       setTileOwner(t, civOfRival(rival.id), id); // A-17: the claim registers to the new rc
     }
   }
@@ -1085,7 +1078,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     // A-17: exactly this city's tiles free (registry scan) — the old
     // work-radius sweep leaked the outer ring as orphaned civ territory.
     for (const t of state.map.tiles) {
-      if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
+      if (tileBelongsTo(t, city)) {
         setTileOwner(t, NO_SEAT);
       }
     }
@@ -1098,7 +1091,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   // A-17: exactly this city's territory transfers to the new owner (registry
   // scan) — the old work-radius sweep also stole sibling cities' frontage.
   for (const t of state.map.tiles) {
-    if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
+    if (tileBelongsTo(t, city)) {
       // tileOwnedByCiv already proved the RIVAL owns it, so the player cannot
       setTileOwner(t, PLAYER_CIV, id);
     }

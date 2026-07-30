@@ -3,7 +3,7 @@
  * as gpu/statelog.py so gpu/logdiff.py can align them. Keep the two in lockstep:
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfCiv } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfCiv, civOfRival, tileOwnedByCiv } from '../src/core/seats';
 import { rivalCityYields } from '../src/core/rivals';
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { isWater } from '../src/core/query';
@@ -110,7 +110,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     const rival = state.rivals[r];
     if (rival.cities.length === 0) continue;
     const pop = rival.cities.reduce((a, rc) => a + rc.population, 0);
-    const rt = state.map.tiles.filter((t) => t.rivalId === rival.id);
+    const rt = state.map.tiles.filter((t) => tileOwnedByCiv(t, civOfRival(rival.id)));
     L.push(
       `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} fai${Math.round((rival.faith ?? 0)*1000)} ` +
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0} ` +

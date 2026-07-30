@@ -18,7 +18,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { playerSeat, isPlayerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, tileBelongsTo } from '../src/core/seats';
 import {
   createGame,
   endTurn,
@@ -289,7 +289,7 @@ for (const game of roll.games) {
         let best = -1;
         let bestAdj = -1;
         for (const tile of state.map.tiles) {
-          if (tile.cityId !== city.id || tile.improvement) continue;
+          if (!tileBelongsTo(tile, city) || tile.improvement) continue;
           if (!canPlaceDistrict(state, city, districtId, tile.index).ok) continue;
           const adj = districtAdjacency(state.map, tile, districtId);
           if (adj > bestAdj) {
