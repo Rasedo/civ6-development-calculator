@@ -5427,18 +5427,25 @@ class BatchSim:
         B, dev = self.B, self.device
         nb = self.neigh[self.p_tile.clamp(min=0).reshape(-1)].reshape(B, P_MAX, 6)
         nbc = nb.clamp(min=0).reshape(B, -1)
-        barb = (self.barb_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
-        pmil = (self.pmil_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
-        pciv = (self.pciv_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
-        rvn = self.rv_at.gather(1, nbc)
-        rv_civ = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=max(self.R - 1, 0))
-        rv_war = ((rvn >= 0) & self.r_atwar.gather(1, rv_civ)).reshape(B, P_MAX, 6)
-        rv_any = (rvn >= 0).reshape(B, P_MAX, 6)
+        # #51/S3.4b: two gathers into the merged maps, then the occupant's SEAT
+        # decides which of the five old questions each was asking.
+        mslot = self.occ_mil.gather(1, nbc)
+        cslot = self.occ_civ.gather(1, nbc)
+        neg = torch.full_like(mslot, -1)
+        m_seat = torch.where(mslot >= 0, self.unit_seat.gather(1, mslot.clamp(min=0)), neg)
+        c_seat = torch.where(cslot >= 0, self.unit_seat.gather(1, cslot.clamp(min=0)), neg)
+        barb = (m_seat == BARB_SEAT).reshape(B, P_MAX, 6)
+        pmil = (m_seat == PLAYER_SEAT).reshape(B, P_MAX, 6)
+        pciv = (c_seat == PLAYER_SEAT).reshape(B, P_MAX, 6)
+        rv_here = (m_seat > 0) & (m_seat != BARB_SEAT)
+        rv_civ = (m_seat - 1).clamp(min=0, max=max(self.R - 1, 0))
+        rv_war = (rv_here & self.r_atwar.gather(1, rv_civ)).reshape(B, P_MAX, 6)
+        rv_any = rv_here.reshape(B, P_MAX, 6)
         # V-W2: at-war rival CITY CENTERS are melee targets (attackTargets'
         # rivalCity branch) — the siege the mask previously never offered.
         rcn = self.rvcity_at.gather(1, nbc)
         rc_war = ((rcn >= 0) & self.r_atwar.gather(1, rcn.clamp(min=0).clamp(max=max(self.R - 1, 0)))).reshape(B, P_MAX, 6)
-        rvc_civ_n = (self.rvciv_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
+        rvc_civ_n = ((c_seat > 0) & (c_seat != BARB_SEAT)).reshape(B, P_MAX, 6)
         passable = self.passable.gather(1, nbc).reshape(B, P_MAX, 6)
         on_map = nb >= 0
         civ = self._p_civ[self.p_type]
@@ -10884,12 +10891,23 @@ class BatchSim:
         (military, civilian) relative to unit slot v's civ — the symmetric
         unitsHostile for the rival-rival war-act target scan. Own-civ units are
         never hostile."""
-        ac = self.v_civ[:, v].clamp(min=0)  # [B]
-        bidxT = torch.arange(self.B, device=self.device).unsqueeze(1)
-        rvm_civ = torch.where(self.rv_at >= 0, self.v_civ.gather(1, self.rv_at.clamp(min=0)), torch.full_like(self.rv_at, -1))  # [B, T]
-        rvc_civ = torch.where(self.rvciv_at >= 0, self.v_civ.gather(1, self.rvciv_at.clamp(min=0)), torch.full_like(self.rvciv_at, -1))
-        war_m = (self.rv_at >= 0) & (rvm_civ != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rvm_civ.clamp(min=0)]
-        war_c = (self.rvciv_at >= 0) & (rvc_civ != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rvc_civ.clamp(min=0)]
+        # #51/S3.4b: the merged maps + the shared hostility rule. RIVAL-ONLY by
+        # construction, as before — the player and barbarians are hostile to
+        # this rival too, but they are handled by other target scans, so they
+        # are filtered out rather than folded in (that would silently widen
+        # the rival-vs-rival war act's target set).
+        seat = self.v_seat[:, v].unsqueeze(1)  # [B, 1]
+        neg_m = torch.full_like(self.occ_mil, -1)
+        m_seat = torch.where(
+            self.occ_mil >= 0, self.unit_seat.gather(1, self.occ_mil.clamp(min=0)), neg_m
+        )
+        c_seat = torch.where(
+            self.occ_civ >= 0, self.unit_seat.gather(1, self.occ_civ.clamp(min=0)), neg_m
+        )
+        rival_m = (m_seat > 0) & (m_seat != BARB_SEAT)
+        rival_c = (c_seat > 0) & (c_seat != BARB_SEAT)
+        war_m = rival_m & self._seats_hostile(seat, m_seat)
+        war_c = rival_c & self._seats_hostile(seat, c_seat)
         return war_m, war_c
 
     def _rival_unit_war_act(self, v: int, act: torch.Tensor) -> None:
