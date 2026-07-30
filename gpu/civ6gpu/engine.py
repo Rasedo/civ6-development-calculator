@@ -5022,10 +5022,27 @@ class BatchSim:
         self,
         tiles: torch.Tensor,
         seat,
-        is_civilian: bool = False,
+        is_civilian=False,
         strict: bool = False,
     ) -> torch.Tensor:
-        """Stacking check for tiles [B, N] — the tileFreeForUnit twin.
+        """tileFreeForUnit: STACKING plus the Encampment wall.
+
+        B-17 (#71): a live enemy Encampment bars entry, exactly as TS's
+        `tileFreeForUnit` does. Split from `_stack_blocked` because the SPAWN
+        probe (_first_free_spot) has never consulted Encampments and TS's
+        spawnUnit does — a real divergence, recorded rather than silently
+        introduced by sharing this body.
+        """
+        return self._stack_blocked(tiles, seat, is_civilian, strict) | self._encamp_block(tiles, seat)
+
+    def _stack_blocked(
+        self,
+        tiles: torch.Tensor,
+        seat,
+        is_civilian=False,
+        strict: bool = False,
+    ) -> torch.Tensor:
+        """Pure STACKING check for tiles [B, N] — no Encampment term.
 
         #51/S3.4: ONE rule, keyed on the mover's SEAT, replacing a five-way
         branch on a `side` string ('barb'|'pmil'|'pciv'|'rmil'|'rciv'). The
@@ -5053,36 +5070,43 @@ class BatchSim:
         pciv_at = self.pciv_at.gather(1, tc)
         rv_slot = self.rv_at.gather(1, tc)
         rvc_slot = self.rvciv_at.gather(1, tc)
-        # B-17 (#71): a live enemy Encampment bars entry on every side, exactly
-        # as TS's `tileFreeForUnit` now does.
-        enc = self._encamp_block(tiles, seat)
 
         if strict:
-            return (
+            occupied = (
                 (barb_at >= 0) | (pmil_at >= 0) | (pciv_at >= 0)
-                | (rv_slot >= 0) | (rvc_slot >= 0) | enc
+                | (rv_slot >= 0) | (rvc_slot >= 0)
             )
-
-        # Whose unit occupies this tile, per DOMAIN, in the absolute seat space
-        # (-1 = nobody). At most one military and one civilian can stand here.
-        neg = torch.full_like(tc, -1)
-        mil_seat = torch.where(
-            barb_at >= 0,
-            torch.full_like(tc, BARB_SEAT),
-            torch.where(
-                pmil_at >= 0,
+        else:
+            # Whose unit occupies this tile, per DOMAIN, in the absolute seat
+            # space (-1 = nobody). At most one military and one civilian can
+            # stand here, so each domain has a single owner.
+            neg = torch.full_like(tc, -1)
+            mil_seat = torch.where(
+                barb_at >= 0,
+                torch.full_like(tc, BARB_SEAT),
+                torch.where(
+                    pmil_at >= 0,
+                    torch.zeros_like(tc),
+                    torch.where(rv_slot >= 0, self.v_seat.gather(1, rv_slot.clamp(min=0)), neg),
+                ),
+            )
+            civ_seat = torch.where(
+                pciv_at >= 0,
                 torch.zeros_like(tc),
-                torch.where(rv_slot >= 0, self.v_seat.gather(1, rv_slot.clamp(min=0)), neg),
-            ),
-        )
-        civ_seat = torch.where(
-            pciv_at >= 0,
-            torch.zeros_like(tc),
-            torch.where(rvc_slot >= 0, self.v_seat.gather(1, rvc_slot.clamp(min=0)), neg),
-        )
-        mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (not is_civilian))
-        civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | is_civilian)
-        return mil_blocks | civ_blocks | enc
+                torch.where(rvc_slot >= 0, self.v_seat.gather(1, rvc_slot.clamp(min=0)), neg),
+            )
+            # `is_civilian` may be a per-row [B] tensor — the spawn probe
+            # decides per GAME whether it is placing a civilian. Normalise to a
+            # broadcastable bool tensor so one expression covers both.
+            civ_b = (
+                is_civilian.unsqueeze(1)
+                if torch.is_tensor(is_civilian)
+                else torch.full((1, 1), bool(is_civilian), dtype=torch.bool, device=tc.device)
+            )
+            mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | ~civ_b)
+            civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | civ_b)
+            occupied = mil_blocks | civ_blocks
+        return occupied
 
     def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -5095,23 +5119,23 @@ class BatchSim:
         Returns (found [B], spot [B])."""
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)  # [B, 7]
         okc = cand7.clamp(min=0)
-        barb = self.barb_at.gather(1, okc) >= 0
-        pmil = self.pmil_at.gather(1, okc) >= 0
-        pciv = self.pciv_at.gather(1, okc) >= 0
-        rv = self.rv_at.gather(1, okc) >= 0
-        rvc_slot = self.rvciv_at.gather(1, okc)
-        rvc = rvc_slot >= 0
+        # #51/S3.4: the SAME stacking rule the movement probe uses. This was a
+        # third transcription of it — a player arm, a rival arm (C1-B5b: an
+        # own-civ civilian stacks with a fresh MILITARY unit, foreign civilians
+        # block) and a barbarian arm where everything blocks. All three are
+        # `_stack_blocked` with the right seat; the barbarian arm needs no
+        # special case, because "hostile to everyone" already makes every
+        # occupant block.
+        #
+        # NOT `_blocked_for`: that adds the Encampment wall, and this spawn
+        # probe has never consulted Encampments even though TS's spawnUnit
+        # does. Real divergence, left alone here and recorded.
         if side == "player":
-            dom = torch.where(civ_mask.unsqueeze(1), pciv, pmil)
-            blocked = barb | rv | rvc | dom
+            blocked = self._stack_blocked(cand7, PLAYER_SEAT, is_civilian=civ_mask)
         elif side == "rival" and civ is not None:
-            # C1-B5b: spawnUnit probes through tileFreeForUnit — an OWN-CIV
-            # civilian stacks with a fresh military unit (cross-domain);
-            # foreign civilians block.
-            rvc_foreign = rvc & (self.v_civ.gather(1, rvc_slot.clamp(min=0)) != civ)
-            blocked = barb | pmil | pciv | rv | rvc_foreign
-        else:  # barb: every other unit blocks
-            blocked = barb | pmil | pciv | rv | rvc
+            blocked = self._stack_blocked(cand7, civ + 1)
+        else:
+            blocked = self._stack_blocked(cand7, BARB_SEAT)
         terr = self.passable.gather(1, okc)
         if naval_mask is not None and bool(naval_mask.any()):
             # #45/B-6: naval rows use the water plane — wpass, OCEAN gated on the
