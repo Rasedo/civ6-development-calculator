@@ -186,6 +186,7 @@ def main() -> int:
         # installed) and it IS the parity harness. A parse costs ~200ms and
         # catches the class that killed this gate with an empty error message.
         ("parse", ["node", "scripts/parse-check.mjs"]),
+        ("lint", [npx, "oxlint", "src", "scripts", "tests"]),  # #51: no-constant-binary-expression et al
         ("export", [npm, "run", "gpu:export"]),
     ):
         run(name, cmd, threads=24)
