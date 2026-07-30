@@ -15,7 +15,7 @@ import { canFoundCity } from '../src/core/rules';
 import { tilesWithin, hexDistance } from '../src/core/hex';
 import { rivalPhase, declareWar, sueForPeace, rivalUnits, rivalCityYields, assertRivalRegistryCoherent } from '../src/core/rivals';
 import { meleeAttack, attackTargets, captureCityState, captureRivalCity } from '../src/core/combat';
-import { rivalTradeCapacity, rivalRouteRaidedAt, routeRaidedAt } from '../src/core/trade';
+import { rivalRouteRaidedAt, routeRaidedAt, tradeCapacity } from '../src/core/trade';
 import { spawnUnit, unitsHostile } from '../src/core/units';
 import { gpCost } from '../src/data/greatPeople';
 import { BUILDINGS } from '../src/data/buildings';
@@ -490,13 +490,13 @@ describe('rival trade routes (A-11)', () => {
   it('capacity counts FOREIGN_TRADE, Market/Lighthouse per city (non-cumulative)', () => {
     const state = makeState();
     const rival = addRival(state, 8, 8);
-    expect(rivalTradeCapacity(state, rival)).toBe(0);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(0);
     rival.research.civics.push('FOREIGN_TRADE');
-    expect(rivalTradeCapacity(state, rival)).toBe(1);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(1);
     rival.cities[0].buildings.push('MARKET');
-    expect(rivalTradeCapacity(state, rival)).toBe(2);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(2);
     rival.cities[0].buildings.push('LIGHTHOUSE'); // same city: still +1
-    expect(rivalTradeCapacity(state, rival)).toBe(2);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(2);
   });
 
   it('rivalPhase forms one route per turn up to capacity; routes die with the city', () => {
@@ -574,12 +574,12 @@ describe('rival CS trade routes (A-12b)', () => {
     const state = makeState();
     const rival = addRival(state, 8, 8);
     const cs = addCs(state, 11, 8, { type: 'trade' });
-    expect(rivalTradeCapacity(state, rival)).toBe(0);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(0);
     cs.rivalEnvoys = [];
     cs.rivalEnvoys[rival.id] = 3;
-    expect(rivalTradeCapacity(state, rival)).toBe(1); // uncontested at the minimum
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(1); // uncontested at the minimum
     cs.envoys = 3; // player ties: nobody is suzerain
-    expect(rivalTradeCapacity(state, rival)).toBe(0);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBe(0);
   });
 
   it('rivalPhase routes to a met in-range CS; the origin earns gold + specialty', () => {

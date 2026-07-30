@@ -5,12 +5,11 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, civOfRival } from './seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, civOfRival, PLAYER_CIV, seatOf, citiesOf } from './seats';
 import { hexDistance } from './hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
-import { isCivicComplete } from './effects';
 import { DISTRICTS } from '../data/districts';
-import { csTradeCapacityBonus, rivalIsSuzerain } from './cityStates';
+import { csTradeCapacityBonus } from './cityStates';
 import { CS_TYPE_YIELD } from '../data/cityStates';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
@@ -23,48 +22,29 @@ export const TRADE_ROUTE_RANGE = 15;
  * online pace). Expiry is arithmetic — zero RNG draws. */
 export const TRADE_ROUTE_DURATION = 20;
 
-/** Total route capacity: Foreign Trade civic, Markets, Lighthouses, wonders,
- * plus +1 per trade city-state you are suzerain of. */
-export function tradeCapacity(state: GameState): number {
+/**
+ * Total route capacity for ANY seat: the Foreign Trade civic, Markets and
+ * Lighthouses (non-cumulative per city — P4/D-7), Colossus/Great Zimbabwe, plus
+ * +1 per trade city-state this seat is suzerain of.
+ *
+ * #51/S2.3: `tradeCapacity` and `rivalTradeCapacity` were the same arithmetic
+ * over three seat-shaped slots — whose civics, whose cities, whose suzerainty.
+ * Zero divergence flags once a seat carries all three.
+ */
+export function tradeCapacity(state: GameState, seat: number = PLAYER_CIV): number {
+  const s = seatOf(state, seat);
   let cap = 0;
-  if (isCivicComplete(state, 'FOREIGN_TRADE')) cap += 1;
-  for (const c of state.cities) {
-    // P4/D-7: real Civ 6 — a city with BOTH a Market and a Lighthouse
-    // still grants only +1 capacity (non-cumulative per city).
+  if (s?.research.civics.includes('FOREIGN_TRADE')) cap += 1;
+  for (const c of citiesOf(state, seat)) {
     if (c.buildings.includes('MARKET') || c.buildings.includes('LIGHTHOUSE')) cap += 1;
-    for (const w of c.wonders) {
+    for (const w of c.wonders ?? []) {
       if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
       if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
     }
   }
-  return cap + csTradeCapacityBonus(state);
+  return cap + csTradeCapacityBonus(state, seat);
 }
 
-/** AUDIT A-11/A-12b: the rival twin of tradeCapacity, off the rival's OWN
- * structures — FOREIGN_TRADE from its civic tree, Market/Lighthouse per
- * city (non-cumulative, the D-7 rule), Colossus/Great Zimbabwe, plus +1
- * per trade city-state this rival is suzerain of (the csTradeCapacityBonus
- * twin on the rival seat's strict-contest suzerainty). */
-export function rivalTradeCapacity(state: GameState, rival: RivalCiv): number {
-  let cap = 0;
-  if (rival.research.civics.includes('FOREIGN_TRADE')) cap += 1;
-  for (const rc of rival.cities) {
-    if (rc.buildings.includes('MARKET') || rc.buildings.includes('LIGHTHOUSE')) cap += 1;
-    for (const w of rc.wonders ?? []) {
-      if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
-      if (w.id === 'COLOSSUS' || w.id === 'GREAT_ZIMBABWE') cap += 1;
-    }
-  }
-  for (const cs of state.cityStates) {
-    if (cs.type === 'trade' && rivalIsSuzerain(cs, rival.id)) cap += 1;
-  }
-  return cap;
-}
-
-/** AUDIT A-11: a rival route is suspended while units HOSTILE TO THAT
- * RIVAL prowl within 3 of either endpoint — barbarians always, player
- * units while at war (rival-rival war is impossible until A-19). The
- * routeRaidedAt twin from the rival's seat. */
 export function rivalRouteRaidedAt(state: GameState, rival: RivalCiv, endpoints: number[]): boolean {
   if (!state.unitsMode) return false;
   for (const u of state.units) {

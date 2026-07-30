@@ -3,19 +3,7 @@ import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, city
 import { makeMap, makeState, tileAtCoords, expandBorders } from './helpers';
 import { foundCity } from '../src/core/game';
 import { tilesWithin } from '../src/core/hex';
-import {
-  tradeCapacity,
-  addTradeRoute,
-  addIntlTradeRoute,
-  canAddIntlTradeRoute,
-  cityTradeYields,
-  routeYieldsInternational,
-  specialtyDistricts,
-  expirePlayerRoutes,
-  rivalTradeCapacity,
-  TRADE_ROUTE_DURATION,
-  INTL_ROUTE_GOLD,
-} from '../src/core/trade';
+import { tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, expirePlayerRoutes, TRADE_ROUTE_DURATION, INTL_ROUTE_GOLD } from '../src/core/trade';
 import { rivalPhase } from '../src/core/rivals';
 import type { City, GameState, RivalCity, RivalCiv } from '../src/core/types';
 
@@ -175,7 +163,7 @@ describe('B-23 rival international pick + income', () => {
     // Single-city rival (no domestic pair), no met CS, a MARKET for capacity,
     // placed within trade range of the player city.
     const rival = addRival(state, 13, 10);
-    expect(rivalTradeCapacity(state, rival)).toBeGreaterThanOrEqual(1);
+    expect(tradeCapacity(state, civOfRival(rival.id))).toBeGreaterThanOrEqual(1);
 
     rivalPhase(state);
 

@@ -7,7 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
-import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat, rivalsOf } from './seats';
+import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat, rivalsOf, civOfRival, rivalOfCiv, isPlayerSeat, PLAYER_CIV } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -120,22 +120,30 @@ export function metCityStates(state: GameState): CityState[] {
   return state.cityStates.filter((cs) => cs.met);
 }
 
-export function isSuzerain(cs: CityState): boolean {
-  // A-12: the suzerain CONTEST — most envoys, minimum 3, STRICTLY more
-  // than every rival (real Civ 6: a tie leaves no suzerain).
-  return cs.envoys >= SUZERAIN_ENVOYS && (cs.rivalEnvoys ?? []).every((e) => cs.envoys > (e ?? 0));
+export function envoysOf(cs: CityState, seat: number): number {
+  return isPlayerSeat(seat) ? cs.envoys : cs.rivalEnvoys?.[rivalOfCiv(seat)] ?? 0;
 }
 
-/** A-12: the rival-seat suzerain test — strictly most envoys, minimum 3. */
-export function rivalIsSuzerain(cs: CityState, rivalId: number): boolean {
-  const mine = cs.rivalEnvoys?.[rivalId] ?? 0;
-  if (mine < SUZERAIN_ENVOYS || mine <= cs.envoys) return false;
-  return (cs.rivalEnvoys ?? []).every((e, i) => i === rivalId || mine > (e ?? 0));
+/**
+ * A-12: the suzerain CONTEST — most envoys, minimum 3, STRICTLY more than every
+ * OTHER seat (real Civ 6: a tie leaves no suzerain).
+ *
+ * #51/S2.3: `isSuzerain(cs)` and `isSuzerain(cs, civOfRival(rivalId))` were the same
+ * rule with the "mine" slot swapped — the player's read `cs.envoys` and
+ * compared against the rival list; the rival's read the list and compared
+ * against `cs.envoys` plus the other rivals. ONE rule now, zero divergence
+ * flags: whoever is asking is "mine", everyone else is the field.
+ */
+export function isSuzerain(cs: CityState, seat: number = PLAYER_CIV): boolean {
+  const mine = envoysOf(cs, seat);
+  if (mine < SUZERAIN_ENVOYS) return false;
+  if (!isPlayerSeat(seat) && cs.envoys >= mine) return false; // the player is a contender too
+  return (cs.rivalEnvoys ?? []).every((e, i) => civOfRival(i) === seat || mine > (e ?? 0));
 }
 
 /** Extra trade-route capacity from being suzerain of trade city-states. */
-export function csTradeCapacityBonus(state: GameState): number {
-  return state.cityStates.filter((cs) => cs.type === 'trade' && isSuzerain(cs)).length;
+export function csTradeCapacityBonus(state: GameState, seat: number = PLAYER_CIV): number {
+  return state.cityStates.filter((cs) => cs.type === 'trade' && isSuzerain(cs, seat)).length;
 }
 
 export interface CsBonuses {
@@ -218,7 +226,7 @@ export function csSuzerainCapitalBonus(state: GameState): Partial<Yields> {
 export function csRivalSuzerainCapitalBonus(state: GameState, rivalId: number): Partial<Yields> {
   const out: Partial<Yields> = {};
   for (const cs of state.cityStates) {
-    if (!rivalIsSuzerain(cs, rivalId)) continue;
+    if (!isSuzerain(cs, civOfRival(rivalId))) continue;
     const key = CS_SUZERAIN_LIVE[cs.name];
     if (!key) continue; // descoped row
     out[key] = (out[key] ?? 0) + CS_SUZERAIN_YIELD;
@@ -340,7 +348,7 @@ export function sueForPeaceWithCityState(state: GameState, csId: number): RuleRe
   // switching". So refuse here; the way out is peace with the suzerain (which
   // makePeace then forces onto every city-state it is suzerain of) or the
   // suzerainty changing hands.
-  const suz = (rivalsOf(state) ?? []).find((rv) => rv.atWar && rivalIsSuzerain(cs, rv.id));
+  const suz = (rivalsOf(state) ?? []).find((rv) => rv.atWar && isSuzerain(cs, civOfRival(rv.id)));
   if (suz) {
     return { ok: false, reason: `${cs.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
   }

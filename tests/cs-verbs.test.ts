@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, NO_SEAT, rivalCount } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { rivalPhase, rivalUnits } from '../src/core/rivals';
-import { cityStatePhase, rivalIsSuzerain } from '../src/core/cityStates';
+import { cityStatePhase, isSuzerain } from '../src/core/cityStates';
 import { spawnUnit } from '../src/core/units';
 import { nextRandom } from '../src/core/rand';
 import { hexDistance, tilesWithin } from '../src/core/hex';
@@ -142,7 +142,7 @@ describe('A-12 (B8-L): rival levy', () => {
 
   it('an at-war suzerain of a militaristic CS levies LEVY_UNITS at its center', () => {
     const { state, rival, cs } = scenario();
-    expect(rivalIsSuzerain(cs, rival.id)).toBe(true);
+    expect(isSuzerain(cs, civOfRival(rival.id))).toBe(true);
     rival.atWar = true;
     // #71 FLAG 4 (RIVAL_TILE_BUY_LIVE): the tile-purchase rung sits in the gold
     // ladder BEFORE the levy, so an exactly-LEVY_GOLD_COST treasury is drained

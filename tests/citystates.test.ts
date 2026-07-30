@@ -1,21 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat } from '../src/core/seats';
+import { playerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, civOfRival } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { canFoundCity } from '../src/core/rules';
 import { borderCandidates, computeCityStats } from '../src/core/city';
 import { tilesWithin, hexDistance } from '../src/core/hex';
-import {
-  cityStatePhase,
-  assignEnvoy,
-  envoyBonusDelta,
-  csEnvoyBonuses,
-  isSuzerain,
-  rivalIsSuzerain,
-  csRivalEnvoyBonuses,
-  csSuzerainCapitalBonus,
-  csRivalSuzerainCapitalBonus,
-} from '../src/core/cityStates';
+import { cityStatePhase, assignEnvoy, envoyBonusDelta, csEnvoyBonuses, isSuzerain, csRivalEnvoyBonuses, csSuzerainCapitalBonus, csRivalSuzerainCapitalBonus } from '../src/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../src/core/trade';
 import { ENVOY_COST, CS_SUZERAIN_YIELD } from '../src/data/cityStates';
 import type { CityState, CityStateType, GameState } from '../src/core/types';
@@ -244,13 +234,13 @@ describe('rival envoys and the suzerain contest (A-12)', () => {
     expect(isSuzerain(cs)).toBe(true); // uncontested
     cs.rivalEnvoys = [3];
     expect(isSuzerain(cs)).toBe(false); // tied: nobody rules
-    expect(rivalIsSuzerain(cs, 0)).toBe(false);
+    expect(isSuzerain(cs, civOfRival(0))).toBe(false);
     cs.rivalEnvoys = [4];
     expect(isSuzerain(cs)).toBe(false);
-    expect(rivalIsSuzerain(cs, 0)).toBe(true);
+    expect(isSuzerain(cs, civOfRival(0))).toBe(true);
     cs.envoys = 5;
     expect(isSuzerain(cs)).toBe(true);
-    expect(rivalIsSuzerain(cs, 0)).toBe(false);
+    expect(isSuzerain(cs, civOfRival(0))).toBe(false);
   });
 
   it('csRivalEnvoyBonuses applies the 1/3/6 thresholds off that rival only', () => {
@@ -303,7 +293,7 @@ describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
     // Vilnius (cultural) is SHIPPED -> culture channel.
     const cs = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: 0 });
     cs.rivalEnvoys = [3];
-    expect(rivalIsSuzerain(cs, 0)).toBe(true);
+    expect(isSuzerain(cs, civOfRival(0))).toBe(true);
     expect(csRivalSuzerainCapitalBonus(state, 0).culture).toBe(CS_SUZERAIN_YIELD);
     // no perk for a rival that is not the suzerain
     expect(csRivalSuzerainCapitalBonus(state, 1)).toEqual({});

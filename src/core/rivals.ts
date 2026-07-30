@@ -17,8 +17,8 @@ import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
-import { rivalTradeCapacity, rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION } from './trade';
-import { isSuzerain, rivalIsSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
+import { rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
+import { isSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE, GOVERNMENTS } from '../data/policies';
@@ -534,7 +534,7 @@ function makePeace(state: GameState, rival: RivalCiv): void {
   // sueForPeaceWithCityState, which refuses while the suzerain is still hostile.
   // Placed in makePeace, not sueForPeace, so the AI peace path gets it too.
   for (const cs of state.cityStates ?? []) {
-    if (cs.atWar && rivalIsSuzerain(cs, rival.id)) {
+    if (cs.atWar && isSuzerain(cs, civOfRival(rival.id))) {
       cs.atWar = false;
       cs.csWarTurns = 0;
       state.eventLog.push(`${cs.name} makes peace alongside its suzerain.`);
@@ -1549,7 +1549,7 @@ export function playerSuzerainCount(state: GameState): number {
 
 /** B-22 (#75): city-states rival `rivalId` is Suzerain of. */
 export function rivalSuzerainCount(state: GameState, rivalId: number): number {
-  return state.cityStates.reduce((n, cs) => n + (rivalIsSuzerain(cs, rivalId) ? 1 : 0), 0);
+  return state.cityStates.reduce((n, cs) => n + (isSuzerain(cs, civOfRival(rivalId)) ? 1 : 0), 0);
 }
 
 /**
@@ -2901,7 +2901,7 @@ export function rivalPhase(state: GameState): void {
       if (rival.atWar && goldAffordable(rival.treasury ?? 0, LEVY_GOLD_COST)) {
         for (const cs of state.cityStates) {
           if (cs.type !== 'militaristic') continue;
-          if (!rivalIsSuzerain(cs, rival.id)) continue;
+          if (!isSuzerain(cs, civOfRival(rival.id))) continue;
           const since = state.turn - (cs.lastLevyTurn ?? -LEVY_COOLDOWN);
           if (since < LEVY_COOLDOWN) continue;
           rival.treasury = (rival.treasury ?? 0) - LEVY_GOLD_COST;
@@ -2928,7 +2928,7 @@ export function rivalPhase(state: GameState): void {
     // beats so ties keep the first-found.
     {
       const routes = (rival.tradeRoutes ??= []);
-      if (routes.length < rivalTradeCapacity(state, rival) && rival.cities.length >= 1) {
+      if (routes.length < tradeCapacity(state, civOfRival(rival.id)) && rival.cities.length >= 1) {
         let best: { from: number; to?: number; toCs?: number; toPlayer?: number; ySum: number } | null = null;
         for (const from of rival.cities) {
           const ft = state.map.tiles[from.centerIndex];
