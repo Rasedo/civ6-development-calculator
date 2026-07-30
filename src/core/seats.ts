@@ -38,15 +38,55 @@ export const rivalOfCiv = (civ: number): number => civ - 1;
  * city-state land (city-states hold territory without being civs).
  */
 export function tileOwnerCiv(t: Tile): number | null {
+  const s = tileSeat(t);
+  return s === NO_SEAT || isCityStateSeat(s) ? null : s; // a city-state is not a civ
+}
+
+/**
+ * #51/S1.3f: THE SEAT that owns this tile, or NO_SEAT.
+ *
+ * Four fields encoded this: `cityId` (player), `rivalId` (which rival),
+ * `rivalCityId` (which rival city) and `csId` (which city-state) — with an
+ * implicit precedence nobody had written down, and no way to say "this tile
+ * belongs to seat X" without knowing first WHICH KIND of seat X was.
+ *
+ * Reads the old fields for now, in exactly the old precedence; the storage
+ * collapses to `ownerSeat`/`ownerCity` once every reader goes through here.
+ */
+export function tileSeat(t: Tile): number {
   if (t.cityId !== -1) return PLAYER_CIV;
   const r = t.rivalId ?? -1;
-  return r !== -1 ? civOfRival(r) : null;
+  if (r !== -1) return civOfRival(r);
+  const cs = t.csId ?? -1;
+  return cs !== -1 ? seatOfCityState(cs) : NO_SEAT;
+}
+
+/**
+ * Give this tile to `seat` (and, for a civ, to one of its cities).
+ * `NO_SEAT` releases it.
+ *
+ * #51/S1.3f: the ONE writer. It always clears the sibling tags, because a tile
+ * carrying both `cityId` and `rivalId` is nonsense that `tileSeat`'s precedence
+ * would silently resolve in the player's favour. Scattered single-field writes
+ * could leave exactly that.
+ */
+export function setTileOwner(t: Tile, seat: number, city = -1): void {
+  t.cityId = isPlayerSeat(seat) ? city : -1;
+  t.rivalId = isRivalSeat(seat) ? rivalOfCiv(seat) : undefined;
+  t.rivalCityId = isRivalSeat(seat) ? (city === -1 ? undefined : city) : undefined;
+  t.csId = isCityStateSeat(seat) ? cityStateOfSeat(seat) : undefined;
+}
+
+/** The CITY (within its seat) that works this tile, or -1. */
+export function tileCity(t: Tile): number {
+  if (t.cityId !== -1) return t.cityId;
+  return t.rivalCityId ?? -1;
 }
 
 /** The rival CIV id claiming this tile, or null (reads only the rival field). */
 export function tileRivalCiv(t: Tile): number | null {
-  const r = t.rivalId ?? -1;
-  return r !== -1 ? civOfRival(r) : null;
+  const s = tileSeat(t);
+  return isRivalSeat(s) ? s : null;
 }
 
 /**
@@ -55,13 +95,12 @@ export function tileRivalCiv(t: Tile): number | null {
  * is bit-equivalent to the pre-C1 per-field tests.
  */
 export function tileOwnedByCiv(t: Tile, civ: number): boolean {
-  if (civ === PLAYER_CIV) return t.cityId !== -1;
-  return (t.rivalId ?? -1) === rivalOfCiv(civ);
+  return tileSeat(t) === civ;
 }
 
 /** Any territorial claim at all — a civ's or a city-state's. */
 export function tileClaimed(t: Tile): boolean {
-  return t.cityId !== -1 || (t.csId ?? -1) !== -1 || (t.rivalId ?? -1) !== -1;
+  return tileSeat(t) !== NO_SEAT;
 }
 
 /**
@@ -69,10 +108,8 @@ export function tileClaimed(t: Tile): boolean {
  * civ). For the player this is exactly the pre-C1 `csId || rivalId` test.
  */
 export function tileForeignTo(t: Tile, civ: number): boolean {
-  if ((t.csId ?? -1) !== -1) return true;
-  if (civ === PLAYER_CIV) return (t.rivalId ?? -1) !== -1;
-  const owner = tileOwnerCiv(t);
-  return owner !== null && owner !== civ;
+  const s = tileSeat(t);
+  return s !== NO_SEAT && s !== civ; // a city-state is foreign to every civ
 }
 
 /**
@@ -111,10 +148,28 @@ export function cityCiv(c: City): number {
 // ---------------------------------------------------------------------------
 
 /** City-states act, so they get seat ids above the civs. */
-export const seatOfCityState = (csId: number, rivalCount: number): number => 1 + rivalCount + csId;
-
-/** Barbarians act too. -1 keeps them sortable-last and distinct from every civ. */
-export const BARB_SEAT = -1;
+/**
+ * ONE ABSOLUTE SEAT SPACE (#51/S1.3e, task #54).
+ *
+ *      -1  unowned / nobody          (NO_SEAT)
+ *       0  the player                (PLAYER_CIV)
+ *   1..99  rivals                    (civOfRival)
+ * 100..199 city-states               (seatOfCityState)
+ *      200 barbarians                (BARB_SEAT)
+ *
+ * Every id is ABSOLUTE. The previous scheme put city-states at
+ * `1 + rivalCount + csId`, so a seat id depended on a RUNTIME value — tolerable
+ * while it lived only in memory, but the tile ownership tags are about to store
+ * seats, and a persisted id that shifts with the rival count is a trap. It also
+ * freed `-1`, which barbarians used to occupy, to mean exactly one thing:
+ * NOBODY. That is what lets a tile say "unowned" without colliding with a
+ * barbarian, which owns no territory anyway.
+ */
+export const NO_SEAT = -1;
+const CS_SEAT_BASE = 100;
+export const seatOfCityState = (csId: number): number => CS_SEAT_BASE + csId;
+export const cityStateOfSeat = (seat: number): number => seat - CS_SEAT_BASE;
+export const BARB_SEAT = 200;
 
 /**
  * #51/S1.2f: how many PROPHET-class great people this seat recruited.
@@ -154,7 +209,10 @@ export const isBarbSeat = (seat: number): boolean => seat === BARB_SEAT;
  * one place to widen — which is the point of the predicate: the old
  * `owner === 'rival'` string could not express a city-state unit at all.
  */
-export const isRivalSeat = (seat: number): boolean => seat >= 1;
+export const isRivalSeat = (seat: number): boolean => seat >= 1 && seat < CS_SEAT_BASE;
+
+/** Is this a city-state? They hold territory and act, but are never civs. */
+export const isCityStateSeat = (seat: number): boolean => seat >= CS_SEAT_BASE && seat < BARB_SEAT;
 
 /** The seat that owns this unit: 0 player, r+1 rival, BARB_SEAT barbarian. */
 export function unitSeat(u: { seat: number }): number {
