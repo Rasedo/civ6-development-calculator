@@ -10385,67 +10385,59 @@ class BatchSim:
             blocked_side, _bstrict = "rival", True  # the strict fallthrough, now NAMED
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
-        dm = self.pmil_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        dc_ = self.pciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        db = self.barb_at.gather(1, ttc.unsqueeze(1)).squeeze(1) if atk_kind == "rival" else torch.full_like(dm, -1)
-        if atk_kind == "barb":
-            dv = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-            dvc = self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        else:
-            # A-19/B-33 (S2): a RIVAL attacker's valid rival defenders are ENEMY
-            # AT-WAR rival units only (never its own civ) — the symmetric
-            # unitsHostile. Own-civ units at the tile stay -1 (not targets).
-            ac_h = self.v_civ[:, u].clamp(min=0)
-            bidx_h = torch.arange(self.B, device=self.device)
-            dv_raw = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-            dvc_raw = self.rvciv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-            dv_civ = torch.where(dv_raw >= 0, self.v_civ.gather(1, dv_raw.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(dv_raw, -1))
-            dvc_civ = torch.where(dvc_raw >= 0, self.v_civ.gather(1, dvc_raw.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(dvc_raw, -1))
-            dv_war = (dv_raw >= 0) & (dv_civ != ac_h) & self.rr_war[bidx_h, ac_h, dv_civ.clamp(min=0)]
-            dvc_war = (dvc_raw >= 0) & (dvc_civ != ac_h) & self.rr_war[bidx_h, ac_h, dvc_civ.clamp(min=0)]
-            dv = torch.where(dv_war, dv_raw, torch.full_like(dv_raw, -1))
-            dvc = torch.where(dvc_war, dvc_raw, torch.full_like(dvc_raw, -1))
-        mil_att = att & ((dm >= 0) | (db >= 0) | (dv >= 0))
-        civ_att = att & (dm < 0) & (db < 0) & (dv < 0) & (dc_ >= 0)
-        rvciv_att = att & (dm < 0) & (db < 0) & (dv < 0) & (dc_ < 0) & (dvc >= 0)  # C1-B5b: lone rival civilian
+        # #51/S3.4b: the tile's military and civilian occupants, by MERGED slot
+        # and SEAT. Eligibility is preserved EXACTLY, including its asymmetry:
+        # a barbarian is never hostile to a barbarian; a RIVAL attacker always
+        # targets PLAYER units (this is only reached from the war act) but its
+        # rival targets are ENEMY AT-WAR rivals only (A-19/B-33, the symmetric
+        # unitsHostile — never its own civ).
+        mslot_raw = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        cslot_raw = self.occ_civ.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        neg = torch.full_like(mslot_raw, -1)
+        m_seat = torch.where(mslot_raw >= 0, self.unit_seat.gather(1, mslot_raw.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+        c_seat = torch.where(cslot_raw >= 0, self.unit_seat.gather(1, cslot_raw.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
+        is_rv_m = (m_seat > 0) & (m_seat != BARB_SEAT)
+        is_rv_c = (c_seat > 0) & (c_seat != BARB_SEAT)
+        a_seat_h = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
+        ok_m = self._seats_hostile(a_seat_h, m_seat.unsqueeze(1)).squeeze(1)
+        ok_c = self._seats_hostile(a_seat_h, c_seat.unsqueeze(1)).squeeze(1)
+        d_slot = torch.where(ok_m, mslot_raw, torch.where(ok_c, cslot_raw, neg))
+        def_is_barb = ok_m & (m_seat == BARB_SEAT)
+        def_is_rv = ok_m & is_rv_m
+        mil_att = att & ok_m
+        civ_att = att & ~ok_m & ok_c & (c_seat == PLAYER_SEAT)
+        rvciv_att = att & ~ok_m & ok_c & is_rv_c  # C1-B5b: lone rival civilian
+        # POOL-LOCAL shims for the capture branches below, which still address
+        # the p_/v_ ranges by slot. They go when those branches move too.
+        dc_ = torch.where(ok_c & (c_seat == PLAYER_SEAT), cslot_raw - self.POOL_LO["p"], neg)
+        dvc = torch.where(ok_c & is_rv_c, cslot_raw - self.POOL_LO["v"], neg)
         if bool(mil_att.any()):
-            def_is_barb = db >= 0
-            def_is_rv = (dv >= 0) & ~def_is_barb & (dm < 0)
-            d_cs_p = self._p_combat[self.p_type.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)]
-            d_cs_b = self._p_combat[self.u_type.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)]
-            d_cs_v = self._p_combat[self.v_type.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)]
-            f_p = self.p_fortify.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
-            f_b = self.u_fortify.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
-            f_v = self.v_fortify.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
-            def_fort = torch.where(def_is_barb, f_b, torch.where(def_is_rv, f_v, f_p)) * 3  # B-5
-            # B-4: defender veterancy — player via p_xp, rival via v_xp, barb none.
-            # Folded into base def_cs so the embarked override drops it (like B-7).
+            ds0 = d_slot.clamp(min=0)
+            d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
+            def_fort = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1) * 3  # B-5
+            # B-4: defender veterancy. Barbs hold 0 in the merged xp plane, so
+            # the explicit barb gate is belt and braces rather than load-bearing.
             def_xp = torch.where(
-                def_is_barb, torch.zeros_like(dm),
-                torch.where(
-                    def_is_rv,
-                    self._xp_lvl_bonus(self.v_xp.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)),
-                    self._xp_lvl_bonus(self.p_xp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)),
-                ),
+                def_is_barb, torch.zeros_like(mslot_raw),
+                self._xp_lvl_bonus(self.unit_xp.gather(1, ds0.unsqueeze(1)).squeeze(1)),
             )
-            def_cs = torch.where(def_is_barb, d_cs_b, torch.where(def_is_rv, d_cs_v, d_cs_p)) + self._tdef_g(ttc) + def_fort + def_xp  # B-5 + B-4
-            # #45/B-6: an EMBARKED defender (player p_emb, or rival v_emb — barbs
-            # never embark) overrides to a flat CS, no terrain/fortify/support.
-            d_emb = (self.p_emb.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1) & ~def_is_barb & ~def_is_rv) | (self.v_emb.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1) & def_is_rv)
+            def_cs = self._p_combat[d_type] + self._tdef_g(ttc) + def_fort + def_xp  # B-5 + B-4
+            # #45/B-6: an EMBARKED defender overrides to a flat CS, no
+            # terrain/fortify/support (barbs never embark, so one merged plane
+            # covers all three pools).
+            d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & ok_m
             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
             # B-29: attacker AND defender fight at HP-reduced strength.
-            d_hp_p = self.p_hp.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
-            d_hp_b = self.u_hp.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
-            d_hp_v = self.v_hp.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
-            def_hp = torch.where(def_is_barb, d_hp_b, torch.where(def_is_rv, d_hp_v, d_hp_p))
+            def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             # B-4: attacker veterancy — a rival attacker via v_xp; barbs never accrue.
             atk_lvl5 = torch.zeros_like(a_hp[:, u]) if atk_kind == "barb" else self._xp_lvl_bonus(self.v_xp[:, u])
             atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt) + atk_lvl5  # B-29 river + B-4 veterancy
             def_e = def_cs - self._wound(def_hp)
             # B-7: flanking helps the hostile attacker (barb/rival at `here`),
             # support helps the defender (player, barb or rival).
-            _dciv = self.v_civ.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)
-            _fl, _sp = self._flank_support(tgt, torch.where(def_is_barb, torch.full_like(dm, BARB_SEAT), torch.where(def_is_rv, _dciv + 1, torch.zeros_like(dm))), here)
+            d_seat_m = torch.where(ok_m, m_seat, neg)
+            _dciv = torch.where(def_is_rv, d_seat_m - 1, neg)  # rival index, else -1
+            _fl, _sp = self._flank_support(tgt, d_seat_m, here)
             atk_e = atk_e + FLANKING_CS * _fl
             def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)  # #45/B-6: embarked → no support
             # B6-S1: enhancer adders — a RIVAL attacker gets the attack terms
@@ -10464,41 +10456,36 @@ class BatchSim:
             if atk_kind == "rival":
                 atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, here, atk_naval).to(atk_e.dtype)
-            _p_def_nav = self.unit_naval[self.p_type.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
-            _v_def_nav = self.unit_naval[self.v_type.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
-            def_naval = d_emb | torch.where(def_is_barb, torch.zeros_like(d_emb), torch.where(def_is_rv, _v_def_nav, _p_def_nav))
-            def_civ_u = torch.where(def_is_barb, torch.full_like(dm, -1), torch.where(def_is_rv, _dciv + 1, torch.zeros_like(dm)))
+            def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
+            def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
             def_dead = torch.zeros_like(mil_att)
-            for grp, at_map, occ_map, hp_t, alive_t in (
-                (~def_is_barb & ~def_is_rv, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive),
-                (def_is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive),
-                (def_is_rv, self.rv_at, self.occ_mil, self.v_hp, self.v_alive),
-            ):
-                g = rows[grp[rows]]
-                if len(g) == 0:
-                    continue
-                ds = at_map[g, ttc[g]]  # paired rows — gather(1, …) would read rows 0..|g|
-                hp_t[g, ds] -= d_def[g]
-                dead = hp_t[g, ds] <= 0
-                def_dead[g[dead]] = True
-                at_map[g[dead], ttc[g[dead]]] = -1
-                occ_map[g[dead], ttc[g[dead]]] = -1  # #51/S3.4b
-                alive_t[g[dead], ds[dead]] = False
+            # #51/S3.4b: ONE merged write. The three rows differed only in which
+            # pool the defender lived in, which the merged slot already answers.
+            if len(rows) > 0:
+                ds = d_slot[rows]
+                self.unit_hp[rows, ds] -= d_def[rows]
+                dead = self.unit_hp[rows, ds] <= 0
+                def_dead[rows[dead]] = True
+                gd, td = rows[dead], ttc[rows[dead]]
+                self.unit_alive[gd, ds[dead]] = False
+                # clearing every MILITARY map at the tile is branch-free and
+                # exact: only one of them is set there.
+                self.occ_mil[gd, td] = -1
+                self.barb_at[gd, td] = -1
+                self.pmil_at[gd, td] = -1
+                self.rv_at[gd, td] = -1
             # B-4: a rival attacker earns +5 for the attack executed (barbs none);
-            # a surviving MILITARY defender earns +2 (player via p_xp / dm, rival
-            # via v_xp / dv; barb defenders never accrue).
+            # a surviving MILITARY defender earns +2 via the merged xp plane
+            # (barb defenders never accrue).
             if atk_kind == "rival":
                 self.v_xp[:, u] = torch.where(mil_att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
-            surv_p = (mil_att & ~def_is_barb & ~def_is_rv & ~def_dead).nonzero(as_tuple=True)[0]
-            if len(surv_p) > 0:
-                self.p_xp[surv_p, dm[surv_p]] += XP_DEFEND
-            surv_v = (mil_att & def_is_rv & ~def_dead).nonzero(as_tuple=True)[0]
-            if len(surv_v) > 0:
-                self.v_xp[surv_v, dv[surv_v]] += XP_DEFEND
+            surv = (mil_att & ~def_is_barb & ~def_dead).nonzero(as_tuple=True)[0]
+            if len(surv) > 0:
+                self.unit_xp[surv, d_slot[surv]] += XP_DEFEND
             a_hp[:, u] = torch.where(mil_att, a_hp[:, u] - d_atk, a_hp[:, u])
             atk_dead = mil_att & (a_hp[:, u] <= 0)
             both = def_dead & atk_dead
@@ -11495,12 +11482,15 @@ class BatchSim:
         # The two ATTACKER-DEPENDENT scope-outs, preserved verbatim: a barb is
         # never hostile to a barb, and A-19/B-33 keeps a rival ranged attacker
         # from engaging rival units.
-        if barb:
-            elig_m = (mslot >= 0) & (m_seat != BARB_SEAT)
-            elig_c = (cslot >= 0) & (c_seat != BARB_SEAT)
-        else:
-            elig_m = (mslot >= 0) & ((m_seat == PLAYER_SEAT) | (m_seat == BARB_SEAT))
-            elig_c = (cslot >= 0) & ((c_seat == PLAYER_SEAT) | (c_seat == BARB_SEAT))
+        a_seat_r = BARB_SEAT if barb else self.v_seat[:, u].unsqueeze(1)
+        elig_m = self._seats_hostile(a_seat_r, m_seat.unsqueeze(1)).squeeze(1)
+        elig_c = self._seats_hostile(a_seat_r, c_seat.unsqueeze(1)).squeeze(1)
+        if not barb:
+            # A-19/B-33: a RIVAL's RANGED unit does not engage rival units at
+            # all (TS: `!(def.ranged && isRivalSeat(unit) && isRivalSeat(u))`).
+            # That is a scope-out ON TOP of hostility, not instead of it.
+            elig_m = elig_m & ~((m_seat > 0) & (m_seat != BARB_SEAT))
+            elig_c = elig_c & ~((c_seat > 0) & (c_seat != BARB_SEAT))
         d_is_mil = elig_m
         civ_def = ~elig_m & elig_c  # a lone CIVILIAN defender (either owner)
         d_slot = torch.where(elig_m, mslot, torch.where(elig_c, cslot, neg))
