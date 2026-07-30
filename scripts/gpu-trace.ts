@@ -31,7 +31,28 @@ import { getCityHp } from '../src/core/combat';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
-import type { City, CityState, GameState, RivalCiv } from '../src/core/types';
+import type { City, CityState, GameState, RivalCity, RivalCiv } from '../src/core/types';
+
+/**
+ * The price of a queue front item. ONE definition, shared by the civ-level
+ * `qCostSum` and the per-rival-city `cost` column — pricing them separately is
+ * how the two would drift.
+ *   P4/D-10: unit items may LOCK a cost (escalated builders) — price the lock
+ *     first, exactly like the completion check does.
+ *   A-4: wonder items carry NO cost field — price from the catalog.
+ */
+function queueItemCost(q: RivalCity['queue'][number] | undefined): number {
+  if (!q) return 0;
+  return q.kind === 'settler' || q.kind === 'project' || q.kind === 'district'
+    ? q.cost ?? 0
+    : q.kind === 'unit'
+      ? q.cost ?? UNITS[q.unit]?.cost ?? 0
+      : q.kind === 'building'
+        ? BUILDINGS[q.building]?.cost ?? 0
+        : q.kind === 'wonder'
+          ? BUILT_WONDERS[q.wonder]?.cost ?? 0
+          : 0;
+}
 
 /** Row-scoped values shared by several head columns (computed once per row). */
 type HeadCtx = { leader: number; dom: number };
@@ -67,6 +88,15 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'diploFavor', tol: 0, get: (s) => s.diploFavor ?? 0 }, // B-22 (#75)
   { name: 'congressSessions', tol: 0, get: (s) => s.congressSessions ?? 0 }, // B-22 (#76)
   { name: 'diploPoints', tol: 0, get: (s) => s.diploPoints ?? 0 }, // B-22 (#76)
+  // #51/S0.2: the PLAYER twins of columns the RIVALS have carried for rounds.
+  // Player FAITH is deliberately absent: the GPU player has no faith ECONOMY at
+  // all (player_faith is written by GP/dedications and read by nothing, and the
+  // per-turn yield side is unmodeled) — tracing it would just go red. Recorded
+  // as task #53 / gpu/AUDIT.md, to be fixed by giving the player the rival's
+  // economy rather than by widening the trace around the gap.
+  { name: 'techProg', tol: 2, get: (s) => Math.round(s.research.techProgress * 1000) },
+  { name: 'civicProg', tol: 2, get: (s) => Math.round(s.research.civicProgress * 1000) },
+  { name: 'warWeariness', tol: 0, get: (s) => s.warWeariness ?? 0 },
 ];
 
 // Keyed by id (== the GPU's static slot), NOT array position: a captured
@@ -105,21 +135,7 @@ const PER_RIVAL_COLS: TraceCol<RivalCiv | undefined>[] = [
   {
     name: 'qCostSum',
     tol: 2,
-    get: (_s, r) =>
-      r
-        ? Math.round(
-            r.cities.reduce((n, rc) => {
-              const q = rc.queue[0];
-              if (!q) return n;
-              // P4/D-10: unit items may LOCK a cost (escalated builders) — price
-              // the lock first, exactly like the completion check does.
-              // A-4: wonder items carry NO cost field — price from the catalog
-              // (the D-10 lesson AGAIN: every new queue-cost mechanic must
-              // update BOTH trace harnesses in the same stage).
-              return n + (q.kind === 'settler' || q.kind === 'project' || q.kind === 'district' ? q.cost ?? 0 : q.kind === 'unit' ? q.cost ?? UNITS[q.unit]?.cost ?? 0 : q.kind === 'building' ? BUILDINGS[q.building]?.cost ?? 0 : q.kind === 'wonder' ? BUILT_WONDERS[q.wonder]?.cost ?? 0 : 0);
-            }, 0) * 1000,
-          )
-        : 0,
+    get: (_s, r) => (r ? Math.round(r.cities.reduce((n, rc) => n + queueItemCost(rc.queue[0]), 0) * 1000) : 0),
   },
   // C1-B4: COMPLETED rival districts (queued ones pave but don't count).
   {
@@ -161,6 +177,56 @@ const PER_RIVAL_COLS: TraceCol<RivalCiv | undefined>[] = [
   // rGScore divergence hid: weariness feeds the amenity tier, the tier scales
   // city yields, and rivalEmpireScore is pop*3 + weighted yields.
   { name: 'warWeariness', tol: 0, get: (_s, r) => r?.warWeariness ?? 0 },
+  // #51/S0.2: one-sided holes — the PLAYER has traced these since the start and
+  // the rival planes existed untraced. Rival SCIENCE has no twin on EITHER
+  // engine (no scienceTotal on RivalCiv, no r_science plane), so it is recorded
+  // as a gap in gpu/AUDIT.md rather than invented here.
+  { name: 'warmonger', tol: 0, get: (_s, r) => r?.warmonger ?? 0 },
+  { name: 'influence', tol: 0, get: (_s, r) => r?.influencePoints ?? 0 },
+  { name: 'envoysAvail', tol: 0, get: (_s, r) => r?.envoysAvailable ?? 0 },
+  { name: 'tilesPurchased', tol: 0, get: (_s, r) => r?.tilesPurchased ?? 0 },
+];
+
+/**
+ * #51/S0.2: per-RIVAL-CITY columns. Until now a rival's cities were traced only
+ * as civ-level SUMS (popSum, nBuildings, qProgSum, ...), and that is exactly the
+ * hole that let #71's rFaith and #79's rGScore1 survive several green gates: a
+ * sum cancels two opposite per-city errors, and `followedSum` was already an
+ * after-the-fact checksum invented because of it.
+ *
+ * THE JOIN IS LIVING ORDER, not slot index. TS `rival.cities[]` is DENSE
+ * (`.push()` on settle/defect/flip, `.filter()` on death). GPU `rc_*` slots keep
+ * HOLES: a new city lands at last-alive+1, and `_reclaim_rc` only compacts when
+ * the alive high-water hits RC-8 — and then for the whole batch at once. So slot
+ * j is NOT a valid key. What IS invariant, and what the engine already asserts in
+ * both `_rival_try_found` and `_reclaim_rc` (whose stable argsort preserves
+ * relative order of the living), is: **the k-th LIVING slot in ascending slot
+ * order is `rival.cities[k]`**. The GPU side sorts by that same stable key.
+ *
+ * Dead slots keep STALE values — `_capture_rival_city` clears rc_alive and the
+ * queue planes but NOT rc_pop/rc_acquired/rc_loyalty/rc_hp — so every column
+ * here is alive-masked, and `rc_id` is zero-initialised (colliding with the
+ * capital's id), which makes the mask load-bearing rather than cosmetic.
+ */
+export const RIVAL_CITY_MAX = 12; // MEASURED 2026-07-30: max 8 rival cities across 12 seeds x 250 turns. Both engines ASSERT no rival exceeds this, so a 13th city fails loudly instead of silently losing coverage.
+
+const PER_RIVAL_CITY_COLS: TraceCol<{ rival: RivalCiv; rc: RivalCity } | undefined>[] = [
+  { name: 'pop', tol: 0, get: (_s, x) => x?.rc.population ?? 0 },
+  {
+    name: 'owned',
+    tol: 0,
+    // The engine's own per-city ownership predicate (rivals.ts pickRivalBorderTile).
+    get: (s, x) => (x ? s.map.tiles.filter((t) => (t.rivalId ?? -1) === x.rival.id && t.rivalCityId === x.rc.id).length : 0),
+  },
+  { name: 'bldgs', tol: 0, get: (_s, x) => x?.rc.buildings.length ?? 0 },
+  { name: 'acquired', tol: 0, get: (_s, x) => x?.rc.tilesAcquired ?? 0 },
+  { name: 'foodBox', tol: 2, get: (_s, x) => (x ? Math.round(x.rc.foodBox * 1000) : 0) },
+  { name: 'cultureBox', tol: 2, get: (_s, x) => (x ? Math.round(x.rc.cultureBox * 1000) : 0) },
+  { name: 'hp', tol: 0, get: (_s, x) => x?.rc.hp ?? 0 },
+  { name: 'loyalty', tol: 2, get: (_s, x) => (x ? Math.round((x.rc.loyalty ?? 100) * 1000) : 0) },
+  { name: 'followed', tol: 0, get: (_s, x) => (x ? x.rc.followedReligion ?? -1 : 0) },
+  { name: 'progress', tol: 2, get: (_s, x) => (x ? Math.round((x.rc.queue[0]?.progress ?? 0) * 1000) : 0) },
+  { name: 'cost', tol: 2, get: (_s, x) => (x ? Math.round(queueItemCost(x.rc.queue[0]) * 1000) : 0) },
 ];
 
 const PER_CITY_COLS: TraceCol<City | undefined>[] = [
@@ -198,6 +264,21 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     const city = state.cities.find((x) => x.id === cityIds[c]);
     for (const col of PER_CITY_COLS) row.push(col.get(state, city));
   }
+  // #51/S0.2: per-rival-city, joined by LIVING ORDER (see PER_RIVAL_CITY_COLS).
+  for (let r = 0; r < rMax; r++) {
+    const rival = state.rivals[r];
+    if (rival && rival.cities.length > RIVAL_CITY_MAX) {
+      throw new Error(
+        `rival ${r} holds ${rival.cities.length} cities but the trace only covers ${RIVAL_CITY_MAX} ` +
+          `— widen RIVAL_CITY_MAX (and the GPU's _TRACE_RC_MAX) rather than lose coverage silently`,
+      );
+    }
+    for (let k = 0; k < RIVAL_CITY_MAX; k++) {
+      const rc = rival?.cities[k];
+      const x = rival && rc ? { rival, rc } : undefined;
+      for (const col of PER_RIVAL_CITY_COLS) row.push(col.get(state, x));
+    }
+  }
   return row;
 }
 
@@ -211,9 +292,11 @@ export function traceColumnTables(): {
   perCs: { name: string; tol: number }[];
   perRival: { name: string; tol: number }[];
   perCity: { name: string; tol: number }[];
+  perRivalCity: { name: string; tol: number }[];
+  rivalCityMax: number;
 } {
   const strip = (t: TraceCol<any>[]) => t.map((c) => ({ name: c.name, tol: c.tol }));
-  return { head: strip(HEAD_COLS), perCs: strip(PER_CS_COLS), perRival: strip(PER_RIVAL_COLS), perCity: strip(PER_CITY_COLS) };
+  return { head: strip(HEAD_COLS), perCs: strip(PER_CS_COLS), perRival: strip(PER_RIVAL_COLS), perCity: strip(PER_CITY_COLS), perRivalCity: strip(PER_RIVAL_CITY_COLS), rivalCityMax: RIVAL_CITY_MAX };
 }
 
 export function traceColumns(cMax: number, csMax: number, rMax: number): { names: string[]; tol: number[] } {
@@ -224,5 +307,8 @@ export function traceColumns(cMax: number, csMax: number, rMax: number): { names
   for (let s = 0; s < csMax; s++) for (const col of PER_CS_COLS) push(`cs${s}.${col.name}`, col.tol);
   for (let r = 0; r < rMax; r++) for (const col of PER_RIVAL_COLS) push(`r${r}.${col.name}`, col.tol);
   for (let c = 0; c < cMax; c++) for (const col of PER_CITY_COLS) push(`c${c}.${col.name}`, col.tol);
+  for (let r = 0; r < rMax; r++)
+    for (let k = 0; k < RIVAL_CITY_MAX; k++)
+      for (const col of PER_RIVAL_CITY_COLS) push(`r${r}c${k}.${col.name}`, col.tol);
   return { names, tol };
 }

@@ -55,6 +55,11 @@ def columns(sim, rj: dict) -> tuple[list[str], torch.Tensor]:
         add(f"r{r}.", tr["perRival"])
     for c in range(sim.C):
         add(f"c{c}.", tr["perCity"])
+    # #51/S0.2: per-rival-city, width fixed by the exporter (not sim.RC) so both
+    # engines cover the same slots; both sides assert no rival exceeds it.
+    for r in range(sim.R):
+        for k in range(int(tr["rivalCityMax"])):
+            add(f"r{r}c{k}.", tr["perRivalCity"])
 
     gpu_cols = sim.trace_columns()
     if cols != gpu_cols:

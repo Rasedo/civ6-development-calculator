@@ -31,6 +31,7 @@ throughput.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -359,6 +360,12 @@ def tiles_from_offsets(centers: torch.Tensor, offsets: torch.Tensor, width: int,
 PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 
 # Names of the mutable state tensors (everything reset() restores).
+# #51/S0.4: CIV6_ALIAS_CHECK=1 turns on the per-step state-discipline assertions
+# (alias storage + _MUTABLE shape/dtype). Off by default so the gates keep their
+# wall-clock; the battery runs one lane with it on, and every poke lane inherits
+# it via the env when the lane sets it.
+_ALIAS_CHECK = os.environ.get("CIV6_ALIAS_CHECK", "") not in ("", "0")
+
 _MUTABLE = [
     "alive", "pop", "food_box", "culture_box", "tiles_acquired", "owner", "workable",
     "buildings", "current", "cur_cost", "progress", "q_dtile", "settlers", "settlers_queued",
@@ -1502,6 +1509,12 @@ class BatchSim:
         self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
         self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
 
+        # #51/S0.4: alias registry (name -> fn(self) returning the base slice it
+        # must remain a view of) and the _MUTABLE shape/dtype baseline, captured
+        # lazily on the first check so every plane exists by then.
+        self._aliases: dict = {}
+        self._mut_sig: dict = {}
+
         self._eff_version = 0
         # G1: two extra invalidation counters the _eff_version epoch misses.
         #  _bel_version   — bumped at the three belief-claim sites (+restore/reset);
@@ -1854,6 +1867,52 @@ class BatchSim:
         self._rival_route_cache = self._belief_feat_cache = None
         self._bel_add_memo = self._gov_pol_cache = None
         self._rcy_all_cache = None  # G4
+
+    # ---- #51/S0.4: state discipline, the aliasing safety net -----------------
+    #
+    # Round 3 unifies the player and rival unit pools by making `p_*` and `v_*`
+    # VIEWS of one seat-indexed tensor. A view survives `x[...] = v` and
+    # `x.copy_(v)` but is silently destroyed by `self.x = torch.where(...)`,
+    # which REBINDS the name to a fresh dense tensor. From then on the two
+    # engines drift with nothing to point at: no exception, no red column until
+    # some downstream sum disagrees many turns later.
+    #
+    # So: any name registered as an alias must keep its storage across a step.
+    # MEASURED 2026-07-29 before writing this: 48 of the 230 `_MUTABLE` tensors
+    # are legitimately rebound every step (`current`, `settlers`, `rng_state`,
+    # ...), so the blanket "no _MUTABLE data_ptr may change" rule this plan
+    # originally called for is simply false here and would fail on turn 1. What
+    # IS invariant today, and worth pinning, is shape and dtype.
+    def register_alias(self, name: str, recompute) -> None:
+        """Declare `self.<name>` to be a VIEW of `recompute(self)`, forever."""
+        self._aliases[name] = recompute
+
+    def _check_state_discipline(self) -> None:
+        for name, fn in self._aliases.items():
+            cur = getattr(self, name)
+            want = fn(self)
+            if cur.data_ptr() != want.data_ptr():
+                raise AssertionError(
+                    f"ALIAS BROKEN: self.{name} no longer shares storage with its base — "
+                    f"something rebound it (`self.{name} = ...`) instead of writing in place "
+                    f"(`self.{name}[...] = ...` / `.copy_()`). Writes to it are now invisible to the base."
+                )
+            if cur.shape != want.shape or cur.dtype != want.dtype:
+                raise AssertionError(
+                    f"ALIAS SHAPE/DTYPE DRIFT: self.{name} is {tuple(cur.shape)}/{cur.dtype}, "
+                    f"base slice is {tuple(want.shape)}/{want.dtype}"
+                )
+        if not self._mut_sig:
+            self._mut_sig = {
+                k: (tuple(getattr(self, k).shape), getattr(self, k).dtype) for k in _MUTABLE if hasattr(self, k)
+            }
+        for name, (shape, dtype) in self._mut_sig.items():
+            t = getattr(self, name)
+            if tuple(t.shape) != shape or t.dtype != dtype:
+                raise AssertionError(
+                    f"_MUTABLE DRIFT: {name} is {tuple(t.shape)}/{t.dtype}, was {shape}/{dtype} at construction. "
+                    "snapshot()/restore() copy by name and would silently mis-shape."
+                )
 
     def snapshot(self) -> dict:
         """Clone the full mutable state (every _MUTABLE tensor + the turn counter)
@@ -15068,6 +15127,9 @@ class BatchSim:
         lead = self.leader() if bool(self.game_over.any()) else torch.full_like(dom, -1)
         self.winner = torch.where(dom >= 0, dom, torch.where(self.game_over, lead, torch.full_like(dom, -1)))  # GV-3
 
+        if _ALIAS_CHECK:
+            self._check_state_discipline()
+
     # --- parity trace row (matches scripts/gpu-trace.ts encoding) ----------------
 
     # #51/S0.1: the trace column NAMES, block by block, mirroring the four
@@ -15082,6 +15144,8 @@ class BatchSim:
         "fertility", "droughtTiles", "improvements", "leader", "gameOver", "winner",
         "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions",
         "diploPoints",
+        # #51/S0.2: PLAYER twins of long-standing rival columns.
+        "techProg", "civicProg", "warWeariness",
     ]
     _TRACE_PER_CS = ["envoys", "pop", "questKind"]
     _TRACE_PER_RIVAL = [
@@ -15089,8 +15153,20 @@ class BatchSim:
         "qProgSum", "qCostSum", "nDistricts", "nBuildings", "treasury", "rGScore", "rrWarMask",
         "age", "tourism", "faith", "followedSum", "cultureTotal", "diploFavor", "diploPoints",
         "warWeariness",
+        # #51/S0.2: rival twins of long-standing player columns.
+        "warmonger", "influence", "envoysAvail", "tilesPurchased",
     ]
     _TRACE_PER_CITY = ["pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty", "followed"]
+    # #51/S0.2: per-RIVAL-CITY, joined by LIVING ORDER (the k-th living slot in
+    # ascending slot order is TS's rival.cities[k]). Rival cities were traced
+    # only as civ-level SUMS before, which is how #71's rFaith and #79's
+    # rGScore1 each survived several green gates — a sum cancels two opposite
+    # per-city errors.
+    _TRACE_RC_MAX = 12  # MEASURED: max 8 rival cities over 12 seeds x 250 turns; asserted, never silently truncated
+    _TRACE_PER_RIVAL_CITY = [
+        "pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty",
+        "followed", "progress", "cost",
+    ]
 
     def trace_columns(self) -> list[str]:
         """Names for every column trace_row() emits, in order."""
@@ -15101,6 +15177,9 @@ class BatchSim:
             names += [f"r{r}.{n}" for n in self._TRACE_PER_RIVAL]
         for c in range(self.C):
             names += [f"c{c}.{n}" for n in self._TRACE_PER_CITY]
+        for r in range(self.R):
+            for k in range(self._TRACE_RC_MAX):
+                names += [f"r{r}c{k}.{n}" for n in self._TRACE_PER_RIVAL_CITY]
         return names
 
     def trace_row(self) -> torch.Tensor:
@@ -15139,6 +15218,10 @@ class BatchSim:
             self.diplo_favor.to(self.dtype),  # B-22 (#75): DIPLOMATIC FAVOR
             self.congress_sessions.to(self.dtype),  # B-22 (#76): Congress sessions held
             self.diplo_points.to(self.dtype),  # B-22 (#76): Diplomatic Victory Points
+            # #51/S0.2: PLAYER twins of columns the rivals have carried for rounds.
+            js_round(self.tech_prog * 1000),
+            js_round(self.civic_prog * 1000),
+            self.war_weariness.to(self.dtype),
         ]
         assert len(cols) == len(self._TRACE_HEAD), f"trace head {len(cols)} cols vs {len(self._TRACE_HEAD)} names"
         for s in range(self.S):
@@ -15212,6 +15295,14 @@ class BatchSim:
                 # the amenity tier, which scales city yields, which is what
                 # rGScore sums. Untraced until now.
                 torch.where(live, self.r_war_weariness[:, r].to(self.dtype), zero),
+                # #51/S0.2: rival twins of long-standing PLAYER columns. Rival
+                # SCIENCE is deliberately absent — neither engine tracks it
+                # (no scienceTotal on RivalCiv, no r_science plane); recorded
+                # as a gap in gpu/AUDIT.md rather than invented here.
+                torch.where(live, self.r_warmonger[:, r].to(self.dtype), zero),
+                torch.where(live, self.r_influence[:, r].to(self.dtype), zero),
+                torch.where(live, self.r_envoys_avail[:, r].to(self.dtype), zero),
+                torch.where(live, self.r_tiles_purchased[:, r].to(self.dtype), zero),
             ]
         assert len(cols) == len(self._TRACE_HEAD) + self.S * len(self._TRACE_PER_CS) + self.R * len(self._TRACE_PER_RIVAL), "trace per-rival block width vs names"
         zero = torch.zeros(self.B, dtype=self.dtype, device=self.device)
@@ -15237,5 +15328,60 @@ class BatchSim:
                 torch.where(live, js_round(self.loyalty[:, c] * 1000), zero),
                 torch.where(live, self.city_followed[:, c].to(self.dtype), zero),  # B-18: followed religion id (-1 none, dead slot 0)
             ]
+        # #51/S0.2: per-RIVAL-CITY block, joined by LIVING ORDER.
+        #
+        # TS `rival.cities[]` is DENSE; these rc_* slots keep HOLES (a new city
+        # lands at last-alive+1, and _reclaim_rc only compacts when the alive
+        # high-water hits RC-8, then for the whole batch at once). So slot j is
+        # NOT a valid join key. What IS invariant — and what _rival_try_found
+        # and _reclaim_rc's stable argsort both preserve — is that the k-th
+        # LIVING slot in ascending slot order is TS's rival.cities[k]. `_ord`
+        # below is literally _reclaim_rc's own permutation.
+        #
+        # Every column is alive-masked because dead slots keep STALE values:
+        # _capture_rival_city clears rc_alive and the queue planes but NOT
+        # rc_pop / rc_acquired / rc_loyalty / rc_hp, and rc_id is
+        # zero-initialised so an unused slot's id collides with the capital's.
+        for r in range(self.R):
+            _al = self.rc_alive[:, r]
+            _ord = torch.argsort((~_al).long(), dim=1, stable=True)
+            _klive = _al.gather(1, _ord) & self.r_alive[:, r].unsqueeze(1)
+            _nlive = int(_al.sum(dim=1).max())
+            assert _nlive <= self._TRACE_RC_MAX, (
+                f"rival {r} holds {_nlive} cities but the trace covers {self._TRACE_RC_MAX} — "
+                "widen _TRACE_RC_MAX (and RIVAL_CITY_MAX in scripts/gpu-trace.ts) rather than lose coverage"
+            )
+            _pop = self.rc_pop[:, r].gather(1, _ord)
+            _bld = (self.rc_bldg[:, r].sum(dim=2) + (self.rc_is_cap[:, r] & _al).long()).gather(1, _ord)
+            _acq = self.rc_acquired[:, r].gather(1, _ord)
+            _fbx = self.rc_growth[:, r].gather(1, _ord)
+            _cbx = self.rc_cbox[:, r].gather(1, _ord)
+            _hp = self.rc_hp[:, r].gather(1, _ord)
+            _loy = self.rc_loyalty[:, r].gather(1, _ord)
+            _fol = self.rc_followed[:, r].gather(1, _ord)
+            _prg = self.rc_progress[:, r].gather(1, _ord)
+            _cst = self.rc_cost[:, r].gather(1, _ord)
+            # owned: no per-tile rival-CITY plane exists, so join territory
+            # (rival_at == r) against the per-tile city id. rc_tile_id is keyed
+            # on the persistent rc_id precisely so compaction needs no remap.
+            _own = torch.stack(
+                [((self.rival_at == r) & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))).sum(dim=1) for j in range(self.RC)],
+                dim=1,
+            ).gather(1, _ord)
+            for k in range(self._TRACE_RC_MAX):
+                lk = _klive[:, k]
+                cols += [
+                    torch.where(lk, _pop[:, k].to(self.dtype), zero),
+                    torch.where(lk, _own[:, k].to(self.dtype), zero),
+                    torch.where(lk, _bld[:, k].to(self.dtype), zero),
+                    torch.where(lk, _acq[:, k].to(self.dtype), zero),
+                    torch.where(lk, js_round(_fbx[:, k] * 1000).to(self.dtype), zero),
+                    torch.where(lk, js_round(_cbx[:, k] * 1000).to(self.dtype), zero),
+                    torch.where(lk, _hp[:, k].to(self.dtype), zero),
+                    torch.where(lk, js_round(_loy[:, k] * 1000).to(self.dtype), zero),
+                    torch.where(lk, _fol[:, k].to(self.dtype), zero),
+                    torch.where(lk, js_round(_prg[:, k] * 1000).to(self.dtype), zero),
+                    torch.where(lk, js_round(_cst[:, k] * 1000).to(self.dtype), zero),
+                ]
         assert len(cols) == len(self.trace_columns()), f"trace row {len(cols)} cols vs {len(self.trace_columns())} names"
         return torch.stack(cols, dim=1)

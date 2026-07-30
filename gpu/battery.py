@@ -231,6 +231,7 @@ def main() -> int:
                 ("governors", [py, "gpu/governors_test.py"], 4),  # #68/B-24 era-score hooks + Ages loyalty modulation + governor anchors
                 ("watermill", [py, "gpu/watermill_test.py"], 4),
                 ("unit_head", [py, "gpu/unit_head_test.py"], 4),  # #51/S0.3: action enum == mask width == RL head width
+                ("state_discipline", [py, "gpu/state_discipline_test.py"], 4),  # #51/S0.4: alias-rebind + _MUTABLE drift net
                 ("fort", [py, "gpu/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
             ],
             [
