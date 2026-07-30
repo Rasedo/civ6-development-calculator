@@ -34,6 +34,7 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../src/data/improvements'; // B-27 (#71)
+import type { ImprovementId } from '../src/core/types';
 import { validImprovements, canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../src/core/combat';
 import { GENERAL_AURA_MP } from '../src/core/aura'; // #70/S3 (B-8)
@@ -67,7 +68,6 @@ import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_CITIES,
   RIVAL_WAR_MIN_TURNS,
-  CITY_MAX_HP,
   RIVAL_WORK_RADIUS,
   LOYALTY_MAX,
   LOYALTY_RANGE,
@@ -141,7 +141,6 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, ENCAMPMENT_HP } from '../src/dat
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
-import { IMPROVEMENTS } from '../src/data/improvements';
 import { FEATURES } from '../src/data/features';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../src/data/techs'; // B-20 (#71): era scale
 import { CIVICS } from '../src/data/civics';
