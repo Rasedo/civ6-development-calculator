@@ -60,7 +60,8 @@ export const RIVAL_WAR_MIN_TURNS = 14;
 // pairings read this one constant.
 export const PEACE_MIN_WAR_TURNS = 10;
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
-export const RIVAL_CITY_MAX_HP = 200;
+// RIVAL_CITY_MAX_HP RETIRED (#51/S1.3): it held the same 200 as CITY_MAX_HP
+// in data/units.ts. One city HP cap, for every seat.
 
 // --- deeper-opponent pacing ---------------------------------------------------
 /** Rival cities work their best owned tiles out to this ring. */

@@ -172,6 +172,11 @@ export type GreatPersonClass =
   | 'MUSICIAN';
 
 export interface City {
+  /** City HP. #51/S1.3: was `RivalCity.hp` for a rival and a side-map entry
+   *  (`GameState.cityHp[id]`, defaulting to CITY_MAX_HP) for the player. One
+   *  field now — the side map and `getCityHp` are gone, and so is the duplicate
+   *  CITY_MAX_HP constant, which held the same 200. */
+  hp: number;
   id: number;
   name: string;
   /**
@@ -348,7 +353,6 @@ export interface GameState {
   /** Barbarian camp tile indexes (units mode only). */
   barbCamps: number[];
   /** City HP keyed by city id (string for JSON); missing = full (200). */
-  cityHp: Record<string, number>;
   /** Random natural disasters (floods, eruptions, droughts, storms). */
   disasters: boolean;
   /** Fog of war (units mode): unexplored tiles are hidden and unusable. */
@@ -428,8 +432,6 @@ export interface Unit {
  * what the heuristic used to call growthBox.
  */
 export interface RivalCity extends City {
-  /** City HP (player cities keep theirs in state.cityHp until C1-B7 unifies). */
-  hp: number;
   foundedTurn: number;
 }
 

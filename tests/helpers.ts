@@ -57,7 +57,6 @@ export function makeState(map: GameMap = makeMap()): GameState {
     nextUnitId: 0,
     rngState: 42,
     barbCamps: [],
-    cityHp: {},
     disasters: false,
     fogOfWar: false,
     explored: [],

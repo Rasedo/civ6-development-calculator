@@ -27,7 +27,6 @@
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { dominationWinner } from '../src/core/game';
-import { getCityHp } from '../src/core/combat';
 import { playerSeat } from '../src/core/seats';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
@@ -237,7 +236,7 @@ const PER_CITY_COLS: TraceCol<City | undefined>[] = [
   { name: 'acquired', tol: 0, get: (_s, c) => c?.tilesAcquired ?? 0 },
   { name: 'foodBox', tol: 2, get: (_s, c) => (c ? Math.round(c.foodBox * 1000) : 0) },
   { name: 'cultureBox', tol: 2, get: (_s, c) => (c ? Math.round(c.cultureBox * 1000) : 0) },
-  { name: 'hp', tol: 0, get: (s, c) => (c ? getCityHp(s, c.id) : 0) },
+  { name: 'hp', tol: 0, get: (_s, c) => (c ? c.hp : 0) },
   { name: 'loyalty', tol: 2, get: (_s, c) => (c ? Math.round((c.loyalty ?? 100) * 1000) : 0) },
   // B-18: the pressure-spread followed-religion id (-1 = none, 0 = dead slot)
   { name: 'followed', tol: 0, get: (_s, c) => (c ? c.followedReligion ?? -1 : 0) },

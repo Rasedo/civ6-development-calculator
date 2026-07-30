@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { CITY_MAX_HP } from '../src/data/units';
 import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
@@ -353,6 +354,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
         districts: [{ type: 'CITY_CENTER', tileIndex: 20 + i }],
         wonders: [],
         specialists: {},
+        hp: CITY_MAX_HP,
       });
     }
     const rival = addRival(state, 8, 8, { atWar: true, warTurns: 10 });

@@ -30,7 +30,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { SPECIALIST_YIELDS, GP_CLASS_DISTRICT, GP_CLASSES, GREAT_PEOPLE, gpCost, GW_WORK_CLASSES, GW_CLASS_KIND, placeGreatWorks, GW_WONDER_SLOTS, greatWorkCulture, placeRelic, relicFaith, artifactCulture } from '../data/greatPeople';
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, RELIGION_NAMES, PANTHEON_FAITH_COST, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, APOSTLE_BUY_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE } from '../data/religion';
@@ -69,50 +69,7 @@ import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from '
 import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import {
-  RIVAL_LEADERS,
-  RIVAL_MAX_CITIES,
-  RIVAL_SETTLER_COST,
-  RIVAL_WAR_MIN_TURNS,
-  PEACE_MIN_WAR_TURNS,
-  PEACE_GOLD_COST,
-  RIVAL_CITY_MAX_HP,
-  RIVAL_WORK_RADIUS,
-  LOYALTY_MAX,
-  LOYALTY_RANGE,
-  LOYALTY_PRESSURE_SCALE,
-  LOYALTY_AMENITY,
-  WAR_WEARINESS_PER_TURN,
-  WAR_WEARINESS_DECAY,
-  WAR_WEARINESS_CAP,
-  WW_SURPRISE_MULT,
-  WW_FORMAL_MULT,
-  warWearinessPenalty,
-  RR_DOW_PROXIMITY,
-  RR_DOW_STRENGTH_RATIO,
-  RR_DOW_WW_MAX,
-  RR_PEACE_WW,
-  RR_FORMAL_MIN_TURNS,
-  ERA_SCORE_FOUND,
-  ERA_SCORE_CONQUER,
-  ERA_SCORE_WONDER,
-  ERA_SCORE_PANTHEON,
-  ERA_SCORE_RELIGION,
-  ERA_SCORE_GP,
-  GOVERNOR_LOYALTY,
-  RIVAL_TILE_BUY_LIVE,
-  ADMIRAL_MARCH_LIVE,
-  RR_ALLY_MIN_PEACE,
-  RR_WARMONGER_DOW,
-  RR_WARMONGER_CAPTURE,
-  RR_WARMONGER_GANG,
-  DIPLO_FAVOR_PER_SUZERAIN,
-  CONGRESS_INTERVAL,
-  CONGRESS_MIN_ERA,
-  DVP_PER_RESOLUTION,
-  DED_MONUMENTALITY,
-  RIVAL_ENGINEER_LIVE,
-} from '../data/rivals';
+import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf } from './seats';
 
@@ -197,7 +154,7 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
     districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
     wonders: [],
     specialists: {},
-    hp: RIVAL_CITY_MAX_HP,
+    hp: CITY_MAX_HP,
     foundedTurn: state.turn,
   };
   tile.district = 'CITY_CENTER';
@@ -713,7 +670,6 @@ export function relocatePalace(
 export function transferCityToRival(state: GameState, city: City, winner: RivalCiv, why: string): boolean {
   state.cities = state.cities.filter((c) => c.id !== city.id);
   relocatePalace(state.cities); // #70/S4 (A-9): the player's Palace moves on capital loss
-  delete state.cityHp[String(city.id)];
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.from !== city.id && r.to !== city.id);
   // P5/S7 (C-5): CONQUEST razes at the winner's city cap, mirroring the
   // player's captureRivalCity raze — the city simply ceases (tiles freed,
@@ -776,7 +732,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     districts: keptDistricts.map((d) => ({ ...d })),
     wonders: keptWonders.map((w) => ({ ...w })),
     specialists: {},
-    hp: Math.round(RIVAL_CITY_MAX_HP / 2),
+    hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) defected.outerHp = 0; // B-30: walls kept, outer pool 0
@@ -2313,7 +2269,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
     greatWorksMusic: rc.greatWorksMusic,
     relics: rc.relics,
     artifacts: rc.artifacts, // B-20 (#79): artifacts ride the flip too
-    hp: Math.round(RIVAL_CITY_MAX_HP / 2),
+    hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // B-30: walls kept, outer pool 0
@@ -3349,7 +3305,7 @@ export function rivalPhase(state: GameState): void {
       // AUDIT B-1: the outer wall pool heals on the same gate/rate (cap
       // WALLS_HP), full-HP or not — the player's barbarianPhase mirror.
       if (!besieged) {
-        rc.hp = Math.min(RIVAL_CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
+        rc.hp = Math.min(CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
         if (rc.buildings.includes('ANCIENT_WALLS')) {
           rc.outerHp = Math.min(WALLS_HP, (rc.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
         }

@@ -20,7 +20,7 @@ import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTu
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
-import { UNITS, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 import { DISTRICTS } from '../data/districts';
@@ -123,7 +123,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     nextUnitId: 0,
     rngState: (map.seed ^ 0x9e3779b9) >>> 0,
     barbCamps: [],
-    cityHp: {},
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
@@ -202,6 +201,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
     districts: [{ type: 'CITY_CENTER', tileIndex }],
     wonders: [],
     specialists: {},
+    hp: CITY_MAX_HP,
   };
 
   tile.district = 'CITY_CENTER';
@@ -1336,7 +1336,6 @@ export function deserialize(json: string): GameState {
   state.nextUnitId ??= 0;
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
   state.barbCamps ??= [];
-  state.cityHp ??= {};
   state.disasters ??= false;
   // GV-2 gameOver is recomputed every endTurn (turn > TURN_LIMIT); no migration
   // needed, and adding ??= would break serialize round-trip idempotence for

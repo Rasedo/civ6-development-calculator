@@ -17,7 +17,7 @@ import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_H
 import { BUILDINGS } from '../data/buildings';
 import { CS_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
-import { RIVAL_MAX_CITIES, RIVAL_CITY_MAX_HP, ERA_SCORE_CONQUER, RR_WARMONGER_CAPTURE } from '../data/rivals';
+import { RIVAL_MAX_CITIES, ERA_SCORE_CONQUER, RR_WARMONGER_CAPTURE } from '../data/rivals';
 import { addEraScore } from './eras';
 import {
   nextRandom,
@@ -385,10 +385,6 @@ export function cityDefenseStrength(state: GameState, city: City): number {
   return Math.max(15, state.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
-export function getCityHp(state: GameState, cityId: number): number {
-  return state.cityHp[String(cityId)] ?? CITY_MAX_HP;
-}
-
 function killUnit(state: GameState, unit: Unit): void {
   markAntiquitySite(state, unit.tileIndex); // B-20 (#79): a death leaves a dig
   disbandUnit(state, unit.id);
@@ -420,7 +416,7 @@ function sackCity(state: GameState, city: City): void {
   for (const t of neighbors(state.map, center)) {
     if (t.improvement && !t.pillaged) t.pillaged = true;
   }
-  state.cityHp[String(city.id)] = Math.round(CITY_MAX_HP / 2);
+  city.hp = Math.round(CITY_MAX_HP / 2);
 }
 
 function attackCity(state: GameState, attacker: Unit, city: City): void {
@@ -453,11 +449,11 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
   const outer = city.outerHp ?? 0;
   const absorbed = Math.min(outer, dmgToCity);
   if (absorbed > 0) city.outerHp = outer - absorbed;
-  state.cityHp[String(city.id)] = getCityHp(state, city.id) - (dmgToCity - absorbed);
+  city.hp = city.hp - (dmgToCity - absorbed);
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
-  if (getCityHp(state, city.id) <= 0) {
+  if (city.hp <= 0) {
     // V-W2 symmetric: a RIVAL conqueror takes the city (the loyalty-flip
     // transfer); barbarians still merely sack.
     if (attacker.owner === 'rival' && attacker.civId !== undefined) {
@@ -752,9 +748,9 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
       : undefined;
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
-    state.cityHp[String(enemyCity.id)] = Math.max(
+    enemyCity.hp = Math.max(
       1,
-      getCityHp(state, enemyCity.id) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
+      enemyCity.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
     );
     attacker.movesLeft = 0;
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
@@ -1016,8 +1012,8 @@ export function captureCityState(state: GameState, cs: CityState): void {
     districts: [{ type: 'CITY_CENTER', tileIndex: cs.centerIndex }],
     wonders: [],
     specialists: {},
+    hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP (S1.3)
   });
-  state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, cs.centerIndex, 3);
   addEraScore(state, 0, ERA_SCORE_CONQUER); // B-24: gained a city (CS conquest)
   state.eventLog.push(`${cs.name} conquered — the city-state joins your empire.`);
@@ -1067,7 +1063,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
     districts: [{ type: 'CITY_CENTER', tileIndex: cs.centerIndex }],
     wonders: [],
     specialists: {},
-    hp: Math.round(RIVAL_CITY_MAX_HP / 2),
+    hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
   addEraScore(state, civOfRival(rival.id), ERA_SCORE_CONQUER); // B-24: gained a city (rival CS conquest)
@@ -1150,11 +1146,15 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     districts: keptDistricts,
     wonders: city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === id).map((w) => ({ ...w })),
     specialists: {},
+    // A city taken by CONQUEST joins at half HP — this used to be a separate
+    // `state.cityHp[id] = CITY_MAX_HP/2` write after the literal, and dropping
+    // the side map without moving the value here left captured cities at FULL
+    // health (caught by fixture byte-identity on 4 of 12 seeds).
+    hp: Math.round(CITY_MAX_HP / 2),
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) captured.outerHp = 0; // B-30: walls kept, outer pool 0
   state.cities.push(captured);
   addEraScore(state, 0, ERA_SCORE_CONQUER); // B-24: gained a city (conquest; the raze branch returned above)
-  state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, city.centerIndex, 3);
   if (plunder) {
     playerSeat(state).treasury += 40;
@@ -1621,13 +1621,13 @@ export function barbarianPhase(state: GameState): void {
   // Civ 6 repairs walls too) — full-HP walled cities still heal their wall,
   // so the early `continue` on full city HP is gone.
   for (const city of state.cities) {
-    const hp = getCityHp(state, city.id);
+    const hp = city.hp;
     const center = map.tiles[city.centerIndex];
     const besieged = neighbors(map, center).some((n) =>
       unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'player' })),
     );
     if (besieged) continue;
-    if (hp < CITY_MAX_HP) state.cityHp[String(city.id)] = Math.min(CITY_MAX_HP, hp + CITY_HEAL_PER_TURN);
+    if (hp < CITY_MAX_HP) city.hp = Math.min(CITY_MAX_HP, hp + CITY_HEAL_PER_TURN);
     if (city.buildings.includes('ANCIENT_WALLS')) {
       city.outerHp = Math.min(WALLS_HP, (city.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
     }

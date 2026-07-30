@@ -67,7 +67,7 @@ import { TERRAINS } from '../src/data/terrains';
 import {
   RIVAL_MAX_CITIES,
   RIVAL_WAR_MIN_TURNS,
-  RIVAL_CITY_MAX_HP,
+  CITY_MAX_HP,
   RIVAL_WORK_RADIUS,
   LOYALTY_MAX,
   LOYALTY_RANGE,
@@ -744,7 +744,7 @@ const rules = {
     peaceMinWarTurns: PEACE_MIN_WAR_TURNS,
     peaceGold0: PEACE_GOLD_COST(0),
     peaceGoldSlope: PEACE_GOLD_COST(1) - PEACE_GOLD_COST(0),
-    cityMaxHp: RIVAL_CITY_MAX_HP,
+    cityMaxHp: CITY_MAX_HP,
     workRadius: RIVAL_WORK_RADIUS,
     loyaltyMax: LOYALTY_MAX,
     loyaltyRange: LOYALTY_RANGE,

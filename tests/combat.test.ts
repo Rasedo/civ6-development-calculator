@@ -9,7 +9,6 @@ import {
   attackTargets,
   terrainDefense,
   barbarianPhase,
-  getCityHp,
   FLANKING_CS,
   SUPPORT_CS,
   XP_ATTACK,
@@ -167,17 +166,17 @@ describe('barbarians', () => {
     barb.tileIndex = tileAtCoords(state.map, 10, 9).index;
 
     let guard = 0;
-    while (getCityHp(state, city.id) > 0 && city.population === 8 && guard++ < 60) {
+    while (city.hp > 0 && city.population === 8 && guard++ < 60) {
       barb.movesLeft = 4;
       barb.hp = 100;
       meleeAttack(state, barb.id, city.centerIndex);
     }
     expect(city.population).toBeLessThan(8); // sacked
-    expect(getCityHp(state, city.id)).toBe(CITY_MAX_HP / 2);
+    expect(city.hp).toBe(CITY_MAX_HP / 2);
 
     state.units = []; // barbarians gone
     barbarianPhase(state);
-    expect(getCityHp(state, city.id)).toBe(CITY_MAX_HP / 2 + 20);
+    expect(city.hp).toBe(CITY_MAX_HP / 2 + 20);
   });
 
   it('barbarians near a trade endpoint suspend the route', () => {

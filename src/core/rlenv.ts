@@ -47,7 +47,7 @@ import { districtAdjacency } from './yields';
 import { availableBuildings, buildingCompletable } from './rules';
 import { computeUnlocks, availableTechs, availableCivics, governmentSlots } from './effects';
 import { trainableUnits, queueUnit, orderMove, builderImprove, builderRepair, setExploreMission, unitDomain } from './units';
-import { attackTargets, meleeAttack, getCityHp } from './combat';
+import { attackTargets, meleeAttack } from './combat';
 import { initFog } from './fog';
 import { validImprovements } from './rules';
 import { hexDistance } from './hex';
@@ -844,7 +844,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     const st = computeCityStats(s, c);
     addYields(yields, st.total);
     pop += c.population;
-    hpDeficit += (CITY_MAX_HP - getCityHp(s, c.id)) / CITY_MAX_HP;
+    hpDeficit += (CITY_MAX_HP - c.hp) / CITY_MAX_HP;
     amenityDeficit += Math.max(0, st.amenities.needed - st.amenities.have);
     housingHeadroom += Math.min(4, st.housing - c.population);
   }

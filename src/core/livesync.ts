@@ -22,7 +22,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS } from '../data/religion';
-import { UNITS, ENCAMPMENT_HP } from '../data/units';
+import { UNITS, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { PROJECTS } from '../data/projects';
 
 const DISTRICT_MAP: Record<string, DistrictId> = {
@@ -238,6 +238,7 @@ export function parseLiveSync(text: string): SyncResult {
       districts: [{ type: 'CITY_CENTER', tileIndex: center.index }],
       wonders: [],
       specialists: {},
+      hp: CITY_MAX_HP,
     };
     center.district = 'CITY_CENTER';
     center.districtComplete = true;

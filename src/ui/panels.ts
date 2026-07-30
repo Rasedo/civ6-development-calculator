@@ -23,7 +23,7 @@ import { FEATURE_VERSION as FEATURE_VERSION_UI } from '../core/rlenv';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BUILDINGS, RELIGION_NAMES, PANTHEON_FAITH_COST } from '../data/religion';
 import { UNITS as UNIT_DEFS, CITY_MAX_HP } from '../data/units';
 import { trainableUnits } from '../core/units';
-import { attackTargets, getCityHp } from '../core/combat';
+import { attackTargets } from '../core/combat';
 import { isExplored, fogActive } from '../core/fog';
 import { tileAppeal, appealTier } from '../core/appeal';
 import { isBoosted } from '../core/boosts';
@@ -507,7 +507,7 @@ export function renderCityPanel(
   container.innerHTML = `
     <h2>${city.isCapital ? '★ ' : ''}${city.name}</h2>
     <div class="row">Population <b>${city.population}</b> · ${growthLine}</div>
-    ${state.unitsMode && getCityHp(state, city.id) < CITY_MAX_HP ? `<div class="row bad">City HP ${getCityHp(state, city.id)}/${CITY_MAX_HP} — under attack!</div>` : ''}
+    ${state.unitsMode && city.hp < CITY_MAX_HP ? `<div class="row bad">City HP ${city.hp}/${CITY_MAX_HP} — under attack!</div>` : ''}
     ${
       state.rivals.some((r) => r.cities.length > 0) && !city.isCapital
         ? (() => {
