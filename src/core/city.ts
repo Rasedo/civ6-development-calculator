@@ -374,10 +374,14 @@ function completedWonders(state: GameState, city: City) {
     .filter((w) => w.def);
 }
 
-/** Empire-wide growth multiplier from wonders (Hanging Gardens). */
-function empireGrowthMult(state: GameState): number {
+/**
+ * Empire-wide growth multiplier from a SEAT's wonders (Hanging Gardens).
+ * #51/S2.3: `rivals.ts:rivalGrowthAllMult` was this loop with the
+ * `completedWonders` filter inlined. Exported now so the rival arm can call it.
+ */
+export function empireGrowthMult(state: GameState, seat: number = PLAYER_CIV): number {
   let mult = 1;
-  for (const c of state.cities) {
+  for (const c of citiesOf(state, seat)) {
     for (const w of completedWonders(state, c)) {
       if (w.def.effects?.growthAllMult) mult *= w.def.effects.growthAllMult;
     }

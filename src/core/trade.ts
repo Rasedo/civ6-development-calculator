@@ -4,8 +4,8 @@
  * met city-states pay gold plus the city-state's specialty yield.
  */
 
-import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, civOfRival, PLAYER_CIV, seatOf, citiesOf } from './seats';
+import { addYields, emptyYields, type City, type CityState, type GameState, type Yields } from './types';
+import { playerSeat, isPlayerSeat, isBarbSeat, rivalOfSeat, civOfRival, PLAYER_CIV, seatOf, citiesOf, civsAtWar } from './seats';
 import { hexDistance } from './hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { DISTRICTS } from '../data/districts';
@@ -43,20 +43,6 @@ export function tradeCapacity(state: GameState, seat: number = PLAYER_CIV): numb
     }
   }
   return cap + csTradeCapacityBonus(state, seat);
-}
-
-export function rivalRouteRaidedAt(state: GameState, rival: RivalCiv, endpoints: number[]): boolean {
-  if (!state.unitsMode) return false;
-  for (const u of state.units) {
-    const hostile = isBarbSeat(u.seat) || (isPlayerSeat(u.seat) && rival.atWar);
-    if (!hostile) continue;
-    const t = state.map.tiles[u.tileIndex];
-    for (const index of endpoints) {
-      const c = state.map.tiles[index];
-      if (hexDistance(t.col, t.row, c.col, c.row) <= 3) return true;
-    }
-  }
-  return false;
 }
 
 /** Count of completed, limit-counting (specialty) districts in a city — the
@@ -106,12 +92,31 @@ export function csRouteYields(cs: CityState): Yields {
 /** A route is suspended while hostiles prowl near either endpoint —
  * barbarians always, and (A-11) AT-WAR rival units: the audit-named
  * one-sidedness fix (rivals interdict player trade like barbs do). */
-export function routeRaidedAt(state: GameState, endpoints: number[]): boolean {
+const RIVAL_RIVAL_RAIDS_LIVE = false; // #51 Round 7: flip, then re-gate
+
+/**
+ * A route is suspended while units HOSTILE TO ITS OWNER prowl within 3 of
+ * either endpoint.
+ *
+ * #51/S2.3 — THE ONE FLAGGED MERGE OF THE ROUND. The twins were:
+ *   player: barbarians, or a RIVAL whose `atWar` is set
+ *   rival:  barbarians, or the PLAYER while that rival is at war
+ * Neither covers RIVAL-vs-RIVAL, and the rival twin said why: "rival-rival war
+ * is impossible until A-19". A-19 has since LANDED (`atWarRivals`), so that is
+ * a stale gap rather than a true statement.
+ *
+ * Merging on `civsAtWar` alone would START raiding rival-rival routes — a
+ * fidelity IMPROVEMENT, but a BEHAVIOUR CHANGE, and Round 2 is byte-identical
+ * by contract. The flag reproduces today exactly; flipping it is Round 7.
+ */
+export function routeRaidedAt(state: GameState, endpoints: number[], seat: number = PLAYER_CIV): boolean {
   if (!state.unitsMode) return false;
   for (const u of state.units) {
-    const hostile =
-      isBarbSeat(u.seat) ||
-      (isRivalSeat(u.seat) && (rivalOfSeat(state, u.seat)?.atWar ?? false));
+    let hostile = isBarbSeat(u.seat);
+    if (!hostile && u.seat !== seat) {
+      const rivalRivalPair = !isPlayerSeat(u.seat) && !isPlayerSeat(seat);
+      if (!rivalRivalPair || RIVAL_RIVAL_RAIDS_LIVE) hostile = civsAtWar(state, u.seat, seat);
+    }
     if (!hostile) continue;
     const t = state.map.tiles[u.tileIndex];
     for (const index of endpoints) {

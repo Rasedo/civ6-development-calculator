@@ -17,7 +17,7 @@ import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
-import { rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
+import { routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity, routeRaidedAt } from './trade';
 import { isSuzerain, csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
@@ -59,7 +59,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, civEraIndex, seatTourism } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, civEraIndex, seatTourism, empireGrowthMult } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -1211,19 +1211,6 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
 
 /** A-4: the civ-wide wonder growth multiplier (Hanging Gardens) — the
  * empireGrowthMult twin over the RIVAL's completed wonders. */
-function rivalGrowthAllMult(state: GameState, rival: RivalCiv): number {
-  let mult = 1;
-  for (const rc of rival.cities) {
-    for (const w of rc.wonders ?? []) {
-      const def = BUILT_WONDERS[w.id];
-      if (def?.effects?.growthAllMult && state.map.tiles[w.tileIndex].builtWonderComplete) {
-        mult *= def.effects.growthAllMult;
-      }
-    }
-  }
-  return mult;
-}
-
 /** C1-B5b: does this rival already have a builder (alive or queued)? One at a time. */
 function rivalHasBuilder(state: GameState, rival: RivalCiv): boolean {
   // NB: rival UNIT civId is the RAW rival id (rivalUnits' convention) —
@@ -2100,7 +2087,7 @@ export function rivalCityYields(
       // csRouteYields), the same pre-tier trade position.
       const cs = state.cityStates.find((c) => c.id === route.toCs);
       if (!cs) continue;
-      if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, cs.centerIndex])) continue;
+      if (routeRaidedAt(state, [rc.centerIndex, cs.centerIndex], civOfRival(rival.id))) continue;
       const cy = csRouteYields(cs);
       total.food += cy.food;
       total.production += cy.production;
@@ -2118,14 +2105,14 @@ export function rivalCityYields(
       if (rival.atWar) continue;
       const pdest = state.cities.find((c) => c.id === route.toPlayer);
       if (!pdest) continue;
-      if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, pdest.centerIndex])) continue;
+      if (routeRaidedAt(state, [rc.centerIndex, pdest.centerIndex], civOfRival(rival.id))) continue;
       const iy = routeYieldsInternational(state, pdest);
       total.gold += iy.gold;
       continue;
     }
     const dest = rival.cities.find((c) => c.id === route.to);
     if (!dest) continue;
-    if (rivalRouteRaidedAt(state, rival, [rc.centerIndex, dest.centerIndex])) continue;
+    if (routeRaidedAt(state, [rc.centerIndex, dest.centerIndex], civOfRival(rival.id))) continue;
     const ry = routeYields(state, dest);
     total.food += ry.food;
     total.production += ry.production;
@@ -3075,7 +3062,7 @@ export function rivalPhase(state: GameState): void {
       // multiplier (Hanging Gardens — the empireGrowthMult twin) ride the
       // chain exactly like computeCityStats (city.ts:495-501).
       rc.foodBox += surplus > 0
-        ? surplus * hFactor * tier.growthFactor * getRivalModifiers(state, rival).growthMult * rivalGrowthAllMult(state, rival)
+        ? surplus * hFactor * tier.growthFactor * getRivalModifiers(state, rival).growthMult * empireGrowthMult(state, civOfRival(rival.id))
         : surplus;
       const need = growthFoodNeeded(rc.population);
       if (rc.foodBox >= need) {
