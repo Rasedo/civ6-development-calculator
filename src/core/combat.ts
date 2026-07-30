@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile, rivalsOf } from './seats';
+import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile, rivalsOf, seatOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -371,11 +371,20 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
 // P4/D-22 (real Civ 6): city defense = the strongest MELEE unit the owner
 // has ever fielded (floor 15), +5 when the owner's own military garrisons
 // the center. No population term; walls stay out of scope.
+/**
+ * A city's defence: its OWNER's strongest melee ever fielded (floor 15,
+ * P4/D-22) plus 5 for that owner's military garrisoning the centre.
+ *
+ * #51/S2.3: `rivalCityDefense` was this exact arithmetic with
+ * `rival.bestMeleeCS` and a per-rival garrison test. It could NOT merge until
+ * `bestMeleeCS` moved onto the Seat — the attempted merge is what exposed five
+ * fields still split between GameState and RivalCiv (S1.2g).
+ */
 export function cityDefenseStrength(state: GameState, city: City): number {
   const garrison = unitsAt(state, city.centerIndex).find(
-    (u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'military',
+    (u) => u.seat === city.seat && unitDomain(u.type) === 'military',
   );
-  return Math.max(15, playerSeat(state).bestMeleeCS ?? 0) + (garrison ? 5 : 0);
+  return Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
 function killUnit(state: GameState, unit: Unit): void {
@@ -690,7 +699,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     if (isPlayerSeat(attacker.seat)) {
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
-        const defCS = rivalCityDefense(state, rc.rival, rc.city);
+        const defCS = cityDefenseStrength(state, rc.city);
         rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
@@ -865,16 +874,6 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 // Rival cities: siege and capture
 // ---------------------------------------------------------------------------
 
-export function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalCity): number {
-  // P4/D-22 (symmetric with cityDefenseStrength): the rival's strongest
-  // melee ever (floor 15) + 5 for its own military garrisoning the center.
-  // Their defense keeps pace through military techs raising bestMeleeCS.
-  const garrison = unitsAt(state, city.centerIndex).find(
-    (u) => isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) && unitDomain(u.type) === 'military',
-  );
-  return Math.max(15, rival.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
-}
-
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
   const atkCS =
     (UNITS[attacker.type]?.combat ?? 0) -
@@ -883,7 +882,7 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
     xpLevelBonus(attacker) + // B-29 wound + river (city not a unit) + B-4 attacker veterancy
     (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
-  const defCS = rivalCityDefense(state, rival, city);
+  const defCS = cityDefenseStrength(state, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
   const dmgToCity = damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
   const outer = city.outerHp ?? 0;

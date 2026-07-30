@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, unitDomain, encampmentIntact, encampmentBlocks, riverCharge, layTradeRoad, cliffBlocksStep } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, rivalCityDefense, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS } from './combat';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
@@ -3219,7 +3219,7 @@ export function rivalPhase(state: GameState): void {
           // #70/S2 (B-8): the general/admiral aura shields against city fire,
           // outside the embarked ternary (the combat.ts pcstk mirror).
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
-          const atkCS = rivalCityDefense(state, rival, rc);
+          const atkCS = cityDefenseStrength(state, rc);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'rcstk', bestTile);
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
           if (defender.hp <= 0) disbandUnit(state, defender.id);
@@ -3258,7 +3258,7 @@ export function rivalPhase(state: GameState): void {
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
           const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the rcstk mirror
-          const atkCS = rivalCityDefense(state, rival, rc);
+          const atkCS = cityDefenseStrength(state, rc);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'restk', bestTile);
           awardDefenseXp(defender);
           if (defender.hp <= 0) disbandUnit(state, defender.id);
