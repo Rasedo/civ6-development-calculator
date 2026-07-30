@@ -59,7 +59,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, civEraIndex, seatTourism, empireGrowthMult } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, civEraIndex, seatTourism, empireGrowthMult, pickBorderTile } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -752,27 +752,6 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
  * borderCandidates. A-17: adjacency is PER-CITY via the rivalCityId tile
  * registry — a rival city can no longer claim across a sibling's frontier,
  * exactly like the player's tileBelongsTo(n, city) check. */
-function pickRivalBorderTile(state: GameState, rival: RivalCiv, city: RivalCity): number | null {
-  const center = state.map.tiles[city.centerIndex];
-  const ctx = { map: state.map, mods: getRivalModifiers(state, rival) };  // A-7: belief tile yields rank candidates too
-  const cands: { dist: number; res: number; ySum: number; i: number }[] = [];
-  for (const t of tilesWithin(state.map, center.col, center.row, 5)) {
-    if (tileOwned(t)) continue;
-    const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
-      (n) => n.index !== t.index && tileBelongsTo(n, city),
-    );
-    if (!adjOwn) continue;
-    const y = tileYields(ctx, t);
-    cands.push({
-      dist: hexDistance(center.col, center.row, t.col, t.row),
-      res: resourcePriority(t),
-      ySum: y.food + y.production + y.gold + y.science + y.culture + y.faith,
-      i: t.index,
-    });
-  }
-  if (cands.length === 0) return null;
-  return cands.sort((a, b) => a.dist - b.dist || b.res - a.res || b.ySum - a.ySum || a.i - b.i)[0].i;
-}
 
 function tryFoundCity(state: GameState, rival: RivalCiv): void {
   // Expand near home: best site within reach of the existing cities.
@@ -2759,7 +2738,7 @@ export function rivalPhase(state: GameState): void {
       // ONE tile per civ per turn, first rc in slot order with a candidate.
       if (RIVAL_TILE_BUY_LIVE && !bought) {
         for (const rc of rival.cities) {
-          const next = pickRivalBorderTile(state, rival, rc);
+          const next = pickBorderTile(state, rc, { map: state.map, mods: getRivalModifiers(state, rival) });
           if (next === null) continue;
           const cost = rivalTilePurchaseCost(state, rival, rc, next);
           if (!goldAffordable(rival.treasury ?? 0, cost)) break;
@@ -3157,7 +3136,7 @@ export function rivalPhase(state: GameState): void {
       const rcBorderCost = () =>
         Math.round(borderGrowthCost(rc.tilesAcquired) * getRivalModifiers(state, rival).borderCostMult);
       while (rc.cultureBox >= rcBorderCost()) {
-        const next = pickRivalBorderTile(state, rival, rc);
+        const next = pickBorderTile(state, rc, { map: state.map, mods: getRivalModifiers(state, rival) });
         if (next === null) {
           // Nowhere to grow: cap the box at the current threshold.
           rc.cultureBox = Math.min(rc.cultureBox, rcBorderCost());

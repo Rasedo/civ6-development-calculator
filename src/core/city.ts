@@ -46,7 +46,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf } from './seats';
+import { PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed } from './seats';
 
 export interface CityStats {
   city: City;
@@ -319,8 +319,9 @@ export function borderCandidates(state: GameState, city: City): number[] {
   const center = state.map.tiles[city.centerIndex];
   const out: number[] = [];
   for (const t of tilesWithin(state.map, center.col, center.row, BORDER_MAX_RADIUS)) {
-    if (isPlayerSeat(tileSeat(t))) continue;
-    if (tileForeignTo(t, PLAYER_CIV)) continue; // foreign territory
+    // #51/S2.3: "own OR foreign" IS "claimed by anyone" — the rival twin wrote
+    // exactly that as `tileOwned(t)`, an alias for `tileClaimed`.
+    if (tileClaimed(t)) continue;
     const adjOwn = tilesWithin(state.map, t.col, t.row, 1).some(
       (n) => n.index !== t.index && tileBelongsTo(n, city),
     );
@@ -336,6 +337,15 @@ export function resourcePriority(tile: Tile): number {
 }
 
 /** The tile culture growth would claim next (Civ 6-ish priorities). */
+/**
+ * The tile culture growth claims next: nearest, then resource priority, then
+ * total yield, then index.
+ *
+ * #51/S2.3: `rivals.ts:pickRivalBorderTile` had the SAME four sort keys in the
+ * same order and the same radius (its literal `5` is `BORDER_MAX_RADIUS`); it
+ * differed only in building its own yield context from `getRivalModifiers`.
+ * Callers pass the seat's context now.
+ */
 export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
   const yctx = ctx ?? makeYieldCtx(state);
   const center = state.map.tiles[city.centerIndex];
