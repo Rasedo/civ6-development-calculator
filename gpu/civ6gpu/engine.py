@@ -4847,33 +4847,44 @@ class BatchSim:
         rv_civ_n = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=rcap)  # [B, 6]
         # a rival military neighbour whose civ is at war with the player
         rv_war_n = has_rv & self.r_atwar.gather(1, rv_civ_n)
-        dside = def_side.unsqueeze(1)  # [B, 1]
+        # #51/S3.4: the defender's SEAT, and each neighbour's, in the one
+        # absolute space. This replaced a three-way branch on def_side
+        # (0 player / 1 barbarian / 2 rival) that spelled out the same
+        # unitsHostile question once per kind.
         dciv = def_civ.clamp(min=0).clamp(max=rcap).unsqueeze(1)  # [B, 1]
-        is_pl = dside == 0
-        is_bb = dside == 1
-        is_rv = dside == 2
-        atwar_dc = self.r_atwar.gather(1, dciv)  # [B, 1] — the defender's rival civ at war
-        # A-19/B-33 (S2): an enemy AT-WAR rival military neighbour is hostile to
-        # a RIVAL defender (its own attacker's flankers included; excluded by
-        # is_atk below). rr_war[b, dciv[b], rv_civ_n[b,d]] — [B, 6].
+        d_seat = torch.where(
+            def_side == 0,
+            torch.zeros_like(def_side),
+            torch.where(def_side == 1, torch.full_like(def_side, BARB_SEAT), def_civ.clamp(min=0) + 1),
+        ).unsqueeze(1)  # [B, 1]
+        n_seat = torch.where(
+            has_barb,
+            torch.full_like(nbc, BARB_SEAT),
+            torch.where(has_pmil, torch.zeros_like(nbc), torch.where(has_rv, rv_civ_n + 1, torch.full_like(nbc, -1))),
+        )  # [B, 6], -1 = no military neighbour
+        present = has_barb | has_pmil | has_rv
+
+        # unitsHostile: a barbarian is hostile to every non-barbarian and vice
+        # versa; otherwise it is civsAtWar. The player pair reads r_atwar, a
+        # rival pair reads rr_war — S4.3 collapses those into one matrix.
         bidx6 = torch.arange(self.B, device=self.device).unsqueeze(1)
-        rr_dc = self.rr_war[bidx6, dciv, rv_civ_n]  # [B, 6]
-        rv_enemy_dc = has_rv & (rv_civ_n != dciv) & rr_dc
-        # hostile-to-defender military per neighbour (unitsHostile, u military)
-        hostile = (
-            (is_pl & (has_barb | rv_war_n))
-            | (is_bb & (has_pmil | has_rv))
-            | (is_rv & (has_barb | (has_pmil & atwar_dc) | rv_enemy_dc))
-        )
+        d_barb = d_seat == BARB_SEAT
+        n_barb = n_seat == BARB_SEAT
+        pair_barb = d_barb ^ n_barb
+        # player-vs-rival, either way round
+        pl_vs_rv = ((d_seat == 0) & (n_seat > 0) & ~n_barb) | ((n_seat == 0) & (d_seat > 0) & ~d_barb)
+        rv_civ_side = torch.where(d_seat == 0, n_seat - 1, d_seat - 1).clamp(min=0, max=rcap)
+        war_pl = self.r_atwar.gather(1, rv_civ_side)  # [B, 6]
+        # rival-vs-rival
+        rv_vs_rv = (d_seat > 0) & ~d_barb & (n_seat > 0) & ~n_barb
+        rr = self.rr_war[bidx6, dciv, rv_civ_n]  # [B, 6]
+        war_rr = rv_vs_rv & (n_seat != d_seat) & rr
+        hostile = present & (pair_barb | (pl_vs_rv & war_pl) | war_rr)
         # exclude the attacker's own unit (the military at attacker_tile)
         is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
         hostile = hostile & ~is_atk
-        # friendly-to-defender military (same owner AND civId), u military
-        friendly = (
-            (is_pl & has_pmil)
-            | (is_bb & has_barb)
-            | (is_rv & has_rv & (rv_civ_n == dciv))
-        )
+        # friendly = same seat (same owner AND civ), military
+        friendly = present & (n_seat == d_seat)
         return hostile.long().sum(dim=1), friendly.long().sum(dim=1)
 
     def _lay_trade_road(self, rows: torch.Tensor, frm: torch.Tensor, dest: torch.Tensor) -> None:
