@@ -9,6 +9,7 @@
  */
 
 import type { City, GameState, Unit, Yields } from './types';
+import { playerSeat } from './seats';
 import { YIELD_KEYS, emptyYields, addYields } from './types';
 import {
   createGame,
@@ -348,7 +349,7 @@ export class CivEnv {
     if (s.research.civic === null && availableCivics(s).length > 0) {
       return { type: 'civic' };
     }
-    if (s.envoysAvailable > 0 && metCityStates(s).length > 0) {
+    if (playerSeat(s).envoysAvailable > 0 && metCityStates(s).length > 0) {
       return { type: 'envoy' };
     }
     for (const c of [...s.cities].sort((a, b) => a.id - b.id)) {
@@ -467,7 +468,7 @@ export function uiPendingDecisions(state: GameState): PendingDecision[] {
   if (envCandidates(state, { type: 'policy' }).length > 1) out.push({ type: 'policy' });
   if (state.research.tech === null && availableTechs(state).length > 0) out.push({ type: 'research' });
   if (state.research.civic === null && availableCivics(state).length > 0) out.push({ type: 'civic' });
-  if (state.envoysAvailable > 0 && metCityStates(state).length > 0) out.push({ type: 'envoy' });
+  if (playerSeat(state).envoysAvailable > 0 && metCityStates(state).length > 0) out.push({ type: 'envoy' });
   for (const c of [...state.cities].sort((a, b) => a.id - b.id)) {
     if (c.queue.length > 0) continue;
     const d: PendingDecision = { type: 'production', cityId: c.id };
@@ -889,7 +890,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     Math.min(1, s.faithTotal / 500),
     Math.min(1, gpProgress),
     emptySlots,
-    Math.min(1, s.envoysAvailable / 3),
+    Math.min(1, playerSeat(s).envoysAvailable / 3),
     Math.min(1, metCityStates(s).length / 6),
     Math.min(1, s.cityStates.filter(isSuzerain).length / 6),
     s.rivals.some((r) => r.atWar) ? 1 : 0,

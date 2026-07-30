@@ -28,6 +28,7 @@
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { dominationWinner } from '../src/core/game';
 import { getCityHp } from '../src/core/combat';
+import { playerSeat } from '../src/core/seats';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -73,8 +74,8 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'nCamps', tol: 0, get: (s) => s.barbCamps.length },
   { name: 'nBarbs', tol: 0, get: (s) => s.units.filter((u) => u.owner === 'barbarian').length },
   { name: 'nPlayerUnits', tol: 0, get: (s) => s.units.filter((u) => u.owner === 'player').length },
-  { name: 'envoysAvail', tol: 0, get: (s) => s.envoysAvailable },
-  { name: 'influence', tol: 0, get: (s) => s.influencePoints },
+  { name: 'envoysAvail', tol: 0, get: (s) => playerSeat(s).envoysAvailable },
+  { name: 'influence', tol: 0, get: (s) => playerSeat(s).influencePoints },
   { name: 'fertility', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + t.fertility, 0) },
   { name: 'droughtTiles', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + (t.droughtTurns > 0 ? 1 : 0), 0) },
   { name: 'improvements', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + (t.improvement !== null ? 1 : 0), 0) },
@@ -84,10 +85,10 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'victoryType', tol: 0, get: (s) => s.victoryType ?? 0 }, // GV-4/GV-3
   { name: 'playerAge', tol: 0, get: (s) => s.civAges?.[0] ?? 1 }, // B-24 S2
   { name: 'tourism', tol: 0, get: (s) => s.tourismTotal ?? 0 }, // B-20 (#71)
-  { name: 'warmonger', tol: 0, get: (s) => s.warmonger ?? 0 }, // B-22 (#74)
-  { name: 'diploFavor', tol: 0, get: (s) => s.diploFavor ?? 0 }, // B-22 (#75)
+  { name: 'warmonger', tol: 0, get: (s) => playerSeat(s).warmonger }, // B-22 (#74)
+  { name: 'diploFavor', tol: 0, get: (s) => playerSeat(s).diploFavor }, // B-22 (#75)
   { name: 'congressSessions', tol: 0, get: (s) => s.congressSessions ?? 0 }, // B-22 (#76)
-  { name: 'diploPoints', tol: 0, get: (s) => s.diploPoints ?? 0 }, // B-22 (#76)
+  { name: 'diploPoints', tol: 0, get: (s) => playerSeat(s).diploPoints }, // B-22 (#76)
   // #51/S0.2: the PLAYER twins of columns the RIVALS have carried for rounds.
   // Player FAITH is deliberately absent: the GPU player has no faith ECONOMY at
   // all (player_faith is written by GP/dedications and read by nothing, and the
@@ -96,7 +97,7 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   // economy rather than by widening the trace around the gap.
   { name: 'techProg', tol: 2, get: (s) => Math.round(s.research.techProgress * 1000) },
   { name: 'civicProg', tol: 2, get: (s) => Math.round(s.research.civicProgress * 1000) },
-  { name: 'warWeariness', tol: 0, get: (s) => s.warWeariness ?? 0 },
+  { name: 'warWeariness', tol: 0, get: (s) => playerSeat(s).warWeariness },
 ];
 
 // Keyed by id (== the GPU's static slot), NOT array position: a captured

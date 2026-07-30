@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { declareWar } from '../src/core/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
@@ -53,46 +54,46 @@ describe('B-22 diplomatic favor', () => {
 
   it('accrues on the player each turn', () => {
     const state = newGame(1);
-    state.diploFavor = 0;
+    playerSeat(state).diploFavor = 0;
     state.government.current = 'MONARCHY';
     endTurn(state);
     // no suzerainties in a fresh game -> exactly the tier
-    expect(state.diploFavor).toBe(GOVERNMENTS.MONARCHY.tier);
+    expect(playerSeat(state).diploFavor).toBe(GOVERNMENTS.MONARCHY.tier);
   });
 });
 
 describe('B-22 player grievances', () => {
   it('declaring war earns grievances', () => {
     const state = newGame(1);
-    expect(state.warmonger ?? 0).toBe(0);
+    expect(playerSeat(state).warmonger ?? 0).toBe(0);
     expect(declareWar(state, state.rivals[0].id).ok).toBe(true);
-    expect(state.warmonger).toBe(RR_WARMONGER_DOW);
+    expect(playerSeat(state).warmonger).toBe(RR_WARMONGER_DOW);
   });
 
   it('grievances do NOT decay while a war is still running', () => {
     const state = newGame(1);
     declareWar(state, state.rivals[0].id);
-    const before = state.warmonger!;
+    const before = playerSeat(state).warmonger!;
     endTurn(state);
-    expect(state.warmonger).toBe(before); // still at war -> no decay
+    expect(playerSeat(state).warmonger).toBe(before); // still at war -> no decay
   });
 
   it('grievances decay by 1 per turn once at peace with every rival', () => {
     const state = newGame(1);
     declareWar(state, state.rivals[0].id);
     state.rivals[0].atWar = false; // peace on every axis
-    const before = state.warmonger!;
+    const before = playerSeat(state).warmonger!;
     endTurn(state);
-    expect(state.warmonger).toBe(before - 1);
+    expect(playerSeat(state).warmonger).toBe(before - 1);
   });
 
   it('decay floors at zero and never goes negative', () => {
     const state = newGame(1);
-    state.warmonger = 1;
+    playerSeat(state).warmonger = 1;
     endTurn(state);
-    expect(state.warmonger).toBe(0);
+    expect(playerSeat(state).warmonger).toBe(0);
     endTurn(state);
-    expect(state.warmonger).toBe(0); // stays put, never negative
+    expect(playerSeat(state).warmonger).toBe(0); // stays put, never negative
   });
 
   it('the gang threshold is a real bar the score can reach', () => {
@@ -101,7 +102,7 @@ describe('B-22 player grievances', () => {
     const state = newGame(2);
     declareWar(state, state.rivals[0].id);
     declareWar(state, state.rivals[1].id);
-    expect(state.warmonger).toBe(2 * RR_WARMONGER_DOW);
-    expect(state.warmonger!).toBeGreaterThanOrEqual(RR_WARMONGER_GANG);
+    expect(playerSeat(state).warmonger).toBe(2 * RR_WARMONGER_DOW);
+    expect(playerSeat(state).warmonger!).toBeGreaterThanOrEqual(RR_WARMONGER_GANG);
   });
 });

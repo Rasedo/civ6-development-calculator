@@ -7,6 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
+import { playerSeat } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -252,8 +253,8 @@ export function assignEnvoy(state: GameState, csId: number): RuleResult {
   const cs = state.cityStates.find((c) => c.id === csId);
   if (!cs) return no('No such city-state.');
   if (!cs.met) return no('You have not met this city-state yet.');
-  if (state.envoysAvailable <= 0) return no('No envoys available.');
-  state.envoysAvailable -= 1;
+  if (playerSeat(state).envoysAvailable <= 0) return no('No envoys available.');
+  playerSeat(state).envoysAvailable -= 1;
   cs.envoys += 1;
   return ok;
 }
@@ -383,10 +384,10 @@ export function cityStatePhase(state: GameState): void {
   // Influence → envoys (only once someone can receive them).
   if (state.cityStates.some((cs) => cs.met)) {
     const tier = state.government.current ? GOV_INFLUENCE_TIER[state.government.current] ?? 0 : 0;
-    state.influencePoints += INFLUENCE_PER_TURN + tier;
-    while (state.influencePoints >= ENVOY_COST) {
-      state.influencePoints -= ENVOY_COST;
-      state.envoysAvailable += 1;
+    playerSeat(state).influencePoints += INFLUENCE_PER_TURN + tier;
+    while (playerSeat(state).influencePoints >= ENVOY_COST) {
+      playerSeat(state).influencePoints -= ENVOY_COST;
+      playerSeat(state).envoysAvailable += 1;
       state.eventLog.push('Earned an envoy.');
     }
   }

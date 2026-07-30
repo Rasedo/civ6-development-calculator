@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { canFoundCity } from '../src/core/rules';
@@ -153,21 +154,21 @@ describe('envoys', () => {
     const state = makeState();
     const met = addCs(state, 9, 9);
     const unmet = addCs(state, 3, 9, { met: false });
-    state.envoysAvailable = 1;
+    playerSeat(state).envoysAvailable = 1;
     expect(assignEnvoy(state, unmet.id).ok).toBe(false);
     expect(assignEnvoy(state, met.id).ok).toBe(true);
     expect(met.envoys).toBe(1);
-    expect(state.envoysAvailable).toBe(0);
+    expect(playerSeat(state).envoysAvailable).toBe(0);
     expect(assignEnvoy(state, met.id).ok).toBe(false); // pool empty
   });
 
   it('influence accrues into envoys once someone is met', () => {
     const state = makeState();
     addCs(state, 9, 9);
-    state.influencePoints = ENVOY_COST - 2;
+    playerSeat(state).influencePoints = ENVOY_COST - 2;
     cityStatePhase(state);
-    expect(state.envoysAvailable).toBe(1);
-    expect(state.influencePoints).toBeLessThan(ENVOY_COST);
+    expect(playerSeat(state).envoysAvailable).toBe(1);
+    expect(playerSeat(state).influencePoints).toBeLessThan(ENVOY_COST);
   });
 
   it('aggregates bonuses across several city-states', () => {

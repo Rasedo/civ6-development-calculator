@@ -34,7 +34,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed, civOfRival, allCities } from './seats';
+import { tileClaimed, civOfRival, allCities, playerSeat } from './seats';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -134,15 +134,16 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
-    warWeariness: 0, // B-15
     spaceProjects: [], // B-25
     capitalTiles: [], // GV-3
     fogOfWar: false,
     explored: [],
     eventLog: [],
     cityStates: [],
-    influencePoints: 0,
-    envoysAvailable: 0,
+    // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
+    // Rival seats are appended by the rival factory (they are the same objects
+    // as `rivals[]` while the field-by-field migration proceeds).
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0 }],
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -787,9 +788,9 @@ export function endTurn(state: GameState): void {
   // the player has no denounce verb, and doubling the player path surfaced a
   // dormant −3/−4-tier economic divergence (seed 9092). Unchanged from S2.
   const atWarNow = state.rivals.some((rv) => rv.atWar && rv.cities.length > 0);
-  state.warWeariness = atWarNow
-    ? Math.min(WAR_WEARINESS_CAP, (state.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
-    : Math.max(0, (state.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
+  playerSeat(state).warWeariness = atWarNow
+    ? Math.min(WAR_WEARINESS_CAP, (playerSeat(state).warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
+    : Math.max(0, (playerSeat(state).warWeariness ?? 0) - WAR_WEARINESS_DECAY);
 
   let turnScience = 0;
   let turnCulture = 0;
@@ -907,13 +908,13 @@ export function endTurn(state: GameState): void {
   state.tourismTotal = (state.tourismTotal ?? 0) + playerTourism(state);
   // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, accumulated
   // once per turn at the civ level, the same position the rival seat uses.
-  state.diploFavor =
-    (state.diploFavor ?? 0) + diploFavorPerTurn(state.government.current, playerSuzerainCount(state));
+  playerSeat(state).diploFavor =
+    (playerSeat(state).diploFavor ?? 0) + diploFavorPerTurn(state.government.current, playerSuzerainCount(state));
   // B-22 (#74): the player's GRIEVANCES decay by 1 each turn they are at peace
   // with EVERY rival (floor 0) — the exact twin of the rival decay, at the same
   // per-turn accumulator position so both engines apply it together.
-  if ((state.warmonger ?? 0) > 0 && !state.rivals.some((rv) => rv.atWar)) {
-    state.warmonger = (state.warmonger ?? 0) - 1;
+  if ((playerSeat(state).warmonger ?? 0) > 0 && !state.rivals.some((rv) => rv.atWar)) {
+    playerSeat(state).warmonger = (playerSeat(state).warmonger ?? 0) - 1;
   }
 
   // Loyalty collapses resolve after the city loop (they mutate the list).
@@ -1032,7 +1033,7 @@ export function endTurn(state: GameState): void {
  */
 function diplomaticVictor(state: GameState): number {
   const alive = [state.cities.length > 0, ...state.rivals.map((rv) => rv.cities.length > 0)];
-  const pts = [state.diploPoints ?? 0, ...state.rivals.map((rv) => rv.diploPoints ?? 0)];
+  const pts = [playerSeat(state).diploPoints ?? 0, ...state.rivals.map((rv) => rv.diploPoints ?? 0)];
   for (let c = 0; c < pts.length; c++) {
     if (alive[c] && pts[c] >= DIPLO_VICTORY_POINTS) return c;
   }
@@ -1301,6 +1302,16 @@ export function serialize(state: GameState): string {
 /** Parse a save, filling in fields that older saves lack. */
 export function deserialize(json: string): GameState {
   const state = JSON.parse(json) as GameState;
+  // #51/S1.2: `seats[r+1]` and `rivals[r]` are the SAME OBJECT in memory, and a
+  // JSON round-trip cannot preserve that — JSON.parse hands back two
+  // independent copies, after which a mutation through one view is invisible to
+  // the other and the reloaded game silently diverges from the live one. Re-tie
+  // them here. (Caught by the rival-determinism test, which is exactly what it
+  // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
+  state.seats = [
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0 },
+    ...(state.rivals ?? []),
+  ];
   state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
   state.research.boosted ??= [];
   state.government ??= { current: null, policies: [] };
@@ -1338,8 +1349,8 @@ export function deserialize(json: string): GameState {
   state.explored ??= [];
   state.eventLog ??= [];
   state.cityStates ??= [];
-  state.influencePoints ??= 0;
-  state.envoysAvailable ??= 0;
+  playerSeat(state).influencePoints ??= 0;
+  playerSeat(state).envoysAvailable ??= 0;
   state.rivals ??= [];
   // C1-A2: rival cities became full City objects; older saves carry the
   // scalar shape (growthBox, no queue/districts/…). Fill ONLY the missing

@@ -114,7 +114,7 @@ import {
   RIVAL_ENGINEER_LIVE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -271,7 +271,14 @@ export function placeRivals(state: GameState, count?: number): void {
       denouncedTurn: {}, // B-22 (S3): directed denouncement stamps, empty at t0
       warTurns: 0,
       peaceTurns: 0,
+      // #51/S1.2: the SEAT block — identical on the player's seat 0.
+      seat: i + 1,
+      warmonger: 0,
       warWeariness: 0, // B-15
+      diploFavor: 0,
+      diploPoints: 0,
+      influencePoints: 0,
+      envoysAvailable: 0,
       spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
@@ -284,6 +291,7 @@ export function placeRivals(state: GameState, count?: number): void {
     // "strongest melee ever FIELDED" includes the starting army (defense
     // 20 from turn 0; the GPU seeds r_best_melee from the fixture pools).
     state.rivals.push(rival);
+    state.seats.push(rival); // #51/S1.2: the SAME object — seats[r+1] is rival r
     spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id);
   });
 }
@@ -533,7 +541,7 @@ export function declareWar(state: GameState, rivalId: number): RuleResult {
   rival.warTurns = 0;
   // B-22 (#74): the player earns GRIEVANCES for declaring, exactly as a rival
   // does (RR_WARMONGER_DOW at the rival↔rival DoW site).
-  state.warmonger = (state.warmonger ?? 0) + RR_WARMONGER_DOW;
+  playerSeat(state).warmonger = (playerSeat(state).warmonger ?? 0) + RR_WARMONGER_DOW;
   state.eventLog.push(`War declared on ${rival.name}!`);
   return ok;
 }
@@ -1610,17 +1618,17 @@ export function worldCongress(state: GameState): void {
   if (!eras.some((e) => e >= CONGRESS_MIN_ERA)) return;
   state.congressSessions = (state.congressSessions ?? 0) + 1;
   // every civ commits ALL its favor; the largest commitment wins
-  const votes = [state.diploFavor ?? 0, ...state.rivals.map((rv) => rv.diploFavor ?? 0)];
+  const votes = [playerSeat(state).diploFavor ?? 0, ...state.rivals.map((rv) => rv.diploFavor ?? 0)];
   let win = -1;
   for (let c = 0; c < votes.length; c++) {
     if (votes[c] <= 0) continue; // no favor, no vote
     if (win < 0 || votes[c] > votes[win]) win = c; // ties keep the LOWER id
   }
   // the commitments are spent whether or not they won
-  state.diploFavor = 0;
+  playerSeat(state).diploFavor = 0;
   for (const rv of state.rivals) rv.diploFavor = 0;
   if (win < 0) return; // nobody could vote
-  if (win === 0) state.diploPoints = (state.diploPoints ?? 0) + DVP_PER_RESOLUTION;
+  if (win === 0) playerSeat(state).diploPoints = (playerSeat(state).diploPoints ?? 0) + DVP_PER_RESOLUTION;
   else {
     const rv = state.rivals[win - 1];
     if (rv) rv.diploPoints = (rv.diploPoints ?? 0) + DVP_PER_RESOLUTION;
@@ -3496,7 +3504,7 @@ export function rivalPhase(state: GameState): void {
         // B-22 (#74): a WARMONGERING player is ganged up on — past
         // RR_WARMONGER_GANG grievances a rival declares without the usual
         // strength advantage, the exact twin of the rival↔rival gang rule.
-        ((state.warmonger ?? 0) >= RR_WARMONGER_GANG || rivalStrength(state, rival) > playerStrength(state) * 1.3) &&
+        ((playerSeat(state).warmonger ?? 0) >= RR_WARMONGER_GANG || rivalStrength(state, rival) > playerStrength(state) * 1.3) &&
         nextRandom(state) < 0.08 * (0.5 + rival.aggression)
       ) {
         rival.atWar = true;

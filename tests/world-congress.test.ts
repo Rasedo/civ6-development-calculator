@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { worldCongress } from '../src/core/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
@@ -42,10 +43,10 @@ describe('B-22 world congress', () => {
   it('does not convene before the MEDIEVAL era', () => {
     const state = newGame(1);
     state.turn = CONGRESS_INTERVAL; // a session turn ...
-    state.diploFavor = 50;
+    playerSeat(state).diploFavor = 50;
     worldCongress(state);
     expect(state.congressSessions ?? 0).toBe(0); // ... but nobody is Medieval
-    expect(state.diploFavor).toBe(50); // favor untouched
+    expect(playerSeat(state).diploFavor).toBe(50); // favor untouched
   });
 
   it('convenes only on interval turns', () => {
@@ -63,12 +64,12 @@ describe('B-22 world congress', () => {
     const state = newGame(1);
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
-    state.diploFavor = 10;
+    playerSeat(state).diploFavor = 10;
     state.rivals[0].diploFavor = 40; // the rival outspends the player
     worldCongress(state);
     expect(state.rivals[0].diploPoints).toBe(DVP_PER_RESOLUTION);
-    expect(state.diploPoints ?? 0).toBe(0);
-    expect(state.diploFavor).toBe(0); // spent regardless of the outcome
+    expect(playerSeat(state).diploPoints ?? 0).toBe(0);
+    expect(playerSeat(state).diploFavor).toBe(0); // spent regardless of the outcome
     expect(state.rivals[0].diploFavor).toBe(0);
   });
 
@@ -76,10 +77,10 @@ describe('B-22 world congress', () => {
     const state = newGame(1);
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
-    state.diploFavor = 25;
+    playerSeat(state).diploFavor = 25;
     state.rivals[0].diploFavor = 25;
     worldCongress(state);
-    expect(state.diploPoints).toBe(DVP_PER_RESOLUTION);
+    expect(playerSeat(state).diploPoints).toBe(DVP_PER_RESOLUTION);
     expect(state.rivals[0].diploPoints ?? 0).toBe(0);
   });
 
@@ -87,11 +88,11 @@ describe('B-22 world congress', () => {
     const state = newGame(1);
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
-    state.diploFavor = 0;
+    playerSeat(state).diploFavor = 0;
     state.rivals[0].diploFavor = 0;
     worldCongress(state);
     expect(state.congressSessions).toBe(1); // the session still happened
-    expect(state.diploPoints ?? 0).toBe(0); // ... and awarded nothing
+    expect(playerSeat(state).diploPoints ?? 0).toBe(0); // ... and awarded nothing
     expect(state.rivals[0].diploPoints ?? 0).toBe(0);
   });
 
@@ -99,7 +100,7 @@ describe('B-22 world congress', () => {
     const state = newGame(1);
     state.rivals[0].research.techs.push('APPRENTICESHIP'); // only the rival
     state.turn = CONGRESS_INTERVAL;
-    state.diploFavor = 5;
+    playerSeat(state).diploFavor = 5;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
     expect(CONGRESS_MIN_ERA).toBe(2); // sourced: Medieval
@@ -109,7 +110,7 @@ describe('B-22 world congress', () => {
 describe('B-22/B-25 diplomatic victory', () => {
   it('20 points wins for the player (victoryType 9)', () => {
     const state = newGame(1);
-    state.diploPoints = DIPLO_VICTORY_POINTS;
+    playerSeat(state).diploPoints = DIPLO_VICTORY_POINTS;
     endTurn(state);
     expect(state.victoryType).toBe(9);
     expect(state.gameOver).toBe(true);
@@ -125,7 +126,7 @@ describe('B-22/B-25 diplomatic victory', () => {
 
   it('19 points is not a win — the bar is the full threshold', () => {
     const state = newGame(1);
-    state.diploPoints = DIPLO_VICTORY_POINTS - 1;
+    playerSeat(state).diploPoints = DIPLO_VICTORY_POINTS - 1;
     endTurn(state);
     expect(state.victoryType).not.toBe(9);
     expect(state.gameOver).toBe(false);
@@ -139,7 +140,7 @@ describe('B-22/B-25 diplomatic victory', () => {
     state.rivals[0].cultureTotal = 400;
     state.rivals[0].tourism = 0;
     // ... and on diplomacy
-    state.diploPoints = DIPLO_VICTORY_POINTS;
+    playerSeat(state).diploPoints = DIPLO_VICTORY_POINTS;
     endTurn(state);
     expect(state.victoryType).toBe(7); // culture ranks first
   });

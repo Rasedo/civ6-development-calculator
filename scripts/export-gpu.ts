@@ -130,6 +130,7 @@ import { tileYields, districtAdjacency } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance, WONDER_TOURISM_BASE } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow, traceColumnTables } from './gpu-trace';
+import { playerSeat } from '../src/core/seats';
 import { unitActionNames } from './gpu-actions';
 import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
@@ -1789,7 +1790,7 @@ for (let s = 0; s < N_SEEDS; s++) {
   for (let t = 0; t < N_TURNS; t++) {
     // Envoys: greedily back the neediest met city-state (fewest envoys,
     // ties to the lowest id) — the GPU scripted policy mirrors this.
-    while (state.envoysAvailable > 0 && state.cityStates.some((cs) => cs.met)) {
+    while (playerSeat(state).envoysAvailable > 0 && state.cityStates.some((cs) => cs.met)) {
       const pick = [...state.cityStates]
         .filter((cs) => cs.met)
         .sort((a, b) => a.envoys - b.envoys || a.id - b.id)[0];

@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar } from './seats';
+import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -1079,7 +1079,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
 export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalCity, plunder = true): void {
   // B-22 (#74): taking a rival's city earns the PLAYER grievances — the twin of
   // transferRivalCityToRival's RR_WARMONGER_CAPTURE on the rival side.
-  state.warmonger = (state.warmonger ?? 0) + RR_WARMONGER_CAPTURE;
+  playerSeat(state).warmonger = (playerSeat(state).warmonger ?? 0) + RR_WARMONGER_CAPTURE;
   rival.cities = rival.cities.filter((c) => c.id !== city.id);
   relocatePalace(rival.cities); // #70/S4 (A-9): the losing rival re-crowns its biggest city
   // A-11: routes die with their endpoint (the state.tradeRoutes twin).

@@ -4,6 +4,7 @@
  */
 
 import type { DistrictId, GameState, Tile, YieldKey, Yields } from '../core/types';
+import { playerSeat } from '../core/seats';
 import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
@@ -841,15 +842,15 @@ export function renderCityStatesPanel(container: HTMLElement, state: GameState, 
           <small class="muted">${cs.quest ? `Quest: ${questLabel(cs.quest)} (+1⚑)` : 'No active quest.'}</small>
           ${gain ? `<br><small>Next envoy: ${gain}</small>` : ''}
         </span>
-        <span>${levy}<button data-act="envoy" data-id="${cs.id}" ${state.envoysAvailable > 0 ? '' : 'disabled'}>+⚑</button></span>
+        <span>${levy}<button data-act="envoy" data-id="${cs.id}" ${playerSeat(state).envoysAvailable > 0 ? '' : 'disabled'}>+⚑</button></span>
       </div>`;
     })
     .join('');
 
   container.innerHTML = `
     <h2>City-states</h2>
-    <div class="row">Envoys available: <b>${state.envoysAvailable}</b> ·
-      Influence ${fmt(state.influencePoints)} / ${ENVOY_COST} <span class="muted">(+${perTurn}/turn)</span></div>
+    <div class="row">Envoys available: <b>${playerSeat(state).envoysAvailable}</b> ·
+      Influence ${fmt(playerSeat(state).influencePoints)} / ${ENVOY_COST} <span class="muted">(+${perTurn}/turn)</span></div>
     <div class="hint muted">1⚑: +2 type-yield in the capital. 3⚑: +2 in every matching district. 6⚑: +4. Suzerain at 3⚑ (trade type: +1 route capacity).</div>
     ${rows || '<div class="muted">None met yet — explore the map.</div>'}
     ${unmet > 0 ? `<div class="muted">${unmet} city-state${unmet === 1 ? '' : 's'} undiscovered.</div>` : ''}

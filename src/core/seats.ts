@@ -20,7 +20,7 @@
  * precedence), and the GPU exporter and all fixtures stay byte-identical.
  */
 
-import type { City, GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import type { City, GameState, RivalCity, RivalCiv, Seat, Tile, Unit } from './types';
 import { RESOURCES } from '../data/resources';
 
 /** The human/agent seat in the unified civ space. */
@@ -116,6 +116,18 @@ export const seatOfCityState = (csId: number, rivalCount: number): number => 1 +
 
 /** Barbarians act too. -1 keeps them sortable-last and distinct from every civ. */
 export const BARB_SEAT = -1;
+
+/** The PLAYER's seat. #51/S1.2: the player's own civ-level state lives here,
+ *  in exactly the shape a rival's does — read it through this, never as a
+ *  special case on GameState. */
+export function playerSeat(state: GameState): Seat {
+  return state.seats[PLAYER_CIV];
+}
+
+/** The seat record for any seat id (player or rival). */
+export function seatOf(state: GameState, seat: number): Seat | undefined {
+  return state.seats[seat];
+}
 
 /** The seat that owns this unit: 0 player, r+1 rival, BARB_SEAT barbarian. */
 export function unitSeat(u: { owner: Unit['owner']; civId?: number }): number {

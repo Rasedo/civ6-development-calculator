@@ -269,6 +269,10 @@ export interface GovernmentState {
 }
 
 export interface GameState {
+  /** #51/S1.2: every actor's own state, seat 0 = the player, r+1 = rival r.
+   *  `rivals` still holds the SAME OBJECTS as seats[1..] while the migration
+   *  proceeds field by field; it disappears once the last one has moved. */
+  seats: Seat[];
   /** GV-2: true once TURN_LIMIT turns are played (or a victory fires). */
   gameOver?: boolean;
   /** GV-4/GV-3/B-25: 0 none, 1 score (TURN_LIMIT), 2 domination (all
@@ -276,8 +280,6 @@ export interface GameState {
    *  the space race first). */
   victoryType?: number;
   /** B-15: player war-weariness accumulator (integer turn counter); the
-   *  empire-wide amenity penalty is warWearinessPenalty(this). */
-  warWeariness?: number;
   /** B-24 (task #68): per-era "historic moment" score, UNIFIED civ ids
    *  (0 = player, r+1 = rival r). Lazy — absent entries read 0. Resets at
    *  every ERA_LENGTH boundary (`eraBoundary`, core/eras.ts). */
@@ -303,19 +305,13 @@ export interface GameState {
    *  residuals, and the Culture VICTORY itself rides B-25. */
   tourismTotal?: number;
   /** B-22 (#75): the PLAYER's cumulative DIPLOMATIC FAVOR — the World Congress
-   *  currency. +government tier and +1 per suzerained city-state each turn. */
-  diploFavor?: number;
   /** B-22 (#76): World Congress sessions held so far (both engines count the
    *  same sessions; traced so parity proves the schedule). */
   congressSessions?: number;
-  /** B-22 (#76): the PLAYER's DIPLOMATIC VICTORY POINTS. 20 wins. */
-  diploPoints?: number;
   /** B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of
    *  RivalCiv.warmonger. Grows on declaring war and on taking a rival city,
    *  decays 1/turn while at peace with every rival. Past RR_WARMONGER_GANG a
    *  rival may declare on the player WITHOUT the usual strength advantage,
-   *  which is real Civ 6's gang-up-on-the-warmonger consequence. */
-  warmonger?: number;
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
@@ -382,10 +378,6 @@ export interface GameState {
   eventLog: string[];
   /** Independent city-states on the map ([] = none / feature off). */
   cityStates: CityState[];
-  /** Influence points accrued toward the next envoy. */
-  influencePoints: number;
-  /** Earned envoys waiting to be assigned to a met city-state. */
-  envoysAvailable: number;
   /** Scripted rival civilizations ([] = none / feature off). */
   rivals: RivalCiv[];
   /** Pantheon beliefs claimed by rivals (unavailable to the player). */
@@ -455,7 +447,33 @@ export interface RivalCity extends City {
 }
 
 /** A scripted rival empire: real map presence, real per-city economy. */
-export interface RivalCiv {
+/**
+ * #51/S1.2: a SEAT — one actor's own state, identical in shape whether that
+ * actor is the player or a rival. This is the "same class" the unification is
+ * for: code that reads a seat must not be able to tell which one it has.
+ *
+ * Being filled in batches, each proven byte-identical: the DIPLOMATIC block
+ * moved first. Every field is REQUIRED — `x?: number` plus `?? 0` at the read
+ * site is exactly what silently swallows a dropped field during a migration.
+ */
+export interface Seat {
+  /** 0 = the player, r+1 = rival r (the unified id space in core/seats.ts). */
+  seat: number;
+  /** Grievances others hold against this seat (B-22). */
+  warmonger: number;
+  /** Accumulated war weariness (B-15). */
+  warWeariness: number;
+  /** Cumulative diplomatic favor (B-22). */
+  diploFavor: number;
+  /** Diplomatic victory points (B-22). */
+  diploPoints: number;
+  /** Influence accrued toward the next envoy. */
+  influencePoints: number;
+  /** Envoys banked and not yet assigned. */
+  envoysAvailable: number;
+}
+
+export interface RivalCiv extends Seat {
   id: number;
   name: string;
   color: string;
@@ -490,17 +508,9 @@ export interface RivalCiv {
   alliedRivals?: number[];
   /** B-22 (2026-07-27): this civ's WARMONGER score (grievances). Grows on
    *  declaring war and taking cities, decays 1/turn at peace. Blocks
-   *  alliances and, past RR_WARMONGER_GANG, invites unprovoked war. */
-  warmonger?: number;
   /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
-   *  player's; feeds the same amenity penalty through rivalAmenityTiers. */
-  warWeariness?: number;
   /** B-20 (#71): this rival's cumulative TOURISM (the player's twin). */
   tourism?: number;
-  /** B-22 (#75): this rival's cumulative DIPLOMATIC FAVOR (the player's twin). */
-  diploFavor?: number;
-  /** B-22 (#76): this rival's DIPLOMATIC VICTORY POINTS (the player's twin). */
-  diploPoints?: number;
   /** B-25 (#72): this rival's cumulative LIFETIME CULTURE — the twin of the
    *  player's `cultureTotal`. Real Civ 6 derives DOMESTIC TOURISTS from
    *  lifetime culture, so the Culture victory cannot be judged without it;
@@ -515,10 +525,6 @@ export interface RivalCiv {
    *  a player city set `toPlayer` (player City id). `expiresTurn` is
    *  start + TRADE_ROUTE_DURATION (B-23 duration). */
   tradeRoutes?: { from: number; to?: number; toCs?: number; toPlayer?: number; expiresTurn?: number }[];
-  /** AUDIT A-12: this civ's influence accumulator + banked envoys — the
-   *  player's influencePoints/envoysAvailable twins. */
-  influencePoints?: number;
-  envoysAvailable?: number;
   /** Real tech/civic trees (C1-B3): same shape as the player's. */
   research: ResearchState;
 
