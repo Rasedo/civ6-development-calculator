@@ -987,7 +987,7 @@ export function renderGreatPeoplePanel(container: HTMLElement, state: GameState)
   const rows = GP_CLASSES.map((cls) => {
     const earned = greatPeopleEarned(state, cls);
     const people = GREAT_PEOPLE[cls];
-    const pts = state.greatPeople.points[cls] ?? 0;
+    const pts = playerSeat(state).gpp[cls] ?? 0;
     const next = people[earned];
     let status: string;
     if (!next) {
@@ -1004,7 +1004,7 @@ export function renderGreatPeoplePanel(container: HTMLElement, state: GameState)
     </div>`;
   }).join('');
 
-  const log = state.greatPeople.earned
+  const log = state.claimedGreatPeople
     .map((id) => {
       for (const cls of GP_CLASSES) {
         const p = GREAT_PEOPLE[cls].find((x) => x.id === id);

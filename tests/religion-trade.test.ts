@@ -63,7 +63,7 @@ describe('founding a religion', () => {
     expect(canFoundReligion(s2).ok).toBe(true); // sandbox waives the prophet
     s2.sandbox = false;
     expect(canFoundReligion(s2).ok).toBe(false);
-    s2.greatPeople.earned.push('GP_CONFUCIUS');
+    s2.claimedGreatPeople.push('GP_CONFUCIUS');
     expect(canFoundReligion(s2).ok).toBe(true);
   });
 
@@ -123,9 +123,9 @@ describe('founding a religion', () => {
     });
     state.sandbox = false;
     expect(canEnhanceReligion(state).ok).toBe(false); // no prophet yet
-    state.greatPeople.earned.push('GP_CONFUCIUS');
+    state.claimedGreatPeople.push('GP_CONFUCIUS');
     expect(canEnhanceReligion(state).ok).toBe(false); // only one
-    state.greatPeople.earned.push('GP_SIDDHARTHA');
+    state.claimedGreatPeople.push('GP_SIDDHARTHA');
     expect(canEnhanceReligion(state).ok).toBe(true); // second prophet
 
     // a rival already holding an enhancer excludes it from the pool

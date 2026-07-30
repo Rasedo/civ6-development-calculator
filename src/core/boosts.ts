@@ -66,9 +66,9 @@ function checkSatisfied(state: GameState, check: BoostCheck): boolean {
     case 'greatPeople': {
       if (check.class) {
         const ids = new Set(GREAT_PEOPLE[check.class].map((p) => p.id));
-        return state.greatPeople.earned.filter((id) => ids.has(id)).length >= check.count;
+        return state.claimedGreatPeople.filter((id) => ids.has(id)).length >= check.count;
       }
-      return state.greatPeople.earned.length >= check.count;
+      return state.claimedGreatPeople.length >= check.count;
     }
     case 'anyWonderBuilt':
       return state.map.tiles.some((t) => t.builtWonderComplete);
@@ -160,9 +160,9 @@ function rivalCheckSatisfied(state: GameState, rival: RivalCiv, check: BoostChec
     case 'greatPeople': {
       if (check.class) {
         const ids = new Set(GREAT_PEOPLE[check.class].map((p) => p.id));
-        return state.greatPeople.earned.filter((id) => ids.has(id)).length >= check.count;
+        return state.claimedGreatPeople.filter((id) => ids.has(id)).length >= check.count;
       }
-      return state.greatPeople.earned.length >= check.count;
+      return state.claimedGreatPeople.length >= check.count;
     }
     case 'anyWonderBuilt':
       return state.map.tiles.some((t) => t.builtWonderComplete);

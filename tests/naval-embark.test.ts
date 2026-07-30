@@ -56,6 +56,7 @@ function addWarRival(state: GameState, col: number, row: number, techs: string[]
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [...techs], civics: [], boosted: [] },
     gpp: {},
+    gpEarned: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   // A minimal off-map "home" so the rival is a real civ; the war-march targets
@@ -237,6 +238,7 @@ function bareRival(state: GameState, atWar = true): RivalCiv {
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
+    gpEarned: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     bestMeleeCS: 0,
   };

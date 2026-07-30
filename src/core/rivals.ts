@@ -114,7 +114,7 @@ import {
   RIVAL_ENGINEER_LIVE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -288,6 +288,7 @@ export function placeRivals(state: GameState, count?: number): void {
       spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
+      gpEarned: [],
       religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     };
     foundRivalCity(state, rival, tile);
@@ -888,7 +889,7 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
     // RIVAL's own streams (research progress, treasury, faith, capital
     // production), exactly like applyGreatPersonEffect.
     let pts = rival.gpp[cls] ?? 0;
-    let earned = state.greatPeople.earned.filter((id) =>
+    let earned = state.claimedGreatPeople.filter((id) =>
       GREAT_PEOPLE[cls].some((p) => p.id === id),
     ).length;
     while (earned < GREAT_PEOPLE[cls].length && pts >= gpCost(earned)) {
@@ -921,7 +922,6 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
         const cap = rival.cities.find((c) => c.isCapital);
         if (cap && cap.queue.length > 0) cap.queue[0].progress += fx.productionToCapital;
       }
-      if (cls === 'PROPHET') rival.prophets = (rival.prophets ?? 0) + 1;
       // B7-G (B-8): a GENERAL/ADMIRAL claim spawns its support unit (civilian,
       // 4 MP) at the rival's capital — same instant-effect-plus-spawn as the
       // player's applyGreatPersonEffect. Zero RNG.
@@ -929,7 +929,8 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
         const cap = rival.cities.find((c) => c.isCapital);
         if (cap) spawnUnit(state, cls, cap.centerIndex, 'rival', rival.id);
       }
-      state.greatPeople.earned.push(person.id); // gone from the shared pool
+      state.claimedGreatPeople.push(person.id); // gone from the shared pool
+      rival.gpEarned.push(person.id); // ...and recorded as THIS seat's recruit
       addEraScore(state, civOfRival(rival.id), ERA_SCORE_GP); // B-24: per earn
       state.eventLog.push(`${rival.name} claimed ${person.name}.`);
       earned++;
@@ -962,7 +963,7 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
   if (
     !rival.religion.founded &&
     rival.religion.pantheon !== null &&
-    (rival.prophets ?? 0) > 0 &&
+    prophetsOf(rival) > 0 &&
     rival.cities.some((rc) =>
       rc.districts.some((d) => d.type === 'HOLY_SITE' && state.map.tiles[d.tileIndex].districtComplete),
     )
@@ -994,7 +995,7 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
   // The draw sits AFTER the founder draw with the same UNCONDITIONAL shape the
   // GPU's _next_random(eopen) mirrors — only the outcome gates on pool + state.
   // Effects are all inert this round; the identity applies via getRivalModifiers.
-  if (rival.religion.founded && rival.religion.enhancer == null && (rival.prophets ?? 0) >= 2) {
+  if (rival.religion.founded && rival.religion.enhancer == null && prophetsOf(rival) >= 2) {
     const enhancers = Object.keys(ENHANCER_BELIEFS).filter(
       (id) => id !== playerSeat(state).religion.enhancer && !(state.claimedEnhancers ?? []).includes(id),
     );

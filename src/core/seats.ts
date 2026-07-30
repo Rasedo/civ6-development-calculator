@@ -22,6 +22,7 @@
 
 import type { City, GameState, RivalCity, RivalCiv, Seat, Tile, Unit } from './types';
 import { RESOURCES } from '../data/resources';
+import { GREAT_PEOPLE } from '../data/greatPeople';
 
 /** The human/agent seat in the unified civ space. */
 export const PLAYER_CIV = 0;
@@ -116,6 +117,18 @@ export const seatOfCityState = (csId: number, rivalCount: number): number => 1 +
 
 /** Barbarians act too. -1 keeps them sortable-last and distinct from every civ. */
 export const BARB_SEAT = -1;
+
+/**
+ * #51/S1.2f: how many PROPHET-class great people this seat recruited.
+ *
+ * Was `RivalCiv.prophets`, a shadow counter that existed only because the one
+ * shared `earned` array could not answer "how many did I get?". Now that every
+ * seat records its own recruits, it is derived — and the player can answer the
+ * same question, which it never could.
+ */
+export function prophetsOf(seat: Seat): number {
+  return seat.gpEarned.filter((id) => GREAT_PEOPLE.PROPHET.some((p) => p.id === id)).length;
+}
 
 /** The PLAYER's seat. #51/S1.2: the player's own civ-level state lives here,
  *  in exactly the shape a rival's does — read it through this, never as a

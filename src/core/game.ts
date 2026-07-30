@@ -111,7 +111,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     nextCityId: 0,
     turn: 1,
     sandbox,
-    greatPeople: { points: {}, earned: [] },
+    claimedGreatPeople: [],
     tradeRoutes: [],
     settlers: 0,
     buildersTrained: 0, // P4/D-10
@@ -136,7 +136,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null } }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] }],
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -430,7 +430,7 @@ function completeProject(state: GameState, city: City, projectId: string, cost: 
   if (classes.length) {
     const pts = Math.round(cost * gppFractionOf(def));
     for (const gc of classes) {
-      state.greatPeople.points[gc] = (state.greatPeople.points[gc] ?? 0) + pts;
+      playerSeat(state).gpp[gc] = (playerSeat(state).gpp[gc] ?? 0) + pts;
     }
     if (!def.yield) state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${classes.join('/')} points.`);
   }
@@ -1140,7 +1140,7 @@ export function greatPersonPointsPerTurn(state: GameState): Record<GreatPersonCl
 
 /** Number of people of a class already earned. */
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
-  return state.greatPeople.earned.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
+  return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
 }
 
 function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
@@ -1183,7 +1183,8 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
     const capital = state.cities.find((c) => c.isCapital);
     if (capital) spawnUnit(state, cls, capital.centerIndex, 'player');
   }
-  state.greatPeople.earned.push(person.id);
+  state.claimedGreatPeople.push(person.id); // gone from the global pool...
+  playerSeat(state).gpEarned.push(person.id); // ...and recorded as the PLAYER's recruit (S1.2f)
   addEraScore(state, 0, ERA_SCORE_GP); // B-24: Great Person moment (per earn, the GPU claim-delta mirror)
 }
 
@@ -1268,15 +1269,15 @@ function spreadReligiousPressure(state: GameState): void {
 function advanceGreatPeople(state: GameState): void {
   const perTurn = greatPersonPointsPerTurn(state);
   for (const cls of GP_CLASSES) {
-    if (perTurn[cls] === 0 && (state.greatPeople.points[cls] ?? 0) === 0) continue;
-    let pts = (state.greatPeople.points[cls] ?? 0) + perTurn[cls];
+    if (perTurn[cls] === 0 && (playerSeat(state).gpp[cls] ?? 0) === 0) continue;
+    let pts = (playerSeat(state).gpp[cls] ?? 0) + perTurn[cls];
     let earned = greatPeopleEarned(state, cls);
     while (earned < GREAT_PEOPLE[cls].length && pts >= gpCost(earned)) {
       pts -= gpCost(earned);
       applyGreatPersonEffect(state, cls);
       earned++;
     }
-    state.greatPeople.points[cls] = pts;
+    playerSeat(state).gpp[cls] = pts;
   }
 }
 
@@ -1304,13 +1305,13 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null } },
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] },
     ...(state.rivals ?? []),
   ];
   playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
   playerSeat(state).research.boosted ??= [];
   playerSeat(state).government ??= { current: null, policies: [] };
-  state.greatPeople ??= { points: {}, earned: [] };
+  state.claimedGreatPeople ??= [];
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
     t.wonder ??= null;
     t.builtWonder ??= null;

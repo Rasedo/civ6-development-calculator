@@ -142,7 +142,7 @@ describe('great people', () => {
     const turns = Math.ceil(gpCost(0) / 2);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(1);
-    expect(state.greatPeople.earned[0]).toBe('GP_ARYABHATA');
+    expect(state.claimedGreatPeople[0]).toBe('GP_ARYABHATA');
     // +50 science landed somewhere in tech progress (research also ticked normally)
     expect(playerSeat(state).research.techProgress + 1e-9).toBeGreaterThanOrEqual(before);
   });

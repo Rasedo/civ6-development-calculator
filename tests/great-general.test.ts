@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit, unitDomain, trainableUnits } from '../src/core/units';
@@ -134,7 +135,7 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
   it('a player GENERAL claim spawns a general civilian at the capital', () => {
     const state = newGame();
     // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
-    state.greatPeople.points.GENERAL = gpCost(0);
+    playerSeat(state).gpp.GENERAL = gpCost(0);
     const before = state.units.filter((u) => u.owner === 'player' && u.type === 'GENERAL').length;
     endTurn(state);
     const after = state.units.filter((u) => u.owner === 'player' && u.type === 'GENERAL');

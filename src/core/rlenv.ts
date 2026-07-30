@@ -858,7 +858,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     s.explored.length > 0 ? s.explored.filter((e) => e === 1).length / s.explored.length : 1;
   let gpProgress = 0;
   for (const cls of GP_CLASSES) {
-    const pts = s.greatPeople.points[cls] ?? 0;
+    const pts = playerSeat(s).gpp[cls] ?? 0;
     gpProgress = Math.max(gpProgress, pts / gpCost(greatPeopleEarned(s, cls)));
   }
   const slots = playerSeat(s).government.current ? governmentSlots(s) : [];

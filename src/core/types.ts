@@ -316,11 +316,12 @@ export interface GameState {
   turn: number;
   /** Sandbox: districts/buildings complete instantly, cost nothing, and ignore tech gating. */
   sandbox: boolean;
-  greatPeople: {
-    points: Partial<Record<GreatPersonClass, number>>;
-    /** Ids of great people already earned (in claim order). */
-    earned: string[];
-  };
+  /** Great-person ids already recruited BY ANYONE, in claim order. Real Civ 6
+   *  great people are unique individuals taken in a fixed order, so the denial
+   *  set is genuinely global — it belongs beside claimedPantheons/Beliefs/
+   *  Enhancers, not on a seat. Each seat records its OWN recruits in
+   *  `Seat.gpEarned`. (S1.2f) */
+  claimedGreatPeople: string[];
   tradeRoutes: TradeRoute[];
   /** Trained settlers waiting to found a city (first city needs none). */
   settlers: number;
@@ -497,6 +498,14 @@ export interface Seat {
    * `enhancerClaimed === (enhancer != null)` were already invariants.
    */
   religion: ReligionState;
+  /** Great-person points per class. The player kept these under
+   *  `greatPeople.points` and a rival under `gpp`; one name now. (S1.2f) */
+  gpp: Partial<Record<GreatPersonClass, number>>;
+  /** Great-person ids THIS seat recruited. New information: previously only the
+   *  global list existed, which is why `RivalCiv.prophets` had to exist as a
+   *  shadow counter — the shared array could not answer "how many did I get?".
+   *  `prophets` is now derived from this and is gone. */
+  gpEarned: string[];
 }
 
 export interface RivalCiv extends Seat {
@@ -548,8 +557,6 @@ export interface RivalCiv extends Seat {
   tradeRoutes?: { from: number; to?: number; toCs?: number; toPlayer?: number; expiresTurn?: number }[];
   /** Real tech/civic trees (C1-B3): same shape as the player's. */
 
-  /** Great-person race points per class. */
-  gpp: Partial<Record<GreatPersonClass, number>>;
   /** AUDIT A-7: the CLAIMED belief identities — effects apply to this civ
    * (previously denial-only: picks joined the global pools and were
    * forgotten). Optional for old saves; unset until claimed/founded. */
@@ -560,8 +567,6 @@ export interface RivalCiv extends Seat {
    * source of its religion's pressure spread (mirror of ReligionState.holyTile). */
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   /** P5/S5 (C-17): banked faith — the pantheon's consumer. */
-  /** P5/S5 (C-16): PROPHET-class great people this civ claimed (religion gate). */
-  prophets?: number;
   /** P4/D-10: this civ's builders ever trained (its own cost escalator). */
   buildersTrained?: number;
   /** P4/D-22: this civ's strongest melee unit ever fielded (city defense). */

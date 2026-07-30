@@ -56,6 +56,7 @@ function addRival(state: GameState, id: number, atWar: boolean): RivalCiv {
     peaceTurns: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
+    gpEarned: [],
   } as unknown as RivalCiv;
   state.rivals.push(rival);
   return rival;

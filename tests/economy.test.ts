@@ -221,7 +221,7 @@ describe('district projects', () => {
     expect(city.queue.length).toBe(0);
     expect(playerSeat(state).scienceTotal - sciBefore).toBeGreaterThanOrEqual(lump);
     expect(playerSeat(state).research.techProgress).toBeGreaterThanOrEqual(lump);
-    expect(state.greatPeople.points.SCIENTIST ?? 0).toBeGreaterThanOrEqual(gpp);
+    expect(playerSeat(state).gpp.SCIENTIST ?? 0).toBeGreaterThanOrEqual(gpp);
     expect(state.eventLog.some((e) => e.includes('Research Grants'))).toBe(true);
 
     // Repeatable: nothing stops you queueing it again.
@@ -236,7 +236,7 @@ describe('district projects', () => {
     const cost = itemCost(city.queue[0]);
     city.queue[0].progress = cost;
     endTurn(state);
-    expect(state.greatPeople.points.GENERAL ?? 0).toBeGreaterThanOrEqual(
+    expect(playerSeat(state).gpp.GENERAL ?? 0).toBeGreaterThanOrEqual(
       Math.round(cost * PROJECT_GPP_FRACTION),
     );
     // No yield lump. #79: this used to compare the treasury delta against
@@ -247,8 +247,8 @@ describe('district projects', () => {
     // invariant instead: TRAINING carries no yield by construction, and no
     // other GP class moves.
     expect(PROJECTS.TRAINING.yield).toBeNull();
-    expect(state.greatPeople.points.SCIENTIST ?? 0).toBe(0);
-    expect(state.greatPeople.points.ARTIST ?? 0).toBe(0);
+    expect(playerSeat(state).gpp.SCIENTIST ?? 0).toBe(0);
+    expect(playerSeat(state).gpp.ARTIST ?? 0).toBe(0);
   });
 
   // #79: the Festival is the ONE multi-class project. Real Civ 6 pays Great
@@ -265,7 +265,7 @@ describe('district projects', () => {
     const cc = foundAt(control, 5, 5);
     addDistrict(control, cc, 'THEATER_SQUARE', 6, 5);
     endTurn(control);
-    const base = control.greatPeople.points.WRITER ?? 0;
+    const base = playerSeat(control).gpp.WRITER ?? 0;
 
     const state = makeState();
     const city = foundAt(state, 5, 5);
@@ -278,14 +278,14 @@ describe('district projects', () => {
 
     const each = Math.round(cost * 0.11);
     expect(each).toBeGreaterThan(0);
-    expect((state.greatPeople.points.WRITER ?? 0) - base).toBe(each);
-    expect((state.greatPeople.points.ARTIST ?? 0) - base).toBe(each);
-    expect((state.greatPeople.points.MUSICIAN ?? 0) - base).toBe(each);
+    expect((playerSeat(state).gpp.WRITER ?? 0) - base).toBe(each);
+    expect((playerSeat(state).gpp.ARTIST ?? 0) - base).toBe(each);
+    expect((playerSeat(state).gpp.MUSICIAN ?? 0) - base).toBe(each);
     // ... at the Festival's OWN rate, not the single-class 22%
     expect(each).not.toBe(Math.round(cost * PROJECT_GPP_FRACTION));
     // ... and no unrelated class is paid
-    expect(state.greatPeople.points.SCIENTIST ?? 0).toBe(0);
-    expect(state.greatPeople.points.PROPHET ?? 0).toBe(0);
+    expect(playerSeat(state).gpp.SCIENTIST ?? 0).toBe(0);
+    expect(playerSeat(state).gpp.PROPHET ?? 0).toBe(0);
   });
 
   it('are refused in sandbox mode', () => {
