@@ -6437,28 +6437,16 @@ class BatchSim:
                 kr = civk.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[kr]
                 ct = tc[kr]
-                cap_type = self.v_type[kr, ks]
-                cap_hp = self.v_hp[kr, ks]
-                cap_ch = self.v_charges[kr, ks]
-                cap_emb = self.v_emb[kr, ks]  # #45/B-6: read BEFORE despawn
-                cap_xp = self.v_xp[kr, ks]  # B-4: read BEFORE despawn (civilian xp 0, but carry it)
                 self.v_alive[kr, ks] = False
                 self.rvciv_at[kr, ct] = -1
-                self.occ_civ[(kr, ct)] = -1  # #51/S3.4b
                 nslot = self.p_next[kr]
                 assert int(nslot.max()) < P_MAX, "player slot pool exhausted — raise P_MAX"
                 self.p_alive[kr, nslot] = True
-                self.p_type[kr, nslot] = cap_type
                 self.p_tile[kr, nslot] = ct
-                self.p_hp[kr, nslot] = cap_hp
-                self.p_charges[kr, nslot] = cap_ch
-                self.p_fortify[kr, nslot] = 0  # B-5: a civilian never fortifies
-                self.p_xp[kr, nslot] = cap_xp  # B-4: ownership transfer carries xp
-                self.p_aura_mp[kr, nslot] = 0  # #70/S3 (B-8): a captured CIVILIAN never auras (and movesLeft = 0 anyway)
-                self.p_emb[kr, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
-                self.p_acted[kr, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
+                self.p_seat[kr, nslot] = PLAYER_SEAT
+                self._carry_capture(kr, ks + self.POOL_LO["v"], nslot + self.POOL_LO["p"])
                 self.pciv_at[kr, ct] = nslot
-                self.occ_civ[(kr, ct)] = nslot  # #51/S3.4b
+                self.occ_civ[(kr, ct)] = nslot + self.POOL_LO["p"]  # #51/S3.4b
                 self.p_next[kr] += 1
                 self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
                 self.p_acted[:, p] = self.p_acted[:, p] | civk  # P4/D-2: TS meleeAttack spends MP
@@ -10577,30 +10565,17 @@ class BatchSim:
                 # carried; movesLeft=0 -> v_acted so the D-2 heal skips it,
                 # exactly like TS's defender.movesLeft = 0.
                 ct = ttc[rows]
-                cap_type = self.p_type[rows, ds]
-                cap_hp = self.p_hp[rows, ds]
-                cap_ch = self.p_charges[rows, ds]
-                cap_emb = self.p_emb[rows, ds]  # #45/B-6: read BEFORE despawn
-                cap_xp = self.p_xp[rows, ds]  # B-4: read BEFORE despawn (civilian xp 0, but carry it)
                 self.pciv_at[rows, ct] = -1
-                self.occ_civ[(rows, ct)] = -1  # #51/S3.4b
                 self.p_alive[rows, ds] = False
                 nslot = self.v_next[rows]
                 assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
                 self.v_alive[rows, nslot] = True
                 self.v_civ[rows, nslot] = self.v_civ[rows, u]
                 self.v_seat[rows, nslot] = self.v_seat[rows, u]  # #51/S3.3: the capture carries the seat
-                self.v_type[rows, nslot] = cap_type
                 self.v_tile[rows, nslot] = ct
-                self.v_hp[rows, nslot] = cap_hp
-                self.v_charges[rows, nslot] = cap_ch
-                self.v_fortify[rows, nslot] = 0  # B-5: a civilian never fortifies
-                self.v_xp[rows, nslot] = cap_xp  # B-4: ownership transfer carries xp
-                self.v_aura_mp[rows, nslot] = 0  # #70/S3 (B-8): a captured CIVILIAN never auras
-                self.v_emb[rows, nslot] = cap_emb  # #45/B-6: captured unit KEEPS embarked under new owner
-                self.v_acted[rows, nslot] = True  # movesLeft = 0 (blocks the D-2 heal)
+                self._carry_capture(rows, ds + self.POOL_LO["p"], nslot + self.POOL_LO["v"])
                 self.rvciv_at[rows, ct] = nslot
-                self.occ_civ[(rows, ct)] = nslot + P_MAX  # #51/S3.4b
+                self.occ_civ[(rows, ct)] = nslot + self.POOL_LO["v"]  # #51/S3.4b
                 self.v_next[rows] += 1
             else:
                 self.pciv_at[rows, ttc[rows]] = -1
@@ -10615,30 +10590,17 @@ class BatchSim:
                 # (B-31 symmetric) — despawn the old slot, respawn at POOL END
                 # under the attacker's civ; hp/charges/xp/embark kept, moves 0.
                 ct = ttc[rows]
-                cap_type = self.v_type[rows, ds]
-                cap_hp = self.v_hp[rows, ds]
-                cap_ch = self.v_charges[rows, ds]
-                cap_emb = self.v_emb[rows, ds]
-                cap_xp = self.v_xp[rows, ds]
                 self.rvciv_at[rows, ct] = -1
-                self.occ_civ[(rows, ct)] = -1  # #51/S3.4b
                 self.v_alive[rows, ds] = False
                 nslot = self.v_next[rows]
                 assert int(nslot.max()) < U_MAX, "rival slot pool exhausted — raise U_MAX"
                 self.v_alive[rows, nslot] = True
                 self.v_civ[rows, nslot] = self.v_civ[rows, u]
                 self.v_seat[rows, nslot] = self.v_seat[rows, u]  # #51/S3.3: the capture carries the seat
-                self.v_type[rows, nslot] = cap_type
                 self.v_tile[rows, nslot] = ct
-                self.v_hp[rows, nslot] = cap_hp
-                self.v_charges[rows, nslot] = cap_ch
-                self.v_fortify[rows, nslot] = 0
-                self.v_xp[rows, nslot] = cap_xp
-                self.v_aura_mp[rows, nslot] = 0  # #70/S3 (B-8): a captured CIVILIAN never auras
-                self.v_emb[rows, nslot] = cap_emb
-                self.v_acted[rows, nslot] = True
+                self._carry_capture(rows, ds + self.POOL_LO["v"], nslot + self.POOL_LO["v"])
                 self.rvciv_at[rows, ct] = nslot
-                self.occ_civ[(rows, ct)] = nslot + P_MAX  # #51/S3.4b
+                self.occ_civ[(rows, ct)] = nslot + self.POOL_LO["v"]  # #51/S3.4b
                 self.v_next[rows] += 1
             else:
                 # C1-B5b: a barbarian kills a lone rival civilian roll-free.
@@ -14234,6 +14196,29 @@ class BatchSim:
                         self.builders_trained.add_((can & (utp == self._builder_idx)).long())
 
     # --- one full turn -----------------------------------------------------------
+
+    #: #51/S3.3: every per-slot plane a captured unit must carry. This list
+    #: exists so a NEW plane cannot be silently forgotten by a capture — the
+    #: exact failure mode that lost relics on a city transfer (rGScore1) and
+    #: left ART/RELICS behind a compaction (_RC_SLOT_FIELDS). Ownership-reset
+    #: planes are named separately below rather than copied.
+    _CAPTURE_CARRY = ("type", "hp", "charges", "emb", "xp")
+    #: Reset on an ownership change: a captured civilian never fortifies, never
+    #: auras, and has movesLeft = 0 (acted) so the D-2 heal skips it this turn.
+    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "acted": True}
+
+    def _carry_capture(self, rows: torch.Tensor, src: torch.Tensor, dst: torch.Tensor) -> None:
+        """Move a unit's per-slot state from MERGED slot `src` to `dst`.
+
+        One loop over _CAPTURE_CARRY instead of a hand-written block per
+        capture path. Reads are taken BEFORE any write, so src and dst may be
+        in the same pool.
+        """
+        vals = {k: getattr(self, f"unit_{k}")[rows, src].clone() for k in self._CAPTURE_CARRY}
+        for k, v in vals.items():
+            getattr(self, f"unit_{k}")[rows, dst] = v
+        for k, v in self._CAPTURE_RESET.items():
+            getattr(self, f"unit_{k}")[rows, dst] = v
 
     def _reclaim_pool(self, prefix: str) -> None:
         """P7 (C-3, the G-S cliff): stable compaction of a unit pool when
