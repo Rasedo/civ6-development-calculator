@@ -7368,7 +7368,7 @@ class BatchSim:
                 # to a hostile (player OR rival) non-embarked military halts the
                 # barb (mp := 0), mirroring hostileUnitAct's per-step inEnemyZoc
                 # check now that barbs obey ZOC. No new draws (pure geometry).
-                zoc = mv & self._in_enemy_zoc_barb(cur)
+                zoc = mv & self._in_enemy_zoc(cur, BARB_SEAT)
                 mp = torch.where(zoc, torch.zeros_like(mp), mp)
                 moving = mv & (mp > 0)
 
@@ -8417,7 +8417,7 @@ class BatchSim:
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: the builder (a civilian mover) halts adjacent to a
                 # hostile military unit too — only the EXERTER must be military.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r], torch.full((self.B,), r, dtype=torch.long, device=self.device)), torch.zeros_like(mp), mp)
+                mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
@@ -8708,7 +8708,7 @@ class BatchSim:
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile
                 # military unit — only the EXERTER must be military.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r], torch.full((self.B,), r, dtype=torch.long, device=self.device)), torch.zeros_like(mp), mp)
+                mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > 1)
@@ -8796,7 +8796,7 @@ class BatchSim:
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile military unit.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, self.r_atwar[:, r], torch.full((self.B,), r, dtype=torch.long, device=self.device)), torch.zeros_like(mp), mp)
+                mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > rng)
@@ -10694,22 +10694,47 @@ class BatchSim:
             d = d + 4 * (self.improvement[bidx, tiles] == self.FORT).long()
         return d
 
-    def _in_enemy_zoc(self, dest: torch.Tensor, atwar: torch.Tensor, mover_civ: torch.Tensor | None = None) -> torch.Tensor:
-        """B-3 ZOC (mirrors units.inEnemyZoc for a RIVAL mover): does `dest`
-        sit adjacent to a MILITARY unit hostile to the mover? Barbarians exert
-        it always; player military only while that mover's civ is at war.
-        A-19/B-33 (S2): when `mover_civ` [B] (the mover's rival civ) is given,
-        an enemy AT-WAR rival's military also exerts ZOC on this mover. [B]->[B]."""
-        # #45/B-6: EMBARKED player military exert NO ZOC (barbs never embark).
+    def _in_enemy_zoc(self, dest: torch.Tensor, seat) -> torch.Tensor:
+        """B-3 ZOC (mirrors units.inEnemyZoc): does `dest` sit adjacent to a
+        MILITARY unit hostile to a mover of `seat`? [B] -> [B].
+
+        #51/S3.4: ONE function for every mover. There were two, and the split
+        was not a difference in the RULE — both ask "is an adjacent
+        non-embarked military unit hostile to me?" — it was a difference in
+        who could answer it. The barbarian copy hardcoded "hostile to every
+        non-barb"; the rival copy took an `atwar` vector plus an optional
+        `mover_civ` and rebuilt the rival-vs-rival test by hand.
+
+        Hostility is unitsHostile, exactly: barbarians are hostile to every
+        non-barbarian and vice versa; otherwise it is civsAtWar(seat, other).
+
+        #45/B-6: EMBARKED military exert NO ZOC (barbarians never embark)."""
         pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
-        hostmil = (self.barb_at >= 0) | (pmil_exert & atwar.unsqueeze(1))
-        if mover_civ is not None:
-            rmil_exert = (self.rv_at >= 0) & ~self.v_emb.gather(1, self.rv_at.clamp(min=0))
-            rmil_civ = torch.where(self.rv_at >= 0, self.v_civ.gather(1, self.rv_at.clamp(min=0)), torch.full_like(self.rv_at, -1))  # [B, T]
-            mc = mover_civ.clamp(min=0).unsqueeze(1)  # [B, 1]
-            bidxT = torch.arange(self.B, device=self.device).unsqueeze(1)
-            war_t = self.rr_war[bidxT, mc, rmil_civ.clamp(min=0)]  # [B, T]
-            hostmil = hostmil | (rmil_exert & (rmil_civ != mover_civ.unsqueeze(1)) & war_t)
+        rmil_exert = (self.rv_at >= 0) & ~self.v_emb.gather(1, self.rv_at.clamp(min=0))
+        barb_here = self.barb_at >= 0
+
+        if not torch.is_tensor(seat) and seat == BARB_SEAT:
+            # A barb is hostile to every non-barb, and to no other barb.
+            hostmil = pmil_exert | rmil_exert
+            dn = self.neigh[dest.clamp(min=0)]
+            return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
+
+        # A civ mover: barbarians always exert; the player and other rivals
+        # exert only while at war with this seat.
+        mover_civ = seat - 1 if torch.is_tensor(seat) else torch.full(
+            (self.B,), seat - 1, dtype=torch.long, device=self.device
+        )
+        atwar = self.r_atwar.gather(1, mover_civ.clamp(min=0).unsqueeze(1)).squeeze(1)
+        hostmil = barb_here | (pmil_exert & atwar.unsqueeze(1))
+        rmil_civ = torch.where(
+            self.rv_at >= 0,
+            self.v_civ.gather(1, self.rv_at.clamp(min=0)),
+            torch.full_like(self.rv_at, -1),
+        )  # [B, T]
+        mc = mover_civ.clamp(min=0).unsqueeze(1)  # [B, 1]
+        bidxT = torch.arange(self.B, device=self.device).unsqueeze(1)
+        war_t = self.rr_war[bidxT, mc, rmil_civ.clamp(min=0)]  # [B, T]
+        hostmil = hostmil | (rmil_exert & (rmil_civ != mover_civ.unsqueeze(1)) & war_t)
         dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
         return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
 
@@ -10725,19 +10750,6 @@ class BatchSim:
         war_m = (self.rv_at >= 0) & (rvm_civ != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rvm_civ.clamp(min=0)]
         war_c = (self.rvciv_at >= 0) & (rvc_civ != ac.unsqueeze(1)) & self.rr_war[bidxT, ac.unsqueeze(1), rvc_civ.clamp(min=0)]
         return war_m, war_c
-
-    def _in_enemy_zoc_barb(self, dest: torch.Tensor) -> torch.Tensor:
-        """AUDIT B-26/B-3 (ROUND B10) ZOC for a BARBARIAN mover — mirrors
-        inEnemyZoc via unitsHostile: a barb is hostile to every non-barb, so
-        any adjacent NON-EMBARKED PLAYER or RIVAL military halts it (player
-        always, rivals always — barbs raid rivals too, C-4a; no at-war gate).
-        Other barbs exert nothing. [B]->[B]."""
-        # #45/B-6: embarked military exert no ZOC (barbs never embark).
-        pmil_exert = (self.pmil_at >= 0) & ~self.p_emb.gather(1, self.pmil_at.clamp(min=0))
-        rmil_exert = (self.rv_at >= 0) & ~self.v_emb.gather(1, self.rv_at.clamp(min=0))
-        hostmil = pmil_exert | rmil_exert
-        dn = self.neigh[dest.clamp(min=0)]  # [B, 6] neighbor tile indices
-        return ((dn >= 0) & hostmil.gather(1, dn.clamp(min=0))).any(dim=1)
 
     def _rival_unit_war_act(self, v: int, act: torch.Tensor) -> None:
         """hostileUnitAct for an at-war rival unit: attack the lowest-index
@@ -11030,7 +11042,6 @@ class BatchSim:
         # default "any unit blocks" — an at-war rival MILITARY unit must be able to stack onto
         # its OWN-civ civilian (Civ 6 cross-domain), matching TS tileFreeForUnit; else it detours.
         arange6 = torch.arange(6, device=dev)
-        aw = self.r_atwar.gather(1, self.v_civ[:, v].clamp(min=0).unsqueeze(1)).squeeze(1)  # B-3: player-mil ZOC only at war
         # #45/B-6 EMBARK: the ONLY walker whose passability changes v1 — a land
         # unit may take WATER steps (embark) when `_embark_live`. INERT by
         # default (mirrors TS embarkState.live) so the gates are byte-identical.
@@ -11116,7 +11127,7 @@ class BatchSim:
                 emb = torch.where(mv, to_water & ~is_naval, emb)  # embarked ⟺ on a water tile
             # B-3 ZOC: a march step ending adjacent to a hostile military unit
             # halts (movesLeft:=0 after paying the enter cost above).
-            mp = torch.where(mv & self._in_enemy_zoc(dest, aw, self.v_civ[:, v]), torch.zeros_like(mp), mp)
+            mp = torch.where(mv & self._in_enemy_zoc(dest, self.v_seat[:, v]), torch.zeros_like(mp), mp)
             d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
@@ -11525,7 +11536,6 @@ class BatchSim:
         # charge; a full-MP unit always affords its first step.
         arange6 = torch.arange(6, device=dev)
         perm_t = torch.tensor(PATROL_DIR_PERM, device=dev, dtype=torch.long)
-        aw = self.r_atwar.gather(1, self.v_civ[:, v].clamp(min=0).unsqueeze(1)).squeeze(1)  # B-3 (False at peace)
         # #45/B-6: the peace-act mirror of the war-march embark handling — a
         # NAVAL galley patrols on water; an EMBARKED land unit that survived a
         # war-march into a peace turn comes home coherently (EMBARK_MOVES pool +
@@ -11614,7 +11624,7 @@ class BatchSim:
                 emb = torch.where(mv, to_water & ~is_naval_p, emb)  # embarked ⟺ on a water tile
             # B-3 ZOC: a patrol step adjacent to a hostile military unit halts
             # (at peace only barbarians exert it — aw is False here).
-            mp = torch.where(mv & self._in_enemy_zoc(dest, aw, self.v_civ[:, v]), torch.zeros_like(mp), mp)
+            mp = torch.where(mv & self._in_enemy_zoc(dest, self.v_seat[:, v]), torch.zeros_like(mp), mp)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
         if self._embark_live:
