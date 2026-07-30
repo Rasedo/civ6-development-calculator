@@ -482,15 +482,78 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
  * flat EMBARK_MOVES pool. In N1 findPath never routes a LAND unit through water
  * (unitPassable is land-only for them) so this is inert here and exercised only
  * by the war-march; it is left correct for naval/embark movers that N2 adds. */
+/** What the movement-point contract did with one step. */
+export type StepOutcome =
+  /** Took the step and has MP left. */
+  | 'moved'
+  /** Took the step; MP is now spent (ZOC halt or the pool ran out). */
+  | 'halted'
+  /** Did not move — not enough MP. The step is still legal next turn. */
+  | 'cantAfford'
+  /** Did not move — a cliff closes this edge. */
+  | 'blocked';
+
+/**
+ * THE movement-point contract, in one place.
+ *
+ * Six walkers used to carry their own copy of this, and the copies were not
+ * the same: the cliff rule reached two of them, and the two engines enforced
+ * it on DIFFERENT unit sets, which is how a rival musketman walked over a
+ * cliff onto water in the off-script gate (seed 9015, t198). One body now
+ * owns the whole contract:
+ *
+ *   - P4/D-3+D-4 (real Civ 6): entering costs the tile's full cost, +3 for a
+ *     river crossing, and needs that much MP left — except a unit at FULL MP
+ *     may always take one step, paying everything it has. No Civ-5-style
+ *     "enter on fumes", no river-zeroing.
+ *   - Embark/disembark (a LAND unit crossing land↔water) costs ALL remaining
+ *     MP. Naval units never transition; water steps never pay a river charge.
+ *     An embarked land unit's pool is EMBARK_MOVES, not its land allowance.
+ *   - B-26 (#79): a CLIFF is an unbreakable barrier to that transition —
+ *     their entire function, and what makes a cliff-ringed city safe from
+ *     naval invasion. Sourced exceptions (the land tile being a city, a
+ *     HARBOR bordering the cliff) live in cliffBlocksStep.
+ *   - AUDIT #78: ANY non-barbarian unit clears a barb camp by entering it.
+ *     clearCampFor no-ops for barbarians and credits the right treasury.
+ *   - B-3 ZOC: ending adjacent to a hostile MILITARY unit zeroes MP.
+ *
+ * The CALLER still picks the destination. That is where the walkers genuinely
+ * differ — candidate sets, occupancy tests, stop conditions — and those stay
+ * injected at the call site rather than flagged in here.
+ *
+ * The reveal/goody-hut block is player-only and stays inert for every other
+ * walker: hostileUnitAct is fed only by barbUnits/rivalUnits, and the rival
+ * civilian walkers iterate one rival's units.
+ */
+export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
+  const from = state.map.tiles[unit.tileIndex];
+  const naval = !!UNITS[unit.type]?.naval;
+  const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
+  const transition = !naval && isWater(from) !== isWater(to);
+  if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
+  const cost = transition
+    ? unit.movesLeft
+    : moveCostInto(from, to) + riverCharge(state, from, to); // B-23 (#71): roads
+  if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
+  if (transition) unit.embarked = isWater(to);
+  unit.tileIndex = to.index;
+  unit.movesLeft = Math.max(0, unit.movesLeft - cost);
+  if (isPlayerSeat(unit.seat)) {
+    revealAround(state, to.index);
+    claimGoodyHut(state, unit);
+  }
+  clearCampFor(state, unit, to.index);
+  if (inEnemyZoc(state, unit.tileIndex, unit)) {
+    unit.movesLeft = 0;
+    return 'halted';
+  }
+  return unit.movesLeft > 0 ? 'moved' : 'halted';
+}
+
 export function walkPath(state: GameState, unit: Unit): void {
   while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
     const nextIndex = unit.path[0];
-    const from = state.map.tiles[unit.tileIndex];
     const to = state.map.tiles[nextIndex];
-    const naval = !!UNITS[unit.type]?.naval;
-    // The MP pool the "always take one step at full MP" rule compares against:
-    // an embarked land unit uses EMBARK_MOVES (naval units keep their own moves).
-    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     // Enemy-occupied tiles block; the final step also needs a free slot.
     const blockedByEnemy =
       unitsAt(state, nextIndex).some((u) => u.seat !== unit.seat) ||
@@ -499,49 +562,13 @@ export function walkPath(state: GameState, unit: Unit): void {
       unit.path = null;
       return;
     }
-    // Embark/disembark = a land unit crossing the land/water boundary. It costs
-    // ALL remaining MP (real Civ 6). Naval units never transition.
-    const transition = !naval && isWater(from) !== isWater(to);
-    // B-26 (#79): a CLIFF blocks that transition. Real Civ 6: cliffs are "an
-    // unbreakable barrier to embarking and disembarking" — this is their entire
-    // function and what makes a cliff-ringed city safe from naval invasion.
-    // Sourced exceptions: the LAND tile being a city, and a HARBOR bordering the
-    // cliff ("when your units use it, they will be able to pass the Cliffs").
-    // The Commando promotion also scales cliffs; promotions are unmodelled here
-    // and that is recorded, not approximated.
-    if (cliffBlocksStep(state, from, to, unit)) {
+    const outcome = stepUnit(state, unit, to);
+    if (outcome === 'blocked') {
       unit.path = null;
       return;
     }
-    // P4/D-3+D-4 (real Civ 6): entering costs the tile's full cost, +3 for
-    // a river crossing, and needs that much MP left — except a unit at full
-    // MP may always take one step (paying everything it has). No more
-    // Civ-5-style "enter on fumes", no river-zeroing. A transition consumes
-    // everything (cost = movesLeft); water steps never pay river.
-    const cost = transition
-      ? unit.movesLeft
-      : moveCostInto(from, to) + riverCharge(state, from, to); // B-23 (#71): roads
-    if (unit.movesLeft < cost && unit.movesLeft < full) return; // path resumes next turn
-    if (transition) unit.embarked = isWater(to);
-    unit.tileIndex = nextIndex;
+    if (outcome === 'cantAfford') return; // path resumes next turn
     unit.path.shift();
-    unit.movesLeft = Math.max(0, unit.movesLeft - cost);
-
-    if (isPlayerSeat(unit.seat)) {
-      revealAround(state, nextIndex);
-      claimGoodyHut(state, unit);
-    }
-    // AUDIT #78: ANY non-barbarian unit clears a camp by entering it, not just
-    // the player's. walkPath kept a player-only inline copy while this file's
-    // own peace `patrol` already called clearCampFor — so a rival WAR MARCH
-    // over a camp left it standing in TS and razed it on the GPU, which has
-    // always cleared for the marching civ. clearCampFor no-ops for barbarians
-    // and credits the correct treasury (player -> state, rival -> that rival).
-    clearCampFor(state, unit, nextIndex);
-    // B-3 ZOC: entering a tile adjacent to a hostile MILITARY unit ends
-    // movement (the enter cost is already paid above, then movesLeft:=0).
-    // The path persists — a queued move resumes next turn.
-    if (inEnemyZoc(state, nextIndex, unit)) unit.movesLeft = 0;
   }
   if (unit.path && unit.path.length === 0) unit.path = null;
 }

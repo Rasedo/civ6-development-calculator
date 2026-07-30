@@ -27,17 +27,15 @@ import {
   spawnUnit,
   disbandUnit,
   unitsHostile,
-  inEnemyZoc,
   fortifyBonus,
   rivalCityAt,
-  moveCostInto,
-  riverCharge,
   encampmentIntact,
   encampmentBlocks,
   crossesRiver,
   cliffBlocksStep,
+  stepUnit,
 } from './units';
-import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
+import { EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
@@ -1331,10 +1329,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   const allowEmbark = embarkState.live;
   for (;;) {
     const at = tile();
-    // Embarked land units march on the flat EMBARK_MOVES pool; naval movers (N2)
-    // keep their own moves.
-    const naval = !!UNITS[unit.type]?.naval;
-    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     const step = neighbors(map, at)
       .filter(
         (n) =>
@@ -1355,29 +1349,15 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     if (!step || stepD >= hexDistance(at.col, at.row, target.col, target.row) || (!marchOnto && stepD < 1)) {
       return;
     }
-    // Embark/disembark (a LAND unit crossing land↔water) costs ALL remaining MP;
-    // water steps enter at 1 and never pay a river charge.
-    const transition = !naval && isWater(at) !== isWater(step);
-    const cost = transition
-      ? unit.movesLeft
-      : moveCostInto(at, step) + riverCharge(state, at, step); // B-23 (#71): roads
-    if (unit.movesLeft < cost && unit.movesLeft < full) return;
-    if (transition) unit.embarked = isWater(step);
-    unit.tileIndex = step.index;
-    unit.movesLeft = Math.max(0, unit.movesLeft - cost);
-    clearCampFor(state, unit, step.index); // P5/S7 (C-3): rivals clear camps (barb no-op)
-    // B-3 ZOC: a march step ending adjacent to a hostile MILITARY unit halts
-    // (same per-step rule as walkPath / patrol / builder walk). AUDIT B-26/B-3
-    // (ROUND B10): barbarians now OBEY ZOC exactly as rival movers do — the
-    // rival-only gate is lifted. unitsHostile makes a barb halt at any adjacent
-    // non-barb military (player always, at-war rivals always — barbs raid
-    // rivals too); other barbs exert nothing. The GPU barb walk mirrors this
-    // via _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
-    if (inEnemyZoc(state, unit.tileIndex, unit)) {
-      unit.movesLeft = 0;
-      return;
-    }
-    if (unit.movesLeft <= 0) return;
+    // The shared MP contract pays for the step (embark/disembark costs all
+    // remaining MP; water steps never pay river) and applies the camp clear.
+    // B-3 ZOC: a march step ending adjacent to a hostile MILITARY unit halts.
+    // AUDIT B-26/B-3 (ROUND B10): barbarians OBEY ZOC exactly as rival movers
+    // do — unitsHostile makes a barb halt at any adjacent non-barb military
+    // (player always, at-war rivals always — barbs raid rivals too); other
+    // barbs exert nothing. The GPU barb walk mirrors this via
+    // _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
+    if (stepUnit(state, unit, step) !== 'moved') return;
   }
 }
 

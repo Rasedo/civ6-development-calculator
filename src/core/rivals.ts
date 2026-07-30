@@ -10,8 +10,8 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, Improvemen
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, unitDomain, encampmentIntact, encampmentBlocks, riverCharge, layTradeRoad, cliffBlocksStep } from './units';
-import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit } from './units';
+import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
@@ -971,7 +971,6 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
   for (;;) {
     const here = state.map.tiles[unit.tileIndex];
     if (hexDistance(here.col, here.row, home.col, home.row) <= 3) return;
-    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     const step = tilesWithin(state.map, here.col, here.row, 1)
       .filter(
         (t) =>
@@ -990,24 +989,10 @@ function patrol(state: GameState, rival: RivalCiv, unit: Unit): void {
     if (!step || hexDistance(step.col, step.row, home.col, home.row) >= hexDistance(here.col, here.row, home.col, home.row)) {
       return;
     }
-    // Embark/disembark (a LAND unit crossing land↔water) costs ALL remaining MP;
-    // water steps enter at 1 and never pay a river charge.
-    const transition = !naval && isWater(here) !== isWater(step);
-    const cost = transition
-      ? unit.movesLeft
-      : moveCostInto(here, step) + riverCharge(state, here, step); // B-23 (#71): roads
-    if (unit.movesLeft < cost && unit.movesLeft < full) return;
-    if (transition) unit.embarked = isWater(step);
-    unit.tileIndex = step.index;
-    unit.movesLeft = Math.max(0, unit.movesLeft - cost);
-    clearCampFor(state, unit, step.index); // P5/S7 (C-3)
-    // B-3 ZOC: patrol halts adjacent to a hostile MILITARY unit (barbs at
-    // peace; the player too once at war — LIVE unitsHostile per step).
-    if (inEnemyZoc(state, unit.tileIndex, unit)) {
-      unit.movesLeft = 0;
-      return;
-    }
-    if (unit.movesLeft <= 0) return;
+    // The shared MP contract: embark/disembark costs all remaining MP, the
+    // camp clear runs, and B-3 ZOC halts the patrol adjacent to a hostile
+    // MILITARY unit (barbs at peace; the player too once at war).
+    if (stepUnit(state, unit, step) !== 'moved') return;
   }
 }
 
@@ -1375,7 +1360,6 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // full-MP unit always affords its first step). Any step still blocks
     // the D-2 heal (movesLeft < full — the GPU v_acted twin).
     const jt = state.map.tiles[best];
-    const fullB = UNITS[u.type]?.moves ?? 2;
     for (;;) {
       const at = state.map.tiles[u.tileIndex];
       const dHere = hexDistance(at.col, at.row, jt.col, jt.row);
@@ -1391,19 +1375,9 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
         }
       }
       if (dest < 0) break;
-      const dt = state.map.tiles[dest];
-      const cost = moveCostInto(at, dt) + riverCharge(state, at, dt); // B-23 (#71): roads
-      if (u.movesLeft < cost && u.movesLeft < fullB) break;
-      u.tileIndex = dest;
-      u.movesLeft = Math.max(0, u.movesLeft - cost);
-      clearCampFor(state, u, dest); // P5/S7 (C-3): mirrors walkPath's any-unit clear
-      // B-3 ZOC: the builder (a civilian mover) halts adjacent to a hostile
-      // MILITARY unit too — only the EXERTER must be military.
-      if (inEnemyZoc(state, u.tileIndex, u)) {
-        u.movesLeft = 0;
-        break;
-      }
-      if (u.movesLeft <= 0) break;
+      // The shared MP contract. B-3 ZOC: a civilian mover halts adjacent to a
+      // hostile MILITARY unit too — only the EXERTER must be military.
+      if (stepUnit(state, u, state.map.tiles[dest]) !== 'moved') break;
     }
   }
 }
@@ -1606,7 +1580,6 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
     }
     // walk toward the (fixed) target center on REAL MP — the rivalBuilderActions
     // step loop verbatim, with the ≤1 stop instead of the on-tile stop.
-    const fullM = UNITS[u.type]?.moves ?? 2;
     for (;;) {
       const at = state.map.tiles[u.tileIndex];
       const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
@@ -1622,17 +1595,8 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
         }
       }
       if (dest < 0) break;
-      const dt = state.map.tiles[dest];
-      const cost = moveCostInto(at, dt) + riverCharge(state, at, dt); // B-23 (#71): roads
-      if (u.movesLeft < cost && u.movesLeft < fullM) break;
-      u.tileIndex = dest;
-      u.movesLeft = Math.max(0, u.movesLeft - cost);
-      clearCampFor(state, u, dest); // any-unit camp clear, the walkPath mirror
-      if (inEnemyZoc(state, u.tileIndex, u)) {
-        u.movesLeft = 0;
-        break;
-      }
-      if (u.movesLeft <= 0) break;
+      // The shared MP contract (camp clear + B-3 ZOC halt included).
+      if (stepUnit(state, u, state.map.tiles[dest]) !== 'moved') break;
     }
   }
 }
@@ -1682,7 +1646,6 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
     if (!target) continue;
     const tt = state.map.tiles[target.centerIndex];
     // the rivalMissionaryActions step loop verbatim, with the ≤2 stop.
-    const fullM = UNITS[u.type]?.moves ?? 2;
     for (;;) {
       const at = state.map.tiles[u.tileIndex];
       const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
@@ -1698,17 +1661,8 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
         }
       }
       if (dest < 0) break;
-      const dt = state.map.tiles[dest];
-      const cost = moveCostInto(at, dt) + riverCharge(state, at, dt); // B-23 (#71): roads
-      if (u.movesLeft < cost && u.movesLeft < fullM) break;
-      u.tileIndex = dest;
-      u.movesLeft = Math.max(0, u.movesLeft - cost);
-      clearCampFor(state, u, dest); // any-unit camp clear, the walkPath mirror
-      if (inEnemyZoc(state, u.tileIndex, u)) {
-        u.movesLeft = 0;
-        break;
-      }
-      if (u.movesLeft <= 0) break;
+      // The shared MP contract (camp clear + B-3 ZOC halt included).
+      if (stepUnit(state, u, state.map.tiles[dest]) !== 'moved') break;
     }
   }
 }
