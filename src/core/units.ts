@@ -328,7 +328,7 @@ function tileOwnedByUnitOwner(
   unit: { seat: number },
 ): boolean {
   if (isPlayerSeat(unit.seat)) return isPlayerSeat(tileSeat(t));
-  if (isRivalSeat(unit.seat)) return (t.rivalId ?? -1) === rivalOfCiv(unit.seat);
+  if (isRivalSeat(unit.seat)) return tileSeat(t) === unit.seat;
   return false; // barbarians own nothing
 }
 
@@ -774,15 +774,15 @@ export function refreshUnits(state: GameState): void {
     // units that have never been refreshed.
     const grantedLast = unit.movesFull ?? full;
     if (unit.movesLeft >= grantedLast) {
-      const unowned = !isPlayerSeat(tileSeat(tile)) && tile.rivalId === undefined && tile.csId === undefined;
+      const unowned = tileSeat(tile) === NO_SEAT;
       let heal: number;
       if (isPlayerSeat(unit.seat)) {
         if (isPlayerSeat(tileSeat(tile)) && tile.district === 'CITY_CENTER') heal = 20;
         else if (isPlayerSeat(tileSeat(tile))) heal = 15;
         else heal = unowned ? 10 : 5;
       } else if (isRivalSeat(unit.seat)) {
-        if (tile.rivalId === rivalOfCiv(unit.seat) && tile.district === 'CITY_CENTER') heal = 20;
-        else if (tile.rivalId === rivalOfCiv(unit.seat)) heal = 15;
+        if (tileSeat(tile) === unit.seat && tile.district === 'CITY_CENTER') heal = 20;
+        else if (tileSeat(tile) === unit.seat) heal = 15;
         else heal = unowned ? 10 : 5;
       } else {
         // barbarian: the camp is home
@@ -887,7 +887,7 @@ export function playerPillage(state: GameState, unitId: number): RuleResult {
   if (unit.movesLeft <= 0) return no('No movement left.');
   const tile = state.map.tiles[unit.tileIndex];
   const enemy =
-    (isRivalSeat(tileSeat(tile)) && (state.rivals.find((r) => r.id === tile.rivalId)?.atWar ?? false)) ||
+    (isRivalSeat(tileSeat(tile)) && (rivalOfSeat(state, tileSeat(tile))?.atWar ?? false)) ||
     isCityStateSeat(tileSeat(tile));
   if (!enemy) return no('Not an enemy tile.');
   if (tile.improvement && !tile.pillaged) {

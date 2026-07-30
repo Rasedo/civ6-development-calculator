@@ -71,6 +71,17 @@ export type DistrictId =
   | 'NEIGHBORHOOD';
 
 export interface Tile {
+  /**
+   * #51/S1.3i: WHO owns this tile — one seat id, from the absolute space in
+   * core/seats.ts (NO_SEAT = nobody). Replaces four fields that between them
+   * encoded the same fact: `cityId` (the player's, -1 = none), `rivalId`
+   * (which rival), `rivalCityId` (which rival city) and `csId` (which
+   * city-state). Read it through `tileSeat`/`tileCity`/`tileBelongsTo` and
+   * write it through `setTileOwner`; nothing else should touch these two.
+   */
+  ownerSeat: number;
+  /** WHICH CITY of that seat works the tile (-1 = none / a city-state). */
+  ownerCity: number;
   index: number;
   col: number;
   row: number;
@@ -128,15 +139,11 @@ export interface Tile {
   /** Turns of drought left (-1 food while active). */
   droughtTurns: number;
   /** Owning city id, or -1. */
-  cityId: number;
   /** Owning city-state id (territory blocks settling/borders); absent = none. */
-  csId?: number;
   /** Owning rival-civ id; absent = none. */
-  rivalId?: number;
   /** AUDIT A-17: owning rival CITY (RivalCity.id, per-civ ids — meaningful
    * only with rivalId set). The per-city registry the player's cityId gives
    * player tiles; capture/raze/transfer and border adjacency key on it. */
-  rivalCityId?: number;
 }
 
 export interface GameMap {

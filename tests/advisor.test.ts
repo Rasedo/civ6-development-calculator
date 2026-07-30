@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { PLAYER_CIV, setTileOwner } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { scoreDistrictSpots, scoreSettleSites, projectTurns, compareCandidates } from '../src/core/advisor';
 import { foundCity } from '../src/core/game';
@@ -55,7 +56,7 @@ describe('settle-site advisor', () => {
     // Same luxury type already inside someone's borders -> lower pull.
     const owned = tileAtCoords(state.map, 2, 2);
     owned.resource = 'WINE';
-    owned.cityId = 99;
+    setTileOwner(owned, PLAYER_CIV, 99);
     sites = scoreSettleSites(state, 1);
     expect(sites[0].resourceScore).toBe(3);
   });

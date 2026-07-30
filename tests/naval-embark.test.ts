@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat } from '../src/core/seats';
+import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat, tileCity, setTileOwner } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, purchaseUnit } from '../src/core/game';
 import {
@@ -358,7 +358,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const rival = bareRival(state);
     const rcCenter = tileAtCoords(state.map, 8, 5);
     rcCenter.terrain = 'GRASSLAND';
-    rcCenter.rivalId = rival.id;
+    setTileOwner(rcCenter, civOfRival(rival.id), tileCity(rcCenter));
     const rc: RivalCity = {
       id: 0,
       name: 'Utica',
@@ -399,7 +399,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const rival = bareRival(state);
     const rcCenter = tileAtCoords(state.map, 9, 5);
     rcCenter.terrain = 'GRASSLAND';
-    rcCenter.rivalId = rival.id;
+    setTileOwner(rcCenter, civOfRival(rival.id), tileCity(rcCenter));
     const rc: RivalCity = {
       id: 0,
       name: 'Kart-Hadasht',

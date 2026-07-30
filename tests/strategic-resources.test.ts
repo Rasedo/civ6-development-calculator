@@ -3,7 +3,7 @@ import { UNITS } from '../src/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { trainableUnits, queueUnit } from '../src/core/units';
-import { civHasStrategic, PLAYER_CIV, isPlayerSeat } from '../src/core/seats';
+import { civHasStrategic, PLAYER_CIV, isPlayerSeat, civOfRival, tileCity, NO_SEAT, setTileOwner } from '../src/core/seats';
 
 /** Units-mode game with the capital at (8,8), and a resource tile inside
  * borders that the caller can configure. Returns the state, city and the tile. */
@@ -13,7 +13,7 @@ function resState(resource: string, improvement: string | null, ...techs: string
   const city = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
   grantTechs(state, ...techs);
   const tile = tileAtCoords(state.map, 8, 9);
-  tile.cityId = city.id; // owned by the player capital
+  setTileOwner(tile, city.seat, city.id); // owned by the player capital
   tile.resource = resource;
   tile.elevation = resource === 'IRON' ? 'HILLS' : 'FLAT';
   tile.improvement = improvement;
@@ -49,9 +49,9 @@ describe('B-9 civHasStrategic access', () => {
     const { state, tile } = resState('IRON', 'MINE');
     expect(has(state, 'IRON')).toBe(true);
     // ownership loss (capture / border loss): cityId cleared, rival takes it
-    tile.cityId = -1;
+    setTileOwner(tile, NO_SEAT);
     expect(has(state, 'IRON')).toBe(false);
-    tile.rivalId = 0; // now owned by rival 0 (civ 1), not the player
+    setTileOwner(tile, civOfRival(0), tileCity(tile)); // now owned by rival 0 (civ 1), not the player
     expect(civHasStrategic(state, PLAYER_CIV, 'IRON')).toBe(false);
     expect(civHasStrategic(state, 1, 'IRON')).toBe(true); // the rival now has access
   });

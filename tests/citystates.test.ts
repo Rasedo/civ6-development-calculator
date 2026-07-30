@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { canFoundCity } from '../src/core/rules';
@@ -39,7 +39,7 @@ function addCs(
     questIssuedTurn: 0,
     ...opts,
   };
-  for (const t of tilesWithin(state.map, col, row, 1)) t.csId = cs.id;
+  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id));
   state.cityStates.push(cs);
   return cs;
 }
@@ -52,7 +52,7 @@ describe('city-state placement', () => {
     expect(serialize(a)).toBe(serialize(b));
     for (const cs of a.cityStates) {
       const center = a.map.tiles[cs.centerIndex];
-      expect(center.csId).toBe(cs.id);
+      expect((isCityStateSeat(tileSeat(center)) ? cityStateOfSeat(tileSeat(center)) : -1)).toBe(cs.id);
       for (const other of a.cityStates) {
         if (other.id === cs.id) continue;
         const oc = a.map.tiles[other.centerIndex];
@@ -85,7 +85,7 @@ describe('city-state placement', () => {
     const city = foundCity(state, tileAtCoords(state.map, 4, 5).index).city!; // dist 4 from the CS (P4/D-5)
     const candidates = borderCandidates(state, city);
     for (const i of candidates) {
-      expect(state.map.tiles[i].csId ?? -1).toBe(-1);
+      expect((isCityStateSeat(tileSeat(state.map.tiles[i])) ? cityStateOfSeat(tileSeat(state.map.tiles[i])) : -1)).toBe(-1);
     }
   });
 });

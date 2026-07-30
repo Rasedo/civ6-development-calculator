@@ -28,7 +28,7 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat } from '../src/core/seats';
 
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
@@ -1417,10 +1417,11 @@ for (let s = 0; s < N_SEEDS; s++) {
       // to cities/camps — are the engine's job; mirrors campCandidates)
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
       // city-state territory (static — placed at game creation)
-      cs: t.csId ?? -1,
+      // #51/S1.3i: derived from the ONE seat field; the fixture keys are unchanged
+      cs: isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1,
       // rival territory at t=0 (grows dynamically in the engine)
-      rv: t.rivalId ?? -1,
-      rci: t.rivalCityId ?? -1, // A-17: per-rc tile registry (RivalCity.id, per-civ)
+      rv: isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1,
+      rci: isRivalSeat(tileSeat(t)) ? tileCity(t) : -1, // A-17: per-rc tile registry
       // C1-B4b-2: Water Mill gates on a river at RIVAL centers too
       riv: hasRiver(t) ? 1 : 0,
       // C1-B5b-iii: water housing IF a center stood here (fresh 5 /
@@ -1712,7 +1713,11 @@ for (let s = 0; s < N_SEEDS; s++) {
   const cities = [siteMeta(capital.centerIndex, cityMaintenance(state, capital))];
   for (const c of chosen) cities.push(siteMeta(c, 0));
 
-  const ownerInit = map.tiles.map((t) => t.cityId);
+  // #51/S1.3i: `ownerInit` is the PLAYER's owning city id (-1 = not the
+  // player's). The old `t.cityId` said that by construction; `tileCity` alone
+  // does not — it returns the RIVAL's city id on a rival tile, which would
+  // hand rival territory to the player in the fixture.
+  const ownerInit = map.tiles.map((t) => (isPlayerSeat(tileSeat(t)) ? tileCity(t) : -1));
   const C_MAX = 1 + N_EXTRA;
 
   const knownBoosts = new Set(playerSeat(state).research.boosted);

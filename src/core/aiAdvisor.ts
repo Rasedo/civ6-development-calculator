@@ -5,6 +5,7 @@
  */
 
 import type { GameState } from './types';
+
 import {
   envCandidates,
   envObservation,

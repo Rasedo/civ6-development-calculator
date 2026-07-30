@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CITY_MAX_HP } from '../src/data/units';
-import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV } from '../src/core/seats';
+import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV, rivalOfCiv, isPlayerSeat, isRivalSeat, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
   createGame,
@@ -79,12 +79,10 @@ function addRival(
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id; // A-17: per-city registry
+  setTileOwner(tile, civOfRival(rival.id), city.id); // A-17: per-city registry
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+    if (!isPlayerSeat(tileSeat(t)) && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);
@@ -101,7 +99,7 @@ describe('rival placement and expansion', () => {
     for (const r of a.rivals) {
       expect(r.cities.length).toBe(1);
       const center = a.map.tiles[r.cities[0].centerIndex];
-      expect(center.rivalId).toBe(r.id);
+      expect((isRivalSeat(tileSeat(center)) ? rivalOfCiv(tileSeat(center)) : -1)).toBe(r.id);
       expect(center.district).toBe('CITY_CENTER');
       expect(rivalUnits(a, r.id).length).toBeGreaterThanOrEqual(1);
       for (const other of a.rivals) {
@@ -117,11 +115,11 @@ describe('rival placement and expansion', () => {
     const rival = addRival(state, 6, 6);
     // C1-B2: settlers are per-city queue items — queue one about to finish
     rival.cities[0].queue.push({ kind: 'settler', progress: 500, cost: 90 });
-    const claimedBefore = state.map.tiles.filter((t) => (t.rivalId ?? -1) !== -1).length;
+    const claimedBefore = state.map.tiles.filter((t) => (isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) !== -1).length;
     state.turn = 9; // border-expansion tick for city id 0
     rivalPhase(state);
     expect(rival.cities.length).toBe(2);
-    const claimedAfter = state.map.tiles.filter((t) => (t.rivalId ?? -1) !== -1).length;
+    const claimedAfter = state.map.tiles.filter((t) => (isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) !== -1).length;
     expect(claimedAfter).toBeGreaterThan(claimedBefore);
     // growth box fills toward pop 4
     expect(rival.cities[0].foodBox).toBeGreaterThan(0);
@@ -160,13 +158,13 @@ describe('A-24 rival district/tile registry coherence', () => {
     // a second city of the SAME civ; steal a ring tile from city 0's frontier
     const sibling = rival.cities[0];
     const stolen = tilesWithin(state.map, 6, 6, 1).find(
-      (t) => t.rivalCityId === sibling.id && t.index !== sibling.centerIndex,
+      (t) => tileCity(t) === sibling.id && t.index !== sibling.centerIndex,
     )!;
     // forge an incoherent district: city 0 lists a tile registered to itself is
     // fine; re-register the tile to a phantom sibling id, then reference it.
     sibling.districts.push({ type: 'HOLY_SITE', tileIndex: stolen.index });
     expect(() => assertRivalRegistryCoherent(state)).not.toThrow(); // still coherent (tile registers to this rc)
-    stolen.rivalCityId = sibling.id + 999; // now it belongs to a sibling
+    setTileOwner(stolen, tileSeat(stolen), sibling.id + 999); // now it belongs to a sibling
     expect(() => assertRivalRegistryCoherent(state)).toThrow(/A-24 registry incoherence/);
   });
 });
@@ -225,7 +223,7 @@ describe('war and peace', () => {
     const city = foundCity(state, tileAtCoords(state.map, 4, 4).index).city!;
     // A farm outside attack range of anything (raiders attack before pillaging).
     const farm = tileAtCoords(state.map, 6, 4);
-    farm.cityId = city.id;
+    setTileOwner(farm, city.seat, city.id);
     farm.improvement = 'FARM';
     const raider = spawnUnit(state, 'WARRIOR', farm.index, civOfRival(rival.id))!;
     raider.tileIndex = farm.index;
@@ -258,8 +256,8 @@ describe('war and peace', () => {
     expect(state.cities.some((c) => c.name === 'Roma')).toBe(true);
     const converted = state.cities.find((c) => c.name === 'Roma')!;
     expect(converted.population).toBeGreaterThanOrEqual(1);
-    expect(state.map.tiles[rc.centerIndex].cityId).toBe(converted.id);
-    expect(state.map.tiles[rc.centerIndex].rivalId ?? -1).toBe(-1);
+    expect(tileCity(state.map.tiles[rc.centerIndex])).toBe(converted.id);
+    expect((isRivalSeat(tileSeat(state.map.tiles[rc.centerIndex])) ? rivalOfCiv(tileSeat(state.map.tiles[rc.centerIndex])) : -1)).toBe(-1);
     expect(rival.atWar).toBe(false); // last city gone: war over
   });
 
@@ -290,14 +288,12 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     const campusTile = ring[0];
     campusTile.district = 'CAMPUS';
     campusTile.districtComplete = true;
-    campusTile.rivalId = rival.id;
-    campusTile.rivalCityId = rc.id;
+    setTileOwner(campusTile, civOfRival(rival.id), rc.id);
     rc.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
     const wonderTile = ring[1];
     wonderTile.builtWonder = 'PYRAMIDS';
     wonderTile.builtWonderComplete = true;
-    wonderTile.rivalId = rival.id;
-    wonderTile.rivalCityId = rc.id;
+    setTileOwner(wonderTile, civOfRival(rival.id), rc.id);
     rc.wonders.push({ id: 'PYRAMIDS', tileIndex: wonderTile.index });
     // An INCOMPLETE district must NOT carry (stays paved-but-dead): a carried
     // incomplete Holy Site would let availableBuildings offer a Shrine the GPU
@@ -305,8 +301,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     const holyTile = ring[2];
     holyTile.district = 'HOLY_SITE';
     holyTile.districtComplete = false;
-    holyTile.rivalId = rival.id;
-    holyTile.rivalCityId = rc.id;
+    setTileOwner(holyTile, civOfRival(rival.id), rc.id);
     rc.districts.push({ type: 'HOLY_SITE', tileIndex: holyTile.index });
     // PALACE must never transfer; MARKET + ANCIENT_WALLS are kept.
     rc.buildings.push('PALACE', 'MARKET', 'ANCIENT_WALLS');
@@ -328,7 +323,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     // ANCIENT_WALLS kept but outer pool reset to 0 (heals via B-1).
     expect(taken.outerHp).toBe(0);
     // the district/wonder tiles re-own to the new city and stay paved.
-    expect(state.map.tiles[campusTile.index].cityId).toBe(taken.id);
+    expect(tileCity(state.map.tiles[campusTile.index])).toBe(taken.id);
     expect(state.map.tiles[campusTile.index].district).toBe('CAMPUS');
     expect(state.map.tiles[wonderTile.index].builtWonderComplete).toBe(true);
   });
@@ -364,8 +359,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);
     ring[0].district = 'CAMPUS';
     ring[0].districtComplete = true;
-    ring[0].rivalId = rival.id;
-    ring[0].rivalCityId = rc.id;
+    setTileOwner(ring[0], civOfRival(rival.id), rc.id);
     rc.districts.push({ type: 'CAMPUS', tileIndex: ring[0].index });
     rc.buildings.push('MARKET');
 
@@ -374,7 +368,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     // razed: no new city added, center unpaved (scorched earth).
     expect(state.cities.length).toBe(before);
     expect(state.map.tiles[center.index].district).toBeNull();
-    expect(state.map.tiles[center.index].cityId).toBe(-1);
+    expect(tileCity(state.map.tiles[center.index])).toBe(-1);
   });
 });
 
@@ -413,10 +407,10 @@ describe('B-10 best-of-roster scripted rival production ladder', () => {
     const rc = rival.cities[0];
     // improve all owned non-center tiles
     for (const t of state.map.tiles) {
-      if (t.rivalId === rival.id && t.index !== rc.centerIndex && !t.improvement) t.improvement = 'FARM';
+      if ((isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) === rival.id && t.index !== rc.centerIndex && !t.improvement) t.improvement = 'FARM';
     }
     // strategic access via improved resource tiles inside the borders
-    const owned = state.map.tiles.filter((t) => t.rivalId === rival.id && t.index !== rc.centerIndex);
+    const owned = state.map.tiles.filter((t) => (isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) === rival.id && t.index !== rc.centerIndex);
     if (opts.iron) {
       owned[0].resource = 'IRON';
       owned[0].elevation = 'HILLS';
@@ -488,8 +482,7 @@ describe('rival trade routes (A-11)', () => {
     };
     tile.district = 'CITY_CENTER';
     tile.districtComplete = true;
-    tile.rivalId = rival.id;
-    tile.rivalCityId = city.id;
+    setTileOwner(tile, civOfRival(rival.id), city.id);
     rival.cities.push(city);
     return city;
   }
@@ -572,7 +565,7 @@ describe('rival CS trade routes (A-12b)', () => {
       questIssuedTurn: 0,
       ...opts,
     };
-    for (const t of tilesWithin(state.map, col, row, 1)) t.csId = cs.id; // placement's territory tags (cityStateAt resolves by tile csId)
+    for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id)); // placement's territory tags (cityStateAt resolves by tile csId)
     state.cityStates.push(cs);
     return cs;
   }
@@ -640,8 +633,8 @@ describe('rival CS trade routes (A-12b)', () => {
     const rc = rival.cities[rival.cities.length - 1];
     expect(rc.centerIndex).toBe(cs.centerIndex);
     expect(rc.population).toBe(2); // 3 × 0.75 floored
-    expect(state.map.tiles[cs.centerIndex].rivalId).toBe(rival.id);
-    expect(state.map.tiles[cs.centerIndex].rivalCityId).toBe(rc.id);
+    expect((isRivalSeat(tileSeat(state.map.tiles[cs.centerIndex])) ? rivalOfCiv(tileSeat(state.map.tiles[cs.centerIndex])) : -1)).toBe(rival.id);
+    expect(tileCity(state.map.tiles[cs.centerIndex])).toBe(rc.id);
   });
 });
 

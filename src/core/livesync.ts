@@ -8,7 +8,7 @@
  */
 
 import type { City, DistrictId, GameState, QueueItem, Tile } from './types';
-import { playerSeat, PLAYER_CIV, isPlayerSeat, tileSeat } from './seats';
+import { playerSeat, PLAYER_CIV, isPlayerSeat, tileSeat, setTileOwner, cityAtTile } from './seats';
 import { parseCivExport } from './importer';
 import { createGameFromMap, districtCost, settlerCost, projectCost } from './game';
 import { tileIndex, inBounds, tilesWithin, hexDistance } from './hex';
@@ -246,9 +246,9 @@ export function parseLiveSync(text: string): SyncResult {
     center.improvement = null;
     if (center.feature && FEATURES[center.feature].removable) center.feature = null;
     for (const t of tilesWithin(map, center.col, center.row, 1)) {
-      if (!isPlayerSeat(tileSeat(t))) t.cityId = id;
+      if (!isPlayerSeat(tileSeat(t))) setTileOwner(t, PLAYER_CIV, id);
     }
-    center.cityId = id;
+    setTileOwner(center, PLAYER_CIV, id);
     state.cities.push(city);
   }
 
@@ -271,7 +271,7 @@ export function parseLiveSync(text: string): SyncResult {
     const tile = map.tiles[i];
     if (delta.owner === localPlayer && !isPlayerSeat(tileSeat(tile))) {
       const c = nearestCity(tile, 5);
-      if (c) tile.cityId = c.id;
+      if (c) setTileOwner(tile, c.seat, c.id);
     }
   }
   for (const [i, delta] of plots) {
@@ -285,7 +285,7 @@ export function parseLiveSync(text: string): SyncResult {
 
     if (delta.district !== '-' && delta.district !== 'DISTRICT_CITY_CENTER') {
       const type = DISTRICT_MAP[delta.district];
-      const owner = state.cities.find((c) => c.id === tile.cityId) ?? nearestCity(tile, 3);
+      const owner = (cityAtTile(state, tile) as City | undefined) ?? nearestCity(tile, 3);
       if (type && DISTRICTS[type] && owner) {
         tile.district = type;
         tile.districtComplete = true;
@@ -299,7 +299,7 @@ export function parseLiveSync(text: string): SyncResult {
 
     if (delta.wonder !== '-') {
       const id = delta.wonder.replace(/^BUILDING_/, '');
-      const owner = state.cities.find((c) => c.id === tile.cityId) ?? nearestCity(tile, 3);
+      const owner = (cityAtTile(state, tile) as City | undefined) ?? nearestCity(tile, 3);
       if (BUILT_WONDERS[id] && owner) {
         tile.builtWonder = id;
         tile.builtWonderComplete = true;

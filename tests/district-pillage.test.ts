@@ -5,7 +5,7 @@
  * restores, static counts unchanged.
  */
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT } from '../src/core/seats';
+import { BARB_SEAT, tileCity } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders } from './helpers';
 import { foundCity, queueDistrict, queueBuilding } from '../src/core/game';
 import { computeCityStats, cityMaintenance } from '../src/core/city';
@@ -68,7 +68,7 @@ describe('B-32 district pillage', () => {
     // the raider cannot attack the city and falls through to the pillage branch.
     const { state, city, campus } = cityWithCampus(11);
     state.unitsMode = true;
-    expect(campus.cityId).toBe(city.id); // the district tile is owned
+    expect(tileCity(campus)).toBe(city.id); // the district tile is owned
     const barb = spawnUnit(state, 'WARRIOR', campus.index, BARB_SEAT)!;
     barb.tileIndex = campus.index;
     barb.movesLeft = 2;

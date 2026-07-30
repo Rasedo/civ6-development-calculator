@@ -216,7 +216,7 @@ const PER_RIVAL_CITY_COLS: TraceCol<{ rival: RivalCiv; rc: RivalCity } | undefin
     name: 'owned',
     tol: 0,
     // The engine's own per-city ownership predicate (rivals.ts pickRivalBorderTile).
-    get: (s, x) => (x ? s.map.tiles.filter((t) => (t.rivalId ?? -1) === x.rival.id && t.rivalCityId === x.rc.id).length : 0),
+    get: (s, x) => (x ? s.map.tiles.filter((t) => tileBelongsTo(t, x.rc)).length : 0),
   },
   { name: 'bldgs', tol: 0, get: (_s, x) => x?.rc.buildings.length ?? 0 },
   { name: 'acquired', tol: 0, get: (_s, x) => x?.rc.tilesAcquired ?? 0 },

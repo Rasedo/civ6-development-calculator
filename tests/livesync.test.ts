@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileCity } from '../src/core/seats';
 import { parseLiveSync, syncSummary } from '../src/core/livesync';
 import { tileIndex } from '../src/core/hex';
 
@@ -54,7 +54,7 @@ describe('live sync parser', () => {
     expect(city.districts.some((d) => d.type === 'CAMPUS')).toBe(true);
 
     expect(map.tiles[tileIndex(map, 3, 4)].improvement).toBe('FARM');
-    expect(map.tiles[tileIndex(map, 6, 4)].cityId).toBe(city.id); // nearest-city ownership
+    expect(tileCity(map.tiles[tileIndex(map, 6, 4)])).toBe(city.id); // nearest-city ownership
     const pyramids = map.tiles[tileIndex(map, 4, 6)];
     expect(pyramids.builtWonder).toBe('PYRAMIDS');
     expect(city.wonders.some((w) => w.id === 'PYRAMIDS')).toBe(true);

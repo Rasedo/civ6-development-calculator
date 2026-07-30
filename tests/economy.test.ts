@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, setTileOwner } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import {
   foundCity,
@@ -32,7 +32,7 @@ function addDistrict(state: GameState, city: City, type: DistrictId, col: number
   const t = tileAtCoords(state.map, col, row);
   t.district = type;
   t.districtComplete = true;
-  t.cityId = city.id;
+  setTileOwner(t, city.seat, city.id);
   city.districts.push({ type, tileIndex: t.index });
 }
 
@@ -178,7 +178,7 @@ describe('chops and harvests', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
     const t = tileAtCoords(state.map, 6, 5);
-    t.cityId = city.id;
+    setTileOwner(t, city.seat, city.id);
     t.resource = 'WINE'; // luxury: no harvestYield
     expect(harvestGrant(state, t)).toBeNull();
     t.resource = 'STONE'; // needs Mining for the Quarry

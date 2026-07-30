@@ -9,6 +9,7 @@
  */
 
 import { fbm } from './noise';
+import { NO_SEAT } from './seats';
 import { mulberry32, deriveSeed, shuffle, type Rng } from './rng';
 import {
   neighbors,
@@ -58,7 +59,8 @@ export function generateMap(opts: MapGenOptions): GameMap {
         volcano: false,
         fertility: 0,
         droughtTurns: 0,
-        cityId: -1,
+        ownerSeat: NO_SEAT,
+        ownerCity: -1,
       });
     }
   }

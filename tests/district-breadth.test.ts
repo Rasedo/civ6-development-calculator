@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { createGame, buildingFaithCost } from '../src/core/game';
 import { rivalPhase, rivalCityYields } from '../src/core/rivals';
@@ -62,12 +63,10 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id;
+  setTileOwner(tile, civOfRival(rival.id), city.id);
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+    if (!isPlayerSeat(tileSeat(t)) && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);

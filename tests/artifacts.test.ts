@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, setTileOwner } from '../src/core/seats';
 import { makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity } from '../src/core/game';
 import { spawnUnit, archaeologistExcavate, trainableUnits } from '../src/core/units';
@@ -57,7 +57,7 @@ describe('B-20 (#79): artifacts and archaeology', () => {
     const city = found(state, 5, 5);
     city.buildings.push(ARTIFACT_BUILDING);
     const dig = tileAtCoords(state.map, 6, 5);
-    dig.cityId = city.id;
+    setTileOwner(dig, city.seat, city.id);
     markAntiquitySite(state, dig.index);
 
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', dig.index)!;
@@ -84,7 +84,7 @@ describe('B-20 (#79): artifacts and archaeology', () => {
     city.buildings.push(ARTIFACT_BUILDING);
     city.artifacts = ARTIFACT_SLOTS; // full
     const dig = tileAtCoords(state.map, 6, 5);
-    dig.cityId = city.id;
+    setTileOwner(dig, city.seat, city.id);
     markAntiquitySite(state, dig.index);
     const arch = spawnUnit(state, 'ARCHAEOLOGIST', dig.index)!;
     arch.tileIndex = dig.index;

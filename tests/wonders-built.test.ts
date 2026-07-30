@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileCity } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, queueDistrict, queueBuilding, queueWonder, setSpecialists, setGovernment, endTurn } from '../src/core/game';
 import { greatPersonPointsPerTurn, greatPeopleEarned } from '../src/core/game';
@@ -59,7 +59,7 @@ describe('world wonders', () => {
     const { state, city } = sandboxCity();
     // make all workable tiles desert so worked tiles are desert for sure
     for (const t of state.map.tiles) {
-      if (t.cityId === city.id && t.index !== city.centerIndex) t.terrain = 'DESERT';
+      if (tileCity(t) === city.id && t.index !== city.centerIndex) t.terrain = 'DESERT';
     }
     const spot = tileAtCoords(state.map, 9, 8);
     const before = computeCityStats(state, city);

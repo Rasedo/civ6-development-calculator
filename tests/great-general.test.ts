@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat, isPlayerSeat, PLAYER_CIV, civOfRival, isRivalSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, PLAYER_CIV, civOfRival, isRivalSeat, tileSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit, unitDomain, trainableUnits } from '../src/core/units';
@@ -32,7 +32,7 @@ function tileAt(state: GameState, ctr: number, dist: number, banned: number[] = 
   const c = state.map.tiles[ctr];
   for (const t of state.map.tiles) {
     if (t.index === ctr || banned.includes(t.index)) continue;
-    if (t.cityId !== -1) continue;
+    if (isPlayerSeat(tileSeat(t))) continue;
     if (hexDistance(c.col, c.row, t.col, t.row) !== dist) continue;
     if (state.units.some((u) => u.tileIndex === t.index)) continue;
     return t.index;
@@ -106,7 +106,7 @@ describe('B7-G (B-8) aura', () => {
       const cap = state.cities[0].centerIndex;
       const at = tileAt(state, cap, 3);
       const nb = neighbors(state.map, state.map.tiles[at]).find(
-        (n) => n.cityId === -1 && !isImpassable(n),
+        (n) => !isPlayerSeat(tileSeat(n)) && !isImpassable(n),
       )!;
       const atk = spawnUnit(state, 'WARRIOR', at, PLAYER_CIV)!;
       atk.tileIndex = at;
@@ -156,7 +156,7 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     const gen = spawnUnit(state, 'GENERAL', gtile, PLAYER_CIV)!;
     gen.tileIndex = gtile;
     const nb = neighbors(state.map, state.map.tiles[gtile]).find(
-      (n) => n.cityId === -1 && !state.units.some((u) => u.tileIndex === n.index),
+      (n) => !isPlayerSeat(tileSeat(n)) && !state.units.some((u) => u.tileIndex === n.index),
     )!;
     const atk = spawnUnit(state, 'WARRIOR', nb.index, civOfRival(state.rivals[0].id))!;
     meleeAttack(state, atk.id, gtile);

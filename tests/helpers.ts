@@ -1,7 +1,7 @@
 /** Shared test fixtures: small synthetic maps with uniform terrain. */
 
 import type { City, GameMap, GameState, TerrainId, Tile } from '../src/core/types';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, tileSeat, NO_SEAT, setTileOwner } from '../src/core/seats';
 import { tilesWithin } from '../src/core/hex';
 import { defaultModifiers, type YieldCtx } from '../src/core/effects';
 
@@ -31,7 +31,9 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
         volcano: false,
         fertility: 0,
         droughtTurns: 0,
-        cityId: -1,
+        ownerSeat: NO_SEAT,
+
+        ownerCity: -1,
       });
     }
   }
@@ -97,6 +99,6 @@ export function grantCivics(state: GameState, ...ids: string[]): void {
 export function expandBorders(state: GameState, city: City, radius: number): void {
   const center = state.map.tiles[city.centerIndex];
   for (const t of tilesWithin(state.map, center.col, center.row, radius)) {
-    if (t.cityId === -1) t.cityId = city.id;
+    if (!isPlayerSeat(tileSeat(t))) setTileOwner(t, city.seat, city.id);
   }
 }

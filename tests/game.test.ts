@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileCity } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
 import {
   growthFoodNeeded,
@@ -59,7 +59,7 @@ describe('founding cities', () => {
     expect(city.buildings).toContain('PALACE');
     expect(center.district).toBe('CITY_CENTER');
     expect(center.districtComplete).toBe(true);
-    const owned = state.map.tiles.filter((t) => t.cityId === city.id);
+    const owned = state.map.tiles.filter((t) => tileCity(t) === city.id);
     expect(owned.length).toBe(7); // Civ 6: ring 1 only; the rest comes from culture
   });
 
@@ -76,12 +76,12 @@ describe('founding cities', () => {
     const state = makeState(makeMap(20, 20));
     const a = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
     const ring1 = tileAtCoords(state.map, 9, 8);
-    expect(ring1.cityId).toBe(a.id);
+    expect(tileCity(ring1)).toBe(a.id);
     state.settlers = 1; // later cities need a trained settler
     const b = foundCity(state, tileAtCoords(state.map, 12, 8).index).city!;
-    expect(ring1.cityId).toBe(a.id); // still A's
-    expect(tileAtCoords(state.map, 13, 8).cityId).toBe(b.id);
-    expect(tileAtCoords(state.map, 11, 8).cityId).toBe(b.id); // unowned gap goes to B's first ring
+    expect(tileCity(ring1)).toBe(a.id); // still A's
+    expect(tileCity(tileAtCoords(state.map, 13, 8))).toBe(b.id);
+    expect(tileCity(tileAtCoords(state.map, 11, 8))).toBe(b.id); // unowned gap goes to B's first ring
   });
 
   it('rejects water, mountains and oases', () => {

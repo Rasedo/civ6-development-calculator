@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, NO_SEAT } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { rivalPhase, rivalUnits } from '../src/core/rivals';
 import { cityStatePhase, rivalIsSuzerain } from '../src/core/cityStates';
@@ -71,12 +71,10 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id;
+  setTileOwner(tile, civOfRival(rival.id), city.id);
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+    if (!isPlayerSeat(tileSeat(t)) && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);
@@ -98,7 +96,7 @@ function addCs(state: GameState, col: number, row: number, opts: Partial<CitySta
     questIssuedTurn: 0,
     ...opts,
   };
-  for (const t of tilesWithin(state.map, col, row, 1)) t.csId = cs.id;
+  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id));
   state.cityStates.push(cs);
   return cs;
 }
@@ -112,7 +110,7 @@ function meetQuota(state: GameState, rival: RivalCiv): void {
   for (const t of state.map.tiles) {
     if (spots.length >= quota) break;
     if (used.has(t.index)) continue;
-    if ((t.csId ?? -1) !== -1 || t.rivalId !== undefined || t.cityId !== -1) continue;
+    if (tileSeat(t) !== NO_SEAT) continue; // an UNOWNED spot
     spots.push(t.index);
   }
   for (let i = rivalUnits(state, rival.id).length; i < quota; i++) {

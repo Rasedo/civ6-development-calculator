@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { makeMap, makeState, tileAtCoords, grantTechs, grantCivics } from './helpers';
 import { foundCity, queueSettler, settlerCost, endTurn, itemLabel } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, BARB_SEAT } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, BARB_SEAT, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat } from '../src/core/seats';
 import { makeState, makeMap, tileAtCoords } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { tilesWithin } from '../src/core/hex';
@@ -70,12 +70,10 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id; // A-17: per-city registry
+  setTileOwner(tile, civOfRival(rival.id), city.id); // A-17: per-city registry
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+    if (!isPlayerSeat(tileSeat(t)) && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);
@@ -96,7 +94,7 @@ function addCs(state: GameState, col: number, row: number, type: CityStateType, 
     quest: null,
     questIssuedTurn: 0,
   };
-  for (const t of tilesWithin(state.map, col, row, 1)) t.csId = cs.id;
+  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id));
   state.cityStates.push(cs);
   return cs;
 }
@@ -195,8 +193,8 @@ describe('city-state conquest and levies', () => {
     expect(state.cityStates.length).toBe(0);
     const city = state.cities.find((c) => c.name === 'Valletta');
     expect(city).toBeDefined();
-    expect(state.map.tiles[cs.centerIndex].cityId).toBe(city!.id);
-    expect(state.map.tiles[cs.centerIndex].csId ?? -1).toBe(-1);
+    expect(tileCity(state.map.tiles[cs.centerIndex])).toBe(city!.id);
+    expect((isCityStateSeat(tileSeat(state.map.tiles[cs.centerIndex])) ? cityStateOfSeat(tileSeat(state.map.tiles[cs.centerIndex])) : -1)).toBe(-1);
   });
 
   it('autopilot target lists never include peaceful city-states', () => {
@@ -279,8 +277,10 @@ describe('loyalty', () => {
     expect(state.cities.some((c) => c.id === border.id)).toBe(false);
     expect(rival.cities.some((c) => c.name === border.name)).toBe(true);
     const center = state.map.tiles[border.centerIndex];
-    expect(center.cityId).toBe(-1);
-    expect(center.rivalId).toBe(rival.id);
+    // #51/S1.3i: the old form asserted `center.cityId === -1`, i.e. "the
+    // PLAYER's tag is cleared" — an artefact of four separate tags. The intent
+    // is that the tile now belongs to the RIVAL, which one seat says directly.
+    expect(tileSeat(center)).toBe(civOfRival(rival.id));
     expect(state.eventLog.some((e) => e.includes('defected'))).toBe(true);
   });
 

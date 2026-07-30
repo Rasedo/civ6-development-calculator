@@ -701,7 +701,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   }
   const keptDistricts: { type: DistrictId; tileIndex: number }[] = [];
   for (const [type, tileIndex] of keptByType) keptDistricts.push({ type, tileIndex });
-  const keptWonders = city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === city.id);
+  const keptWonders = city.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], city));
   for (const t of state.map.tiles) {
     if (isPlayerSeat(tileSeat(t)) && tileCity(t) === city.id) {
       setTileOwner(t, civOfRival(winner.id), winner.nextCityId); // A-17: the rc pushed below
@@ -1169,7 +1169,7 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
     const p = def.placement;
     const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
       .filter((t) => {
-        // A-24: per-city ownership, mirroring canPlaceWonder's `tile.cityId ===
+        // A-24: per-city ownership, mirroring canPlaceWonder's `tileCity(tile) ===
         // city.id` — the wonder tile registers to THIS rc (rivalCityId), not
         // merely the civ. Same coherence fix as tryQueueRivalDistrict.
         if (!tileOwnedByCiv(t, civ) || !tileBelongsTo(t, rc) || t.index === rc.centerIndex) return false;
@@ -1807,7 +1807,7 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   for (const rc of rival.cities) grants.set(rc.id, 0);
   const luxuries = new Set<string>();
   for (const t of state.map.tiles) {
-    if (!t.resource || (t.rivalId ?? -1) !== rival.id) continue;
+    if (!t.resource || !tileOwnedByCiv(t, civOfRival(rival.id))) continue;
     const def = RESOURCES[t.resource];
     if (def.category === 'luxury' && t.improvement === def.improvement) luxuries.add(t.resource);
   }
@@ -2291,7 +2291,7 @@ export function assertRivalRegistryCoherent(state: GameState): void {
         if (!tileBelongsTo(t, rc) || !tileOwnedByCiv(t, civ)) {
           throw new Error(
             `A-24 registry incoherence: rival=${rival.id} rc.id=${rc.id} ${kind}=${type} ` +
-              `tile=${tileIndex} rivalCityId=${t.rivalCityId} rivalId=${t.rivalId} turn=${state.turn}`,
+              `tile=${tileIndex} ownerSeat=${tileSeat(t)} ownerCity=${tileCity(t)} turn=${state.turn}`,
           );
         }
       };
@@ -2799,8 +2799,7 @@ export function rivalPhase(state: GameState): void {
           const cost = rivalTilePurchaseCost(state, rival, rc, next);
           if (!goldAffordable(rival.treasury ?? 0, cost)) break;
           rival.treasury = (rival.treasury ?? 0) - cost;
-          state.map.tiles[next].rivalId = rival.id;
-          state.map.tiles[next].rivalCityId = rc.id; // A-17 registry
+          setTileOwner(state.map.tiles[next], civOfRival(rival.id), rc.id); // A-17 registry
           rc.tilesAcquired += 1;
           rival.tilesPurchased = (rival.tilesPurchased ?? 0) + 1;
           bought = true;
@@ -3200,8 +3199,7 @@ export function rivalPhase(state: GameState): void {
           break;
         }
         rc.cultureBox -= rcBorderCost();
-        state.map.tiles[next].rivalId = rival.id;
-        state.map.tiles[next].rivalCityId = rc.id; // A-17
+        setTileOwner(state.map.tiles[next], civOfRival(rival.id), rc.id); // A-17
         rc.tilesAcquired += 1;
       }
       // AUDIT B-2: the rival mirror of the player city strike (combat.ts) —

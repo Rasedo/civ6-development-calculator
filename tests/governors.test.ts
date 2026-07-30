@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat } from '../src/core/seats';
 import { dedicationEvent } from '../src/core/eras';
 import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../src/data/rivals';
 import { makeState, tileAtCoords } from './helpers';
@@ -78,12 +79,10 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id;
+  setTileOwner(tile, civOfRival(rival.id), city.id);
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+    if (!isPlayerSeat(tileSeat(t)) && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);
@@ -116,8 +115,7 @@ function addCity(state: GameState, rival: RivalCiv, col: number, row: number, lo
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id;
+  setTileOwner(tile, civOfRival(rival.id), city.id);
   rival.cities.push(city);
   return city;
 }

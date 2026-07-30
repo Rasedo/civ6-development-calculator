@@ -182,6 +182,10 @@ def main() -> int:
         # type check IS the gate, so run tsc alone. vitest moved into the
         # parity lane (it needs no fixtures).
         ("tsc", [npx, "tsc", "--noEmit"]),
+        # #51/S1.3i: most of scripts/ cannot be typechecked (@types/node is not
+        # installed) and it IS the parity harness. A parse costs ~200ms and
+        # catches the class that killed this gate with an empty error message.
+        ("parse", ["node", "scripts/parse-check.mjs"]),
         ("export", [npm, "run", "gpu:export"]),
     ):
         run(name, cmd, threads=24)

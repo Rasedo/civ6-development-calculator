@@ -54,11 +54,7 @@ export function tileOwnerCiv(t: Tile): number | null {
  * collapses to `ownerSeat`/`ownerCity` once every reader goes through here.
  */
 export function tileSeat(t: Tile): number {
-  if (t.cityId !== -1) return PLAYER_CIV;
-  const r = t.rivalId ?? -1;
-  if (r !== -1) return civOfRival(r);
-  const cs = t.csId ?? -1;
-  return cs !== -1 ? seatOfCityState(cs) : NO_SEAT;
+  return t.ownerSeat;
 }
 
 /**
@@ -71,16 +67,13 @@ export function tileSeat(t: Tile): number {
  * could leave exactly that.
  */
 export function setTileOwner(t: Tile, seat: number, city = -1): void {
-  t.cityId = isPlayerSeat(seat) ? city : -1;
-  t.rivalId = isRivalSeat(seat) ? rivalOfCiv(seat) : undefined;
-  t.rivalCityId = isRivalSeat(seat) ? (city === -1 ? undefined : city) : undefined;
-  t.csId = isCityStateSeat(seat) ? cityStateOfSeat(seat) : undefined;
+  t.ownerSeat = seat;
+  t.ownerCity = isCityStateSeat(seat) || seat === NO_SEAT ? -1 : city;
 }
 
 /** The CITY (within its seat) that works this tile, or -1. */
 export function tileCity(t: Tile): number {
-  if (t.cityId !== -1) return t.cityId;
-  return t.rivalCityId ?? -1;
+  return t.ownerCity;
 }
 
 /**

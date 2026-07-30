@@ -8,6 +8,7 @@
  */
 
 import type { GameMap, TerrainId, Tile } from './types';
+import { NO_SEAT } from './seats';
 import { neighborOffset, oppositeDir, inBounds, tileIndex } from './hex';
 import { RESOURCES } from '../data/resources';
 import { FEATURES } from '../data/features';
@@ -84,7 +85,8 @@ function blankTile(index: number, col: number, row: number): Tile {
     volcano: false,
     fertility: 0,
     droughtTurns: 0,
-    cityId: -1,
+    ownerSeat: NO_SEAT,
+    ownerCity: -1,
   };
 }
 

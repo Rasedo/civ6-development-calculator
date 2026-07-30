@@ -18,7 +18,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { playerSeat, isPlayerSeat, tileBelongsTo } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, tileBelongsTo, tileCity } from '../src/core/seats';
 import {
   createGame,
   endTurn,

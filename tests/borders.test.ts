@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, tileCity } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { borderGrowthCost } from '../src/data/constants';
 import { foundCity, endTurn, buyTile, tilePurchaseCost } from '../src/core/game';
@@ -17,14 +17,14 @@ describe('cultural border growth', () => {
   it('culture claims new tiles over time, adjacent and within 5 rings', () => {
     const state = makeState(makeMap(18, 18));
     const city = foundCity(state, tileAtCoords(state.map, 9, 9).index).city!;
-    const before = state.map.tiles.filter((t) => t.cityId === city.id).length;
+    const before = state.map.tiles.filter((t) => tileCity(t) === city.id).length;
     expect(before).toBe(7);
 
     let guard = 0;
     while (city.tilesAcquired === 0 && guard++ < 60) endTurn(state);
     expect(city.tilesAcquired).toBeGreaterThanOrEqual(1);
 
-    const owned = state.map.tiles.filter((t) => t.cityId === city.id);
+    const owned = state.map.tiles.filter((t) => tileCity(t) === city.id);
     expect(owned.length).toBe(before + city.tilesAcquired);
     const center = state.map.tiles[city.centerIndex];
     for (const t of owned) {
@@ -51,7 +51,7 @@ describe('cultural border growth', () => {
     expect(cost).toBe(30); // ring 2: round(50 × GAME_SPEED), no research yet
 
     expect(buyTile(state, city.id, target.index).ok).toBe(true);
-    expect(target.cityId).toBe(city.id);
+    expect(tileCity(target)).toBe(city.id);
     expect(playerSeat(state).treasury).toBe(1000 - cost);
     expect(city.tilesAcquired).toBe(0); // purchases don't advance the culture counter
     expect(state.tilesPurchased).toBe(1);
@@ -68,6 +68,6 @@ describe('cultural border growth', () => {
     playerSeat(state).treasury = 10;
     const target = tileAtCoords(state.map, 11, 9);
     expect(buyTile(state, city.id, target.index).ok).toBe(false);
-    expect(target.cityId).toBe(-1);
+    expect(tileCity(target)).toBe(-1);
   });
 });

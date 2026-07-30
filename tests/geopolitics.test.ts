@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, tileAtCoords } from './helpers';
 import { rivalPhase, isFormalWar, rivalStrength } from '../src/core/rivals';
-import { civsAtWar, setRivalWar, civOfRival } from '../src/core/seats';
+import { civsAtWar, setRivalWar, civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat } from '../src/core/seats';
 import { hostileRangedStrike, attackTargets } from '../src/core/combat';
 import { unitsHostile, spawnUnit } from '../src/core/units';
 import { tilesWithin } from '../src/core/hex';
@@ -68,12 +68,10 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id;
+  setTileOwner(tile, civOfRival(rival.id), city.id);
   for (const t of tilesWithin(state.map, col, row, 1)) {
-    if (t.cityId === -1 && (t.csId ?? -1) === -1) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+    if (!isPlayerSeat(tileSeat(t)) && (isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1) === -1) {
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);
@@ -106,8 +104,7 @@ function addCity(state: GameState, rival: RivalCiv, col: number, row: number): R
   };
   tile.district = 'CITY_CENTER';
   tile.districtComplete = true;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id;
+  setTileOwner(tile, civOfRival(rival.id), city.id);
   rival.cities.push(city);
   return city;
 }

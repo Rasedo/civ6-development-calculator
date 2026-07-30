@@ -4,7 +4,7 @@
  */
 
 import type { DistrictId, GameState, Tile, YieldKey, Yields } from '../core/types';
-import { playerSeat, isPlayerSeat, tileSeat } from '../core/seats';
+import { playerSeat, isPlayerSeat, tileSeat, tileCity } from '../core/seats';
 import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
@@ -184,7 +184,7 @@ export function renderTilePanel(
   const terrain = TERRAINS[tile.terrain];
   const elevLabel =
     tile.elevation === 'MOUNTAIN' ? ' (Mountain)' : tile.elevation === 'HILLS' ? ' (Hills)' : '';
-  const owner = state.cities.find((c) => c.id === tile.cityId);
+  const owner = state.cities.find((c) => c.id === tileCity(tile));
   const wonder = tile.wonder ? WONDERS[tile.wonder] : null;
 
   const chips: string[] = [];
@@ -1493,7 +1493,7 @@ export function tileSummary(state: GameState, tile: Tile): string {
   if (tile.resource) parts.push(RESOURCES[tile.resource].name);
   if (tile.improvement) parts.push(IMPROVEMENTS[tile.improvement as keyof typeof IMPROVEMENTS].name);
   if (tile.district) parts.push(DISTRICTS[tile.district].name);
-  const city = state.cities.find((c) => c.id === tile.cityId);
+  const city = state.cities.find((c) => c.id === tileCity(tile));
   if (city) parts.push(`(${city.name})`);
   return parts.join(' · ');
 }

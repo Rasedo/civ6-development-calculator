@@ -1,7 +1,7 @@
 /** App entry: wires game state, canvas renderer, panels and input together. */
 
 import './style.css';
-import { playerSeat, tileBelongsTo } from '../src/core/seats';
+import { playerSeat, tileBelongsTo, tileCity } from '../src/core/seats';
 import type { DistrictId, GameState } from './core/types';
 import {
   createGame,
@@ -951,7 +951,7 @@ canvas.addEventListener('click', (e) => {
   if (
     ui.manageCitizens &&
     ui.selectedCityId !== null &&
-    tile.cityId === ui.selectedCityId &&
+    tileCity(tile) === ui.selectedCityId &&
     tileIdx !== state.cities.find((c) => c.id === ui.selectedCityId)!.centerIndex
   ) {
     const city = state.cities.find((c) => c.id === ui.selectedCityId)!;

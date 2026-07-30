@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { PLAYER_CIV, setTileOwner } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, bareCtx } from './helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { disasterPhase, FERTILITY_CAP } from '../src/core/disasters';
@@ -21,7 +22,7 @@ describe('disasters', () => {
     volcano.volcano = true;
     const slope = tileAtCoords(state.map, 9, 8);
     slope.improvement = 'FARM';
-    slope.cityId = 0;
+    setTileOwner(slope, PLAYER_CIV, 0);
 
     let guard = 0;
     while (!slope.pillaged && guard++ < 600) disasterPhase(state);

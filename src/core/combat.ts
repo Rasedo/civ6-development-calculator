@@ -254,8 +254,8 @@ function unitReligion(state: GameState, unit: Unit): number {
 }
 
 /** B6-S1: the followed religion of the city OWNING this tile (-1 = unowned or
- * following nothing). Player tiles via tile.cityId; rival tiles via the A-17
- * per-city registry (tile.rivalCityId). */
+ * following nothing). Player tiles via tileCity(tile); rival tiles via the A-17
+ * per-city registry (tileCity(tile)). */
 function tileFollowedReligion(state: GameState, tile: Tile): number {
   return cityAtTile(state, tile)?.followedReligion ?? -1;
 }
@@ -518,7 +518,7 @@ export function encampmentDefense(
   // unit instead (the `enemies.length === 0` precedence in meleeAttack), so the
   // district never doubles up with a defender.
   if (isRivalSeat(tileSeat(tile))) {
-    const rival = state.rivals.find((r) => r.id === tile.rivalId);
+    const rival = rivalOfSeat(state, tileSeat(tile));
     if (!rival) return null;
     return { defCS: Math.max(15, rival.bestMeleeCS ?? 0), k: 'renc' };
   }
@@ -1113,7 +1113,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   // Shrine the GPU (district-complete gated) never could (seed 9235).
   const keptDistricts: { type: DistrictId; tileIndex: number }[] = [];
   for (const t of state.map.tiles) {
-    if (t.cityId === id && t.district !== null && t.districtComplete) {
+    if (tileBelongsTo(t, { seat: PLAYER_CIV, id }) && t.district !== null && t.districtComplete) {
       keptDistricts.push({ type: t.district, tileIndex: t.index });
     }
   }
@@ -1133,7 +1133,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     isCapital: false,
     buildings: keptBuildings,
     districts: keptDistricts,
-    wonders: city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === id).map((w) => ({ ...w })),
+    wonders: city.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: PLAYER_CIV, id })).map((w) => ({ ...w })),
     specialists: {},
     // A city taken by CONQUEST joins at half HP — this used to be a separate
     // `state.cityHp[id] = CITY_MAX_HP/2` write after the literal, and dropping

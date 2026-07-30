@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PLAYER_CIV, civOfRival } from '../src/core/seats';
+import { PLAYER_CIV, civOfRival, setTileOwner } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { cliffBlocks, cliffBlocksStep } from '../src/core/units';
 import { neighborTile } from '../src/core/hex';
@@ -60,7 +60,7 @@ describe('B-26: cliffs block embark and disembark', () => {
   it('a Harbor passes its OWNER only, never the enemy', () => {
     const { state, land, sea } = setup();
     land.district = 'HARBOR';
-    land.cityId = 1; // the player's territory
+    setTileOwner(land, PLAYER_CIV, 1); // the player's territory
     expect(cliffBlocks(state, land, sea, { seat: PLAYER_CIV })).toBe(false);
     // an enemy using the same Harbor tile is still walled out
     expect(cliffBlocks(state, land, sea, { seat: civOfRival(0) })).toBe(true);

@@ -7,7 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
-import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState } from './seats';
+import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -111,7 +111,8 @@ export function placeCityStates(state: GameState, count?: number): void {
 // ---------------------------------------------------------------------------
 
 export function cityStateAt(state: GameState, tileIndex: number): CityState | undefined {
-  const csId = state.map.tiles[tileIndex].csId ?? -1;
+  const _s = tileSeat(state.map.tiles[tileIndex]);
+  const csId = isCityStateSeat(_s) ? cityStateOfSeat(_s) : -1;
   return csId === -1 ? undefined : state.cityStates.find((cs) => cs.id === csId);
 }
 

@@ -5,7 +5,7 @@
  */
 
 import { hexCenter, cornerOffsets, EDGE_CORNERS, pixelToHex, inBounds, tileIndex, neighborOffset } from '../core/hex';
-import { isBarbSeat, isRivalSeat, rivalOfSeat, isPlayerSeat, tileSeat } from '../core/seats';
+import { isBarbSeat, isRivalSeat, rivalOfSeat, isPlayerSeat, tileSeat, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat } from '../core/seats';
 import type { GameMap, GameState, Tile } from '../core/types';
 import { TERRAINS, MOUNTAIN_COLOR } from '../data/terrains';
 import { RESOURCES, RESOURCE_CATEGORY_COLORS } from '../data/resources';
@@ -190,7 +190,7 @@ export class MapRenderer {
       for (let d = 0; d < 6; d++) {
         const [nc, nr] = neighborOffset(tile.col, tile.row, d);
         const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
-        if (n && n.cityId === tile.cityId) continue;
+        if (n && tileCity(n) === tileCity(tile)) continue;
         const [a, b] = EDGE_CORNERS[d];
         ctx.beginPath();
         ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
@@ -201,7 +201,7 @@ export class MapRenderer {
 
     // --- city-state territory borders ----------------------------------------
     for (const { tile, cx, cy } of visible) {
-      const csId = tile.csId ?? -1;
+      const csId = isCityStateSeat(tileSeat(tile)) ? cityStateOfSeat(tileSeat(tile)) : -1;
       if (csId === -1) continue;
       const cs = state.cityStates.find((c) => c.id === csId);
       ctx.strokeStyle = cs ? CS_TYPE_COLORS[cs.type] : '#999999';
@@ -209,7 +209,7 @@ export class MapRenderer {
       for (let d = 0; d < 6; d++) {
         const [nc, nr] = neighborOffset(tile.col, tile.row, d);
         const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
-        if (n && (n.csId ?? -1) === csId) continue;
+        if (n && (isCityStateSeat(tileSeat(n)) ? cityStateOfSeat(tileSeat(n)) : -1) === csId) continue;
         const [a, b] = EDGE_CORNERS[d];
         ctx.beginPath();
         ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
@@ -220,7 +220,7 @@ export class MapRenderer {
 
     // --- rival territory borders -----------------------------------------------
     for (const { tile, cx, cy } of visible) {
-      const rivalId = tile.rivalId ?? -1;
+      const rivalId = isRivalSeat(tileSeat(tile)) ? rivalOfCiv(tileSeat(tile)) : -1;
       if (rivalId === -1) continue;
       const rival = state.rivals.find((r) => r.id === rivalId);
       ctx.strokeStyle = rival?.color ?? '#888888';
@@ -228,7 +228,7 @@ export class MapRenderer {
       for (let d = 0; d < 6; d++) {
         const [nc, nr] = neighborOffset(tile.col, tile.row, d);
         const n = inBounds(map, nc, nr) ? map.tiles[tileIndex(map, nc, nr)] : null;
-        if (n && (n.rivalId ?? -1) === rivalId) continue;
+        if (n && (isRivalSeat(tileSeat(n)) ? rivalOfCiv(tileSeat(n)) : -1) === rivalId) continue;
         const [a, b] = EDGE_CORNERS[d];
         ctx.beginPath();
         ctx.moveTo(cx + corners[a].x, cy + corners[a].y);
