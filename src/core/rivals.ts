@@ -15,7 +15,7 @@ import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearC
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
-import { tileYields } from './yields';
+import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
 import { rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
 import { isSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
@@ -49,7 +49,6 @@ import {
   AQUEDUCT_NO_FRESH_TOTAL,
   GAME_SPEED,
   GOLD_PURCHASE_MULT,
-  REGIONAL_RANGE,
   borderGrowthCost,
   amenitiesNeeded,
   amenityTier,
@@ -1820,7 +1819,7 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
     }
     // B9-R2: regional amenities (Zoo/Stadium) join the base like the player's
     // luxury ranking (city.ts:292 — localBuildingAmenities + regional).
-    baseHave.set(rc.id, n + rivalRegionalEffects(state, rival, rc).amenities);
+    baseHave.set(rc.id, n + regionalEffects(state, rc).amenities);
   }
   for (let i = 0; i < luxuries.size; i++) {
     const ranked = [...rival.cities].sort((a, b) => {
@@ -1859,30 +1858,6 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
  * buildings on this rival's OWN cities' complete unpillaged districts reach
  * every same-civ city center within REGIONAL_RANGE; the same building type
  * never stacks. */
-function rivalRegionalEffects(state: GameState, rival: RivalCiv, rc: RivalCity): { yields: Yields; amenities: number } {
-  const center = state.map.tiles[rc.centerIndex];
-  const seen = new Set<string>();
-  const out = { yields: { food: 0, production: 0, gold: 0, science: 0, culture: 0, faith: 0 } as Yields, amenities: 0 };
-  for (const other of rival.cities) {
-    for (const inst of other.districts) {
-      const tile = state.map.tiles[inst.tileIndex];
-      if (!tile.districtComplete || tile.districtPillaged) continue; // B-32: pillaged source is dark
-      for (const id of other.buildings) {
-        const def = BUILDINGS[id];
-        if (!def || !def.regional || def.district !== inst.type) continue;
-        if (seen.has(id)) continue;
-        if (hexDistance(tile.col, tile.row, center.col, center.row) > REGIONAL_RANGE) continue;
-        seen.add(id);
-        if (def.yields) {
-          for (const [k, v] of Object.entries(def.yields)) out.yields[k as keyof Yields] += v ?? 0;
-        }
-        if (def.amenities) out.amenities += def.amenities;
-      }
-    }
-  }
-  return out;
-}
-
 export function rivalCityYields(
   state: GameState,
   rival: RivalCiv,
@@ -2057,7 +2032,7 @@ export function rivalCityYields(
   // B9-R2: regional-building yields — the city.ts:445-446 position (after the
   // local buildings, before the wonder flat yields), pre-tier.
   {
-    const regional = rivalRegionalEffects(state, rival, rc);
+    const regional = regionalEffects(state, rc);
     for (const [k, v] of Object.entries(regional.yields)) total[k as keyof Yields] += v ?? 0;
   }
   // B-20: slotted Great Works — culture/turn per work BY KIND (#70/S1), the

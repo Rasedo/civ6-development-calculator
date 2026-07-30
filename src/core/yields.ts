@@ -5,6 +5,7 @@
  */
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
+import { citiesOf } from './seats';
 import { neighbors, hexDistance } from './hex';
 import { isWater, isMountain, hasRiver } from './query';
 import type { YieldCtx } from './effects';
@@ -216,11 +217,18 @@ export interface RegionalEffects {
  * building type never stacks. (Policy building multipliers deliberately not
  * applied here — no card in the current catalogue targets regional buildings.)
  */
+/**
+ * Regional building effects reaching this city from its OWNER's other cities.
+ *
+ * #51/S2.3: `rivals.ts:rivalRegionalEffects` was this body character for
+ * character apart from `rival.cities` in place of `state.cities` and an inlined
+ * `addYields`. One function now, keyed on the city's seat — zero flags.
+ */
 export function regionalEffects(state: GameState, city: City): RegionalEffects {
   const center = state.map.tiles[city.centerIndex];
   const seen = new Set<string>();
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
-  for (const other of state.cities) {
+  for (const other of citiesOf(state, city.seat)) {
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
       if (!tile.districtComplete || tile.districtPillaged) continue; // B-32: pillaged source is dark
