@@ -3,12 +3,12 @@
  * `Modifiers` object that the yield/housing/amenity code consumes.
  */
 
-import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, RivalCiv, Yields } from './types';
+import type { DistrictId, GameState, GreatPersonClass, ImprovementId, ResearchState, ResourceCategory, Seat, Yields } from './types';
 import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { PLAYER_CIV, playerSeat, rivalsOf } from './seats';
+import { PLAYER_CIV, playerSeat, rivalsOf, seatOf, citiesOf, isPlayerSeat } from './seats';
 import { csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 
 // ---------------------------------------------------------------------------
@@ -241,37 +241,105 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
   return mods;
 }
 
-export function getModifiers(state: GameState): Modifiers {
-  const mods = modifiersFromResearch(playerSeat(state).research);
+// T1 PERF: self-validating value-key cache for the modifier head. The key
+// projects every input the returned Modifiers depends on, so a call-site-free
+// invalidation (combat captures/transfers, tech/civic completion, growth) is
+// captured automatically:
+//   - research.techs.length / research.civics.length: the research arrays are
+//     APPEND-ONLY (only .push at game.ts / rivals.ts; no splice/pop/shift/
+//     filter/reassign on any seat's research across the repo), so per-seat the
+//     length is a monotonic version counter that uniquely identifies the
+//     completed-effects set feeding both modifiersFromResearch and
+//     computeAdoption (government + slotted policies).
+//   - pantheon / founded / founder / enhancer: belief ids fully determine the
+//     static belief-effect tables applied.
+//   - Sum(pop) + cities.length: the ONLY fields the belief seat reads
+//     (perFollowers = floor(Sum(pop)/per); perCity = cities.length).
+// `state` is NOT an input: every seat now passes an explicit belief seat, so
+// applyBeliefEffects never falls back to reading state.cities. WeakMap keys on
+// the seat object, stable within a state and fresh across deserialize/clone.
+//
+// The PLAYER is deliberately excluded: its mods also depend on stored policy
+// slots and the live city-state channel, neither of which is in this key.
+const modCache = new WeakMap<Seat, { key: string; mods: Modifiers }>();
 
-  // Government + slotted policies
-  const govId = playerSeat(state).government.current;
-  const gov = govId ? GOVERNMENTS[govId] : null;
-  if (gov) {
-    applyPolicyEffects(mods, gov.effects);
-    for (const cardId of playerSeat(state).government.policies) {
-      if (!cardId) continue;
-      const card = POLICIES[cardId];
-      if (card) applyPolicyEffects(mods, card.effects);
+/**
+ * ONE modifier head, for any seat. Callers no longer choose between a player
+ * function and a rival function — that choice WAS the asymmetry.
+ *
+ * The research and belief work is genuinely shared. Three things still branch
+ * on whether this is the player, each an explicitly-named divergence rather
+ * than an accident, each pointing at its Round 7 slice:
+ *
+ *  1. GOVERNMENT SOURCE. The player reads its STORED government + policy
+ *     slots (an RL agent or the UI picks the cards). A rival DERIVES its
+ *     adoption from research via computeAdoption. Today those agree because
+ *     the scripted player adopts with the same function, but they are not the
+ *     same mechanism and merging them would silently overwrite a real
+ *     player's card choices. Round 7 gives rivals stored slots instead.
+ *  2. THE CITY-STATE CHANNEL. Envoy bonuses and the suzerain capital perk are
+ *     applied here for the player and re-added by hand inside rivalCityYields
+ *     for a rival. This is the plan's declared csChannel flag: one home is
+ *     correct, this one, and Round 7 moves the rival's copy here.
+ *  3. CACHING. The rival mods are memoised on a key of exactly the fields
+ *     they depend on. The player's depend on stored policy slots and the
+ *     live city-state channel, neither of which is in that key, so the
+ *     player is deliberately NOT cached.
+ *
+ * The belief seat is NOT a divergence: applyBeliefEffects' no-seat fallback
+ * computes the player's own Σpop and city count, which is exactly what an
+ * explicit seat would pass, so both arms now pass one.
+ */
+export function getModifiers(state: GameState, seat: number = PLAYER_CIV): Modifiers {
+  const s = seatOf(state, seat);
+  if (!s) return defaultModifiers(); // no such seat — unreachable from real callers
+  const player = isPlayerSeat(seat);
+  const cities = citiesOf(state, seat);
+  let pop = 0;
+  for (const c of cities) pop += c.population;
+
+  // (3) Non-player seats are memoised; see the note above for why the player
+  // is not. WeakMap keys on the seat object, stable within a state and fresh
+  // across deserialize/clone.
+  const rel = s.religion;
+  const key = `${s.research.techs.length}:${s.research.civics.length}:${rel.pantheon ?? ''}:${rel.founded ? 1 : 0}:${rel.founder ?? ''}:${rel.enhancer ?? ''}:${pop}:${cities.length}`;
+  if (!player) {
+    const cached = modCache.get(s);
+    if (cached && cached.key === key) return cached.mods;
+  }
+
+  const mods = modifiersFromResearch(s.research);
+
+  // (1) Government + slotted policies.
+  if (player) {
+    const govId = s.government.current;
+    const gov = govId ? GOVERNMENTS[govId] : null;
+    if (gov) {
+      applyPolicyEffects(mods, gov.effects);
+      for (const cardId of s.government.policies) {
+        if (!cardId) continue;
+        const card = POLICIES[cardId];
+        if (card) applyPolicyEffects(mods, card.effects);
+      }
     }
+  } else if (GOVERNMENTS_ADOPTION_LIVE) {
+    applyGovernment(mods, s.research);
   }
 
   // Religion: pantheon always; founder belief once founded. B-18: the FOLLOWER
   // belief is NO LONGER applied per-civ here — it applies per-CITY keyed on that
   // city's followedReligion (withFollowerBelief in computeCityStats /
   // rivalCityYields). Pantheons + founder + enhancer stay per-civ.
-  const rel_263 = playerSeat(state).religion;
-  applyBeliefEffects(state, mods, rel_263?.pantheon ? PANTHEONS[rel_263.pantheon] : undefined);
-  if (playerSeat(state).religion?.founded) {
-    const rel_265 = playerSeat(state).religion;
-    applyBeliefEffects(state, mods, rel_265.founder ? FOUNDER_BELIEFS[rel_265.founder] : undefined);
+  const beliefSeat = { followers: pop, cities: cities.length };
+  applyBeliefEffects(state, mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
+  if (rel?.founded) {
+    applyBeliefEffects(state, mods, rel.founder ? FOUNDER_BELIEFS[rel.founder] : undefined, beliefSeat);
     // B-18: Enhancer belief (inert effects this round; wired for symmetry).
-    const rel_267 = playerSeat(state).religion;
-    applyBeliefEffects(state, mods, rel_267.enhancer ? ENHANCER_BELIEFS[rel_267.enhancer] : undefined);
+    applyBeliefEffects(state, mods, rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer] : undefined, beliefSeat);
   }
 
-  // City-state envoy bonuses
-  if (state.cityStates?.length) {
+  // (2) City-state envoy bonuses.
+  if (player && state.cityStates?.length) {
     const cs = csEnvoyBonuses(state);
     addPartial(mods.capitalYields, cs.capital);
     // B-21: the 3/6 tiers land on BUILDINGS now (buildingYieldAdd, applied in
@@ -283,6 +351,7 @@ export function getModifiers(state: GameState): Modifiers {
     // B-21: the suzerain's per-CS unique perk — a flat capital yield.
     addPartial(mods.capitalYields, csSuzerainCapitalBonus(state));
   }
+  if (!player) modCache.set(s, { key, mods });
   return mods;
 }
 
@@ -388,60 +457,6 @@ function applyGovernment(mods: Modifiers, research: ResearchState): void {
     const card = POLICIES[cardId];
     if (card) applyPolicyEffects(mods, card.effects);
   }
-}
-
-/** AUDIT A-7 / A-7r: the rival's modifier head — its research boosts, its OWN
- * claimed pantheon and (once its religion is founded) its two beliefs, PLUS
- * its scripted government + slotted policies (A-7r; the getModifiers
- * government block, computed from the rival's research). CS blocks stay
- * player machinery. The follower counts are the RIVAL's population/cities
- * (the seat), not the player's. */
-// T1 PERF: self-validating value-key cache for getRivalModifiers. The key
-// projects every input the returned Modifiers depends on, so a call-site-free
-// invalidation (combat captures/transfers, tech/civic completion, growth) is
-// captured automatically:
-//   - research.techs.length / research.civics.length: the research arrays are
-//     APPEND-ONLY (only .push at game.ts / rivals.ts:1872/1901; no
-//     splice/pop/shift/filter/reassign on any RivalCiv research across the
-//     repo), so per-rival the length is a monotonic version counter that
-//     uniquely identifies the completed-effects set feeding both
-//     modifiersFromResearch and computeAdoption (government + slotted policies).
-//   - pantheon / religionFounded / founderBelief / enhancerBelief: belief ids
-//     fully determine the static belief-effect tables applied.
-//   - Σpop + cities.length: the ONLY rival fields the belief seat reads
-//     (perFollowers = floor(Σpop/per); perCity = cities.length).
-// `state` is NOT an input: getRivalModifiers always passes an explicit seat, so
-// applyBeliefEffects never falls back to reading state.cities. The government
-// path (computeAdoption) reads only research. WeakMap keys on the rival object
-// identity, which is stable within a state and fresh across deserialize/clone.
-const rivalModCache = new WeakMap<RivalCiv, { key: string; mods: Modifiers }>();
-
-export function getRivalModifiers(state: GameState, rival: RivalCiv): Modifiers {
-  let pop = 0;
-  for (const c of rival.cities) pop += c.population;
-  const key = `${rival.research.techs.length}:${rival.research.civics.length}:${rival.religion.pantheon ?? ''}:${rival.religion.founded ? 1 : 0}:${rival.religion.founder ?? ''}:${rival.religion.enhancer ?? ''}:${pop}:${rival.cities.length}`;
-  const cached = rivalModCache.get(rival);
-  if (cached && cached.key === key) return cached.mods;
-
-  const mods = modifiersFromResearch(rival.research);
-  const seat = {
-    followers: pop,
-    cities: rival.cities.length,
-  };
-  applyBeliefEffects(state, mods, rival.religion.pantheon ? PANTHEONS[rival.religion.pantheon] : undefined, seat);
-  if (rival.religion.founded) {
-    // B-18: the FOLLOWER belief moved to the per-CITY followed-religion lookup
-    // (withFollowerBelief in rivalCityYields/rivalHousing/rivalAmenityTiers) —
-    // it is NO LONGER applied per-civ here. Founder + enhancer stay per-civ.
-    applyBeliefEffects(state, mods, rival.religion.founder ? FOUNDER_BELIEFS[rival.religion.founder] : undefined, seat);
-    // B-18: symmetric with the player (playerSeat(state).religion.enhancer above). Every
-    // enhancer effect is currently inert ({}), so this is byte-identical — the
-    // coupling surface is here for when a non-inert enhancer lands.
-    applyBeliefEffects(state, mods, rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer] : undefined, seat);
-  }
-  if (GOVERNMENTS_ADOPTION_LIVE) applyGovernment(mods, rival.research);
-  rivalModCache.set(rival, { key, mods });
-  return mods;
 }
 
 // ---------------------------------------------------------------------------

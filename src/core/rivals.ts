@@ -14,7 +14,7 @@ import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampm
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
-import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
+import { getModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
 import { routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity, routeRaidedAt } from './trade';
@@ -802,7 +802,7 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
     const gpDist = GP_CLASS_DISTRICT[cls];
     // A-7: Divine Spark — the belief's flat GPP joins the per-city term,
     // exactly like greatPersonPointsPerTurn (game.ts:876).
-    const gppFlat = getRivalModifiers(state, rival).gppFlat[cls] ?? 0;
+    const gppFlat = getModifiers(state, civOfRival(rival.id)).gppFlat[cls] ?? 0;
     let accrue = 0;
     for (const rc of rival.cities) {
       if (
@@ -927,7 +927,7 @@ function claimBeliefs(state: GameState, rival: RivalCiv): void {
   // enhancer belief, denying it from the shared pool (like follower/founder).
   // The draw sits AFTER the founder draw with the same UNCONDITIONAL shape the
   // GPU's _next_random(eopen) mirrors — only the outcome gates on pool + state.
-  // Effects are all inert this round; the identity applies via getRivalModifiers.
+  // Effects are all inert this round; the identity applies via getModifiers.
   if (rival.religion.founded && rival.religion.enhancer == null && prophetsOf(rival) >= 2) {
     const enhancers = Object.keys(ENHANCER_BELIEFS).filter(
       (id) => id !== playerSeat(state).religion.enhancer && !(state.claimedEnhancers ?? []).includes(id),
@@ -1693,7 +1693,7 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
   // the city's followed religion; River Goddess (pantheon) stays per-civ. The
   // owner religion id is this rival's index + 1 (used when coupling is inert).
   const ownerRel = rivalsOf(state).indexOf(rival) + 1;
-  const m = withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel));
+  const m = withFollowerBelief(state, getModifiers(state, civOfRival(rival.id)), followerReligionForCity(rc.followedReligion, ownerRel));
   for (const id of rc.buildings) {
     const bd = BUILDINGS[id];
     if (bd && pillaged.has(bd.district)) continue; // B-32: dark buildings
@@ -1757,7 +1757,7 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   // per-CITY on the followed religion) join the tier balance exactly like
   // computeCityStats' have (city.ts:456-461); the luxury-grant RANKING
   // stays building-amenities-only, mirroring the player's luxuryAmenities.
-  const base = getRivalModifiers(state, rival);
+  const base = getModifiers(state, civOfRival(rival.id));
   const ownerRel = rivalsOf(state).indexOf(rival) + 1;
   // B-15: this rival's flat war-weariness amenity penalty (symmetric with the
   // player's), applied to the tier balance after the luxury grants.
@@ -1808,7 +1808,7 @@ export function rivalCityYields(
   // on this city's followed religion (owner religion = rival index + 1 when the
   // coupling is inert). Government/CS stay player-only.
   const ownerRel = rivalsOf(state).indexOf(rival) + 1;
-  const ctx = { map: state.map, mods: withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel)) };
+  const ctx = { map: state.map, mods: withFollowerBelief(state, getModifiers(state, civOfRival(rival.id)), followerReligionForCity(rc.followedReligion, ownerRel)) };
   const ranked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
       (t) =>
@@ -2692,7 +2692,7 @@ export function rivalPhase(state: GameState): void {
       // ONE tile per civ per turn, first rc in slot order with a candidate.
       if (RIVAL_TILE_BUY_LIVE && !bought) {
         for (const rc of rival.cities) {
-          const next = pickBorderTile(state, rc, { map: state.map, mods: getRivalModifiers(state, rival) });
+          const next = pickBorderTile(state, rc, { map: state.map, mods: getModifiers(state, civOfRival(rival.id)) });
           if (next === null) continue;
           const cost = rivalTilePurchaseCost(state, rival, rc, next);
           if (!goldAffordable(rival.treasury ?? 0, cost)) break;
@@ -2995,7 +2995,7 @@ export function rivalPhase(state: GameState): void {
       // multiplier (Hanging Gardens — the empireGrowthMult twin) ride the
       // chain exactly like computeCityStats (city.ts:495-501).
       rc.foodBox += surplus > 0
-        ? surplus * hFactor * tier.growthFactor * getRivalModifiers(state, rival).growthMult * empireGrowthMult(state, civOfRival(rival.id))
+        ? surplus * hFactor * tier.growthFactor * getModifiers(state, civOfRival(rival.id)).growthMult * empireGrowthMult(state, civOfRival(rival.id))
         : surplus;
       const need = growthFoodNeeded(rc.population);
       if (rc.foodBox >= need) {
@@ -3088,9 +3088,9 @@ export function rivalPhase(state: GameState): void {
       // A-7: Religious Settlements — the belief border-cost multiplier,
       // the player's Math.round(base * borderCostMult) form (city.ts:507).
       const rcBorderCost = () =>
-        Math.round(borderGrowthCost(rc.tilesAcquired) * getRivalModifiers(state, rival).borderCostMult);
+        Math.round(borderGrowthCost(rc.tilesAcquired) * getModifiers(state, civOfRival(rival.id)).borderCostMult);
       while (rc.cultureBox >= rcBorderCost()) {
-        const next = pickBorderTile(state, rc, { map: state.map, mods: getRivalModifiers(state, rival) });
+        const next = pickBorderTile(state, rc, { map: state.map, mods: getModifiers(state, civOfRival(rival.id)) });
         if (next === null) {
           // Nowhere to grow: cap the box at the current threshold.
           rc.cultureBox = Math.min(rc.cultureBox, rcBorderCost());
