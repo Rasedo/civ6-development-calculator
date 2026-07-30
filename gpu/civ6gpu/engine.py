@@ -5057,7 +5057,6 @@ class BatchSim:
         tiles: torch.Tensor,
         seat,
         is_civilian=False,
-        strict: bool = False,
     ) -> torch.Tensor:
         """tileFreeForUnit: STACKING plus the Encampment wall.
 
@@ -5067,14 +5066,13 @@ class BatchSim:
         spawnUnit does — a real divergence, recorded rather than silently
         introduced by sharing this body.
         """
-        return self._stack_blocked(tiles, seat, is_civilian, strict) | self._encamp_block(tiles, seat)
+        return self._stack_blocked(tiles, seat, is_civilian) | self._encamp_block(tiles, seat)
 
     def _stack_blocked(
         self,
         tiles: torch.Tensor,
         seat,
         is_civilian=False,
-        strict: bool = False,
     ) -> torch.Tensor:
         """Pure STACKING check for tiles [B, N] — no Encampment term.
 
@@ -5105,9 +5103,7 @@ class BatchSim:
         mil_slot = self.occ_mil.gather(1, tc)
         civ_slot = self.occ_civ.gather(1, tc)
 
-        if strict:
-            occupied = (mil_slot >= 0) | (civ_slot >= 0)
-        else:
+        if True:
             # Whose unit occupies this tile, per DOMAIN, in the absolute seat
             # space (-1 = nobody). At most one military and one civilian can
             # stand here, so each domain has a single owner.
@@ -5150,15 +5146,16 @@ class BatchSim:
         # special case, because "hostile to everyone" already makes every
         # occupant block.
         #
-        # NOT `_blocked_for`: that adds the Encampment wall, and this spawn
-        # probe has never consulted Encampments even though TS's spawnUnit
-        # does. Real divergence, left alone here and recorded.
+        # `_blocked_for`, not `_stack_blocked`: TS's spawnUnit probes with
+        # tileFreeForUnit (units.ts), which calls encampmentBlocks — so the
+        # Encampment wall belongs here. The GPU omitted it and would place a
+        # unit into a tile a live enemy Encampment bars.
         if side == "player":
-            blocked = self._stack_blocked(cand7, PLAYER_SEAT, is_civilian=civ_mask)
+            blocked = self._blocked_for(cand7, PLAYER_SEAT, is_civilian=civ_mask)
         elif side == "rival" and civ is not None:
-            blocked = self._stack_blocked(cand7, civ + 1)
+            blocked = self._blocked_for(cand7, civ + 1)
         else:
-            blocked = self._stack_blocked(cand7, BARB_SEAT)
+            blocked = self._blocked_for(cand7, BARB_SEAT)
         terr = self.passable.gather(1, okc)
         if naval_mask is not None and bool(naval_mask.any()):
             # #45/B-6: naval rows use the water plane — wpass, OCEAN gated on the
@@ -10376,13 +10373,11 @@ class BatchSim:
             a_occ, a_lo = self.occ_mil, P_MAX + U_MAX  # #51/S3.4b
             a_alive = self.u_alive
             atk_cs_all = self._p_combat[self.u_type[:, u]]
-            blocked_side, _bstrict = "barb", False
         else:
             a_hp, a_tile, a_at = self.v_hp, self.v_tile, self.rv_at
             a_occ, a_lo = self.occ_mil, P_MAX  # #51/S3.4b
             a_alive = self.v_alive
             atk_cs_all = self._p_combat[self.v_type[:, u]]
-            blocked_side, _bstrict = "rival", True  # the strict fallthrough, now NAMED
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
         # #51/S3.4b: the tile's military and civilian occupants, by MERGED slot
@@ -10531,7 +10526,7 @@ class BatchSim:
             # #51/S3.4: the advance probe, by seat. `_bstrict` preserves the
             # loose-"rival" fallthrough exactly (see _blocked_for).
             _bseat = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
-            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), _bseat, strict=_bstrict).squeeze(1) & adv_terr
+            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), _bseat).squeeze(1) & adv_terr
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
@@ -10614,7 +10609,7 @@ class BatchSim:
                 if atk_kind == "barb"
                 else torch.ones_like(kill_adv)
             )
-            adv = kill_adv & _kterr & ~self._blocked_for(tgt.unsqueeze(1), _bseat2, strict=_bstrict).squeeze(1)
+            adv = kill_adv & _kterr & ~self._blocked_for(tgt.unsqueeze(1), _bseat2).squeeze(1)
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1

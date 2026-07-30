@@ -211,6 +211,7 @@ def main() -> int:
                 ("domination", [py, "gpu/domination_test.py"], 4),
                 ("melee", [py, "gpu/melee_test.py"], 4),  # #51/S3.4: was UNGATED — an S3.2 regression hid here
                 ("peace_target", [py, "gpu/peace_target_test.py"], 2),  # #51: no attack without a war
+                ("stack_rules", [py, "gpu/stack_rules_test.py"], 2),  # #51: cross-domain stacking + Encampment spawn wall
                 ("bankruptcy", [py, "gpu/bankruptcy_test.py"], 4),
                 ("seat", [py, "gpu/seat_test.py"], 4),
                 ("government", [py, "gpu/government_test.py"], 4),
