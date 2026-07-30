@@ -7504,7 +7504,9 @@ class BatchSim:
                 # never embark) → flat CS, no terrain (and no support below).
                 d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                 def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-                gar = (self.pmil_at[bidx, ctr] >= 0).long()  # cityDefenseStrength garrison +5
+                # #51/S3.4b: a PLAYER military standing on the centre tile.
+                _g = self.occ_mil[bidx, ctr]
+                gar = ((_g >= 0) & (self.unit_seat[bidx, _g.clamp(min=0)] == PLAYER_SEAT)).long()
                 atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
                 # B-29: the defending unit is wounded (the attacker is the city).
                 def_hp = self.unit_hp[bidx, ds0]
@@ -7607,7 +7609,9 @@ class BatchSim:
                 def_cs = self._p_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
                 d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                 def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-                gar = (self.pmil_at[bidx, ctr] >= 0).long()  # cityDefenseStrength garrison +5
+                # #51/S3.4b: a PLAYER military standing on the centre tile.
+                _g = self.occ_mil[bidx, ctr]
+                gar = ((_g >= 0) & (self.unit_seat[bidx, _g.clamp(min=0)] == PLAYER_SEAT)).long()
                 atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
                 def_hp = self.unit_hp[bidx, ds0]
                 def_e = def_cs - self._wound(def_hp)
@@ -11359,7 +11363,8 @@ class BatchSim:
         # P4/D-22 (cityDefenseStrength): max(15, strongest melee ever) + 5
         # when the PLAYER's own military garrisons the center (a hostile
         # standing there is a besieger, not a garrison). No population term.
-        gm = self.pmil_at.gather(1, sitec)
+        _gm = self.occ_mil.gather(1, sitec)
+        gm = torch.where((_gm >= 0) & (self.unit_seat.gather(1, _gm.clamp(min=0)) == PLAYER_SEAT), _gm, torch.full_like(_gm, -1))  # #51/S3.4b
         gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
         def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
         _ct = self.site.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -11477,7 +11482,9 @@ class BatchSim:
         if bool(city_att.any()):
             # cityDefenseStrength: max(15, strongest melee ever) + 5 when the
             # player's own military garrisons the center (P4/D-22)
-            gm = self.pmil_at.gather(1, self.site.clamp(min=0))
+            _sitec = self.site.clamp(min=0)
+            _gm = self.occ_mil.gather(1, _sitec)
+            gm = torch.where((_gm >= 0) & (self.unit_seat.gather(1, _gm.clamp(min=0)) == PLAYER_SEAT), _gm, torch.full_like(_gm, -1))  # #51/S3.4b
             gar = (gm.gather(1, tgt_city.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
             def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
             atk_e = atk_rs - self._wound(a_hp) + a_lvl  # B-29 (city not a unit) + B-4 veterancy
@@ -11614,7 +11621,9 @@ class BatchSim:
         rngd = self._p_rng_str[vt0] > 0
         rng_u = torch.where(rngd, self._p_rng_rng[vt0], torch.ones_like(vt0))
         d_all = self.pair_dist[hc0].to(torch.long)  # [B, T]
-        valid = (d_all >= 1) & (d_all <= rng_u.unsqueeze(1)) & (self.barb_at >= 0)
+        _bm = self.occ_mil
+        _bs = torch.where(_bm >= 0, self.unit_seat.gather(1, _bm.clamp(min=0)), torch.full_like(_bm, -1))
+        valid = (d_all >= 1) & (d_all <= rng_u.unsqueeze(1)) & (_bs == BARB_SEAT)  # #51/S3.4b
         tkey = torch.where(valid, self._arangeT.unsqueeze(0).expand(B, T), torch.full((B, T), T + 1, dtype=torch.long, device=dev))
         target_tile = tkey.min(dim=1).values
         attack = act & (target_tile <= T) & ~self.v_emb[:, v]  # #45/B-6: embarked cannot attack
@@ -11675,11 +11684,9 @@ class BatchSim:
             free = (
                 (nbp >= 0)
                 & terr
-                & (self.barb_at.gather(1, nbpc) < 0)
-                & (self.pmil_at.gather(1, nbpc) < 0)
-                & (self.pciv_at.gather(1, nbpc) < 0)
-                & (self.rv_at.gather(1, nbpc) < 0)
-                & (self.rvciv_at.gather(1, nbpc) < 0)  # C1-B5b: TS patrol blocks on ANY unit — builders included
+                # C1-B5b: TS patrol blocks on ANY unit. #51/S3.4b: two reads.
+                & (self.occ_mil.gather(1, nbpc) < 0)
+                & (self.occ_civ.gather(1, nbpc) < 0)
             )
             if self._embark_live:
                 # B-26 (#79): a CLIFF closes the embark/disembark edge for the
@@ -13493,8 +13500,12 @@ class BatchSim:
                 # never besiege), read live at this point in the city loop.
                 nbh = self.neigh[self.rc_center[:, r, j].clamp(min=0)]  # [B, 6]
                 nbhc = nbh.clamp(min=0)
-                hostile_adj = (self.barb_at.gather(1, nbhc) >= 0) | (
-                    ((self.pmil_at.gather(1, nbhc) >= 0) | (self.pciv_at.gather(1, nbhc) >= 0))
+                _ha_m = self.occ_mil.gather(1, nbhc)
+                _ha_s = torch.where(_ha_m >= 0, self.unit_seat.gather(1, _ha_m.clamp(min=0)), torch.full_like(_ha_m, -1))
+                _ha_c = self.occ_civ.gather(1, nbhc)
+                _ha_cs = torch.where(_ha_c >= 0, self.unit_seat.gather(1, _ha_c.clamp(min=0)), torch.full_like(_ha_c, -1))
+                hostile_adj = (_ha_s == BARB_SEAT) | (  # #51/S3.4b
+                    ((_ha_s == PLAYER_SEAT) | (_ha_cs == PLAYER_SEAT))
                     & self.r_atwar[:, r].unsqueeze(1)
                 )
                 # A-19/B-33 (S2): an adjacent enemy AT-WAR rival unit (mil or
