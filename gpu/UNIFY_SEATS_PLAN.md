@@ -238,7 +238,11 @@ Route every `state.cities`/`rival.cities` scan through `citiesOf`/`allCities` (w
 
 **S1.2 — Storage flip to `state.seats: Seat[]`. [R]**
 
-**IN PROGRESS 2026-07-30 — SPLIT INTO BLOCKS, one byte-identical gate each.** The
+**COMPLETE 2026-07-30 — SPLIT INTO SIX BLOCKS, one byte-identical gate each.** `GameState` now holds NO per-civ state; everything a civ owns lives on a `Seat` and `RivalCiv extends Seat`. ~330 references moved, every block proven byte-identical.
+
+**Two of the stage's predictions were wrong and are corrected below:** the great-people split needed NO behaviour delta (the global claim ORDER is the faithful index, so per-seat `gpEarned` is purely additive), and the rival-determinism test failure was a REAL defect (seat/rival object aliasing does not survive a JSON round-trip) rather than the expected save-shape complaint.
+
+Original in-progress note: The
 stage as written is ~400 player-field references in one pass; that is a bet, not
 a migration. Landed so far, each with its own battery:
 - **S1.2a diplomacy** (`b8c7012`): warmonger, warWeariness, diploFavor,
@@ -247,8 +251,24 @@ a migration. Landed so far, each with its own battery:
   two-names-one-quantity collapses `faithTotal`->`faith`,
   `tourismTotal`->`tourism`. `scienceTotal` gains the rival field that never
   existed (storage only; the mechanic gap stays recorded).
-- **S1.2c research**: the largest single block, and the easiest — player and
-  rival already shared the exact `ResearchState` type.
+- **S1.2c research** (`88d7e2e`): the largest single block, and the easiest —
+  player and rival already shared the exact `ResearchState` type.
+- **S1.2d government** (`3cdab4d`): rivals gain a STORED government that nothing
+  reads yet; replacing their per-read derivation with one write is the
+  precondition for merging `getModifiers`/`getRivalModifiers`.
+- **S1.2e religion** (`a6c5009`): the rival's EIGHT flat fields become the
+  player's ONE `ReligionState`, and the rival gains `worship`/`name`, which it
+  never had. The dropped `pantheonClaimed`/`enhancerClaimed` booleans were
+  provably redundant with the ids they guarded.
+- **S1.2f great people** (`b0a8fbe`): `gpp` + per-seat `gpEarned`; the
+  `prophets` SHADOW COUNTER is derived away.
+
+**A FOURTH METHOD RULE, learned at S1.2e:** replacing a boolean field with a
+COMPARISON breaks every `!` in front of it. `!rival.pantheonClaimed` became
+`!rival.religion.pantheon !== null`, i.e. `(!pantheon) !== null` — always true —
+so rivals re-claimed a pantheon every turn. `tsc` gave 0 errors and all 463 tests
+passed; only fixture byte-identity caught it. Grep `![\w.]+ [!=]== ` after any
+such replacement, and prefer a named helper, which survives `!` unharmed.
 
 `state.seats[r+1]` IS the same object as `state.rivals[r]` during the migration
 so both views see every mutation; `rivals` goes when the last field has moved.
