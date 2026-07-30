@@ -13971,14 +13971,18 @@ class BatchSim:
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept
         inv = torch.empty_like(perm)
         inv.scatter_(1, perm, torch.arange(U, device=alive.device).unsqueeze(0).expand(B, -1))
+        # #51/S3.3: write the permutation IN PLACE. These were setattr rebinds,
+        # which is fatal once p_/v_/u_ are VIEWS of one merged pool tensor: the
+        # first compaction would swap in fresh storage and silently orphan every
+        # alias. gather() cannot target itself, so permute via a temporary.
         for name in fields:
-            setattr(self, name, getattr(self, name).gather(1, perm))
-        new_alive = alive.gather(1, perm)
-        setattr(self, f"{prefix}_alive", new_alive)
-        getattr(self, counter).copy_(new_alive.sum(dim=1))
+            t = getattr(self, name)
+            t.copy_(t.gather(1, perm))
+        alive.copy_(alive.gather(1, perm))
+        getattr(self, counter).copy_(alive.sum(dim=1))
         for m in maps:
             at = getattr(self, m)
-            setattr(self, m, torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
+            at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
 
     _RC_SLOT_FIELDS = (
         "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty",
@@ -14008,11 +14012,15 @@ class BatchSim:
         trigger for forced-compaction validation gates."""
         alive = self.rc_alive  # [B, R, RC]
         perm = torch.argsort((~alive).long(), dim=2, stable=True)  # living first, order kept
+        # #51/S3.3: in place, for the same reason as _reclaim_pool — S4.1
+        # makes these rc_* planes views of one merged city tensor, and a
+        # setattr rebind here would orphan every alias at the first compaction.
         for name in self._RC_SLOT_FIELDS:
-            setattr(self, name, getattr(self, name).gather(2, perm))
+            t = getattr(self, name)
+            t.copy_(t.gather(2, perm))
         for name in ("rc_dist_tile", "rc_bldg", "rc_wonder", "rc_pressure"):  # B-18: rc_pressure is 4D [B,R,RC,O]
             t = getattr(self, name)
-            setattr(self, name, t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
+            t.copy_(t.gather(2, perm.unsqueeze(3).expand(-1, -1, -1, t.shape[3])))
         self._eff_version += 1  # no (r, j)-keyed cache may survive the permutation
 
     def _check_rc_registry_invariant(self) -> None:

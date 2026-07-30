@@ -15,6 +15,14 @@ RULE 1 - no self-referential rebinding after __init__.
     silently skipped 8 statements whose self-reference sat on a continuation
     line (the three fortify blocks among them). AST sees the whole statement.
 
+RULE 3 - no `setattr(self, name, ...)` rebinding.
+    The dynamic form is invisible to RULE 1, and it is where the real damage
+    was waiting: `_reclaim_pool` compacted a unit pool with
+    `setattr(self, name, getattr(self, name).gather(1, perm))`, so the FIRST
+    compaction after aliasing would have swapped in fresh storage and orphaned
+    every view — with the forced-compaction gate the only thing standing
+    between that and a silent corruption.
+
 RULE 2 - no stale captures around an in-place write.
     `was = self.x` binds a REFERENCE. Under the old rebinding style the local
     kept the OLD tensor; under an in-place write it sees the NEW value. That
@@ -123,11 +131,28 @@ def rule2_stale_captures(tree: ast.AST) -> list[tuple[int, str, str, int, int]]:
     return bad
 
 
+def rule3_setattr_rebinds(tree: ast.AST) -> list[tuple[int, str]]:
+    """`setattr(self, <name>, <value>)` — a rebind the static rules cannot see."""
+    bad = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "setattr"
+            and len(node.args) == 3
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id == "self"
+        ):
+            bad.append((node.lineno, ast.unparse(node.args[1])[:60]))
+    return bad
+
+
 def main() -> int:
     tree = ast.parse(ENGINE.read_text(encoding="utf-8"))
 
     rebinds = rule1_rebinds(tree)
     stale = rule2_stale_captures(tree)
+    setattrs = rule3_setattr_rebinds(tree)
 
     for line, name in rebinds:
         print(
@@ -141,8 +166,17 @@ def main() -> int:
             f"again at line {r} — it will see the NEW value. Use .clone()."
         )
 
-    if rebinds or stale:
-        print(f"\nin-place discipline FAILED — {len(rebinds)} rebind(s), {len(stale)} stale capture(s)")
+    for line, what in setattrs:
+        print(
+            f"SETATTR engine.py:{line}: `setattr(self, {what}, ...)` rebinds a plane "
+            f"— write it in place instead, or aliases of it are orphaned"
+        )
+
+    if rebinds or stale or setattrs:
+        print(
+            f"\nin-place discipline FAILED — {len(rebinds)} rebind(s), "
+            f"{len(stale)} stale capture(s), {len(setattrs)} setattr rebind(s)"
+        )
         return 1
 
     # Report the scale of what is being guarded, so a silently-empty scan
@@ -157,7 +191,7 @@ def main() -> int:
     )
     print(
         f"in-place discipline OK — {n_inplace} in-place self writes, "
-        f"0 self-referential rebinds, 0 stale captures"
+        f"0 self-referential rebinds, 0 stale captures, 0 setattr rebinds"
     )
     return 0
 
