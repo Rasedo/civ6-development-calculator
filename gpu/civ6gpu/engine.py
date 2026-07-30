@@ -1970,7 +1970,7 @@ class BatchSim:
             raise AssertionError("SEAT DRIFT: a living PLAYER slot does not carry seat 0")
         # EVERY rival slot, alive or not: the range is seeded to civOfRival(0)
         # so `v_seat - 1 == v_civ` is total. A dead slot with a bogus seat is
-        # not harmless — _civ_of subtracts 1 and indexes r_atwar with it.
+        # not harmless — the encampment probe subtracts 1 and indexes r_atwar.
         if not bool((seat[:, v:ve] == self.v_civ + 1).all()):
             raise AssertionError("SEAT DRIFT: a RIVAL slot's seat != civOfRival(v_civ)")
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
@@ -4959,23 +4959,31 @@ class BatchSim:
             & (self.encamp_hp > 0)
         )
 
-    def _encamp_block_plane(self, side: str, civ=None) -> torch.Tensor:
+    def _encamp_block_plane(self, seat) -> torch.Tensor:
         """[B, T] bool — the `encampmentBlocks` twin over the WHOLE map: does a
-        LIVE ENEMY Encampment bar this side from each tile? Hostility mirrors
-        `unitsHostile` exactly — barbarians are hostile to every owner, the
-        player to at-war rivals, a rival to the player when `r_atwar` and to
-        another rival when `rr_war`. `civ` may be an int or a [B, 1] tensor
-        (the war-march passes `v_civ` per slot)."""
+        LIVE ENEMY Encampment bar this SEAT from each tile?
+
+        #51/S3.4: keyed on the prober's seat, not a `side` string. The old
+        signature took one of five side strings but only ever branched THREE
+        ways — 'rmil', 'rciv' and the loose 'rival' all took the same path,
+        because whether the prober is military or civilian has nothing to do
+        with whether an Encampment's owner is hostile to it.
+
+        Hostility mirrors `unitsHostile` exactly, which is to say it is
+        civsAtWar(prober, owner) plus "barbarians are hostile to everyone":
+        the player is hostile to at-war rivals, a rival to the player when
+        `r_atwar` and to another rival when `rr_war`. `seat` may be an int or
+        a [B, 1] tensor (the war-march probes per slot)."""
         live = self._encamp_live()  # [B, T]
-        if side == "barb":
+        tensor_seat = torch.is_tensor(seat)
+        if not tensor_seat and seat == BARB_SEAT:
             return live  # barbarians are hostile to every owner
         r_at = self.rival_at  # [B, T] owning rival, else -1
-        if side in ("pmil", "pciv"):
+        if not tensor_seat and seat == PLAYER_SEAT:
             war_r = self.r_atwar.gather(1, r_at.clamp(min=0))
             return live & (r_at >= 0) & war_r
-        # rival probe ("rmil"/"rciv", and the loose "rival" that _blocked_for
-        # resolves through its strict fallthrough): `civ` is this rival's index
-        # (int or [B, 1] tensor).
+        # A rival seat: civOfRival(civ) = civ + 1, so the rival index is seat-1.
+        civ = seat - 1
         p_tile = (r_at < 0) & (self.owner >= 0)
         if torch.is_tensor(civ):
             cv = civ.reshape(self.B, 1)
@@ -4992,12 +5000,12 @@ class BatchSim:
         hostile = torch.where(r_at >= 0, war_r, p_tile & war_p)
         return live & hostile
 
-    def _encamp_block(self, tiles: torch.Tensor, side: str, civ=None) -> torch.Tensor:
+    def _encamp_block(self, tiles: torch.Tensor, seat) -> torch.Tensor:
         """[B, N] — `_encamp_block_plane` sampled at `tiles` (one source of
         truth for the predicate; the walkers probe a handful of tiles)."""
         if self._encamp_didx < 0:
             return torch.zeros_like(tiles, dtype=torch.bool)
-        return self._encamp_block_plane(side, civ).gather(1, tiles.clamp(min=0))
+        return self._encamp_block_plane(seat).gather(1, tiles.clamp(min=0))
 
     def _blocked_for(
         self,
@@ -5036,7 +5044,7 @@ class BatchSim:
         rvc_slot = self.rvciv_at.gather(1, tc)
         # B-17 (#71): a live enemy Encampment bars entry on every side, exactly
         # as TS's `tileFreeForUnit` now does.
-        enc = self._encamp_block(tiles, self._legacy_side(seat, is_civilian, strict), self._civ_of(seat))
+        enc = self._encamp_block(tiles, seat)
 
         if strict:
             return (
@@ -5064,30 +5072,6 @@ class BatchSim:
         mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (not is_civilian))
         civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | is_civilian)
         return mil_blocks | civ_blocks | enc
-
-    @staticmethod
-    def _civ_of(seat):
-        """The rival index behind a seat, or None for the player/barbarians."""
-        if torch.is_tensor(seat):
-            return seat - 1  # the war-march only ever probes with rival seats
-        if seat == 0 or seat == BARB_SEAT:
-            return None
-        return seat - 1
-
-    @staticmethod
-    def _legacy_side(seat, is_civilian: bool, strict: bool) -> str:
-        """The `side` string _encamp_block still speaks. Kept so the
-        Encampment hostility rule stays byte-identical while the STACKING
-        rule unifies; folding it onto seats is the next slice."""
-        if strict:
-            return "rival"
-        if torch.is_tensor(seat):
-            return "rciv" if is_civilian else "rmil"
-        if seat == BARB_SEAT:
-            return "barb"
-        if seat == 0:
-            return "pciv" if is_civilian else "pmil"
-        return "rciv" if is_civilian else "rmil"
 
     def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -6406,7 +6390,7 @@ class BatchSim:
             # (meleeAttack's encamp arm). Requires the tile to hold no unit and
             # no rival city — the exact TS precedence — and a MELEE attacker.
             if self._encamp_didx >= 0:
-                enc_ok = self._encamp_block(tc.unsqueeze(1), "pmil").squeeze(1)
+                enc_ok = self._encamp_block(tc.unsqueeze(1), PLAYER_SEAT).squeeze(1)
                 enc_att = (
                     alive
                     & (a >= 6)
@@ -6929,7 +6913,7 @@ class BatchSim:
                 # B-17 (#71): a LIVE enemy Encampment bars the step (walkPath's
                 # blockedByEnemy twin — the melee arm is the only way in).
                 # (player hostility is side-independent, so "pmil" covers both)
-                & ~self._encamp_block(tgt.clamp(min=0).unsqueeze(1), "pmil").squeeze(1)
+                & ~self._encamp_block(tgt.clamp(min=0).unsqueeze(1), PLAYER_SEAT).squeeze(1)
             )
             if bool(ok.any()):
                 rows = ok.nonzero(as_tuple=True)[0]
@@ -7163,7 +7147,7 @@ class BatchSim:
             rvc = self.rvcity_at.gather(1, nbc) >= 0
             # B-17 (#71): an adjacent LIVE Encampment is a melee target for a
             # barbarian too (hostile to every owner) — attackTargets' encampTarget.
-            enc_nb = self._encamp_block(nb, "barb") if self._encamp_didx >= 0 else None
+            enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
             valid = (nb >= 0) & ((ctr >= 0) | has_unit | rvc | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)
             target_tile = tkey.min(dim=1).values
@@ -7214,7 +7198,7 @@ class BatchSim:
                 & (tgt_city < 0)
                 & ~has_u
                 & (self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) < 0)
-                & self._encamp_block(ttc.unsqueeze(1), "barb").squeeze(1)
+                & self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
                 if self._encamp_didx >= 0
                 else None
             )
@@ -10844,7 +10828,7 @@ class BatchSim:
         valid = valid | (enemy_rc & (d_all == 1) & ~rngd.unsqueeze(1))  # A-19/B-33: enemy rival center, melee CAPTURE (vs the no-op quirk above)
         # B-17 (#71): an adjacent LIVE enemy Encampment is a melee target — the
         # only way to open its tile (attackTargets' encampTarget: d==1, !ranged).
-        enc_plane = self._encamp_block_plane("rmil", ac) if self._encamp_didx >= 0 else None
+        enc_plane = self._encamp_block_plane(ac + 1) if self._encamp_didx >= 0 else None
         if enc_plane is not None:
             valid = valid | (enc_plane & (d_all == 1) & ~rngd.unsqueeze(1))
         if cs_suz_t is not None:
