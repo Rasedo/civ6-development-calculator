@@ -3,12 +3,13 @@
  * as gpu/statelog.py so gpu/logdiff.py can align them. Keep the two in lockstep:
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfCiv } from '../src/core/seats';
 import { rivalCityYields } from '../src/core/rivals';
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { isWater } from '../src/core/query';
 import { computeCityStats } from '../src/core/city';
 import { unitMaintenance } from '../src/core/units';
+import { terrainDefense } from '../src/core/combat';
 import { greatPeopleEarned } from '../src/core/game';
 import { GP_CLASSES } from '../src/data/greatPeople';
 import { UNITS } from '../src/data/units';
@@ -68,7 +69,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   const rvHp = new Map<string, number>();
   const rvActed = new Map<string, number>();
   for (const u of state.units) if (isRivalSeat(u.seat)) {
-    const k = `${u.civId}\t${u.tileIndex}\t${ti(u.type)}`;
+    const k = `${rivalOfCiv(u.seat)}\t${u.tileIndex}\t${ti(u.type)}`;
     rv.set(k, (rv.get(k) ?? 0) + 1);
     rvHp.set(k, (rvHp.get(k) ?? 0) + u.hp);
     rvActed.set(k, (rvActed.get(k) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));

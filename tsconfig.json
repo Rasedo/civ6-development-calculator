@@ -13,5 +13,5 @@
     "noEmit": true,
     "types": ["vite/client"]
   },
-  "include": ["src", "tests", "scripts/gpu-trace.ts", "scripts/gpu-actions.ts"]
+  "include": ["src", "tests", "scripts/gpu-trace.ts", "scripts/gpu-actions.ts", "scripts/statelog.ts"]
 }
