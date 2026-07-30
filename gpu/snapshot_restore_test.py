@@ -91,16 +91,34 @@ def main() -> None:
     # past here — verified. The check hardens as a mechanic becomes reachable,
     # which is the right direction, but it is not a substitute for registering
     # a new plane deliberately.
-    missing = sorted(changed - set(_MUTABLE))
+    # #51/S3.3: a plane may be covered by NAME or by STORAGE. The merged unit
+    # pool registers ten bases (unit_hp, ...) and exposes thirty p_/v_/u_ views
+    # into them; restoring the base restores every view, so a view is covered
+    # even though its own name is absent. Cover-by-storage is checked against
+    # the REGISTERED set only — an unregistered plane that merely happens to
+    # alias another unregistered one is still missing.
+    registered_storage = {
+        getattr(s2, k).untyped_storage().data_ptr()
+        for k in _MUTABLE
+        if isinstance(getattr(s2, k, None), torch.Tensor)
+    }
+    missing = sorted(
+        k
+        for k in changed - set(_MUTABLE)
+        if getattr(s2, k).untyped_storage().data_ptr() not in registered_storage
+    )
     assert not missing, (
-        f"{len(missing)} tensor(s) mutate during a step but are NOT in _MUTABLE, so "
-        f"snapshot/restore will not round-trip them: {missing}"
+        f"{len(missing)} tensor(s) mutate during a step but are NOT in _MUTABLE "
+        f"(and are not views of anything that is), so snapshot/restore will not "
+        f"round-trip them: {missing}"
     )
 
+    aliased = len(changed - set(_MUTABLE))
     print(
         f"snapshot/restore OK — bit-exact across {len(_MUTABLE)} mutable tensors "
         f"+ RNG + turn; step-after-restore deterministic; "
-        f"registry COMPLETE ({len(changed)} step-mutated tensors all registered)"
+        f"registry COMPLETE ({len(changed)} step-mutated tensors: "
+        f"{len(changed) - aliased} by name, {aliased} as views of a registered base)"
     )
 
 

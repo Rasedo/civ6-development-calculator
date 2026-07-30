@@ -55,6 +55,20 @@ IN_PLACE = {
 # every entry is a plane that can never be aliased.
 ALLOWED_REBIND: set[str] = set()
 
+# #51/S3.3: the merged unit pool. Each of these is a VIEW into unit_<plane>,
+# so ANY rebinding orphans it -- not only the self-referential kind RULE 1
+# catches. `self.p_aura_mp = (p_hit & p_ok).long() * gm` mentions no
+# p_aura_mp, passed RULE 1 clean, and silently detached the player's aura
+# plane from the pool. Parity stayed green because the code then consistently
+# used the detached tensor; only the runtime data_ptr check saw it.
+_POOL_PLANES = (
+    "alive", "acted", "type", "tile", "hp",
+    "fortify", "xp", "charges", "aura_mp", "emb",
+)
+ALIASED: frozenset[str] = frozenset(
+    f"{pre}_{plane}" for pre in ("p", "v", "u") for plane in _POOL_PLANES
+)
+
 
 def _self_attr(node: ast.AST) -> str | None:
     """`self.foo` -> "foo", anything else -> None."""
@@ -132,18 +146,42 @@ def rule2_stale_captures(tree: ast.AST) -> list[tuple[int, str, str, int, int]]:
 
 
 def rule3_setattr_rebinds(tree: ast.AST) -> list[tuple[int, str]]:
-    """`setattr(self, <name>, <value>)` — a rebind the static rules cannot see."""
+    """`setattr(self, <name>, <value>)` — a rebind the static rules cannot see.
+
+    __init__ is exempt: that is where planes are ALLOCATED, and the merged
+    unit pool builds its ten bases and thirty views through exactly this call.
+    Everywhere else, setattr on self means rebinding something that already
+    exists, which is the thing that must not happen.
+    """
     bad = []
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "setattr"
-            and len(node.args) == 3
-            and isinstance(node.args[0], ast.Name)
-            and node.args[0].id == "self"
-        ):
-            bad.append((node.lineno, ast.unparse(node.args[1])[:60]))
+    for fn in _functions(tree):
+        if fn.name == "__init__":
+            continue
+        for node in ast.walk(fn):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "setattr"
+                and len(node.args) == 3
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "self"
+            ):
+                bad.append((node.lineno, ast.unparse(node.args[1])[:60]))
+    return bad
+
+
+def rule4_aliased_rebinds(tree: ast.AST) -> list[tuple[int, str]]:
+    """Any rebinding at all of a merged-pool view, self-referential or not."""
+    bad = []
+    for fn in _functions(tree):
+        if fn.name == "__init__":
+            continue
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                continue
+            name = _self_attr(node.targets[0])
+            if name in ALIASED:
+                bad.append((node.lineno, name))
     return bad
 
 
@@ -153,6 +191,7 @@ def main() -> int:
     rebinds = rule1_rebinds(tree)
     stale = rule2_stale_captures(tree)
     setattrs = rule3_setattr_rebinds(tree)
+    aliased = rule4_aliased_rebinds(tree)
 
     for line, name in rebinds:
         print(
@@ -172,10 +211,17 @@ def main() -> int:
             f"— write it in place instead, or aliases of it are orphaned"
         )
 
-    if rebinds or stale or setattrs:
+    for line, name in aliased:
+        print(
+            f"ALIAS   engine.py:{line}: `self.{name} = ...` rebinds a VIEW of the "
+            f"merged unit pool — write it in place, or the pool stops seeing it"
+        )
+
+    if rebinds or stale or setattrs or aliased:
         print(
             f"\nin-place discipline FAILED — {len(rebinds)} rebind(s), "
-            f"{len(stale)} stale capture(s), {len(setattrs)} setattr rebind(s)"
+            f"{len(stale)} stale capture(s), {len(setattrs)} setattr rebind(s), "
+            f"{len(aliased)} aliased-plane rebind(s)"
         )
         return 1
 
@@ -191,7 +237,8 @@ def main() -> int:
     )
     print(
         f"in-place discipline OK — {n_inplace} in-place self writes, "
-        f"0 self-referential rebinds, 0 stale captures, 0 setattr rebinds"
+        f"0 self-referential rebinds, 0 stale captures, 0 setattr rebinds, "
+        f"{len(ALIASED)} pooled views guarded"
     )
     return 0
 

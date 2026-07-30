@@ -366,20 +366,32 @@ PATROL_DIR_PERM = [3, 4, 2, 5, 1, 0]
 # it via the env when the lane sets it.
 _ALIAS_CHECK = os.environ.get("CIV6_ALIAS_CHECK", "") not in ("", "0")
 
+def pool_view(snap: dict, pre: str, plane: str):
+    """#51/S3.3: read a p_/v_/u_ slice out of a snapshot() dict.
+
+    snapshot() stores the ten MERGED unit bases, not the thirty views into
+    them, so `snap["mut"]["u_hp"]` no longer exists. This is the supported way
+    to get a single pool's slice back, and it keeps the slot-range arithmetic
+    in one place rather than sprinkling `512 + b` through the callers.
+    """
+    lo = {"p": 0, "v": P_MAX, "u": P_MAX + U_MAX}[pre]
+    hi = lo + (P_MAX if pre == "p" else U_MAX)
+    return snap["mut"][f"unit_{plane}"][:, lo:hi]
+
+
 _MUTABLE = [
     "alive", "pop", "food_box", "culture_box", "tiles_acquired", "owner", "workable",
     "buildings", "current", "cur_cost", "progress", "q_dtile", "settlers", "settlers_queued",
     "treasury", "science_total", "culture_total", "techs", "civics",
     "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
     "rng_state", "city_hp", "outer_hp", "center_at", "barb_at", "pmil_at", "pciv_at", "tdef", "tmove",
-    "p_acted", "u_acted", "v_acted",
-    "p_fortify", "u_fortify", "v_fortify",  # B-5 FORTIFY (military; cap 2)
-    "p_xp", "v_xp",  # AUDIT B-4 XP (player/rival units; barbs accrue none — no plane)
-    "p_aura_mp", "v_aura_mp",  # #70/S3 (B-8) frozen general/admiral +MP (barbs never have generals — no plane)
-    "p_emb", "v_emb",  # #45/B-6 EMBARK: a land unit is on water (bool per slot)
-    "u_alive", "u_type", "u_tile", "u_hp", "next_slot", "camp_tile", "n_camps", "game_over",
+    # B-5 FORTIFY (military; cap 2)
+    # AUDIT B-4 XP (player/rival units; barbs accrue none — no plane)
+    # #70/S3 (B-8) frozen general/admiral +MP (barbs never have generals — no plane)
+    # #45/B-6 EMBARK: a land unit is on water (bool per slot)
+    "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # B-25 (Round B3): space-race chain progress
-    "p_alive", "p_type", "p_tile", "p_hp", "p_next", "warrior_trained", "builder_trained",
+    "p_next", "warrior_trained", "builder_trained",
     "builders_trained", "r_builders_trained",  # P4/D-10 cost escalators
     "best_melee", "r_best_melee",  # P4/D-22 city-defense trackers
     "district_dead",  # P5/S1: captured districts are paved-but-dead
@@ -393,15 +405,14 @@ _MUTABLE = [
     "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "congress_sessions", "diplo_points", "r_diplo_points", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
     "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
-    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "v_charges",
-    "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
+    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "rvciv_at", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
     "r_route_dest",  # B-23: international dest player-city CENTER TILE (>=0), else -1 (domestic/CS)
     "r_route_exp",   # B-23: per-route expiry turn (start + trade.duration), -1 = free slot
     "cs_r_envoys", "cs_r_met", "r_influence", "r_envoys_avail",  # A-12: rival↔CS diplomacy
     "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
-    "v_alive", "v_civ", "v_type", "v_tile", "v_hp", "v_next",
+    "v_civ", "v_next",
     "gp_earned", "player_gp_points", "player_faith", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # A-7: belief identity
     "enh_claimed", "r_enhancer", "r_enhancer_done",  # B-18: enhancer race
@@ -413,9 +424,13 @@ _MUTABLE = [
     "tourism_total", "r_tourism",  # B-20 (#71): cumulative TOURISM, player + per rival
     "r_culture",  # B-25 (#72): per-rival LIFETIME culture (the player's culture_total twin)
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
-    "fertility", "drought", "improvement", "pillaged", "p_charges", "district", "dscaffold_placed",
+    "fertility", "drought", "improvement", "pillaged", "district", "dscaffold_placed",
     "district_pillaged",  # B-32: raided-dark districts (tile plane, reclaim-safe)
     "d_static_adj",  # mutated when an in-game founding clears the center tile's removable feature
+    # #51/S3.3: the merged unit pool. The BASES are registered, never the
+    # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
+    # plane instead of three, and a view can never be half-restored.
+    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb",
 ]
 
 
@@ -856,26 +871,74 @@ class BatchSim:
         self.cs_r_quest_camp = torch.full((B, r_pad, s_pad), -1, dtype=torch.long, device=device)
         self.cs_r_quest_issued = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
         self.rvcity_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at rival centers
-        self.v_alive = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # rival units, spawn order
-        self.v_acted = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # P4/D-2: spent MP since the last refresh (blocks healing)
+        # #51/S0.4: alias registry (name -> fn(self) returning the base slice it
+        # must remain a view of). Declared here because the merged unit pool
+        # below is the first thing that registers into it.
+        self._aliases: dict = {}
+
+        # ---------------------------------------------------------------------
+        # #51/S3.3: ONE UNIT POOL.
+        #
+        # p_*, v_* and u_* are no longer three tensors per plane; they are three
+        # DISJOINT CONTIGUOUS SLOT RANGES of one tensor per plane:
+        #
+        #     [ 0 .. 256 )  player     [ 256 .. 512 )  rival     [ 512 .. 768 )  barbarian
+        #
+        # The merged layout is byte-identical to three separate tensors, so every
+        # slot loop, every gather and every per-pool compaction is unchanged --
+        # `p_hp[b, s]` is still the same element it always was. What changes is
+        # that a unit's OWNER becomes a property of its slot range rather than of
+        # which variable name reached it, which is what lets S3.4 replace five
+        # occupancy maps with two and S4.x address any unit by one index.
+        #
+        # Views, so every write must be in place. gpu/inplace_discipline_test.py
+        # enforces that statically and _check_state_discipline re-checks the
+        # data_ptr at runtime under CIV6_ALIAS_CHECK=1.
+        #
+        # The barbarian pool GAINS xp / charges / aura_mp / emb, which it never
+        # had. They stay INERT here (nothing reads them for a barb yet); giving
+        # them real behaviour is Round 7. Their absence is what forced
+        # `atk_lvl5 = torch.zeros_like(...) if atk_kind == "barb"` to be
+        # hardcoded in _hostile_vs_unit.
+        # ---------------------------------------------------------------------
+        self.UNIT_MAX = P_MAX + 2 * U_MAX
+        self.POOL_LO = {"p": 0, "v": P_MAX, "u": P_MAX + U_MAX}
+        self.POOL_HI = {"p": P_MAX, "v": P_MAX + U_MAX, "u": P_MAX + 2 * U_MAX}
+        for _pl, _dt in (
+            ("alive", torch.bool),      # a slot holds a living unit
+            ("acted", torch.bool),      # P4/D-2: spent MP since the last refresh (blocks healing)
+            ("emb", torch.bool),        # #45/B-6: embarked — a land unit standing on water
+            ("type", torch.long),       # roster index (#51/S3.2: barbs too)
+            ("tile", torch.long),
+            ("hp", torch.long),
+            ("fortify", torch.long),    # B-5: fortifyTurns (military; cap 2)
+            ("xp", torch.long),         # B-4: combat experience
+            ("charges", torch.long),    # builder/missionary charges
+            ("aura_mp", torch.long),    # #70/S3 (B-8): frozen general/admiral +MP
+        ):
+            _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
+            setattr(self, f"unit_{_pl}", _base)
+            for _pre in ("p", "v", "u"):
+                setattr(self, f"{_pre}_{_pl}", _base[:, self.POOL_LO[_pre]:self.POOL_HI[_pre]])
+                # S0.4 built this net for exactly this moment: assert forever
+                # that the view still shares storage with the merged pool.
+                self.register_alias(
+                    f"{_pre}_{_pl}",
+                    lambda sim, pl=_pl, pre=_pre: getattr(sim, f"unit_{pl}")[
+                        :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
+                    ],
+                )
+
         self.v_civ = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.v_type = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # roster index
-        self.v_tile = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.v_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.v_fortify = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
-        self.v_xp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # B-4: combat experience (rival units)
         # #70/S3 (B-8): the general/admiral aura's +1 MP, FROZEN at the
         # refreshUnits site (see _refresh_aura_mp) — walkers read this instead
         # of recomputing, so a general that war-walks later in the same step
         # cannot retro-change a pool TS already granted.
-        self.v_aura_mp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.v_emb = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # #45/B-6: embarked (rival units)
         self.v_next = torch.zeros(B, dtype=torch.long, device=device)
         self.rv_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # rival-unit slot at tile
         # C1-B5a: rival CIVILIAN occupancy (slot at tile; civ via v_civ) and
         # per-slot build charges — inert until B5b spawns the first builder.
         self.rvciv_at = torch.full((B, T), -1, dtype=torch.long, device=device)
-        self.v_charges = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         self.gp_earned = torch.zeros(B, n_gp, dtype=torch.long, device=device)
         self.pantheon_claimed_n = torch.zeros(B, dtype=torch.long, device=device)
         self.claimed_f_n = torch.zeros(B, dtype=torch.long, device=device)
@@ -1279,7 +1342,6 @@ class BatchSim:
         self._sr_nf = torch.tensor([[t.get("sr_nf", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.improvement = torch.full((B, T), -1, dtype=torch.long, device=device)  # -1 none, else improvement idx
         self.pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
-        self.p_charges = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
 
         # --- districts (D1: catalog + state tensor) -------------------------------
         # The catalog is loaded and a [B, T] district-type-index tensor is
@@ -1509,10 +1571,9 @@ class BatchSim:
         self._aq_fresh_bonus = float(rules.housing_aq_fresh_bonus)
         self._aq_no_fresh_total = float(rules.housing_aq_no_fresh)
 
-        # #51/S0.4: alias registry (name -> fn(self) returning the base slice it
-        # must remain a view of) and the _MUTABLE shape/dtype baseline, captured
-        # lazily on the first check so every plane exists by then.
-        self._aliases: dict = {}
+        # #51/S0.4: the _MUTABLE shape/dtype baseline, captured lazily on the
+        # first check so every plane exists by then. (_aliases is initialised
+        # earlier — the merged unit pool is the first thing to register into it.)
         self._mut_sig: dict = {}
 
         self._eff_version = 0
@@ -1656,12 +1717,6 @@ class BatchSim:
         self.barb_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.pmil_at = torch.full((B, T), -1, dtype=torch.long, device=device)
         self.pciv_at = torch.full((B, T), -1, dtype=torch.long, device=device)
-        self.u_alive = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)
-        self.u_acted = torch.zeros(B, U_MAX, dtype=torch.bool, device=device)  # P4/D-2
-        self.u_type = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # barb ladder: 0/1/2/3 melee, 4/5 ranged (#70/S5)
-        self.u_tile = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.u_hp = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
-        self.u_fortify = torch.zeros(B, U_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
         self.next_slot = torch.zeros(B, dtype=torch.long, device=device)  # append-only: keeps unit order
         self.game_over = torch.zeros(B, dtype=torch.bool, device=device)  # GV-2
         self.victory_type = torch.zeros(B, dtype=torch.long, device=device)  # GV-4/GV-3
@@ -1678,15 +1733,6 @@ class BatchSim:
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
         # Player units (phase 4b): trained via the production head, ordered
         # like state.units (append-only slots preserve spawn order).
-        self.p_alive = torch.zeros(B, P_MAX, dtype=torch.bool, device=device)
-        self.p_acted = torch.zeros(B, P_MAX, dtype=torch.bool, device=device)  # P4/D-2
-        self.p_type = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # index into rules.units
-        self.p_tile = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
-        self.p_hp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)
-        self.p_fortify = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # B-5: fortifyTurns (military; cap 2)
-        self.p_xp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # B-4: combat experience (player units)
-        self.p_aura_mp = torch.zeros(B, P_MAX, dtype=torch.long, device=device)  # #70/S3 (B-8): frozen aura +MP (see v_aura_mp)
-        self.p_emb = torch.zeros(B, P_MAX, dtype=torch.bool, device=device)  # #45/B-6: embarked (player units)
         self.p_next = torch.zeros(B, dtype=torch.long, device=device)
         self.warrior_trained = torch.zeros(B, C, dtype=torch.bool, device=device)  # scripted-policy flag
         self.builder_trained = torch.zeros(B, dtype=torch.bool, device=device)  # scripted-policy flag (capital, once)
@@ -3122,7 +3168,7 @@ class BatchSim:
             self.p_tile,
             self.unit_naval[self.p_type] | self.p_emb,  # ADMIRAL-keyed when naval OR embarked
         )
-        self.p_aura_mp = (p_hit & p_ok).long() * gm
+        self.p_aura_mp.copy_((p_hit & p_ok).long() * gm)
 
     def _refresh_aura_mp_rival(self) -> None:
         """#70/S3: the RIVAL pool freezes at a DIFFERENT moment than the player's
@@ -3142,7 +3188,7 @@ class BatchSim:
             self.v_tile,
             self.unit_naval[self.v_type] | self.v_emb,
         )
-        self.v_aura_mp = (v_hit & v_ok).long() * self._gen_aura_mp
+        self.v_aura_mp.copy_((v_hit & v_ok).long() * self._gen_aura_mp)
 
     def _civ_era(self, techs: torch.Tensor, civics: torch.Tensor) -> torch.Tensor:
         """[B] — B-20 (#71): the `civEraIndex` twin. The HIGHEST era among a

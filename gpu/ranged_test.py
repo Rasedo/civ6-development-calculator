@@ -23,7 +23,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
-from civ6gpu.engine import P_MAX
+from civ6gpu.engine import P_MAX, pool_view
 
 HOLD = 12
 
@@ -117,10 +117,10 @@ def main() -> None:
 def defender_state_from_snap(snap, tile):
     b = int(snap["mut"]["barb_at"][0, tile])
     if b >= 0:
-        return ("barb", b, int(snap["mut"]["u_hp"][0, b]), bool(snap["mut"]["u_alive"][0, b]))
+        return ("barb", b, int(pool_view(snap, "u", "hp")[0, b]), bool(pool_view(snap, "u", "alive")[0, b]))
     v = int(snap["mut"]["rv_at"][0, tile])
     assert v >= 0
-    return ("rival", v, int(snap["mut"]["v_hp"][0, v]), bool(snap["mut"]["v_alive"][0, v]))
+    return ("rival", v, int(pool_view(snap, "v", "hp")[0, v]), bool(pool_view(snap, "v", "alive")[0, v]))
 
 
 if __name__ == "__main__":
