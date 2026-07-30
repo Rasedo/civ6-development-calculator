@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat } from './seats';
+import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -970,7 +970,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   // the GPU documented a skip-at-full-pool divergence for this path).
   if (state.cities.length >= 6) {
     for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-      if ((t.csId ?? -1) === cs.id) t.csId = undefined;
+      if (tileSeat(t) === seatOfCityState(cs.id)) setTileOwner(t, NO_SEAT);
     }
     state.eventLog.push(`${cs.name} razed — the empire is full.`);
     return;
@@ -978,8 +978,8 @@ export function captureCityState(state: GameState, cs: CityState): void {
   const id = state.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
     if ((t.csId ?? -1) === cs.id) {
-      t.csId = undefined;
-      if (!isPlayerSeat(tileSeat(t))) t.cityId = id;
+      // the player keeps its own claim where it has one, else takes the tile
+      setTileOwner(t, PLAYER_CIV, isPlayerSeat(tileSeat(t)) ? tileCity(t) : id);
     }
   }
   // #70 HUNT (new G-item): a conquered city-state's centre tile never got its
@@ -993,7 +993,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   // city-state IS a city with a centre). Surfaced by #70/S5's ranged barb
   // scan, which extended the exposure from d==1 melee to d<=2.
   center.district = 'CITY_CENTER';
-  center.cityId = id;
+  setTileOwner(center, PLAYER_CIV, id);
   state.cities.push({
     id,
     seat: PLAYER_CIV, // #51/S1.3d: a conquered city-state joins the PLAYER's seat
@@ -1031,7 +1031,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
   const center = state.map.tiles[cs.centerIndex];
   if (rival.cities.length >= RIVAL_MAX_CITIES) {
     for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-      if ((t.csId ?? -1) === cs.id) t.csId = undefined;
+      if (tileSeat(t) === seatOfCityState(cs.id)) setTileOwner(t, NO_SEAT);
     }
     state.eventLog.push(`${cs.name} razed — ${rival.name} cannot govern more cities.`);
     return;
@@ -1039,9 +1039,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
   const id = rival.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
     if ((t.csId ?? -1) === cs.id) {
-      t.csId = undefined;
-      t.rivalId = rival.id;
-      t.rivalCityId = id; // A-17: the conquered claim registers to the new rc
+      setTileOwner(t, civOfRival(rival.id), id); // A-17: the claim registers to the new rc
     }
   }
   center.district = 'CITY_CENTER'; // #70 HUNT: the captureCityState twin — see the note there
@@ -1088,8 +1086,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
     // work-radius sweep leaked the outer ring as orphaned civ territory.
     for (const t of state.map.tiles) {
       if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
-        t.rivalId = undefined;
-        t.rivalCityId = undefined;
+        setTileOwner(t, NO_SEAT);
       }
     }
     center.district = null;
@@ -1102,12 +1099,11 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   // scan) — the old work-radius sweep also stole sibling cities' frontage.
   for (const t of state.map.tiles) {
     if (tileOwnedByCiv(t, civOfRival(rival.id)) && t.rivalCityId === city.id) {
-      t.rivalId = undefined;
-      t.rivalCityId = undefined;
-      if (!isPlayerSeat(tileSeat(t))) t.cityId = id;
+      // tileOwnedByCiv already proved the RIVAL owns it, so the player cannot
+      setTileOwner(t, PLAYER_CIV, id);
     }
   }
-  center.cityId = id;
+  setTileOwner(center, PLAYER_CIV, id);
   // AUDIT B-30: conquest keeps infrastructure. The captured city carries its
   // districts (live, re-owned) and its buildings MINUS PALACE (never transfers)
   // and wonders. ANCIENT_WALLS is kept but its outer pool resets to 0 (it heals

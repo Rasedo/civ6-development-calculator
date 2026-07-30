@@ -7,7 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
-import { playerSeat, isPlayerSeat, tileSeat } from './seats';
+import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -99,9 +99,9 @@ export function placeCityStates(state: GameState, count?: number): void {
       questIssuedTurn: 0,
     };
     for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-      if (!isPlayerSeat(tileSeat(t)) && (t.csId ?? -1) === -1) t.csId = cs.id;
+      if (tileSeat(t) === NO_SEAT) setTileOwner(t, seatOfCityState(cs.id));
     }
-    tile.csId = cs.id;
+    setTileOwner(tile, seatOfCityState(cs.id));
     state.cityStates.push(cs);
   });
 }

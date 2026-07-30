@@ -34,7 +34,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV } from './seats';
+import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV, setTileOwner } from './seats';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -213,9 +213,9 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   // Civ 6: a new city starts with its center plus the first ring only;
   // everything beyond comes from culture growth or tile purchase.
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (!tileClaimed(t)) t.cityId = id;
+    if (!tileClaimed(t)) setTileOwner(t, PLAYER_CIV, id);
   }
-  tile.cityId = id;
+  setTileOwner(tile, PLAYER_CIV, id);
   revealAround(state, tileIndex, 3);
 
   state.cities.push(city);
@@ -639,7 +639,7 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number): Ru
   }
   // P4/D-17: purchases claim the tile but do NOT advance the culture-growth
   // counter (real Civ 6 keeps the two schedules separate).
-  state.map.tiles[tileIndex].cityId = city.id;
+  setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
   revealAround(state, tileIndex, 1);
   state.tilesPurchased = (state.tilesPurchased ?? 0) + 1;
   return { ok: true };

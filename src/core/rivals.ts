@@ -71,7 +71,7 @@ import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -164,15 +164,13 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
   // district adjacency all read the live map).
   tile.improvement = null;
   if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
-  tile.rivalId = rival.id;
-  tile.rivalCityId = city.id; // A-17: per-city registry
+  setTileOwner(tile, civOfRival(rival.id), city.id); // A-17: per-city registry
   for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
     // Mirrors foundCity: the full first ring, water included — a coastal
     // rival must own its harbor water (AUDIT C-1; the water skip made the
     // whole Harbor line structurally unreachable for rivals).
     if (!tileOwned(t)) {
-      t.rivalId = rival.id;
-      t.rivalCityId = city.id;
+      setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
   rival.cities.push(city);
@@ -676,7 +674,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   // center unpaved, no plunder). Loyalty flips stay uncapped.
   if (why === 'conquered' && winner.cities.length >= RIVAL_MAX_CITIES) {
     for (const t of state.map.tiles) {
-      if (t.cityId === city.id) t.cityId = -1;
+      if (isPlayerSeat(tileSeat(t)) && tileCity(t) === city.id) setTileOwner(t, NO_SEAT);
     }
     const center = state.map.tiles[city.centerIndex];
     center.district = null;
@@ -705,10 +703,8 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   for (const [type, tileIndex] of keptByType) keptDistricts.push({ type, tileIndex });
   const keptWonders = city.wonders.filter((w) => state.map.tiles[w.tileIndex].cityId === city.id);
   for (const t of state.map.tiles) {
-    if (t.cityId === city.id) {
-      t.cityId = -1;
-      t.rivalId = winner.id;
-      t.rivalCityId = winner.nextCityId; // A-17: the rc pushed below
+    if (isPlayerSeat(tileSeat(t)) && tileCity(t) === city.id) {
+      setTileOwner(t, civOfRival(winner.id), winner.nextCityId); // A-17: the rc pushed below
     }
   }
   // AUDIT B-30: conquest keeps infrastructure. The city carries its districts
@@ -2232,8 +2228,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
   // work-radius sweep both leaked its outer ring and stole sibling frontage.
   for (const t of state.map.tiles) {
     if (tileOwnedByCiv(t, civOfRival(from.id)) && t.rivalCityId === rc.id) {
-      t.rivalId = to.id;
-      t.rivalCityId = to.nextCityId; // the rc pushed below
+      setTileOwner(t, civOfRival(to.id), to.nextCityId); // the rc pushed below
     }
   }
   // AUDIT B-30: conquest keeps infrastructure — the flipping city carries its

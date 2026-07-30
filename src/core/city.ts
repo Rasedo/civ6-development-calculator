@@ -46,7 +46,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat } from './seats';
+import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner } from './seats';
 
 export interface CityStats {
   city: City;
@@ -359,7 +359,7 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
 
 /** Claim a tile for the city (culture growth or purchase). */
 export function acquireTile(state: GameState, city: City, tileIndex: number): void {
-  state.map.tiles[tileIndex].cityId = city.id;
+  setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
   city.tilesAcquired += 1;
   revealAround(state, tileIndex, 1);
 }
