@@ -13301,10 +13301,18 @@ class BatchSim:
                         ctr = self.rc_center[:, r, j].clamp(min=0)  # [B]
                         dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
                         war = self.r_atwar[:, r].unsqueeze(1)  # [B, 1]
-                        barb_h = self.barb_at >= 0
-                        pmil_h = (self.pmil_at >= 0) & war
-                        pciv_h = (self.pciv_at >= 0) & war
-                        hostile = barb_h | pmil_h | pciv_h  # [B, T]
+                        # #51/S3.4b: hostile to THIS rival, from the merged
+                        # planes. Deliberately NOT `_seats_hostile`: this scan
+                        # omits other rivals' units, exactly as TS does
+                        # (`!isRivalSeat(u.seat)`, rivals.ts). That omission is
+                        # a Civ 6 fidelity gap in BOTH engines — task #59 —
+                        # not something to widen inside a refactor.
+                        _mil, _civ = self.occ_mil, self.occ_civ
+                        _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
+                        _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
+                        hm = (_mseat == BARB_SEAT) | ((_mseat == PLAYER_SEAT) & war)
+                        hc = (_cseat == PLAYER_SEAT) & war
+                        hostile = hm | hc  # [B, T]
                         valid = walled.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
                         arangeT = torch.arange(Tn, device=dev2)
                         key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
@@ -13312,27 +13320,28 @@ class BatchSim:
                         tt = key.argmin(dim=1)  # [B]
                         strike = walled & (best_key < 10**9)
                         if bool(strike.any()):
-                            b_slot = self.barb_at[bidx, tt]
-                            pm_slot = self.pmil_at[bidx, tt]
-                            pc_slot = self.pciv_at[bidx, tt]
-                            is_barb = b_slot >= 0
-                            is_pmil = ~is_barb & (pm_slot >= 0)  # military first (barb > player mil > player civ)
-                            is_pciv = ~is_barb & ~is_pmil & (pc_slot >= 0)
-                            d_cs_barb = self._p_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
-                            d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
-                            d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
+                            # #51/S3.4b: ONE defender slot; "military first" is
+                            # the entire priority (one military + one civilian
+                            # per tile makes the rest unreachable).
+                            _okm, _okc = hm[bidx, tt], hc[bidx, tt]
+                            d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
+                            d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
+                            ds0 = d_slot.clamp(min=0)
+                            is_barb = d_seat == BARB_SEAT
+                            is_pmil = _okm & ~is_barb
+                            d_type = self.unit_type[bidx, ds0]
                             # B-4: only a player MILITARY target (is_pmil) carries veterancy.
-                            def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
-                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self._tdef_i(bidx, tt) + def_xp  # + B-4
+                            def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
+                            def_cs = self._p_combat[d_type] + self._tdef_i(bidx, tt) + def_xp  # + B-4
                             # #45/B-6: an embarked player target (military/civilian;
                             # barbs never embark) → flat CS, no terrain (no support).
-                            d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
+                            d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                             gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
                             gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
                             atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
                             # B-29: the defending unit is wounded (attacker is the city).
-                            def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_pmil, self.p_hp[bidx, pm_slot.clamp(min=0)], self.p_hp[bidx, pc_slot.clamp(min=0)]))
+                            def_hp = self.unit_hp[bidx, ds0]
                             def_e = def_cs - self._wound(def_hp)
                             # B-7 support (the pcstk mirror): the struck unit — barb
                             # or player — gains support from adjacent same-side
@@ -13346,34 +13355,35 @@ class BatchSim:
                             # (unified civ 0); barbs own no general and a player
                             # CIVILIAN is combat-0 → generalAuraCS returns 0.
                             _def_civ_u = torch.where(is_pmil, torch.zeros_like(tt), torch.full_like(tt, -1))
-                            _def_nav = torch.where(is_pmil, self.unit_naval[self.p_type[bidx, pm_slot.clamp(min=0)].clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
+                            _def_nav = torch.where(is_pmil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                             d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
-                            for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
-                                (is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, b_slot),
-                                (is_pmil, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive, pm_slot),
-                                (is_pciv, self.pciv_at, self.occ_civ, self.p_hp, self.p_alive, pc_slot),
+                            for grp, occ_map, legacy in (
+                                (_okm, self.occ_mil, (self.barb_at, self.pmil_at, self.rv_at)),
+                                (~_okm & _okc, self.occ_civ, (self.pciv_at, self.rvciv_at)),
                             ):
                                 g = rows[grp[rows]]
                                 if len(g) == 0:
                                     continue
-                                ds = slot_t[g]
-                                hp_t[g, ds] -= d[g]
-                                dead = hp_t[g, ds] <= 0
-                                at_map[g[dead], tt[g[dead]]] = -1
-                                occ_map[g[dead], tt[g[dead]]] = -1  # #51/S3.4b
-                                alive_t[g[dead], ds[dead]] = False
+                                ds = d_slot[g]
+                                self.unit_hp[g, ds] -= d[g]
+                                dead = self.unit_hp[g, ds] <= 0
+                                gd, td = g[dead], tt[g[dead]]
+                                occ_map[gd, td] = -1
+                                for _lm in legacy:
+                                    _lm[gd, td] = -1
+                                self.unit_alive[gd, ds[dead]] = False
                                 if bool(dead.any()):
                                     self._rp_kill_version += 1  # G1: u_alive/p_alive death -> _rival_route_income raided-mask changes for city j+1
                             # B-4: a surviving player MILITARY defender earns +2
                             # (attacker is the city; barb / player civilian never accrue).
                             surv_pm = (strike & is_pmil).nonzero(as_tuple=True)[0]
                             if len(surv_pm) > 0:
-                                alive_now = self.p_hp[surv_pm, pm_slot[surv_pm]] > 0
+                                alive_now = self.unit_hp[surv_pm, d_slot[surv_pm]] > 0
                                 sp = surv_pm[alive_now]
                                 if len(sp) > 0:
-                                    self.p_xp[sp, pm_slot[sp]] += XP_DEFEND
+                                    self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
                 # B-17 (ROUND B7): the rival mirror of the ADDITIONAL Encampment
                 # strike (the restk twin of walls' rcstk). This rival city
                 # (r, j), if it owns a COMPLETE unpillaged ENCAMPMENT, fires the
@@ -13393,10 +13403,18 @@ class BatchSim:
                         ctr = self.rc_center[:, r, j].clamp(min=0)  # [B]
                         dist = self.pair_dist[ctr].to(torch.long)  # [B, T]
                         war = self.r_atwar[:, r].unsqueeze(1)  # [B, 1]
-                        barb_h = self.barb_at >= 0
-                        pmil_h = (self.pmil_at >= 0) & war
-                        pciv_h = (self.pciv_at >= 0) & war
-                        hostile = barb_h | pmil_h | pciv_h  # [B, T]
+                        # #51/S3.4b: hostile to THIS rival, from the merged
+                        # planes. Deliberately NOT `_seats_hostile`: this scan
+                        # omits other rivals' units, exactly as TS does
+                        # (`!isRivalSeat(u.seat)`, rivals.ts). That omission is
+                        # a Civ 6 fidelity gap in BOTH engines — task #59 —
+                        # not something to widen inside a refactor.
+                        _mil, _civ = self.occ_mil, self.occ_civ
+                        _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
+                        _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
+                        hm = (_mseat == BARB_SEAT) | ((_mseat == PLAYER_SEAT) & war)
+                        hc = (_cseat == PLAYER_SEAT) & war
+                        hostile = hm | hc  # [B, T]
                         valid = has_enc.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
                         arangeT = torch.arange(Tn, device=dev2)
                         key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
@@ -13404,55 +13422,57 @@ class BatchSim:
                         tt = key.argmin(dim=1)  # [B]
                         strike = has_enc & (best_key < 10**9)
                         if bool(strike.any()):
-                            b_slot = self.barb_at[bidx, tt]
-                            pm_slot = self.pmil_at[bidx, tt]
-                            pc_slot = self.pciv_at[bidx, tt]
-                            is_barb = b_slot >= 0
-                            is_pmil = ~is_barb & (pm_slot >= 0)  # military first (barb > player mil > player civ)
-                            is_pciv = ~is_barb & ~is_pmil & (pc_slot >= 0)
-                            d_cs_barb = self._p_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
-                            d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
-                            d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
-                            def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
-                            def_cs = torch.where(is_barb, d_cs_barb, torch.where(is_pmil, d_cs_pmil, d_cs_pciv)) + self._tdef_i(bidx, tt) + def_xp
-                            d_emb = (self.p_emb[bidx, pm_slot.clamp(min=0)] & is_pmil) | (self.p_emb[bidx, pc_slot.clamp(min=0)] & is_pciv)
+                            # #51/S3.4b: ONE defender slot; "military first" is
+                            # the entire priority (one military + one civilian
+                            # per tile makes the rest unreachable).
+                            _okm, _okc = hm[bidx, tt], hc[bidx, tt]
+                            d_slot = torch.where(_okm, _mil[bidx, tt], torch.where(_okc, _civ[bidx, tt], torch.full_like(tt, -1)))
+                            d_seat = torch.where(_okm, _mseat[bidx, tt], torch.where(_okc, _cseat[bidx, tt], torch.full_like(tt, -1)))
+                            ds0 = d_slot.clamp(min=0)
+                            is_barb = d_seat == BARB_SEAT
+                            is_pmil = _okm & ~is_barb
+                            d_type = self.unit_type[bidx, ds0]
+                            def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
+                            def_cs = self._p_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
+                            d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                             gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
                             gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
                             atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
-                            def_hp = torch.where(is_barb, self.u_hp[bidx, b_slot.clamp(min=0)], torch.where(is_pmil, self.p_hp[bidx, pm_slot.clamp(min=0)], self.p_hp[bidx, pc_slot.clamp(min=0)]))
+                            def_hp = self.unit_hp[bidx, ds0]
                             def_e = def_cs - self._wound(def_hp)
                             _, _sp = self._flank_support(tt, torch.where(is_barb, torch.full((Bn,), BARB_SEAT, dtype=torch.long, device=dev2), torch.zeros(Bn, dtype=torch.long, device=dev2)), torch.full((Bn,), -1, dtype=torch.long, device=dev2))
                             def_e = def_e + SUPPORT_CS * torch.where(d_emb, torch.zeros_like(_sp), _sp)
                             # #70/S2 (B-8): the rcstk mirror — defender-side aura
                             # (player MILITARY only), outside the embarked override.
                             _def_civ_u = torch.where(is_pmil, torch.zeros_like(tt), torch.full_like(tt, -1))
-                            _def_nav = torch.where(is_pmil, self.unit_naval[self.p_type[bidx, pm_slot.clamp(min=0)].clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
+                            _def_nav = torch.where(is_pmil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                             d = self._damage_roll(strike, atk_cs - def_e, k="restk", tile=tt)
                             rows = strike.nonzero(as_tuple=True)[0]
-                            for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
-                                (is_barb, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, b_slot),
-                                (is_pmil, self.pmil_at, self.occ_mil, self.p_hp, self.p_alive, pm_slot),
-                                (is_pciv, self.pciv_at, self.occ_civ, self.p_hp, self.p_alive, pc_slot),
+                            for grp, occ_map, legacy in (
+                                (_okm, self.occ_mil, (self.barb_at, self.pmil_at, self.rv_at)),
+                                (~_okm & _okc, self.occ_civ, (self.pciv_at, self.rvciv_at)),
                             ):
                                 g = rows[grp[rows]]
                                 if len(g) == 0:
                                     continue
-                                ds = slot_t[g]
-                                hp_t[g, ds] -= d[g]
-                                dead = hp_t[g, ds] <= 0
-                                at_map[g[dead], tt[g[dead]]] = -1
-                                occ_map[g[dead], tt[g[dead]]] = -1  # #51/S3.4b
-                                alive_t[g[dead], ds[dead]] = False
+                                ds = d_slot[g]
+                                self.unit_hp[g, ds] -= d[g]
+                                dead = self.unit_hp[g, ds] <= 0
+                                gd, td = g[dead], tt[g[dead]]
+                                occ_map[gd, td] = -1
+                                for _lm in legacy:
+                                    _lm[gd, td] = -1
+                                self.unit_alive[gd, ds[dead]] = False
                                 if bool(dead.any()):
                                     self._rp_kill_version += 1  # G1: death -> raided-mask changes for city j+1
                             surv_pm2 = (strike & is_pmil).nonzero(as_tuple=True)[0]
                             if len(surv_pm2) > 0:
-                                alive_now2 = self.p_hp[surv_pm2, pm_slot[surv_pm2]] > 0
+                                alive_now2 = self.unit_hp[surv_pm2, d_slot[surv_pm2]] > 0
                                 sp2 = surv_pm2[alive_now2]
                                 if len(sp2) > 0:
-                                    self.p_xp[sp2, pm_slot[sp2]] += XP_DEFEND
+                                    self.unit_xp[sp2, d_slot[sp2]] += XP_DEFEND
                 # AUDIT A-10: a siege pins the HP, exactly like the player's
                 # heal — any adjacent unit hostile to THIS civ (the player's
                 # at-war units, CIVILIANS included per unitsHostile — the
