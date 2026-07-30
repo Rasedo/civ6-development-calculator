@@ -247,6 +247,7 @@ def load_fixture(path: Path) -> dict:
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 40  # > tree size: complete all ready techs/civics per turn (TS uses an unbounded while); early-exit keeps it free
 U_MAX = 256  # barbarian/rival unit slots per game (append-only; runtime-asserted).
+PLAYER_SEAT = 0  # #51/S3.4: the player seat, TS seats.ts PLAYER_CIV
 BARB_SEAT = 200  # #51/S3.3: the TS seats.ts BARB_SEAT, same absolute seat space
              # Raised 96→256 for horizon-300 (G-S cliff #1): barbs high-water
              # ~160 ever-spawned by t300, rivals ~55. Behavior-preserving at the
@@ -937,9 +938,14 @@ class BatchSim:
                         :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
                     ],
                 )
-        # The player and barbarian ranges have a CONSTANT owner (0 is already
-        # the zero-fill); the rival range is written wherever v_civ is.
+        # The player range's owner is constant 0 (already the zero-fill) and the
+        # barbarian range's is constant BARB_SEAT. The rival range is written
+        # wherever v_civ is, but it is SEEDED to civOfRival(0) = 1 so that
+        # `v_seat - 1 == v_civ` holds on DEAD slots too, exactly as v_civ's own
+        # zero-fill means "rival 0". Without that, seat-1 on an unwritten slot
+        # is -1 and indexes out of bounds the moment anything probes it.
         self.u_seat.fill_(BARB_SEAT)
+        self.v_seat.fill_(1)
 
         self.v_civ = torch.zeros(B, U_MAX, dtype=torch.long, device=device)
         # #70/S3 (B-8): the general/admiral aura's +1 MP, FROZEN at the
@@ -1772,7 +1778,18 @@ class BatchSim:
         # ranged strength / ranged range / naval all come from the one roster
         # table instead of five parallel arrays in a second index space.
         _bl = list(cb.get("barbLadder") or [])
-        self._barb_ladder = torch.tensor(_bl or [0], dtype=torch.long, device=device)
+        if not _bl:
+            # #51/S3.2 replaced unitCombat/unitMoves/... with barbLadder. A
+            # rules.json without it is a STALE EXPORT, and silently falling
+            # back to a one-entry ladder just moves the failure somewhere
+            # confusing (melee_test died with "index 4 out of bounds" deep
+            # inside _spawn_barb). Say so here instead.
+            raise ValueError(
+                "rules.json has no combat.barbLadder — this is a pre-#51/S3.2 export. "
+                "Re-run the exporter for this fixture set "
+                "(the O=4 pool: `npx vite-node scripts/export-gpu.ts -- 24 100 5 3 gpu/fixtures_o4`)."
+            )
+        self._barb_ladder = torch.tensor(_bl, dtype=torch.long, device=device)
         _bn = rules.combat.get("barbNavalTypes", []) or []
         self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
         self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
@@ -1951,8 +1968,11 @@ class BatchSim:
         pe, ve, ue = self.POOL_HI["p"], self.POOL_HI["v"], self.POOL_HI["u"]
         if not bool(((seat[:, p:pe] == 0) | ~al[:, p:pe]).all()):
             raise AssertionError("SEAT DRIFT: a living PLAYER slot does not carry seat 0")
-        if not bool(((seat[:, v:ve] == self.v_civ + 1) | ~al[:, v:ve]).all()):
-            raise AssertionError("SEAT DRIFT: a living RIVAL slot's seat != civOfRival(v_civ)")
+        # EVERY rival slot, alive or not: the range is seeded to civOfRival(0)
+        # so `v_seat - 1 == v_civ` is total. A dead slot with a bogus seat is
+        # not harmless — _civ_of subtracts 1 and indexes r_atwar with it.
+        if not bool((seat[:, v:ve] == self.v_civ + 1).all()):
+            raise AssertionError("SEAT DRIFT: a RIVAL slot's seat != civOfRival(v_civ)")
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
 
@@ -4979,39 +4999,95 @@ class BatchSim:
             return torch.zeros_like(tiles, dtype=torch.bool)
         return self._encamp_block_plane(side, civ).gather(1, tiles.clamp(min=0))
 
-    def _blocked_for(self, tiles: torch.Tensor, side: str, civ: int | None = None) -> torch.Tensor:
-        """Stacking check for tiles [B, N] (mirrors tileFreeForUnit): a
-        foreign unit blocks entirely; an own unit of the same domain blocks;
-        own cross-domain stacks. side: 'barb' | 'pmil' | 'pciv' | 'rmil' |
-        'rciv' ('rmil'/'rciv' are C1-B5a's civ-aware rival probes — pass the
-        probing rival index; rival civs are FOREIGN to each other)."""
+    def _blocked_for(
+        self,
+        tiles: torch.Tensor,
+        seat,
+        is_civilian: bool = False,
+        strict: bool = False,
+    ) -> torch.Tensor:
+        """Stacking check for tiles [B, N] — the tileFreeForUnit twin.
+
+        #51/S3.4: ONE rule, keyed on the mover's SEAT, replacing a five-way
+        branch on a `side` string ('barb'|'pmil'|'pciv'|'rmil'|'rciv'). The
+        five arms were five spellings of the same sentence:
+
+            a FOREIGN unit blocks; an OWN unit of the SAME DOMAIN blocks;
+            own cross-domain stacks.
+
+        Verified exhaustively against all five arms x seven occupant kinds
+        (barb, player mil/civ, own-civ and other-civ rival mil/civ) before
+        the swap — every cell agrees. `seat` may be an int or a [B, 1] tensor
+        (the war-march probes per slot).
+
+        `strict` is a REAL divergence, not a spelling: the advance-after-kill
+        path passed the loose side 'rival', which matched no arm and fell
+        through to "anything standing there blocks". So a rival advancing
+        into a tile is blocked by its OWN civilian, where the rmil rule lets
+        them stack. Real Civ 6 allows the stack, so the strict arm is the
+        wrong one — but changing it moves units, so it stays flagged here and
+        is resolved in Round 7, not smuggled in under a refactor.
+        """
         tc = tiles.clamp(min=0)
-        barb = self.barb_at.gather(1, tc) >= 0
-        pmil = self.pmil_at.gather(1, tc) >= 0
-        pciv = self.pciv_at.gather(1, tc) >= 0
+        barb_at = self.barb_at.gather(1, tc)
+        pmil_at = self.pmil_at.gather(1, tc)
+        pciv_at = self.pciv_at.gather(1, tc)
         rv_slot = self.rv_at.gather(1, tc)
-        rv = rv_slot >= 0
         rvc_slot = self.rvciv_at.gather(1, tc)
-        rvc = rvc_slot >= 0
         # B-17 (#71): a live enemy Encampment bars entry on every side, exactly
         # as TS's `tileFreeForUnit` now does.
-        enc = self._encamp_block(tiles, side, civ)
-        if side == "pmil":
-            return barb | pmil | rv | rvc | enc
-        if side == "pciv":
-            return barb | pciv | rv | rvc | enc
-        if side == "rmil":
-            # foreign anything; own-civ military (same domain); own-civ
-            # civilian stacks (cross-domain)
-            rvc_foreign = rvc & (self.v_civ.gather(1, rvc_slot.clamp(min=0)) != civ)
-            return barb | pmil | pciv | rv | rvc_foreign | enc
-        if side == "rciv":
-            # foreign anything; own-civ civilian (same domain); own-civ
-            # military stacks (cross-domain)
-            rv_foreign = rv & (self.v_civ.gather(1, rv_slot.clamp(min=0)) != civ)
-            return barb | pmil | pciv | rv_foreign | rvc | enc
-        # 'barb': anything standing there blocks.
-        return barb | pmil | pciv | rv | rvc | enc
+        enc = self._encamp_block(tiles, self._legacy_side(seat, is_civilian, strict), self._civ_of(seat))
+
+        if strict:
+            return (
+                (barb_at >= 0) | (pmil_at >= 0) | (pciv_at >= 0)
+                | (rv_slot >= 0) | (rvc_slot >= 0) | enc
+            )
+
+        # Whose unit occupies this tile, per DOMAIN, in the absolute seat space
+        # (-1 = nobody). At most one military and one civilian can stand here.
+        neg = torch.full_like(tc, -1)
+        mil_seat = torch.where(
+            barb_at >= 0,
+            torch.full_like(tc, BARB_SEAT),
+            torch.where(
+                pmil_at >= 0,
+                torch.zeros_like(tc),
+                torch.where(rv_slot >= 0, self.v_seat.gather(1, rv_slot.clamp(min=0)), neg),
+            ),
+        )
+        civ_seat = torch.where(
+            pciv_at >= 0,
+            torch.zeros_like(tc),
+            torch.where(rvc_slot >= 0, self.v_seat.gather(1, rvc_slot.clamp(min=0)), neg),
+        )
+        mil_blocks = (mil_seat >= 0) & ((mil_seat != seat) | (not is_civilian))
+        civ_blocks = (civ_seat >= 0) & ((civ_seat != seat) | is_civilian)
+        return mil_blocks | civ_blocks | enc
+
+    @staticmethod
+    def _civ_of(seat):
+        """The rival index behind a seat, or None for the player/barbarians."""
+        if torch.is_tensor(seat):
+            return seat - 1  # the war-march only ever probes with rival seats
+        if seat == 0 or seat == BARB_SEAT:
+            return None
+        return seat - 1
+
+    @staticmethod
+    def _legacy_side(seat, is_civilian: bool, strict: bool) -> str:
+        """The `side` string _encamp_block still speaks. Kept so the
+        Encampment hostility rule stays byte-identical while the STACKING
+        rule unifies; folding it onto seats is the next slice."""
+        if strict:
+            return "rival"
+        if torch.is_tensor(seat):
+            return "rciv" if is_civilian else "rmil"
+        if seat == BARB_SEAT:
+            return "barb"
+        if seat == 0:
+            return "pciv" if is_civilian else "pmil"
+        return "rciv" if is_civilian else "rmil"
 
     def _first_free_spot(self, at_tile: torch.Tensor, side: str, civ_mask: torch.Tensor | None = None, civ: int | None = None, naval_mask: torch.Tensor | None = None, cart: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
         """Mirrors spawnUnit's placement probe: the anchor if free, else the
@@ -5540,8 +5616,8 @@ class BatchSim:
                 nb = self.neigh[here.clamp(min=0)]  # [B, 6]
                 tgt = nb.gather(1, a.clamp(min=0, max=5).unsqueeze(1)).squeeze(1)
                 tc = tgt.clamp(min=0)
-                blocked_mil = self._blocked_for(tgt.unsqueeze(1), "rmil", civ=r).squeeze(1)
-                blocked_civ = self._blocked_for(tgt.unsqueeze(1), "rciv", civ=r).squeeze(1)
+                blocked_mil = self._blocked_for(tgt.unsqueeze(1), r + 1).squeeze(1)
+                blocked_civ = self._blocked_for(tgt.unsqueeze(1), r + 1, is_civilian=True).squeeze(1)
                 blocked = torch.where(is_civ, blocked_civ, blocked_mil)
                 ok = mv & (tgt >= 0) & self.passable.gather(1, tc.unsqueeze(1)).squeeze(1) & ~blocked
                 if bool(ok.any()):
@@ -5744,7 +5820,7 @@ class BatchSim:
             d_here = self.pair_dist[here.clamp(min=0), tgt].to(torch.long)
             nb = self.neigh[hc]
             nbc = nb.clamp(min=0)
-            step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "pciv")
+            step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, PLAYER_SEAT, is_civilian=True)
             d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
             skey = torch.where(step_ok, d_nb * 8 + arange6, torch.full_like(d_nb, 10**9))
             best = skey.min(dim=1).values
@@ -6435,7 +6511,7 @@ class BatchSim:
                 # desyncing from TS (which refuses the advance). Player builds no
                 # naval (production_mask excludes it), so the land plane is exact.
                 adv_terr = self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
-                adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), "pmil").squeeze(1) & adv_terr
+                adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), PLAYER_SEAT).squeeze(1) & adv_terr
                 if bool(adv.any()):
                     vr = adv.nonzero(as_tuple=True)[0]
                     self.pmil_at[vr, here[vr]] = -1
@@ -7277,7 +7353,7 @@ class BatchSim:
                     self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),  # no CARTOGRAPHY
                     self.passable.gather(1, nb2c),
                 )
-                step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, "barb")
+                step_ok = (nb2 >= 0) & _plane & ~self._blocked_for(nb2, BARB_SEAT)
                 d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)  # dist(neighbor, target); symmetric
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values
@@ -8117,7 +8193,7 @@ class BatchSim:
             return torch.zeros_like(mask)
         cand7 = torch.cat([at_tile.unsqueeze(1), self.neigh[at_tile.clamp(min=0)]], dim=1)
         okc = cand7.clamp(min=0)
-        ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~self._blocked_for(cand7, "rciv", civ=civ)
+        ok7 = (cand7 >= 0) & self.passable.gather(1, okc) & ~self._blocked_for(cand7, civ + 1, is_civilian=True)
         first = torch.where(ok7, torch.arange(7, device=self.device), 7).min(dim=1).values
         spot = cand7.gather(1, first.clamp(max=6).unsqueeze(1)).squeeze(1)
         can = mask & (first < 7)
@@ -8330,7 +8406,7 @@ class BatchSim:
                 curc = cur.clamp(min=0)
                 nb = self.neigh[curc]  # [B, 6]
                 nbc = nb.clamp(min=0)
-                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rciv", civ=r)
+                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, r + 1, is_civilian=True)
                 d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values
@@ -8621,7 +8697,7 @@ class BatchSim:
                 curc = cur.clamp(min=0)
                 nb = self.neigh[curc]  # [B, 6]
                 nbc = nb.clamp(min=0)
-                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rciv", civ=r)
+                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, r + 1, is_civilian=True)
                 d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values
@@ -8710,7 +8786,7 @@ class BatchSim:
                 curc = cur.clamp(min=0)
                 nb = self.neigh[curc]  # [B, 6]
                 nbc = nb.clamp(min=0)
-                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, "rciv", civ=r)
+                step_ok = (nb >= 0) & self.passable.gather(1, nbc) & ~self._blocked_for(nb, r + 1, is_civilian=True)
                 d_nb = self.pair_dist[tgt.unsqueeze(1), nbc].to(torch.long)
                 skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
                 best = skey.min(dim=1).values
@@ -10219,12 +10295,12 @@ class BatchSim:
             a_hp, a_tile, a_at = self.u_hp, self.u_tile, self.barb_at
             a_alive = self.u_alive
             atk_cs_all = self._p_combat[self.u_type[:, u]]
-            blocked_side = "barb"
+            blocked_side, _bstrict = "barb", False
         else:
             a_hp, a_tile, a_at = self.v_hp, self.v_tile, self.rv_at
             a_alive = self.v_alive
             atk_cs_all = self._p_combat[self.v_type[:, u]]
-            blocked_side = "rival"  # _blocked_for's strict fallthrough (unchanged)
+            blocked_side, _bstrict = "rival", True  # the strict fallthrough, now NAMED
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
         dm = self.pmil_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
@@ -10382,8 +10458,10 @@ class BatchSim:
                     self._barb_water_ok(ttc_adv),
                     land_ok,
                 )
-            _bciv = None if atk_kind == "barb" else self.v_civ[:, u]  # B-17 (#71)
-            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv).squeeze(1) & adv_terr
+            # #51/S3.4: the advance probe, by seat. `_bstrict` preserves the
+            # loose-"rival" fallthrough exactly (see _blocked_for).
+            _bseat = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
+            adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), _bseat, strict=_bstrict).squeeze(1) & adv_terr
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
@@ -10470,7 +10548,7 @@ class BatchSim:
         # advance; a rival captor (civ_att under atk_kind=="rival") stays put.
         kill_adv = (civ_att | rvciv_att) if atk_kind == "barb" else torch.zeros_like(civ_att)
         if bool(kill_adv.any()):
-            _bciv2 = None if atk_kind == "barb" else self.v_civ[:, u]  # B-17 (#71)
+            _bseat2 = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
             # B-26 (2026-07-27): the SAME naval-plane gate as the melee advance
             # above — a roll-free civilian kill by a barb GALLEY must not walk
             # the hull onto the (land) tile it just cleared.
@@ -10484,7 +10562,7 @@ class BatchSim:
                 if atk_kind == "barb"
                 else torch.ones_like(kill_adv)
             )
-            adv = kill_adv & _kterr & ~self._blocked_for(tgt.unsqueeze(1), blocked_side, _bciv2).squeeze(1)
+            adv = kill_adv & _kterr & ~self._blocked_for(tgt.unsqueeze(1), _bseat2, strict=_bstrict).squeeze(1)
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_at[vr, here[vr]] = -1
@@ -11009,7 +11087,7 @@ class BatchSim:
                 terr = torch.where(is_naval.unsqueeze(1), water_gate, land_ok | (water_gate & can_emb.unsqueeze(1)))
             else:
                 terr = self.passable.gather(1, nb2c)
-            step_ok = (nb2 >= 0) & terr & ~self._blocked_for(nb2, "rmil", civ=self.v_civ[:, v].unsqueeze(1))
+            step_ok = (nb2 >= 0) & terr & ~self._blocked_for(nb2, self.v_seat[:, v].unsqueeze(1))
             if self._embark_live:
                 # B-26 (#79): a CLIFF closes the embark/disembark edge.
                 step_ok = step_ok & ~self._cliff_block_dirs(cur, nb2, self.rival_at == self.v_civ[:, v].unsqueeze(1))

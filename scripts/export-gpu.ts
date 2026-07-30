@@ -231,7 +231,7 @@ const OUT = process.argv[6] ?? 'gpu/fixtures';
 const SEED_OVERRIDES_ALT: Record<number, Record<number, number>> = {
   // 3 rivals: 9196's player is wiped by t100 under the post-#70 world
   // (ranged barbs + general auras + a third rival). 9199 survives.
-  3: { 15: 9199 },
+  3: { 4: 9057, 15: 9199, 17: 9226 },
 };
 
 function seedFor(s: number): number {

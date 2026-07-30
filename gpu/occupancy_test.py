@@ -15,6 +15,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
+from civ6gpu.engine import PLAYER_SEAT, BARB_SEAT  # #51/S3.4: seat-keyed occupancy
 
 
 def main() -> None:
@@ -46,13 +47,13 @@ def main() -> None:
     sim.v_next[0] += 1
 
     tiles = torch.tensor([[t]])
-    assert bool(sim._blocked_for(tiles, "pmil")[0, 0]), "rival civilian must block player military (foreign)"
-    assert bool(sim._blocked_for(tiles, "pciv")[0, 0]), "rival civilian must block player civilian (foreign)"
-    assert bool(sim._blocked_for(tiles, "barb")[0, 0]), "rival civilian must block barbarians"
-    assert not bool(sim._blocked_for(tiles, "rmil", civ=0)[0, 0]), "own-civ military stacks cross-domain"
-    assert bool(sim._blocked_for(tiles, "rmil", civ=1)[0, 0]), "foreign-civ rival military is blocked"
-    assert bool(sim._blocked_for(tiles, "rciv", civ=0)[0, 0]), "own-civ civilian blocks (same domain)"
-    assert bool(sim._blocked_for(tiles, "rciv", civ=1)[0, 0]), "foreign-civ rival civilian is blocked"
+    assert bool(sim._blocked_for(tiles, PLAYER_SEAT)[0, 0]), "rival civilian must block player military (foreign)"
+    assert bool(sim._blocked_for(tiles, PLAYER_SEAT, is_civilian=True)[0, 0]), "rival civilian must block player civilian (foreign)"
+    assert bool(sim._blocked_for(tiles, BARB_SEAT)[0, 0]), "rival civilian must block barbarians"
+    assert not bool(sim._blocked_for(tiles, 0 + 1)[0, 0]), "own-civ military stacks cross-domain"
+    assert bool(sim._blocked_for(tiles, 1 + 1)[0, 0]), "foreign-civ rival military is blocked"
+    assert bool(sim._blocked_for(tiles, 0 + 1, is_civilian=True)[0, 0]), "own-civ civilian blocks (same domain)"
+    assert bool(sim._blocked_for(tiles, 1 + 1, is_civilian=True)[0, 0]), "foreign-civ rival civilian is blocked"
 
     # a rival MILITARY tile: own-civ civilian may enter (cross-domain), foreign may not
     mil = (sim.rv_at[0] >= 0).nonzero(as_tuple=True)[0]
@@ -60,9 +61,9 @@ def main() -> None:
         mt = int(mil[0])
         mciv = int(sim.v_civ[0, int(sim.rv_at[0, mt])])
         mtiles = torch.tensor([[mt]])
-        assert not bool(sim._blocked_for(mtiles, "rciv", civ=mciv)[0, 0]), "own-civ civilian stacks on own military"
-        assert bool(sim._blocked_for(mtiles, "rciv", civ=mciv + 1)[0, 0]), "foreign civilian blocked by rival military"
-        assert bool(sim._blocked_for(mtiles, "rmil", civ=mciv)[0, 0]), "own military blocks own military (same domain)"
+        assert not bool(sim._blocked_for(mtiles, mciv + 1, is_civilian=True)[0, 0]), "own-civ civilian stacks on own military"
+        assert bool(sim._blocked_for(mtiles, mciv + 2, is_civilian=True)[0, 0]), "foreign civilian blocked by rival military"
+        assert bool(sim._blocked_for(mtiles, mciv + 1)[0, 0]), "own military blocks own military (same domain)"
 
     # snapshot/restore must round-trip the new planes
     snap = sim.snapshot()
