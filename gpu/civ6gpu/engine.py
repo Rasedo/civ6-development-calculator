@@ -4907,12 +4907,10 @@ class BatchSim:
         has_rv = (rvn >= 0) & on & ~self.v_emb.gather(1, rvn.clamp(min=0))
         rv_civ_n = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=rcap)  # [B, 6]
         # a rival military neighbour whose civ is at war with the player
-        rv_war_n = has_rv & self.r_atwar.gather(1, rv_civ_n)
         # #51/S3.4: the defender's SEAT, and each neighbour's, in the one
         # absolute space. This replaced a three-way branch on def_side
         # (0 player / 1 barbarian / 2 rival) that spelled out the same
         # unitsHostile question once per kind.
-        dciv = def_civ.clamp(min=0).clamp(max=rcap).unsqueeze(1)  # [B, 1]
         d_seat = torch.where(
             def_side == 0,
             torch.zeros_like(def_side),
@@ -4925,22 +4923,10 @@ class BatchSim:
         )  # [B, 6], -1 = no military neighbour
         present = has_barb | has_pmil | has_rv
 
-        # unitsHostile: a barbarian is hostile to every non-barbarian and vice
-        # versa; otherwise it is civsAtWar. The player pair reads r_atwar, a
-        # rival pair reads rr_war — S4.3 collapses those into one matrix.
-        bidx6 = torch.arange(self.B, device=self.device).unsqueeze(1)
-        d_barb = d_seat == BARB_SEAT
-        n_barb = n_seat == BARB_SEAT
-        pair_barb = d_barb ^ n_barb
-        # player-vs-rival, either way round
-        pl_vs_rv = ((d_seat == 0) & (n_seat > 0) & ~n_barb) | ((n_seat == 0) & (d_seat > 0) & ~d_barb)
-        rv_civ_side = torch.where(d_seat == 0, n_seat - 1, d_seat - 1).clamp(min=0, max=rcap)
-        war_pl = self.r_atwar.gather(1, rv_civ_side)  # [B, 6]
-        # rival-vs-rival
-        rv_vs_rv = (d_seat > 0) & ~d_barb & (n_seat > 0) & ~n_barb
-        rr = self.rr_war[bidx6, dciv, rv_civ_n]  # [B, 6]
-        war_rr = rv_vs_rv & (n_seat != d_seat) & rr
-        hostile = present & (pair_barb | (pl_vs_rv & war_pl) | war_rr)
+        # #51/S3.4b: one call, the same question ZOC and the Encampment probe
+        # ask. `_seats_hostile` already treats -1 as nobody, so `present` is
+        # only needed for the FRIENDLY side.
+        hostile = self._seats_hostile(d_seat, n_seat)
         # exclude the attacker's own unit (the military at attacker_tile)
         is_atk = (nb == attacker_tile.unsqueeze(1)) & (attacker_tile.unsqueeze(1) >= 0)
         hostile = hostile & ~is_atk
@@ -5054,23 +5040,15 @@ class BatchSim:
         if not tensor_seat and seat == PLAYER_SEAT:
             war_r = self.r_atwar.gather(1, r_at.clamp(min=0))
             return live & (r_at >= 0) & war_r
-        # A rival seat: civOfRival(civ) = civ + 1, so the rival index is seat-1.
-        civ = seat - 1
-        p_tile = (r_at < 0) & (self.owner >= 0)
-        if torch.is_tensor(civ):
-            cv = civ.reshape(self.B, 1)
-            war_p = self.r_atwar.gather(1, cv)  # [B, 1]
-            rr = self.rr_war.gather(
-                1, cv.unsqueeze(-1).expand(self.B, 1, self.rr_war.shape[2])
-            ).squeeze(1)  # [B, R]
-            same = r_at == cv
-        else:
-            war_p = self.r_atwar[:, civ].unsqueeze(1)
-            rr = self.rr_war[:, civ]
-            same = r_at == civ
-        war_r = rr.gather(1, r_at.clamp(min=0)) & ~same
-        hostile = torch.where(r_at >= 0, war_r, p_tile & war_p)
-        return live & hostile
+        # #51/S3.4b: the Encampment OWNER's seat per tile, then the one shared
+        # hostility question. This was a third hand-rolled derivation of it,
+        # with its own int-vs-tensor branch for the probing rival.
+        owner_seat = torch.where(
+            r_at >= 0,
+            r_at + 1,                                   # a rival's district
+            torch.where(self.owner >= 0, torch.zeros_like(r_at), torch.full_like(r_at, -1)),
+        )
+        return live & self._seats_hostile(seat, owner_seat)
 
     def _encamp_block(self, tiles: torch.Tensor, seat) -> torch.Tensor:
         """[B, N] — `_encamp_block_plane` sampled at `tiles` (one source of
