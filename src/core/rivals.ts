@@ -135,7 +135,7 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: nextCityName(rival),
-    civId: civOfRival(rival.id),
+    seat: civOfRival(rival.id),
     centerIndex: tile.index,
     // P5/S3 (C-14): pop 1 like foundCity — the capital's old pop-3 head
     // start was an asymmetric pacing crutch.
@@ -718,7 +718,7 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
   const defected: RivalCity = {
     id: winner.nextCityId++,
     name: city.name,
-    civId: civOfRival(winner.id),
+    seat: civOfRival(winner.id),
     centerIndex: city.centerIndex,
     population: Math.max(1, Math.floor(city.population * 0.75)),
     foodBox: 0,
@@ -2243,7 +2243,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
   const flipped: RivalCity = {
     id: to.nextCityId++,
     name: rc.name,
-    civId: civOfRival(to.id),
+    seat: civOfRival(to.id),
     centerIndex: rc.centerIndex,
     population: Math.max(1, Math.floor(rc.population * 0.75)),
     foodBox: 0,

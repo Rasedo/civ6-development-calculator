@@ -60,7 +60,7 @@ function addRival(
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: 'Roma',
-    civId: rival.id + 1,
+    seat: rival.id + 1,
     centerIndex: tile.index,
     population: 3,
     foodBox: 0,
@@ -340,6 +340,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     for (let i = 0; i < 6; i++) {
       state.cities.push({
         id: state.nextCityId++,
+        seat: PLAYER_CIV,
         name: `P${i}`,
         centerIndex: 20 + i,
         population: 1,
@@ -468,7 +469,7 @@ describe('rival trade routes (A-11)', () => {
     const city: RivalCity = {
       id: rival.nextCityId++,
       name: 'Ostia',
-      civId: rival.id + 1,
+      seat: rival.id + 1,
       centerIndex: tile.index,
       population: 3,
       foodBox: 0,

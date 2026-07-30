@@ -362,7 +362,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const rc: RivalCity = {
       id: 0,
       name: 'Utica',
-      civId: 1,
+      seat: civOfRival(1),
       centerIndex: rcCenter.index,
       population: 5,
       foodBox: 0,
@@ -403,7 +403,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const rc: RivalCity = {
       id: 0,
       name: 'Kart-Hadasht',
-      civId: 1,
+      seat: civOfRival(1),
       centerIndex: rcCenter.index,
       population: 5,
       foodBox: 0,

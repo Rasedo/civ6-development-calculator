@@ -180,11 +180,13 @@ export interface City {
   id: number;
   name: string;
   /**
-   * Owning civ in the unified civ space (C1-A2): absent = the player
-   * (civ 0); rival cities carry civOfRival(rival.id). Ids stay per-owner
-   * sequences until C1-B7 unifies them (rival ids drive border pacing).
+   * The SEAT that owns this city: 0 player, r+1 rival. #51/S1.3d: was an
+   * OPTIONAL `civId` where "absent" silently meant the player — the same
+   * two-meanings-one-field shape `Unit.owner`/`civId` had. Required now, so a
+   * city with no owner is a type error rather than a player city by default.
+   * Ids stay per-owner sequences (rival ids drive border pacing).
    */
-  civId?: number;
+  seat: number;
   centerIndex: number;
   population: number;
   /** Accumulated food toward next citizen. */

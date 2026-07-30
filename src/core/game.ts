@@ -187,6 +187,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   const id = state.nextCityId++;
   const city: City = {
     id,
+    seat: PLAYER_CIV, // #51/S1.3d: a player city says so explicitly
     name: cityName(id),
     centerIndex: tileIndex,
     population: 1,
@@ -1356,7 +1357,7 @@ export function deserialize(json: string): GameState {
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
     r.treasury ??= 0; // VP-G1
     for (const rc of r.cities as (RivalCity & { growthBox?: number })[]) {
-      rc.civId ??= civOfRival(r.id);
+      rc.seat ??= civOfRival(r.id);
       rc.foodBox ??= rc.growthBox ?? 0;
       delete rc.growthBox;
       rc.cultureBox ??= 0;

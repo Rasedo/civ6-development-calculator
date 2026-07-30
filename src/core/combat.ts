@@ -996,6 +996,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   center.cityId = id;
   state.cities.push({
     id,
+    seat: PLAYER_CIV, // #51/S1.3d: a conquered city-state joins the PLAYER's seat
     name: cs.name,
     centerIndex: cs.centerIndex,
     population: Math.max(1, Math.floor(cs.population * 0.75)),
@@ -1047,7 +1048,7 @@ export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: 
   rival.cities.push({
     id,
     name: cs.name,
-    civId: civOfRival(rival.id),
+    seat: civOfRival(rival.id),
     centerIndex: cs.centerIndex,
     population: Math.max(1, Math.floor(cs.population * 0.75)),
     foodBox: 0,
@@ -1130,6 +1131,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   const keptBuildings = city.buildings.filter((b) => b !== 'PALACE');
   const captured: City = {
     id,
+    seat: PLAYER_CIV, // #51/S1.3d: a player city says so explicitly
     name: city.name,
     centerIndex: city.centerIndex,
     population: Math.max(1, Math.floor(city.population * 0.75)),

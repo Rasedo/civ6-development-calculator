@@ -101,7 +101,7 @@ export function unitCiv(u: Unit): number | null {
 
 /** Civ owning this city (absent civId = the player, C1-A2). */
 export function cityCiv(c: City): number {
-  return c.civId ?? PLAYER_CIV;
+  return c.seat;
 }
 
 

@@ -8,7 +8,7 @@
  */
 
 import type { City, DistrictId, GameState, QueueItem, Tile } from './types';
-import { playerSeat } from './seats';
+import { playerSeat, PLAYER_CIV } from './seats';
 import { parseCivExport } from './importer';
 import { createGameFromMap, districtCost, settlerCost, projectCost } from './game';
 import { tileIndex, inBounds, tilesWithin, hexDistance } from './hex';
@@ -224,6 +224,7 @@ export function parseLiveSync(text: string): SyncResult {
     civIdToOurs.set(sc.civId, id);
     const city: City = {
       id,
+      seat: PLAYER_CIV, // #51/S1.3d: a player city says so explicitly
       name: sc.name,
       centerIndex: center.index,
       population: sc.pop,

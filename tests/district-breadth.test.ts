@@ -43,7 +43,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: 'Roma',
-    civId: rival.id + 1,
+    seat: rival.id + 1,
     centerIndex: tile.index,
     population: 3,
     foodBox: 0,
@@ -81,7 +81,7 @@ function makeSourceCity(rival: RivalCiv, centerIndex: number, izTileIndex: numbe
   return {
     id: rival.nextCityId++,
     name: 'Ostia',
-    civId: rival.id + 1,
+    seat: rival.id + 1,
     centerIndex,
     population: 1,
     foodBox: 0,

@@ -49,7 +49,7 @@ function addRival(state: GameState, col: number, row: number, name: string): Riv
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: name + ' Prime',
-    civId: rival.id + 1,
+    seat: rival.id + 1,
     centerIndex: tile.index,
     population: 6,
     foodBox: 0,
