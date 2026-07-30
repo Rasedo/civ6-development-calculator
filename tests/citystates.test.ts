@@ -5,7 +5,7 @@ import { createGame, foundCity, endTurn, serialize, deserialize } from '../src/c
 import { canFoundCity } from '../src/core/rules';
 import { borderCandidates, computeCityStats } from '../src/core/city';
 import { tilesWithin, hexDistance } from '../src/core/hex';
-import { cityStatePhase, assignEnvoy, envoyBonusDelta, csEnvoyBonuses, isSuzerain, csRivalEnvoyBonuses, csSuzerainCapitalBonus, csRivalSuzerainCapitalBonus } from '../src/core/cityStates';
+import { cityStatePhase, assignEnvoy, envoyBonusDelta, csEnvoyBonuses, isSuzerain, csSuzerainCapitalBonus } from '../src/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../src/core/trade';
 import { ENVOY_COST, CS_SUZERAIN_YIELD } from '../src/data/cityStates';
 import type { CityState, CityStateType, GameState } from '../src/core/types';
@@ -247,13 +247,13 @@ describe('rival envoys and the suzerain contest (A-12)', () => {
     const state = makeState();
     const cs = addCs(state, 8, 8, { type: 'scientific' });
     cs.rivalEnvoys = [6, 1];
-    const b0 = csRivalEnvoyBonuses(state, 0);
+    const b0 = csEnvoyBonuses(state, civOfRival(0));
     expect(b0.capital.science).toBe(2);
     // B-21: at 6 envoys the 3-tier lands on the tier-1 building (LIBRARY) and
     // the 6-tier on the tier-2 building (UNIVERSITY) — +2 each, separate keys.
     expect(b0.buildingAdd.LIBRARY?.science).toBe(2);
     expect(b0.buildingAdd.UNIVERSITY?.science).toBe(2);
-    const b1 = csRivalEnvoyBonuses(state, 1);
+    const b1 = csEnvoyBonuses(state, civOfRival(1));
     expect(b1.capital.science).toBe(2);
     expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
   });
@@ -294,8 +294,8 @@ describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
     const cs = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: 0 });
     cs.rivalEnvoys = [3];
     expect(isSuzerain(cs, civOfRival(0))).toBe(true);
-    expect(csRivalSuzerainCapitalBonus(state, 0).culture).toBe(CS_SUZERAIN_YIELD);
+    expect(csSuzerainCapitalBonus(state, civOfRival(0)).culture).toBe(CS_SUZERAIN_YIELD);
     // no perk for a rival that is not the suzerain
-    expect(csRivalSuzerainCapitalBonus(state, 1)).toEqual({});
+    expect(csSuzerainCapitalBonus(state, civOfRival(1))).toEqual({});
   });
 });

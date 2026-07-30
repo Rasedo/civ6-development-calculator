@@ -166,34 +166,17 @@ function csTierBuildings(type: GameState['cityStates'][number]['type']): {
 }
 
 /** Aggregate envoy bonuses across all city-states (folded into modifiers). */
-export function csEnvoyBonuses(state: GameState): CsBonuses {
+/**
+ * The 1/3/6 envoy-count bonuses for ANY seat. #51/S2.3: `csEnvoyBonuses` and
+ * `csRivalEnvoyBonuses` were the same three thresholds differing only in where
+ * "my envoy count" came from — `cs.envoys` vs `cs.rivalEnvoys[id]`. `envoysOf`
+ * is that slot; zero flags.
+ */
+export function csEnvoyBonuses(state: GameState, seat: number = PLAYER_CIV): CsBonuses {
   const capital: Partial<Yields> = {};
   const buildingAdd: CsBonuses['buildingAdd'] = {};
   for (const cs of state.cityStates) {
-    const key = CS_TYPE_YIELD[cs.type];
-    if (cs.envoys >= 1) {
-      capital[key] = (capital[key] ?? 0) + CS_CAPITAL_BONUS;
-    }
-    const { tier1, tier2 } = csTierBuildings(cs.type);
-    if (cs.envoys >= 3 && tier1) {
-      const cur = (buildingAdd[tier1] ??= {});
-      cur[key] = (cur[key] ?? 0) + CS_DISTRICT_BONUS;
-    }
-    if (cs.envoys >= 6 && tier2) {
-      const cur = (buildingAdd[tier2] ??= {});
-      cur[key] = (cur[key] ?? 0) + CS_DISTRICT_BONUS;
-    }
-  }
-  return { capital, buildingAdd };
-}
-
-/** A-12: the rival twin of csEnvoyBonuses — the same 1/3/6 thresholds off
- * THAT RIVAL's envoy counts (bonuses are count-based, not suzerain-based). */
-export function csRivalEnvoyBonuses(state: GameState, rivalId: number): CsBonuses {
-  const capital: Partial<Yields> = {};
-  const buildingAdd: CsBonuses['buildingAdd'] = {};
-  for (const cs of state.cityStates) {
-    const mine = cs.rivalEnvoys?.[rivalId] ?? 0;
+    const mine = envoysOf(cs, seat);
     const key = CS_TYPE_YIELD[cs.type];
     if (mine >= 1) capital[key] = (capital[key] ?? 0) + CS_CAPITAL_BONUS;
     const { tier1, tier2 } = csTierBuildings(cs.type);
@@ -209,24 +192,15 @@ export function csRivalEnvoyBonuses(state: GameState, rivalId: number): CsBonuse
   return { capital, buildingAdd };
 }
 
-/** B-21: the suzerain's per-CS unique bonus (CS_SUZERAIN_LIVE), summed into a
- * flat capital-yield add for whichever seat holds suzerainty. Player seat. */
-export function csSuzerainCapitalBonus(state: GameState): Partial<Yields> {
+/**
+ * B-21: the suzerain's per-CS unique bonus, as a flat capital-yield add for
+ * whichever seat holds suzerainty. #51/S2.3: the two twins differed only in the
+ * seat handed to `isSuzerain`.
+ */
+export function csSuzerainCapitalBonus(state: GameState, seat: number = PLAYER_CIV): Partial<Yields> {
   const out: Partial<Yields> = {};
   for (const cs of state.cityStates) {
-    if (!isSuzerain(cs)) continue;
-    const key = CS_SUZERAIN_LIVE[cs.name];
-    if (!key) continue; // descoped row
-    out[key] = (out[key] ?? 0) + CS_SUZERAIN_YIELD;
-  }
-  return out;
-}
-
-/** B-21: the rival twin — suzerain bonus for a rival seat. */
-export function csRivalSuzerainCapitalBonus(state: GameState, rivalId: number): Partial<Yields> {
-  const out: Partial<Yields> = {};
-  for (const cs of state.cityStates) {
-    if (!isSuzerain(cs, civOfRival(rivalId))) continue;
+    if (!isSuzerain(cs, seat)) continue;
     const key = CS_SUZERAIN_LIVE[cs.name];
     if (!key) continue; // descoped row
     out[key] = (out[key] ?? 0) + CS_SUZERAIN_YIELD;

@@ -7,7 +7,7 @@
 import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit, RivalCiv } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin, hexDistance } from './hex';
-import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots, playerTourism } from './city';
+import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots, seatTourism } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
@@ -898,7 +898,7 @@ export function endTurn(state: GameState): void {
   // B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level, right
   // after the city loop, so the GPU mirrors at the same position. Great Works
   // plus every owned Seaside Resort (worth its tile's appeal).
-  playerSeat(state).tourism = (playerSeat(state).tourism ?? 0) + playerTourism(state);
+  playerSeat(state).tourism = (playerSeat(state).tourism ?? 0) + seatTourism(state);
   // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, accumulated
   // once per turn at the civ level, the same position the rival seat uses.
   playerSeat(state).diploFavor =

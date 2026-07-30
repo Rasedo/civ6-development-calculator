@@ -18,7 +18,7 @@ import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from '
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
 import { rivalRouteRaidedAt, routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
-import { isSuzerain, csRivalEnvoyBonuses, csRivalSuzerainCapitalBonus } from './cityStates';
+import { isSuzerain, csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE, GOVERNMENTS } from '../data/policies';
@@ -59,7 +59,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, rivalTourism, civEraIndex } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, resourcePriority, civEraIndex, seatTourism } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -2065,12 +2065,12 @@ export function rivalCityYields(
   // csEnvoyBonuses; suzerainty not required). Pre-tier, the player's
   // modifiers position.
   {
-    const csb = csRivalEnvoyBonuses(state, rival.id);
+    const csb = csEnvoyBonuses(state, civOfRival(rival.id));
     if (rc.isCapital) {
       for (const [k, v] of Object.entries(csb.capital)) total[k as keyof Yields] += v ?? 0;
       // B-21: the suzerain's per-CS unique perk — a flat capital yield to
       // whichever seat is suzerain (this rival here).
-      const suz = csRivalSuzerainCapitalBonus(state, rival.id);
+      const suz = csSuzerainCapitalBonus(state, civOfRival(rival.id));
       for (const [k, v] of Object.entries(suz)) total[k as keyof Yields] += v ?? 0;
     }
     // B-21: the 3/6 tiers land on BUILDINGS now — mirror cityBuildingYields'
@@ -3334,7 +3334,7 @@ export function rivalPhase(state: GameState): void {
     // B-20 (#71): TOURISM — the player's twin, accumulated once per turn at
     // the civ level (Great Works + owned Seaside Resorts, each worth its
     // tile's appeal). Zero-draw, integer-only.
-    rival.tourism = (rival.tourism ?? 0) + rivalTourism(state, rival);
+    rival.tourism = (rival.tourism ?? 0) + seatTourism(state, civOfRival(rival.id));
     // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, the
     // player's twin at the same per-turn accumulator position.
     rival.diploFavor =

@@ -46,7 +46,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner, civOfRival, tileBelongsTo, tileOwnedByCiv } from './seats';
+import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf } from './seats';
 
 export interface CityStats {
   city: City;
@@ -465,29 +465,25 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
   return t;
 }
 
-export function playerTourism(state: GameState): number {
+/**
+ * Cumulative tourism for ANY seat: great works (PRINTING doubles Writing —
+ * B-20 #74), relics, artifacts, seaside resorts and wonders.
+ *
+ * #51/S2.3: `playerTourism` and `rivalTourism` had identical structure over
+ * three seat-shaped slots — whose techs decide PRINTING and the era, whose
+ * cities hold the works, and which tiles the seat OWNS. The plan called this
+ * pair "the template" for the round, and it is: one seat argument removes all
+ * three, and the rival overload's hand-written structural type
+ * (`{ id, cities: {greatWorksWriting?...}[], research }`) goes with it.
+ */
+export function seatTourism(state: GameState, seat: number = PLAYER_CIV): number {
+  const s = seatOf(state, seat);
+  if (!s) return 0;
   let t = 0;
-  // B-20 (#74): PRINTING doubles Great Work of Writing tourism.
-  const printing = playerSeat(state).research.techs.includes(GW_PRINTING_TECH);
-  for (const c of state.cities) t += greatWorkTourism(c, printing) + relicTourism(c) + artifactTourism(c); // B-20 (#73) relics, (#79) artifacts
-  const owns = (tile: Tile) => isPlayerSeat(tileSeat(tile));
-  const era = civEraIndex(playerSeat(state).research.techs, playerSeat(state).research.civics);
-  return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
-}
-
-export function rivalTourism(
-  state: GameState,
-  rival: {
-    id: number;
-    cities: { greatWorksWriting?: number; greatWorksMusic?: number; relics?: number; artifacts?: number }[];
-    research: { techs: string[]; civics: string[] };
-  },
-): number {
-  let t = 0;
-  const printing = rival.research.techs.includes(GW_PRINTING_TECH); // B-20 (#74)
-  for (const rc of rival.cities) t += greatWorkTourism(rc, printing) + relicTourism(rc) + artifactTourism(rc); // B-20 (#73) relics, (#79) artifacts
-  const owns = (tile: Tile) => tileOwnedByCiv(tile, civOfRival(rival.id));
-  const era = civEraIndex(rival.research.techs, rival.research.civics);
+  const printing = s.research.techs.includes(GW_PRINTING_TECH);
+  for (const c of citiesOf(state, seat)) t += greatWorkTourism(c, printing) + relicTourism(c) + artifactTourism(c);
+  const owns = (tile: Tile) => tileOwnedByCiv(tile, seat);
+  const era = civEraIndex(s.research.techs, s.research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
 }
 
