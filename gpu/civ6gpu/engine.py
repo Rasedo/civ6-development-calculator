@@ -4893,30 +4893,23 @@ class BatchSim:
         Stacking blocks foreign units, so each tile holds at most ONE military
         unit — each of the 6 neighbours contributes 0 or 1. Returns
         (flank [B] long, support [B] long)."""
-        rcap = max(self.R - 1, 0)
         nb = self.neigh[def_tile.clamp(min=0)]  # [B, 6]
         nbc = nb.clamp(min=0)
         on = nb >= 0
-        has_barb = (self.barb_at.gather(1, nbc) >= 0) & on
-        # #45/B-6: EMBARKED military units flank/support for NOBODY (barbs never
-        # embark). Exclude an embarked occupant from the player/rival counts.
-        pm_slot_n = self.pmil_at.gather(1, nbc)
-        has_pmil = (pm_slot_n >= 0) & on & ~self.p_emb.gather(1, pm_slot_n.clamp(min=0))
-        rvn = self.rv_at.gather(1, nbc)
-        has_rv = (rvn >= 0) & on & ~self.v_emb.gather(1, rvn.clamp(min=0))
-        rv_civ_n = self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=rcap)  # [B, 6]
-        # a rival military neighbour whose civ is at war with the player
-        # #51/S3.4: the defender's SEAT, and each neighbour's, in the one
-        # absolute space. This replaced a three-way branch on def_side
-        # (0 player / 1 barbarian / 2 rival) that spelled out the same
-        # unitsHostile question once per kind.
+        # #51/S3.4b: TWO gathers. The defender's SEAT and each neighbour's, in
+        # the one absolute space — replacing a three-way branch on def_side
+        # (0 player / 1 barb / 2 rival) that spelled out the same unitsHostile
+        # question once per kind, over five separate occupancy maps.
+        #
+        # #45/B-6: an EMBARKED military unit flanks and supports for NOBODY.
+        # Barbarians never embark, so the merged emb plane covers all three
+        # pools with one read.
+        mslot = self.occ_mil.gather(1, nbc)  # [B, 6]
+        present = (mslot >= 0) & on & ~self.unit_emb.gather(1, mslot.clamp(min=0))
         d_seat = def_seat.reshape(self.B, 1)
         n_seat = torch.where(
-            has_barb,
-            torch.full_like(nbc, BARB_SEAT),
-            torch.where(has_pmil, torch.zeros_like(nbc), torch.where(has_rv, rv_civ_n + 1, torch.full_like(nbc, -1))),
-        )  # [B, 6], -1 = no military neighbour
-        present = has_barb | has_pmil | has_rv
+            present, self.unit_seat.gather(1, mslot.clamp(min=0)), torch.full_like(nbc, -1)
+        )  # [B, 6], -1 = no (unembarked) military neighbour
 
         # #51/S3.4b: one call, the same question ZOC and the Encampment probe
         # ask. `_seats_hostile` already treats -1 as nobody, so `present` is
@@ -5586,13 +5579,19 @@ class BatchSim:
         tile = self.v_tile.gather(1, sc)  # [B, P_MAX]
         nb = self.neigh[tile.clamp(min=0).reshape(-1)].reshape(B, P_MAX, 6)
         nbc = nb.clamp(min=0).reshape(B, -1)
-        barb = (self.barb_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
-        pmil = (self.pmil_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
-        pciv = (self.pciv_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)
-        rvn = self.rv_at.gather(1, nbc)
+        # #51/S3.4b: two gathers, then the occupant's SEAT answers each of the
+        # old per-pool questions.
+        _ms = self.occ_mil.gather(1, nbc)
+        _cs = self.occ_civ.gather(1, nbc)
+        _mseat = torch.where(_ms >= 0, self.unit_seat.gather(1, _ms.clamp(min=0)), torch.full_like(_ms, -1))
+        _cseat = torch.where(_cs >= 0, self.unit_seat.gather(1, _cs.clamp(min=0)), torch.full_like(_cs, -1))
+        barb = (_mseat == BARB_SEAT).reshape(B, P_MAX, 6)
+        pmil = (_mseat == PLAYER_SEAT).reshape(B, P_MAX, 6)
+        pciv = (_cseat == PLAYER_SEAT).reshape(B, P_MAX, 6)
+        rvn = torch.where((_mseat > 0) & (_mseat != BARB_SEAT), _ms - self.POOL_LO["v"], torch.full_like(_ms, -1))
         rv_own = ((rvn >= 0) & (self.v_civ.gather(1, rvn.clamp(min=0)) == r)).reshape(B, P_MAX, 6)
         rv_any = (rvn >= 0).reshape(B, P_MAX, 6)
-        rcn = self.rvciv_at.gather(1, nbc)
+        rcn = torch.where((_cseat > 0) & (_cseat != BARB_SEAT), _cs - self.POOL_LO["v"], torch.full_like(_cs, -1))
         rc_own = ((rcn >= 0) & (self.v_civ.gather(1, rcn.clamp(min=0)) == r)).reshape(B, P_MAX, 6)
         rc_any = (rcn >= 0).reshape(B, P_MAX, 6)
         passable = self.passable.gather(1, nbc).reshape(B, P_MAX, 6)
@@ -5695,9 +5694,14 @@ class BatchSim:
                 valid_t = atk & (tgt >= 0)
                 if bool(valid_t.any()):
                     tc = tgt.clamp(min=0)
-                    barb_t = self.barb_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
+                    # #51/S3.4b: who stands on the target tile, by seat.
+                    _mt = self.occ_mil.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    _ct = self.occ_civ.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    _mts = torch.where(_mt >= 0, self.unit_seat.gather(1, _mt.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_mt, -1))
+                    _cts = torch.where(_ct >= 0, self.unit_seat.gather(1, _ct.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ct, -1))
+                    barb_t = _mts == BARB_SEAT
                     at_war = self.r_atwar[:, r]
-                    p_unit = (self.pmil_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0) | (self.pciv_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0)
+                    p_unit = (_mts == PLAYER_SEAT) | (_cts == PLAYER_SEAT)
                     p_city = self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
                     unit_att = valid_t & (barb_t | (p_unit & at_war))
                     city_att = valid_t & ~barb_t & ~p_unit & p_city & at_war
@@ -7649,10 +7653,14 @@ class BatchSim:
         # heal while the GPU read only the military map).
         nb_c = self.neigh[self.site.clamp(min=0)]  # [B, C, 6]
         nbf = nb_c.clamp(min=0).reshape(B, -1)
-        adj_b = (self.barb_at.gather(1, nbf) >= 0).reshape(B, self.C, 6)
-        rvn = self.rv_at.gather(1, nbf)
+        _mf = self.occ_mil.gather(1, nbf)
+        _mfs = torch.where(_mf >= 0, self.unit_seat.gather(1, _mf.clamp(min=0)), torch.full_like(_mf, -1))
+        adj_b = (_mfs == BARB_SEAT).reshape(B, self.C, 6)
+        rvn = torch.where((_mfs > 0) & (_mfs != BARB_SEAT), _mf - self.POOL_LO["v"], torch.full_like(_mf, -1))
         rv_war = (rvn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rvn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
-        rvcn = self.rvciv_at.gather(1, nbf)
+        _cf = self.occ_civ.gather(1, nbf)
+        _cfs = torch.where(_cf >= 0, self.unit_seat.gather(1, _cf.clamp(min=0)), torch.full_like(_cf, -1))
+        rvcn = torch.where((_cfs > 0) & (_cfs != BARB_SEAT), _cf - self.POOL_LO["v"], torch.full_like(_cf, -1))
         rvc_war = (rvcn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rvcn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
         besieged = ((adj_b | (rv_war | rvc_war).reshape(B, self.C, 6)) & (nb_c >= 0)).any(dim=2)
         healable = self.alive & (self.city_hp < city_max_hp) & ~besieged
@@ -10894,7 +10902,12 @@ class BatchSim:
         # walls-strike scope-out family; melee rivals fight rivals via
         # _hostile_vs_unit). Player/barb targets are unchanged for ranged.
         rr_units = (war_m | war_c) & ~rngd.unsqueeze(1)
-        units_pl = (((self.pmil_at >= 0) | (self.pciv_at >= 0)) & hp.unsqueeze(1)) | (self.barb_at >= 0) | rr_units
+        # #51/S3.4b: a PLAYER unit (while the player still holds a city) or a
+        # barbarian occupies the tile.
+        _mp, _cp = self.occ_mil, self.occ_civ
+        _mps = torch.where(_mp >= 0, self.unit_seat.gather(1, _mp.clamp(min=0)), torch.full_like(_mp, -1))
+        _cps = torch.where(_cp >= 0, self.unit_seat.gather(1, _cp.clamp(min=0)), torch.full_like(_cp, -1))
+        units_pl = (((_mps == PLAYER_SEAT) | (_cps == PLAYER_SEAT)) & hp.unsqueeze(1)) | (_mps == BARB_SEAT) | rr_units
         # enemy AT-WAR rival city center (rvcity_at holds the owning civ) — a
         # MELEE-only d==1 target (rivalVsRivalCity; ranged-vs-rival-city out of
         # scope, like csWar). Own / non-at-war centers are NOT targets.
