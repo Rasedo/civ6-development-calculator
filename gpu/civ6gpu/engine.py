@@ -6524,25 +6524,27 @@ class BatchSim:
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
                 def_dead = torch.zeros_like(att)
-                for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
-                    (is_b, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, bslot),
-                    (~is_b, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, vslot),
-                ):
-                    g = rows[grp[rows]]
-                    if len(g) == 0:
-                        continue
-                    ds = slot_t[g]
-                    hp_t[g, ds] -= d_def[g]
-                    dead = hp_t[g, ds] <= 0
-                    def_dead[g[dead]] = True
-                    at_map[g[dead], tc[g[dead]]] = -1
-                    occ_map[g[dead], tc[g[dead]]] = -1  # #51/S3.4b
-                    alive_t[g[dead], ds[dead]] = False
+                # #51/S3.4b: one merged write. The two rows differed only in
+                # which pool the defender lived in — the merged slot answers
+                # that, and clearing every military map at the tile is
+                # branch-free and exact (only one is set there).
+                if len(rows) > 0:
+                    _lo = torch.where(is_b, torch.full_like(bslot, self.POOL_LO["u"]), torch.full_like(bslot, self.POOL_LO["v"]))
+                    _ds = (torch.where(is_b, bslot, vslot) + _lo)[rows]
+                    self.unit_hp[rows, _ds] -= d_def[rows]
+                    _dead = self.unit_hp[rows, _ds] <= 0
+                    def_dead[rows[_dead]] = True
+                    _gd, _td = rows[_dead], tc[rows[_dead]]
+                    self.unit_alive[_gd, _ds[_dead]] = False
+                    self.occ_mil[_gd, _td] = -1
+                    self.barb_at[_gd, _td] = -1
+                    self.pmil_at[_gd, _td] = -1
+                    self.rv_at[_gd, _td] = -1
                 # B-4: a surviving rival MILITARY defender earns +2 (barbs never
                 # accrue; rv_at is the rival-military map, so no civilian here).
                 surv_rv = (att & ~is_b & ~def_dead).nonzero(as_tuple=True)[0]
                 if len(surv_rv) > 0:
-                    self.v_xp[surv_rv, vslot[surv_rv]] += XP_DEFEND
+                    self.unit_xp[surv_rv, vslot[surv_rv] + self.POOL_LO["v"]] += XP_DEFEND
                 self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
                 atk_dead = att & (self.p_hp[:, p] <= 0)
                 both = def_dead & atk_dead
@@ -6609,24 +6611,26 @@ class BatchSim:
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 r_def_dead = torch.zeros_like(r_att)
-                for grp, at_map, occ_map, hp_t, alive_t, slot_t in (
-                    (is_b, self.barb_at, self.occ_mil, self.u_hp, self.u_alive, bslot),
-                    (~is_b, self.rv_at, self.occ_mil, self.v_hp, self.v_alive, vslot),
-                ):
-                    g = rows[grp[rows]]
-                    if len(g) == 0:
-                        continue
-                    ds = slot_t[g]
-                    hp_t[g, ds] -= d_def[g]
-                    dead = hp_t[g, ds] <= 0
-                    r_def_dead[g[dead]] = True
-                    at_map[g[dead], tc[g[dead]]] = -1
-                    occ_map[g[dead], tc[g[dead]]] = -1  # #51/S3.4b
-                    alive_t[g[dead], ds[dead]] = False
+                # #51/S3.4b: one merged write. The two rows differed only in
+                # which pool the defender lived in — the merged slot answers
+                # that, and clearing every military map at the tile is
+                # branch-free and exact (only one is set there).
+                if len(rows) > 0:
+                    _lo = torch.where(is_b, torch.full_like(bslot, self.POOL_LO["u"]), torch.full_like(bslot, self.POOL_LO["v"]))
+                    _ds = (torch.where(is_b, bslot, vslot) + _lo)[rows]
+                    self.unit_hp[rows, _ds] -= d_def[rows]
+                    _dead = self.unit_hp[rows, _ds] <= 0
+                    r_def_dead[rows[_dead]] = True
+                    _gd, _td = rows[_dead], tc[rows[_dead]]
+                    self.unit_alive[_gd, _ds[_dead]] = False
+                    self.occ_mil[_gd, _td] = -1
+                    self.barb_at[_gd, _td] = -1
+                    self.pmil_at[_gd, _td] = -1
+                    self.rv_at[_gd, _td] = -1
                 # B-4: a surviving rival MILITARY defender earns +2 (rv_at map).
                 surv_rv = (r_att & ~is_b & ~r_def_dead).nonzero(as_tuple=True)[0]
                 if len(surv_rv) > 0:
-                    self.v_xp[surv_rv, vslot[surv_rv]] += XP_DEFEND
+                    self.unit_xp[surv_rv, vslot[surv_rv] + self.POOL_LO["v"]] += XP_DEFEND
             # P4/D-2: any fight spends the attacker's MP (att|r_att = the
             # original validated attack set — both branches always execute)
             self.p_acted[:, p] = self.p_acted[:, p] | att | r_att
@@ -6974,19 +6978,15 @@ class BatchSim:
             dirs = a.clamp(min=0, max=5)
             tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
             civ = self._p_civ[self.p_type[:, p]]
-            side = torch.where(civ, self.pciv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1), self.pmil_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1))
+            # #51/S3.4b: this was tileFreeForUnit written out — foreign units
+            # block, an own unit of the SAME domain blocks, own cross-domain
+            # stacks, and a live enemy Encampment bars the step (B-17 #71,
+            # walkPath's blockedByEnemy twin). `_blocked_for` IS that rule.
             ok = (
                 mv
                 & (tgt >= 0)
                 & self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
-                & (self.barb_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)
-                & (self.rv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)
-                & (self.rvciv_at.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1) < 0)  # C1-B5b: rival builders block player moves (foreign)
-                & (side < 0)
-                # B-17 (#71): a LIVE enemy Encampment bars the step (walkPath's
-                # blockedByEnemy twin — the melee arm is the only way in).
-                # (player hostility is side-independent, so "pmil" covers both)
-                & ~self._encamp_block(tgt.clamp(min=0).unsqueeze(1), PLAYER_SEAT).squeeze(1)
+                & ~self._blocked_for(tgt.clamp(min=0).unsqueeze(1), PLAYER_SEAT, is_civilian=civ).squeeze(1)
             )
             if bool(ok.any()):
                 rows = ok.nonzero(as_tuple=True)[0]
