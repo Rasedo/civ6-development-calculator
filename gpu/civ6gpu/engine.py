@@ -6263,8 +6263,9 @@ class BatchSim:
         # P4/D-22 (rivalCityDefense): max(15, THAT civ's strongest melee
         # ever) + 5 for its own military garrisoning the center.
         best_r = self.r_best_melee[bidx, civ]
-        gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
+        # #51/S3.4b: the city owner's OWN military on the centre tile.
+        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.p_type[:, p]]
         atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(self.p_tile[:, p], tgt) + self._xp_lvl_bonus(self.p_xp[:, p])  # B-29 wound + river (city not a unit) + B-4 veterancy
@@ -6405,14 +6406,20 @@ class BatchSim:
             dirs = (a - 6).clamp(min=0, max=5)
             tgt = nb.gather(1, dirs.unsqueeze(1)).squeeze(1)
             tc = tgt.clamp(min=0)
-            bslot = self.barb_at.gather(1, tc.unsqueeze(1)).squeeze(1)
-            vslot = self.rv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
-            v_civ = self.v_civ.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(max=max(self.R - 1, 0))
+            # #51/S3.4b: the tile's military occupant, split back into the
+            # pool-local slots the death table still addresses.
+            _tm = self.occ_mil.gather(1, tc.unsqueeze(1)).squeeze(1)
+            _tms = torch.where(_tm >= 0, self.unit_seat.gather(1, _tm.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_tm, -1))
+            bslot = torch.where(_tms == BARB_SEAT, _tm - self.POOL_LO["u"], torch.full_like(_tm, -1))
+            vslot = torch.where((_tms > 0) & (_tms != BARB_SEAT), _tm - self.POOL_LO["v"], torch.full_like(_tm, -1))
+            v_civ = (torch.where(vslot >= 0, _tms - 1, torch.zeros_like(_tms))).clamp(min=0, max=max(self.R - 1, 0))
             v_ok = (vslot >= 0) & self.r_atwar.gather(1, v_civ.unsqueeze(1)).squeeze(1)
             rc_civ_t = self.rvcity_at.gather(1, tc.unsqueeze(1)).squeeze(1)
             rc_ok = (rc_civ_t >= 0) & self.r_atwar.gather(1, rc_civ_t.clamp(min=0).clamp(max=max(self.R - 1, 0)).unsqueeze(1)).squeeze(1)
-            rvc_slot_t = self.rvciv_at.gather(1, tc.unsqueeze(1)).squeeze(1)
-            rvc_civ_t = self.v_civ.gather(1, rvc_slot_t.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(max=max(self.R - 1, 0))
+            _tc_ = self.occ_civ.gather(1, tc.unsqueeze(1)).squeeze(1)
+            _tcs = torch.where(_tc_ >= 0, self.unit_seat.gather(1, _tc_.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_tc_, -1))
+            rvc_slot_t = torch.where((_tcs > 0) & (_tcs != BARB_SEAT), _tc_ - self.POOL_LO["v"], torch.full_like(_tc_, -1))
+            rvc_civ_t = (torch.where(rvc_slot_t >= 0, _tcs - 1, torch.zeros_like(_tcs))).clamp(min=0, max=max(self.R - 1, 0))
             rvc_ok = (rvc_slot_t >= 0) & self.r_atwar.gather(1, rvc_civ_t.unsqueeze(1)).squeeze(1)
             if self._rl_ranged_active:
                 rngd = self._p_rng_str[self.p_type[:, p]] > 0
@@ -8611,11 +8618,11 @@ class BatchSim:
                 if _rws.numel() == 0:
                     return
                 _t = self.v_tile[_rws, _slots]
-                _c = self.rvciv_at[_rws, _t] == _slots
+                _c = self.occ_civ[_rws, _t] == _slots + self.POOL_LO["v"]  # #51/S3.4b
                 if bool(_c.any()):
                     self.rvciv_at[_rws[_c], _t[_c]] = -1
                     self.occ_civ[(_rws[_c], _t[_c])] = -1  # #51/S3.4b
-                _m = self.rv_at[_rws, _t] == _slots
+                _m = self.occ_mil[_rws, _t] == _slots + self.POOL_LO["v"]  # #51/S3.4b
                 if bool(_m.any()):
                     self.rv_at[_rws[_m], _t[_m]] = -1
                     self.occ_mil[(_rws[_m], _t[_m])] = -1  # #51/S3.4b
@@ -10659,8 +10666,9 @@ class BatchSim:
         # P4/D-22 (rivalCityDefense): max(15, civ's strongest melee ever)
         # + 5 for its own military garrisoning the center.
         best_r = self.r_best_melee[bidx, civ]
-        gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
+        # #51/S3.4b: the city owner's OWN military on the centre tile.
+        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.u_type[:, u]]
         atk_e = atk_cs - self._wound(self.u_hp[:, u]) - 5.0 * self._river_cross(self.u_tile[:, u], tgt)  # B-29 wound + river (city not a unit)
@@ -10725,8 +10733,9 @@ class BatchSim:
         # + 5 for its own military garrisoning the center (ungarrisoned here by
         # construction — rc_att required ~has_u — but keep the term for parity).
         best_r = self.r_best_melee[bidx, civ]
-        gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
+        # #51/S3.4b: the city owner's OWN military on the centre tile.
+        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
         atk_cs = self._p_combat[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
         atk_e = atk_cs - self._wound(self.v_hp[:, u]) - 5.0 * self._river_cross(self.v_tile[:, u], tgt) + self._xp_lvl_bonus(self.v_xp[:, u])  # B-29 wound + river + B-4 veterancy
@@ -13357,8 +13366,10 @@ class BatchSim:
                             # barbs never embark) → flat CS, no terrain (no support).
                             d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-                            gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
-                            gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
+                            # #51/S3.4b: rivalCityDefense garrison — this
+                            # rival's OWN military on its centre tile.
+                            gslot = self.occ_mil[bidx, ctr]
+                            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == r + 1)).long()
                             atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
                             # B-29: the defending unit is wounded (attacker is the city).
                             def_hp = self.unit_hp[bidx, ds0]
@@ -13456,8 +13467,10 @@ class BatchSim:
                             def_cs = self._p_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
                             d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
-                            gslot = self.rv_at[bidx, ctr]  # rivalCityDefense garrison: own military at center
-                            gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == r)).long()
+                            # #51/S3.4b: rivalCityDefense garrison — this
+                            # rival's OWN military on its centre tile.
+                            gslot = self.occ_mil[bidx, ctr]
+                            gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == r + 1)).long()
                             atk_cs = torch.maximum(self.r_best_melee[:, r], torch.full_like(self.r_best_melee[:, r], 15)) + gar * 5
                             def_hp = self.unit_hp[bidx, ds0]
                             def_e = def_cs - self._wound(def_hp)
