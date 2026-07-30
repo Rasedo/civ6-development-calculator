@@ -13,7 +13,7 @@ import { nextRandom } from './rand';
 import { spawnUnit, unitsAt, unitsHostile, inEnemyZoc, moveCostInto, unitDomain, encampmentIntact, encampmentBlocks, riverCharge, layTradeRoad, cliffBlocksStep } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, clearCampFor, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
-import { detectRivalBoosts, effectiveResearchCostIn } from './boosts';
+import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getRivalModifiers, withFollowerBelief, followerReligionForCity } from './effects';
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
@@ -2386,7 +2386,7 @@ export function rivalPhase(state: GameState): void {
     // mirror of the player's endTurn-top detectBoosts (same conditions,
     // this civ's cities/research/territory; the discounts apply in the
     // research loops below).
-    detectRivalBoosts(state, rival);
+    detectBoosts(state, civOfRival(rival.id));
 
     // AUDIT A-12: city-state diplomacy from the rival's seat — meet by
     // PROXIMITY (a city or unit within CS_MEET_RANGE; rivals have no fog),
