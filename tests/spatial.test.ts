@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { isBarbSeat, BARB_SEAT } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { spatialObservation, SPATIAL_PLANES, SPATIAL_PLANE_COUNT } from '../src/core/spatial';
 import { createGame, foundCity } from '../src/core/game';
@@ -66,9 +67,9 @@ describe('spatial observation', () => {
     obs = spatialObservation(state);
     expect(obs[plane('improvement') * size + farm.index]).toBe(2);
 
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 8, 8).index, 'barbarian');
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 8, 8).index, BARB_SEAT);
     obs = spatialObservation(state);
-    const barbTile = state.units.find((u) => u.owner === 'barbarian')!.tileIndex;
+    const barbTile = state.units.find((u) => isBarbSeat(u.seat))!.tileIndex;
     expect(obs[plane('hostiles') * size + barbTile]).toBe(2);
   });
 });

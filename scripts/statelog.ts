@@ -3,7 +3,7 @@
  * as gpu/statelog.py so gpu/logdiff.py can align them. Keep the two in lockstep:
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat } from '../src/core/seats';
 import { rivalCityYields } from '../src/core/rivals';
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { isWater } from '../src/core/query';
@@ -39,7 +39,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     cb.length = 0;
   }
 
-  const pu = state.units.filter((u) => u.owner === 'player');
+  const pu = state.units.filter((u) => isPlayerSeat(u.seat));
   L.push(
     `${p}PT = treas:${Math.round(playerSeat(state).treasury*1000)} sci:${Math.round(playerSeat(state).scienceTotal*1000)} ` +
       `cul:${Math.round(playerSeat(state).cultureTotal*1000)} ntech:${playerSeat(state).research.techs.length} ` +
@@ -53,12 +53,12 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
 
   const barb = new Map<number, number>();
   const barbHp = new Map<number, number>();
-  for (const u of state.units) if (u.owner === 'barbarian') {
+  for (const u of state.units) if (isBarbSeat(u.seat)) {
     barb.set(u.tileIndex, (barb.get(u.tileIndex) ?? 0) + 1);
     barbHp.set(u.tileIndex, (barbHp.get(u.tileIndex) ?? 0) + u.hp);
   }
   const barbActed = new Map<number, number>();
-  for (const u of state.units) if (u.owner === 'barbarian')
+  for (const u of state.units) if (isBarbSeat(u.seat))
     barbActed.set(u.tileIndex, (barbActed.get(u.tileIndex) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));
   for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)} a${barbActed.get(tile)}`);
   // barb CAMPS (P5/S6 hunt: locations were invisible — the count-only trace)
@@ -67,7 +67,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   const rv = new Map<string, number>();
   const rvHp = new Map<string, number>();
   const rvActed = new Map<string, number>();
-  for (const u of state.units) if (u.owner === 'rival') {
+  for (const u of state.units) if (isRivalSeat(u.seat)) {
     const k = `${u.civId}\t${u.tileIndex}\t${ti(u.type)}`;
     rv.set(k, (rv.get(k) ?? 0) + 1);
     rvHp.set(k, (rvHp.get(k) ?? 0) + u.hp);

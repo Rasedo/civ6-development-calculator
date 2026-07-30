@@ -5,7 +5,7 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
-import { playerSeat } from './seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat } from './seats';
 import { hexDistance } from './hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { isCivicComplete } from './effects';
@@ -68,7 +68,7 @@ export function rivalTradeCapacity(state: GameState, rival: RivalCiv): number {
 export function rivalRouteRaidedAt(state: GameState, rival: RivalCiv, endpoints: number[]): boolean {
   if (!state.unitsMode) return false;
   for (const u of state.units) {
-    const hostile = u.owner === 'barbarian' || (u.owner === 'player' && rival.atWar);
+    const hostile = isBarbSeat(u.seat) || (isPlayerSeat(u.seat) && rival.atWar);
     if (!hostile) continue;
     const t = state.map.tiles[u.tileIndex];
     for (const index of endpoints) {
@@ -130,8 +130,8 @@ export function routeRaidedAt(state: GameState, endpoints: number[]): boolean {
   if (!state.unitsMode) return false;
   for (const u of state.units) {
     const hostile =
-      u.owner === 'barbarian' ||
-      (u.owner === 'rival' && (state.rivals.find((r) => r.id === u.civId)?.atWar ?? false));
+      isBarbSeat(u.seat) ||
+      (isRivalSeat(u.seat) && (rivalOfSeat(state, u.seat)?.atWar ?? false));
     if (!hostile) continue;
     const t = state.map.tiles[u.tileIndex];
     for (const index of endpoints) {

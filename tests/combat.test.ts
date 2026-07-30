@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isBarbSeat, civOfRival, BARB_SEAT } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { spawnUnit, builderRepair } from '../src/core/units';
@@ -40,7 +40,7 @@ describe('combat', () => {
 
     const atk = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 11, 9).index)!;
     atk.tileIndex = tileAtCoords(state.map, 11, 9).index;
-    const def = spawnUnit(state, 'WARRIOR', hill.index, 'barbarian')!;
+    const def = spawnUnit(state, 'WARRIOR', hill.index, BARB_SEAT)!;
     def.tileIndex = hill.index;
 
     expect(meleeAttack(state, atk.id, hill.index).ok).toBe(true);
@@ -54,7 +54,7 @@ describe('combat', () => {
       const { state } = battlefield();
       const atk = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 11, 9).index)!;
       atk.tileIndex = tileAtCoords(state.map, 11, 9).index;
-      const def = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 9).index, 'barbarian')!;
+      const def = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 9).index, BARB_SEAT)!;
       def.tileIndex = tileAtCoords(state.map, 12, 9).index;
       return { state, atk, def };
     };
@@ -71,7 +71,7 @@ describe('combat', () => {
     state.barbCamps.push(campTile.index);
     const atk = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 11, 9).index)!;
     atk.tileIndex = tileAtCoords(state.map, 11, 9).index;
-    const def = spawnUnit(state, 'WARRIOR', campTile.index, 'barbarian')!;
+    const def = spawnUnit(state, 'WARRIOR', campTile.index, BARB_SEAT)!;
     def.tileIndex = campTile.index;
     def.hp = 5;
 
@@ -100,7 +100,7 @@ describe('combat', () => {
     let galley: ReturnType<typeof spawnUnit> = null;
     for (let i = 0; i < 400 && !galley; i++) {
       barbarianPhase(state);
-      galley = state.units.find((u) => u.owner === 'barbarian' && u.type === 'GALLEY') ?? null;
+      galley = state.units.find((u) => isBarbSeat(u.seat) && u.type === 'GALLEY') ?? null;
     }
     expect(galley).not.toBeNull();
     expect(isWater(state.map.tiles[galley!.tileIndex])).toBe(true);
@@ -110,7 +110,7 @@ describe('combat', () => {
     const { state } = battlefield();
     const water = tileAtCoords(state.map, 11, 9);
     water.terrain = 'COAST';
-    const galley = spawnUnit(state, 'GALLEY', water.index, 'barbarian')!;
+    const galley = spawnUnit(state, 'GALLEY', water.index, BARB_SEAT)!;
     galley.tileIndex = water.index;
     const land = tileAtCoords(state.map, 12, 9);
     const builder = spawnUnit(state, 'BUILDER', land.index)!;
@@ -125,7 +125,7 @@ describe('combat', () => {
     const { state } = battlefield();
     const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 11, 9).index)!;
     archer.tileIndex = tileAtCoords(state.map, 11, 9).index;
-    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 9).index, 'barbarian')!;
+    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 13, 9).index;
 
     expect(attackTargets(state, archer)).toContain(barb.tileIndex); // range 2
@@ -162,7 +162,7 @@ describe('barbarians', () => {
     const { state, city } = battlefield();
     city.population = 8;
     playerSeat(state).treasury = 200;
-    const barb = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 10, 9).index, 'barbarian')!;
+    const barb = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 10, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 10, 9).index;
 
     let guard = 0;
@@ -184,7 +184,7 @@ describe('barbarians', () => {
     state.settlers = 1;
     const b = foundCity(state, tileAtCoords(state.map, 14, 9).index).city!;
     expect(routeRaided(state, city, b)).toBe(false);
-    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 9).index, 'barbarian')!;
+    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 9).index, BARB_SEAT)!;
     barb.tileIndex = tileAtCoords(state.map, 15, 9).index;
     expect(routeRaided(state, city, b)).toBe(true);
   });
@@ -239,7 +239,7 @@ describe('B-7 flanking & support', () => {
       const { state } = battlefield();
       const atk = spawnUnit(state, 'WARRIOR', atkTile)!;
       atk.tileIndex = atkTile;
-      const def = spawnUnit(state, 'WARRIOR', defTile, 'barbarian')!;
+      const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
       def.tileIndex = defTile;
       return { state, atk };
     };
@@ -265,7 +265,7 @@ describe('B-7 flanking & support', () => {
       const defTile = tileAtCoords(state.map, defC.col, defC.row).index;
       const atk = spawnUnit(state, 'WARRIOR', atkTile)!;
       atk.tileIndex = atkTile;
-      const def = spawnUnit(state, 'WARRIOR', defTile, 'barbarian')!;
+      const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
       def.tileIndex = defTile;
       return { state, atk, atkTile, defTile };
     };
@@ -275,7 +275,7 @@ describe('B-7 flanking & support', () => {
 
     const supported = setup();
     const sn = freeNeighbor(supported.state, supported.defTile, supported.atkTile);
-    const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, 'barbarian')!; // same side as the defender
+    const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, BARB_SEAT)!; // same side as the defender
     helper.tileIndex = sn.index;
     const d1 = rollDiff('mel', () => meleeAttack(supported.state, supported.atk.id, supported.defTile));
 
@@ -289,7 +289,7 @@ describe('B-7 flanking & support', () => {
       const defTile = tileAtCoords(state.map, 13, 9).index; // range 2
       const archer = spawnUnit(state, 'ARCHER', atkTile)!;
       archer.tileIndex = atkTile;
-      const def = spawnUnit(state, 'WARRIOR', defTile, 'barbarian')!;
+      const def = spawnUnit(state, 'WARRIOR', defTile, BARB_SEAT)!;
       def.tileIndex = defTile;
       return { state, archer, atkTile, defTile };
     };
@@ -299,7 +299,7 @@ describe('B-7 flanking & support', () => {
 
     const supported = setup();
     const sn = freeNeighbor(supported.state, supported.defTile, supported.atkTile);
-    const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, 'barbarian')!;
+    const helper = spawnUnit(supported.state, 'WARRIOR', sn.index, BARB_SEAT)!;
     helper.tileIndex = sn.index;
     const d1 = rollDiff('rng', () => rangedAttack(supported.state, supported.archer.id, supported.defTile));
 
@@ -346,7 +346,7 @@ describe('B-4 XP & levels', () => {
     const { state } = battlefield();
     const p = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index)!;
     expect(p.xp).toBe(0);
-    const b = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 15).index, 'barbarian')!;
+    const b = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 15).index, BARB_SEAT)!;
     expect(b.xp).toBeUndefined();
   });
 
@@ -354,7 +354,7 @@ describe('B-4 XP & levels', () => {
     const { state } = battlefield();
     const atk = spawnUnit(state, 'WARRIOR', atkTile(state))!;
     atk.tileIndex = atkTile(state);
-    const def = spawnUnit(state, 'WARRIOR', defTile(state), 'barbarian')!;
+    const def = spawnUnit(state, 'WARRIOR', defTile(state), BARB_SEAT)!;
     def.tileIndex = defTile(state);
     def.hp = 100; // survives the single hit
     meleeAttack(state, atk.id, def.tileIndex);
@@ -369,7 +369,7 @@ describe('B-4 XP & levels', () => {
 
   it('a surviving military defender gains +2; a barbarian defender does not', () => {
     const { state } = battlefield();
-    const barb = spawnUnit(state, 'WARRIOR', atkTile(state), 'barbarian')!;
+    const barb = spawnUnit(state, 'WARRIOR', atkTile(state), BARB_SEAT)!;
     barb.tileIndex = atkTile(state);
     barb.movesLeft = 2;
     const def = spawnUnit(state, 'WARRIOR', defTile(state))!;
@@ -402,7 +402,7 @@ describe('B-4 XP & levels', () => {
       const atk = spawnUnit(state, 'WARRIOR', atkTile(state))!;
       atk.tileIndex = atkTile(state);
       atk.xp = atkXp;
-      const def = spawnUnit(state, 'WARRIOR', defTile(state), 'barbarian')!;
+      const def = spawnUnit(state, 'WARRIOR', defTile(state), BARB_SEAT)!;
       def.tileIndex = defTile(state);
       def.hp = 100;
       return rollDiff('mel', () => meleeAttack(state, atk.id, def.tileIndex));
@@ -416,7 +416,7 @@ describe('B-4 XP & levels', () => {
   it('each level adds +5 CS at DEFENSE (mel diff drops 5 CS per defender level)', () => {
     const run = (defXp: number): number => {
       const { state } = battlefield();
-      const barb = spawnUnit(state, 'WARRIOR', atkTile(state), 'barbarian')!;
+      const barb = spawnUnit(state, 'WARRIOR', atkTile(state), BARB_SEAT)!;
       barb.tileIndex = atkTile(state);
       barb.movesLeft = 2;
       const def = spawnUnit(state, 'WARRIOR', defTile(state))!;
@@ -436,7 +436,7 @@ describe('B-4 XP & levels', () => {
     state.rivals.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col + 1, center.row); // adjacent → in range 1..2
-    const rv = spawnUnit(state, 'SPEARMAN', near.index, 'rival', 0)!;
+    const rv = spawnUnit(state, 'SPEARMAN', near.index, civOfRival(0))!;
     rv.tileIndex = near.index;
     rv.hp = 100; // survives the strike (defense 25 vs city ~15)
     expect(rv.xp).toBe(0);

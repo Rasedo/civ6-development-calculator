@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, BARB_SEAT } from '../src/core/seats';
 import { makeState, makeMap, tileAtCoords } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { tilesWithin } from '../src/core/hex';
@@ -125,7 +125,7 @@ describe('rival tile economies', () => {
     // more (units + cities + in-flight progress), not a bigger stock.
     // C1-B4: districts/buildings are completions too (rough catalog costs).
     const output = (st: GameState, r: RivalCiv) =>
-      st.units.filter((u) => u.owner === 'rival' && u.civId === r.id).length * 40 +
+      st.units.filter((u) => isRivalSeat(u.seat) && u.seat === civOfRival(r.id)).length * 40 +
       (r.cities.length - 1) * 90 +
       r.cities.reduce(
         (n, rc) =>
@@ -146,9 +146,9 @@ describe('barbarians vs rivals', () => {
     const rival = addRival(state, 8, 8);
     const rc = rival.cities[0];
     rc.hp = 5;
-    const defender = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, 'rival', rival.id)!;
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 4).index, 'barbarian');
-    const sieger = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 7, 8).index, 'barbarian')!;
+    const defender = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, civOfRival(rival.id))!;
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 4).index, BARB_SEAT);
+    const sieger = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 7, 8).index, BARB_SEAT)!;
     const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== rc.centerIndex)!;
     sieger.tileIndex = adj.index;
 
@@ -166,8 +166,8 @@ describe('barbarians vs rivals', () => {
     const state = makeState();
     state.unitsMode = true;
     const rival = addRival(state, 8, 8);
-    const guard = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, 'rival', rival.id)!;
-    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, 'barbarian')!;
+    const guard = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, civOfRival(rival.id))!;
+    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, BARB_SEAT)!;
     expect(attackTargets(state, guard)).toContain(barb.tileIndex);
     rivalPhase(state);
     expect(barb.hp < 100 || !state.units.includes(barb)).toBe(true);
@@ -221,7 +221,7 @@ describe('city-state conquest and levies', () => {
     const cs = addCs(state, 8, 8, 'militaristic', 3);
     playerSeat(state).treasury = LEVY_GOLD_COST;
     expect(levyUnits(state, cs.id).ok).toBe(true);
-    expect(state.units.filter((u) => u.owner === 'player').length).toBe(LEVY_UNITS);
+    expect(state.units.filter((u) => isPlayerSeat(u.seat)).length).toBe(LEVY_UNITS);
     expect(playerSeat(state).treasury).toBe(0);
     playerSeat(state).treasury = LEVY_GOLD_COST;
     expect(levyUnits(state, cs.id).ok).toBe(false); // cooldown

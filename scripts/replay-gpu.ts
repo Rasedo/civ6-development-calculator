@@ -18,7 +18,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat } from '../src/core/seats';
 import {
   createGame,
   endTurn,
@@ -158,7 +158,7 @@ for (const game of roll.games) {
       // the logged order so no earlier move has vacated/entered this tile.
       const unit = state.units.find(
         (un) =>
-          un.owner === 'player' &&
+          isPlayerSeat(un.seat) &&
           un.tileIndex === tile &&
           (UNITS[un.type]?.charges !== undefined) === (civ === 1),
       );

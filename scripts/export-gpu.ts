@@ -28,7 +28,7 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival } from '../src/core/seats';
 
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
@@ -1333,7 +1333,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     state.rivals.map((r) => [
       r.id,
       state.units
-        .filter((u) => u.owner === 'rival' && u.civId === r.id)
+        .filter((u) => isRivalSeat(u.seat) && u.seat === civOfRival(r.id))
         .map((u) => ({ type: unitRosterIdx.get(u.type) ?? 0, tile: u.tileIndex })),
     ]),
   );
@@ -1725,7 +1725,7 @@ for (let s = 0; s < N_SEEDS; s++) {
   // capital re-trains a builder whenever none is alive or queued and a
   // builder job (owned unimproved-farmable OR owned pillaged tile) exists.
   const anyPlayerBuilder = (): boolean =>
-    state.units.some((u2) => u2.owner === 'player' && u2.type === 'BUILDER' && (u2.charges ?? 0) > 0) ||
+    state.units.some((u2) => isPlayerSeat(u2.seat) && u2.type === 'BUILDER' && (u2.charges ?? 0) > 0) ||
     state.cities.some((c2) => c2.queue.some((q) => q.kind === 'unit' && q.unit === 'BUILDER'));
   const builderJobExists = (): boolean =>
     state.map.tiles.some(
@@ -1738,7 +1738,7 @@ for (let s = 0; s < N_SEEDS; s++) {
   // ties (the GPU's argmax-first twin).
   const militaryCount = (): number => {
     let n = 0;
-    for (const u2 of state.units) if (u2.owner === 'player' && (UNITS[u2.type]?.combat ?? 0) > 0) n += 1;
+    for (const u2 of state.units) if (isPlayerSeat(u2.seat) && (UNITS[u2.type]?.combat ?? 0) > 0) n += 1;
     for (const c2 of state.cities)
       for (const q of c2.queue) if (q.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) n += 1;
     return n;
@@ -1837,12 +1837,12 @@ for (let s = 0; s < N_SEEDS; s++) {
       state.units.some(
         (u2) =>
           u2.tileIndex === ti &&
-          (u2.owner === 'barbarian' ||
-            u2.owner === 'rival' ||
-            (u2.owner === 'player' && UNITS[u2.type]?.charges !== undefined)),
+          (isBarbSeat(u2.seat) ||
+            isRivalSeat(u2.seat) ||
+            (isPlayerSeat(u2.seat) && UNITS[u2.type]?.charges !== undefined)),
       );
     for (const u of state.units) {
-      if (u.owner !== 'player' || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
+      if (!isPlayerSeat(u.seat) || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
       const btile = state.map.tiles[u.tileIndex];
       if (btile.pillaged && btile.cityId !== -1) {
         // #56 H2: REPAIR first (the rival A-13 semantics — no charge spent,

@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat } from './seats';
+import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -54,15 +54,15 @@ export const MAX_BARB_PER_CAMP = 3;
 /** P5/S7 (C-3): any non-barbarian unit entering a camp tile clears it —
  * +50 to ITS civ's treasury (rivals bank it like the player). */
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
-  if (unit.owner === 'barbarian') return;
+  if (isBarbSeat(unit.seat)) return;
   const camp = state.barbCamps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbCamps.splice(camp, 1);
   markAntiquitySite(state, tileIndex); // B-20 (#79): a razed outpost leaves a dig
-  if (unit.owner === 'player') {
+  if (isPlayerSeat(unit.seat)) {
     playerSeat(state).treasury += CAMP_CLEAR_REWARD;
   } else {
-    const rival = state.rivals.find((r) => r.id === unit.civId);
+    const rival = rivalOfSeat(state, unit.seat);
     if (rival) rival.treasury = (rival.treasury ?? 0) + CAMP_CLEAR_REWARD;
   }
 }
@@ -167,7 +167,7 @@ export function encampmentTrainXp(buildings: readonly string[]): number {
 
 /** B-4: award XP to a unit (barbarians never accrue). */
 function gainXp(unit: Unit, amount: number): void {
-  if (unit.owner === 'barbarian') return;
+  if (isBarbSeat(unit.seat)) return;
   unit.xp = (unit.xp ?? 0) + amount;
 }
 
@@ -202,7 +202,7 @@ export function supportCount(state: GameState, defTileIndex: number, defender: U
     for (const u of unitsAt(state, t.index)) {
       if (unitDomain(u.type) !== 'military') continue;
       if (u.embarked) continue; // #45/B-6: embarked units support nobody
-      if (u.owner === defender.owner && u.civId === defender.civId) n++;
+      if (u.seat === defender.seat) n++;
     }
   }
   return n;
@@ -235,22 +235,22 @@ export function generalAuraCS(state: GameState, unit: Unit, tileIndex: number): 
  * civ id: 0 = the player's, i+1 = rival i's). Undefined for barbarians, for
  * unfounded religions, and for unenhanced ones. */
 function unitEnhancer(state: GameState, unit: Unit): BeliefEffects | undefined {
-  if (unit.owner === 'player') {
+  if (isPlayerSeat(unit.seat)) {
     const rel_239 = playerSeat(state).religion;
     return rel_239.founded && rel_239.enhancer ? ENHANCER_BELIEFS[rel_239.enhancer]?.effects : undefined;
   }
-  if (unit.owner !== 'rival' || unit.civId == null) return undefined; // barbarians have no faith
-  const rival = state.rivals.find((rv) => rv.id === unit.civId); // unit.civId = rival.id for rival units
+  if (!isRivalSeat(unit.seat)) return undefined; // barbarians have no faith
+  const rival = rivalOfSeat(state, unit.seat); // unit.civId = rival.id for rival units
   return rival?.religion.founded && rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
 }
 
 /** B6-S1: the religion id of a unit's civ (-1 when none founded). Religion
  * ids are the unified civ space: 0 player, rival.id + 1 for rival units. */
 function unitReligion(state: GameState, unit: Unit): number {
-  if (unit.owner === 'player') return playerSeat(state).religion.founded ? 0 : -1;
-  if (unit.owner !== 'rival' || unit.civId == null) return -1;
-  const rival = state.rivals.find((rv) => rv.id === unit.civId);
-  return rival?.religion.founded ? unit.civId! + 1 : -1;
+  if (isPlayerSeat(unit.seat)) return playerSeat(state).religion.founded ? 0 : -1;
+  if (!isRivalSeat(unit.seat)) return -1;
+  const rival = rivalOfSeat(state, unit.seat);
+  return rival?.religion.founded ? unit.seat : -1;
 }
 
 /** B6-S1: the followed religion of the city OWNING this tile (-1 = unowned or
@@ -380,7 +380,7 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
 // the center. No population term; walls stay out of scope.
 export function cityDefenseStrength(state: GameState, city: City): number {
   const garrison = unitsAt(state, city.centerIndex).find(
-    (u) => u.owner === 'player' && unitDomain(u.type) === 'military',
+    (u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'military',
   );
   return Math.max(15, state.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
@@ -436,7 +436,7 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
     // the term here made it REACHABLE off-script — rollout seeds 9183/9235 went
     // red on draw counts. Record as a G-item; drop this guard the moment the
     // GPU grows a player holy city (it rides #50's religion verb).
-    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) +
+    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, city.centerIndex) : 0) +
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8): the aura covers city assaults too
   const defCS = cityDefenseStrength(state, city);
   const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
@@ -456,8 +456,8 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
   if (city.hp <= 0) {
     // V-W2 symmetric: a RIVAL conqueror takes the city (the loyalty-flip
     // transfer); barbarians still merely sack.
-    if (attacker.owner === 'rival' && attacker.civId !== undefined) {
-      const rival = state.rivals.find((r) => r.id === attacker.civId);
+    if (isRivalSeat(attacker.seat)) {
+      const rival = rivalOfSeat(state, attacker.seat);
       if (rival) {
         // P5/S1 (C-11b): the conqueror plunders +40, symmetric with the
         // player's captureRivalCity — but only on a real transfer; the
@@ -497,7 +497,7 @@ function attackEncampment(
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], tile) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) +
-    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, tileIndex) : 0) +
+    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, tileIndex) : 0) +
     generalAuraCS(state, attacker, attacker.tileIndex);
   const dmgToEncamp = damageRoll(state, atkCS - defCS, k, tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, k + 'c', tileIndex);
@@ -547,20 +547,20 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   }
 
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
-  const hostileToPlayer = attacker.owner !== 'player' && unitsHostile(state, attacker, { owner: 'player' });
+  const hostileToPlayer = !isPlayerSeat(attacker.seat) && unitsHostile(state, attacker, { seat: PLAYER_CIV });
   const enemyCity =
     target.district === 'CITY_CENTER' && hostileToPlayer
       ? state.cities.find((c) => c.centerIndex === targetIndex)
       : undefined;
   const rivalTarget =
-    attacker.owner === 'player' || attacker.owner === 'barbarian'
+    isPlayerSeat(attacker.seat) || isBarbSeat(attacker.seat)
       ? rivalCityAt(state, targetIndex)
-      : attacker.owner === 'rival'
+      : isRivalSeat(attacker.seat)
       ? (() => {
           // A-19/B-33 (S2): an at-war rival attacker targets an ENEMY rival's
           // city (never its own); civsAtWar already gates the target scan.
           const rc = rivalCityAt(state, targetIndex);
-          return rc && rc.rival.id !== attacker.civId && civsAtWar(state, unitSeat(attacker), rc.rival.id + 1)
+          return rc && civOfRival(rc.rival.id) !== attacker.seat && civsAtWar(state, unitSeat(attacker), rc.rival.id + 1)
             ? rc
             : undefined;
         })()
@@ -572,11 +572,11 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // DECLARED war before striking it. This used to accept ANY city-state, so
     // a UI/RL order could siege a civ we were at peace with while
     // attackTargets (correctly) never offered one. Both sides now read cs.atWar.
-    if (attacker.owner === 'player') return cs.atWar ? cs : undefined;
+    if (isPlayerSeat(attacker.seat)) return cs.atWar ? cs : undefined;
     // A-12b join-the-suzerain's-war: an AT-WAR rival may siege a CS whose
     // suzerain is the player (attackTargets applies the same gate).
-    if (attacker.owner === 'rival') {
-      const rv = state.rivals.find((r) => r.id === attacker.civId);
+    if (isRivalSeat(attacker.seat)) {
+      const rv = rivalOfSeat(state, attacker.seat);
       if (rv?.atWar && isSuzerain(cs)) return cs;
     }
     return undefined;
@@ -600,7 +600,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   }
 
   if (enemies.length === 0 && rivalTarget) {
-    if (attacker.owner === 'player' && !rivalTarget.rival.atWar) {
+    if (isPlayerSeat(attacker.seat) && !rivalTarget.rival.atWar) {
       return no(`You are at peace with ${rivalTarget.rival.name} — declare war first.`);
     }
     attackRivalCity(state, attacker, rivalTarget.rival, rivalTarget.city);
@@ -627,12 +627,10 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     // unit stays on its tile); the attacker spends its attack but does NOT
     // advance (single-occupancy model). Barbarians still merely kill — no
     // prisoner/camp system is modeled (recorded simplification).
-    if (attacker.owner === 'barbarian') {
+    if (isBarbSeat(attacker.seat)) {
       killUnit(state, defender);
     } else {
-      defender.owner = attacker.owner;
-      if (attacker.owner === 'rival') defender.civId = attacker.civId;
-      else delete defender.civId;
+      defender.seat = attacker.seat; // #51/S1.3b: one field carries the whole ownership change
       defender.movesLeft = 0;
       attacker.movesLeft = 0;
       // GPU parity: the batch engine transfers the captured unit to the END
@@ -696,7 +694,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     // chain as meleeAttack (rival city, then city-state center), one roll,
     // no retaliation. Ranged fire never captures: the city holds at 1 HP
     // until melee takes it.
-    if (attacker.owner === 'player') {
+    if (isPlayerSeat(attacker.seat)) {
       const rc = rivalCityAt(state, targetIndex);
       if (rc && rc.rival.atWar) {
         const defCS = rivalCityDefense(state, rc.rival, rc.city);
@@ -741,7 +739,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   const def = UNITS[attacker.type];
   if (!def?.ranged) return;
   const target = state.map.tiles[targetIndex];
-  const hostileToPlayer = attacker.owner !== 'player' && unitsHostile(state, attacker, { owner: 'player' });
+  const hostileToPlayer = !isPlayerSeat(attacker.seat) && unitsHostile(state, attacker, { seat: PLAYER_CIV });
   const enemyCity =
     target.district === 'CITY_CENTER' && hostileToPlayer
       ? state.cities.find((c) => c.centerIndex === targetIndex)
@@ -765,7 +763,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // strike is a TS-only draw. This restores the documented "any other civ's
   // center is a no-op quirk" behavior when a hostile rival unit garrisons it.
   const enemies = unitsAt(state, targetIndex).filter(
-    (u) => unitsHostile(state, attacker, u) && !(attacker.owner === 'rival' && u.owner === 'rival'),
+    (u) => unitsHostile(state, attacker, u) && !(isRivalSeat(attacker.seat) && isRivalSeat(u.seat)),
   );
   if (enemies.length === 0) return; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
@@ -786,7 +784,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
   if (unit.embarked) return []; // #45/B-6: embarked units cannot attack
   const from = state.map.tiles[unit.tileIndex];
   const range = def.ranged?.range ?? 1;
-  const hostileToPlayer = unit.owner !== 'player' && unitsHostile(state, unit, { owner: 'player' });
+  const hostileToPlayer = !isPlayerSeat(unit.seat) && unitsHostile(state, unit, { seat: PLAYER_CIV });
   const out: number[] = [];
   for (const t of state.map.tiles) {
     const d = hexDistance(from.col, from.row, t.col, t.row);
@@ -795,7 +793,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // (ranged-vs-rival scope-out — melee rivals fight rivals; player/barb
     // targets unchanged). def.ranged marks a ranged attacker.
     const hasEnemy = unitsAt(state, t.index).some(
-      (u) => unitsHostile(state, unit, u) && !(def.ranged && unit.owner === 'rival' && u.owner === 'rival'),
+      (u) => unitsHostile(state, unit, u) && !(def.ranged && isRivalSeat(unit.seat) && isRivalSeat(u.seat)),
     );
     // AUDIT A-6: ranged hostiles bombard city-center tiles at their full
     // range (the player's D-23 rule from the other seat); melee keeps d===1.
@@ -820,26 +818,26 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // city-states were never reachable here — the csWar arm owns that path.
     // Barbarians are untouched (the guard is `owner === 'rival'`), keeping the
     // barb paths byte-identical across both engines.
-    const foreignCentre = unit.owner === 'rival' && rivalCityAt(state, t.index) !== undefined;
+    const foreignCentre = isRivalSeat(unit.seat) && rivalCityAt(state, t.index) !== undefined;
     const playerCity = hostileToPlayer && t.district === 'CITY_CENTER' && d <= range && !foreignCentre;
     // P4/D-23: the player's ranged units bombard cities at their full range.
-    const cityRange = unit.owner === 'player' ? range : 1;
+    const cityRange = isPlayerSeat(unit.seat) ? range : 1;
     const rivalCity =
       d <= cityRange &&
-      ((unit.owner === 'player' && (rivalCityAt(state, t.index)?.rival.atWar ?? false)) ||
-        (unit.owner === 'barbarian' && d === 1 && rivalCityAt(state, t.index) !== undefined));
+      ((isPlayerSeat(unit.seat) && (rivalCityAt(state, t.index)?.rival.atWar ?? false)) ||
+        (isBarbSeat(unit.seat) && d === 1 && rivalCityAt(state, t.index) !== undefined));
     // A-19/B-33 (S2): a MELEE at-war rival unit may attack an ADJACENT enemy
     // rival's city center (capture via transferRivalCityToRival). Ranged-vs-
     // rival-city stays out of scope (melee finishes, like the A-12b csWar).
     const rivalVsRivalCity =
-      unit.owner === 'rival' &&
+      isRivalSeat(unit.seat) &&
       d === 1 &&
       !def.ranged &&
       (() => {
         const rc = rivalCityAt(state, t.index);
         return (
           rc !== undefined &&
-          rc.rival.id !== unit.civId &&
+          civOfRival(rc.rival.id) !== unit.seat &&
           civsAtWar(state, unitSeat(unit), rc.rival.id + 1)
         );
       })();
@@ -847,7 +845,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // an adjacent CS center whose suzerain is THE PLAYER (strict contest).
     // Ranged-vs-CS stays out of scope (melee finishes, like capture).
     const csWar =
-      unit.owner === 'rival' &&
+      isRivalSeat(unit.seat) &&
       hostileToPlayer &&
       d === 1 &&
       !def.ranged &&
@@ -861,7 +859,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // is preserved by construction — only a DECLARED war offers the centre.
     // Melee + adjacent, the same shape as the rival-seat csWar arm above.
     const csPlayerWar =
-      unit.owner === 'player' &&
+      isPlayerSeat(unit.seat) &&
       d === 1 &&
       !def.ranged &&
       state.cityStates.some((c) => c.centerIndex === t.index && c.atWar);
@@ -879,7 +877,7 @@ export function rivalCityDefense(state: GameState, rival: RivalCiv, city: RivalC
   // melee ever (floor 15) + 5 for its own military garrisoning the center.
   // Their defense keeps pace through military techs raising bestMeleeCS.
   const garrison = unitsAt(state, city.centerIndex).find(
-    (u) => u.owner === 'rival' && u.civId === rival.id && unitDomain(u.type) === 'military',
+    (u) => isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) && unitDomain(u.type) === 'military',
   );
   return Math.max(15, rival.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
@@ -890,7 +888,7 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-29 wound + river (city not a unit) + B-4 attacker veterancy
-    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
+    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = rivalCityDefense(state, rival, city);
   // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
@@ -904,14 +902,14 @@ function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker);
   if (city.hp <= 0) {
-    if (attacker.owner === 'player') {
+    if (isPlayerSeat(attacker.seat)) {
       captureRivalCity(state, rival, city);
-    } else if (attacker.owner === 'rival') {
+    } else if (isRivalSeat(attacker.seat)) {
       // A-19/B-33 (S2): a rival conqueror TAKES the enemy rival's city via the
       // EXISTING loyalty-flip transfer (B-30 infra-carry + POOL-END already in
       // place). No +40 plunder for the rival-vs-rival path (v1) and no raze cap
       // (RC=24 slots absorb it, like the loyalty flips).
-      const toRival = state.rivals.find((r) => r.id === attacker.civId);
+      const toRival = rivalOfSeat(state, attacker.seat);
       if (toRival) transferRivalCityToRival(state, rival, toRival, city);
     } else {
       // Barbarians sack, they don't govern. P5/S1 (C-10): a rival sack now
@@ -937,7 +935,7 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
     woundPenalty(attacker) -
     (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
     xpLevelBonus(attacker) + // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
-    (CITY_RELIGION_ADDER_LIVE && attacker.owner === 'rival' ? religionAttackCS(state, attacker, cs.centerIndex) : 0) + // #71 (debt): see attackCity
+    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, cs.centerIndex) : 0) + // #71 (debt): see attackCity
     generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
@@ -947,8 +945,8 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
   if (attacker.hp <= 0) killUnit(state, attacker);
   if ((cs.hp ?? 0) <= 0) {
     // A-12b: a rival conqueror lands the CS as its own city.
-    if (attacker.owner === 'rival') {
-      const rv = state.rivals.find((r) => r.id === attacker.civId);
+    if (isRivalSeat(attacker.seat)) {
+      const rv = rivalOfSeat(state, attacker.seat);
       if (rv) captureCityStateForRival(state, rv, cs);
     } else {
       captureCityState(state, cs);
@@ -1199,7 +1197,7 @@ function campCandidates(state: GameState): Tile[] {
 }
 
 function barbUnits(state: GameState): Unit[] {
-  return state.units.filter((u) => u.owner === 'barbarian');
+  return state.units.filter((u) => isBarbSeat(u.seat));
 }
 
 /**
@@ -1231,8 +1229,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // player's improvements alone. Rival-rival improvement pillage is out of
   // scope (residual) — enemy rival TILES are never a pillage/march target here.
   const atWarWithPlayer =
-    unit.owner === 'barbarian' || (unit.owner === 'rival' && civsAtWar(state, unitSeat(unit), 0));
-  const hereOwned = (here.cityId !== -1 && atWarWithPlayer) || (unit.owner === 'barbarian' && here.rivalId !== undefined);
+    isBarbSeat(unit.seat) || (isRivalSeat(unit.seat) && civsAtWar(state, unitSeat(unit), 0));
+  const hereOwned = (here.cityId !== -1 && atWarWithPlayer) || (isBarbSeat(unit.seat) && here.rivalId !== undefined);
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
     if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
@@ -1262,7 +1260,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   let target: Tile | null = null;
   let bestDist = 13;
   for (const t of map.tiles) {
-    const tOwned = (t.cityId !== -1 && atWarWithPlayer) || (unit.owner === 'barbarian' && t.rivalId !== undefined);
+    const tOwned = (t.cityId !== -1 && atWarWithPlayer) || (isBarbSeat(unit.seat) && t.rivalId !== undefined);
     if (!tOwned) continue;
     const impJob = t.improvement !== null && !t.pillaged;
     const distJob =
@@ -1289,8 +1287,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     // unified civ id — documented), then rival cities by rival id, then
     // center tile index.
     const attackPlayer =
-      unit.owner === 'barbarian' ||
-      (unit.owner === 'rival' && civsAtWar(state, unitSeat(unit), 0));
+      isBarbSeat(unit.seat) ||
+      (isRivalSeat(unit.seat) && civsAtWar(state, unitSeat(unit), 0));
     let pcTarget: Tile | null = null;
     let pcDist = Infinity;
     if (attackPlayer && state.cities.length > 0) {
@@ -1305,8 +1303,8 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     }
     let rcTarget: Tile | null = null;
     let rcKey = Infinity;
-    if (unit.owner === 'rival') {
-      const ci = unit.civId ?? -1;
+    if (isRivalSeat(unit.seat)) {
+      const ci = rivalOfCiv(unit.seat);
       for (const other of state.rivals) {
         if (other.id === ci) continue;
         if (!civsAtWar(state, ci + 1, other.id + 1)) continue;
@@ -1445,7 +1443,7 @@ export function barbarianPhase(state: GameState): void {
   const map = state.map;
   // Barbarians get their movement in their own phase (self-contained for tests/RL).
   for (const u of state.units) {
-    if (u.owner === 'barbarian') u.movesLeft = UNITS[u.type]?.moves ?? 2;
+    if (isBarbSeat(u.seat)) u.movesLeft = UNITS[u.type]?.moves ?? 2;
   }
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
@@ -1466,7 +1464,7 @@ export function barbarianPhase(state: GameState): void {
       // barbs 5 vs 4 with a draw-count split; the GPU ends up one barbarian
       // short and _spawn_barb accepts the type fine, so it is a later
       // death/gate difference needing a statelog. Flip = drop the guard.
-      spawnUnit(state, BARB_SCOUT_OPENER_LIVE ? barbScoutType() : barbMeleeType(state.turn), spot.index, 'barbarian');
+      spawnUnit(state, BARB_SCOUT_OPENER_LIVE ? barbScoutType() : barbMeleeType(state.turn), spot.index, BARB_SEAT);
     }
   }
 
@@ -1482,7 +1480,7 @@ export function barbarianPhase(state: GameState): void {
         hexDistance(map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
     if (nearCamp.length === 0) {
-      spawnUnit(state, barbMeleeType(state.turn), campIdx, 'barbarian'); // B-26 era ladder
+      spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT); // B-26 era ladder
     } else if (
       barbUnits(state).length < state.barbCamps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1
@@ -1506,10 +1504,10 @@ export function barbarianPhase(state: GameState): void {
         )
         .sort((x, y) => x.index - y.index)[0];
       if (campNo % 4 === 1 && water) {
-        spawnUnit(state, barbNavalType(state.turn), water.index, 'barbarian');
+        spawnUnit(state, barbNavalType(state.turn), water.index, BARB_SEAT);
       } else {
         const type = campNo % 3 === 0 ? barbRangedType(state.turn) : barbMeleeType(state.turn);
-        spawnUnit(state, type, campIdx, 'barbarian');
+        spawnUnit(state, type, campIdx, BARB_SEAT);
       }
     }
   }
@@ -1555,14 +1553,14 @@ export function barbarianPhase(state: GameState): void {
     for (const t of map.tiles) {
       const d = hexDistance(center.col, center.row, t.col, t.row);
       if (d < 1 || d > 2) continue;
-      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'player' }))) continue;
+      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: PLAYER_CIV }))) continue;
       if (d < bestDist) {
         bestDist = d;
         bestTile = t.index;
       }
     }
     if (bestTile < 0) continue;
-    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { owner: 'player' }));
+    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { seat: PLAYER_CIV }));
     const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
     const tt = map.tiles[bestTile];
     // B-29 + B-7 support (attacker is the city — not a unit, so no flanking).
@@ -1596,14 +1594,14 @@ export function barbarianPhase(state: GameState): void {
     for (const t of map.tiles) {
       const d = hexDistance(center.col, center.row, t.col, t.row);
       if (d < 1 || d > 2) continue;
-      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { owner: 'player' }))) continue;
+      if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: PLAYER_CIV }))) continue;
       if (d < bestDist) {
         bestDist = d;
         bestTile = t.index;
       }
     }
     if (bestTile < 0) continue;
-    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { owner: 'player' }));
+    const hostiles = unitsAt(state, bestTile).filter((u) => unitsHostile(state, u, { seat: PLAYER_CIV }));
     const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
     const tt = map.tiles[bestTile];
     const defCS = defender.embarked
@@ -1624,7 +1622,7 @@ export function barbarianPhase(state: GameState): void {
     const hp = city.hp;
     const center = map.tiles[city.centerIndex];
     const besieged = neighbors(map, center).some((n) =>
-      unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'player' })),
+      unitsAt(state, n.index).some((u) => unitsHostile(state, u, { seat: PLAYER_CIV })),
     );
     if (besieged) continue;
     if (hp < CITY_MAX_HP) city.hp = Math.min(CITY_MAX_HP, hp + CITY_HEAL_PER_TURN);

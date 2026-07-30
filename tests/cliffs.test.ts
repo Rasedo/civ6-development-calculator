@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { PLAYER_CIV, civOfRival } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { cliffBlocks, cliffBlocksStep } from '../src/core/units';
 import { neighborTile } from '../src/core/hex';
@@ -39,7 +40,7 @@ describe('B-26: cliffs block embark and disembark', () => {
 
   it('blocks the land/water crossing in both directions', () => {
     const { state, land, sea } = setup();
-    const unit = { owner: 'player' as const };
+    const unit = { seat: PLAYER_CIV };
     expect(cliffBlocks(state, land, sea, unit)).toBe(true); // embark
     expect(cliffBlocks(state, sea, land, unit)).toBe(true); // disembark
   });
@@ -47,28 +48,28 @@ describe('B-26: cliffs block embark and disembark', () => {
   it('never touches a land-to-land step', () => {
     const { state, land } = setup();
     const inland = tileAtCoords(state.map, 6, 6);
-    expect(cliffBlocks(state, land, inland, { owner: 'player' })).toBe(false);
+    expect(cliffBlocks(state, land, inland, { seat: PLAYER_CIV })).toBe(false);
   });
 
   it('a city centre ignores cliffs', () => {
     const { state, land, sea } = setup();
     land.district = 'CITY_CENTER';
-    expect(cliffBlocks(state, land, sea, { owner: 'player' })).toBe(false);
+    expect(cliffBlocks(state, land, sea, { seat: PLAYER_CIV })).toBe(false);
   });
 
   it('a Harbor passes its OWNER only, never the enemy', () => {
     const { state, land, sea } = setup();
     land.district = 'HARBOR';
     land.cityId = 1; // the player's territory
-    expect(cliffBlocks(state, land, sea, { owner: 'player' })).toBe(false);
+    expect(cliffBlocks(state, land, sea, { seat: PLAYER_CIV })).toBe(false);
     // an enemy using the same Harbor tile is still walled out
-    expect(cliffBlocks(state, land, sea, { owner: 'rival', civId: 0 })).toBe(true);
+    expect(cliffBlocks(state, land, sea, { seat: civOfRival(0) })).toBe(true);
   });
 
   it('an edge with no cliff bit is free', () => {
     const { state, land, sea } = setup();
     land.cliffMask = 0;
-    expect(cliffBlocks(state, land, sea, { owner: 'player' })).toBe(false);
+    expect(cliffBlocks(state, land, sea, { seat: PLAYER_CIV })).toBe(false);
   });
 
   // #79 REGRESSION. The rule was correct but reached only ONE of the movers:
@@ -80,7 +81,7 @@ describe('B-26: cliffs block embark and disembark', () => {
   describe('cliffBlocksStep: the step-level rule every mover shares', () => {
     it('blocks a land unit crossing a cliff edge, both directions', () => {
       const { state, land, sea } = setup();
-      const u = { type: 'MUSKETMAN', owner: 'rival' as const, civId: 0 };
+      const u = { type: 'MUSKETMAN', seat: civOfRival(0) };
       expect(cliffBlocksStep(state, land, sea, u)).toBe(true); // embark
       expect(cliffBlocksStep(state, sea, land, u)).toBe(true); // disembark
     });
@@ -89,9 +90,9 @@ describe('B-26: cliffs block embark and disembark', () => {
       const { state, land, sea } = setup();
       const inland = tileAtCoords(state.map, 6, 6);
       // land->land is never a cliff question
-      expect(cliffBlocksStep(state, land, inland, { type: 'MUSKETMAN', owner: 'player' })).toBe(false);
+      expect(cliffBlocksStep(state, land, inland, { type: 'MUSKETMAN', seat: PLAYER_CIV })).toBe(false);
       // a naval unit never transitions, so the cliff cannot gate it
-      expect(cliffBlocksStep(state, land, sea, { type: 'GALLEY', owner: 'player' })).toBe(false);
+      expect(cliffBlocksStep(state, land, sea, { type: 'GALLEY', seat: PLAYER_CIV })).toBe(false);
     });
 
     // The BEHAVIOURAL half of this regression — a rival war-march refusing a

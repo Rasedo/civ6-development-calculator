@@ -6,7 +6,7 @@
  */
 
 import type { GameState, Unit } from './types';
-import { playerSeat } from './seats';
+import { playerSeat, isPlayerSeat } from './seats';
 import { tilesWithin, hexDistance } from './hex';
 import { nextRandom } from './rand';
 import { isWater, isImpassable } from './query';
@@ -42,7 +42,7 @@ export function initFog(state: GameState): void {
   }
   for (const c of state.cities) revealAround(state, c.centerIndex, 3);
   for (const u of state.units) {
-    if (u.owner === 'player') revealAround(state, u.tileIndex);
+    if (isPlayerSeat(u.seat)) revealAround(state, u.tileIndex);
   }
 }
 
@@ -53,7 +53,7 @@ export function initFog(state: GameState): void {
 /** Claim a village with a player unit standing on it (seeded reward). */
 export function claimGoodyHut(state: GameState, unit: Unit): void {
   const tile = state.map.tiles[unit.tileIndex];
-  if (!tile.goodyHut || unit.owner !== 'player') return;
+  if (!tile.goodyHut || !isPlayerSeat(unit.seat)) return;
   tile.goodyHut = false;
   const roll = Math.floor(nextRandom(state) * 6);
   let text: string;

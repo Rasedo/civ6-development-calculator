@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { PLAYER_CIV, BARB_SEAT } from '../src/core/seats';
 import { createGame, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit, refreshUnits } from '../src/core/units';
@@ -47,12 +48,12 @@ describe('#70/S3 general aura: +1 movement', () => {
     const ctr = state.cities[0].centerIndex;
     const near = tileAt(state, ctr, 1);
     const far = tileAt(state, ctr, 5);
-    const warriorIn = spawnUnit(state, 'WARRIOR', near, 'player')!;
-    const warriorOut = spawnUnit(state, 'WARRIOR', far, 'player')!;
+    const warriorIn = spawnUnit(state, 'WARRIOR', near, PLAYER_CIV)!;
+    const warriorOut = spawnUnit(state, 'WARRIOR', far, PLAYER_CIV)!;
     const base = UNITS.WARRIOR.moves ?? 2;
 
     expect(generalAuraMP(state, warriorIn)).toBe(0); // no general yet
-    spawnUnit(state, 'GENERAL', ctr, 'player');
+    spawnUnit(state, 'GENERAL', ctr, PLAYER_CIV);
 
     expect(generalAuraMP(state, warriorIn)).toBe(GENERAL_AURA_MP);
     expect(generalAuraMP(state, warriorOut)).toBe(0);
@@ -67,8 +68,8 @@ describe('#70/S3 general aura: +1 movement', () => {
   it('never reaches civilians (the general itself included)', () => {
     const state = newGame();
     const ctr = state.cities[0].centerIndex;
-    const gen = spawnUnit(state, 'GENERAL', ctr, 'player')!;
-    const builder = spawnUnit(state, 'BUILDER', tileAt(state, ctr, 1), 'player')!;
+    const gen = spawnUnit(state, 'GENERAL', ctr, PLAYER_CIV)!;
+    const builder = spawnUnit(state, 'BUILDER', tileAt(state, ctr, 1), PLAYER_CIV)!;
     expect(inGeneralAura(state, gen, gen.tileIndex)).toBe(false);
     expect(generalAuraMP(state, builder)).toBe(0);
   });
@@ -76,9 +77,9 @@ describe('#70/S3 general aura: +1 movement', () => {
   it('an aura unit that SPENT MP does not heal; one that sat still does', () => {
     const state = newGame();
     const ctr = state.cities[0].centerIndex;
-    spawnUnit(state, 'GENERAL', ctr, 'player');
-    const moved = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), 'player')!;
-    const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 'player')!;
+    spawnUnit(state, 'GENERAL', ctr, PLAYER_CIV);
+    const moved = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), PLAYER_CIV)!;
+    const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), PLAYER_CIV)!;
     refreshUnits(state); // both granted base+1, movesFull recorded
     const granted = moved.movesFull!;
     expect(granted).toBe((UNITS.WARRIOR.moves ?? 2) + GENERAL_AURA_MP);
@@ -99,9 +100,9 @@ describe('#70/S3 general aura: +1 movement', () => {
   it('fortify accrues only for the unit that spent nothing', () => {
     const state = newGame();
     const ctr = state.cities[0].centerIndex;
-    spawnUnit(state, 'GENERAL', ctr, 'player');
-    const moved = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), 'player')!;
-    const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 'player')!;
+    spawnUnit(state, 'GENERAL', ctr, PLAYER_CIV);
+    const moved = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 1), PLAYER_CIV)!;
+    const still = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), PLAYER_CIV)!;
     refreshUnits(state);
     moved.movesLeft = moved.movesFull! - 1;
     refreshUnits(state);
@@ -118,8 +119,8 @@ describe('#70/S3 general aura: +1 movement', () => {
     const ctr = state.cities[0].centerIndex;
     const water = state.map.tiles[tileAt(state, ctr, 1)];
     water.terrain = 'COAST';
-    const hull = spawnUnit(state, 'GALLEY', water.index, 'barbarian')!;
-    const land = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), 'barbarian')!;
+    const hull = spawnUnit(state, 'GALLEY', water.index, BARB_SEAT)!;
+    const land = spawnUnit(state, 'WARRIOR', tileAt(state, ctr, 2), BARB_SEAT)!;
     refreshUnits(state);
     refreshUnits(state);
     refreshUnits(state);
@@ -129,7 +130,7 @@ describe('#70/S3 general aura: +1 movement', () => {
 
   it('units that never refreshed fall back to their base moves (no NaN gate)', () => {
     const state = newGame();
-    const w = spawnUnit(state, 'WARRIOR', tileAt(state, state.cities[0].centerIndex, 3), 'player')!;
+    const w = spawnUnit(state, 'WARRIOR', tileAt(state, state.cities[0].centerIndex, 3), PLAYER_CIV)!;
     expect(w.movesFull).toBeUndefined();
     w.hp = UNIT_HP - 20;
     refreshUnits(state); // `?? full` path

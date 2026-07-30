@@ -19,7 +19,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat } from './seats';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, civOfRival } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -48,16 +48,16 @@ export function unitPassable(tile: Tile, unit?: { type: string }): boolean {
 
 /** The owner's completed techs for a unit (player → playerSeat(state).research; rival →
  * its own ResearchState; barbarians have none). */
-function ownerTechs(state: GameState, unit: { owner: Unit['owner']; civId?: number }): string[] {
-  if (unit.owner === 'player') return playerSeat(state).research.techs;
-  if (unit.owner === 'rival') return state.rivals.find((r) => r.id === unit.civId)?.research.techs ?? [];
+function ownerTechs(state: GameState, unit: { seat: number }): string[] {
+  if (isPlayerSeat(unit.seat)) return playerSeat(state).research.techs;
+  if (isRivalSeat(unit.seat)) return rivalOfSeat(state, unit.seat)?.research.techs ?? [];
   return [];
 }
 
 /** #45/B-6: does a unit's OWNER have a tech (the embark/ocean gate reads this). */
 export function ownerHasTech(
   state: GameState,
-  unit: { owner: Unit['owner']; civId?: number },
+  unit: { seat: number },
   tech: string,
 ): boolean {
   return ownerTechs(state, unit).includes(tech);
@@ -67,7 +67,7 @@ export function ownerHasTech(
  * SHIPBUILDING (all land units incl. military). Naval units never "embark". */
 export function canEmbark(
   state: GameState,
-  unit: { type: string; owner: Unit['owner']; civId?: number },
+  unit: { type: string; seat: number },
 ): boolean {
   if (UNITS[unit.type]?.naval) return false;
   const tech = unitDomain(unit.type) === 'civilian' ? 'SAILING' : 'SHIPBUILDING';
@@ -80,7 +80,7 @@ export function canEmbark(
 export function waterEnterable(
   state: GameState,
   tile: Tile,
-  unit: { owner: Unit['owner']; civId?: number },
+  unit: { seat: number },
 ): boolean {
   if (tile.terrain === 'OCEAN') return ownerHasTech(state, unit, 'CARTOGRAPHY');
   return true;
@@ -205,8 +205,8 @@ export function unitDomain(type: string): 'civilian' | 'military' {
 }
 
 /** Side key: rival civs are distinct sides; everyone else is their owner. */
-export function unitSide(unit: { owner: Unit['owner']; civId?: number }): string {
-  return unit.owner === 'rival' ? `rival:${unit.civId ?? 0}` : unit.owner;
+export function unitSide(unit: { seat: number }): string {
+  return isRivalSeat(unit.seat) ? `rival:${rivalOfCiv(unit.seat)}` : isPlayerSeat(unit.seat) ? 'player' : 'barbarian';
 }
 
 /**
@@ -215,21 +215,21 @@ export function unitSide(unit: { owner: Unit['owner']; civId?: number }): string
  */
 export function unitsHostile(
   state: GameState,
-  a: { owner: Unit['owner']; civId?: number },
-  b: { owner: Unit['owner']; civId?: number },
+  a: { seat: number },
+  b: { seat: number },
 ): boolean {
   if (unitSide(a) === unitSide(b)) return false;
-  if (a.owner === 'barbarian' || b.owner === 'barbarian') return true;
-  if (a.owner === 'rival' && b.owner === 'rival') {
+  if (isBarbSeat(a.seat) || isBarbSeat(b.seat)) return true;
+  if (isRivalSeat(a.seat) && isRivalSeat(b.seat)) {
     // A-19/B-33 (S2): rival↔rival hostility off the per-pair war state
     // (atWarRivals stores 0-based rival ids = civId). Symmetric; same-civ /
     // unknown-civ never hostile. Inlined (not `civsAtWar`) to avoid a
     // units↔rivals import cycle.
-    if (a.civId === undefined || b.civId === undefined || a.civId === b.civId) return false;
-    return state.rivals.find((r) => r.id === a.civId)?.atWarRivals?.includes(b.civId as number) ?? false;
+    if (a.seat === b.seat) return false; // same seat is never hostile to itself
+    return rivalOfSeat(state, a.seat)?.atWarRivals?.includes(rivalOfCiv(b.seat)) ?? false;
   }
-  const civId = a.owner === 'rival' ? a.civId : b.civId;
-  return state.rivals.find((r) => r.id === civId)?.atWar ?? false;
+  const rivalSeat = isRivalSeat(a.seat) ? a.seat : b.seat;
+  return rivalOfSeat(state, rivalSeat)?.atWar ?? false;
 }
 
 /**
@@ -256,9 +256,9 @@ export function encampmentIntact(tile: Tile): boolean {
  * territory carries `rivalId`; otherwise an owned tile belongs to the player.
  * (City-states never build Encampments in this model, so `csId` needs no arm.)
  */
-export function tileOwnerSide(tile: Tile): { owner: Unit['owner']; civId?: number } | null {
-  if (tile.rivalId !== undefined) return { owner: 'rival', civId: tile.rivalId };
-  if (tile.cityId >= 0) return { owner: 'player' };
+export function tileOwnerSide(tile: Tile): { seat: number } | null {
+  if (tile.rivalId !== undefined) return { seat: civOfRival(tile.rivalId) };
+  if (tile.cityId >= 0) return { seat: PLAYER_CIV };
   return null;
 }
 
@@ -272,7 +272,7 @@ export function tileOwnerSide(tile: Tile): { owner: Unit['owner']; civId?: numbe
 export function encampmentBlocks(
   state: GameState,
   tile: Tile,
-  unit: { owner: Unit['owner']; civId?: number },
+  unit: { seat: number },
 ): boolean {
   if (!encampmentIntact(tile)) return false;
   const side = tileOwnerSide(tile);
@@ -288,7 +288,7 @@ export function encampmentBlocks(
 export function inEnemyZoc(
   state: GameState,
   tileIndex: number,
-  mover: { owner: Unit['owner']; civId?: number },
+  mover: { seat: number },
 ): boolean {
   const tile = state.map.tiles[tileIndex];
   for (const n of neighbors(state.map, tile)) {
@@ -326,14 +326,14 @@ export function fortifyBonus(unit: { fortifyTurns?: number }): number {
  *  Harbor cliff exception). */
 function tileOwnedByUnitOwner(
   t: Tile,
-  unit: { owner: Unit['owner']; civId?: number },
+  unit: { seat: number },
 ): boolean {
-  if (unit.owner === 'player') return t.cityId !== -1;
-  if (unit.owner === 'rival') return (t.rivalId ?? -1) === (unit.civId ?? -1);
+  if (isPlayerSeat(unit.seat)) return t.cityId !== -1;
+  if (isRivalSeat(unit.seat)) return (t.rivalId ?? -1) === rivalOfCiv(unit.seat);
   return false; // barbarians own nothing
 }
 
-export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { owner: Unit['owner']; civId?: number }): boolean {
+export function cliffBlocks(state: GameState, a: Tile, b: Tile, unit?: { seat: number }): boolean {
   const land = isWater(a) ? b : a;
   const water = isWater(a) ? a : b;
   if (isWater(land) || !isWater(water)) return false; // not a land/water edge
@@ -370,7 +370,7 @@ export function cliffBlocksStep(
   state: GameState,
   from: Tile,
   to: Tile,
-  unit: { type: string; owner: Unit['owner']; civId?: number },
+  unit: { type: string; seat: number },
 ): boolean {
   if (UNITS[unit.type]?.naval) return false; // naval movers never transition
   if (isWater(from) === isWater(to)) return false; // not a land/water crossing
@@ -380,7 +380,7 @@ export function cliffBlocksStep(
 export function tileFreeForUnit(
   state: GameState,
   tileIndex: number,
-  unit?: Unit | { type: string; owner: Unit['owner']; civId?: number; id?: number },
+  unit?: Unit | { type: string; seat: number; id?: number },
   allowEmbark = false,
 ): boolean {
   const tile = state.map.tiles[tileIndex];
@@ -407,7 +407,9 @@ export function tileFreeForUnit(
     // C1-B5a: rival CIVS are foreign to each other — side alone can't tell
     // them apart. Inert for the all-military world (cross-civ military
     // blocked under either reading); it matters once rival civilians exist.
-    if (unitSide(u) !== side || (side === 'rival' && u.civId !== unit?.civId)) return false; // foreign occupied
+    // #51/S1.3b: `side` already encodes WHICH rival (`rival:<id>`), so the
+    // separate civId test the old string form needed is subsumed.
+    if (unitSide(u) !== side) return false; // foreign occupied
     if (unitDomain(u.type) === domain) return false; // same-slot ally
   }
   return true;
@@ -492,7 +494,7 @@ export function walkPath(state: GameState, unit: Unit): void {
     const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
     // Enemy-occupied tiles block; the final step also needs a free slot.
     const blockedByEnemy =
-      unitsAt(state, nextIndex).some((u) => u.owner !== unit.owner) ||
+      unitsAt(state, nextIndex).some((u) => u.seat !== unit.seat) ||
       encampmentBlocks(state, to, unit); // B-17 (#71)
     if (blockedByEnemy || (unit.path.length === 1 && !tileFreeForUnit(state, nextIndex, unit))) {
       unit.path = null;
@@ -526,7 +528,7 @@ export function walkPath(state: GameState, unit: Unit): void {
     unit.path.shift();
     unit.movesLeft = Math.max(0, unit.movesLeft - cost);
 
-    if (unit.owner === 'player') {
+    if (isPlayerSeat(unit.seat)) {
       revealAround(state, nextIndex);
       claimGoodyHut(state, unit);
     }
@@ -645,7 +647,7 @@ export function trainableUnits(
  */
 export function archaeologistExcavate(state: GameState, unitId: number): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
-  if (!unit || unit.owner !== 'player') return no('No such unit.');
+  if (!unit || !isPlayerSeat(unit.seat)) return no('No such unit.');
   if (unit.type !== 'ARCHAEOLOGIST') return no('Only an Archaeologist can excavate.');
   if ((unit.charges ?? 0) <= 0) return no('No charges left.');
   const tile = state.map.tiles[unit.tileIndex];
@@ -689,13 +691,12 @@ export function spawnUnit(
   state: GameState,
   unitType: string,
   nearIndex: number,
-  owner: Unit['owner'] = 'player',
-  civId?: number,
+  seat: number = PLAYER_CIV,
 ): Unit | null {
   const def = UNITS[unitType];
   if (!def) return null;
   const near = state.map.tiles[nearIndex];
-  const probe = { type: unitType, owner, civId };
+  const probe = { type: unitType, seat };
   const spot = [near, ...neighbors(state.map, near)]
     .sort((a, b) => hexDistance(near.col, near.row, a.col, a.row) - hexDistance(near.col, near.row, b.col, b.row))
     .find((t) => tileFreeForUnit(state, t.index, probe));
@@ -703,7 +704,7 @@ export function spawnUnit(
   const unit: Unit = {
     id: state.nextUnitId++,
     type: unitType,
-    owner,
+    seat,
     tileIndex: spot.index,
     movesLeft: def.moves,
     hp: UNIT_HP,
@@ -713,18 +714,17 @@ export function spawnUnit(
   // B-5 FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
   // AUDIT B-4 XP: player & rival units start at 0 experience (barbs never accrue).
-  if (owner !== 'barbarian') unit.xp = 0;
-  if (civId !== undefined) unit.civId = civId;
+  if (!isBarbSeat(seat)) unit.xp = 0;
   state.units.push(unit);
-  if (owner === 'player') revealAround(state, unit.tileIndex);
+  if (isPlayerSeat(seat)) revealAround(state, unit.tileIndex);
   // P4/D-22: track the strongest MELEE unit each civ has ever fielded —
   // real Civ 6 bases city defense on it (spawnUnit is the chokepoint for
   // training, purchase, levies and rival production alike).
   if (def.combat > 0 && !def.ranged) {
-    if (owner === 'player') {
+    if (isPlayerSeat(seat)) {
       state.bestMeleeCS = Math.max(state.bestMeleeCS ?? 0, def.combat);
-    } else if (owner === 'rival') {
-      const rv = state.rivals.find((r) => r.id === civId);
+    } else if (isRivalSeat(seat)) {
+      const rv = rivalOfSeat(state, seat);
       if (rv) rv.bestMeleeCS = Math.max(rv.bestMeleeCS ?? 0, def.combat);
     }
   }
@@ -750,7 +750,7 @@ export function disbandUnit(state: GameState, unitId: number): void {
 /** Empire-level gold upkeep of the player's units. */
 export function unitMaintenance(state: GameState): number {
   return state.units.reduce(
-    (s, u) => s + (u.owner === 'player' ? UNITS[u.type]?.maintenance ?? 0 : 0),
+    (s, u) => s + (isPlayerSeat(u.seat) ? UNITS[u.type]?.maintenance ?? 0 : 0),
     0,
   );
 }
@@ -777,13 +777,13 @@ export function refreshUnits(state: GameState): void {
     if (unit.movesLeft >= grantedLast) {
       const unowned = tile.cityId === -1 && tile.rivalId === undefined && tile.csId === undefined;
       let heal: number;
-      if (unit.owner === 'player') {
+      if (isPlayerSeat(unit.seat)) {
         if (tile.cityId !== -1 && tile.district === 'CITY_CENTER') heal = 20;
         else if (tile.cityId !== -1) heal = 15;
         else heal = unowned ? 10 : 5;
-      } else if (unit.owner === 'rival') {
-        if (tile.rivalId === unit.civId && tile.district === 'CITY_CENTER') heal = 20;
-        else if (tile.rivalId === unit.civId) heal = 15;
+      } else if (isRivalSeat(unit.seat)) {
+        if (tile.rivalId === rivalOfCiv(unit.seat) && tile.district === 'CITY_CENTER') heal = 20;
+        else if (tile.rivalId === rivalOfCiv(unit.seat)) heal = 15;
         else heal = unowned ? 10 : 5;
       } else {
         // barbarian: the camp is home
@@ -883,7 +883,7 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
  */
 export function playerPillage(state: GameState, unitId: number): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
-  if (!unit || unit.owner !== 'player') return no('No such player unit.');
+  if (!unit || !isPlayerSeat(unit.seat)) return no('No such player unit.');
   if (unitDomain(unit.type) !== 'military') return no('Only military units pillage.');
   if (unit.movesLeft <= 0) return no('No movement left.');
   const tile = state.map.tiles[unit.tileIndex];

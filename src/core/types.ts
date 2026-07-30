@@ -383,9 +383,16 @@ export interface Unit {
   id: number;
   /** Unit type id from data/units. */
   type: string;
-  owner: 'player' | 'barbarian' | 'rival';
-  /** Owning rival civ id (rival units only). */
-  civId?: number;
+  /**
+   * The SEAT that owns this unit: 0 player, r+1 rival, BARB_SEAT barbarian.
+   *
+   * #51/S1.3b: was a `'player'|'rival'|'barbarian'` string PLUS an optional
+   * `civId` that only rival units carried — two fields encoding one fact, and a
+   * shape in which "which rival" was unrepresentable for the player and
+   * meaningless for barbarians. Test it through `isPlayerSeat`/`isRivalSeat`/
+   * `isBarbSeat` (core/seats.ts), never by comparing the number inline.
+   */
+  seat: number;
   tileIndex: number;
   movesLeft: number;
   /**

@@ -9,7 +9,7 @@
  */
 
 import type { City, GameState, Unit, Yields } from './types';
-import { playerSeat } from './seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, PLAYER_CIV } from './seats';
 import { YIELD_KEYS, emptyYields, addYields } from './types';
 import {
   createGame,
@@ -224,7 +224,7 @@ function autoMilitary(state: GameState, unit: Unit): void {
 export function playerAutoPhase(state: GameState): void {
   if (!state.unitsMode) return;
   for (const unit of [...state.units]) {
-    if (unit.owner !== 'player' || unit.movesLeft <= 0) continue;
+    if (!isPlayerSeat(unit.seat) || unit.movesLeft <= 0) continue;
     if (!state.units.includes(unit)) continue; // died mid-phase
     const def = UNITS[unit.type];
     if (def?.charges !== undefined) {
@@ -627,7 +627,7 @@ function purchaseCandidates(state: GameState, city: City): Candidate[] {
     const center = s.map.tiles[city.centerIndex];
     const spawnable = (type: string) =>
       [center, ...neighbors(s.map, center)].some((t) =>
-        tileFreeForUnit(s, t.index, { type, owner: 'player' }),
+        tileFreeForUnit(s, t.index, { type, seat: PLAYER_CIV }),
       );
     const units = trainableUnits(s)
       .filter((u) => playerSeat(s).treasury >= unitPurchaseCost(s, u.id))
@@ -804,13 +804,13 @@ function makeCandidate(
   if (city) {
     const ct = s.map.tiles[city.centerIndex];
     threat = s.units.filter((u) => {
-      if (u.owner !== 'barbarian') return false;
+      if (!isBarbSeat(u.seat)) return false;
       const bt = s.map.tiles[u.tileIndex];
       return hexDistance(bt.col, bt.row, ct.col, ct.row) <= 6;
     }).length;
   }
-  const builders = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'civilian').length;
-  const military = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'military').length;
+  const builders = s.units.filter((u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'civilian').length;
+  const military = s.units.filter((u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'military').length;
   const delta = parts.delta ?? emptyYields();
   return {
     action,
@@ -848,9 +848,9 @@ export function envObservation(state: GameState, horizon: number): number[] {
     amenityDeficit += Math.max(0, st.amenities.needed - st.amenities.have);
     housingHeadroom += Math.min(4, st.housing - c.population);
   }
-  const barbs = s.units.filter((u) => u.owner === 'barbarian').length;
-  const builders = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'civilian').length;
-  const military = s.units.filter((u) => u.owner === 'player' && unitDomain(u.type) === 'military').length;
+  const barbs = s.units.filter((u) => isBarbSeat(u.seat)).length;
+  const builders = s.units.filter((u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'civilian').length;
+  const military = s.units.filter((u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'military').length;
   const pillaged = s.map.tiles.filter((t) => t.pillaged).length;
   const owned = s.map.tiles.filter((t) => t.cityId !== -1);
   const improvable = owned.filter((t) => !t.improvement && !t.district && validImprovements(s, t).length > 0).length;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { civOfRival } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit } from '../src/core/units';
@@ -42,7 +43,7 @@ function makeBuyer(state: GameState) {
 }
 
 function rivalMissionaries(state: GameState, civId: number) {
-  return state.units.filter((u) => u.owner === 'rival' && u.civId === civId && u.type === 'MISSIONARY');
+  return state.units.filter((u) => u.seat === civOfRival(civId) && u.type === 'MISSIONARY');
 }
 
 /** Force every city (player + rivals) to follow g so a freshly-bought
@@ -68,7 +69,7 @@ describe('B6-S2 rival missionary chassis', () => {
     const { rv: rvC } = makeBuyer(ctl);
     rvC.faith = 200;
     for (let k = 0; k < 2; k++) {
-      const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, 'rival', rvC.id);
+      const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, civOfRival(rvC.id));
       if (u) u.charges = 0;
     }
     // #71 (APOSTLE_BUY_LIVE): the apostle rung only fires when NO missionary
@@ -76,7 +77,7 @@ describe('B6-S2 rival missionary chassis', () => {
     // cap too, or the control spends 120 on an apostle and the delta no longer
     // isolates the missionary price.
     {
-      const a = spawnUnit(ctl, 'APOSTLE', rvC.cities[0].centerIndex, 'rival', rvC.id);
+      const a = spawnUnit(ctl, 'APOSTLE', rvC.cities[0].centerIndex, civOfRival(rvC.id));
       if (a) a.charges = 0;
     }
     endTurn(ctl);
@@ -98,7 +99,7 @@ describe('B6-S2 rival missionary chassis', () => {
     rvC.religion.enhancer = 'HOLY_ORDER';
     rvC.faith = 200;
     for (let k = 0; k < 2; k++) {
-      const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, 'rival', rvC.id);
+      const u = spawnUnit(ctl, 'MISSIONARY', rvC.cities[0].centerIndex, civOfRival(rvC.id));
       if (u) u.charges = 0;
     }
     // #71 (APOSTLE_BUY_LIVE): the apostle rung only fires when NO missionary
@@ -106,7 +107,7 @@ describe('B6-S2 rival missionary chassis', () => {
     // cap too, or the control spends 120 on an apostle and the delta no longer
     // isolates the missionary price.
     {
-      const a = spawnUnit(ctl, 'APOSTLE', rvC.cities[0].centerIndex, 'rival', rvC.id);
+      const a = spawnUnit(ctl, 'APOSTLE', rvC.cities[0].centerIndex, civOfRival(rvC.id));
       if (a) a.charges = 0;
     }
     endTurn(ctl);
@@ -131,7 +132,7 @@ describe('B6-S2 rival missionary chassis', () => {
     const { rv } = makeBuyer(state);
     rv.faith = 500;
     for (let k = 0; k < 2; k++) {
-      const u = spawnUnit(state, 'MISSIONARY', rv.cities[0].centerIndex, 'rival', rv.id);
+      const u = spawnUnit(state, 'MISSIONARY', rv.cities[0].centerIndex, civOfRival(rv.id));
       if (u) u.charges = 0;
     }
     endTurn(state);
@@ -146,7 +147,7 @@ describe('B6-S2 rival missionary chassis', () => {
       const target = state.cities[0];
       target.followedReligion = 0; // != g (1)
       target.religionPressure = [0, 0];
-      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, 'rival', rv.id)!;
+      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civOfRival(rv.id))!;
       u.charges = 2;
       const uid = u.id;
       endTurn(state);
@@ -162,7 +163,7 @@ describe('B6-S2 rival missionary chassis', () => {
       const target = state.cities[0];
       target.followedReligion = 0;
       target.religionPressure = [0, 0];
-      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, 'rival', rv.id)!;
+      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civOfRival(rv.id))!;
       u.charges = 1;
       const uid = u.id;
       endTurn(state);

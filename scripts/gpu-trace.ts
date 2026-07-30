@@ -27,7 +27,7 @@
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { dominationWinner } from '../src/core/game';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival } from '../src/core/seats';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -71,8 +71,8 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'score', tol: 2, get: (s) => Math.round(empireScore(s, 'balanced') * 1000) },
   { name: 'rng', tol: 0, get: (s) => s.rngState >>> 0 },
   { name: 'nCamps', tol: 0, get: (s) => s.barbCamps.length },
-  { name: 'nBarbs', tol: 0, get: (s) => s.units.filter((u) => u.owner === 'barbarian').length },
-  { name: 'nPlayerUnits', tol: 0, get: (s) => s.units.filter((u) => u.owner === 'player').length },
+  { name: 'nBarbs', tol: 0, get: (s) => s.units.filter((u) => isBarbSeat(u.seat)).length },
+  { name: 'nPlayerUnits', tol: 0, get: (s) => s.units.filter((u) => isPlayerSeat(u.seat)).length },
   { name: 'envoysAvail', tol: 0, get: (s) => playerSeat(s).envoysAvailable },
   { name: 'influence', tol: 0, get: (s) => playerSeat(s).influencePoints },
   { name: 'fertility', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + t.fertility, 0) },
@@ -118,7 +118,7 @@ const PER_RIVAL_COLS: TraceCol<RivalCiv | undefined>[] = [
   {
     name: 'nUnits',
     tol: 0,
-    get: (s, r) => (r ? s.units.filter((u) => u.owner === 'rival' && u.civId === r.id).length : 0),
+    get: (s, r) => (r ? s.units.filter((u) => isRivalSeat(u.seat) && u.seat === civOfRival(r.id)).length : 0),
   },
   { name: 'atWar', tol: 0, get: (_s, r) => (r?.atWar ? 1 : 0) },
   { name: 'nTechs', tol: 0, get: (_s, r) => r?.research.techs.length ?? 0 },

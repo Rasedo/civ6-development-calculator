@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { civOfRival } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { rivalPhase, rivalUnits } from '../src/core/rivals';
 import { cityStatePhase, rivalIsSuzerain } from '../src/core/cityStates';
@@ -115,7 +116,7 @@ function meetQuota(state: GameState, rival: RivalCiv): void {
     spots.push(t.index);
   }
   for (let i = rivalUnits(state, rival.id).length; i < quota; i++) {
-    spawnUnit(state, 'WARRIOR', spots[i], 'rival', rival.id);
+    spawnUnit(state, 'WARRIOR', spots[i], civOfRival(rival.id));
   }
 }
 

@@ -5,6 +5,7 @@
  */
 
 import { hexCenter, cornerOffsets, EDGE_CORNERS, pixelToHex, inBounds, tileIndex, neighborOffset } from '../core/hex';
+import { isBarbSeat, isRivalSeat, rivalOfSeat } from '../core/seats';
 import type { GameMap, GameState, Tile } from '../core/types';
 import { TERRAINS, MOUNTAIN_COLOR } from '../data/terrains';
 import { RESOURCES, RESOURCE_CATEGORY_COLORS } from '../data/resources';
@@ -360,11 +361,11 @@ export class MapRenderer {
       for (const u of state.units) {
         let fill = '#6fa8dc';
         let text = '#14202c';
-        if (u.owner === 'barbarian') {
+        if (isBarbSeat(u.seat)) {
           fill = '#c04040';
           text = '#2c0e0e';
-        } else if (u.owner === 'rival') {
-          fill = state.rivals.find((r) => r.id === u.civId)?.color ?? '#888888';
+        } else if (isRivalSeat(u.seat)) {
+          fill = rivalOfSeat(state, u.seat)?.color ?? '#888888';
           text = '#101318';
         }
         byTile.set(u.tileIndex, { code: UNITS[u.type]?.code ?? '?', fill, text });

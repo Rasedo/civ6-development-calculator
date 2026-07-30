@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CITY_MAX_HP } from '../src/data/units';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
   createGame,
@@ -210,7 +210,7 @@ describe('war and peace', () => {
     state.unitsMode = true;
     const rival = addRival(state, 8, 8);
     const mine = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index)!;
-    const theirs = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, 'rival', rival.id)!;
+    const theirs = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, civOfRival(rival.id))!;
     expect(unitsHostile(state, mine, theirs)).toBe(false);
     expect(attackTargets(state, mine)).not.toContain(theirs.tileIndex);
     expect(declareWar(state, rival.id).ok).toBe(true);
@@ -227,7 +227,7 @@ describe('war and peace', () => {
     const farm = tileAtCoords(state.map, 6, 4);
     farm.cityId = city.id;
     farm.improvement = 'FARM';
-    const raider = spawnUnit(state, 'WARRIOR', farm.index, 'rival', rival.id)!;
+    const raider = spawnUnit(state, 'WARRIOR', farm.index, civOfRival(rival.id))!;
     raider.tileIndex = farm.index;
     rivalPhase(state);
     expect(farm.pillaged).toBe(true);
@@ -428,7 +428,7 @@ describe('B-10 best-of-roster scripted rival production ladder', () => {
     rc.buildings = Object.keys(BUILDINGS); // pre-own everything → no building pick
     if (opts.premelee) {
       // one live melee unit → wantRanged (rangedCount*2 < meleeCount) trips
-      spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 2, 2).index, 'rival', rival.id);
+      spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 2, 2).index, civOfRival(rival.id));
     }
     rivalPhase(state);
     const q = rc.queue[0];
@@ -538,7 +538,7 @@ describe('rival trade routes (A-11)', () => {
     expect(rivalRouteRaidedAt(state, rival, ends)).toBe(true);
     state.units = state.units.filter((u) => u.id !== mine.id);
     expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false);
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index, 'barbarian');
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index, BARB_SEAT);
     rival.atWar = false;
     expect(rivalRouteRaidedAt(state, rival, ends)).toBe(true); // barbs always
   });
@@ -549,7 +549,7 @@ describe('rival trade routes (A-11)', () => {
     const rival = addRival(state, 10, 10);
     const home = tileAtCoords(state.map, 4, 4);
     const ends = [home.index];
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 4).index, 'rival', rival.id);
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 4).index, civOfRival(rival.id));
     expect(routeRaidedAt(state, ends)).toBe(false); // at peace: no interdiction
     rival.atWar = true;
     expect(routeRaidedAt(state, ends)).toBe(true);
@@ -623,7 +623,7 @@ describe('rival CS trade routes (A-12b)', () => {
     const rival = addRival(state, 4, 4);
     const cs = addCs(state, 9, 9);
     cs.envoys = 3; // the player is suzerain, uncontested
-    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 8).index, 'rival', rival.id);
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 8).index, civOfRival(rival.id));
     const u = state.units[state.units.length - 1];
     expect(attackTargets(state, u)).not.toContain(cs.centerIndex); // at peace: no join-the-war
     rival.atWar = true;
@@ -654,7 +654,7 @@ describe('B-31 civilian capture', () => {
     const defTile = tileAtCoords(state.map, 12, 9);
     const atk = spawnUnit(state, 'WARRIOR', atkTile.index)!;
     atk.tileIndex = atkTile.index;
-    const builder = spawnUnit(state, 'BUILDER', defTile.index, 'rival', rival.id)!;
+    const builder = spawnUnit(state, 'BUILDER', defTile.index, civOfRival(rival.id))!;
     builder.tileIndex = defTile.index;
     const charges = builder.charges;
     expect(charges).toBeGreaterThan(0);
@@ -664,8 +664,9 @@ describe('B-31 civilian capture', () => {
     // Captured: SAME unit id, now player-owned, still on its tile, charges kept.
     const cap = state.units.find((u) => u.id === builder.id);
     expect(cap).toBeDefined();
-    expect(cap!.owner).toBe('player');
-    expect(cap!.civId).toBeUndefined();
+    // #51/S1.3b: one field carries the whole capture — a player-owned unit is
+    // simply seat 0, with no separate "and no civId" half to assert.
+    expect(cap!.seat).toBe(PLAYER_CIV);
     expect(cap!.tileIndex).toBe(defTile.index);
     expect(cap!.charges).toBe(charges);
     expect(cap!.movesLeft).toBe(0);
@@ -680,7 +681,7 @@ describe('B-31 civilian capture', () => {
     foundCity(state, tileAtCoords(state.map, 9, 9).index);
     const atkTile = tileAtCoords(state.map, 11, 9);
     const defTile = tileAtCoords(state.map, 12, 9);
-    const barb = spawnUnit(state, 'WARRIOR', atkTile.index, 'barbarian')!;
+    const barb = spawnUnit(state, 'WARRIOR', atkTile.index, BARB_SEAT)!;
     barb.tileIndex = atkTile.index;
     const builder = spawnUnit(state, 'BUILDER', defTile.index)!; // a player civilian
     builder.tileIndex = defTile.index;
@@ -690,6 +691,6 @@ describe('B-31 civilian capture', () => {
     // Killed, not captured — and the barbarian advances into the emptied tile.
     expect(state.units.some((u) => u.id === builder.id)).toBe(false);
     expect(barb.tileIndex).toBe(defTile.index);
-    expect(barb.owner).toBe('barbarian');
+    expect(isBarbSeat(barb.seat)).toBe(true);
   });
 });

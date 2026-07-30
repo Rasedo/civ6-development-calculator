@@ -34,7 +34,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed, civOfRival, allCities, playerSeat } from './seats';
+import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV } from './seats';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -924,7 +924,7 @@ export function endTurn(state: GameState): void {
       // gold, so a sub-milli float drift must not spuriously trip < 0 vs the GPU.
       let victim: Unit | undefined;
       for (const u of state.units) {
-        if (u.owner !== 'player') continue;
+        if (!isPlayerSeat(u.seat)) continue;
         const m = UNITS[u.type]?.maintenance ?? 0;
         if (m <= 0) continue;
         const vm = victim ? UNITS[victim.type]?.maintenance ?? 0 : 0;
@@ -1181,7 +1181,7 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
   // the retire ability). Spawn-at-claim is production-free — zero RNG draws.
   if (cls === 'GENERAL' || cls === 'ADMIRAL') {
     const capital = state.cities.find((c) => c.isCapital);
-    if (capital) spawnUnit(state, cls, capital.centerIndex, 'player');
+    if (capital) spawnUnit(state, cls, capital.centerIndex, PLAYER_CIV);
   }
   state.claimedGreatPeople.push(person.id); // gone from the global pool...
   playerSeat(state).gpEarned.push(person.id); // ...and recorded as the PLAYER's recruit (S1.2f)
@@ -1326,7 +1326,7 @@ export function deserialize(json: string): GameState {
   state.bestMeleeCS ??= Math.max(
     0,
     ...state.units
-      .filter((u) => u.owner === 'player' && !UNITS[u.type]?.ranged)
+      .filter((u) => isPlayerSeat(u.seat) && !UNITS[u.type]?.ranged)
       .map((u) => UNITS[u.type]?.combat ?? 0),
   );
   state.tilesPurchased ??= 0; // P4/D-17
@@ -1374,7 +1374,7 @@ export function deserialize(json: string): GameState {
   state.claimedBeliefs ??= [];
   state.claimedEnhancers ??= []; // B-18
   for (const u of state.units) {
-    u.owner ??= 'player';
+    u.seat ??= PLAYER_CIV; // #51/S1.3b: old saves predate the seat field
     u.hp ??= 100;
     // B-5 FORTIFY: fill only MILITARY units in place (civilians never carry
     // the field) so a current-shape save round-trips byte-identically.

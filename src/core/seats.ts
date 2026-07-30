@@ -96,9 +96,7 @@ export function civHasStrategic(state: GameState, civ: number, resourceId: strin
 
 /** Civ owning this unit: PLAYER_CIV, civOfRival(r), or null (barbarian). */
 export function unitCiv(u: Unit): number | null {
-  if (u.owner === 'player') return PLAYER_CIV;
-  if (u.owner === 'rival') return civOfRival(u.civId ?? 0);
-  return null;
+  return isBarbSeat(u.seat) ? null : u.seat; // barbarians are not a civ
 }
 
 /** Civ owning this city (absent civId = the player, C1-A2). */
@@ -142,11 +140,25 @@ export function seatOf(state: GameState, seat: number): Seat | undefined {
   return state.seats[seat];
 }
 
+/** Is this the human/agent seat? */
+export const isPlayerSeat = (seat: number): boolean => seat === PLAYER_CIV;
+
+/** Is this a barbarian? They act but hold no territory, research or diplomacy. */
+export const isBarbSeat = (seat: number): boolean => seat === BARB_SEAT;
+
+/**
+ * Is this a rival civ? Rival seats are 1..R.
+ *
+ * City-states get ids ABOVE the rivals (`seatOfCityState`) and own no units
+ * today, so `>= 1` is exact. If a city-state is ever given units, THIS is the
+ * one place to widen — which is the point of the predicate: the old
+ * `owner === 'rival'` string could not express a city-state unit at all.
+ */
+export const isRivalSeat = (seat: number): boolean => seat >= 1;
+
 /** The seat that owns this unit: 0 player, r+1 rival, BARB_SEAT barbarian. */
-export function unitSeat(u: { owner: Unit['owner']; civId?: number }): number {
-  if (u.owner === 'player') return PLAYER_CIV;
-  if (u.owner === 'rival') return civOfRival(u.civId ?? 0);
-  return BARB_SEAT;
+export function unitSeat(u: { seat: number }): number {
+  return u.seat; // #51/S1.3b: the unit STORES its seat now; this is the last shim
 }
 
 /** The RivalCiv behind a seat, or undefined for the player/city-states/barbs. */

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, purchaseUnit } from '../src/core/game';
 import {
@@ -63,7 +63,7 @@ function addWarRival(state: GameState, col: number, row: number, techs: string[]
   // the PLAYER city, so no rival city geometry is needed here.
   state.rivals.push(rival);
   const tile = tileAtCoords(state.map, col, row);
-  spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id)!;
+  spawnUnit(state, 'WARRIOR', tile.index, civOfRival(rival.id))!;
   return rival;
 }
 
@@ -86,8 +86,8 @@ describe('#45/B-6 movement primitives', () => {
   it('canEmbark reads the OWNER tech by unit domain (military=SHIPBUILDING, civilian=SAILING)', () => {
     const state = makeState(makeMap(12, 12));
     const rival = addWarRival(state, 3, 3, []);
-    const warrior = state.units.find((u) => u.owner === 'rival')!;
-    const builder = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 3, 4).index, 'rival', rival.id)!;
+    const warrior = state.units.find((u) => isRivalSeat(u.seat))!;
+    const builder = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 3, 4).index, civOfRival(rival.id))!;
     // no naval techs yet
     expect(canEmbark(state, warrior)).toBe(false);
     expect(canEmbark(state, builder)).toBe(false);
@@ -102,7 +102,7 @@ describe('#45/B-6 movement primitives', () => {
   it('OCEAN needs CARTOGRAPHY to enter; COAST/LAKE do not', () => {
     const state = makeState(makeMap(12, 12));
     const rival = addWarRival(state, 3, 3, ['SAILING', 'SHIPBUILDING']);
-    const warrior = state.units.find((u) => u.owner === 'rival')!;
+    const warrior = state.units.find((u) => isRivalSeat(u.seat))!;
     const coast = tileAtCoords(state.map, 5, 5);
     coast.terrain = 'COAST';
     const ocean = tileAtCoords(state.map, 6, 5);
@@ -118,8 +118,8 @@ describe('#45/B-6 movement primitives', () => {
     const state = makeState(makeMap(12, 12));
     state.unitsMode = true;
     addWarRival(state, 5, 5, []);
-    const exerter = state.units.find((u) => u.owner === 'rival')!;
-    const player: Unit = { id: 999, type: 'WARRIOR', owner: 'player', tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2, hp: 100, charges: null, path: null };
+    const exerter = state.units.find((u) => isRivalSeat(u.seat))!;
+    const player: Unit = { id: 999, type: 'WARRIOR', seat: PLAYER_CIV, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2, hp: 100, charges: null, path: null };
     // the mover is the player; a hostile rival military adjacent exerts ZOC
     expect(inEnemyZoc(state, player.tileIndex, player)).toBe(true);
     // once that rival is EMBARKED it exerts nothing
@@ -134,7 +134,7 @@ describe('#45/B-6 spawn stays ashore', () => {
     // island: one land tile surrounded by water
     const island = tileAtCoords(state.map, 5, 5);
     island.terrain = 'GRASSLAND';
-    const u = spawnUnit(state, 'WARRIOR', island.index, 'player')!;
+    const u = spawnUnit(state, 'WARRIOR', island.index, PLAYER_CIV)!;
     expect(u).toBeTruthy();
     expect(isWater(state.map.tiles[u.tileIndex])).toBe(false);
     expect(u.tileIndex).toBe(island.index);
@@ -153,7 +153,7 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
     cityTile.terrain = 'GRASSLAND';
     foundCity(state, cityTile.index);
     addWarRival(state, 3, 5, techs);
-    const unit = state.units.find((u) => u.owner === 'rival')!;
+    const unit = state.units.find((u) => isRivalSeat(u.seat))!;
     return { state, unit };
   }
 
@@ -300,7 +300,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const center = tileAtCoords(state.map, 5, 5);
     const water = tileAtCoords(state.map, 6, 5);
     water.terrain = 'COAST';
-    const galley = spawnUnit(state, 'GALLEY', center.index, 'player')!;
+    const galley = spawnUnit(state, 'GALLEY', center.index, PLAYER_CIV)!;
     expect(galley).toBeTruthy();
     expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true);
     expect(galley.embarked).toBeFalsy(); // naval units are never "embarked"
@@ -314,7 +314,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     // construct the embarked unit directly (the map is all water — a land unit
     // cannot spawnUnit here) with a fortify counter that must be IGNORED.
     const embarked: Unit = {
-      id: state.nextUnitId++, type: 'WARRIOR', owner: 'rival', civId: rival.id,
+      id: state.nextUnitId++, type: 'WARRIOR', seat: civOfRival(rival.id),
       tileIndex: water.index, movesLeft: 2, hp: 100, charges: null, path: null,
       embarked: true, fortifyTurns: 2,
     };
@@ -337,15 +337,15 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const warriorTile = tileAtCoords(state.map, 5, 5);
     const builderTile = neighbors(state.map, warriorTile)[0];
     builderTile.terrain = 'COAST';
-    const warrior = spawnUnit(state, 'WARRIOR', warriorTile.index, 'player')!;
-    const builder = spawnUnit(state, 'BUILDER', warriorTile.index, 'rival', rival.id)!;
+    const warrior = spawnUnit(state, 'WARRIOR', warriorTile.index, PLAYER_CIV)!;
+    const builder = spawnUnit(state, 'BUILDER', warriorTile.index, civOfRival(rival.id))!;
     builder.tileIndex = builderTile.index; // embarked civilian on the water tile
     builder.embarked = true;
     // add another player unit AFTER the builder so pool-end is observable
-    const tail = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 9).index, 'player')!;
+    const tail = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 9).index, PLAYER_CIV)!;
     const res = meleeAttack(state, warrior.id, builderTile.index);
     expect(res.ok).toBe(true);
-    expect(builder.owner).toBe('player');
+    expect(isPlayerSeat(builder.seat)).toBe(true);
     expect(builder.embarked).toBe(true); // KEEPS embarked under the new owner
     // pool-end: the captured unit is the LAST entry in state.units
     expect(state.units[state.units.length - 1].id).toBe(builder.id);
@@ -382,7 +382,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     rival.cities.push(rc);
     // a galley on a water tile adjacent to the rival city center
     const waterAdj = neighbors(state.map, rcCenter).find((n) => isWater(n))!;
-    const galley = spawnUnit(state, 'GALLEY', waterAdj.index, 'player')!;
+    const galley = spawnUnit(state, 'GALLEY', waterAdj.index, PLAYER_CIV)!;
     expect(galley.tileIndex).toBe(waterAdj.index);
     const before = rc.hp;
     const res = meleeAttack(state, galley.id, rcCenter.index);
@@ -422,7 +422,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     };
     rival.cities.push(rc);
     // spawn the galley on OPEN WATER several tiles from the city
-    const galley = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 4, 5).index, 'player')!;
+    const galley = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 4, 5).index, PLAYER_CIV)!;
     expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true);
     const startIdx = galley.tileIndex;
     const waterAdj = neighbors(state.map, rcCenter).find((n) => isWater(n))!;

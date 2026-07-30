@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, tileAtCoords } from './helpers';
 import { rivalPhase, isFormalWar, rivalStrength } from '../src/core/rivals';
-import { civsAtWar, setRivalWar } from '../src/core/seats';
+import { civsAtWar, setRivalWar, civOfRival } from '../src/core/seats';
 import { hostileRangedStrike, attackTargets } from '../src/core/combat';
 import { unitsHostile, spawnUnit } from '../src/core/units';
 import { tilesWithin } from '../src/core/hex';
@@ -143,13 +143,13 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
 
   it('unitsHostile keys rival-vs-rival on the pair state', () => {
     const { state } = pairState();
-    const a = { owner: 'rival' as const, civId: 0 };
-    const b = { owner: 'rival' as const, civId: 1 };
+    const a = { seat: civOfRival(0) };
+    const b = { seat: civOfRival(1) };
     expect(unitsHostile(state, a, b)).toBe(false);
     setRivalWar(state, 1, 2, true);
     expect(unitsHostile(state, a, b)).toBe(true);
     expect(unitsHostile(state, b, a)).toBe(true);
-    expect(unitsHostile(state, a, { owner: 'rival', civId: 0 })).toBe(false); // same civ
+    expect(unitsHostile(state, a, { seat: civOfRival(0) })).toBe(false); // same civ
   });
 
   it('rivalPhase denounces (stronger, near, directed) then declares SURPRISE without an old grudge', () => {
@@ -207,8 +207,8 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
     setRivalWar(state, 1, 2, true);
     const atkTile = tileAtCoords(state.map, 10, 10);
     const defTile = tileAtCoords(state.map, 11, 10);
-    const atk = spawnUnit(state, 'ARCHER', atkTile.index, 'rival', 0)!;
-    const def = spawnUnit(state, 'WARRIOR', defTile.index, 'rival', 1)!;
+    const atk = spawnUnit(state, 'ARCHER', atkTile.index, civOfRival(0))!;
+    const def = spawnUnit(state, 'WARRIOR', defTile.index, civOfRival(1))!;
     expect(unitsHostile(state, atk, def)).toBe(true); // they ARE at war...
     const hp0 = def.hp;
     const mp0 = atk.movesLeft;
@@ -217,7 +217,7 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
     expect(atk.movesLeft).toBe(mp0); // no MP spent on the no-op quirk
     expect(attackTargets(state, atk)).not.toContain(def.tileIndex);
     // the MELEE arm stays live: a melee unit lists the enemy rival's tile
-    const melee = spawnUnit(state, 'WARRIOR', atkTile.index, 'rival', 0)!;
+    const melee = spawnUnit(state, 'WARRIOR', atkTile.index, civOfRival(0))!;
     expect(attackTargets(state, melee)).toContain(def.tileIndex);
   });
 });

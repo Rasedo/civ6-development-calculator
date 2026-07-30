@@ -71,7 +71,7 @@ import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -255,7 +255,7 @@ export function placeRivals(state: GameState, count?: number): void {
     // 20 from turn 0; the GPU seeds r_best_melee from the fixture pools).
     state.rivals.push(rival);
     state.seats.push(rival); // #51/S1.2: the SAME object — seats[r+1] is rival r
-    spawnUnit(state, 'WARRIOR', tile.index, 'rival', rival.id);
+    spawnUnit(state, 'WARRIOR', tile.index, civOfRival(rival.id));
   });
 }
 
@@ -265,7 +265,7 @@ export function placeRivals(state: GameState, count?: number): void {
 
 export function rivalUnits(state: GameState, rivalId?: number): Unit[] {
   return state.units.filter(
-    (u) => u.owner === 'rival' && (rivalId === undefined || u.civId === rivalId),
+    (u) => isRivalSeat(u.seat) && (rivalId === undefined || u.seat === civOfRival(rivalId)),
   );
 }
 
@@ -273,7 +273,7 @@ export function rivalUnits(state: GameState, rivalId?: number): Unit[] {
 export function playerStrength(state: GameState): number {
   let s = state.cities.length * 10;
   for (const u of state.units) {
-    if (u.owner === 'player') s += UNITS[u.type]?.combat ?? 0;
+    if (isPlayerSeat(u.seat)) s += UNITS[u.type]?.combat ?? 0;
   }
   return s;
 }
@@ -562,7 +562,7 @@ export function levyUnits(state: GameState, csId: number): RuleResult {
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
   for (let i = 0; i < LEVY_UNITS; i++) {
-    spawnUnit(state, type, cs.centerIndex, 'player');
+    spawnUnit(state, type, cs.centerIndex, PLAYER_CIV);
   }
   cs.lastLevyTurn = state.turn;
   state.eventLog.push(`${cs.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
@@ -883,7 +883,7 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
       // player's applyGreatPersonEffect. Zero RNG.
       if (cls === 'GENERAL' || cls === 'ADMIRAL') {
         const cap = rival.cities.find((c) => c.isCapital);
-        if (cap) spawnUnit(state, cls, cap.centerIndex, 'rival', rival.id);
+        if (cap) spawnUnit(state, cls, cap.centerIndex, civOfRival(rival.id));
       }
       state.claimedGreatPeople.push(person.id); // gone from the shared pool
       rival.gpEarned.push(person.id); // ...and recorded as THIS seat's recruit
@@ -1230,14 +1230,14 @@ function rivalGrowthAllMult(state: GameState, rival: RivalCiv): number {
 function rivalHasBuilder(state: GameState, rival: RivalCiv): boolean {
   // NB: rival UNIT civId is the RAW rival id (rivalUnits' convention) —
   // only TILE ownership lives in the unified civ space.
-  if (state.units.some((u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'BUILDER')) return true;
+  if (state.units.some((u) => isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) && u.type === 'BUILDER')) return true;
   return rival.cities.some((rc) => rc.queue[0]?.kind === 'unit' && rc.queue[0].unit === 'BUILDER');
 }
 
 /** B-27 (#79): does this rival already have a Military Engineer (alive or
  *  queued)? One at a time, exactly like `rivalHasBuilder`. */
 function rivalHasEngineer(state: GameState, rival: RivalCiv): boolean {
-  if (state.units.some((u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'MILITARY_ENGINEER')) return true;
+  if (state.units.some((u) => isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) && u.type === 'MILITARY_ENGINEER')) return true;
   return rival.cities.some((rc) => rc.queue[0]?.kind === 'unit' && rc.queue[0].unit === 'MILITARY_ENGINEER');
 }
 
@@ -1328,7 +1328,7 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // TS=7 GPU=6). So the acting path is reachable TODAY and the GPU twin is
     // mandatory, not optional.
     const civilian = u.type === 'BUILDER' || (RIVAL_ENGINEER_LIVE && u.type === 'MILITARY_ENGINEER');
-    if (u.owner !== 'rival' || u.civId !== rival.id || !civilian || (u.charges ?? 0) <= 0) continue;
+    if (!isRivalSeat(u.seat) || u.seat !== civOfRival(rival.id) || !civilian || (u.charges ?? 0) <= 0) continue;
     const bt = state.map.tiles[u.tileIndex];
     // AUDIT A-13: REPAIR first — standing on an owned pillaged tile clears
     // the flag with builderRepair's exact semantics (no charge, the turn is
@@ -1605,7 +1605,7 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
   const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
   const cities = allCities(state) as City[];
   for (const u of [...state.units]) {
-    if (u.owner !== 'rival' || u.civId !== rival.id || (u.charges ?? 0) <= 0) continue;
+    if (!isRivalSeat(u.seat) || u.seat !== civOfRival(rival.id) || (u.charges ?? 0) <= 0) continue;
     if (u.type !== 'MISSIONARY' && u.type !== 'APOSTLE') continue; // B-18 (#71): apostles spread too
     // B-18 (#71): THEOLOGICAL COMBAT, before the spread/walk. Only an APOSTLE
     // may INITIATE (real Civ 6 also allows Inquisitors — out of scope), and
@@ -1694,7 +1694,7 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
     // its +5/+1MP naval aura over the front. Same chassis, same target scan,
     // same ≤range stop; only the aura's DOMAIN differs, and that is decided at
     // the roll sites by inGeneralAura, not here.
-    if (u.owner !== 'rival' || u.civId !== rival.id) continue;
+    if (!isRivalSeat(u.seat) || u.seat !== civOfRival(rival.id)) continue;
     // B-8 (#71): the ADMIRAL march is landed INERT (ADMIRAL_MARCH_LIVE) — the
     // substrate-then-flip pattern this round used for B-18/A-5r/A-9/B-26. The
     // walker admits admirals on both engines; only the switch is off. WHY: a
@@ -2409,7 +2409,7 @@ export function rivalPhase(state: GameState): void {
   // Rival generals war-walk LATER in this phase, so freezing the bonus here
   // (before any of them moves) is also what keeps the GPU snapshot turn-exact.
   for (const u of state.units) {
-    if (u.owner !== 'rival') continue;
+    if (!isRivalSeat(u.seat)) continue;
     const fullR = u.embarked && !UNITS[u.type]?.naval ? EMBARK_MOVES : UNITS[u.type]?.moves ?? 2;
     u.movesLeft = fullR + generalAuraMP(state, u);
     u.movesFull = u.movesLeft;
@@ -2776,7 +2776,7 @@ export function rivalPhase(state: GameState): void {
         if (pickId) {
           const spawnCity = rival.cities.find((c) => c.isCapital) ?? rival.cities[0];
           const price = UNITS[pickId].cost * GOLD_PURCHASE_MULT;
-          const u = spawnUnit(state, pickId, spawnCity.centerIndex, 'rival', rival.id);
+          const u = spawnUnit(state, pickId, spawnCity.centerIndex, civOfRival(rival.id));
           if (u) {
             rival.treasury = (rival.treasury ?? 0) - price;
             bought = true;
@@ -2845,7 +2845,7 @@ export function rivalPhase(state: GameState): void {
       if (rival.religion.founded) {
         let boughtRelig = false; // B-18 (#71)
         const liveM = state.units.filter(
-          (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'MISSIONARY',
+          (u) => isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) && u.type === 'MISSIONARY',
         ).length;
         const eb = rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
         const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
@@ -2855,7 +2855,7 @@ export function rivalPhase(state: GameState): void {
             const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');
             const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
             if (!ht?.districtComplete || ht.districtPillaged) continue;
-            const u = spawnUnit(state, 'MISSIONARY', rc.centerIndex, 'rival', rival.id);
+            const u = spawnUnit(state, 'MISSIONARY', rc.centerIndex, civOfRival(rival.id));
             if (u) {
               rival.faith = (rival.faith ?? 0) - mCost;
               boughtRelig = true; // B-18 (#71): one religious unit per civ per turn
@@ -2874,7 +2874,7 @@ export function rivalPhase(state: GameState): void {
         // through the shared faith pool, which is a timing surface both
         // engines would have to reproduce exactly.
         const liveA = state.units.filter(
-          (u) => u.owner === 'rival' && u.civId === rival.id && u.type === 'APOSTLE',
+          (u) => isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) && u.type === 'APOSTLE',
         ).length;
         // B-18 (#71): FLAT cost — the enhancer's missionaryCostMult is a
         // MISSIONARY discount and does not extend to apostles here (both
@@ -2886,7 +2886,7 @@ export function rivalPhase(state: GameState): void {
             const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');
             const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
             if (!ht?.districtComplete || ht.districtPillaged) continue;
-            const u = spawnUnit(state, 'APOSTLE', rc.centerIndex, 'rival', rival.id);
+            const u = spawnUnit(state, 'APOSTLE', rc.centerIndex, civOfRival(rival.id));
             if (u) rival.faith = (rival.faith ?? 0) - aCost;
             break;
           }
@@ -2914,7 +2914,7 @@ export function rivalPhase(state: GameState): void {
           rival.treasury = (rival.treasury ?? 0) - LEVY_GOLD_COST;
           const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
           for (let i = 0; i < LEVY_UNITS; i++) {
-            spawnUnit(state, type, cs.centerIndex, 'rival', rival.id);
+            spawnUnit(state, type, cs.centerIndex, civOfRival(rival.id));
           }
           cs.lastLevyTurn = state.turn;
           state.eventLog.push(
@@ -3177,7 +3177,7 @@ export function rivalPhase(state: GameState): void {
               }
             }
           } else {
-            const trained = spawnUnit(state, q.unit, rc.centerIndex, 'rival', rival.id);
+            const trained = spawnUnit(state, q.unit, rc.centerIndex, civOfRival(rival.id));
             // B-17 (ROUND B7): a trained military unit inherits this city's
             // Encampment training XP (best military-building tier).
             if (trained && (UNITS[q.unit]?.combat ?? 0) > 0) {
@@ -3228,7 +3228,7 @@ export function rivalPhase(state: GameState): void {
           // enemy rival's units (v1 scope; the besiege heal-block below IS
           // symmetric). Excluding rival attackers keeps the GPU strike (already
           // player/barb-only) byte-exact without a strike-side rival port.
-          if (!unitsAt(state, t.index).some((u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
+          if (!unitsAt(state, t.index).some((u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }))) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
@@ -3236,7 +3236,7 @@ export function rivalPhase(state: GameState): void {
         }
         if (bestTile >= 0) {
           const hostiles = unitsAt(state, bestTile).filter(
-            (u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
+            (u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }),
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
@@ -3271,7 +3271,7 @@ export function rivalPhase(state: GameState): void {
           // enemy rival's units (v1 scope; the besiege heal-block below IS
           // symmetric). Excluding rival attackers keeps the GPU strike (already
           // player/barb-only) byte-exact without a strike-side rival port.
-          if (!unitsAt(state, t.index).some((u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }))) continue;
+          if (!unitsAt(state, t.index).some((u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }))) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
@@ -3279,7 +3279,7 @@ export function rivalPhase(state: GameState): void {
         }
         if (bestTile >= 0) {
           const hostiles = unitsAt(state, bestTile).filter(
-            (u) => u.owner !== 'rival' && unitsHostile(state, u, { owner: 'rival', civId: rival.id }),
+            (u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }),
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
@@ -3298,7 +3298,7 @@ export function rivalPhase(state: GameState): void {
       // CIVILIANS included per unitsHostile — the P5/S2 player-heal lesson
       // — or barbarians; other rivals never besiege).
       const besieged = neighbors(state.map, rcCenter).some((n) =>
-        unitsAt(state, n.index).some((u) => unitsHostile(state, u, { owner: 'rival', civId: rival.id })),
+        unitsAt(state, n.index).some((u) => unitsHostile(state, u, { seat: civOfRival(rival.id) })),
       );
       // AUDIT A-20: unbesieged cities heal the flat player rate, war or
       // not (real Civ 6) — the 15-peace/5-war split was a local invention.
@@ -3383,13 +3383,13 @@ export function rivalPhase(state: GameState): void {
       rival.warmonger = (rival.warmonger ?? 0) - 1;
     }
     rival.treasury -= state.units.reduce(
-      (s, u) => s + (u.owner === 'rival' && u.civId === rival.id ? UNITS[u.type]?.maintenance ?? 0 : 0),
+      (s, u) => s + (isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) ? UNITS[u.type]?.maintenance ?? 0 : 0),
       0,
     );
     if (Math.round(rival.treasury * 1000) < 0) {
       let victim: Unit | undefined;
       for (const u of state.units) {
-        if (u.owner !== 'rival' || u.civId !== rival.id) continue;
+        if (!isRivalSeat(u.seat) || u.seat !== civOfRival(rival.id)) continue;
         const m = UNITS[u.type]?.maintenance ?? 0;
         if (m <= 0) continue;
         const vm = victim ? UNITS[victim.type]?.maintenance ?? 0 : 0;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, civOfRival } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 
@@ -74,7 +74,7 @@ describe('B6-S3 religious victory', () => {
     const rv = state.rivals[0];
     // Rival 1 is eliminated: no cities, no units.
     state.rivals[1].cities = [];
-    state.units = state.units.filter((u) => !(u.owner === 'rival' && u.civId === state.rivals[1].id));
+    state.units = state.units.filter((u) => !(u.seat === civOfRival(state.rivals[1].id)));
     rv.religion.founded = true;
     rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);

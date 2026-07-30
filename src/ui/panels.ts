@@ -4,7 +4,7 @@
  */
 
 import type { DistrictId, GameState, Tile, YieldKey, Yields } from '../core/types';
-import { playerSeat } from '../core/seats';
+import { playerSeat, isPlayerSeat } from '../core/seats';
 import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
@@ -227,7 +227,7 @@ export function renderTilePanel(
   for (const u of unitsHere) {
     const def = UNIT_DEFS[u.type];
     const isBuilder = def?.charges !== undefined;
-    const mine = u.owner === 'player';
+    const mine = isPlayerSeat(u.seat);
     if (!mine) {
       unitsHtml += `<div class="district-row"><b class="bad">Barbarian ${def?.name ?? u.type}</b>
         <span class="muted">${u.hp}/100 HP</span></div>`;

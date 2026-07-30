@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, PLAYER_CIV, civOfRival, isRivalSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit, unitDomain, trainableUnits } from '../src/core/units';
@@ -64,22 +64,22 @@ describe('B7-G (B-8) aura', () => {
   it('+5 to own LAND military within 2 of an own GENERAL; 0 at range 3 / wrong civ / naval', () => {
     const state = newGame();
     const cap = state.cities[0].centerIndex;
-    const gen = spawnUnit(state, 'GENERAL', cap, 'player')!;
+    const gen = spawnUnit(state, 'GENERAL', cap, PLAYER_CIV)!;
     const gt = gen.tileIndex;
     const t2 = tileAt(state, gt, 2, [gt]);
     const t3 = tileAt(state, gt, 3, [gt, t2]);
     expect(t2).toBeGreaterThanOrEqual(0);
     expect(t3).toBeGreaterThanOrEqual(0);
-    const war = spawnUnit(state, 'WARRIOR', t2, 'player')!;
+    const war = spawnUnit(state, 'WARRIOR', t2, PLAYER_CIV)!;
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(GENERAL_AURA_CS);
     // range 3 → 0
     war.tileIndex = t3;
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
     // a rival unit near the PLAYER general → 0
-    const rw: Unit = { ...war, owner: 'rival', civId: state.rivals[0].id, tileIndex: t2 };
+    const rw: Unit = { ...war, seat: civOfRival(state.rivals[0].id), tileIndex: t2 };
     expect(generalAuraCS(state, rw, rw.tileIndex)).toBe(0);
     // a naval unit near a GENERAL (not an ADMIRAL) → 0
-    const galley = spawnUnit(state, 'GALLEY', cap, 'player');
+    const galley = spawnUnit(state, 'GALLEY', cap, PLAYER_CIV);
     if (galley) {
       galley.tileIndex = t2;
       expect(generalAuraCS(state, galley, galley.tileIndex)).toBe(0);
@@ -89,9 +89,9 @@ describe('B7-G (B-8) aura', () => {
   it('ADMIRAL +5 to own NAVAL/embarked within 2; not to land units', () => {
     const state = newGame();
     const cap = state.cities[0].centerIndex;
-    const adm = spawnUnit(state, 'ADMIRAL', cap, 'player')!;
+    const adm = spawnUnit(state, 'ADMIRAL', cap, PLAYER_CIV)!;
     const t2 = tileAt(state, adm.tileIndex, 2, [adm.tileIndex]);
-    const war = spawnUnit(state, 'WARRIOR', t2, 'player')!;
+    const war = spawnUnit(state, 'WARRIOR', t2, PLAYER_CIV)!;
     // a LAND unit gets nothing from an admiral
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
     // an EMBARKED land unit reads the ADMIRAL aura
@@ -108,14 +108,14 @@ describe('B7-G (B-8) aura', () => {
       const nb = neighbors(state.map, state.map.tiles[at]).find(
         (n) => n.cityId === -1 && !isImpassable(n),
       )!;
-      const atk = spawnUnit(state, 'WARRIOR', at, 'player')!;
+      const atk = spawnUnit(state, 'WARRIOR', at, PLAYER_CIV)!;
       atk.tileIndex = at;
       atk.movesLeft = UNITS.WARRIOR.moves;
-      const def = spawnUnit(state, 'WARRIOR', nb.index, 'rival', state.rivals[0].id)!;
+      const def = spawnUnit(state, 'WARRIOR', nb.index, civOfRival(state.rivals[0].id))!;
       def.tileIndex = nb.index;
       if (withGen) {
         const gt = tileAt(state, at, 1, [at, nb.index]);
-        const g = spawnUnit(state, 'GENERAL', gt, 'player')!;
+        const g = spawnUnit(state, 'GENERAL', gt, PLAYER_CIV)!;
         g.tileIndex = gt;
       }
       const hp0 = def.hp;
@@ -136,9 +136,9 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     const state = newGame();
     // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
     playerSeat(state).gpp.GENERAL = gpCost(0);
-    const before = state.units.filter((u) => u.owner === 'player' && u.type === 'GENERAL').length;
+    const before = state.units.filter((u) => isPlayerSeat(u.seat) && u.type === 'GENERAL').length;
     endTurn(state);
-    const after = state.units.filter((u) => u.owner === 'player' && u.type === 'GENERAL');
+    const after = state.units.filter((u) => isPlayerSeat(u.seat) && u.type === 'GENERAL');
     expect(after.length).toBe(before + 1);
     // spawned at/adjacent to the capital, a civilian with 1 charge
     const cap = state.map.tiles[state.cities[0].centerIndex];
@@ -153,16 +153,16 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     state.rivals[0].atWar = true;
     const cap = state.cities[0].centerIndex;
     const gtile = tileAt(state, cap, 4);
-    const gen = spawnUnit(state, 'GENERAL', gtile, 'player')!;
+    const gen = spawnUnit(state, 'GENERAL', gtile, PLAYER_CIV)!;
     gen.tileIndex = gtile;
     const nb = neighbors(state.map, state.map.tiles[gtile]).find(
       (n) => n.cityId === -1 && !state.units.some((u) => u.tileIndex === n.index),
     )!;
-    const atk = spawnUnit(state, 'WARRIOR', nb.index, 'rival', state.rivals[0].id)!;
+    const atk = spawnUnit(state, 'WARRIOR', nb.index, civOfRival(state.rivals[0].id))!;
     meleeAttack(state, atk.id, gtile);
     const captured = state.units.find((u) => u.id === gen.id)!;
-    expect(captured.owner).toBe('rival');
-    expect(captured.civId).toBe(state.rivals[0].id);
+    expect(isRivalSeat(captured.seat)).toBe(true);
+    expect(captured.seat).toBe(civOfRival(state.rivals[0].id));
     // POOL-END: the captured unit sits at the tail of state.units.
     expect(state.units[state.units.length - 1].id).toBe(gen.id);
   });

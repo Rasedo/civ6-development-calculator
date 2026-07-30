@@ -11,7 +11,7 @@ import { tileYields } from './yields';
 import { fogActive, isExplored } from './fog';
 import { unitsHostile, unitDomain } from './units';
 import { RESOURCES } from '../data/resources';
-import { tileForeignTo, PLAYER_CIV } from './seats';
+import { tileForeignTo, PLAYER_CIV, isPlayerSeat } from './seats';
 
 export const SPATIAL_PLANES = [
   'water',
@@ -101,10 +101,10 @@ export function spatialObservation(state: GameState): Uint8Array {
 
   for (const u of state.units) {
     if (fog && !isExplored(state, u.tileIndex)) continue;
-    if (u.owner === 'player') {
+    if (isPlayerSeat(u.seat)) {
       out[at(P.myUnits, u.tileIndex)] = unitDomain(u.type) === 'military' ? 2 : 1;
     } else {
-      const hostile = unitsHostile(state, u, { owner: 'player' });
+      const hostile = unitsHostile(state, u, { seat: PLAYER_CIV });
       const cur = out[at(P.hostiles, u.tileIndex)];
       out[at(P.hostiles, u.tileIndex)] = Math.max(cur, hostile ? 2 : 1);
     }
