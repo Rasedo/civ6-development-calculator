@@ -2074,7 +2074,7 @@ class BatchSim:
         n = (placed[:, :, di] >= 0).sum(dim=1)
         tiles_f = placed.clamp(min=0).reshape(self.B, -1)
         comp = (placed >= 0) & self.district_complete.gather(1, tiles_f).reshape(placed.shape)
-        D = (comp & self._is_specialty.view(1, 1, -1)).sum(dim=(1, 2))
+        D = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2))
         thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")
         return (U > 0) & (D >= U) & (n < thresh)
 
@@ -2090,7 +2090,7 @@ class BatchSim:
         frac = self.rules.boost_fraction
         if golden_civ is not None:
             g = self._golden_ded(golden_civ, self._ded_pen_brush if is_civic else self._ded_free_inquiry)
-            extra = g.to(cost.dtype).view(-1, *((1,) * (cost.dim() - 1))) * 0.1
+            extra = g.to(cost.dtype).reshape(-1, *((1,) * (cost.dim() - 1))) * 0.1
             return torch.where(boosted, js_round(cost * (1 - frac - extra)), cost)
         return torch.where(boosted, js_round(cost * (1 - frac)), cost)  # Math.round is half-up
 
@@ -2259,7 +2259,7 @@ class BatchSim:
         cnt = torch.zeros(self.B * self.T, dtype=torch.long, device=self.device)
         cnt.index_put_((gi,), torch.ones_like(gi), accumulate=True)
         touched = cnt > 0
-        flat = self.fertility.view(-1)
+        flat = self.fertility.reshape(-1)
         flat[touched] = (flat[touched] + cnt[touched]).clamp(max=3)
 
     def _scorch(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
@@ -2294,7 +2294,7 @@ class BatchSim:
         capped +1s, max is commutative)."""
         B, dev = self.B, self.device
         self._eff_version += 1
-        self.drought = (self.drought - 1).clamp(min=0)
+        self.drought.copy_((self.drought - 1).clamp(min=0))
         every = torch.ones(B, dtype=torch.bool, device=dev)
 
         r = self._next_random(every)
@@ -2336,7 +2336,7 @@ class BatchSim:
             rrm = rows.unsqueeze(1).expand(-1, M).reshape(-1)
             af = area.reshape(-1)
             on = (af >= 0) & ~self.water[rrm, af.clamp(min=0)]
-            flat = self.drought.view(-1)
+            flat = self.drought.reshape(-1)
             gi = rrm[on] * self.T + af[on]
             flat.scatter_reduce_(0, gi, torch.full_like(gi, 8), reduce="amax")
 
@@ -2373,7 +2373,7 @@ class BatchSim:
             torch.ones(B, NB, dtype=torch.bool, device=dev),
         )  # Temple/Amphitheater/… gate on a civic (mirrors availableBuildings' unlocks.buildings)
         unlocked = unlocked & unlocked_civic
-        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.view(1, 1, -1) | self.river_center.unsqueeze(2)) & ~self._b_worship.view(1, 1, -1)  # B9-R3: worship is faith-only
+        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.reshape(1, 1, -1) | self.river_center.unsqueeze(2)) & ~self._b_worship.reshape(1, 1, -1)  # B9-R3: worship is faith-only
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
             valid = (self.district >= 0) & self.district_complete & (self.owner >= 0) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
@@ -2381,7 +2381,7 @@ class BatchSim:
             dt_oh = torch.nn.functional.one_hot(self.district.clamp(min=0), nD).bool()  # [B, T, nD]
             has_dtype = (ow_oh.unsqueeze(3) & dt_oh.unsqueeze(2)).any(dim=1)  # [B, C, nD] city owns a district of type d
             rq = self._b_req_district  # [NB]
-            district_ok = (rq < 0).view(1, 1, NB) | has_dtype[:, :, rq.clamp(min=0)]  # [B, C, NB]
+            district_ok = (rq < 0).reshape(1, 1, NB) | has_dtype[:, :, rq.clamp(min=0)]  # [B, C, NB]
             prereq_ok = torch.ones(B, C, NB, dtype=torch.bool, device=dev)
             for nb, reqs in enumerate(self._b_req_buildings):
                 if reqs:
@@ -2707,7 +2707,7 @@ class BatchSim:
         current civic. Every slot write bumps _eff_version (yield-bearing)."""
         bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
         if bcol < 0:  # building absent from the catalog: every charge overflows
-            self.civic_prog = self.civic_prog + can_col.to(self.dtype) * nworks * culture_val
+            self.civic_prog.add_(can_col.to(self.dtype) * nworks * culture_val)
             return
         used = (self.gw_writing, self.gw_art, self.gw_music)[kind]  # [B, C]
         cap = self.buildings[:, :, bcol].long() * nslots  # [B, C] (a city holds 1 such building max)
@@ -2731,12 +2731,12 @@ class BatchSim:
         alloc = torch.zeros_like(openc).scatter(1, ordv, alloc_ord)  # back to city index
         overflow = (W - alloc_ord.sum(dim=1)).clamp(min=0)  # [B] charges with no slot
         if kind == 0:
-            self.gw_writing = self.gw_writing + alloc
+            self.gw_writing.add_(alloc)
         elif kind == 1:
-            self.gw_art = self.gw_art + alloc
+            self.gw_art.add_(alloc)
         else:
-            self.gw_music = self.gw_music + alloc
-        self.civic_prog = self.civic_prog + overflow.to(self.dtype) * culture_val
+            self.gw_music.add_(alloc)
+        self.civic_prog.add_(overflow.to(self.dtype) * culture_val)
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
@@ -2760,7 +2760,7 @@ class BatchSim:
             compw = (wreg >= 0) & self.built_wonder_complete.gather(
                 1, wreg.clamp(min=0).reshape(self.B, -1)
             ).reshape_as(wreg)
-            cap = cap + (compw.long() * self._wond_gw[:, kind].view(1, 1, -1)).sum(dim=2)
+            cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
         openc = (cap - used).clamp(min=0) * self.rc_alive[:, r].long()  # [B, RC]
         W = nworks * hit.long()  # [B]
         prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
@@ -2809,7 +2809,7 @@ class BatchSim:
             can = (earned < self._gp_roster[:nCls].unsqueeze(0)) & (self.player_gp_points >= cost)
             if not bool(can.any()):
                 break
-            eff = self._gp_effects[torch.arange(nCls, device=dev).view(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,5] (col 4 = faith)
+            eff = self._gp_effects[torch.arange(nCls, device=dev).reshape(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,5] (col 4 = faith)
             cf = can.to(self.dtype)
             # B-20: WRITER/MUSICIAN culture is slotted as Great Works (deferred
             # +2/turn), not applied instantly — mask those columns out of the
@@ -2819,11 +2819,11 @@ class BatchSim:
             for _kcls in self._gw_cls:  # #73: WRITER / ARTIST / MUSICIAN
                 if _kcls >= 0:
                     cf_cult[:, _kcls] = 0
-            self.tech_prog = self.tech_prog + (eff[:, :, 0] * cf).sum(dim=1)  # science → current tech (banks for next turn)
-            self.civic_prog = self.civic_prog + (eff[:, :, 1] * cf_cult).sum(dim=1)  # culture → current civic (W/M slotted)
-            self.treasury = self.treasury + (eff[:, :, 2] * cf).sum(dim=1)  # gold → treasury
+            self.tech_prog.add_((eff[:, :, 0] * cf).sum(dim=1))  # science → current tech (banks for next turn)
+            self.civic_prog.add_((eff[:, :, 1] * cf_cult).sum(dim=1))  # culture → current civic (W/M slotted)
+            self.treasury.add_((eff[:, :, 2] * cf).sum(dim=1))  # gold → treasury
             if self._gp_effects.shape[2] > 4:  # G-2: faith → player's faith bank (mirrors the rival loop)
-                self.player_faith = self.player_faith + (eff[:, :, 4].double() * cf.double()).sum(dim=1)
+                self.player_faith.add_((eff[:, :, 4].double() * cf.double()).sum(dim=1))
             prod = (eff[:, :, 3] * cf).sum(dim=1)  # production → capital's current build head
             # #70/S4 (A-9) fallout: applyGreatPersonEffect resolves the capital as
             # `state.cities.find((c) => c.isCapital)` — the FLAG, not the array
@@ -2838,7 +2838,7 @@ class BatchSim:
                 if bool(has_build.any()):
                     _hb = has_build.nonzero(as_tuple=True)[0]
                     self.progress[_hb, _cap_col[_hb]] = self.progress[_hb, _cap_col[_hb]] + prod[_hb]
-            self.player_gp_points = self.player_gp_points - cost * cf
+            self.player_gp_points.sub_(cost * cf)
             self.gp_earned[:, :nCls] = earned + can.long()
             self.era_score[:, 0] += can.long().sum(dim=1) * self._era_pts["gp"]  # B-24: per GP earned
             # B-20: slot the earned WRITER/MUSICIAN's Great Works into the
@@ -2885,7 +2885,7 @@ class BatchSim:
         pc = self.site.clamp(min=0)  # [B, C] center tile (dead slots -> 0, masked out)
         d_pc = self.pair_dist[pc.unsqueeze(2), ht.unsqueeze(1)].to(torch.long)  # [B, C, O]
         add_pc = (d_pc <= RANGE.unsqueeze(1)) & founded.unsqueeze(1) & self.alive.unsqueeze(2)  # [B, C, O]
-        self.city_pressure = torch.where(self.alive.unsqueeze(2), self.city_pressure + add_pc.long(), torch.zeros_like(self.city_pressure))
+        self.city_pressure.copy_(torch.where(self.alive.unsqueeze(2), self.city_pressure + add_pc.long(), torch.zeros_like(self.city_pressure)))
         tot_pc = self.city_pressure.sum(dim=2)
         best_pc = self.city_pressure.argmax(dim=2)  # ties -> lowest id
         # B-24 (#77): EXODUS OF THE EVANGELISTS pays era score each time a city
@@ -2900,9 +2900,9 @@ class BatchSim:
         # --- rival cities [B, r_pad, rc_pad] -------------------------------
         if self.R > 0:
             rcc = self.rc_center.clamp(min=0)  # [B, R, RC]
-            d_rc = self.pair_dist[rcc.unsqueeze(3), ht.view(B, 1, 1, O)].to(torch.long)  # [B, R, RC, O]
-            add_rc = (d_rc <= RANGE.view(B, 1, 1, O)) & founded.view(B, 1, 1, O) & self.rc_alive.unsqueeze(3)
-            self.rc_pressure = torch.where(self.rc_alive.unsqueeze(3), self.rc_pressure + add_rc.long(), torch.zeros_like(self.rc_pressure))
+            d_rc = self.pair_dist[rcc.unsqueeze(3), ht.reshape(B, 1, 1, O)].to(torch.long)  # [B, R, RC, O]
+            add_rc = (d_rc <= RANGE.reshape(B, 1, 1, O)) & founded.reshape(B, 1, 1, O) & self.rc_alive.unsqueeze(3)
+            self.rc_pressure.copy_(torch.where(self.rc_alive.unsqueeze(3), self.rc_pressure + add_rc.long(), torch.zeros_like(self.rc_pressure)))
             tot_rc = self.rc_pressure.sum(dim=3)
             best_rc = self.rc_pressure.argmax(dim=3)
             _was_rc = self.rc_followed.clone()
@@ -2938,7 +2938,7 @@ class BatchSim:
                         continue
                     ring = (self.rival_at == r) & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1)) & self.rc_alive[:, r, j].unsqueeze(1)
                     tfol = torch.where(ring, self.rc_followed[:, r, j].unsqueeze(1).expand(B, T), tfol)
-        terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).view(1, O, 1)  # [B, O, T]
+        terr = tfol.unsqueeze(1) == torch.arange(O, device=dev).reshape(1, O, 1)  # [B, O, T]
         # near3: dilate FOLLOWING city centers by justWarRange (scatter_add
         # then >0 — a masked bool scatter would clobber tile 0 via the clamp)
         near3 = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
@@ -3334,7 +3334,7 @@ class BatchSim:
         dt_oh = torch.nn.functional.one_hot(dt_win.clamp(min=0), nD).bool() & pil_win.unsqueeze(3)  # [B,C,M,nD]
         pil_dtype = dt_oh.any(dim=2)  # [B, C, nD] this city holds a pillaged district of type di
         breq = self._b_req_district  # [NB] building's district idx (-1 = CITY_CENTER)
-        bdark = pil_dtype.gather(2, breq.clamp(min=0).view(1, 1, -1).expand(B, C, -1)) & (breq >= 0).view(1, 1, -1)  # [B,C,NB]
+        bdark = pil_dtype.gather(2, breq.clamp(min=0).reshape(1, 1, -1).expand(B, C, -1)) & (breq >= 0).reshape(1, 1, -1)  # [B,C,NB]
         return bf * (~bdark).to(self.dtype)
 
     def _city_totals(self, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -3369,7 +3369,7 @@ class BatchSim:
         M = tiles.shape[2]
         tc = tiles.clamp(min=0)
         tcf = tc.reshape(B, -1)
-        slot_ids = torch.arange(C, device=dev).view(1, C, 1)
+        slot_ids = torch.arange(C, device=dev).reshape(1, C, 1)
         cand = (
             (tiles >= 0)
             & (self.owner.gather(1, tcf).reshape(B, C, M) == slot_ids)
@@ -3400,7 +3400,7 @@ class BatchSim:
         self._tiebreak_key_dtype = score.dtype  # #78: what the poke lane asserts
         k = min(max(int(self.pop.max().item()), 1), M)
         top_scores, top_idx = score.topk(k, dim=2)
-        take = (torch.arange(k, device=dev).view(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)
+        take = (torch.arange(k, device=dev).reshape(1, 1, k) < self.pop.unsqueeze(2)) & (top_scores > -1e17)
         top_tile = tc.gather(2, top_idx)  # [B, C, k] global tile ids
         ty = eff_y.unsqueeze(1).expand(B, C, T, 6).gather(2, top_tile.unsqueeze(-1).expand(B, C, k, 6))
         worked_y = (ty * take.unsqueeze(-1).to(self.dtype)).sum(dim=2)  # [B, C, 6]
@@ -3457,7 +3457,7 @@ class BatchSim:
             # localBuildingAmenities' `if (def.regional) continue`). The
             # regional channel below delivers them by range; maintenance
             # stays on the unmasked bf (cityMaintenance has no regional skip).
-            bf_live = bf_live * self._b_local_f.view(1, 1, -1)
+            bf_live = bf_live * self._b_local_f.reshape(1, 1, -1)
             b_y = torch.einsum("bcn,nk->bck", bf_live, rd.b_yields)
         center_y = self.center_yields
         if self.disasters:
@@ -3467,7 +3467,7 @@ class BatchSim:
             cf = torch.where(self.drought.gather(1, sitec) > 0, (cf - 1).clamp(min=0), cf)
             center_y = self.center_yields.clone()
             center_y[:, :, 0] = torch.maximum(cf, torch.full_like(cf, float(r.center_min_food)))
-        total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.view(1, 1, 6) + b_y
+        total = worked_y + center_y + self.is_cap.unsqueeze(2).to(self.dtype) * self._palace_y.reshape(1, 1, 6) + b_y
         # B-18: per-PLAYER-city FOLLOWER-belief id (from followedReligion when
         # LIVE, else player religion 0 = -1 follower = no add; INERT byte-exact).
         # Its building-yield adds (Feed the World / Choral Music) land at the
@@ -3536,7 +3536,7 @@ class BatchSim:
                     cs_bld6f = torch.zeros(B, nBc * 6, dtype=self.dtype, device=dev)
                     cs_bld6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
                     cs_bld6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
-                    cs_bld6 = cs_bld6f.view(B, nBc, 6)
+                    cs_bld6 = cs_bld6f.reshape(B, nBc, 6)
                     cs_city6 = torch.einsum("bcn,bnk->bck", bf_live, cs_bld6)  # [B, C, 6] — pillaged/regional dark via bf_live
                 # For each PLACED district with an adjacencyYield: floor(static +
                 # 0.5*adjacent-districts) into its yield column. Type-specific dynamic
@@ -3597,7 +3597,7 @@ class BatchSim:
                         if reg_y is None:
                             reg_y = torch.zeros(B, C, 6, dtype=self.dtype, device=dev)
                             reg_am = torch.zeros(B, C, dtype=self.dtype, device=dev)
-                        reg_y = reg_y + _hf.unsqueeze(2) * rd.b_yields[_n].view(1, 1, 6)
+                        reg_y = reg_y + _hf.unsqueeze(2) * rd.b_yields[_n].reshape(1, 1, 6)
                         reg_am = reg_am + _hf * rd.b_amenities[_n]
             for yc_a, adj_add in d_addends:
                 total[:, :, yc_a] = total[:, :, yc_a] + adj_add
@@ -3781,8 +3781,8 @@ class BatchSim:
         if gpc_slotted is not None and self._npol and self.districts_on:
             _hid_act = gpc_slotted & (self._pol_hid_min >= 0).unsqueeze(0)  # [B, nPol]
             if bool(_hid_act.any()):
-                _hid_ok = _hid_act.unsqueeze(1) & (dcount_all.unsqueeze(2) >= self._pol_hid_min.clamp(min=0).view(1, 1, -1))
-                housing = housing + (_hid_ok.to(self.dtype) * self._pol_hid_house.view(1, 1, -1)).sum(dim=2)
+                _hid_ok = _hid_act.unsqueeze(1) & (dcount_all.unsqueeze(2) >= self._pol_hid_min.clamp(min=0).reshape(1, 1, -1))
+                housing = housing + (_hid_ok.to(self.dtype) * self._pol_hid_house.reshape(1, 1, -1)).sum(dim=2)
 
         # D-10: refresh the store on every miss (lux=None callers always land
         # here, so a fresh walk always starts from a same-version store).
@@ -3951,13 +3951,13 @@ class BatchSim:
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             ty_oth = ty_oth + featP
-            oth_sc = oth_sc + (featP[:, :, 2:].double() * g["w"][2:].view(1, 1, 4)).sum(dim=2)
+            oth_sc = oth_sc + (featP[:, :, 2:].double() * g["w"][2:].reshape(1, 1, 4)).sum(dim=2)
         f = gat(f_plane).double()
         p = gat(p_plane).double()
         if self._mine_boost_tech.numel() > 0 and self.MINE >= 0:
             boost_r = (self.r_techs[:, r][:, self._mine_boost_tech].to(self.dtype) * self._mine_boost_amt).sum(dim=1).double()
             mine_here = (gat(self.improvement) == self.MINE) & ~gat(self.pillaged)
-            p = p + mine_here.double() * boost_r.view(B, 1, 1)
+            p = p + mine_here.double() * boost_r.reshape(B, 1, 1)
         w = g["w"]
         s = f * w[0] + p * w[1] + gat(oth_sc)
         # ties break by GLOBAL tile index like the per-j path; valid keys are
@@ -3974,7 +3974,7 @@ class BatchSim:
             _ns_all[:, _j] = _n1
             _sa_all[:, _j] = _a1
         take = (
-            torch.arange(M, device=self.device).view(1, 1, M)
+            torch.arange(M, device=self.device).reshape(1, 1, M)
             < (self.rc_pop[:, r] - _ns_all).clamp(min=0).unsqueeze(2)
         ) & (top_vals > -1e17)
         f_sel = f.gather(2, top_idx) * take.double()
@@ -4028,7 +4028,7 @@ class BatchSim:
         if self._wond_n:
             wreg = self.rc_wonder[:, r]  # [B, RC, nW]
             compw = (wreg >= 0) & self.built_wonder_complete.gather(1, wreg.clamp(min=0).reshape(B, -1)).reshape_as(wreg)
-            hasP = (compw & self._wond_petra.view(1, 1, -1)).any(dim=2)  # [B, RC]
+            hasP = (compw & self._wond_petra.reshape(1, 1, -1)).any(dim=2)  # [B, RC]
             if bool(hasP.any()):
                 sel_tiles = tc3.gather(2, top_idx)  # [B, RC, M] the worked tiles
                 st = sel_tiles.reshape(B, RC * M)
@@ -4091,7 +4091,7 @@ class BatchSim:
                         faith = faith + add  # GV-1a
         # C1-B4b-2: building yields (int-valued matmul: exact in any order)
         if self.districts_on:
-            selb = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # [B, RC, NB] (B-32 dark; B9-R2 regional by range)
+            selb = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # [B, RC, NB] (B-32 dark; B9-R2 regional by range)
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, RC, 6]
                 food = food + add6[:, :, 0]
@@ -4192,7 +4192,7 @@ class BatchSim:
             # pillage/regional match TS cityBuildingYields exactly.
             _cols6 = None
             if self.districts_on:
-                selb_cs = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # [B, RC, NB]
+                selb_cs = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # [B, RC, NB]
                 if bool(selb_cs.any()):
                     _nBc = selb_cs.shape[2]
                     per3 = (self.cs_r_envoys[:, r] >= 3).double() * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).double()
@@ -4200,7 +4200,7 @@ class BatchSim:
                     csb6f = torch.zeros(B, _nBc * 6, dtype=torch.float64, device=self.device)
                     csb6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
                     csb6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
-                    csb6 = csb6f.view(B, _nBc, 6)
+                    csb6 = csb6f.reshape(B, _nBc, 6)
                     _cs6_all = torch.einsum("bjn,bnk->bjk", selb_cs.double(), csb6)  # [B, RC, 6]
                     _cols6 = [_cs6_all[:, :, _k] for _k in range(6)]
             tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
@@ -4268,7 +4268,7 @@ class BatchSim:
             ones6 = torch.ones(1, 1, 6, dtype=torch.float64, device=self.device)
             wmm = torch.ones(B, RC, 6, dtype=torch.float64, device=self.device)
             for wi in range(compw.shape[2]):
-                wmm = wmm * torch.where(compw[:, :, wi : wi + 1], self._wond_mult[wi].view(1, 1, 6), ones6)
+                wmm = wmm * torch.where(compw[:, :, wi : wi + 1], self._wond_mult[wi].reshape(1, 1, 6), ones6)
             food = food * wmm[:, :, 0]
             prod = prod * wmm[:, :, 1]
             gold = gold * wmm[:, :, 2]
@@ -4372,8 +4372,8 @@ class BatchSim:
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )
             unit_ok = unit_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate
-            unit_ok = unit_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: trainableUnits' faithOnly filter (MISSIONARY never queues)
-            unit_ok = unit_ok & ~self._p_spawn_only.view(1, -1)  # B7-G (B-8): spawn-only filter (GENERAL/ADMIRAL never queue)
+            unit_ok = unit_ok & ~self._p_faith_only.reshape(1, -1)  # B6-S2: trainableUnits' faithOnly filter (MISSIONARY never queues)
+            unit_ok = unit_ok & ~self._p_spawn_only.reshape(1, -1)  # B7-G (B-8): spawn-only filter (GENERAL/ADMIRAL never queue)
             # B-20 (#79): the Archaeologist's civic + artifact-slot gates. The
             # slot rule is PER-CITY, so it joins after the [B, NU] -> [B, C, NU]
             # expansion rather than collapsing unit_ok's rank early.
@@ -4384,7 +4384,7 @@ class BatchSim:
                 # bestMilitary); player naval rides #50 with its move/attack
                 # verbs. The scripted RIVAL galley policy is the only in-gate
                 # naval production.
-                unit_col = unit_col & ~self.unit_naval.view(1, 1, -1)
+                unit_col = unit_col & ~self.unit_naval.reshape(1, 1, -1)
             cols.append(unit_col)
         else:
             cols.append(torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev))
@@ -4431,7 +4431,7 @@ class BatchSim:
             # tile there — TS refunds when spawnUnit finds none).
             mult = self.rules.gold_purchase_mult
             tre = self.treasury
-            pb = cols[0] & self._afford(tre.view(B, 1, 1), self.rules_dev.b_cost.view(1, 1, -1) * mult)
+            pb = cols[0] & self._afford(tre.reshape(B, 1, 1), self.rules_dev.b_cost.reshape(1, 1, -1) * mult)
             n_cities = self.alive.sum(dim=1, keepdim=True)
             queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
             s_cost = self.rules.settler_base + self.rules.settler_per_city * (
@@ -4444,8 +4444,8 @@ class BatchSim:
                 )
                 u_ok = u_ok & self._p_civic_slot_ok(False)  # B-20 (#79): civic gate
                 u_ok = u_ok & self._res_avail_mask(self.owner >= 0)  # B-9: player strategic-resource gate (purchase)
-                u_ok = u_ok & ~self._p_faith_only.view(1, -1)  # B6-S2: faith-only never gold-buys (trainableUnits mirror)
-                u_ok = u_ok & ~self._p_spawn_only.view(1, -1)  # B7-G (B-8): spawn-only never gold-buys (trainableUnits mirror)
+                u_ok = u_ok & ~self._p_faith_only.reshape(1, -1)  # B6-S2: faith-only never gold-buys (trainableUnits mirror)
+                u_ok = u_ok & ~self._p_spawn_only.reshape(1, -1)  # B7-G (B-8): spawn-only never gold-buys (trainableUnits mirror)
                 u_cost = self._p_cost.unsqueeze(0).expand(B, -1)
                 if self._builder_idx >= 0:
                     # P4/D-10: the builder column prices off the live escalator
@@ -4455,7 +4455,7 @@ class BatchSim:
                     u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained + bq)
                 pu = (u_ok & self._afford(tre.unsqueeze(1), u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
                 if bool(self.unit_naval.any()):
-                    pu = pu & ~self.unit_naval.view(1, 1, -1)  # #45/B-6: no controlled-player naval buy (rides #50)
+                    pu = pu & ~self.unit_naval.reshape(1, 1, -1)  # #45/B-6: no controlled-player naval buy (rides #50)
             else:
                 pu = torch.zeros(B, C, self.NU, dtype=torch.bool, device=dev)
             cols.append(torch.cat([pb, ps, pu], dim=2))
@@ -4626,9 +4626,9 @@ class BatchSim:
                 if dtype < 0:
                     if row.get("distinct"):
                         # B9-R1 (CIVIL_ENGINEERING): distinct specialty TYPES across cities.
-                        pred = (on.any(dim=1) & self._is_specialty.view(1, -1)).sum(dim=1) >= row["count"]
+                        pred = (on.any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= row["count"]
                     else:
-                        pred = (on & self._is_specialty.view(1, 1, -1)).sum(dim=(1, 2)) >= row["count"]
+                        pred = (on & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2)) >= row["count"]
                 else:
                     pred = on[:, :, dtype].sum(dim=1) >= row["count"]
             else:
@@ -4654,7 +4654,7 @@ class BatchSim:
         t = ((a ^ (a >> 15)) * (1 | a)) & M32
         t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
         out = ((t ^ (t >> 14)) & M32).to(torch.float64) / 4294967296.0
-        self.rng_state = torch.where(mask, a, self.rng_state)
+        self.rng_state.copy_(torch.where(mask, a, self.rng_state))
         return out
 
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None) -> torch.Tensor:
@@ -5068,7 +5068,7 @@ class BatchSim:
             self._p_combat[tim],
             torch.zeros_like(self.best_melee),
         )
-        self.best_melee = torch.maximum(self.best_melee, melee_cs)
+        self.best_melee.copy_(torch.maximum(self.best_melee, melee_cs))
 
 
     def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
@@ -5108,7 +5108,7 @@ class BatchSim:
             c = civ.clamp(min=0)
             age = self.civ_age.gather(1, c.unsqueeze(1)).squeeze(1)
             k = self.ded_picks.shape[2]
-            picks = self.ded_picks.gather(1, c.view(-1, 1, 1).expand(-1, 1, k)).squeeze(1)
+            picks = self.ded_picks.gather(1, c.reshape(-1, 1, 1).expand(-1, 1, k)).squeeze(1)
             return (age == 2) & (picks == kind).any(dim=1)
         return (self.civ_age[:, civ] == 2) & (self.ded_picks[:, civ] == kind).any(dim=1)
 
@@ -5130,7 +5130,7 @@ class BatchSim:
         trans = (cw != nw) & (nb6 >= 0)
         if not bool(trans.any()):
             return torch.zeros(B, 6, dtype=torch.bool, device=dev)
-        dirs = torch.arange(6, device=dev).view(1, 6).expand(B, 6)
+        dirs = torch.arange(6, device=dev).reshape(1, 6).expand(B, 6)
         land = torch.where(cw.expand(B, 6), nbc, c.unsqueeze(1).expand(B, 6))
         dl = torch.where(cw.expand(B, 6), (dirs + 3) % 6, dirs)
         bit = ((self.cliff_mask.gather(1, land) >> dl) & 1).bool()
@@ -5210,7 +5210,7 @@ class BatchSim:
         if not per_city:
             return civ_ok
         C = self.C
-        need = self._p_needs_slot.view(1, 1, -1)  # [1, 1, NU]
+        need = self._p_needs_slot.reshape(1, 1, -1)  # [1, 1, NU]
         if self._artifact_bidx < 0:
             room = torch.zeros(B, C, 1, dtype=torch.bool, device=dev)
         else:
@@ -5407,7 +5407,7 @@ class BatchSim:
         alive = present.unsqueeze(2)
         move = on_map & passable & ~foreign & ~own_dom & alive
         can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
-        at_war = self.r_atwar[:, r].view(B, 1, 1)
+        at_war = self.r_atwar[:, r].reshape(B, 1, 1)
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war
         attack = on_map & (barb | p_target) & can_fight & alive
         hold = present.unsqueeze(2)
@@ -5744,7 +5744,7 @@ class BatchSim:
         need = alive.any(dim=1) & ~(self.rc_is_cap[rows, civ] & alive).any(dim=1)  # [n]
         if not bool(need.any()):
             return
-        idx = torch.arange(self.RC, device=self.device).view(1, -1).expand_as(alive)
+        idx = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive)
         key = torch.where(alive, self.rc_pop[rows, civ] * (1 << 20) - idx, torch.full_like(idx, -(1 << 60)))
         pick = key.max(dim=1).indices  # [n]
         self.rc_is_cap[rows[need], civ[need], pick[need]] = True
@@ -6145,7 +6145,7 @@ class BatchSim:
         if not bool(wet.any()):
             return
         rows, tiles = rows[wet], tiles[wet]
-        contrib = self._dyn_searesource.view(1, -1).expand(len(rows), -1)
+        contrib = self._dyn_searesource.reshape(1, -1).expand(len(rows), -1)
         nb = self.neigh[tiles]
         for d in range(6):
             n_d = nb[:, d]
@@ -7268,7 +7268,7 @@ class BatchSim:
                 rciv_h = (rcvn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rcvn.clamp(min=0)).clamp(max=rcap))
                 hostile = barb_h | rmil_h | rciv_h  # [B, T]
                 valid = walled.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
-                key = torch.where(valid, dist * (Tn + 1) + arangeT.view(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+                key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
                 best_key = key.min(dim=1).values
                 tt = key.argmin(dim=1)  # [B] target tile (garbage where no target)
                 strike = walled & (best_key < 10**9)
@@ -7366,7 +7366,7 @@ class BatchSim:
                 rciv_h = (rcvn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rcvn.clamp(min=0)).clamp(max=rcap))
                 hostile = barb_h | rmil_h | rciv_h  # [B, T]
                 valid = enc_city.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
-                key = torch.where(valid, dist * (Tn + 1) + arangeT.view(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+                key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
                 best_key = key.min(dim=1).values
                 tt = key.argmin(dim=1)  # [B] target tile (garbage where no target)
                 strike = enc_city & (best_key < 10**9)
@@ -7434,12 +7434,12 @@ class BatchSim:
         rvc_war = (rvcn >= 0) & self.r_atwar.gather(1, self.v_civ.gather(1, rvcn.clamp(min=0)).clamp(max=max(self.R - 1, 0)))
         besieged = ((adj_b | (rv_war | rvc_war).reshape(B, self.C, 6)) & (nb_c >= 0)).any(dim=2)
         healable = self.alive & (self.city_hp < city_max_hp) & ~besieged
-        self.city_hp = torch.where(healable, (self.city_hp + cb.get("cityHealPerTurn", 20)).clamp(max=city_max_hp), self.city_hp)
+        self.city_hp.copy_(torch.where(healable, (self.city_hp + cb.get("cityHealPerTurn", 20)).clamp(max=city_max_hp), self.city_hp))
         # AUDIT B-1: the outer wall pool heals on the SAME unbesieged gate and
         # rate (cap wallsHp), even at full city HP (TS drops the full-HP skip).
         if self._walls_bidx >= 0:
             heal_o = self.alive & self.buildings[:, :, self._walls_bidx] & ~besieged
-            self.outer_hp = torch.where(heal_o, (self.outer_hp + cb.get("cityHealPerTurn", 20)).clamp(max=self._walls_hp), self.outer_hp)
+            self.outer_hp.copy_(torch.where(heal_o, (self.outer_hp + cb.get("cityHealPerTurn", 20)).clamp(max=self._walls_hp), self.outer_hp))
         # B-17 (#71): the ENCAMPMENT garrison repairs on the SAME unbesieged
         # gate and rate as the wall pool (the TS barbarianPhase twin — the gate
         # is the CITY's siege state, not the district's own adjacency).
@@ -7471,10 +7471,10 @@ class BatchSim:
             return
         # #50 (#79): tick the player<->city-state war clock FIRST, exactly where
         # cityStatePhase does — before meeting/influence/envoys.
-        self.cs_war_turns = self.cs_war_turns + self.cs_atwar.long()
+        self.cs_war_turns.add_(self.cs_atwar.long())
         r = self.rules.cs
         B = self.B
-        self.cs_met = self.cs_met | self.cs_alive
+        self.cs_met.logical_or_(self.cs_alive)
         any_met = self.cs_met.any(dim=1)
         # A-7r: the player's adopted-government influence tier joins the flat
         # rate (cityStates.ts:248 `INFLUENCE_PER_TURN + GOV_INFLUENCE_TIER`).
@@ -7482,14 +7482,14 @@ class BatchSim:
         per_turn = float(r.get("influencePerTurn", 3))
         if self._gov_live:
             per_turn = per_turn + self._adopted_gov_tier(self.civics).to(self.dtype)
-        self.influence = self.influence + torch.where(any_met, per_turn, torch.zeros_like(self.influence))
+        self.influence.copy_(self.influence + torch.where(any_met, per_turn, torch.zeros_like(self.influence)))
         cost = float(r.get("envoyCost", 100))
         for _ in range(3):
             earn = any_met & (self.influence >= cost)
             if not bool(earn.any()):
                 break
-            self.influence = torch.where(earn, self.influence - cost, self.influence)
-            self.envoys_avail = self.envoys_avail + earn.long()
+            self.influence.copy_(torch.where(earn, self.influence - cost, self.influence))
+            self.envoys_avail.add_(earn.long())
 
         cooldown = int(r.get("questCooldown", 12))
         # D-16: "player owns a live complete district of askable type a" is
@@ -7498,7 +7498,7 @@ class BatchSim:
         # s below, instead of 2·S full [B, T] scans.
         if self._askable.numel() > 0 and self.districts_on:
             own_live = self.district_complete & (self.owner >= 0) & ~self.district_dead  # [B, T]
-            own_tbl = ((self.district.unsqueeze(2) == self._askable.view(1, 1, -1)) & own_live.unsqueeze(2)).any(dim=1)  # [B, nA]
+            own_tbl = ((self.district.unsqueeze(2) == self._askable.reshape(1, 1, -1)) & own_live.unsqueeze(2)).any(dim=1)  # [B, nA]
         else:
             own_tbl = None
         for s in range(self.S):
@@ -7567,10 +7567,10 @@ class BatchSim:
                     self.cs_quest_district[dr, s] = draw1[dr]
 
         if self.turn % 12 == 0:
-            self.cs_pop = torch.where(self.cs_alive, (self.cs_pop + 1).clamp(max=10), self.cs_pop)
+            self.cs_pop.copy_(torch.where(self.cs_alive, (self.cs_pop + 1).clamp(max=10), self.cs_pop))
         # V-CS: siege recovery — +10/turn toward maxHp (cityStatePhase tail).
         cs_max = int(self.rules.cs.get("maxHp", 150))
-        self.cs_hp = torch.where(self.cs_alive & (self.cs_hp < cs_max), (self.cs_hp + 10).clamp(max=cs_max), self.cs_hp)
+        self.cs_hp.copy_(torch.where(self.cs_alive & (self.cs_hp < cs_max), (self.cs_hp + 10).clamp(max=cs_max), self.cs_hp))
 
     # --- rival civs (phase 4c) ------------------------------------------------------
 
@@ -7655,7 +7655,7 @@ class BatchSim:
             have_b = self.rc_bldg[:, r, j]
             ctile = self.rc_center[:, r, j].clamp(min=0)
             riv_c = self.tile_river.gather(1, ctile.unsqueeze(1)).squeeze(1)
-            ok_b = unl_b & ~have_b & (~rdv.b_river.view(1, -1) | riv_c.unsqueeze(1)) & ~self._b_worship.view(1, -1)  # B9-R3: worship is faith-only
+            ok_b = unl_b & ~have_b & (~rdv.b_river.reshape(1, -1) | riv_c.unsqueeze(1)) & ~self._b_worship.reshape(1, -1)  # B9-R3: worship is faith-only
             reqd_b = rdv.b_req_district
             reg_t = self.rc_dist_tile[:, r, j].gather(1, reqd_b.clamp(min=0).unsqueeze(0).expand(B, -1))
             dcomp = (reg_t >= 0) & self.district_complete.gather(1, reg_t.clamp(min=0))
@@ -7904,7 +7904,7 @@ class BatchSim:
                         landed = torch.zeros_like(ok_now)
                         if bool(is_mil.any()):
                             # B-17: a purchased military unit inherits city j's Encampment training XP (best tier).
-                            xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                            xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                             landed = landed | self._spawn_rival(is_mil, ctr, ui, r, init_xp=xp_rj)
                         if bool(is_bldr.any()):
                             landed_civ = self._spawn_rival_civ(is_bldr, ctr, r)
@@ -8521,7 +8521,7 @@ class BatchSim:
                 if len(prows):
                     self.city_pressure[prows, pj, g] += lump[prows]
                 if self.R > 0:
-                    rm = sp.view(B, 1, 1) & self.rc_alive & (self.rc_center == tgt.view(B, 1, 1))
+                    rm = sp.reshape(B, 1, 1) & self.rc_alive & (self.rc_center == tgt.reshape(B, 1, 1))
                     rrows, rr_, rj = rm.nonzero(as_tuple=True)
                     if len(rrows):
                         self.rc_pressure[rrows, rr_, rj, g] += lump[rrows]
@@ -8732,7 +8732,7 @@ class BatchSim:
             era_ok = era_ok | (self._civ_era(self.r_techs[:, r], self.r_civics[:, r]) >= self._congress_min_era)
         if not bool(era_ok.any()):
             return
-        self.congress_sessions = self.congress_sessions + era_ok.long()
+        self.congress_sessions.add_(era_ok.long())
         # the ascending scan: strictly-greater keeps the LOWER id on a tie
         best = self.diplo_favor.clone()
         win = torch.where(best > 0, torch.zeros_like(best), torch.full_like(best, -1))
@@ -8743,10 +8743,10 @@ class BatchSim:
             best = torch.where(take, v, best)
         # commitments are spent whether or not they won (only where the
         # session actually convened)
-        self.diplo_favor = torch.where(era_ok, torch.zeros_like(self.diplo_favor), self.diplo_favor)
+        self.diplo_favor.copy_(torch.where(era_ok, torch.zeros_like(self.diplo_favor), self.diplo_favor))
         for r in range(self.R):
             self.r_diplo_favor[:, r] = torch.where(era_ok, torch.zeros_like(self.r_diplo_favor[:, r]), self.r_diplo_favor[:, r])
-        self.diplo_points = self.diplo_points + (era_ok & (win == 0)).long() * self._dvp_per_res
+        self.diplo_points.add_((era_ok & (win == 0)).long() * self._dvp_per_res)
         for r in range(self.R):
             self.r_diplo_points[:, r] = self.r_diplo_points[:, r] + (era_ok & (win == r + 1)).long() * self._dvp_per_res
 
@@ -8856,7 +8856,7 @@ class BatchSim:
                 if bool(sr_live.any()):
                     ty_oth[:, :, 2] = ty_oth[:, :, 2] + self._tile_appeal().clamp(min=0).to(self.dtype) * sr_live
         w = self.rules_dev.focus_base.double()
-        oth_score = (ty_oth[:, :, 2:].double() * w[2:].view(1, 1, 4)).sum(dim=2)  # [B, T]
+        oth_score = (ty_oth[:, :, 2:].double() * w[2:].reshape(1, 1, 4)).sum(dim=2)  # [B, T]
         g = {"fs": fs, "f_base": f_base, "p_plane": p_plane, "ty_oth": ty_oth, "oth_score": oth_score, "w": w, "f_r": {}}
         self._rcy_cache = (self._eff_version, g)
         return g
@@ -9044,7 +9044,7 @@ class BatchSim:
         dest_j = dm.long().argmax(dim=2)
         dt = self.rc_dist_tile[:, r]  # [B, RC, nD]
         comp = (dt >= 0) & self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
-        spec = (comp & self._is_specialty.view(1, 1, -1)).sum(dim=2)  # [B, RC]
+        spec = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
         per = (1 + spec // 2).double()  # [B, RC] — routeYields' food (= prod) column
         centers = self.rc_center[:, r].clamp(min=0)  # [B, RC]
         # hostile-near-endpoint [B, RC]: barbarians always; player units at war
@@ -9054,7 +9054,7 @@ class BatchSim:
             near = near | (d_b & self.u_alive.unsqueeze(1)).any(dim=2)
         if self.p_tile.numel():
             d_p = self.pair_dist[centers.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, P]
-            near = near | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].view(B, 1))
+            near = near | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].reshape(B, 1))
         inc = torch.zeros(B, RC * 6, dtype=torch.float64, device=self.device)
         # domestic legs
         raided_d = near.gather(1, from_j) | near.gather(1, dest_j)  # [B, K]
@@ -9087,7 +9087,7 @@ class BatchSim:
                 near_cs = near_cs | (d_bc & self.u_alive.unsqueeze(1)).any(dim=2)
             if self.p_tile.numel():
                 d_pc = self.pair_dist[csc.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, S, P]
-                near_cs = near_cs | ((d_pc & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].view(B, 1))
+                near_cs = near_cs | ((d_pc & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].reshape(B, 1))
             cs_ok = self.cs_alive[:, :S].gather(1, cs_s) & (cs_s < S)
             raided_c = near.gather(1, from_j) | near_cs.gather(1, cs_s)
             pays_c = act & is_cs & has_from & cs_ok & ~raided_c
@@ -9119,7 +9119,7 @@ class BatchSim:
                 d_bi = self.pair_dist[dest_tile.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, K, U]
                 near_dest = near_dest | (d_bi & self.u_alive.unsqueeze(1)).any(dim=2)
             raided_i = near.gather(1, from_j) | near_dest
-            pays_i = act & intl & has_from & valid_dest & ~self.r_atwar[:, r].view(B, 1) & ~raided_i
+            pays_i = act & intl & has_from & valid_dest & ~self.r_atwar[:, r].reshape(B, 1) & ~raided_i
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
         inc = inc.reshape(B, RC, 6)
         self._rival_route_cache = (key, inc)
@@ -9162,7 +9162,7 @@ class BatchSim:
         cache = getattr(self, "_spec_order_cache", None)
         if cache is None:
             w = self.rules_dev.focus_base.double()
-            sc_d = (self._spec_yields.double() * w.view(1, 6)).sum(dim=1)  # [nD]
+            sc_d = (self._spec_yields.double() * w.reshape(1, 6)).sum(dim=1)  # [nD]
             order = sorted(range(nD), key=lambda d: (-float(sc_d[d]), d))
             order = [d for d in order if float(sc_d[d]) > 0.0]
             cache = (sc_d, order)
@@ -9247,7 +9247,7 @@ class BatchSim:
             f_plane = f_plane + featP[:, :, 0]
             p_plane = p_plane + featP[:, :, 1]
             ty_oth = ty_oth + featP
-            oth_sc = oth_sc + (featP[:, :, 2:].double() * g["w"][2:].view(1, 1, 4)).sum(dim=2)
+            oth_sc = oth_sc + (featP[:, :, 2:].double() * g["w"][2:].reshape(1, 1, 4)).sum(dim=2)
         f = f_plane.gather(1, tc).double()
         p = p_plane.gather(1, tc).double()
         # C1-B5b-iii: the OWNER's mine boosts apply to worked tiles (and via
@@ -9355,7 +9355,7 @@ class BatchSim:
         if self._wond_n:
             wreg_p = self.rc_wonder[:, r, j]
             compw_p = (wreg_p >= 0) & self.built_wonder_complete.gather(1, wreg_p.clamp(min=0))
-            hasP = (compw_p & self._wond_petra.view(1, -1)).any(dim=1)
+            hasP = (compw_p & self._wond_petra.reshape(1, -1)).any(dim=1)
             if bool(hasP.any()):
                 sel_tiles = tc.gather(1, top_idx)  # [B, kk] the worked tiles
                 qual = (
@@ -9424,7 +9424,7 @@ class BatchSim:
         # C1-B4b-2: building yields under empty modifiers (worship never
         # queues, so the plain def.yields sum matches cityBuildingYields).
         if self.districts_on:
-            selb = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j]) & ~self._b_regional.view(1, -1)  # B-32 dark; B9-R2 regional delivered by range
+            selb = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j]) & ~self._b_regional.reshape(1, -1)  # B-32 dark; B9-R2 regional delivered by range
             if bool(selb.any()):
                 add6 = selb.double() @ self.rules_dev.b_yields.double()  # [B, 6] (int-valued: dtype roundtrip is exact)
                 food = food + add6[:, 0]
@@ -9540,7 +9540,7 @@ class BatchSim:
             # with pillaged-dark + regional-skip (the b_yields twin at ~7335).
             _cols6 = None
             if self.districts_on:
-                selb_cs = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j]) & ~self._b_regional.view(1, -1)  # [B, NB]
+                selb_cs = self.rc_bldg[:, r, j] & ~self._rc_bdark(self.rc_dist_tile[:, r, j]) & ~self._b_regional.reshape(1, -1)  # [B, NB]
                 if bool(selb_cs.any()):
                     _nBc = selb_cs.shape[1]
                     per3 = (self.cs_r_envoys[:, r] >= 3).double() * self._cs_district_bonus * _acs * (self._cs_b1idx >= 0).double()
@@ -9548,7 +9548,7 @@ class BatchSim:
                     csb6f = torch.zeros(self.B, _nBc * 6, dtype=torch.float64, device=self.device)
                     csb6f.scatter_add_(1, self._cs_b1idx.clamp(min=0) * 6 + self._cs_yidx, per3)
                     csb6f.scatter_add_(1, self._cs_b2idx.clamp(min=0) * 6 + self._cs_yidx, per6)
-                    csb6 = csb6f.view(self.B, _nBc, 6)
+                    csb6 = csb6f.reshape(self.B, _nBc, 6)
                     _cs6_j = torch.einsum("bn,bnk->bk", selb_cs.double(), csb6)  # [B, 6]
                     _cols6 = [_cs6_j[:, _k] for _k in range(6)]
             tier1_r = ((self.cs_r_envoys[:, r] >= 1) & self.cs_alive).double() * float(self.rules.cs.get("capitalBonus", 2))
@@ -9612,7 +9612,7 @@ class BatchSim:
         if compw is not None and bool(compw.any()):
             wmm = torch.where(
                 compw.unsqueeze(2),
-                self._wond_mult.view(1, -1, 6).expand(compw.shape[0], -1, -1),
+                self._wond_mult.reshape(1, -1, 6).expand(compw.shape[0], -1, -1),
                 torch.ones(compw.shape[0], compw.shape[1], 6, dtype=torch.float64, device=self.device),
             ).prod(dim=1)
             food = food * wmm[:, 0]
@@ -9662,7 +9662,7 @@ class BatchSim:
             if y6 is None:
                 y6 = torch.zeros(B, RC, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, RC, dtype=torch.float64, device=self.device)
-            y6 = y6 + hf.unsqueeze(2) * self.rules_dev.b_yields[n].double().view(1, 1, 6)
+            y6 = y6 + hf.unsqueeze(2) * self.rules_dev.b_yields[n].double().reshape(1, 1, 6)
             am = am + hf * float(self.rules.b_amenities[n])
         return None if y6 is None else (y6, am)
 
@@ -9676,7 +9676,7 @@ class BatchSim:
         yield_f), each [B, RC]."""
         B, RC = self.B, self.RC
         rd = self.rules_dev
-        selb_a = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.view(1, 1, -1)  # B-32 dark; B9-R2 regional delivered by range
+        selb_a = self.rc_bldg[:, r] & ~self._rc_bdark(self.rc_dist_tile[:, r]) & ~self._b_regional.reshape(1, 1, -1)  # B-32 dark; B9-R2 regional delivered by range
         have = torch.einsum("bjn,n->bj", selb_a.to(torch.float64), rd.b_amenities.double())
         # B9-R3: PALACE amenity on the capital slot — rivalAmenityTiers'
         # baseHave sums rc.buildings (now holding the founding PALACE), so it
@@ -9696,7 +9696,7 @@ class BatchSim:
             counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
             rounds = (counts > 0).long().sum(dim=1)
             mx = int(rounds.max().item())
-            slot = torch.arange(RC, device=self.device, dtype=torch.float64).view(1, RC)
+            slot = torch.arange(RC, device=self.device, dtype=torch.float64).reshape(1, RC)
             k = min(self._lux_k, RC)
             for rnd in range(mx):
                 act = rounds > rnd
@@ -9719,7 +9719,7 @@ class BatchSim:
             if bool((zamt != 0).any()):
                 dt_ = self.rc_dist_tile[:, r]
                 comp_ = (dt_ >= 0) & self.district_complete.gather(1, dt_.clamp(min=0).reshape(B, -1)).reshape_as(dt_)
-                spec_ = (comp_ & self._is_specialty.view(1, 1, -1)).sum(dim=2).double()
+                spec_ = (comp_ & self._is_specialty.reshape(1, 1, -1)).sum(dim=2).double()
                 extra = extra + torch.where(spec_ >= zmin, zamt, torch.zeros_like(spec_))
             balance = have + out + extra - need
         else:
@@ -9939,7 +9939,7 @@ class BatchSim:
                 nb_flat = nbs.clamp(min=0).reshape(B, -1)
                 adj_own = (
                     (self.rival_at.gather(1, nb_flat).reshape(B, -1, 6) == r)
-                    & (self.rc_tile_id.gather(1, nb_flat).reshape(B, -1, 6) == self.rc_id[:, r, j].view(B, 1, 1))
+                    & (self.rc_tile_id.gather(1, nb_flat).reshape(B, -1, 6) == self.rc_id[:, r, j].reshape(B, 1, 1))
                     & (nbs >= 0)
                 ).any(dim=2)
             ok = (tiles >= 0) & unowned & adj_own & ready.unsqueeze(1)
@@ -9959,7 +9959,7 @@ class BatchSim:
                 # real spot >= 0). Cross-civ claims can't flip a valid bit.
                 if j + 1 < self.RC:
                     _win = self._rcy_globals().get("win_r", {}).get(r)
-                    if _win is None or bool((_win[rows, j + 1 :, :] == spot.view(-1, 1, 1)).any()):
+                    if _win is None or bool((_win[rows, j + 1 :, :] == spot.reshape(-1, 1, 1)).any()):
                         self._claim_version += 1
                 self.rc_acquired[rows, r, j] += 1
                 self.rc_cbox[rows, r, j] -= cost[rows]
@@ -10058,7 +10058,7 @@ class BatchSim:
         # city and overwrites it. TS appends, so the mirror is last-alive+1
         # (new cities iterate LAST, matching the array order; holes stay
         # holes until P7's reclamation).
-        occ_idx = torch.arange(self.RC, device=self.device).view(1, -1)
+        occ_idx = torch.arange(self.RC, device=self.device).reshape(1, -1)
         slot = (torch.where(self.rc_alive[rows, r], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
         assert int(slot.max()) < self.RC, "rival city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
         s_idx = best_site[rows]
@@ -11532,7 +11532,7 @@ class BatchSim:
                 return
             key = torch.where(
                 met_live,
-                self.cs_r_envoys[:, r, :S] * 64 + torch.arange(S, device=dev).view(1, -1),
+                self.cs_r_envoys[:, r, :S] * 64 + torch.arange(S, device=dev).reshape(1, -1),
                 torch.full((B, S), 10**9, dtype=torch.long, device=dev),
             )
             pick = key.argmin(dim=1)
@@ -11570,14 +11570,14 @@ class BatchSim:
         nD = dt.shape[2]
         di = self._cs_didx[:, :S].clamp(min=0, max=nD - 1)  # [B, S]
         own_tile = dt.unsqueeze(1).expand(B, S, self.RC, nD).gather(
-            3, di.view(B, S, 1, 1).expand(B, S, self.RC, 1)
+            3, di.reshape(B, S, 1, 1).expand(B, S, self.RC, 1)
         ).squeeze(3)  # [B, S, RC] tile of the CS-type district per rival city
         own_dc = self.district_complete.gather(1, own_tile.clamp(min=0).reshape(B, -1)).reshape(B, S, self.RC)
         owns_dist = ((own_tile >= 0) & own_dc).any(dim=2)  # [B, S]
         # sendTradeRoute: this rival routes to CS s (r_routes dest == -(2+s)).
         route_dest = self.r_routes[:, r, :, 1]  # [B, K_routes]
         s_ar = torch.arange(S, device=dev)
-        has_route = (route_dest.unsqueeze(1) == (-(2 + s_ar)).view(1, S, 1)).any(dim=2)  # [B, S]
+        has_route = (route_dest.unsqueeze(1) == (-(2 + s_ar)).reshape(1, S, 1)).any(dim=2)  # [B, S]
         # clearCamp: the NEAREST camp within range 6, ties to the lowest tile
         # index (key = dist·(T+1)+tile, the TS issueRivalQuest key).
         cdist = self.pair_dist[csc.unsqueeze(2), self.camp_tile.clamp(min=0).unsqueeze(1)].to(torch.long)  # [B, S, K]
@@ -11676,24 +11676,24 @@ class BatchSim:
         # dest score (j-only): routeYields food+prod = 2 + 2*floor(spec/2)
         dt = self.rc_dist_tile[:, r]  # [B, RC, nD]
         comp = (dt >= 0) & self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
-        spec = (comp & self._is_specialty.view(1, 1, -1)).sum(dim=2)  # [B, RC]
+        spec = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)  # [B, RC]
         ysum = 2 + 2 * (spec // 2)  # [B, RC] long, >= 2
         centers = self.rc_center[:, r].clamp(min=0)  # [B, RC]
         d = self.pair_dist[centers.unsqueeze(2), centers.unsqueeze(1)]  # [B, RC, RC]
         ids = self.rc_id[:, r]  # [B, RC]
         rr = self.r_routes[:, r]  # [B, K, 2]
         exists = (
-            (rr[:, :, 0].view(B, 1, 1, -1) == ids.view(B, RC, 1, 1))
-            & (rr[:, :, 1].view(B, 1, 1, -1) == ids.view(B, 1, RC, 1))
+            (rr[:, :, 0].reshape(B, 1, 1, -1) == ids.reshape(B, RC, 1, 1))
+            & (rr[:, :, 1].reshape(B, 1, 1, -1) == ids.reshape(B, 1, RC, 1))
         ).any(dim=3)  # [B, RC, RC]
-        eye = torch.eye(RC, dtype=torch.bool, device=dev).view(1, RC, RC)
+        eye = torch.eye(RC, dtype=torch.bool, device=dev).reshape(1, RC, RC)
         valid = (
             alive.unsqueeze(2)
             & alive.unsqueeze(1)
             & ~eye
             & (d <= self._trade_range)
             & ~exists
-            & want.view(B, 1, 1)
+            & want.reshape(B, 1, 1)
         )
         key = torch.where(valid, ysum.unsqueeze(1).expand(B, RC, RC), torch.full((B, RC, RC), -1, dtype=torch.long, device=dev))
         # A-12b: MET city-states join each origin's candidate list AFTER the
@@ -11708,28 +11708,28 @@ class BatchSim:
             d_cs = self.pair_dist[centers.unsqueeze(2), csc.unsqueeze(1)]  # [B, RC, S]
             cs_to = -(2 + torch.arange(S, device=dev))  # encoded dest ids
             exists_cs = (
-                (rr[:, :, 0].view(B, 1, 1, -1) == ids.view(B, RC, 1, 1))
-                & (rr[:, :, 1].view(B, 1, 1, -1) == cs_to.view(1, 1, S, 1))
+                (rr[:, :, 0].reshape(B, 1, 1, -1) == ids.reshape(B, RC, 1, 1))
+                & (rr[:, :, 1].reshape(B, 1, 1, -1) == cs_to.reshape(1, 1, S, 1))
             ).any(dim=3)  # [B, RC, S]
             valid_cs = (
                 alive.unsqueeze(2)
                 & (self.cs_r_met[:, r, :S] & self.cs_alive[:, :S]).unsqueeze(1)
                 & (d_cs <= self._trade_range)
                 & ~exists_cs
-                & want.view(B, 1, 1)
+                & want.reshape(B, 1, 1)
             )
             key_cs = torch.where(valid_cs, torch.full((B, RC, S), ysum_cs, dtype=torch.long, device=dev), torch.full((B, RC, S), -1, dtype=torch.long, device=dev))
             key = torch.cat([key, key_cs], dim=2)  # [B, RC, RC+S]
             W2 = RC + S
         kf = key.reshape(B, RC * W2)  # i-major flat order = the TS from-asc, dests-then-CS scan
         kmax, _ = kf.max(dim=1)
-        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).view(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
+        first = torch.where(kf == kmax.unsqueeze(1), torch.arange(RC * W2, device=dev).reshape(1, -1), torch.full((1, RC * W2), RC * W2, device=dev)).min(dim=1).values
         K = self.r_routes.shape[2]
         exp_val = int(self.turn) + self._trade_duration
 
         def _free_slot(rws: torch.Tensor) -> torch.Tensor:
             free = self.r_routes[rws, r, :, 0] < 0  # [n, K]
-            s = torch.where(free, torch.arange(K, device=dev).view(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values
+            s = torch.where(free, torch.arange(K, device=dev).reshape(1, -1), torch.full((1, K), K, device=dev)).min(dim=1).values
             assert int(s.max()) < K, "r_routes columns exhausted — raise K above the capacity bound"
             return s
 
@@ -11772,22 +11772,22 @@ class BatchSim:
             act2 = rr2[:, :, 0] >= 0  # [B, K]
             # already-connected: an ACTIVE intl route from rc i to player tile c
             exists_ip = (
-                (rr2[:, :, 0].view(B, 1, 1, -1) == ids.view(B, RC, 1, 1))
-                & (rd.view(B, 1, 1, -1) == psite.view(B, 1, C, 1))
-                & act2.view(B, 1, 1, -1)
+                (rr2[:, :, 0].reshape(B, 1, 1, -1) == ids.reshape(B, RC, 1, 1))
+                & (rd.reshape(B, 1, 1, -1) == psite.reshape(B, 1, C, 1))
+                & act2.reshape(B, 1, 1, -1)
             ).any(dim=3)  # [B, RC, C] (rd is -1 for domestic/CS → never == psite>=0)
             valid_ip = (
                 alive.unsqueeze(2)
                 & palive.unsqueeze(1)
                 & (d_ip <= self._trade_range)
                 & ~exists_ip
-                & intl_want.view(B, 1, 1)
+                & intl_want.reshape(B, 1, 1)
             )
             BIG = 1 << 30
             dkey = torch.where(valid_ip, d_ip.long(), torch.full((B, RC, C), BIG, dtype=torch.long, device=dev))
             df = dkey.reshape(B, RC * C)  # i-major = from-asc, player-city-asc
             dmin, _ = df.min(dim=1)
-            firsti = torch.where(df == dmin.unsqueeze(1), torch.arange(RC * C, device=dev).view(1, -1), torch.full((1, RC * C), RC * C, device=dev)).min(dim=1).values
+            firsti = torch.where(df == dmin.unsqueeze(1), torch.arange(RC * C, device=dev).reshape(1, -1), torch.full((1, RC * C), RC * C, device=dev)).min(dim=1).values
             doi = intl_want & (dmin < BIG)
             if bool(doi.any()):
                 rows = doi.nonzero(as_tuple=True)[0]
@@ -12125,11 +12125,11 @@ class BatchSim:
                     ones_nb,
                 )  # [B, NB] — j-invariant (previously rebuilt per j)
                 riv_cA = self.tile_river.gather(1, self.rc_center[:, r].clamp(min=0))  # [B, RC]
-                ok_bA = unl_b.unsqueeze(1) & ~have_bA & (~rdv3.b_river.view(1, 1, -1) | riv_cA.unsqueeze(2)) & ~self._b_worship.view(1, 1, -1)  # B9-R3: worship is faith-only
+                ok_bA = unl_b.unsqueeze(1) & ~have_bA & (~rdv3.b_river.reshape(1, 1, -1) | riv_cA.unsqueeze(2)) & ~self._b_worship.reshape(1, 1, -1)  # B9-R3: worship is faith-only
                 reqd_b = rdv3.b_req_district  # [NB]
-                reg_tA = self.rc_dist_tile[:, r].gather(2, reqd_b.clamp(min=0).view(1, 1, -1).expand(B, self.RC, -1))
+                reg_tA = self.rc_dist_tile[:, r].gather(2, reqd_b.clamp(min=0).reshape(1, 1, -1).expand(B, self.RC, -1))
                 dcompA = (reg_tA >= 0) & self.district_complete.gather(1, reg_tA.clamp(min=0).reshape(B, -1)).reshape_as(reg_tA)
-                ok_bA &= torch.where(reqd_b.view(1, 1, -1) >= 0, dcompA, torch.ones_like(dcompA))
+                ok_bA &= torch.where(reqd_b.reshape(1, 1, -1) >= 0, dcompA, torch.ones_like(dcompA))
                 for bi2, reqs in enumerate(self.rules.b_req_buildings):
                     if reqs:
                         ok_bA[:, :, bi2] &= have_bA[:, :, torch.tensor(reqs, device=dev, dtype=torch.long)].any(dim=2)
@@ -12138,7 +12138,7 @@ class BatchSim:
                         ok_bA[:, :, bi2] &= ~have_bA[:, :, torch.tensor(excl, device=dev, dtype=torch.long)].any(dim=2)
                 arNB = torch.arange(NBn, device=dev, dtype=rdv3.b_cost.dtype)
                 inf_bA = torch.full((B, self.RC, NBn), float("inf"), dtype=rdv3.b_cost.dtype, device=dev)
-                key_bA = torch.where(ok_bA, rdv3.b_cost.view(1, 1, -1) * 1024 + arNB, inf_bA)  # the *1024+arNB tie-break key, verbatim
+                key_bA = torch.where(ok_bA, rdv3.b_cost.reshape(1, 1, -1) * 1024 + arNB, inf_bA)  # the *1024+arNB tie-break key, verbatim
                 bi_A = key_bA.argmin(dim=2)  # [B, RC]
                 okb_anyA = ok_bA.any(dim=2)  # [B, RC]
                 code_bA = bi_A + (1 + self.NU + len(self._scaffold))
@@ -12410,7 +12410,7 @@ class BatchSim:
                     have6 = self.rc_bldg[:, r, j6]
                     ctile6 = self.rc_center[:, r, j6].clamp(min=0)
                     riv6 = self.tile_river.gather(1, ctile6.unsqueeze(1)).squeeze(1)
-                    ok6 = unl6 & ~have6 & (~rdv6.b_river.view(1, -1) | riv6.unsqueeze(1)) & ~self._b_worship.view(1, -1)  # B9-R3: worship is faith-only
+                    ok6 = unl6 & ~have6 & (~rdv6.b_river.reshape(1, -1) | riv6.unsqueeze(1)) & ~self._b_worship.reshape(1, -1)  # B9-R3: worship is faith-only
                     reg6 = self.rc_dist_tile[:, r, j6].gather(1, rdv6.b_req_district.clamp(min=0).unsqueeze(0).expand(B, -1))
                     dc6 = (reg6 >= 0) & self.district_complete.gather(1, reg6.clamp(min=0))
                     ok6 = ok6 & torch.where(rdv6.b_req_district.unsqueeze(0) >= 0, dc6, ones6)
@@ -12426,8 +12426,8 @@ class BatchSim:
                         rows_q = is_qb.nonzero(as_tuple=True)[0]
                         ok6[rows_q, qb6[rows_q]] = False
                     elig6[:, j6] = ok6 & al6.unsqueeze(1)
-                key6 = (rdv6.b_cost.view(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).view(1, 1, -1)) * 32 \
-                    + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).view(1, -1, 1)
+                key6 = (rdv6.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, 1, -1)) * 32 \
+                    + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, -1, 1)
                 key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
                 flat6 = key6.reshape(B, -1)
                 best6 = flat6.argmin(dim=1)
@@ -12499,7 +12499,7 @@ class BatchSim:
                     ctr5 = self.rc_center[:, r].gather(1, spawn_slot5.unsqueeze(1)).squeeze(1).clamp(min=0)
                     # B-17: a bought military unit inherits the SPAWN city's (capital, else first alive) Encampment training XP.
                     bidx5 = torch.arange(self.B, device=self.device)
-                    xp_cap5 = (self.rc_bldg[bidx5, r, spawn_slot5].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                    xp_cap5 = (self.rc_bldg[bidx5, r, spawn_slot5].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                     landed_u5 = self._spawn_rival(elig_u5, ctr5, pick_ty5, r, init_xp=xp_cap5)
                     price_u5 = self._p_cost.gather(0, pick_ty5).double() * mult_r5
                     self.r_treasury[:, r] = torch.where(landed_u5, self.r_treasury[:, r] - price_u5, self.r_treasury[:, r])
@@ -12600,7 +12600,7 @@ class BatchSim:
                     _nbf = _nbs.clamp(min=0).reshape(self.B, -1)
                     _adj = (
                         (self.rival_at.gather(1, _nbf).reshape(self.B, -1, 6) == r)
-                        & (self.rc_tile_id.gather(1, _nbf).reshape(self.B, -1, 6) == self.rc_id[:, r, _j].view(self.B, 1, 1))
+                        & (self.rc_tile_id.gather(1, _nbf).reshape(self.B, -1, 6) == self.rc_id[:, r, _j].reshape(self.B, 1, 1))
                         & (_nbs >= 0)
                     ).any(dim=2)
                     _ok = (_tiles >= 0) & _unowned & _adj & _live.unsqueeze(1)
@@ -12699,7 +12699,7 @@ class BatchSim:
             # ties by slot index == TS array order; alive-masked).
             _titles_r = (self.r_civics[:, r].sum(dim=1) // self._gov_per).clamp(max=self._gov_max)  # [B]
             _q_rloy = js_round(self.rc_loyalty[:, r] * 1000).long()
-            _gk = torch.where(self.rc_alive[:, r], _q_rloy * 64 + torch.arange(self.RC, device=dev).view(1, -1), torch.full_like(_q_rloy, 1 << 40))
+            _gk = torch.where(self.rc_alive[:, r], _q_rloy * 64 + torch.arange(self.RC, device=dev).reshape(1, -1), torch.full_like(_q_rloy, 1 << 40))
             _gr = torch.empty_like(_gk)
             _gr.scatter_(1, _gk.argsort(dim=1, stable=True), torch.arange(self.RC, device=dev).expand(B, self.RC))
             rc_gov = (_gr < _titles_r.unsqueeze(1)) & self.rc_alive[:, r]  # [B, RC]
@@ -12719,7 +12719,7 @@ class BatchSim:
             if self._wond_n:
                 wregG = self.rc_wonder[:, r]  # [B, RC, nW]
                 compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
-                gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
+                gw_cache = torch.where(compG, self._wond_grow.reshape(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
             # G3-A: one guard sync for the whole economy loop. Exact: alive_c
             # is a pre-loop CLONE (a queue-completion newborn founded inside
             # the loop deliberately does not act this turn — the [...rival.
@@ -12746,7 +12746,7 @@ class BatchSim:
             def _g5_hm() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
                 dt_all = self.rc_dist_tile[:, r]  # [B, RC, nD]
                 dd_all = (dt_all >= 0) & self.district_complete.gather(1, dt_all.clamp(min=0).reshape(B, -1)).reshape_as(dt_all)
-                maint = (self._d_maint.view(1, 1, -1) * dd_all.to(torch.float64)).sum(dim=2)
+                maint = (self._d_maint.reshape(1, 1, -1) * dd_all.to(torch.float64)).sum(dim=2)
                 maint = maint + torch.einsum("bjn,n->bj", self.rc_bldg[:, r].to(torch.float64), self.rules_dev.b_maintenance.double())
                 wh = self.tile_wh.gather(1, _ctr_r)  # [B, RC]
                 fresh = wh == float(self._h_fresh)
@@ -12901,7 +12901,7 @@ class BatchSim:
                     if gw_cache is None:
                         wregG = self.rc_wonder[:, r]  # [B, RC, nW]
                         compG = (wregG >= 0) & self.built_wonder_complete.gather(1, wregG.clamp(min=0).reshape(B, -1)).reshape_as(wregG)
-                        gw_cache = torch.where(compG, self._wond_grow.view(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
+                        gw_cache = torch.where(compG, self._wond_grow.reshape(1, 1, -1).expand_as(compG).double(), torch.ones_like(compG, dtype=torch.float64)).prod(dim=2).prod(dim=1)
                     gmul = gmul * gw_cache
                 self.rc_growth[:, r, j] = torch.where(cact, self.rc_growth[:, r, j] + torch.where(surplus > 0, surplus * hfac * amen_gf[:, j] * gmul, surplus), self.rc_growth[:, r, j])
                 need = need_all[:, j]  # G5: pre-growth pop == the batch's entry value for this column
@@ -12948,7 +12948,7 @@ class BatchSim:
                             spawn_u = spawn_u & ~is_eng
                         if bool(spawn_u.any()):
                             # B-17: a trained military unit inherits city j's Encampment training XP (best tier).
-                            xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                            xp_rj = (self.rc_bldg[:, r, j, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                             self._spawn_rival(spawn_u, self.rc_center[:, r, j], (cur - 1).clamp(min=0), r, init_xp=xp_rj)
                         # C1-B4: a finished district completes its paved tile
                         nS_b4 = len(self._scaffold)
@@ -13045,8 +13045,8 @@ class BatchSim:
                                     if int(prow.get("sp", 0)):
                                         self.space_done[hitp, r + 1, self._space_step[pi_]] = True
                                         if pi_ in self._space_victory_idx:
-                                            self.victory_type = torch.where(hitp, torch.full_like(self.victory_type, 4), self.victory_type)
-                                            self.game_over = self.game_over | hitp
+                                            self.victory_type.copy_(torch.where(hitp, torch.full_like(self.victory_type, 4), self.victory_type))
+                                            self.game_over.logical_or_(hitp)
                 self._rival_border_growth(r, j, cact, cul_c)  # P5/S4: the timer died
                 # AUDIT B-2: the rival mirror of the player city strike — a
                 # rival city with ANCIENT_WALLS fires once/turn at the nearest
@@ -13069,7 +13069,7 @@ class BatchSim:
                         hostile = barb_h | pmil_h | pciv_h  # [B, T]
                         valid = walled.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
                         arangeT = torch.arange(Tn, device=dev2)
-                        key = torch.where(valid, dist * (Tn + 1) + arangeT.view(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+                        key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
                         best_key = key.min(dim=1).values
                         tt = key.argmin(dim=1)  # [B]
                         strike = walled & (best_key < 10**9)
@@ -13161,7 +13161,7 @@ class BatchSim:
                         hostile = barb_h | pmil_h | pciv_h  # [B, T]
                         valid = has_enc.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
                         arangeT = torch.arange(Tn, device=dev2)
-                        key = torch.where(valid, dist * (Tn + 1) + arangeT.view(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
+                        key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
                         best_key = key.min(dim=1).values
                         tt = key.argmin(dim=1)  # [B]
                         strike = has_enc & (best_key < 10**9)
@@ -13298,7 +13298,7 @@ class BatchSim:
                         if w_ == 0:
                             self._capture_rival_city(
                                 torch.tensor([b], device=dev), torch.tensor([r], device=dev),
-                                torch.tensor([j2], device=dev), self.rc_center[b, r, j2].view(1),
+                                torch.tensor([j2], device=dev), self.rc_center[b, r, j2].reshape(1),
                                 plunder=False,
                             )
                         else:
@@ -13332,7 +13332,7 @@ class BatchSim:
             broke_r = active & (js_round(self.r_treasury[:, r] * 1000) < 0)
             if bool(broke_r.any()):
                 vm = self._p_maint[self.v_type.clamp(min=0, max=self.NU - 1)]  # [B, U_MAX]
-                slots_ar = torch.arange(self.v_alive.shape[1], device=dev, dtype=self.dtype).view(1, -1)
+                slots_ar = torch.arange(self.v_alive.shape[1], device=dev, dtype=self.dtype).reshape(1, -1)
                 key_v = torch.where(mine_r & (vm > 0), vm * 4096 - slots_ar, torch.full_like(vm, -1.0))
                 best_v, victim = key_v.max(dim=1)
                 kill = broke_r & (best_v > 0)
@@ -13436,7 +13436,7 @@ class BatchSim:
                 if d_cls >= 0 and self.districts_on:
                     reg_c = self.rc_dist_tile[:, r, :, d_cls]  # [B, RC]
                     comp_c = (reg_c >= 0) & self.district_complete.gather(1, reg_c.clamp(min=0)) & ~self.district_pillaged.gather(1, reg_c.clamp(min=0))  # B-32: pillaged earns no GPP
-                    bmask_c = (self.rules_dev.b_req_district == d_cls).view(1, 1, -1)
+                    bmask_c = (self.rules_dev.b_req_district == d_cls).reshape(1, 1, -1)
                     nb_of = (self.rc_bldg[:, r] & bmask_c).sum(dim=2)  # [B, RC]
                     # A-7 Divine Spark: the belief's flat GPP joins the
                     # per-city term (1 + gppFlat + buildings), the
@@ -13528,7 +13528,7 @@ class BatchSim:
                 self.r_pantheon[prow, r] = pid[prow]
                 self._bel_version += 1  # G1: belief change -> _bel_add / _belief_feat_plane invalidate
             self.r_faith[:, r] = torch.where(popen, self.r_faith[:, r] - pfc, self.r_faith[:, r])
-            self.pantheon_claimed_n = self.pantheon_claimed_n + popen.long()
+            self.pantheon_claimed_n.add_(popen.long())
             self.r_pantheon_done[:, r] = self.r_pantheon_done[:, r] | popen
             self.era_score[:, r + 1] += popen.long() * self._era_pts["pantheon"]  # B-24
             d_hs = int(self._gp_class_district[self._prophet_cls]) if self._prophet_cls < self._gp_nc else -1
@@ -13552,8 +13552,8 @@ class BatchSim:
                     claimed_m[rrow, bid[rrow]] = True
                     ids_t[rrow, r] = bid[rrow]
                 self._bel_version += 1  # G1: follower/founder change -> _bel_add / _belief_feat_plane invalidate
-            self.claimed_f_n = self.claimed_f_n + ropen.long()
-            self.claimed_o_n = self.claimed_o_n + ropen.long()
+            self.claimed_f_n.add_(ropen.long())
+            self.claimed_o_n.add_(ropen.long())
             self.r_religion_done[:, r] = self.r_religion_done[:, r] | ropen
             self.era_score[:, r + 1] += ropen.long() * self._era_pts["religion"]  # B-24
             # B-18: freeze this religion's holy tile at founding — the pressure
@@ -13591,7 +13591,7 @@ class BatchSim:
                 self.enh_claimed[erow, eid[erow]] = True
                 self.r_enhancer[erow, r] = eid[erow]
                 self._bel_version += 1  # G1: enhancer claim (inert today, but keep the belief epoch honest)
-            self.claimed_e_n = self.claimed_e_n + eopen.long()
+            self.claimed_e_n.add_(eopen.long())
             self.r_enhancer_done[:, r] = self.r_enhancer_done[:, r] | eopen
 
             # B7-G (B-8): the Great General marches with the war effort (spawned
@@ -13723,9 +13723,9 @@ class BatchSim:
         d_cr = self.pair_dist[sitec.unsqueeze(2), rc_flat.unsqueeze(1)].to(self.dtype)
         wf = (rng + 1 - d_cr).clamp(min=0)
         foreign_r = (
-            wf.view(B, C, self.R, self.RC)
-            * self.rc_pop.view(B, 1, self.R, self.RC).to(self.dtype)
-            * self.rc_alive.view(B, 1, self.R, self.RC).to(self.dtype)
+            wf.reshape(B, C, self.R, self.RC)
+            * self.rc_pop.reshape(B, 1, self.R, self.RC).to(self.dtype)
+            * self.rc_alive.reshape(B, 1, self.R, self.RC).to(self.dtype)
         ).sum(dim=3)  # [B, C, R]
         foreign = (foreign_r * f_age[:, 1 : 1 + self.R].unsqueeze(1)).sum(dim=2)
         tot = own + foreign
@@ -13743,10 +13743,10 @@ class BatchSim:
         delta = pressure + self._loyalty_amenity[tier_idx.clamp(min=0, max=self._loyalty_amenity.shape[0] - 1)] + gov_b.to(self.dtype) * self._gov_loy
         upd = self.alive & any_rc.unsqueeze(1)
         nxt = (self.loyalty + delta).clamp(min=0, max=float(self.rules.rivals.get("loyaltyMax", 100)))
-        self.loyalty = torch.where(upd, nxt, self.loyalty)
+        self.loyalty.copy_(torch.where(upd, nxt, self.loyalty))
         # P7 (C-1): pin/guard by IDENTITY (TS isCapital), not column 0.
         cap_pin = upd & self.is_cap
-        self.loyalty = torch.where(cap_pin, torch.full_like(self.loyalty, 100.0), self.loyalty)
+        self.loyalty.copy_(torch.where(cap_pin, torch.full_like(self.loyalty, 100.0), self.loyalty))
         flip = upd & (self.loyalty <= 0) & ~self.is_cap
         if not bool(flip.any()):
             return
@@ -13892,7 +13892,7 @@ class BatchSim:
                 self.cur_cost[:, c] = torch.where(is_s, s_cost, self.cur_cost[:, c])
                 self.current[:, c] = torch.where(is_s, torch.full_like(self.current[:, c], self.SETTLER), self.current[:, c])
                 queued_live = queued_live + is_s.long()
-                self.settlers_queued = self.settlers_queued + is_s.long()
+                self.settlers_queued.add_(is_s.long())
             # --- queue a builder (P4/D-10: excluded from the vectorized unit
             # block in purchase mode; priced off the live escalator here).
             if self._builder_idx >= 0:
@@ -13919,7 +13919,7 @@ class BatchSim:
                         if len(wm) > 0:
                             self.outer_hp[wm, c] = self._walls_hp
                     self._eff_version += 1  # D-8: _buildable keys on it (a bought building must vanish from later masks)
-                    self.treasury = torch.where(can, self.treasury - cost, self.treasury)
+                    self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
             # --- buy a settler (purchaseSettler: settlers += 1 immediately,
             # which raises every later slot's price)
             is_ps = pi == self.NB
@@ -13928,8 +13928,8 @@ class BatchSim:
                     r.settler_base + r.settler_per_city * (n_cities - 1 + settlers_live + queued_live).clamp(min=0).to(self.dtype)
                 ) * mult
                 can = is_ps & self._afford(self.treasury, s_cost)
-                self.treasury = torch.where(can, self.treasury - s_cost, self.treasury)
-                self.settlers = self.settlers + can.long()
+                self.treasury.copy_(torch.where(can, self.treasury - s_cost, self.treasury))
+                self.settlers.add_(can.long())
                 self.pop[:, c] = torch.where(can, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])  # P4/D-6: purchased settlers cost the pop too
                 settlers_live = settlers_live + can.long()
             # --- buy a unit (purchaseUnit: trainable ∧ gold ∧ a free spawn
@@ -13952,13 +13952,13 @@ class BatchSim:
                 found, _ = self._first_free_spot(self.site[:, c], "player", self._p_civ[utp])
                 can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
                 if bool(can.any()):
-                    self.treasury = torch.where(can, self.treasury - cost, self.treasury)
+                    self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
                     # B-17: a purchased military unit inherits city c's Encampment training XP (best tier).
-                    xp_c = (self.buildings[:, c, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                    xp_c = (self.buildings[:, c, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                     self._spawn_player(can, self.site[:, c], utp, init_xp=xp_c)
                     if self._builder_idx >= 0:
                         # …and move it for every later slot (TS purchaseUnit).
-                        self.builders_trained = self.builders_trained + (can & (utp == self._builder_idx)).long()
+                        self.builders_trained.add_((can & (utp == self._builder_idx)).long())
 
     # --- one full turn -----------------------------------------------------------
 
@@ -14111,8 +14111,8 @@ class BatchSim:
                 decl = ok & (w < self.R)
                 if bool(decl.any()):
                     oh = torch.nn.functional.one_hot(w.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
-                    self.r_atwar = self.r_atwar | oh
-                    self.r_warturns = torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns)
+                    self.r_atwar.logical_or_(oh)
+                    self.r_warturns.copy_(torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns))
                 pea = ok & (w >= self.R)
                 if bool(pea.any()):
                     ri = (w - self.R).clamp(min=0, max=self.R - 1)
@@ -14121,10 +14121,10 @@ class BatchSim:
                         1, ri.unsqueeze(1)
                     ).squeeze(1).to(self.dtype)
                     oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
-                    self.treasury = torch.where(pea, self.treasury - cost, self.treasury)
-                    self.r_atwar = self.r_atwar & ~oh
-                    self.r_warturns = torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns)
-                    self.r_peaceturns = torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns)
+                    self.treasury.copy_(torch.where(pea, self.treasury - cost, self.treasury))
+                    self.r_atwar.logical_and_(~oh)
+                    self.r_warturns.copy_(torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns))
+                    self.r_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns))
 
         # --- player unit orders (before the turn advances) ----------------------
         # #56 phase-order: the EXPORTER's script runs envoys → production →
@@ -14180,14 +14180,14 @@ class BatchSim:
                     # Neither increment site bumped it, so the capital could
                     # keep serving pre-crossing yields.
                     self._eff_version += 1
-                    self.envoys_avail = self.envoys_avail - can.long()
+                    self.envoys_avail.sub_(can.long())
             else:
                 e_act = envoy.to(torch.long)
                 ok = (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
                 if bool(ok.any()):
                     rows = ok.nonzero(as_tuple=True)[0]
                     self.cs_envoys[rows, e_act[rows]] += 1
-                    self.envoys_avail = self.envoys_avail - ok.long()
+                    self.envoys_avail.sub_(ok.long())
 
         # --- production choice ------------------------------------------------
         if production is None:
@@ -14251,7 +14251,7 @@ class BatchSim:
                 self.current[rows, cc] = self.SETTLER
                 self.cur_cost[rows, cc] = s_cost[rows]
                 self.progress[rows, cc] = 0
-            self.settlers_queued = self.settlers_queued + want_settler.long()
+            self.settlers_queued.add_(want_settler.long())
 
             # One defender per city, once it can spare the production
             # (mirrors the exporter script's warrior branch).
@@ -14264,10 +14264,10 @@ class BatchSim:
                 mil_q0 = (_in_urange & (self._p_combat[(self.current - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)] > 0)).sum(dim=1)
                 want_w = empty & (self.pop >= 2) & ~self.warrior_trained
                 wcode = self.UNIT_BASE + self._warrior_idx
-                self.current = torch.where(want_w, torch.full_like(self.current, wcode), self.current)
-                self.cur_cost = torch.where(want_w, self._p_cost[self._warrior_idx].expand_as(self.cur_cost), self.cur_cost)
-                self.progress = torch.where(want_w, torch.zeros_like(self.progress), self.progress)
-                self.warrior_trained = self.warrior_trained | want_w
+                self.current.copy_(torch.where(want_w, torch.full_like(self.current, wcode), self.current))
+                self.cur_cost.copy_(torch.where(want_w, self._p_cost[self._warrior_idx].expand_as(self.cur_cost), self.cur_cost))
+                self.progress.copy_(torch.where(want_w, torch.zeros_like(self.progress), self.progress))
+                self.warrior_trained.logical_or_(want_w)
 
             # Scripted districts (P2): the CAPITAL queues the next scaffold
             # district when idle — after the warrior branch, before the
@@ -14353,18 +14353,18 @@ class BatchSim:
                         best_u = key_u.argmax(dim=1)  # [B]
                         ucode = (self.UNIT_BASE + best_u).unsqueeze(1).expand_as(self.current)
                         ucost = self._p_cost[best_u].unsqueeze(1).expand_as(self.cur_cost)
-                        self.current = torch.where(want_a, ucode, self.current)
-                        self.cur_cost = torch.where(want_a, ucost, self.cur_cost)
-                        self.progress = torch.where(want_a, torch.zeros_like(self.progress), self.progress)
+                        self.current.copy_(torch.where(want_a, ucode, self.current))
+                        self.cur_cost.copy_(torch.where(want_a, ucost, self.cur_cost))
+                        self.progress.copy_(torch.where(want_a, torch.zeros_like(self.progress), self.progress))
 
             # Everyone else: cheapest available City Center building.
             empty = self.alive & (self.current == -1)
             buildable = self._buildable()
-            first = torch.where(buildable, self._arangeNB.view(1, 1, -1), self.NB).min(dim=2).values  # [B, C]
+            first = torch.where(buildable, self._arangeNB.reshape(1, 1, -1), self.NB).min(dim=2).values  # [B, C]
             pickable = empty & (first < self.NB)
-            self.progress = torch.where(pickable, torch.zeros_like(self.progress), self.progress)
-            self.cur_cost = torch.where(pickable, rd.b_cost[first.clamp(max=self.NB - 1)], self.cur_cost)
-            self.current = torch.where(pickable, first, self.current)
+            self.progress.copy_(torch.where(pickable, torch.zeros_like(self.progress), self.progress))
+            self.cur_cost.copy_(torch.where(pickable, rd.b_cost[first.clamp(max=self.NB - 1)], self.cur_cost))
+            self.current.copy_(torch.where(pickable, first, self.current))
         else:
             act = torch.where(self.alive & (self.current == -1), production.to(torch.long), torch.full_like(production.to(torch.long), -1))
             buildable = self._buildable()
@@ -14377,16 +14377,16 @@ class BatchSim:
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
             trainable = trainable & self._res_avail_mask(self.owner >= 0)  # B-9: RL apply re-validates strategic-resource access
-            trainable = trainable & ~self._p_faith_only.view(1, -1)  # B6-S2: faith-only never queues (trainableUnits mirror)
+            trainable = trainable & ~self._p_faith_only.reshape(1, -1)  # B6-S2: faith-only never queues (trainableUnits mirror)
             valid_u = is_u & trainable.gather(1, ut)
             if self._rl_purchase_active and self._builder_idx >= 0:
                 # P4/D-10: with purchases live, builder queues are order-coupled
                 # with builder PURCHASES in the same turn (both move the
                 # escalator) — the sequential walk below handles them instead.
                 valid_u = valid_u & (ut != self._builder_idx)
-            self.progress = torch.where(valid_b | valid_u, torch.zeros_like(self.progress), self.progress)
-            self.cur_cost = torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost)
-            self.cur_cost = torch.where(valid_u, self._p_cost[ut], self.cur_cost)
+            self.progress.copy_(torch.where(valid_b | valid_u, torch.zeros_like(self.progress), self.progress))
+            self.cur_cost.copy_(torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost))
+            self.cur_cost.copy_(torch.where(valid_u, self._p_cost[ut], self.cur_cost))
             if self._builder_idx >= 0:
                 # P4/D-10 (no-purchase mode): builder queues escalate like the
                 # settler prefix-sum — earlier slots' queues raise later slots'
@@ -14397,8 +14397,8 @@ class BatchSim:
                     base_bq = (self.current == bcode_q).sum(dim=1, keepdim=True)
                     prefix_b = is_bu.long().cumsum(dim=1) - is_bu.long()
                     bq_n = self.builders_trained.unsqueeze(1) + base_bq + prefix_b
-                    self.cur_cost = torch.where(is_bu, self._builder_cost(bq_n), self.cur_cost)
-            self.current = torch.where(valid_b | valid_u, act, self.current)
+                    self.cur_cost.copy_(torch.where(is_bu, self._builder_cost(bq_n), self.cur_cost))
+            self.current.copy_(torch.where(valid_b | valid_u, act, self.current))
             if not self._rl_purchase_active:
                 # The TS engine queues city-by-city in slot order, and each queued
                 # settler raises the next one's price — an exclusive prefix sum
@@ -14409,10 +14409,10 @@ class BatchSim:
                 prefix = is_s.long().cumsum(dim=1) - is_s.long()
                 n_cities = self.alive.sum(dim=1, keepdim=True)
                 s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self.settlers.unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
-                self.progress = torch.where(is_s, torch.zeros_like(self.progress), self.progress)
-                self.cur_cost = torch.where(is_s, s_cost, self.cur_cost)
-                self.current = torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current)
-                self.settlers_queued = self.settlers_queued + is_s.sum(dim=1)
+                self.progress.copy_(torch.where(is_s, torch.zeros_like(self.progress), self.progress))
+                self.cur_cost.copy_(torch.where(is_s, s_cost, self.cur_cost))
+                self.current.copy_(torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current))
+                self.settlers_queued.add_(is_s.sum(dim=1))
             else:
                 # V-P1: with purchases live, settler prices and the treasury are
                 # order-coupled across slots (a queued OR bought settler raises
@@ -14468,11 +14468,11 @@ class BatchSim:
         if tech is not None:
             t_act = tech.to(torch.long)
             ok = (self.cur_tech == -1) & (t_act >= 0) & self._available_mask(self.techs, self._prereq_t).gather(1, t_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.cur_tech = torch.where(ok, t_act, self.cur_tech)
+            self.cur_tech.copy_(torch.where(ok, t_act, self.cur_tech))
         if civic is not None:
             c_act = civic.to(torch.long)
             ok = (self.cur_civic == -1) & (c_act >= 0) & self._available_mask(self.civics, self._prereq_c).gather(1, c_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-            self.cur_civic = torch.where(ok, c_act, self.cur_civic)
+            self.cur_civic.copy_(torch.where(ok, c_act, self.cur_civic))
 
         # --- eurekas (mirrors detectBoosts at the start of endTurn) ------------
         if self.boost_mode == "detect":
@@ -14496,21 +14496,21 @@ class BatchSim:
             u_owned = (self.owner.gather(1, ut) >= 0) | (self.rival_at.gather(1, ut) >= 0) | (self.cs_at.gather(1, ut) >= 0)
             u_camp = (self.camp_tile.unsqueeze(2) == ut.unsqueeze(1)).any(dim=1)
             u_heal = torch.where(u_camp, torch.full_like(ut, 20), torch.where(u_owned, torch.full_like(ut, 5), torch.full_like(ut, 10)))
-            self.u_hp = torch.where(self.u_alive & ~self.u_acted, (self.u_hp + u_heal).clamp(max=cap), self.u_hp)
+            self.u_hp.copy_(torch.where(self.u_alive & ~self.u_acted, (self.u_hp + u_heal).clamp(max=cap), self.u_hp))
             # rival units: own civ's land / own center
             vt = self.v_tile.clamp(min=0)
             v_own = self.rival_at.gather(1, vt) == self.v_civ
             v_center = self.rvcity_at.gather(1, vt) == self.v_civ
             v_owned_any = (self.owner.gather(1, vt) >= 0) | (self.rival_at.gather(1, vt) >= 0) | (self.cs_at.gather(1, vt) >= 0)
             v_heal = torch.where(v_own & v_center, torch.full_like(vt, 20), torch.where(v_own, torch.full_like(vt, 15), torch.where(v_owned_any, torch.full_like(vt, 5), torch.full_like(vt, 10))))
-            self.v_hp = torch.where(self.v_alive & ~self.v_acted, (self.v_hp + v_heal).clamp(max=cap), self.v_hp)
+            self.v_hp.copy_(torch.where(self.v_alive & ~self.v_acted, (self.v_hp + v_heal).clamp(max=cap), self.v_hp))
             # player units
             pt = self.p_tile.clamp(min=0)
             p_own = self.owner.gather(1, pt) >= 0
             p_center = self.center_at.gather(1, pt) >= 0
             p_owned_any = p_own | (self.rival_at.gather(1, pt) >= 0) | (self.cs_at.gather(1, pt) >= 0)
             p_heal = torch.where(p_own & p_center, torch.full_like(pt, 20), torch.where(p_own, torch.full_like(pt, 15), torch.where(p_owned_any, torch.full_like(pt, 5), torch.full_like(pt, 10))))
-            self.p_hp = torch.where(self.p_alive & ~self.p_acted, (self.p_hp + p_heal).clamp(max=cap), self.p_hp)
+            self.p_hp.copy_(torch.where(self.p_alive & ~self.p_acted, (self.p_hp + p_heal).clamp(max=cap), self.p_hp))
             # B-5 FORTIFY: co-located with the D-2 heal and keyed on the EXACT
             # SAME gate (~X_acted = spent no MP since the last refresh). A live
             # MILITARY unit that stayed put digs in (+1, cap 2); a move/attack
@@ -14577,7 +14577,7 @@ class BatchSim:
         sci_add = torch.zeros(B, dtype=self.dtype, device=dev)
         cul_add = torch.zeros(B, dtype=self.dtype, device=dev)
         neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
-        neigh_valid = (self.neigh >= 0).view(1, T, 6)
+        neigh_valid = (self.neigh >= 0).reshape(1, T, 6)
         # P7-FULL (C-2): TS iterates state.cities in ARRAY order (splice on
         # death, push on found/capture = acquisition order); after a
         # hole-reuse founding the column order stops matching, and every
@@ -14628,7 +14628,7 @@ class BatchSim:
             self.prod_bank[bidx, col] = torch.where(has_item, torch.zeros_like(self.prod_bank[bidx, col]), self.prod_bank[bidx, col])
             done = has_item & (self.progress[bidx, col] >= self.cur_cost[bidx, col])
             made_settler = done & (cur_c == self.SETTLER)
-            self.settlers = self.settlers + made_settler.long()
+            self.settlers.add_(made_settler.long())
             # P4/D-6: a completed Settler costs the city 1 pop (real Civ 6);
             # the pop-snapshot guard refreshes later cities' totals.
             self.pop[bidx, col] = torch.where(made_settler, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
@@ -14646,12 +14646,12 @@ class BatchSim:
             if bool(made_unit.any()):
                 # clamp max too: unmasked rows may hold P2 district codes
                 # B-17: a trained military unit inherits city `col`'s Encampment training XP (best tier).
-                xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.view(1, -1)).max(dim=1).values
+                xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                 self._spawn_player(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
                 if self._builder_idx >= 0:
                     # P4/D-10: a completed builder moves the cost escalator
                     made_b = made_unit & (cur_c == self.UNIT_BASE + self._builder_idx)
-                    self.builders_trained = self.builders_trained + made_b.long()
+                    self.builders_trained.add_(made_b.long())
             # P2: a finished district completes its paved tile (queueDistrict's
             # queue item — the tile was reserved at queue time in q_dtile).
             made_district = done & (cur_c >= self.UNIT_BASE + self.NU)
@@ -14718,7 +14718,7 @@ class BatchSim:
                     break
                 if adj_own is None:
                     owner_nb = self.owner.gather(1, neigh_flat).reshape(B, T, 6)
-                    adj_own = ((owner_nb == col.view(B, 1, 1)) & neigh_valid).any(dim=2)
+                    adj_own = ((owner_nb == col.reshape(B, 1, 1)) & neigh_valid).any(dim=2)
                 cand_b = (self.owner == -1) & (self.cs_at < 0) & (self.rival_at < 0) & (dist_c <= 5) & adj_own
                 # order: dist asc, resource priority desc, yield sum desc, index asc
                 # C-6: priority reads LIVE (a paved bonus resource is GONE in
@@ -14760,9 +14760,9 @@ class BatchSim:
             sci_add = sci_add + t_c[:, 3]
             cul_add = cul_add + t_c[:, 4]
 
-        self.treasury = self.treasury + gold_add
-        self.science_total = self.science_total + sci_add
-        self.culture_total = self.culture_total + cul_add
+        self.treasury.add_(gold_add)
+        self.science_total.add_(sci_add)
+        self.culture_total.add_(cul_add)
         # B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level,
         # right after the city loop and BEFORE the loyalty collapses, exactly
         # where TS puts it.
@@ -14774,7 +14774,7 @@ class BatchSim:
         )
         # B-22 (#75): DIPLOMATIC FAVOR — government TIER + suzerainties, once
         # per turn at the civ level, the TS twin position.
-        self.diplo_favor = self.diplo_favor + self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._player_suzerain_count()
+        self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._player_suzerain_count())
         # B-22 (#74): the PLAYER's grievances decay by 1 each turn at peace with
         # EVERY rival (floor 0) — the TS twin position, immediately after the
         # tourism accumulator. NOTE: the +RR_WARMONGER_DOW accrual on declaring
@@ -14801,7 +14801,7 @@ class BatchSim:
 
         # --- the hostile world (after the city loop, before research) ----------------------
         if self.units_mode:
-            self.treasury = self.treasury - (self.p_alive.to(self.dtype) * self._p_maint[self.p_type]).sum(dim=1)
+            self.treasury.sub_((self.p_alive.to(self.dtype) * self._p_maint[self.p_type]).sum(dim=1))
             self._bankrupt_disband()  # GV-5 (after upkeep, before the barb phase — matches TS)
             self._barbarian_phase()
         if self.disasters:
@@ -14815,8 +14815,8 @@ class BatchSim:
         turn_science = sci_add
         turn_culture = cul_add
         if tech is None:
-            self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t, golden_civ=0)
-        self.tech_prog = self.tech_prog + turn_science
+            self.cur_tech.copy_(self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t, golden_civ=0))
+        self.tech_prog.add_(turn_science)
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_tech >= 0
             eff = self._eff_cost(
@@ -14834,18 +14834,18 @@ class BatchSim:
             # caches (subsumes the old conditional bumps; over-invalidation
             # only costs a recompute of identical values).
             self._eff_version += 1
-            self.tech_prog = torch.where(fin, self.tech_prog - eff, self.tech_prog)
-            self.cur_tech = torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech)
+            self.tech_prog.copy_(torch.where(fin, self.tech_prog - eff, self.tech_prog))
+            self.cur_tech.copy_(torch.where(fin, torch.full_like(self.cur_tech, -1), self.cur_tech))
             if tech is None:
-                self.cur_tech = self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t, golden_civ=0)  # B-24 (#79)
+                self.cur_tech.copy_(self._auto_pick(self.cur_tech, self.techs, self.tech_boosted, rd.t_cost, self._prereq_t, golden_civ=0))  # B-24 (#79)
         # Banked progress only drains once the tree is exhausted (mirrors
         # advanceResearch; in manual mode progress banks while undecided).
         no_tech = (self.cur_tech == -1) & ~self._available_mask(self.techs, self._prereq_t).any(dim=1)
-        self.tech_prog = torch.where(no_tech, torch.minimum(self.tech_prog, torch.zeros_like(self.tech_prog)), self.tech_prog)
+        self.tech_prog.copy_(torch.where(no_tech, torch.minimum(self.tech_prog, torch.zeros_like(self.tech_prog)), self.tech_prog))
 
         if civic is None:
-            self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c, golden_civ=0, is_civic=True)
-        self.civic_prog = self.civic_prog + turn_culture
+            self.cur_civic.copy_(self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c, golden_civ=0, is_civic=True))
+        self.civic_prog.add_(turn_culture)
         for _ in range(RESEARCH_LOOPS):
             active = self.cur_civic >= 0
             eff = self._eff_cost(
@@ -14861,12 +14861,12 @@ class BatchSim:
             # D-batch: ANY civic completion bumps (Feudalism farm-adjacency +
             # civic-gated buildings in _buildable) — subsumes the conditional.
             self._eff_version += 1
-            self.civic_prog = torch.where(fin, self.civic_prog - eff, self.civic_prog)
-            self.cur_civic = torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic)
+            self.civic_prog.copy_(torch.where(fin, self.civic_prog - eff, self.civic_prog))
+            self.cur_civic.copy_(torch.where(fin, torch.full_like(self.cur_civic, -1), self.cur_civic))
             if civic is None:
-                self.cur_civic = self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c, golden_civ=0, is_civic=True)  # B-24 (#79)
+                self.cur_civic.copy_(self._auto_pick(self.cur_civic, self.civics, self.civic_boosted, rd.c_cost, self._prereq_c, golden_civ=0, is_civic=True))  # B-24 (#79)
         no_civic = (self.cur_civic == -1) & ~self._available_mask(self.civics, self._prereq_c).any(dim=1)
-        self.civic_prog = torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog)
+        self.civic_prog.copy_(torch.where(no_civic, torch.minimum(self.civic_prog, torch.zeros_like(self.civic_prog)), self.civic_prog))
 
         # Player great people (advanceGreatPeople) — after research, mirroring
         # endTurn's order (rivalPhase claimed earlier this step). Science/culture
@@ -14905,7 +14905,7 @@ class BatchSim:
             slot_new = torch.where(self.founded_n < C, self.founded_n, hole)
             ok = free & (dcity.min(dim=1).values >= 4) & (drc.min(dim=1).values >= 4) & cap_ok  # P4/D-5: CITY_MIN_DIST = 4
             valid = can & ok
-            self.next_site_ptr = self.next_site_ptr + can.long()  # consumed either way
+            self.next_site_ptr.add_(can.long())  # consumed either way
             if not bool(valid.any()):
                 continue
             rows = valid.nonzero(as_tuple=True)[0]
@@ -15028,7 +15028,7 @@ class BatchSim:
                 self._reclaim_pool("p")
         if self.R > 0:
             # rc high-water = last-alive slot + 1 (what the next append uses)
-            rc_hw = (self.rc_alive.long() * (torch.arange(self.RC, device=dev).view(1, 1, -1) + 1)).amax(dim=2)
+            rc_hw = (self.rc_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)
             if int(rc_hw.max()) >= self._rc_reclaim_at:
                 self._reclaim_rc()
             # A-24: after compaction (the riskiest registry reshuffle) and all
@@ -15095,10 +15095,10 @@ class BatchSim:
             _gold = self.civ_age == 2
             _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
             _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
-            self.era_score = self.era_score + _es
-            self.player_faith = self.player_faith + _fa[:, 0].to(self.player_faith.dtype)
+            self.era_score.add_(_es)
+            self.player_faith.copy_(self.player_faith + _fa[:, 0].to(self.player_faith.dtype))
             if self.R > 0:
-                self.r_faith = self.r_faith + _fa[:, 1 : 1 + self.R].to(self.r_faith.dtype)
+                self.r_faith.copy_(self.r_faith + _fa[:, 1 : 1 + self.R].to(self.r_faith.dtype))
         dom = self._domination()  # GV-3
         # B-25 (Round B3): a science victory (3, player) / defeat (4, a rival)
         # set during THIS turn's project completions takes precedence over the
@@ -15120,7 +15120,7 @@ class BatchSim:
         rel_vt = torch.where(rel == 0, torch.full_like(rel, 5), torch.full_like(rel, 6))
         cul_vt = torch.where(cul == 0, torch.full_like(cul, 7), torch.full_like(cul, 8))
         dip_vt = torch.where(dip == 0, torch.full_like(dip, 9), torch.full_like(dip, 10))
-        self.victory_type = torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(dip >= 0, dip_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom)))))))  # GV-4/GV-3 + B-25 + B6-S3 + B-22
+        self.victory_type.copy_(torch.where(space_won, self.victory_type, torch.where(dom >= 0, torch.full_like(dom, 2), torch.where(rel >= 0, rel_vt, torch.where(cul >= 0, cul_vt, torch.where(dip >= 0, dip_vt, torch.where(self.game_over, torch.ones_like(dom), torch.zeros_like(dom))))))))  # GV-4/GV-3 + B-25 + B6-S3 + B-22
         # D-1: leader() (a full empire+rival score pass) only matters where a
         # game just ENDED — torch.where evaluated it eagerly every turn and
         # threw it away. Winner stays -1 for running games either way.
