@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival } from '../src/core/seats';
+import { civOfRival, rivalsOf } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit } from '../src/core/units';
 import { neighbors } from '../src/core/hex';
-import type { GameState } from '../src/core/types';
+import type { GameState, RivalCiv } from '../src/core/types';
 
 // B6-S2 rival MISSIONARY chassis (mirror of the GPU religion2_test pokes). The
 // scripted 250t rollout barely reaches a rival that has founded a religion AND
@@ -28,7 +28,7 @@ function newGame(rivals = 1): GameState {
  * any Temple (worship-buy faith sink) are neutralised so the missionary buy is
  * the sole faith lever. */
 function makeBuyer(state: GameState) {
-  const rv = state.rivals[0];
+  const rv = (state.seats[(0) + 1] as RivalCiv);
   rv.religion.founded = true;
   rv.religion.pantheon = 'GOD_OF_THE_SEA'; // claimed — skips the 25-faith drain
   rv.religion.enhancer = null; // no enhancer claimed
@@ -49,7 +49,7 @@ function rivalMissionaries(state: GameState, civId: number) {
 /** Force every city (player + rivals) to follow g so a freshly-bought
  * missionary finds no target and keeps its full charge count. */
 function followAll(state: GameState, g: number) {
-  for (const c of [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)]) c.followedReligion = g;
+  for (const c of [...state.cities, ...rivalsOf(state).flatMap((rv) => rv.cities)]) c.followedReligion = g;
 }
 
 describe('B6-S2 rival missionary chassis', () => {
@@ -143,7 +143,7 @@ describe('B6-S2 rival missionary chassis', () => {
     // base lump 10, charges 2 -> survives at 1.
     {
       const state = newGame();
-      const rv = state.rivals[0];
+      const rv = (state.seats[(0) + 1] as RivalCiv);
       const target = state.cities[0];
       target.followedReligion = 0; // != g (1)
       target.religionPressure = [0, 0];
@@ -158,7 +158,7 @@ describe('B6-S2 rival missionary chassis', () => {
     // SCRIPTURE lump 15, charges 1 -> dies (disbanded) at 0.
     {
       const state = newGame();
-      const rv = state.rivals[0];
+      const rv = (state.seats[(0) + 1] as RivalCiv);
       rv.religion.enhancer = 'SCRIPTURE';
       const target = state.cities[0];
       target.followedReligion = 0;

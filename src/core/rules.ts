@@ -17,7 +17,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
-import { tileRivalCiv, playerSeat, isPlayerSeat, tileSeat, isCityStateSeat, tileBelongsTo } from './seats';
+import { tileRivalCiv, playerSeat, isPlayerSeat, tileSeat, isCityStateSeat, tileBelongsTo, rivalsOf } from './seats';
 
 export interface RuleResult {
   ok: boolean;
@@ -61,7 +61,7 @@ export function canFoundCity(state: GameState, tileIndex: number): RuleResult {
       return no(`Too close to the city-state of ${cs.name}.`);
     }
   }
-  for (const rival of state.rivals ?? []) {
+  for (const rival of rivalsOf(state) ?? []) {
     for (const rc of rival.cities) {
       const center = state.map.tiles[rc.centerIndex];
       if (hexDistance(center.col, center.row, tile.col, tile.row) < CITY_MIN_DIST) {

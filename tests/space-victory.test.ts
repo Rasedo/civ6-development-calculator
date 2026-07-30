@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { RivalCiv } from '../src/core/types';
 import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity, availableProjects } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
@@ -67,7 +68,7 @@ describe('B-25 science victory', () => {
 
   it('a rival finishing the race first is a science DEFEAT (victoryType 4)', () => {
     const { state } = newGameWithCampus(1);
-    const rc = state.rivals[0].cities[0];
+    const rc = (state.seats[(0) + 1] as RivalCiv).cities[0];
     rc.queue = [{ kind: 'project', project: 'EXOPLANET_EXPEDITION', progress: 100000, cost: 1 }];
     endTurn(state);
     expect(state.victoryType).toBe(4);

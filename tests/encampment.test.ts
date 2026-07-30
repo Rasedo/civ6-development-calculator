@@ -68,7 +68,7 @@ describe('B-17 Encampment', () => {
   it('the ADDITIONAL Encampment strike fires (and only when complete)', () => {
     const { state, city } = battlefield();
     addEncampment(state, city, 10, 9);
-    state.rivals.push({ id: 0, atWar: true, cities: [] } as any);
+    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
     const rv = spawnUnit(state, 'SPEARMAN', near.index, civOfRival(0))!;
@@ -82,7 +82,7 @@ describe('B-17 Encampment', () => {
     const { state, city } = battlefield();
     const enc = addEncampment(state, city, 10, 9);
     enc.districtComplete = false; // not yet built
-    state.rivals.push({ id: 0, atWar: true, cities: [] } as any);
+    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
     const rv = spawnUnit(state, 'SPEARMAN', near.index, civOfRival(0))!;
@@ -95,7 +95,7 @@ describe('B-17 Encampment', () => {
     const { state, city } = battlefield();
     city.buildings.push('ANCIENT_WALLS');
     addEncampment(state, city, 10, 9);
-    state.rivals.push({ id: 0, atWar: true, cities: [] } as any);
+    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
     const rv = spawnUnit(state, 'SPEARMAN', near.index, civOfRival(0))!;

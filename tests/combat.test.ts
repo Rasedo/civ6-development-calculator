@@ -433,7 +433,7 @@ describe('B-4 XP & levels', () => {
   it('a city walls strike grants a surviving rival defender +2', () => {
     const { state, city } = battlefield();
     city.buildings.push('ANCIENT_WALLS');
-    state.rivals.push({ id: 0, atWar: true, cities: [] } as any);
+    state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col + 1, center.row); // adjacent → in range 1..2
     const rv = spawnUnit(state, 'SPEARMAN', near.index, civOfRival(0))!;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { RivalCiv } from '../src/core/types';
 import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { declareWar } from '../src/core/rivals';
@@ -66,13 +67,13 @@ describe('B-22 player grievances', () => {
   it('declaring war earns grievances', () => {
     const state = newGame(1);
     expect(playerSeat(state).warmonger ?? 0).toBe(0);
-    expect(declareWar(state, state.rivals[0].id).ok).toBe(true);
+    expect(declareWar(state, (state.seats[(0) + 1] as RivalCiv).id).ok).toBe(true);
     expect(playerSeat(state).warmonger).toBe(RR_WARMONGER_DOW);
   });
 
   it('grievances do NOT decay while a war is still running', () => {
     const state = newGame(1);
-    declareWar(state, state.rivals[0].id);
+    declareWar(state, (state.seats[(0) + 1] as RivalCiv).id);
     const before = playerSeat(state).warmonger!;
     endTurn(state);
     expect(playerSeat(state).warmonger).toBe(before); // still at war -> no decay
@@ -80,8 +81,8 @@ describe('B-22 player grievances', () => {
 
   it('grievances decay by 1 per turn once at peace with every rival', () => {
     const state = newGame(1);
-    declareWar(state, state.rivals[0].id);
-    state.rivals[0].atWar = false; // peace on every axis
+    declareWar(state, (state.seats[(0) + 1] as RivalCiv).id);
+    (state.seats[(0) + 1] as RivalCiv).atWar = false; // peace on every axis
     const before = playerSeat(state).warmonger!;
     endTurn(state);
     expect(playerSeat(state).warmonger).toBe(before - 1);
@@ -100,8 +101,8 @@ describe('B-22 player grievances', () => {
     // Two declarations put the player at 8, past the gang threshold of 6 —
     // the point at which rivals stop needing a strength advantage.
     const state = newGame(2);
-    declareWar(state, state.rivals[0].id);
-    declareWar(state, state.rivals[1].id);
+    declareWar(state, (state.seats[(0) + 1] as RivalCiv).id);
+    declareWar(state, (state.seats[(1) + 1] as RivalCiv).id);
     expect(playerSeat(state).warmonger).toBe(2 * RR_WARMONGER_DOW);
     expect(playerSeat(state).warmonger!).toBeGreaterThanOrEqual(RR_WARMONGER_GANG);
   });

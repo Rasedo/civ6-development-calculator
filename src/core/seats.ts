@@ -235,9 +235,23 @@ export function unitSeat(u: { seat: number }): number {
   return u.seat; // #51/S1.3b: the unit STORES its seat now; this is the last shim
 }
 
+/**
+ * The rival seats, in id order. #51/S1.3j: `state.rivals` is gone — the seats
+ * array IS the storage, and a rival is simply a seat above the player.
+ * Use `rivalCount` when you only need the number; this allocates.
+ */
+export function rivalsOf(state: GameState): RivalCiv[] {
+  return state.seats.slice(1) as RivalCiv[];
+}
+
+/** How many rival seats exist (no allocation — this is called in hot loops). */
+export function rivalCount(state: GameState): number {
+  return state.seats.length - 1;
+}
+
 /** The RivalCiv behind a seat, or undefined for the player/city-states/barbs. */
 export function rivalOfSeat(state: GameState, seat: number): RivalCiv | undefined {
-  return seat === PLAYER_CIV ? undefined : state.rivals.find((r) => r.id === rivalOfCiv(seat));
+  return isRivalSeat(seat) ? (state.seats[seat] as RivalCiv | undefined) : undefined;
 }
 
 /** Every city this seat holds. Player cities and rival cities are different
@@ -252,7 +266,7 @@ export function citiesOf(state: GameState, seat: number): (City | RivalCity)[] {
  *  by construction the `[...state.cities, ...rivals.flatMap(r => r.cities)]`
  *  order the existing scans build by hand. */
 export function allCities(state: GameState): (City | RivalCity)[] {
-  return [...state.cities, ...state.rivals.flatMap((r) => r.cities)];
+  return [...state.cities, ...rivalsOf(state).flatMap((r) => r.cities)];
 }
 
 /** Every unit this seat owns, in state.units order. */
@@ -276,10 +290,10 @@ export function civsAtWar(state: GameState, a: number, b: number): boolean {
   // A player pair (one side is civ 0) reads the rival's war-with-player bool.
   if (a === 0 || b === 0) {
     const rivalUnified = a === 0 ? b : a;
-    return state.rivals.find((r) => r.id === rivalUnified - 1)?.atWar ?? false;
+    return rivalOfSeat(state, rivalUnified)?.atWar ?? false;
   }
   // A rival↔rival pair: membership in either side's list (symmetric).
-  return state.rivals.find((r) => r.id === a - 1)?.atWarRivals?.includes(b - 1) ?? false;
+  return rivalOfSeat(state, a)?.atWarRivals?.includes(rivalOfCiv(b)) ?? false;
 }
 
 /** Set the war state between unified civs `a` and `b` (both sides written). */
@@ -287,12 +301,12 @@ export function setRivalWar(state: GameState, a: number, b: number, on: boolean)
   if (a === b) return;
   if (a === 0 || b === 0) {
     // The player pair rides the existing single boolean (both engines).
-    const rival = state.rivals.find((r) => r.id === (a === 0 ? b : a) - 1);
+    const rival = rivalOfSeat(state, a === 0 ? b : a);
     if (rival) rival.atWar = on;
     return;
   }
-  const ra = state.rivals.find((r) => r.id === a - 1);
-  const rb = state.rivals.find((r) => r.id === b - 1);
+  const ra = rivalOfSeat(state, a);
+  const rb = rivalOfSeat(state, b);
   if (!ra || !rb) return;
   const add = (r: RivalCiv, otherRivalId: number) => {
     const list = (r.atWarRivals ??= []);

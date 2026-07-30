@@ -9,7 +9,7 @@
  */
 
 import type { City, GameState, Unit, Yields } from './types';
-import { playerSeat, isPlayerSeat, isBarbSeat, PLAYER_CIV, tileSeat } from './seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, PLAYER_CIV, tileSeat, rivalsOf } from './seats';
 import { YIELD_KEYS, emptyYields, addYields } from './types';
 import {
   createGame,
@@ -893,7 +893,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     Math.min(1, playerSeat(s).envoysAvailable / 3),
     Math.min(1, metCityStates(s).length / 6),
     Math.min(1, s.cityStates.filter(isSuzerain).length / 6),
-    s.rivals.some((r) => r.atWar) ? 1 : 0,
+    rivalsOf(s).some((r) => r.atWar) ? 1 : 0,
     strengthRatio(state),
     rivalPressure(state),
   ];
@@ -902,7 +902,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
 /** Player strength vs the strongest rival, squashed to [-1, 1]. */
 function strengthRatio(state: GameState): number {
   const s = state;
-  const alive = s.rivals.filter((r) => r.cities.length > 0);
+  const alive = rivalsOf(s).filter((r) => r.cities.length > 0);
   if (alive.length === 0) return 1;
   const strongest = Math.max(...alive.map((r) => rivalStrength(s, r)));
   if (strongest <= 0) return 1;
@@ -913,7 +913,7 @@ function strengthRatio(state: GameState): number {
 function rivalPressure(state: GameState): number {
   const s = state;
   let best = Infinity;
-  for (const r of s.rivals) {
+  for (const r of rivalsOf(s)) {
     if (r.cities.length === 0) continue;
     best = Math.min(best, rivalProximity(s, r));
   }

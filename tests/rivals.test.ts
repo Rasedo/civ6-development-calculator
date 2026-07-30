@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CITY_MAX_HP } from '../src/data/units';
-import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV, rivalOfCiv, isPlayerSeat, isRivalSeat, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat } from '../src/core/seats';
+import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV, rivalOfCiv, isPlayerSeat, isRivalSeat, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
   createGame,
@@ -29,7 +29,7 @@ function addRival(
 ): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -86,7 +86,7 @@ function addRival(
     }
   }
   rival.cities.push(city);
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 
@@ -95,14 +95,14 @@ describe('rival placement and expansion', () => {
     const a = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, rivals: true });
     const b = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, rivals: true });
     expect(serialize(a)).toBe(serialize(b));
-    expect(a.rivals.length).toBeGreaterThanOrEqual(1);
-    for (const r of a.rivals) {
+    expect(rivalCount(a)).toBeGreaterThanOrEqual(1);
+    for (const r of rivalsOf(a)) {
       expect(r.cities.length).toBe(1);
       const center = a.map.tiles[r.cities[0].centerIndex];
       expect((isRivalSeat(tileSeat(center)) ? rivalOfCiv(tileSeat(center)) : -1)).toBe(r.id);
       expect(center.district).toBe('CITY_CENTER');
       expect(rivalUnits(a, r.id).length).toBeGreaterThanOrEqual(1);
-      for (const other of a.rivals) {
+      for (const other of rivalsOf(a)) {
         if (other.id === r.id) continue;
         const oc = a.map.tiles[other.cities[0].centerIndex];
         expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(10);
@@ -145,11 +145,11 @@ describe('A-24 rival district/tile registry coherence', () => {
       assertRivalRegistryCoherent(state);
     }
     // sanity: rivals actually placed some districts to make the check meaningful
-    const placed = state.rivals.reduce(
+    const placed = rivalsOf(state).reduce(
       (n, r) => n + r.cities.reduce((m, c) => m + c.districts.length + (c.wonders?.length ?? 0), 0),
       0,
     );
-    expect(placed).toBeGreaterThan(state.rivals.length); // more than just the CITY_CENTERs
+    expect(placed).toBeGreaterThan(rivalCount(state)); // more than just the CITY_CENTERs
   });
 
   it('the scan catches a district tile registered to a SIBLING rc', () => {

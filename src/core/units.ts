@@ -19,7 +19,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, NO_SEAT } from './seats';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, NO_SEAT, rivalsOf } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -735,7 +735,7 @@ export function rivalCityAt(
   state: GameState,
   tileIndex: number,
 ): { rival: RivalCiv; city: RivalCity } | undefined {
-  for (const rival of state.rivals) {
+  for (const rival of rivalsOf(state)) {
     const city = rival.cities.find((c) => c.centerIndex === tileIndex);
     if (city) return { rival, city };
   }

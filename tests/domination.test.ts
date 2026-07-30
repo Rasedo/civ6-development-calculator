@@ -9,7 +9,8 @@ const mk = (capitalTiles: number[], playerCenters: number[], rivalCenters: numbe
   ({
     capitalTiles,
     cities: playerCenters.map((centerIndex) => ({ centerIndex })),
-    rivals: rivalCenters.map((cs) => ({ cities: cs.map((centerIndex) => ({ centerIndex })) })),
+    // #51/S1.3j: seats[0] is the player, seats[r+1] the rivals — `rivals` is gone
+    seats: [{ seat: 0 }, ...rivalCenters.map((cs) => ({ cities: cs.map((centerIndex) => ({ centerIndex })) }))],
   }) as unknown as GameState;
 
 describe('GV-3 dominationWinner', () => {

@@ -58,7 +58,7 @@ function addRival(state: GameState, id: number, atWar: boolean): RivalCiv {
     gpp: {},
     gpEarned: [],
   } as unknown as RivalCiv;
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 

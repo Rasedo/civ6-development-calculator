@@ -19,7 +19,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { computeUnlocks } from './effects';
 import { CITY_WORK_RADIUS } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat } from './seats';
+import { tileForeignTo, PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, rivalsOf } from './seats';
 
 /** Balanced yield weights used to value a tile's raw output. */
 const YIELD_WEIGHTS: Yields = {
@@ -121,7 +121,7 @@ export function scoreSettleSites(state: GameState, limit = 8): SettleSiteScore[]
     }
     // Settling in a rival's lap invites border friction and early wars.
     let rivalPenalty = 0;
-    for (const rival of state.rivals) {
+    for (const rival of rivalsOf(state)) {
       for (const rc of rival.cities) {
         const rt = state.map.tiles[rc.centerIndex];
         const d = hexDistance(site.col, site.row, rt.col, rt.row);

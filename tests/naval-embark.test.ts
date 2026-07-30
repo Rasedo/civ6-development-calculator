@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat, tileCity, setTileOwner } from '../src/core/seats';
+import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat, tileCity, setTileOwner, rivalCount } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, purchaseUnit } from '../src/core/game';
 import {
@@ -32,7 +32,7 @@ afterEach(() => setEmbarkLive(false)); // never leak the switch into other suite
 
 function addWarRival(state: GameState, col: number, row: number, techs: string[]): RivalCiv {
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -61,7 +61,7 @@ function addWarRival(state: GameState, col: number, row: number, techs: string[]
   };
   // A minimal off-map "home" so the rival is a real civ; the war-march targets
   // the PLAYER city, so no rival city geometry is needed here.
-  state.rivals.push(rival);
+  state.seats.push(rival);
   const tile = tileAtCoords(state.map, col, row);
   spawnUnit(state, 'WARRIOR', tile.index, civOfRival(rival.id))!;
   return rival;
@@ -214,7 +214,7 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
 
 function bareRival(state: GameState, atWar = true): RivalCiv {
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name: 'Carthage',
     color: '#2d8',
     aggression: 0.5,
@@ -242,7 +242,7 @@ function bareRival(state: GameState, atWar = true): RivalCiv {
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     bestMeleeCS: 0,
   };
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 

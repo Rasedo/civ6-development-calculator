@@ -379,7 +379,6 @@ export interface GameState {
   /** Independent city-states on the map ([] = none / feature off). */
   cityStates: CityState[];
   /** Scripted rival civilizations ([] = none / feature off). */
-  rivals: RivalCiv[];
   /** Pantheon beliefs claimed by rivals (unavailable to the player). */
   claimedPantheons: string[];
   /** Follower/founder beliefs claimed by rival religions. */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat, civOfRival } from '../src/core/seats';
+import type { RivalCiv } from '../src/core/types';
+import { playerSeat, civOfRival, rivalCount, rivalsOf } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 
@@ -23,8 +24,8 @@ function newGame(rivals = 1) {
 
 /** Pre-load pressure so this endTurn's spread flips every listed city to g. */
 function pressAll(state: ReturnType<typeof newGame>, g: number, amount = 500) {
-  const nRel = 1 + state.rivals.length;
-  const all = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
+  const nRel = 1 + rivalCount(state);
+  const all = [...state.cities, ...rivalsOf(state).flatMap((rv) => rv.cities)];
   for (const c of all) {
     const pres = new Array(nRel).fill(0);
     pres[g] = amount;
@@ -35,7 +36,7 @@ function pressAll(state: ReturnType<typeof newGame>, g: number, amount = 500) {
 describe('B6-S3 religious victory', () => {
   it('a rival religion predominant in every civ is a DEFEAT (victoryType 6)', () => {
     const state = newGame(1);
-    const rv = state.rivals[0];
+    const rv = (state.seats[(0) + 1] as RivalCiv);
     rv.religion.founded = true;
     rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);
@@ -56,7 +57,7 @@ describe('B6-S3 religious victory', () => {
 
   it('no victory while any alive civ lacks a >half majority', () => {
     const state = newGame(1);
-    const rv = state.rivals[0];
+    const rv = (state.seats[(0) + 1] as RivalCiv);
     rv.religion.founded = true;
     rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);
@@ -71,10 +72,10 @@ describe('B6-S3 religious victory', () => {
 
   it('a civ with zero cities is excluded from the every-civ requirement', () => {
     const state = newGame(2);
-    const rv = state.rivals[0];
+    const rv = (state.seats[(0) + 1] as RivalCiv);
     // Rival 1 is eliminated: no cities, no units.
-    state.rivals[1].cities = [];
-    state.units = state.units.filter((u) => !(u.seat === civOfRival(state.rivals[1].id)));
+    (state.seats[(1) + 1] as RivalCiv).cities = [];
+    state.units = state.units.filter((u) => !(u.seat === civOfRival((state.seats[(1) + 1] as RivalCiv).id)));
     rv.religion.founded = true;
     rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);

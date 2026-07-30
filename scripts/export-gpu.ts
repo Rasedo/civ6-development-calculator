@@ -28,7 +28,7 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
 
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
@@ -1327,10 +1327,10 @@ for (let s = 0; s < N_SEEDS; s++) {
   const eraScoreInit = Array.from({ length: 1 + R_MAX }, (_, c) => state.eraScore?.[c] ?? 0);
   const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
   const rivalCitiesInit = new Map(
-    state.rivals.map((r) => [r.id, r.cities.map((rc) => ({ id: rc.id, center: rc.centerIndex, pop: rc.population }))]),
+    rivalsOf(state).map((r) => [r.id, r.cities.map((rc) => ({ id: rc.id, center: rc.centerIndex, pop: rc.population }))]),
   );
   const rivalUnitsInit = new Map(
-    state.rivals.map((r) => [
+    rivalsOf(state).map((r) => [
       r.id,
       state.units
         .filter((u) => isRivalSeat(u.seat) && u.seat === civOfRival(r.id))
@@ -1939,7 +1939,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     csMax: CS_MAX,
     rMax: R_MAX,
     cityStates: csAtStart,
-    rivals: state.rivals.map((r, i) => {
+    rivals: rivalsOf(state).map((r, i) => {
       // C1-A3: the GPU maps rival ARRAY INDEX r to civ r+1 (src/core/civs.ts
       // numbering), which is only sound while ids stay contiguous 0..R-1.
       if (r.id !== i) throw new Error(`rival ids must be contiguous 0..R-1 (got id ${r.id} at index ${i})`);
@@ -1961,10 +1961,10 @@ for (let s = 0; s < N_SEEDS; s++) {
   writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));
   const pops = state.cities.map((c) => c.population).join('/');
   const envoys = state.cityStates.map((cs) => cs.envoys).join('/');
-  const wars = state.rivals.filter((r) => r.atWar).length;
+  const wars = rivalsOf(state).filter((r) => r.atWar).length;
   console.log(
     `seed${seed}.json: ${N_TURNS} turns, ${state.cities.length}/${C_MAX} cities, pop ${pops}, ` +
-      `${state.cityStates.length} CS (envoys ${envoys}), ${state.rivals.length} rivals (${wars} at war), ${boostSchedule.length} boosts`,
+      `${state.cityStates.length} CS (envoys ${envoys}), ${rivalCount(state)} rivals (${wars} at war), ${boostSchedule.length} boosts`,
   );
 }
 // ROUND B10 lesson: a SEED_OVERRIDES change leaves the PREVIOUS seed's

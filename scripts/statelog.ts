@@ -3,7 +3,7 @@
  * as gpu/statelog.py so gpu/logdiff.py can align them. Keep the two in lockstep:
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfCiv, civOfRival, tileOwnedByCiv } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfCiv, civOfRival, tileOwnedByCiv, rivalCount } from '../src/core/seats';
 import { rivalCityYields } from '../src/core/rivals';
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { isWater } from '../src/core/query';
@@ -16,7 +16,7 @@ import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { RESOURCES } from '../src/data/resources';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
-import type { GameState } from '../src/core/types';
+import type { GameState, RivalCiv } from '../src/core/types';
 
 function frontCost(rc: any): number {
   const q = rc.queue[0];
@@ -106,8 +106,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     );
   }
 
-  for (let r = 0; r < state.rivals.length; r++) {
-    const rival = state.rivals[r];
+  for (let r = 0; r < rivalCount(state); r++) {
+    const rival = (state.seats[(r) + 1] as RivalCiv);
     if (rival.cities.length === 0) continue;
     const pop = rival.cities.reduce((a, rc) => a + rc.population, 0);
     const rt = state.map.tiles.filter((t) => tileOwnedByCiv(t, civOfRival(rival.id)));

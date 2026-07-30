@@ -5,7 +5,7 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type RivalCiv, type Yields } from './types';
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat } from './seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, civOfRival } from './seats';
 import { hexDistance } from './hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { isCivicComplete } from './effects';
@@ -162,7 +162,7 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       // B-23 international: a player route to a met rival's city — gold only.
       // Suspended while at war with that rival (destination-civ interdiction)
       // or while hostiles prowl either endpoint.
-      const rv = state.rivals.find((r) => r.id === route.toRivalCiv);
+      const rv = rivalOfSeat(state, civOfRival(route.toRivalCiv));
       const rc = rv?.cities.find((c) => c.id === route.toRivalCity);
       if (rv && rc && !rv.atWar && !routeRaidedAt(state, [city.centerIndex, rc.centerIndex])) {
         addYields(out, routeYieldsInternational(state, rc));
@@ -252,7 +252,7 @@ export function addCsTradeRoute(state: GameState, from: number, csId: number): R
  * civ `rivalCiv`'s city `rivalCity`? */
 export function canAddIntlTradeRoute(state: GameState, from: number, rivalCiv: number, rivalCity: number): RuleResult {
   const a = state.cities.find((c) => c.id === from);
-  const rv = state.rivals.find((r) => r.id === rivalCiv);
+  const rv = rivalOfSeat(state, civOfRival(rivalCiv));
   const rc = rv?.cities.find((c) => c.id === rivalCity);
   if (!a || !rv || !rc) return { ok: false, reason: 'No such city / rival city.' };
   if (state.tradeRoutes.length >= tradeCapacity(state)) {
@@ -276,7 +276,7 @@ export function addIntlTradeRoute(state: GameState, from: number, rivalCiv: numb
   layRouteRoad(
     state,
     from,
-    state.rivals.find((r) => r.id === rivalCiv)?.cities.find((c) => c.id === rivalCity)?.centerIndex ?? -1,
+    rivalOfSeat(state, civOfRival(rivalCiv))?.cities.find((c) => c.id === rivalCity)?.centerIndex ?? -1,
   ); // B-23 (#71)
   return { ok: true };
 }

@@ -4,7 +4,7 @@
  * the end-of-turn loop, and serialization.
  */
 
-import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit } from './types';
+import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit, RivalCiv } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin, hexDistance } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots, playerTourism } from './city';
@@ -34,7 +34,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV, setTileOwner } from './seats';
+import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV, setTileOwner, rivalsOf, rivalCount } from './seats';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -136,7 +136,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
     seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] }],
-    rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
     claimedEnhancers: [],
@@ -236,15 +235,15 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
  * city there) makes domination impossible, so we return -1.
  */
 export function dominationWinner(state: GameState): number {
-  const nRivals = state.rivals?.length ?? 0;
+  const nRivals = rivalsOf(state)?.length ?? 0;
   if (nRivals === 0) return -1; // nothing to conquer — a solo game never dominates
   const caps = state.capitalTiles;
   const expected = 1 + nRivals;
   if (!caps || caps.filter((t) => t !== undefined).length < expected) return -1;
   const ownerOf = (ct: number): number => {
     if (state.cities.some((c) => c.centerIndex === ct)) return 0;
-    for (let r = 0; r < state.rivals.length; r++) {
-      if (state.rivals[r].cities.some((rc) => rc.centerIndex === ct)) return r + 1;
+    for (let r = 0; r < rivalCount(state); r++) {
+      if ((state.seats[(r) + 1] as RivalCiv).cities.some((rc) => rc.centerIndex === ct)) return r + 1;
     }
     return -1;
   };
@@ -781,7 +780,7 @@ export function endTurn(state: GameState): void {
   // casus-belli ww differential (SURPRISE ×2 / FORMAL ×1) is rival↔rival only —
   // the player has no denounce verb, and doubling the player path surfaced a
   // dormant −3/−4-tier economic divergence (seed 9092). Unchanged from S2.
-  const atWarNow = state.rivals.some((rv) => rv.atWar && rv.cities.length > 0);
+  const atWarNow = rivalsOf(state).some((rv) => rv.atWar && rv.cities.length > 0);
   playerSeat(state).warWeariness = atWarNow
     ? Math.min(WAR_WEARINESS_CAP, (playerSeat(state).warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
     : Math.max(0, (playerSeat(state).warWeariness ?? 0) - WAR_WEARINESS_DECAY);
@@ -907,7 +906,7 @@ export function endTurn(state: GameState): void {
   // B-22 (#74): the player's GRIEVANCES decay by 1 each turn they are at peace
   // with EVERY rival (floor 0) — the exact twin of the rival decay, at the same
   // per-turn accumulator position so both engines apply it together.
-  if ((playerSeat(state).warmonger ?? 0) > 0 && !state.rivals.some((rv) => rv.atWar)) {
+  if ((playerSeat(state).warmonger ?? 0) > 0 && !rivalsOf(state).some((rv) => rv.atWar)) {
     playerSeat(state).warmonger = (playerSeat(state).warmonger ?? 0) - 1;
   }
 
@@ -971,7 +970,7 @@ export function endTurn(state: GameState): void {
   applyDedications(state, (civ, amt) => {
     if (civ === 0) playerSeat(state).faith += amt;
     else {
-      const rv = state.rivals[civ - 1];
+      const rv = rivalsOf(state)[civ - 1];
       if (rv) rv.faith = (rv.faith ?? 0) + amt;
     }
   });
@@ -1026,8 +1025,8 @@ export function endTurn(state: GameState): void {
  * unified civ id. Returns the winner's unified id, or -1.
  */
 function diplomaticVictor(state: GameState): number {
-  const alive = [state.cities.length > 0, ...state.rivals.map((rv) => rv.cities.length > 0)];
-  const pts = [playerSeat(state).diploPoints ?? 0, ...state.rivals.map((rv) => rv.diploPoints ?? 0)];
+  const alive = [state.cities.length > 0, ...rivalsOf(state).map((rv) => rv.cities.length > 0)];
+  const pts = [playerSeat(state).diploPoints ?? 0, ...rivalsOf(state).map((rv) => rv.diploPoints ?? 0)];
   for (let c = 0; c < pts.length; c++) {
     if (alive[c] && pts[c] >= DIPLO_VICTORY_POINTS) return c;
   }
@@ -1053,11 +1052,11 @@ function diplomaticVictor(state: GameState): number {
  * never both qualify against each other.
  */
 function cultureVictor(state: GameState): number {
-  const nCivs = 1 + state.rivals.length;
+  const nCivs = 1 + rivalCount(state);
   const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
-  const alive = [state.cities.length > 0, ...state.rivals.map((rv) => rv.cities.length > 0)];
-  const tourism = [playerSeat(state).tourism ?? 0, ...state.rivals.map((rv) => rv.tourism ?? 0)];
-  const culture = [playerSeat(state).cultureTotal, ...state.rivals.map((rv) => rv.cultureTotal ?? 0)];
+  const alive = [state.cities.length > 0, ...rivalsOf(state).map((rv) => rv.cities.length > 0)];
+  const tourism = [playerSeat(state).tourism ?? 0, ...rivalsOf(state).map((rv) => rv.tourism ?? 0)];
+  const culture = [playerSeat(state).cultureTotal, ...rivalsOf(state).map((rv) => rv.cultureTotal ?? 0)];
   // Milli-rounded before the floor: culture is a non-dyadic float accumulator,
   // so a sub-milli drift must not move a tourist count across engines (the
   // GS bankruptcy-test convention).
@@ -1090,11 +1089,11 @@ function cultureVictor(state: GameState): number {
 function religiousVictor(state: GameState): number {
   const civs: City[][] = [];
   if (state.cities.length > 0) civs.push(state.cities);
-  for (const rv of state.rivals) if (rv.cities.length > 0) civs.push(rv.cities);
+  for (const rv of rivalsOf(state)) if (rv.cities.length > 0) civs.push(rv.cities);
   if (civs.length === 0) return -1;
-  const nRel = 1 + state.rivals.length;
+  const nRel = 1 + rivalCount(state);
   for (let g = 0; g < nRel; g++) {
-    const founded = g === 0 ? !!playerSeat(state).religion?.founded : !!state.rivals[g - 1]?.religion.founded;
+    const founded = g === 0 ? !!playerSeat(state).religion?.founded : !!rivalsOf(state)[g - 1]?.religion.founded;
     if (!founded) continue;
     let all = true;
     for (const cs of civs) {
@@ -1210,7 +1209,7 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
  * hygiene, mirrored on the GPU by zeroing dead/absent slots each turn.
  */
 function spreadReligiousPressure(state: GameState): void {
-  const R = state.rivals.length;
+  const R = rivalCount(state);
   const nRel = 1 + R;
   const holy: number[] = new Array(nRel).fill(-1);
   const rel_1214 = playerSeat(state).religion;
@@ -1218,7 +1217,7 @@ function spreadReligiousPressure(state: GameState): void {
     holy[0] = rel_1214.holyTile;
   }
   for (let i = 0; i < R; i++) {
-    const rv = state.rivals[i];
+    const rv = (state.seats[(i) + 1] as RivalCiv);
     if (rv.religion.founded && rv.religion.holyTile != null && rv.religion.holyTile >= 0) holy[i + 1] = rv.religion.holyTile;
   }
   if (!holy.some((h) => h >= 0)) return; // no religion exists yet — nothing to spread
@@ -1230,7 +1229,7 @@ function spreadReligiousPressure(state: GameState): void {
     range[0] += ENHANCER_BELIEFS[pEnh]?.effects.pressureRangeBonus ?? 0;
   }
   for (let i = 0; i < R; i++) {
-    const eb = state.rivals[i].religion.enhancer;
+    const eb = (state.seats[(i) + 1] as RivalCiv).religion.enhancer;
     if (eb) range[i + 1] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
   }
   const tiles = state.map.tiles;
@@ -1307,7 +1306,7 @@ export function deserialize(json: string): GameState {
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
     state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] },
-    ...(state.rivals ?? []),
+    ...(rivalsOf(state) ?? []),
   ];
   playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
   playerSeat(state).research.boosted ??= [];
@@ -1347,12 +1346,12 @@ export function deserialize(json: string): GameState {
   state.cityStates ??= [];
   playerSeat(state).influencePoints ??= 0;
   playerSeat(state).envoysAvailable ??= 0;
-  state.rivals ??= [];
+  state.seats ??= []; // #51/S1.3j: seats IS the rival storage now
   // C1-A2: rival cities became full City objects; older saves carry the
   // scalar shape (growthBox, no queue/districts/…). Fill ONLY the missing
   // fields in place — a current-shape save must round-trip byte-identically
   // (the rival determinism test serializes and compares).
-  for (const r of state.rivals) {
+  for (const r of rivalsOf(state)) {
     // C1-B3: older saves lack the rival research trees.
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
     r.treasury ??= 0; // VP-G1

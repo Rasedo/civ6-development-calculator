@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { transferRivalCityToRival } from '../src/core/rivals';
 import { tilesWithin } from '../src/core/hex';
@@ -20,7 +20,7 @@ import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
 function addRival(state: GameState, col: number, row: number, name: string): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name,
     color: '#8e3db8',
     aggression: 0.5,
@@ -76,7 +76,7 @@ function addRival(state: GameState, col: number, row: number, name: string): Riv
     }
   }
   rival.cities.push(city);
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 

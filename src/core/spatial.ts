@@ -11,7 +11,7 @@ import { tileYields } from './yields';
 import { fogActive, isExplored } from './fog';
 import { unitsHostile, unitDomain } from './units';
 import { RESOURCES } from '../data/resources';
-import { tileForeignTo, PLAYER_CIV, isPlayerSeat, tileSeat } from './seats';
+import { tileForeignTo, PLAYER_CIV, isPlayerSeat, tileSeat, rivalsOf } from './seats';
 
 export const SPATIAL_PLANES = [
   'water',
@@ -92,7 +92,7 @@ export function spatialObservation(state: GameState): Uint8Array {
     if (fog && !isExplored(state, cs.centerIndex)) continue;
     out[at(P.foreignCityCenter, cs.centerIndex)] = clamp(cs.population);
   }
-  for (const rival of state.rivals) {
+  for (const rival of rivalsOf(state)) {
     for (const rc of rival.cities) {
       if (fog && !isExplored(state, rc.centerIndex)) continue;
       out[at(P.foreignCityCenter, rc.centerIndex)] = clamp(rc.population);

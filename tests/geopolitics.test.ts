@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, tileAtCoords } from './helpers';
 import { rivalPhase, isFormalWar, rivalStrength } from '../src/core/rivals';
-import { civsAtWar, setRivalWar, civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat } from '../src/core/seats';
+import { civsAtWar, setRivalWar, civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount } from '../src/core/seats';
 import { hostileRangedStrike, attackTargets } from '../src/core/combat';
 import { unitsHostile, spawnUnit } from '../src/core/units';
 import { tilesWithin } from '../src/core/hex';
@@ -18,7 +18,7 @@ import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -75,7 +75,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     }
   }
   rival.cities.push(city);
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 
@@ -175,12 +175,12 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
 
   it('anti-thrash: weary targets and weary aggressors block the DoW', () => {
     const weary = pairState();
-    weary.state.rivals[1].warWeariness = RR_PEACE_WW + 1; // would sue out the same turn
+    (weary.state.seats[1 + 1] as RivalCiv).warWeariness = RR_PEACE_WW + 1; // would sue out the same turn
     rivalPhase(weary.state);
     expect(civsAtWar(weary.state, 1, 2)).toBe(false);
 
     const aggr = pairState();
-    aggr.state.rivals[0].warWeariness = RR_DOW_WW_MAX; // war-weary aggressor
+    (aggr.state.seats[0 + 1] as RivalCiv).warWeariness = RR_DOW_WW_MAX; // war-weary aggressor
     rivalPhase(aggr.state);
     expect(civsAtWar(aggr.state, 1, 2)).toBe(false);
   });

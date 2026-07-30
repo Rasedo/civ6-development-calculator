@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, NO_SEAT } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, NO_SEAT, rivalCount } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { rivalPhase, rivalUnits } from '../src/core/rivals';
 import { cityStatePhase, rivalIsSuzerain } from '../src/core/cityStates';
@@ -21,7 +21,7 @@ import type { CityState, CityStateType, GameState, RivalCiv, RivalCity } from '.
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -78,7 +78,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     }
   }
   rival.cities.push(city);
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount, rivalsOf } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { createGame, buildingFaithCost } from '../src/core/game';
 import { rivalPhase, rivalCityYields } from '../src/core/rivals';
@@ -13,7 +13,7 @@ import type { GameState, RivalCity, RivalCiv, Tile } from '../src/core/types';
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
-    id: state.rivals.length,
+    id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
     aggression: 0.5,
@@ -70,7 +70,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     }
   }
   rival.cities.push(city);
-  state.rivals.push(rival);
+  state.seats.push(rival);
   return rival;
 }
 
@@ -225,8 +225,8 @@ describe('B9-R3 rival WORSHIP faith-buy (rivalPhase)', () => {
 describe('B9-R3 rival PALACE grant (foundRivalCity / captureRivalCity)', () => {
   it("a rival's FIRST city carries the PALACE", () => {
     const game = createGame({ width: 44, height: 26, seed: 3, withResources: true, withWonders: true, rivals: true });
-    expect(game.rivals.length).toBeGreaterThanOrEqual(1);
-    for (const r of game.rivals) {
+    expect(rivalCount(game)).toBeGreaterThanOrEqual(1);
+    for (const r of rivalsOf(game)) {
       const capital = r.cities[0];
       expect(capital.isCapital).toBe(true);
       expect(capital.buildings).toContain('PALACE');

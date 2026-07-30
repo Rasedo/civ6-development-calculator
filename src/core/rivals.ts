@@ -71,7 +71,7 @@ import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -251,8 +251,7 @@ export function placeRivals(state: GameState, count?: number): void {
     // spawns so spawnUnit's bestMeleeCS chokepoint can find the rival —
     // "strongest melee ever FIELDED" includes the starting army (defense
     // 20 from turn 0; the GPU seeds r_best_melee from the fixture pools).
-    state.rivals.push(rival);
-    state.seats.push(rival); // #51/S1.2: the SAME object — seats[r+1] is rival r
+    state.seats.push(rival); // #51/S1.3j: seats IS the storage — seats[r+1] is rival r
     spawnUnit(state, 'WARRIOR', tile.index, civOfRival(rival.id));
   });
 }
@@ -351,8 +350,8 @@ export function isFormalWar(rival: RivalCiv, otherRivalId: number): boolean {
 
 /** Set/clear the FORMAL flag on the (a,b) rival pair symmetrically. */
 function setWarKindFormal(state: GameState, a: number, b: number, formal: boolean): void {
-  const ra = state.rivals.find((r) => r.id === a - 1);
-  const rb = state.rivals.find((r) => r.id === b - 1);
+  const ra = rivalsOf(state).find((r) => r.id === a - 1);
+  const rb = rivalsOf(state).find((r) => r.id === b - 1);
   if (!ra || !rb) return;
   const mark = (r: RivalCiv, otherRivalId: number) => {
     const list = (r.warKindFormal ??= []);
@@ -377,14 +376,14 @@ function setWarKindFormal(state: GameState, a: number, b: number, formal: boolea
  * scan (denouncer id asc, target id asc); no nextRandom.
  */
 function rivalRivalDenounce(state: GameState): void {
-  for (let a = 0; a < state.rivals.length; a++) {
-    const ri = state.rivals[a];
+  for (let a = 0; a < rivalCount(state); a++) {
+    const ri = (state.seats[(a) + 1] as RivalCiv);
     if (ri.cities.length === 0) continue;
     const si = rivalStrength(state, ri);
     const stamps = (ri.denouncedTurn ??= {});
-    for (let b = 0; b < state.rivals.length; b++) {
+    for (let b = 0; b < rivalCount(state); b++) {
       if (a === b) continue;
-      const rj = state.rivals[b];
+      const rj = (state.seats[(b) + 1] as RivalCiv);
       if (rj.cities.length === 0) continue;
       if (stamps[rj.id] !== undefined) continue; // already denounced (grudge)
       if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
@@ -403,11 +402,11 @@ function rivalRivalDenounce(state: GameState): void {
   // stands in for real Civ 6's Declaration-of-Friendship prerequisite. Written
   // symmetrically, and only ever from the LOWER id so the scan order cannot
   // matter.
-  for (let a = 0; a < state.rivals.length; a++) {
-    const ri = state.rivals[a];
+  for (let a = 0; a < rivalCount(state); a++) {
+    const ri = (state.seats[(a) + 1] as RivalCiv);
     if (ri.cities.length === 0) continue;
-    for (let b = a + 1; b < state.rivals.length; b++) {
-      const rj = state.rivals[b];
+    for (let b = a + 1; b < rivalCount(state); b++) {
+      const rj = (state.seats[(b) + 1] as RivalCiv);
       if (rj.cities.length === 0) continue;
       if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if ((ri.alliedRivals ?? []).includes(rj.id)) continue;
@@ -430,15 +429,15 @@ function breakAlliance(ri: RivalCiv, rj: RivalCiv): void {
 
 function rivalRivalDeclareWars(state: GameState): void {
   const used = new Set<number>();
-  for (let a = 0; a < state.rivals.length; a++) {
-    const ri = state.rivals[a];
+  for (let a = 0; a < rivalCount(state); a++) {
+    const ri = (state.seats[(a) + 1] as RivalCiv);
     if (ri.cities.length === 0 || used.has(ri.id)) continue;
     // anti-thrash: a war-weary civ never opens a new front (documented).
     if ((ri.warWeariness ?? 0) >= RR_DOW_WW_MAX) continue;
     const si = rivalStrength(state, ri);
-    for (let b = 0; b < state.rivals.length; b++) {
+    for (let b = 0; b < rivalCount(state); b++) {
       if (a === b) continue;
-      const rj = state.rivals[b];
+      const rj = (state.seats[(b) + 1] as RivalCiv);
       if (rj.cities.length === 0 || used.has(rj.id)) continue;
       if (civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if (rivalRivalProximity(state, ri, rj) > RR_DOW_PROXIMITY) continue;
@@ -480,10 +479,10 @@ function rivalRivalDeclareWars(state: GameState): void {
  * peace path (untouched this stage).
  */
 function rivalRivalMakePeace(state: GameState): void {
-  for (let a = 0; a < state.rivals.length; a++) {
-    const ri = state.rivals[a];
-    for (let b = a + 1; b < state.rivals.length; b++) {
-      const rj = state.rivals[b];
+  for (let a = 0; a < rivalCount(state); a++) {
+    const ri = (state.seats[(a) + 1] as RivalCiv);
+    for (let b = a + 1; b < rivalCount(state); b++) {
+      const rj = (state.seats[(b) + 1] as RivalCiv);
       if (!civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
       if ((ri.warWeariness ?? 0) > RR_PEACE_WW || (rj.warWeariness ?? 0) > RR_PEACE_WW) {
         setRivalWar(state, ri.id + 1, rj.id + 1, false);
@@ -495,7 +494,7 @@ function rivalRivalMakePeace(state: GameState): void {
 }
 
 export function declareWar(state: GameState, rivalId: number): RuleResult {
-  const rival = state.rivals.find((r) => r.id === rivalId);
+  const rival = rivalOfSeat(state, civOfRival(rivalId));
   if (!rival) return no('No such civilization.');
   if (rival.atWar) return no('Already at war.');
   rival.atWar = true;
@@ -508,7 +507,7 @@ export function declareWar(state: GameState, rivalId: number): RuleResult {
 }
 
 export function sueForPeace(state: GameState, rivalId: number): RuleResult {
-  const rival = state.rivals.find((r) => r.id === rivalId);
+  const rival = rivalOfSeat(state, civOfRival(rivalId));
   if (!rival) return no('No such civilization.');
   if (!rival.atWar) return no('Not at war.');
   if (rival.warTurns < PEACE_MIN_WAR_TURNS) {
@@ -586,7 +585,7 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
     if (d <= LOYALTY_RANGE) own += c.population * (LOYALTY_RANGE + 1 - d);
   }
   own *= agePressureFactor(state, 0);
-  for (const rival of state.rivals) {
+  for (const rival of rivalsOf(state)) {
     let sub = 0;
     for (const rc of rival.cities) {
       const t = state.map.tiles[rc.centerIndex];
@@ -605,7 +604,7 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
  * already computed). Returns true when the city has hit 0 and must flip.
  */
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, govBonus = 0): boolean {
-  if (!state.rivals.some((r) => r.cities.length > 0)) return false;
+  if (!rivalsOf(state).some((r) => r.cities.length > 0)) return false;
   if (city.isCapital) {
     city.loyalty = LOYALTY_MAX;
     return false;
@@ -622,7 +621,7 @@ export function flipCityToRival(state: GameState, city: City): void {
   const here = state.map.tiles[city.centerIndex];
   let winner: RivalCiv | null = null;
   let best = -1;
-  for (const rival of state.rivals) {
+  for (const rival of rivalsOf(state)) {
     let pressure = 0;
     for (const rc of rival.cities) {
       const t = state.map.tiles[rc.centerIndex];
@@ -792,7 +791,7 @@ function tryFoundCity(state: GameState, rival: RivalCiv): void {
             hexDistance(state.map.tiles[cs.centerIndex].col, state.map.tiles[cs.centerIndex].row, t.col, t.row) <
             CITY_MIN_DIST,
         ) ||
-        state.rivals.some((r) =>
+        rivalsOf(state).some((r) =>
           r.cities.some(
             (c) =>
               // P5/S3 (C-14): uniform spacing — the old +1 rival-vs-rival
@@ -1528,7 +1527,7 @@ function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number)
 /** B-20 (#73): hand unified civ `civ` (0 player, r+1 rival r) one relic. */
 function grantRelic(state: GameState, civ: number): void {
   if (civ === 0) placeRelic(state.cities);
-  else placeRelic(state.rivals[civ - 1]?.cities ?? []);
+  else placeRelic(rivalsOf(state)[civ - 1]?.cities ?? []);
 }
 
 /**
@@ -1571,12 +1570,12 @@ export function worldCongress(state: GameState): void {
   if (state.turn % CONGRESS_INTERVAL !== 0) return;
   const eras = [
     civEraIndex(playerSeat(state).research.techs, playerSeat(state).research.civics),
-    ...state.rivals.map((rv) => civEraIndex(rv.research.techs, rv.research.civics)),
+    ...rivalsOf(state).map((rv) => civEraIndex(rv.research.techs, rv.research.civics)),
   ];
   if (!eras.some((e) => e >= CONGRESS_MIN_ERA)) return;
   state.congressSessions = (state.congressSessions ?? 0) + 1;
   // every civ commits ALL its favor; the largest commitment wins
-  const votes = [playerSeat(state).diploFavor ?? 0, ...state.rivals.map((rv) => rv.diploFavor ?? 0)];
+  const votes = [playerSeat(state).diploFavor ?? 0, ...rivalsOf(state).map((rv) => rv.diploFavor ?? 0)];
   let win = -1;
   for (let c = 0; c < votes.length; c++) {
     if (votes[c] <= 0) continue; // no favor, no vote
@@ -1584,18 +1583,18 @@ export function worldCongress(state: GameState): void {
   }
   // the commitments are spent whether or not they won
   playerSeat(state).diploFavor = 0;
-  for (const rv of state.rivals) rv.diploFavor = 0;
+  for (const rv of rivalsOf(state)) rv.diploFavor = 0;
   if (win < 0) return; // nobody could vote
   if (win === 0) playerSeat(state).diploPoints = (playerSeat(state).diploPoints ?? 0) + DVP_PER_RESOLUTION;
   else {
-    const rv = state.rivals[win - 1];
+    const rv = rivalsOf(state)[win - 1];
     if (rv) rv.diploPoints = (rv.diploPoints ?? 0) + DVP_PER_RESOLUTION;
   }
 }
 
 function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
-  const g = state.rivals.indexOf(rival) + 1;
-  const nRel = 1 + state.rivals.length;
+  const g = rivalsOf(state).indexOf(rival) + 1;
+  const nRel = 1 + rivalCount(state);
   const nTiles = state.map.tiles.length;
   const eb = rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
   const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
@@ -1770,7 +1769,7 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
   // A-7 / B-18: belief building housing (Religious Community) keys per-city on
   // the city's followed religion; River Goddess (pantheon) stays per-civ. The
   // owner religion id is this rival's index + 1 (used when coupling is inert).
-  const ownerRel = state.rivals.indexOf(rival) + 1;
+  const ownerRel = rivalsOf(state).indexOf(rival) + 1;
   const m = withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel));
   for (const id of rc.buildings) {
     const bd = BUILDINGS[id];
@@ -1836,7 +1835,7 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   // computeCityStats' have (city.ts:456-461); the luxury-grant RANKING
   // stays building-amenities-only, mirroring the player's luxuryAmenities.
   const base = getRivalModifiers(state, rival);
-  const ownerRel = state.rivals.indexOf(rival) + 1;
+  const ownerRel = rivalsOf(state).indexOf(rival) + 1;
   // B-15: this rival's flat war-weariness amenity penalty (symmetric with the
   // player's), applied to the tier balance after the luxury grants.
   const wwPenalty = warWearinessPenalty(rival.warWeariness ?? 0);
@@ -1909,7 +1908,7 @@ export function rivalCityYields(
   // Feed the World / Choral Music building adds, faithPerWonder) keys per-city
   // on this city's followed religion (owner religion = rival index + 1 when the
   // coupling is inert). Government/CS stay player-only.
-  const ownerRel = state.rivals.indexOf(rival) + 1;
+  const ownerRel = rivalsOf(state).indexOf(rival) + 1;
   const ctx = { map: state.map, mods: withFollowerBelief(state, getRivalModifiers(state, rival), followerReligionForCity(rc.followedReligion, ownerRel)) };
   const ranked = tilesWithin(state.map, center.col, center.row, RIVAL_WORK_RADIUS)
     .filter(
@@ -2196,7 +2195,7 @@ function defectRivalCity(state: GameState, rival: RivalCiv, rc: RivalCity): void
   };
   let winner: RivalCiv | null = null; // null = the player
   let best = pressureOf(state.cities);
-  for (const other of state.rivals) {
+  for (const other of rivalsOf(state)) {
     if (other.id === rival.id) continue;
     const p = pressureOf(other.cities);
     if (p > best) {
@@ -2283,7 +2282,7 @@ export function transferRivalCityToRival(state: GameState, from: RivalCiv, to: R
  * 9118 latent) throws. NO always-on cost: only called when the env flag is set.
  */
 export function assertRivalRegistryCoherent(state: GameState): void {
-  for (const rival of state.rivals) {
+  for (const rival of rivalsOf(state)) {
     const civ = civOfRival(rival.id);
     for (const rc of rival.cities) {
       const check = (kind: string, tileIndex: number, type: string) => {
@@ -2386,7 +2385,7 @@ function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity,
 }
 
 export function rivalPhase(state: GameState): void {
-  if (state.rivals.length === 0) return;
+  if (rivalCount(state) === 0) return;
 
   // Rival units get their movement in this phase (like barbarians).
   // #45/B-6: an EMBARKED land unit moves on the flat EMBARK_MOVES pool (not its
@@ -2417,7 +2416,7 @@ export function rivalPhase(state: GameState): void {
   rivalRivalDenounce(state);
   rivalRivalDeclareWars(state);
 
-  for (const rival of state.rivals) {
+  for (const rival of rivalsOf(state)) {
     if (rival.cities.length === 0) continue; // eliminated
 
     // B-15: war weariness — symmetric with the player's endTurn-top update,
@@ -2814,7 +2813,7 @@ export function rivalPhase(state: GameState): void {
       // COMPLETE unpillaged Holy Site and the Temple. Faith is a separate
       // currency, so this does not consume the one-gold-purchase slot.
       if (rival.religion.founded) {
-        const wid = WORSHIP_BUILDINGS[(state.rivals.indexOf(rival) + 1) % WORSHIP_BUILDINGS.length];
+        const wid = WORSHIP_BUILDINGS[(rivalsOf(state).indexOf(rival) + 1) % WORSHIP_BUILDINGS.length];
         const wCost = buildingFaithCost(wid);
         if (goldAffordable(rival.faith ?? 0, wCost)) {
           for (const rc of rival.cities) {
@@ -3030,7 +3029,7 @@ export function rivalPhase(state: GameState): void {
       // (earlier cities in this loop already grew — the player's mix).
       if (rc.isCapital) {
         rc.loyalty = LOYALTY_MAX;
-      } else if (state.cities.length > 0 || state.rivals.some((o) => o.id !== rival.id && o.cities.length > 0)) {
+      } else if (state.cities.length > 0 || rivalsOf(state).some((o) => o.id !== rival.id && o.cities.length > 0)) {
         const here = state.map.tiles[rc.centerIndex];
         // B-24 S2: contributions scale by the SOURCE civ's age factor (the
         // loyaltyDelta mirror — per-civ subtotal × factor, halves-exact).
@@ -3049,7 +3048,7 @@ export function rivalPhase(state: GameState): void {
           if (d <= LOYALTY_RANGE) subP += c2.population * (LOYALTY_RANGE + 1 - d);
         }
         foreign += subP * agePressureFactor(state, 0);
-        for (const other of state.rivals) {
+        for (const other of rivalsOf(state)) {
           if (other.id === rival.id) continue;
           let subO = 0;
           for (const c2 of other.cities) {

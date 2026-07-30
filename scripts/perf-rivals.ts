@@ -16,6 +16,7 @@
  */
 
 import { createGame, foundCity, endTurn } from '../src/core/game';
+import { rivalsOf } from '../src/core/seats';
 import { scoreSettleSites } from '../src/core/advisor';
 
 const SEEDS = [9001, 9014, 9029]; // export-gpu s=0,1,2 (9029 = the s=2 override)
@@ -45,7 +46,7 @@ for (const seed of SEEDS) {
   totalMs += ms;
   console.log(
     `seed ${seed}: ${TURNS} turns in ${(ms / 1000).toFixed(2)}s — ${(TURNS / (ms / 1000)).toFixed(0)} t/s ` +
-    `(cities ${state.cities.length}, rivals ${state.rivals.map((r) => r.cities.length).join('/')})`,
+    `(cities ${state.cities.length}, rivals ${rivalsOf(state).map((r) => r.cities.length).join('/')})`,
   );
 }
 console.log(`TOTAL: ${total} turns in ${(totalMs / 1000).toFixed(2)}s — ${(total / (totalMs / 1000)).toFixed(0)} t/s`);

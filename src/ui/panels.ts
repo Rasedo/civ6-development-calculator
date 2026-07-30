@@ -4,7 +4,7 @@
  */
 
 import type { DistrictId, GameState, Tile, YieldKey, Yields } from '../core/types';
-import { playerSeat, isPlayerSeat, tileSeat, tileCity } from '../core/seats';
+import { playerSeat, isPlayerSeat, tileSeat, tileCity, rivalsOf } from '../core/seats';
 import { YIELD_KEYS } from '../core/types';
 import { tileYields, effectiveAdjacency } from '../core/yields';
 import { computeCityStats, luxuryAmenities, borderCandidates, citySpecialistSlots, effectiveSpecialists, type CityStats } from '../core/city';
@@ -509,7 +509,7 @@ export function renderCityPanel(
     <div class="row">Population <b>${city.population}</b> · ${growthLine}</div>
     ${state.unitsMode && city.hp < CITY_MAX_HP ? `<div class="row bad">City HP ${city.hp}/${CITY_MAX_HP} — under attack!</div>` : ''}
     ${
-      state.rivals.some((r) => r.cities.length > 0) && !city.isCapital
+      rivalsOf(state).some((r) => r.cities.length > 0) && !city.isCapital
         ? (() => {
             const loyalty = city.loyalty ?? 100;
             const d = loyaltyDelta(state, city, stats.amenities.tier.name);
@@ -871,7 +871,7 @@ export function renderCityStatesPanel(container: HTMLElement, state: GameState, 
 
 export function renderRivalsPanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
   const yourStrength = playerStrength(state);
-  const rows = state.rivals
+  const rows = rivalsOf(state)
     .map((r) => {
       if (r.cities.length === 0) {
         return `<div class="build-row"><span><b style="color:${r.color}">■</b> ${r.name}

@@ -5,7 +5,7 @@
  */
 
 import { hexCenter, cornerOffsets, EDGE_CORNERS, pixelToHex, inBounds, tileIndex, neighborOffset } from '../core/hex';
-import { isBarbSeat, isRivalSeat, rivalOfSeat, isPlayerSeat, tileSeat, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat } from '../core/seats';
+import { isBarbSeat, isRivalSeat, rivalOfSeat, isPlayerSeat, tileSeat, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat, civOfRival, rivalsOf } from '../core/seats';
 import type { GameMap, GameState, Tile } from '../core/types';
 import { TERRAINS, MOUNTAIN_COLOR } from '../data/terrains';
 import { RESOURCES, RESOURCE_CATEGORY_COLORS } from '../data/resources';
@@ -222,7 +222,7 @@ export class MapRenderer {
     for (const { tile, cx, cy } of visible) {
       const rivalId = isRivalSeat(tileSeat(tile)) ? rivalOfCiv(tileSeat(tile)) : -1;
       if (rivalId === -1) continue;
-      const rival = state.rivals.find((r) => r.id === rivalId);
+      const rival = rivalOfSeat(state, civOfRival(rivalId));
       ctx.strokeStyle = rival?.color ?? '#888888';
       ctx.lineWidth = 1.4;
       for (let d = 0; d < 6; d++) {
@@ -430,7 +430,7 @@ export class MapRenderer {
     for (const { tile, cx, cy } of visible) {
       let owner: { color: string; atWar: boolean } | null = null;
       let label = '';
-      for (const rival of state.rivals) {
+      for (const rival of rivalsOf(state)) {
         const rc = rival.cities.find((c) => c.centerIndex === tile.index);
         if (rc) {
           owner = rival;

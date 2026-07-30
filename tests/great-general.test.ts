@@ -8,7 +8,7 @@ import { generalAuraCS, GENERAL_AURA_CS, meleeAttack } from '../src/core/combat'
 import { neighbors, hexDistance } from '../src/core/hex';
 import { UNITS } from '../src/data/units';
 import { gpCost } from '../src/data/greatPeople';
-import type { GameState, Unit } from '../src/core/types';
+import type { GameState, Unit, RivalCiv } from '../src/core/types';
 
 // B7-G / AUDIT B-8 — Great General & Great Admiral (the TS twin of the GPU
 // gpu/gp_aura_test.py pokes). The scripted 250t rollout never claims a GENERAL
@@ -76,7 +76,7 @@ describe('B7-G (B-8) aura', () => {
     war.tileIndex = t3;
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
     // a rival unit near the PLAYER general → 0
-    const rw: Unit = { ...war, seat: civOfRival(state.rivals[0].id), tileIndex: t2 };
+    const rw: Unit = { ...war, seat: civOfRival((state.seats[(0) + 1] as RivalCiv).id), tileIndex: t2 };
     expect(generalAuraCS(state, rw, rw.tileIndex)).toBe(0);
     // a naval unit near a GENERAL (not an ADMIRAL) → 0
     const galley = spawnUnit(state, 'GALLEY', cap, PLAYER_CIV);
@@ -102,7 +102,7 @@ describe('B7-G (B-8) aura', () => {
   it('an attacker beside its own GENERAL deals strictly more damage (same RNG)', () => {
     const build = (withGen: boolean) => {
       const state = newGame();
-      state.rivals[0].atWar = true;
+      (state.seats[(0) + 1] as RivalCiv).atWar = true;
       const cap = state.cities[0].centerIndex;
       const at = tileAt(state, cap, 3);
       const nb = neighbors(state.map, state.map.tiles[at]).find(
@@ -111,7 +111,7 @@ describe('B7-G (B-8) aura', () => {
       const atk = spawnUnit(state, 'WARRIOR', at, PLAYER_CIV)!;
       atk.tileIndex = at;
       atk.movesLeft = UNITS.WARRIOR.moves;
-      const def = spawnUnit(state, 'WARRIOR', nb.index, civOfRival(state.rivals[0].id))!;
+      const def = spawnUnit(state, 'WARRIOR', nb.index, civOfRival((state.seats[(0) + 1] as RivalCiv).id))!;
       def.tileIndex = nb.index;
       if (withGen) {
         const gt = tileAt(state, at, 1, [at, nb.index]);
@@ -150,7 +150,7 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
 
   it('B-31: an at-war rival melee on a lone player GENERAL captures it', () => {
     const state = newGame();
-    state.rivals[0].atWar = true;
+    (state.seats[(0) + 1] as RivalCiv).atWar = true;
     const cap = state.cities[0].centerIndex;
     const gtile = tileAt(state, cap, 4);
     const gen = spawnUnit(state, 'GENERAL', gtile, PLAYER_CIV)!;
@@ -158,11 +158,11 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     const nb = neighbors(state.map, state.map.tiles[gtile]).find(
       (n) => !isPlayerSeat(tileSeat(n)) && !state.units.some((u) => u.tileIndex === n.index),
     )!;
-    const atk = spawnUnit(state, 'WARRIOR', nb.index, civOfRival(state.rivals[0].id))!;
+    const atk = spawnUnit(state, 'WARRIOR', nb.index, civOfRival((state.seats[(0) + 1] as RivalCiv).id))!;
     meleeAttack(state, atk.id, gtile);
     const captured = state.units.find((u) => u.id === gen.id)!;
     expect(isRivalSeat(captured.seat)).toBe(true);
-    expect(captured.seat).toBe(civOfRival(state.rivals[0].id));
+    expect(captured.seat).toBe(civOfRival((state.seats[(0) + 1] as RivalCiv).id));
     // POOL-END: the captured unit sits at the tail of state.units.
     expect(state.units[state.units.length - 1].id).toBe(gen.id);
   });

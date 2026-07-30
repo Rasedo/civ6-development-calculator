@@ -7,7 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
-import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat } from './seats';
+import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat, rivalsOf } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -340,7 +340,7 @@ export function sueForPeaceWithCityState(state: GameState, csId: number): RuleRe
   // switching". So refuse here; the way out is peace with the suzerain (which
   // makePeace then forces onto every city-state it is suzerain of) or the
   // suzerainty changing hands.
-  const suz = (state.rivals ?? []).find((rv) => rv.atWar && rivalIsSuzerain(cs, rv.id));
+  const suz = (rivalsOf(state) ?? []).find((rv) => rv.atWar && rivalIsSuzerain(cs, rv.id));
   if (suz) {
     return { ok: false, reason: `${cs.name} will not talk while you are at war with its suzerain, ${suz.name}.` };
   }

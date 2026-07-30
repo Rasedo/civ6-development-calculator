@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat } from '../src/core/seats';
+import type { RivalCiv } from '../src/core/types';
+import { playerSeat, rivalsOf } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { worldCongress } from '../src/core/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
@@ -36,7 +37,7 @@ function newGame(rivals = 1) {
 /** Force every civ past the Medieval gate by handing them a Medieval tech. */
 function medieval(state: ReturnType<typeof newGame>) {
   playerSeat(state).research.techs.push('APPRENTICESHIP'); // Medieval
-  for (const rv of state.rivals) rv.research.techs.push('APPRENTICESHIP');
+  for (const rv of rivalsOf(state)) rv.research.techs.push('APPRENTICESHIP');
 }
 
 describe('B-22 world congress', () => {
@@ -65,12 +66,12 @@ describe('B-22 world congress', () => {
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
     playerSeat(state).diploFavor = 10;
-    state.rivals[0].diploFavor = 40; // the rival outspends the player
+    (state.seats[(0) + 1] as RivalCiv).diploFavor = 40; // the rival outspends the player
     worldCongress(state);
-    expect(state.rivals[0].diploPoints).toBe(DVP_PER_RESOLUTION);
+    expect((state.seats[(0) + 1] as RivalCiv).diploPoints).toBe(DVP_PER_RESOLUTION);
     expect(playerSeat(state).diploPoints ?? 0).toBe(0);
     expect(playerSeat(state).diploFavor).toBe(0); // spent regardless of the outcome
-    expect(state.rivals[0].diploFavor).toBe(0);
+    expect((state.seats[(0) + 1] as RivalCiv).diploFavor).toBe(0);
   });
 
   it('a TIE goes to the lower civ id (the player)', () => {
@@ -78,10 +79,10 @@ describe('B-22 world congress', () => {
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
     playerSeat(state).diploFavor = 25;
-    state.rivals[0].diploFavor = 25;
+    (state.seats[(0) + 1] as RivalCiv).diploFavor = 25;
     worldCongress(state);
     expect(playerSeat(state).diploPoints).toBe(DVP_PER_RESOLUTION);
-    expect(state.rivals[0].diploPoints ?? 0).toBe(0);
+    expect((state.seats[(0) + 1] as RivalCiv).diploPoints ?? 0).toBe(0);
   });
 
   it('a civ with NO favor casts no vote and cannot win', () => {
@@ -89,16 +90,16 @@ describe('B-22 world congress', () => {
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
     playerSeat(state).diploFavor = 0;
-    state.rivals[0].diploFavor = 0;
+    (state.seats[(0) + 1] as RivalCiv).diploFavor = 0;
     worldCongress(state);
     expect(state.congressSessions).toBe(1); // the session still happened
     expect(playerSeat(state).diploPoints ?? 0).toBe(0); // ... and awarded nothing
-    expect(state.rivals[0].diploPoints ?? 0).toBe(0);
+    expect((state.seats[(0) + 1] as RivalCiv).diploPoints ?? 0).toBe(0);
   });
 
   it('the Medieval gate reads ANY civ, not just the player', () => {
     const state = newGame(1);
-    state.rivals[0].research.techs.push('APPRENTICESHIP'); // only the rival
+    (state.seats[(0) + 1] as RivalCiv).research.techs.push('APPRENTICESHIP'); // only the rival
     state.turn = CONGRESS_INTERVAL;
     playerSeat(state).diploFavor = 5;
     worldCongress(state);
@@ -118,7 +119,7 @@ describe('B-22/B-25 diplomatic victory', () => {
 
   it('a rival reaching 20 is a DEFEAT (victoryType 10)', () => {
     const state = newGame(1);
-    state.rivals[0].diploPoints = DIPLO_VICTORY_POINTS;
+    (state.seats[(0) + 1] as RivalCiv).diploPoints = DIPLO_VICTORY_POINTS;
     endTurn(state);
     expect(state.victoryType).toBe(10);
     expect(state.gameOver).toBe(true);
@@ -137,8 +138,8 @@ describe('B-22/B-25 diplomatic victory', () => {
     // player would win on culture ...
     playerSeat(state).tourism = 5 * 2 * 200;
     playerSeat(state).cultureTotal = 100;
-    state.rivals[0].cultureTotal = 400;
-    state.rivals[0].tourism = 0;
+    (state.seats[(0) + 1] as RivalCiv).cultureTotal = 400;
+    (state.seats[(0) + 1] as RivalCiv).tourism = 0;
     // ... and on diplomacy
     playerSeat(state).diploPoints = DIPLO_VICTORY_POINTS;
     endTurn(state);

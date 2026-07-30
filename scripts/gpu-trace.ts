@@ -27,7 +27,7 @@
 
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { dominationWinner } from '../src/core/game';
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileBelongsTo } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileBelongsTo, rivalsOf } from '../src/core/seats';
 import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
@@ -246,7 +246,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   // GV-1: current score-leader as a unified civ id (0 player, r+1 rival); ties -> lowest id
   let leader = 0;
   let leaderBest = empireScore(state, 'balanced');
-  for (const rv of state.rivals) {
+  for (const rv of rivalsOf(state)) {
     const rs = rivalEmpireScore(state, rv);
     if (rs > leaderBest) { leaderBest = rs; leader = rv.id + 1; }
   }
@@ -257,7 +257,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
     for (const col of PER_CS_COLS) row.push(col.get(state, cs));
   }
   for (let r = 0; r < rMax; r++) {
-    const rival = state.rivals[r];
+    const rival = (state.seats[(r) + 1] as RivalCiv);
     for (const col of PER_RIVAL_COLS) row.push(col.get(state, rival));
   }
   for (let c = 0; c < cMax; c++) {
@@ -266,7 +266,7 @@ export function traceRow(state: GameState, cityIds: number[], cMax: number, csMa
   }
   // #51/S0.2: per-rival-city, joined by LIVING ORDER (see PER_RIVAL_CITY_COLS).
   for (let r = 0; r < rMax; r++) {
-    const rival = state.rivals[r];
+    const rival = (state.seats[(r) + 1] as RivalCiv);
     if (rival && rival.cities.length > RIVAL_CITY_MAX) {
       throw new Error(
         `rival ${r} holds ${rival.cities.length} cities but the trace only covers ${RIVAL_CITY_MAX} ` +

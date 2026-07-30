@@ -8,7 +8,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { PLAYER_CIV, playerSeat } from './seats';
+import { PLAYER_CIV, playerSeat, rivalsOf } from './seats';
 import { csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 
 // ---------------------------------------------------------------------------
@@ -463,7 +463,7 @@ export function followerBeliefForReligion(state: GameState, g: number): BeliefDe
     const rel = playerSeat(state).religion;
     return rel?.founded && rel.follower ? FOLLOWER_BELIEFS[rel.follower] : undefined;
   }
-  const rv = state.rivals[g - 1];
+  const rv = rivalsOf(state)[g - 1];
   if (!rv || !rv.religion.founded || !rv.religion.follower) return undefined;
   return FOLLOWER_BELIEFS[rv.religion.follower];
 }

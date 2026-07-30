@@ -42,7 +42,7 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile } from './seats';
+import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile, rivalsOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -268,7 +268,7 @@ function nearFollowingCity(state: GameState, tile: Tile, g: number): boolean {
     const t = state.map.tiles[c.centerIndex];
     if (hexDistance(tile.col, tile.row, t.col, t.row) <= JUST_WAR_RANGE) return true;
   }
-  for (const rv of state.rivals) {
+  for (const rv of rivalsOf(state)) {
     for (const rc of rv.cities) {
       if (rc.followedReligion !== g) continue;
       const t = state.map.tiles[rc.centerIndex];
@@ -953,7 +953,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
   // A-12b: rival CS routes die with the city-state too (the A-11
   // routes-die-with-their-endpoint rule).
-  for (const rv of state.rivals) {
+  for (const rv of rivalsOf(state)) {
     rv.tradeRoutes = rv.tradeRoutes?.filter((x) => x.toCs !== cs.id);
   }
   const center = state.map.tiles[cs.centerIndex];
@@ -1018,7 +1018,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
 export function captureCityStateForRival(state: GameState, rival: RivalCiv, cs: CityState): void {
   state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
   state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
-  for (const rv of state.rivals) {
+  for (const rv of rivalsOf(state)) {
     rv.tradeRoutes = rv.tradeRoutes?.filter((x) => x.toCs !== cs.id);
   }
   const center = state.map.tiles[cs.centerIndex];
@@ -1173,7 +1173,7 @@ function campCandidates(state: GameState): Tile[] {
     }
     // AUDIT A-15: camp spacing respects RIVAL cities too (real Civ 6 —
     // camps rise away from every civilization, not just the player).
-    for (const rv of state.rivals) {
+    for (const rv of rivalsOf(state)) {
       for (const rc of rv.cities) {
         const ct = state.map.tiles[rc.centerIndex];
         if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
@@ -1296,7 +1296,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     let rcKey = Infinity;
     if (isRivalSeat(unit.seat)) {
       const ci = rivalOfCiv(unit.seat);
-      for (const other of state.rivals) {
+      for (const other of rivalsOf(state)) {
         if (other.id === ci) continue;
         if (!civsAtWar(state, ci + 1, other.id + 1)) continue;
         for (const rc of other.cities) {
@@ -1441,7 +1441,7 @@ export function barbarianPhase(state: GameState): void {
   // New camp? AUDIT A-15: ANY live civilization sustains the barb world —
   // rivals count, not just the player (the roll-gate short-circuit is part
   // of the draw-count contract; both engines change together).
-  const anyCivCity = state.cities.length > 0 || state.rivals.some((r) => r.cities.length > 0);
+  const anyCivCity = state.cities.length > 0 || rivalsOf(state).some((r) => r.cities.length > 0);
   if (anyCivCity && state.barbCamps.length < maxCamps && nextRandom(state) < 0.08) {
     const candidates = campCandidates(state);
     if (candidates.length > 0) {

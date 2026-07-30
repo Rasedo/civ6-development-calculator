@@ -1,4 +1,5 @@
 import type { GameState } from './types';
+import { rivalCount } from './seats';
 import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,7 @@ export function eraBoundary(state: GameState): void {
   const ages = (state.civAges ??= []);
   const prev = (state.prevAges ??= []);
   const ded = (state.dedications ??= []);
-  for (let c = 0; c < 1 + state.rivals.length; c++) {
+  for (let c = 0; c < 1 + rivalCount(state); c++) {
     const s = state.eraScore?.[c] ?? 0;
     const was = ages[c] ?? 1; // era 0 is Normal for everyone
     const now = s < ERA_DARK_T ? 0 : s >= ERA_GOLDEN_T ? 2 : 1;
@@ -195,7 +196,7 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
  */
 export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {
   if (!DEDICATION_PAYOUTS_LIVE) return; // B-24 (#71): substrate live, payouts inert
-  for (let c = 0; c < 1 + state.rivals.length; c++) {
+  for (let c = 0; c < 1 + rivalCount(state); c++) {
     const f = dedicationFaith(state, c);
     if (f > 0) addFaith(c, f);
     const es = dedicationEraScore(state, c);
