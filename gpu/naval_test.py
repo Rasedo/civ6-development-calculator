@@ -589,15 +589,16 @@ def poke_flank_support(rules, path, GALLEY):
     ally = place_rmil(sim, r, n_sup, GALLEY)      # rival galley, same civ as the defender
     foe = place_pmil(sim, n_flk, GALLEY)          # player galley
 
-    dtile = torch.tensor([dt]); dside = torch.tensor([2]); dciv = torch.tensor([r]); noatk = torch.tensor([-1])
-    flank0, sup0 = sim._flank_support(dtile, dside, dciv, noatk)
+    # #51/S3.4: _flank_support takes the defender's SEAT now
+    dtile = torch.tensor([dt]); dseat = torch.tensor([r + 1]); noatk = torch.tensor([-1])
+    flank0, sup0 = sim._flank_support(dtile, dseat, noatk)
     assert int(sup0) >= 1, "a rival naval ally must count for support"
     assert int(flank0) >= 1, "a player naval unit must count for flanking"
 
     # embark BOTH — neither contributes now.
     sim.v_emb[0, ally] = True
     sim.p_emb[0, foe] = True
-    flank1, sup1 = sim._flank_support(dtile, dside, dciv, noatk)
+    flank1, sup1 = sim._flank_support(dtile, dseat, noatk)
     assert int(sup0) - int(sup1) == 1, "the naval ally embarked must drop support by exactly 1"
     assert int(flank0) - int(flank1) == 1, "the naval unit embarked must drop flanking by exactly 1"
     print(f"  9 B-7 flank/support OK (naval counts flank {int(flank0)}/support {int(sup0)}; embarked -> {int(flank1)}/{int(sup1)})")
