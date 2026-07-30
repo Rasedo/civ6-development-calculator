@@ -65,9 +65,8 @@ def test_own_civilian_does_not_block() -> None:
     sim.v_type[0, slot] = 0
     sim.v_tile[0, slot] = t
     sim.v_charges[0, slot] = 3  # civilian
-    sim.rvciv_at[0, t] = slot
+    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
-    sim.rebuild_occ()
 
     tiles = torch.tensor([[t]])
     own = bool(sim._blocked_for(tiles, 1)[0, 0])          # rival 0's military
@@ -93,7 +92,6 @@ def test_spawn_probe_obeys_encampments() -> None:
     sim.district_pillaged[0, t] = False
     sim.encamp_hp[0, t] = 100
     sim.r_atwar[0, 0] = True
-    sim.rebuild_occ()
 
     if not bool(sim._encamp_live()[0, t]):
         print("  SKIP: could not make a live Encampment by poking")

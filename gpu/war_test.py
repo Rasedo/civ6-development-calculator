@@ -190,11 +190,9 @@ def _place_next_to(sim, p_, ctr):
         t_ = int(nb[d])
         if t_ >= 0 and int(sim.pmil_at[0, t_]) < 0 and int(sim.center_at[0, t_]) < 0:
             old = int(sim.p_tile[0, p_])
-            sim.pmil_at[0, old] = -1
-            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+            sim.occ_mil[0, old] = -1
             sim.p_tile[0, p_] = t_
-            sim.pmil_at[0, t_] = p_
-            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+            sim.occ_mil[0, t_] = p_
             sim.p_hp[0, p_] = 100
             back = sim.neigh[t_]
             for d2 in range(6):
@@ -249,8 +247,7 @@ def test_cs_siege(rules, path):
         t_ = int(sim.u_tile[0, u])
         sim.u_alive[0, u] = False
         if int(sim.barb_at[0, t_]) == u:
-            sim.barb_at[0, t_] = -1
-            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+            sim.occ_mil[0, t_] = -1
     if not bool(sim.p_alive[0, p_]):
         p_ = _melee_slot(sim)
         assert p_ is not None

@@ -26,15 +26,15 @@ def build(rules, path):
 def setup(sim, types, tiles, treasury):
     """Wipe the player roster and plant a known set at slots 0.. (spawn order)."""
     sim.p_alive[0, :] = False
-    sim.pmil_at[0, :] = -1
-    sim.pciv_at[0, :] = -1
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    _pl = sim.occ_mil[0]  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
+    _pl = sim.occ_civ[0]  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
     for i, (ty, ti) in enumerate(zip(types, tiles)):
         sim.p_alive[0, i] = True
         sim.p_type[0, i] = ty
         sim.p_tile[0, i] = ti
-        sim.pmil_at[0, ti] = i
-        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+        sim.occ_mil[0, ti] = i
     sim.treasury[0] = treasury
 
 

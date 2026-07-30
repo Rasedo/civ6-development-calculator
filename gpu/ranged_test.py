@@ -115,10 +115,12 @@ def main() -> None:
 
 
 def defender_state_from_snap(snap, tile):
-    b = int(snap["mut"]["barb_at"][0, tile])
+    # #51/S3.4b: the snapshot stores the MERGED occupancy planes.
+    _m = int(snap["mut"]["occ_mil"][0, tile])
+    b = _m - P_MAX - 256 if _m >= P_MAX + 256 else -1
     if b >= 0:
         return ("barb", b, int(pool_view(snap, "u", "hp")[0, b]), bool(pool_view(snap, "u", "alive")[0, b]))
-    v = int(snap["mut"]["rv_at"][0, tile])
+    v = _m - P_MAX if P_MAX <= _m < P_MAX + 256 else -1
     assert v >= 0
     return ("rival", v, int(pool_view(snap, "v", "hp")[0, v]), bool(pool_view(snap, "v", "alive")[0, v]))
 

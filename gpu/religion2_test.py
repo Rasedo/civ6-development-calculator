@@ -119,8 +119,7 @@ def clear_missionaries(sim, r: int) -> None:
         t = int(sim.v_tile[0, u])
         sim.v_alive[0, u] = False
         if int(sim.rvciv_at[0, t]) == u:
-            sim.rvciv_at[0, t] = -1
-            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+            sim.occ_civ[0, t] = -1
 
 
 def place_missionary(sim, r: int, t: int, charges: int) -> int:
@@ -133,8 +132,7 @@ def place_missionary(sim, r: int, t: int, charges: int) -> int:
     sim.v_charges[0, slot] = charges
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = False
-    sim.rvciv_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
     return slot
 
@@ -198,9 +196,11 @@ def poke_missionary_buy(rules, rj, path):
     make_holy_site(sim, r, j)
     follow_all(sim, r + 1)  # spawned missionary finds no target -> keeps full charges
     ctr = int(sim.rc_center[0, r, j])
-    for m in (sim.rvciv_at, sim.rv_at, sim.pmil_at, sim.pciv_at, sim.barb_at):
-        if int(m[0, ctr]) >= 0:
-            m[0, ctr] = -1
+    # #51/S3.4b: clear the MERGED planes. The p_/v_/u_ names are now
+    # DERIVED read-only views — a subscript write to one lands in a
+    # temporary and is silently discarded.
+    sim.occ_mil[0, ctr] = -1
+    sim.occ_civ[0, ctr] = -1
 
     base = sim.snapshot()
     sim._rival_phase()
@@ -512,8 +512,7 @@ def poke_messenger_route(rules, rj, path):
     sim.r_religion_done[:, r] = True
     sim.r_atwar[:, r] = False
     sim.u_alive[:] = False
-    sim.barb_at[:] = -1  # no raiders suspend the route
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_mil[:] = -1  # no raiders suspend the route + sim.POOL_LO["u"]
 
     # two dedicated rival-r cities well apart; a single domestic route between.
     FROM, DEST = 5, 6
@@ -613,16 +612,18 @@ def poke_victor_through_step(rules, rj, path):
         # every unit (settlers can't found) and idle every rival build queue.
         if sim.units_mode:
             sim.p_alive[:] = False
-            sim.pmil_at[:] = -1
-            sim.pciv_at[:] = -1
-            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+            _pl = sim.occ_mil  # #51: clear only this pool's entries
+            _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
+            _pl = sim.occ_civ  # #51: clear only this pool's entries
+            _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
         sim.v_alive[:] = False
-        sim.rv_at[:] = -1
-        sim.rvciv_at[:] = -1
-        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+        _pl = sim.occ_mil  # #51: clear only this pool's entries
+        _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
+        _pl = sim.occ_civ  # #51: clear only this pool's entries
+        _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
         sim.u_alive[:] = False
-        sim.barb_at[:] = -1
-        sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+        _pl = sim.occ_mil  # #51: clear only this pool's entries
+        _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
         if sim.R > 0:
             sim.rc_current[:] = -1
             sim.rc_progress[:] = 0.0

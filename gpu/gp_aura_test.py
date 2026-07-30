@@ -57,12 +57,16 @@ def clear_all_units(sim) -> None:
     sim.p_alive[:] = False
     sim.v_alive[:] = False
     sim.u_alive[:] = False
-    sim.pmil_at[:] = -1
-    sim.pciv_at[:] = -1
-    sim.rv_at[:] = -1
-    sim.rvciv_at[:] = -1
-    sim.barb_at[:] = -1
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    _pl = sim.occ_mil  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
+    _pl = sim.occ_civ  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
+    _pl = sim.occ_mil  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
+    _pl = sim.occ_civ  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
+    _pl = sim.occ_mil  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
     sim._gen_ver += 1
 
 
@@ -75,8 +79,7 @@ def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> 
     sim.p_charges[0, slot] = 0
     sim.p_fortify[0, slot] = 0
     sim.p_emb[0, slot] = emb
-    sim.pmil_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_mil[0, t] = slot
     sim.p_next[0] += 1
     return slot
 
@@ -90,8 +93,7 @@ def place_pciv(sim, t: int, type_idx: int, hp: int = 100) -> int:
     sim.p_charges[0, slot] = int(sim._p_charges[type_idx])
     sim.p_fortify[0, slot] = 0
     sim.p_emb[0, slot] = False
-    sim.pciv_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_civ[0, t] = slot
     sim.p_next[0] += 1
     sim._gen_ver += 1
     return slot
@@ -107,8 +109,7 @@ def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
     sim.v_charges[0, slot] = 0
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = emb
-    sim.rv_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_mil[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
     return slot
 
@@ -123,8 +124,7 @@ def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100) -> int:
     sim.v_charges[0, slot] = int(sim._p_charges[type_idx])
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = False
-    sim.rvciv_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
     sim._gen_ver += 1
     return slot

@@ -52,9 +52,11 @@ def idx(rules, name: str) -> int:
 
 def clear_tile(sim, t: int) -> None:
     """Remove any unit/marker occupancy at tile t (0-batch)."""
-    for m in (sim.pmil_at, sim.pciv_at, sim.rv_at, sim.rvciv_at, sim.barb_at):
-        if int(m[0, t]) >= 0:
-            m[0, t] = -1
+    # #51/S3.4b: clear the MERGED planes. The p_/v_/u_ names are now
+    # DERIVED read-only views — a subscript write to one lands in a
+    # temporary and is silently discarded.
+    sim.occ_mil[0, t] = -1
+    sim.occ_civ[0, t] = -1
 
 
 def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
@@ -66,8 +68,7 @@ def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> 
     sim.p_charges[0, slot] = 0
     sim.p_fortify[0, slot] = 0
     sim.p_emb[0, slot] = emb
-    sim.pmil_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_mil[0, t] = slot
     sim.p_next[0] += 1
     return slot
 
@@ -82,8 +83,7 @@ def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
     sim.v_charges[0, slot] = 0
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = emb
-    sim.rv_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_mil[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
     return slot
 
@@ -98,8 +98,7 @@ def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = Fa
     sim.v_charges[0, slot] = 0
     sim.v_fortify[0, slot] = 0
     sim.v_emb[0, slot] = emb
-    sim.rvciv_at[0, t] = slot
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
     return slot
 
@@ -162,17 +161,18 @@ def first_rival_city(sim):
 
 def neutralize_barbs(sim) -> None:
     sim.u_alive[:] = False
-    sim.barb_at[:] = -1
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    _pl = sim.occ_mil  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
     sim.n_camps[:] = sim.max_camps
     sim.camp_tile[:] = -1
 
 
 def clear_all_rival_units(sim) -> None:
     sim.v_alive[:] = False
-    sim.rv_at[:] = -1
-    sim.rvciv_at[:] = -1
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    _pl = sim.occ_mil  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
+    _pl = sim.occ_civ  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
 
 
 # ------------------------------------------------------------------ pokes -----
@@ -238,8 +238,7 @@ def poke_galley_cs(rules, path, GALLEY):
         t_ = int(sim.u_tile[0, u])
         sim.u_alive[0, u] = False
         if int(sim.barb_at[0, t_]) == u:
-            sim.barb_at[0, t_] = -1
-            sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+            sim.occ_mil[0, t_] = -1
     sim.cs_hp[0, s] = 1
     assert bool((~sim.alive[0]).any()), "no free player city slot for the CS capture"
     pop_before = int(sim.cs_pop[0, s])
@@ -479,8 +478,8 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     sim.r_atwar[0, r] = True
     clear_all_rival_units(sim)
     sim.u_alive[:] = False
-    sim.barb_at[:] = -1
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    _pl = sim.occ_mil  # #51: clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
     sim.rc_bldg[0, r, j, sim._walls_bidx] = True
     sim.rc_current[0, r] = -1
     sim.rc_progress[0, r] = 0.0
@@ -499,8 +498,7 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     # -- embarked override (two-run compare on one RNG).
     sim.restore(base)
     # drop the ship, put a player WARRIOR on the same tile
-    sim.pmil_at[0, tt] = -1
-    sim.rebuild_occ()  # #51/S3.4b: pokes write the legacy maps
+    sim.occ_mil[0, tt] = -1
     sim.p_alive[0, gslot] = False
     wslot = place_pmil(sim, tt, WARRIOR, emb=True)
     sim.r_best_melee[0, r] = 20

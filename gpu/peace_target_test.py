@@ -53,7 +53,7 @@ def place(sim, tile, seat_is_player, hp=100):
         sim.p_tile[0, slot] = tile
         sim.p_hp[0, slot] = hp
         sim.p_seat[0, slot] = PLAYER_SEAT
-        sim.pmil_at[0, tile] = slot
+        sim.occ_mil[0, tile] = slot
         sim.p_next[0] += 1
         return slot
     slot = int(sim.v_next[0])
@@ -63,7 +63,7 @@ def place(sim, tile, seat_is_player, hp=100):
     sim.v_type[0, slot] = 2
     sim.v_tile[0, slot] = tile
     sim.v_hp[0, slot] = hp
-    sim.rv_at[0, tile] = slot
+    sim.occ_mil[0, tile] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1
     return slot
 
@@ -89,7 +89,6 @@ def run(ranged: bool) -> None:
     rv_tile, pl_tile = scenario(sim)
     v = place(sim, rv_tile, seat_is_player=False)
     p = place(sim, pl_tile, seat_is_player=True)
-    sim.rebuild_occ()
 
     # rival 0 is AT PEACE with the player, and AT WAR with rival 1.
     sim.r_atwar[0, 0] = False
