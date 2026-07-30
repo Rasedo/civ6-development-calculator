@@ -77,7 +77,7 @@ describe('founding cities', () => {
     const a = foundCity(state, tileAtCoords(state.map, 8, 8).index).city!;
     const ring1 = tileAtCoords(state.map, 9, 8);
     expect(tileCity(ring1)).toBe(a.id);
-    state.settlers = 1; // later cities need a trained settler
+    playerSeat(state).settlers = 1; // later cities need a trained settler
     const b = foundCity(state, tileAtCoords(state.map, 12, 8).index).city!;
     expect(tileCity(ring1)).toBe(a.id); // still A's
     expect(tileCity(tileAtCoords(state.map, 13, 8))).toBe(b.id);

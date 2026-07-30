@@ -113,10 +113,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     sandbox,
     claimedGreatPeople: [],
     tradeRoutes: [],
-    settlers: 0,
-    buildersTrained: 0, // P4/D-10
-    bestMeleeCS: 0, // P4/D-22
-    tilesPurchased: 0, // P4/D-17
     plannedSettles: [],
     unitsMode,
     units: [],
@@ -126,7 +122,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
-    spaceProjects: [], // B-25
     capitalTiles: [], // GV-3
     fogOfWar: false,
     explored: [],
@@ -135,7 +130,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [], settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0, spaceProjects: [] }],
     claimedPantheons: [],
     claimedBeliefs: [],
     claimedEnhancers: [],
@@ -151,7 +146,7 @@ export function settlerCost(state: GameState): number {
   );
   return (
     Math.round(80 * GAME_SPEED) +
-    Math.round(30 * GAME_SPEED) * Math.max(0, state.cities.length - 1 + state.settlers + queued)
+    Math.round(30 * GAME_SPEED) * Math.max(0, state.cities.length - 1 + playerSeat(state).settlers + queued)
   );
 }
 
@@ -176,10 +171,10 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
   // The first city uses your starting settler; later ones must be trained
   // (unless sandbox). canFoundCity stays tile-only so advisors keep working.
   if (!state.sandbox && state.cities.length > 0) {
-    if (state.settlers <= 0) {
+    if (playerSeat(state).settlers <= 0) {
       return { ok: false, reason: 'No settler available — train one in a city.' };
     }
-    state.settlers -= 1;
+    playerSeat(state).settlers -= 1;
   }
 
   const tile = state.map.tiles[tileIndex];
@@ -380,7 +375,7 @@ export function projectCost(state: GameState): number {
  * space-race projects additionally require their gating tech, the previous
  * chain step already completed by this empire, and are one-time (not repeated). */
 export function availableProjects(state: GameState, city: City): ProjectDef[] {
-  const done = state.spaceProjects ?? [];
+  const done = playerSeat(state).spaceProjects ?? [];
   return Object.values(PROJECTS).filter((p) => {
     if (!city.districts.some((d) => d.type === p.district && state.map.tiles[d.tileIndex].districtComplete)) {
       return false;
@@ -409,8 +404,8 @@ function completeProject(state: GameState, city: City, projectId: string, cost: 
   if (!def) return;
   // B-25: space-race step — record chain progress; the final step wins.
   if (def.space) {
-    if (!state.spaceProjects) state.spaceProjects = [];
-    if (!state.spaceProjects.includes(projectId)) state.spaceProjects.push(projectId);
+    if (!playerSeat(state).spaceProjects) playerSeat(state).spaceProjects = [];
+    if (!playerSeat(state).spaceProjects.includes(projectId)) playerSeat(state).spaceProjects.push(projectId);
     state.eventLog.push(`${city.name} completed ${def.name}.`);
     if (def.victory) {
       state.victoryType = 3; // GV/B-25 science victory (player)
@@ -519,7 +514,7 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string)
     const xp = encampmentTrainXp(city.buildings);
     if (xp > 0) unit.xp = xp;
   }
-  if (unitType === 'BUILDER') state.buildersTrained += 1; // P4/D-10
+  if (unitType === 'BUILDER') playerSeat(state).buildersTrained += 1; // P4/D-10
   return { ok: true };
 }
 
@@ -532,7 +527,7 @@ export function purchaseSettler(state: GameState, cityId: number): RuleResult {
     if (!goldAffordable(playerSeat(state).treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
     playerSeat(state).treasury -= cost;
   }
-  state.settlers += 1;
+  playerSeat(state).settlers += 1;
   // P4/D-6: purchased settlers cost the pop too (real Civ 6).
   city.population = Math.max(1, city.population - 1);
   return { ok: true };
@@ -620,7 +615,7 @@ export function tilePurchaseCost(state: GameState, city: City, tileIndex?: numbe
   const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
   const step = Math.round(5 * GAME_SPEED);
   return Math.round(
-    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (state.tilesPurchased ?? 0)) *
+    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (playerSeat(state).tilesPurchased ?? 0)) *
       mods.tilePurchaseMult,
   );
 }
@@ -640,7 +635,7 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number): Ru
   // counter (real Civ 6 keeps the two schedules separate).
   setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
   revealAround(state, tileIndex, 1);
-  state.tilesPurchased = (state.tilesPurchased ?? 0) + 1;
+  playerSeat(state).tilesPurchased = (playerSeat(state).tilesPurchased ?? 0) + 1;
   return { ok: true };
 }
 
@@ -839,7 +834,7 @@ export function endTurn(state: GameState): void {
           // wonder path) — TS-only, symmetric with the rival hook below.
           addEraScore(state, 0, ERA_SCORE_WONDER);
         } else if (item.kind === 'settler') {
-          state.settlers += 1;
+          playerSeat(state).settlers += 1;
           // P4/D-6: real Civ 6 — a completed Settler costs the city 1 pop.
           city.population = Math.max(1, city.population - 1);
         } else if (item.kind === 'unit') {
@@ -850,7 +845,7 @@ export function endTurn(state: GameState): void {
             const xp = encampmentTrainXp(city.buildings);
             if (xp > 0) trained.xp = xp;
           }
-          if (item.unit === 'BUILDER') state.buildersTrained += 1; // P4/D-10
+          if (item.unit === 'BUILDER') playerSeat(state).buildersTrained += 1; // P4/D-10
         } else if (item.kind === 'project') {
           completeProject(state, city, item.project, itemCost(item));
         } else {
@@ -946,7 +941,7 @@ export function endTurn(state: GameState): void {
   advanceGreatPeople(state);
 
   // Auto-found sites queued by the empire planner as settlers become available.
-  while (state.settlers > 0 && state.plannedSettles.length > 0) {
+  while (playerSeat(state).settlers > 0 && state.plannedSettles.length > 0) {
     const target = state.plannedSettles.shift()!;
     if (canFoundCity(state, target).ok) {
       foundCity(state, target);
@@ -1305,7 +1300,7 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] },
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [], settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0, spaceProjects: [] },
     ...(rivalsOf(state) ?? []),
   ];
   playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
@@ -1320,16 +1315,16 @@ export function deserialize(json: string): GameState {
   playerSeat(state).religion ??= { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null };
   playerSeat(state).religion.enhancer ??= null; // B-18
   state.tradeRoutes ??= [];
-  state.settlers ??= 0;
-  state.buildersTrained ??= 0; // P4/D-10
+  playerSeat(state).settlers ??= 0;
+  playerSeat(state).buildersTrained ??= 0; // P4/D-10
   // P4/D-22: older saves seed the tracker from the standing army.
-  state.bestMeleeCS ??= Math.max(
+  playerSeat(state).bestMeleeCS ??= Math.max(
     0,
     ...state.units
       .filter((u) => isPlayerSeat(u.seat) && !UNITS[u.type]?.ranged)
       .map((u) => UNITS[u.type]?.combat ?? 0),
   );
-  state.tilesPurchased ??= 0; // P4/D-17
+  playerSeat(state).tilesPurchased ??= 0; // P4/D-17
   state.plannedSettles ??= [];
   state.unitsMode ??= false;
   state.units ??= [];

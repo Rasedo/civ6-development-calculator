@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { foundCity } from '../src/core/game';
 import { loadPolicyJson, adviseAll } from '../src/core/aiAdvisor';
@@ -60,10 +61,10 @@ describe('AI advisor', () => {
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index).city!;
     const recs = adviseAll(state, policy);
     const production = recs.find((r) => r.decision.type === 'production')!;
-    const before = city.queue.length + state.settlers;
+    const before = city.queue.length + playerSeat(state).settlers;
     applyEnvAction(state, production.decision, production.options[0].candidate.action);
     const after =
-      city.queue.length + state.settlers + (city.buildings.length > 1 ? 1 : 0) + state.units.length;
+      city.queue.length + playerSeat(state).settlers + (city.buildings.length > 1 ? 1 : 0) + state.units.length;
     expect(after).toBeGreaterThan(before);
   });
 

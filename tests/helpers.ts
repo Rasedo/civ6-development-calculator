@@ -49,10 +49,6 @@ export function makeState(map: GameMap = makeMap()): GameState {
     sandbox: false,
     claimedGreatPeople: [],
     tradeRoutes: [],
-    settlers: 0,
-    buildersTrained: 0, // P4/D-10
-    bestMeleeCS: 0, // P4/D-22
-    tilesPurchased: 0, // P4/D-17
     plannedSettles: [],
     unitsMode: false,
     units: [],
@@ -64,7 +60,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
     explored: [],
     eventLog: [],
     cityStates: [],
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [] }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [], settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0, spaceProjects: [] }],
     claimedPantheons: [],
     claimedBeliefs: [],
     claimedEnhancers: [],

@@ -83,14 +83,14 @@ describe('gold & faith purchases', () => {
     expect(purchaseUnit(state, city.id, 'BUILDER').ok).toBe(true);
     expect(state.units.length).toBe(1);
     expect(playerSeat(state).treasury).toBe(0);
-    expect(state.buildersTrained).toBe(1); // P4/D-10
+    expect(playerSeat(state).buildersTrained).toBe(1); // P4/D-10
     expect(unitPurchaseCost(state, 'BUILDER')).toBeGreaterThan(120); // escalated
     expect(purchaseUnit(state, city.id, 'BUILDER').ok).toBe(false); // broke
 
     const sCost = settlerCost(state) * 4;
     playerSeat(state).treasury = sCost;
     expect(purchaseSettler(state, city.id).ok).toBe(true);
-    expect(state.settlers).toBe(1);
+    expect(playerSeat(state).settlers).toBe(1);
     expect(playerSeat(state).treasury).toBe(0);
   });
 });

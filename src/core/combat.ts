@@ -375,7 +375,7 @@ export function cityDefenseStrength(state: GameState, city: City): number {
   const garrison = unitsAt(state, city.centerIndex).find(
     (u) => isPlayerSeat(u.seat) && unitDomain(u.type) === 'military',
   );
-  return Math.max(15, state.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
+  return Math.max(15, playerSeat(state).bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
 function killUnit(state: GameState, unit: Unit): void {
@@ -522,7 +522,7 @@ export function encampmentDefense(
     if (!rival) return null;
     return { defCS: Math.max(15, rival.bestMeleeCS ?? 0), k: 'renc' };
   }
-  return { defCS: Math.max(15, state.bestMeleeCS ?? 0), k: 'penc' };
+  return { defCS: Math.max(15, playerSeat(state).bestMeleeCS ?? 0), k: 'penc' };
 }
 
 /** Melee attack an adjacent enemy unit or city tile. */

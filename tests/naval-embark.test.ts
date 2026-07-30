@@ -57,6 +57,11 @@ function addWarRival(state: GameState, col: number, row: number, techs: string[]
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [...techs], civics: [], boosted: [] },
     gpp: {},
     gpEarned: [],
+    settlers: 0,
+    buildersTrained: 0,
+    bestMeleeCS: 0,
+    tilesPurchased: 0,
+    spaceProjects: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   // A minimal off-map "home" so the rival is a real civ; the war-march targets
@@ -239,8 +244,12 @@ function bareRival(state: GameState, atWar = true): RivalCiv {
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
     gpEarned: [],
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
+    settlers: 0,
+    buildersTrained: 0,
     bestMeleeCS: 0,
+    tilesPurchased: 0,
+    spaceProjects: [],
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   state.seats.push(rival);
   return rival;
@@ -261,7 +270,7 @@ describe('#45/B-6 N2 production gating', () => {
     expect(queueUnit(state, coastCity.id, 'GALLEY').ok).toBe(true);
 
     // inland city: no water neighbor, no completed Harbor
-    state.settlers = 1;
+    playerSeat(state).settlers = 1;
     const inlandCenter = tileAtCoords(state.map, 11, 5);
     foundCity(state, inlandCenter.index);
     const inlandCity = state.cities[1];

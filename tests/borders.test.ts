@@ -54,7 +54,7 @@ describe('cultural border growth', () => {
     expect(tileCity(target)).toBe(city.id);
     expect(playerSeat(state).treasury).toBe(1000 - cost);
     expect(city.tilesAcquired).toBe(0); // purchases don't advance the culture counter
-    expect(state.tilesPurchased).toBe(1);
+    expect(playerSeat(state).tilesPurchased).toBe(1);
     expect(tilePurchaseCost(state, city)).toBe(33); // +5 (speed-scaled → 3) per purchase
 
     // far tile: not a candidate

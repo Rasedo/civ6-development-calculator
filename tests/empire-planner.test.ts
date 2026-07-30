@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 
 import { makeMap, makeState, tileAtCoords, grantTechs, grantCivics } from './helpers';
 import { foundCity, queueSettler, settlerCost, endTurn, itemLabel } from '../src/core/game';
@@ -19,10 +20,10 @@ describe('settlers', () => {
     const prod = computeCityStats(state, a).total.production;
     const turns = Math.ceil(48 / prod);
     for (let i = 0; i < turns; i++) endTurn(state);
-    expect(state.settlers).toBe(1);
+    expect(playerSeat(state).settlers).toBe(1);
 
     expect(foundCity(state, tileAtCoords(state.map, 12, 9).index).ok).toBe(true);
-    expect(state.settlers).toBe(0);
+    expect(playerSeat(state).settlers).toBe(0);
     expect(state.cities.length).toBe(2);
   });
 

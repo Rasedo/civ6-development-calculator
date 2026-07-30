@@ -1467,8 +1467,8 @@ export function renderEmpireSummary(container: HTMLElement, state: GameState): v
     pop += c.population;
   }
   const settlers =
-    state.settlers > 0 || state.plannedSettles.length > 0
-      ? ` · ${state.settlers} settler(s)${state.plannedSettles.length ? `, ${state.plannedSettles.length} settle(s) planned` : ''}`
+    playerSeat(state).settlers > 0 || state.plannedSettles.length > 0
+      ? ` · ${playerSeat(state).settlers} settler(s)${state.plannedSettles.length ? `, ${state.plannedSettles.length} settle(s) planned` : ''}`
       : '';
   container.innerHTML = `
     <div>${state.cities.length} city(ies), pop ${pop} · ${gov}${settlers}</div>

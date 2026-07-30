@@ -33,7 +33,7 @@ describe('fog of war', () => {
     orderMove(state, scout.id, tileAtCoords(state.map, 14, 9).index);
     for (let i = 0; i < 6; i++) endTurn(state);
     expect(isExplored(state, tileAtCoords(state.map, 14, 9).index)).toBe(true);
-    state.settlers = 1;
+    playerSeat(state).settlers = 1;
     // dark tile is now within the scout's revealed trail or still dark:
     if (isExplored(state, dark.index)) {
       expect(canFoundCity(state, dark.index).ok).toBe(true);

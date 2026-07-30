@@ -48,7 +48,7 @@ describe('B-25 science victory', () => {
     expect(avail).toEqual(['LAUNCH_EARTH_SATELLITE']);
 
     // Complete step 1 by hand: step 2 opens, step 1 is now one-time-consumed.
-    state.spaceProjects = ['LAUNCH_EARTH_SATELLITE'];
+    playerSeat(state).spaceProjects = ['LAUNCH_EARTH_SATELLITE'];
     avail = availableProjects(state, city).filter((p) => p.space).map((p) => p.id);
     expect(avail).toEqual(['LAUNCH_MOON_LANDING']);
   });
@@ -60,7 +60,7 @@ describe('B-25 science victory', () => {
       // Drive completion through the real endTurn queue path (progress pre-filled).
       city.queue = [{ kind: 'project', project: id, progress: 100000, cost: 1 }];
       endTurn(state);
-      expect(state.spaceProjects).toContain(id);
+      expect(playerSeat(state).spaceProjects).toContain(id);
     }
     expect(state.victoryType).toBe(3);
     expect(state.gameOver).toBe(true);

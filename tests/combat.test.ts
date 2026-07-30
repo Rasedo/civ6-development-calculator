@@ -181,7 +181,7 @@ describe('barbarians', () => {
 
   it('barbarians near a trade endpoint suspend the route', () => {
     const { state, city } = battlefield();
-    state.settlers = 1;
+    playerSeat(state).settlers = 1;
     const b = foundCity(state, tileAtCoords(state.map, 14, 9).index).city!;
     expect(routeRaided(state, city, b)).toBe(false);
     const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 15, 9).index, BARB_SEAT)!;

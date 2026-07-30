@@ -45,6 +45,11 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
     gpEarned: [],
+    settlers: 0,
+    buildersTrained: 0,
+    bestMeleeCS: 0,
+    tilesPurchased: 0,
+    spaceProjects: [],
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     ...opts,
   };
@@ -244,7 +249,7 @@ describe('loyalty', () => {
   it('rival pressure drains border cities; distance and capitals protect', () => {
     const state = makeState(makeMap(20, 14));
     const capital = foundCity(state, tileAtCoords(state.map, 2, 7).index).city!;
-    state.settlers = 1;
+    playerSeat(state).settlers = 1;
     const border = foundCity(state, tileAtCoords(state.map, 12, 7).index).city!;
     const rival = addRival(state, 16, 7);
     rival.cities[0].population = 10;
@@ -267,7 +272,7 @@ describe('loyalty', () => {
   it('a city at zero loyalty defects to the pressuring rival', () => {
     const state = makeState(makeMap(20, 14));
     foundCity(state, tileAtCoords(state.map, 2, 7).index);
-    state.settlers = 1;
+    playerSeat(state).settlers = 1;
     const border = foundCity(state, tileAtCoords(state.map, 12, 7).index).city!;
     const rival = addRival(state, 16, 7);
     rival.cities[0].population = 10;

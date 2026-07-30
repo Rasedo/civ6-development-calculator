@@ -880,7 +880,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     Math.min(1, barbs / 6),
     Math.min(1, pillaged / 10),
     hpDeficit,
-    Math.min(1, s.settlers / 2),
+    Math.min(1, playerSeat(s).settlers / 2),
     exploredFrac,
     Math.min(1, amenityDeficit / 10),
     Math.max(-1, Math.min(1, housingHeadroom / 20)),

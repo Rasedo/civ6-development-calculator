@@ -320,7 +320,6 @@ export interface GameState {
    *  same sessions; traced so parity proves the schedule). */
   congressSessions?: number;
   /** B-25: completed space-race project ids (empire-wide chain progress). */
-  spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
    *  Static once founded — capture never moves the tile, only its owner. */
   capitalTiles?: number[];
@@ -338,16 +337,12 @@ export interface GameState {
   claimedGreatPeople: string[];
   tradeRoutes: TradeRoute[];
   /** Trained settlers waiting to found a city (first city needs none). */
-  settlers: number;
   /** P4/D-10: builders ever trained or purchased — each adds +4 (pre-speed)
    * to the next builder's cost, like real Civ 6. */
-  buildersTrained: number;
   /** P4/D-22: combat strength of the strongest MELEE unit the player has
    * ever fielded — real Civ 6 bases city defense on it. */
-  bestMeleeCS: number;
   /** P4/D-17: tiles ever gold-purchased — each adds +5 (pre-speed) to every
    * future tile purchase, empire-wide (real Civ 6 schedule). */
-  tilesPurchased: number;
   /** Tile indexes queued for automatic founding as settlers complete. */
   plannedSettles: number[];
   /**
@@ -518,6 +513,17 @@ export interface Seat {
   /** Great-person points per class. The player kept these under
    *  `greatPeople.points` and a rival under `gpp`; one name now. (S1.2f) */
   gpp: Partial<Record<GreatPersonClass, number>>;
+  /** Settlers banked and not yet founded. */
+  settlers: number;
+  /** Builders ever trained — this seat's OWN cost escalator (P4/D-10). */
+  buildersTrained: number;
+  /** Strongest melee combat strength this seat ever FIELDED (P4/D-22) — the
+   *  floor its city defence keeps pace with. */
+  bestMeleeCS: number;
+  /** Tiles bought with gold (P4/D-17). */
+  tilesPurchased: number;
+  /** Completed space-race project ids (B-25). */
+  spaceProjects: string[];
   /** Great-person ids THIS seat recruited. New information: previously only the
    *  global list existed, which is why `RivalCiv.prophets` had to exist as a
    *  shadow counter — the shared array could not answer "how many did I get?".
@@ -565,7 +571,6 @@ export interface RivalCiv extends Seat {
    *  `research.civicProgress` is spent down by every completed civic and is
    *  therefore NOT a lifetime total. */
   /** B-25: this civ's completed space-race project ids (chain progress). */
-  spaceProjects?: string[];
   /** AUDIT A-11/A-12b: this civ's trade routes — `from` is always an own
    *  RivalCity id; domestic routes set `to` (own RivalCity id), routes to
    *  a met city-state set `toCs` (CityState id), B-23 international routes to
@@ -585,12 +590,9 @@ export interface RivalCiv extends Seat {
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
   /** P5/S5 (C-17): banked faith — the pantheon's consumer. */
   /** P4/D-10: this civ's builders ever trained (its own cost escalator). */
-  buildersTrained?: number;
   /** P4/D-22: this civ's strongest melee unit ever fielded (city defense). */
-  bestMeleeCS?: number;
   /** AUDIT A-5r (#71): tiles this civ has GOLD-purchased — the escalator in
    * rivalTilePurchaseCost, the player's state.tilesPurchased twin. */
-  tilesPurchased?: number;
 }
 
 export interface ReligionState {

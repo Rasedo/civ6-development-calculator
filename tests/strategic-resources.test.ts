@@ -3,7 +3,7 @@ import { UNITS } from '../src/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { trainableUnits, queueUnit } from '../src/core/units';
-import { civHasStrategic, PLAYER_CIV, isPlayerSeat, civOfRival, tileCity, NO_SEAT, setTileOwner } from '../src/core/seats';
+import { civHasStrategic, PLAYER_CIV, isPlayerSeat, civOfRival, tileCity, NO_SEAT, setTileOwner, playerSeat } from '../src/core/seats';
 
 /** Units-mode game with the capital at (8,8), and a resource tile inside
  * borders that the caller can configure. Returns the state, city and the tile. */
@@ -99,12 +99,12 @@ describe('B-9/B-10 new-unit build path', () => {
     expect(queueUnit(state, city.id, 'SWORDSMAN').ok).toBe(true);
     // force the queue to completion and run a turn
     city.queue[0].progress = 10_000;
-    const before = state.bestMeleeCS;
+    const before = playerSeat(state).bestMeleeCS;
     endTurn(state);
     const swords = state.units.filter((u) => u.type === 'SWORDSMAN' && isPlayerSeat(u.seat));
     expect(swords.length).toBe(1);
     // P4/D-22: strongest melee ever fielded now reflects the Swordsman (combat 36)
-    expect(state.bestMeleeCS).toBeGreaterThanOrEqual(UNITS.SWORDSMAN.combat);
-    expect(state.bestMeleeCS).toBeGreaterThan(before);
+    expect(playerSeat(state).bestMeleeCS).toBeGreaterThanOrEqual(UNITS.SWORDSMAN.combat);
+    expect(playerSeat(state).bestMeleeCS).toBeGreaterThan(before);
   });
 });

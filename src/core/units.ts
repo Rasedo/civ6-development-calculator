@@ -572,7 +572,7 @@ export function builderCost(state: GameState): number {
     (n, c) => n + c.queue.filter((q) => q.kind === 'unit' && q.unit === 'BUILDER').length,
     0,
   );
-  return Math.round((50 + 4 * ((state.buildersTrained ?? 0) + queued)) * GAME_SPEED);
+  return Math.round((50 + 4 * ((playerSeat(state).buildersTrained ?? 0) + queued)) * GAME_SPEED);
 }
 
 /**
@@ -721,7 +721,7 @@ export function spawnUnit(
   // training, purchase, levies and rival production alike).
   if (def.combat > 0 && !def.ranged) {
     if (isPlayerSeat(seat)) {
-      state.bestMeleeCS = Math.max(state.bestMeleeCS ?? 0, def.combat);
+      playerSeat(state).bestMeleeCS = Math.max(playerSeat(state).bestMeleeCS ?? 0, def.combat);
     } else if (isRivalSeat(seat)) {
       const rv = rivalOfSeat(state, seat);
       if (rv) rv.bestMeleeCS = Math.max(rv.bestMeleeCS ?? 0, def.combat);

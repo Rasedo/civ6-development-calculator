@@ -57,6 +57,11 @@ function addRival(state: GameState, id: number, atWar: boolean): RivalCiv {
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     gpp: {},
     gpEarned: [],
+    settlers: 0,
+    buildersTrained: 0,
+    bestMeleeCS: 0,
+    tilesPurchased: 0,
+    spaceProjects: [],
   } as unknown as RivalCiv;
   state.seats.push(rival);
   return rival;

@@ -44,7 +44,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   L.push(
     `${p}PT = treas:${Math.round(playerSeat(state).treasury*1000)} sci:${Math.round(playerSeat(state).scienceTotal*1000)} ` +
       `cul:${Math.round(playerSeat(state).cultureTotal*1000)} ntech:${playerSeat(state).research.techs.length} ` +
-      `nciv:${playerSeat(state).research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length} ` +
+      `nciv:${playerSeat(state).research.civics.length} nset:${playerSeat(state).settlers} ncity:${state.cities.length} nunit:${pu.length} ` +
       `umaint:${Math.round(unitMaintenance(state)*1000)} ` +
       `gp:${GP_CLASSES.map((cls) => greatPeopleEarned(state, cls)).join(',')} ` +
       `ers:${state.eraScore?.[0] ?? 0} age:${state.civAges?.[0] ?? 1} ` + // B-24: player era score + Age (esc is empire score)

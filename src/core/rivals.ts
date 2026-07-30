@@ -239,10 +239,14 @@ export function placeRivals(state: GameState, count?: number): void {
       faith: 0,
       tourism: 0,
       government: { current: null, policies: [] },
-      spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
       gpEarned: [],
+      settlers: 0,
+      buildersTrained: 0,
+      bestMeleeCS: 0,
+      tilesPurchased: 0,
+      spaceProjects: [],
       religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     };
     foundRivalCity(state, rival, tile);
