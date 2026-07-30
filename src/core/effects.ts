@@ -245,10 +245,11 @@ export function getModifiers(state: GameState): Modifiers {
   const mods = modifiersFromResearch(playerSeat(state).research);
 
   // Government + slotted policies
-  const gov = state.government.current ? GOVERNMENTS[state.government.current] : null;
+  const govId = playerSeat(state).government.current;
+  const gov = govId ? GOVERNMENTS[govId] : null;
   if (gov) {
     applyPolicyEffects(mods, gov.effects);
-    for (const cardId of state.government.policies) {
+    for (const cardId of playerSeat(state).government.policies) {
       if (!cardId) continue;
       const card = POLICIES[cardId];
       if (card) applyPolicyEffects(mods, card.effects);
@@ -373,7 +374,7 @@ export function computeAdoption(research: ResearchState): {
 }
 
 /** Layer a seat's adopted government + slotted policies onto `mods`, exactly
- * as getModifiers does for the player's state.government (A-7r). */
+ * as getModifiers does for the player's playerSeat(state).government (A-7r). */
 function applyGovernment(mods: Modifiers, research: ResearchState): void {
   const { government, policies } = computeAdoption(research);
   const gov = government ? GOVERNMENTS[government] : null;
@@ -531,7 +532,8 @@ export function makeYieldCtx(state: GameState): YieldCtx {
 
 /** Current government's policy slots, including wonder-granted extras. */
 export function governmentSlots(state: GameState): import('../data/policies').SlotKind[] {
-  const gov = state.government.current ? GOVERNMENTS[state.government.current] : null;
+  const govId = playerSeat(state).government.current;
+  const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];
   // Forbidden City grants an extra wildcard slot.

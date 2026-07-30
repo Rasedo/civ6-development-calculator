@@ -39,8 +39,8 @@ describe('research progression', () => {
     let guard = 0;
     while (playerSeat(state).research.civics.length === 0 && guard++ < 40) endTurn(state);
     expect(playerSeat(state).research.civics).toContain('CODE_OF_LAWS');
-    expect(state.government.current).toBe('CHIEFDOM');
-    expect(state.government.policies.length).toBe(2); // 1 military + 1 economic
+    expect(playerSeat(state).government.current).toBe('CHIEFDOM');
+    expect(playerSeat(state).government.policies.length).toBe(2); // 1 military + 1 economic
   });
 });
 
@@ -180,7 +180,7 @@ describe('governments and policies', () => {
     const { state } = withGovernment('CHIEFDOM');
     expect(setPolicy(state, 1, 'URBAN_PLANNING').ok).toBe(true);
     expect(setGovernment(state, 'MONARCHY').ok).toBe(true); // [M,M,M,E,D,W]
-    expect(state.government.policies.filter((p) => p === 'URBAN_PLANNING').length).toBe(1);
+    expect(playerSeat(state).government.policies.filter((p) => p === 'URBAN_PLANNING').length).toBe(1);
   });
 
   it('unlocked governments and policies are reported by computeUnlocks', () => {

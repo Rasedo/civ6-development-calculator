@@ -43,6 +43,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
+    government: { current: null, policies: [] },
     cities: [],
     nextCityId: 0,
     atWar: false,

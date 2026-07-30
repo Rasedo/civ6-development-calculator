@@ -79,7 +79,7 @@ function checkSatisfied(state: GameState, check: BoostCheck): boolean {
           (t.wonder !== null || neighbors(state.map, t).some((n) => n.wonder !== null)),
       );
     case 'policies':
-      return state.government.policies.filter((p) => p !== null).length >= check.count;
+      return playerSeat(state).government.policies.filter((p) => p !== null).length >= check.count;
     case 'cities':
       return state.cities.length >= check.count;
   }

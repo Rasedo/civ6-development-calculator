@@ -302,7 +302,7 @@ export class CivEnv {
       case 'setPolicy':
         this.policyMoves += 1;
         if (
-          !s.government.policies.includes(null) ||
+          !playerSeat(s).government.policies.includes(null) ||
           this.policyMoves >= governmentSlots(s).length + 2
         ) {
           this.settlePolicies();
@@ -442,7 +442,7 @@ export function applyEnvAction(state: GameState, decision: PendingDecision, acti
       break;
     case 'setPolicy':
       padPolicySlots(s);
-      s.government.policies[action.slot] = action.card;
+      playerSeat(s).government.policies[action.slot] = action.card;
       break;
     case 'keepPolicies':
       break;
@@ -684,7 +684,7 @@ function researchCandidates(state: GameState, kind: 'tech' | 'civic'): Candidate
 function padPolicySlots(state: GameState): void {
   const s = state;
   const slots = governmentSlots(s);
-  while (s.government.policies.length < slots.length) s.government.policies.push(null);
+  while (playerSeat(s).government.policies.length < slots.length) playerSeat(s).government.policies.push(null);
 }
 
 /** Empire per-turn yield totals (used for candidate deltas and rates). */
@@ -699,10 +699,10 @@ function empireTotals(state: GameState): Yields {
 /** Δ empire yields from putting `card` into `slot` (state restored after). */
 function policySwapDelta(state: GameState, base: Yields, slot: number, card: string | null): Yields {
   const s = state;
-  const prev = s.government.policies[slot] ?? null;
-  s.government.policies[slot] = card;
+  const prev = playerSeat(s).government.policies[slot] ?? null;
+  playerSeat(s).government.policies[slot] = card;
   const after = empireTotals(state);
-  s.government.policies[slot] = prev;
+  playerSeat(s).government.policies[slot] = prev;
   const delta = emptyYields();
   for (const k of YIELD_KEYS) delta[k] = after[k] - base[k];
   return delta;
@@ -710,16 +710,16 @@ function policySwapDelta(state: GameState, base: Yields, slot: number, card: str
 
 function policyCandidates(state: GameState): Candidate[] {
   const s = state;
-  if (!s.government.current) return [];
+  if (!playerSeat(s).government.current) return [];
   padPolicySlots(state);
   const slots = governmentSlots(s);
   const base = empireTotals(state);
   const unlocked = s.sandbox ? new Set(Object.keys(POLICIES)) : computeUnlocks(s).policies;
-  const slotted = new Set(s.government.policies.filter((p): p is string => p !== null));
+  const slotted = new Set(playerSeat(s).government.policies.filter((p): p is string => p !== null));
 
   // Contribution of each currently slotted card (to pick replacement victims).
   const removalDelta = new Map<number, number>();
-  s.government.policies.forEach((card, i) => {
+  playerSeat(s).government.policies.forEach((card, i) => {
     if (card === null) return;
     const d = policySwapDelta(state, base, i, null);
     removalDelta.set(i, YIELD_KEYS.reduce((sum, k) => sum + d[k], 0));
@@ -734,7 +734,7 @@ function policyCandidates(state: GameState): Candidate[] {
       .map((kind, i) => (cardFitsSlot(card, kind) ? i : -1))
       .filter((i) => i >= 0);
     if (fitting.length === 0) continue;
-    const free = fitting.find((i) => s.government.policies[i] === null);
+    const free = fitting.find((i) => playerSeat(s).government.policies[i] === null);
     // No free slot: evict the fitting card contributing least (removal
     // deltas are negative contributions, so the max is the weakest card).
     const target =
@@ -755,9 +755,9 @@ function policyCandidates(state: GameState): Candidate[] {
 
 function governmentCandidates(state: GameState): Candidate[] {
   const s = state;
-  if (!s.government.current) return [];
+  if (!playerSeat(s).government.current) return [];
   const unlocked = computeUnlocks(s).governments;
-  const options = [...unlocked].filter((g) => g !== s.government.current && GOVERNMENTS[g]);
+  const options = [...unlocked].filter((g) => g !== playerSeat(s).government.current && GOVERNMENTS[g]);
   if (options.length === 0) return [];
   const base = empireTotals(state);
   const out: Candidate[] = [];
@@ -861,9 +861,9 @@ export function envObservation(state: GameState, horizon: number): number[] {
     const pts = s.greatPeople.points[cls] ?? 0;
     gpProgress = Math.max(gpProgress, pts / gpCost(greatPeopleEarned(s, cls)));
   }
-  const slots = s.government.current ? governmentSlots(s) : [];
+  const slots = playerSeat(s).government.current ? governmentSlots(s) : [];
   const emptySlots = slots.length
-    ? slots.filter((_, i) => (s.government.policies[i] ?? null) === null).length / slots.length
+    ? slots.filter((_, i) => (playerSeat(s).government.policies[i] ?? null) === null).length / slots.length
     : 0;
   return [
     s.turn / horizon,

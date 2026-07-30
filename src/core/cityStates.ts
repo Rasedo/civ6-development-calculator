@@ -383,7 +383,8 @@ export function cityStatePhase(state: GameState): void {
 
   // Influence → envoys (only once someone can receive them).
   if (state.cityStates.some((cs) => cs.met)) {
-    const tier = state.government.current ? GOV_INFLUENCE_TIER[state.government.current] ?? 0 : 0;
+    const govNow = playerSeat(state).government.current;
+    const tier = govNow ? GOV_INFLUENCE_TIER[govNow] ?? 0 : 0;
     playerSeat(state).influencePoints += INFLUENCE_PER_TURN + tier;
     while (playerSeat(state).influencePoints >= ENVOY_COST) {
       playerSeat(state).influencePoints -= ENVOY_COST;

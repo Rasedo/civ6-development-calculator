@@ -109,9 +109,9 @@ describe('live sync parser', () => {
     ].join('\n');
 
     const { state, report } = parseLiveSync(text);
-    expect(state.government.current).toBe('OLIGARCHY');
-    expect(state.government.policies).toContain('URBAN_PLANNING');
-    expect(state.government.policies).toContain('GOD_KING');
+    expect(playerSeat(state).government.current).toBe('OLIGARCHY');
+    expect(playerSeat(state).government.policies).toContain('URBAN_PLANNING');
+    expect(playerSeat(state).government.policies).toContain('GOD_KING');
     expect(report.skipped['policy']).toBe(1); // the unknown DLC card
     expect(state.religion.pantheon).toBe('FERTILITY_RITES');
     expect(state.religion.follower).toBe('WORK_ETHIC');

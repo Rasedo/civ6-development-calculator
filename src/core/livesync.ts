@@ -336,8 +336,8 @@ export function parseLiveSync(text: string): SyncResult {
   if (government) {
     const id = government.replace(/^GOVERNMENT_/, '');
     if (GOVERNMENTS[id]) {
-      state.government.current = id;
-      state.government.policies = governmentSlots(state).map(() => null);
+      playerSeat(state).government.current = id;
+      playerSeat(state).government.policies = governmentSlots(state).map(() => null);
     } else {
       skip(report, 'government');
     }
@@ -345,16 +345,16 @@ export function parseLiveSync(text: string): SyncResult {
   for (const p of policyCards) {
     const id = p.replace(/^POLICY_/, '');
     const card = POLICIES[id];
-    if (!card || !state.government.current) {
+    if (!card || !playerSeat(state).government.current) {
       skip(report, 'policy');
       continue;
     }
     const slots = governmentSlots(state);
-    while (state.government.policies.length < slots.length) state.government.policies.push(null);
+    while (playerSeat(state).government.policies.length < slots.length) playerSeat(state).government.policies.push(null);
     const slot = slots.findIndex(
-      (kind, i) => state.government.policies[i] === null && cardFitsSlot(card, kind),
+      (kind, i) => playerSeat(state).government.policies[i] === null && cardFitsSlot(card, kind),
     );
-    if (slot >= 0) state.government.policies[slot] = id;
+    if (slot >= 0) playerSeat(state).government.policies[slot] = id;
     else skip(report, 'policy');
   }
 

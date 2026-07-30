@@ -820,7 +820,8 @@ export function renderTradePanel(container: HTMLElement, state: GameState, cb: P
 // ---------------------------------------------------------------------------
 
 export function renderCityStatesPanel(container: HTMLElement, state: GameState, cb: PanelCallbacks): void {
-  const tier = state.government.current ? GOV_INFLUENCE_TIER[state.government.current] ?? 0 : 0;
+  const govNow = playerSeat(state).government.current;
+  const tier = govNow ? GOV_INFLUENCE_TIER[govNow] ?? 0 : 0;
   const perTurn = INFLUENCE_PER_TURN + tier;
   const met = state.cityStates.filter((cs) => cs.met);
   const unmet = state.cityStates.length - met.length;
@@ -1145,7 +1146,7 @@ export function renderGovernmentPanel(
 ): void {
   const unlocks = computeUnlocks(state);
   const sandbox = state.sandbox;
-  const curId = state.government.current;
+  const curId = playerSeat(state).government.current;
   const cur = curId ? GOVERNMENTS[curId] : null;
 
   const govOptions = Object.values(GOVERNMENTS)
@@ -1158,12 +1159,12 @@ export function renderGovernmentPanel(
   if (cur) {
     slotsHtml = governmentSlots(state)
       .map((slotKind, i) => {
-        const chosen = state.government.policies[i];
+        const chosen = playerSeat(state).government.policies[i];
         const fitting = Object.values(POLICIES).filter(
           (p) =>
             (sandbox || unlocks.policies.has(p.id)) &&
             cardFitsSlot(p, slotKind) &&
-            (!state.government.policies.includes(p.id) || chosen === p.id),
+            (!playerSeat(state).government.policies.includes(p.id) || chosen === p.id),
         );
         const options =
           `<option value="">— empty —</option>` +
@@ -1449,7 +1450,8 @@ export function renderEmpireSummary(container: HTMLElement, state: GameState): v
     : research.civics.length === Object.keys(CIVICS).length
       ? 'all complete'
       : 'auto-picks next turn';
-  const gov = state.government.current ? GOVERNMENTS[state.government.current]?.name : 'none';
+  const govCur = playerSeat(state).government.current;
+  const gov = govCur ? GOVERNMENTS[govCur]?.name : 'none';
 
   if (state.cities.length === 0) {
     container.innerHTML = '<span class="muted">No cities yet — use "Found city" and click a land tile.</span>';

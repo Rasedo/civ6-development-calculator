@@ -111,7 +111,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     nextCityId: 0,
     turn: 1,
     sandbox,
-    government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null },
     tradeRoutes: [],
@@ -138,7 +137,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] } }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] } }],
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -670,30 +669,30 @@ export function setGovernment(state: GameState, governmentId: string): RuleResul
   const def = GOVERNMENTS[governmentId];
   if (!def) return { ok: false, reason: 'No such government.' };
 
-  const oldCards = state.government.policies.filter((p): p is string => p !== null);
-  state.government.current = governmentId;
+  const oldCards = playerSeat(state).government.policies.filter((p): p is string => p !== null);
+  playerSeat(state).government.current = governmentId;
   const slots = governmentSlots(state); // includes wonder-granted extras
-  state.government.policies = slots.map(() => null);
+  playerSeat(state).government.policies = slots.map(() => null);
   // Re-seat old cards into compatible slots where possible.
   for (const cardId of oldCards) {
     const card = POLICIES[cardId];
     if (!card) continue;
     const slot = slots.findIndex(
-      (kind, i) => state.government.policies[i] === null && cardFitsSlot(card, kind),
+      (kind, i) => playerSeat(state).government.policies[i] === null && cardFitsSlot(card, kind),
     );
-    if (slot >= 0) state.government.policies[slot] = cardId;
+    if (slot >= 0) playerSeat(state).government.policies[slot] = cardId;
   }
   return { ok: true };
 }
 
 export function setPolicy(state: GameState, slotIndex: number, policyId: string | null): RuleResult {
-  const govId = state.government.current;
+  const govId = playerSeat(state).government.current;
   if (!govId) return { ok: false, reason: 'No government yet (research Code of Laws).' };
   const slots = governmentSlots(state);
   if (slotIndex < 0 || slotIndex >= slots.length) return { ok: false, reason: 'No such slot.' };
-  while (state.government.policies.length < slots.length) state.government.policies.push(null);
+  while (playerSeat(state).government.policies.length < slots.length) playerSeat(state).government.policies.push(null);
   if (policyId === null) {
-    state.government.policies[slotIndex] = null;
+    playerSeat(state).government.policies[slotIndex] = null;
     return { ok: true };
   }
   const card = POLICIES[policyId];
@@ -705,10 +704,10 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
   if (!cardFitsSlot(card, slots[slotIndex])) {
     return { ok: false, reason: `${card.name} does not fit a ${slots[slotIndex]} slot.` };
   }
-  if (state.government.policies.some((p, i) => p === policyId && i !== slotIndex)) {
+  if (playerSeat(state).government.policies.some((p, i) => p === policyId && i !== slotIndex)) {
     return { ok: false, reason: `${card.name} is already slotted.` };
   }
-  state.government.policies[slotIndex] = policyId;
+  playerSeat(state).government.policies[slotIndex] = policyId;
   return { ok: true };
 }
 
@@ -761,9 +760,9 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
   // flipped the player keeps the pre-A-7r free-Chiefdom-only behavior.
   if (GOVERNMENTS_ADOPTION_LIVE) {
     const adopted = computeAdoption(playerSeat(state).research);
-    state.government.current = adopted.government;
-    state.government.policies = adopted.policies;
-  } else if (!state.government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {
+    playerSeat(state).government.current = adopted.government;
+    playerSeat(state).government.policies = adopted.policies;
+  } else if (!playerSeat(state).government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {
     setGovernment(state, 'CHIEFDOM');
   }
 }
@@ -904,7 +903,7 @@ export function endTurn(state: GameState): void {
   // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, accumulated
   // once per turn at the civ level, the same position the rival seat uses.
   playerSeat(state).diploFavor =
-    (playerSeat(state).diploFavor ?? 0) + diploFavorPerTurn(state.government.current, playerSuzerainCount(state));
+    (playerSeat(state).diploFavor ?? 0) + diploFavorPerTurn(playerSeat(state).government.current, playerSuzerainCount(state));
   // B-22 (#74): the player's GRIEVANCES decay by 1 each turn they are at peace
   // with EVERY rival (floor 0) — the exact twin of the rival decay, at the same
   // per-turn accumulator position so both engines apply it together.
@@ -1304,12 +1303,12 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] } },
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] } },
     ...(state.rivals ?? []),
   ];
   playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
   playerSeat(state).research.boosted ??= [];
-  state.government ??= { current: null, policies: [] };
+  playerSeat(state).government ??= { current: null, policies: [] };
   state.greatPeople ??= { points: {}, earned: [] };
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {
     t.wonder ??= null;

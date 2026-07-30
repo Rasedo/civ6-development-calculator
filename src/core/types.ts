@@ -316,7 +316,6 @@ export interface GameState {
   turn: number;
   /** Sandbox: districts/buildings complete instantly, cost nothing, and ignore tech gating. */
   sandbox: boolean;
-  government: GovernmentState;
   greatPeople: {
     points: Partial<Record<GreatPersonClass, number>>;
     /** Ids of great people already earned (in claim order). */
@@ -480,6 +479,12 @@ export interface Seat {
   /** Tech + civic progress. Player and rival already shared this exact type —
    *  the only thing that differed was WHERE it hung. (S1.2c) */
   research: ResearchState;
+  /** Adopted government + filled policy slots (S1.2d). Every seat STORES one.
+   *  Rivals still derive theirs per read via `computeAdoption`, so their stored
+   *  copy is inert today — it exists so that derivation can be replaced by a
+   *  single write, which is the precondition for merging `getModifiers` and
+   *  `getRivalModifiers` into one function. */
+  government: GovernmentState;
 }
 
 export interface RivalCiv extends Seat {

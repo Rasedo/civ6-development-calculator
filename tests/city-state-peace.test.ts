@@ -48,6 +48,7 @@ function addRival(state: GameState, id: number, atWar: boolean): RivalCiv {
     cultureTotal: 0,
     faith: 0,
     tourism: 0,
+    government: { current: null, policies: [] },
     cities: [],
     nextCityId: 0,
     atWar,

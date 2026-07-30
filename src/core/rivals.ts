@@ -284,6 +284,7 @@ export function placeRivals(state: GameState, count?: number): void {
       cultureTotal: 0,
       faith: 0,
       tourism: 0,
+      government: { current: null, policies: [] },
       spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},

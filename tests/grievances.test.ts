@@ -55,7 +55,7 @@ describe('B-22 diplomatic favor', () => {
   it('accrues on the player each turn', () => {
     const state = newGame(1);
     playerSeat(state).diploFavor = 0;
-    state.government.current = 'MONARCHY';
+    playerSeat(state).government.current = 'MONARCHY';
     endTurn(state);
     // no suzerainties in a fresh game -> exactly the tier
     expect(playerSeat(state).diploFavor).toBe(GOVERNMENTS.MONARCHY.tier);
