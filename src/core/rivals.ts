@@ -10,6 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, Improvemen
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
+import { seatAccumulators } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -21,7 +22,7 @@ import { routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE
 import { isSuzerain, csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
-import { GOVERNMENTS_ADOPTION_LIVE, GOVERNMENTS } from '../data/policies';
+import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
@@ -59,7 +60,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, civEraIndex, seatTourism, empireGrowthMult, pickBorderTile } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, civEraIndex, empireGrowthMult, pickBorderTile } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -68,7 +69,7 @@ import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from '
 import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
+import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount } from './seats';
 
@@ -1480,21 +1481,7 @@ function grantRelic(state: GameState, civ: number): void {
  * none, which pays nothing — Chiefdom is tier 0 anyway) and `suzerains` the
  * count from that seat's suzerain test. Zero-draw, integer-only.
  */
-export function diploFavorPerTurn(gov: string | null, suzerains: number): number {
-  const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
-  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains;
-}
-
 /** B-22 (#75): city-states the PLAYER is Suzerain of. */
-export function playerSuzerainCount(state: GameState): number {
-  return state.cityStates.reduce((n, cs) => n + (isSuzerain(cs) ? 1 : 0), 0);
-}
-
-/** B-22 (#75): city-states rival `rivalId` is Suzerain of. */
-export function rivalSuzerainCount(state: GameState, rivalId: number): number {
-  return state.cityStates.reduce((n, cs) => n + (isSuzerain(cs, civOfRival(rivalId)) ? 1 : 0), 0);
-}
-
 /**
  * B-22 (#76): the WORLD CONGRESS session. Convenes at every CONGRESS_INTERVAL
  * turn once ANY civ has reached CONGRESS_MIN_ERA (Medieval), and runs one
@@ -3255,24 +3242,9 @@ export function rivalPhase(state: GameState): void {
     // id; no refund).
     rival.treasury = (rival.treasury ?? 0) + goldSum;
     rival.faith = (rival.faith ?? 0) + faithSum; // P5/S5 (C-17)
-    // B-20 (#71): TOURISM — the player's twin, accumulated once per turn at
-    // the civ level (Great Works + owned Seaside Resorts, each worth its
-    // tile's appeal). Zero-draw, integer-only.
-    rival.tourism = (rival.tourism ?? 0) + seatTourism(state, civOfRival(rival.id));
-    // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, the
-    // player's twin at the same per-turn accumulator position.
-    rival.diploFavor =
-      (rival.diploFavor ?? 0) +
-      diploFavorPerTurn(
-        GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(rival.research).government : null,
-        rivalSuzerainCount(state, rival.id),
-      );
-    // B-22 (2026-07-27): grievances DECAY by 1 each turn this civ is at peace
-    // on every axis (floor 0) — the same position as the other per-turn civ
-    // accumulators so the GPU mirrors it exactly.
-    if ((rival.warmonger ?? 0) > 0 && !rival.atWar && (rival.atWarRivals ?? []).length === 0) {
-      rival.warmonger = (rival.warmonger ?? 0) - 1;
-    }
+    // #51/S2.4: tourism, diplomatic favor and grievance decay — the shared
+    // per-seat accumulators, at the position they have always held.
+    seatAccumulators(state, civOfRival(rival.id));
     rival.treasury -= state.units.reduce(
       (s, u) => s + (isRivalSeat(u.seat) && u.seat === civOfRival(rival.id) ? UNITS[u.type]?.maintenance ?? 0 : 0),
       0,

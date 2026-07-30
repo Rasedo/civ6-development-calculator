@@ -5,7 +5,7 @@ import { createGame, endTurn, foundCity } from '../src/core/game';
 import { declareWar } from '../src/core/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
 import { RR_WARMONGER_DOW, RR_WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN } from '../src/data/rivals';
-import { diploFavorPerTurn } from '../src/core/rivals';
+import { diploFavorPerTurn } from '../src/core/seatTurn';
 import { GOVERNMENTS } from '../src/data/policies';
 
 // B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of

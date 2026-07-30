@@ -7,7 +7,7 @@
 import type { City, DistrictId, GameState, GreatPersonClass, ImprovementId, MapGenOptions, QueueItem, ResearchState, Tile, RivalCity, Unit, RivalCiv } from './types';
 import { generateMap } from './mapgen';
 import { tilesWithin, hexDistance } from './hex';
-import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots, seatTourism } from './city';
+import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
@@ -16,7 +16,8 @@ import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
-import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, diploFavorPerTurn, playerSuzerainCount, worldCongress } from './rivals';
+import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress } from './rivals';
+import { seatAccumulators } from './seatTurn';
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
@@ -890,20 +891,9 @@ export function endTurn(state: GameState): void {
     turnCulture += stats.total.culture;
   }
 
-  // B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level, right
-  // after the city loop, so the GPU mirrors at the same position. Great Works
-  // plus every owned Seaside Resort (worth its tile's appeal).
-  playerSeat(state).tourism = (playerSeat(state).tourism ?? 0) + seatTourism(state);
-  // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, accumulated
-  // once per turn at the civ level, the same position the rival seat uses.
-  playerSeat(state).diploFavor =
-    (playerSeat(state).diploFavor ?? 0) + diploFavorPerTurn(playerSeat(state).government.current, playerSuzerainCount(state));
-  // B-22 (#74): the player's GRIEVANCES decay by 1 each turn they are at peace
-  // with EVERY rival (floor 0) — the exact twin of the rival decay, at the same
-  // per-turn accumulator position so both engines apply it together.
-  if ((playerSeat(state).warmonger ?? 0) > 0 && !rivalsOf(state).some((rv) => rv.atWar)) {
-    playerSeat(state).warmonger = (playerSeat(state).warmonger ?? 0) - 1;
-  }
+  // #51/S2.4: tourism, diplomatic favor and grievance decay — the shared
+  // per-seat accumulators, run here at the position they have always held.
+  seatAccumulators(state, PLAYER_CIV);
 
   // Loyalty collapses resolve after the city loop (they mutate the list).
   for (const city of defectors) flipCityToRival(state, city);
