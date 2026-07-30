@@ -8,7 +8,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { PLAYER_CIV } from './seats';
+import { PLAYER_CIV, playerSeat } from './seats';
 import { csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 
 // ---------------------------------------------------------------------------
@@ -85,15 +85,15 @@ export function computeUnlocksIn(research: ResearchState): Unlocks {
 }
 
 export function computeUnlocks(state: GameState): Unlocks {
-  return computeUnlocksIn(state.research);
+  return computeUnlocksIn(playerSeat(state).research);
 }
 
 export function isTechComplete(state: GameState, id: string): boolean {
-  return state.research.techs.includes(id);
+  return playerSeat(state).research.techs.includes(id);
 }
 
 export function isCivicComplete(state: GameState, id: string): boolean {
-  return state.research.civics.includes(id);
+  return playerSeat(state).research.civics.includes(id);
 }
 
 /**
@@ -114,11 +114,11 @@ export function availableCivicsIn(research: ResearchState): CivicDef[] {
 }
 
 export function availableTechs(state: GameState): TechDef[] {
-  return availableTechsIn(state.research);
+  return availableTechsIn(playerSeat(state).research);
 }
 
 export function availableCivics(state: GameState): CivicDef[] {
-  return availableCivicsIn(state.research);
+  return availableCivicsIn(playerSeat(state).research);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
 }
 
 export function getModifiers(state: GameState): Modifiers {
-  const mods = modifiersFromResearch(state.research);
+  const mods = modifiersFromResearch(playerSeat(state).research);
 
   // Government + slotted policies
   const gov = state.government.current ? GOVERNMENTS[state.government.current] : null;

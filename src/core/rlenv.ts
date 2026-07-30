@@ -312,13 +312,13 @@ export class CivEnv {
         this.settlePolicies();
         break;
       case 'setGovernment':
-        this.govSettledAt = s.research.civics.length;
+        this.govSettledAt = playerSeat(s).research.civics.length;
         // A new government opens fresh slots: revisit policies right away.
-        this.policySettledAt = s.research.civics.length - 1;
+        this.policySettledAt = playerSeat(s).research.civics.length - 1;
         this.policyMoves = 0;
         break;
       case 'keepGovernment':
-        this.govSettledAt = s.research.civics.length;
+        this.govSettledAt = playerSeat(s).research.civics.length;
         break;
       default:
         break;
@@ -326,27 +326,27 @@ export class CivEnv {
   }
 
   private settlePolicies(): void {
-    this.policySettledAt = this.state.research.civics.length;
+    this.policySettledAt = playerSeat(this.state).research.civics.length;
     this.policyMoves = 0;
   }
 
   /** Find the next decision that actually has choices, in priority order. */
   private nextDecision(): PendingDecision | null {
     const s = this.state;
-    if (s.research.civics.length > this.govSettledAt) {
+    if (playerSeat(s).research.civics.length > this.govSettledAt) {
       const d: PendingDecision = { type: 'government' };
       if (envCandidates(s, d).length > 1) return d;
-      this.govSettledAt = s.research.civics.length;
+      this.govSettledAt = playerSeat(s).research.civics.length;
     }
-    if (s.research.civics.length > this.policySettledAt) {
+    if (playerSeat(s).research.civics.length > this.policySettledAt) {
       const d: PendingDecision = { type: 'policy' };
       if (envCandidates(s, d).length > 1) return d;
       this.settlePolicies();
     }
-    if (s.research.tech === null && availableTechs(s).length > 0) {
+    if (playerSeat(s).research.tech === null && availableTechs(s).length > 0) {
       return { type: 'research' };
     }
-    if (s.research.civic === null && availableCivics(s).length > 0) {
+    if (playerSeat(s).research.civic === null && availableCivics(s).length > 0) {
       return { type: 'civic' };
     }
     if (playerSeat(s).envoysAvailable > 0 && metCityStates(s).length > 0) {
@@ -466,8 +466,8 @@ export function uiPendingDecisions(state: GameState): PendingDecision[] {
   const out: PendingDecision[] = [];
   if (envCandidates(state, { type: 'government' }).length > 1) out.push({ type: 'government' });
   if (envCandidates(state, { type: 'policy' }).length > 1) out.push({ type: 'policy' });
-  if (state.research.tech === null && availableTechs(state).length > 0) out.push({ type: 'research' });
-  if (state.research.civic === null && availableCivics(state).length > 0) out.push({ type: 'civic' });
+  if (playerSeat(state).research.tech === null && availableTechs(state).length > 0) out.push({ type: 'research' });
+  if (playerSeat(state).research.civic === null && availableCivics(state).length > 0) out.push({ type: 'civic' });
   if (playerSeat(state).envoysAvailable > 0 && metCityStates(state).length > 0) out.push({ type: 'envoy' });
   for (const c of [...state.cities].sort((a, b) => a.id - b.id)) {
     if (c.queue.length > 0) continue;
@@ -662,7 +662,7 @@ function researchCandidates(state: GameState, kind: 'tech' | 'civic'): Candidate
   const totals = empireTotals(state);
   const rate = Math.max(0.5, kind === 'tech' ? totals.science : totals.culture);
   const defs = kind === 'tech' ? availableTechs(s) : availableCivics(s);
-  const progress = kind === 'tech' ? s.research.techProgress : s.research.civicProgress;
+  const progress = kind === 'tech' ? playerSeat(s).research.techProgress : playerSeat(s).research.civicProgress;
   return defs
     .map((d) => ({ d, cost: effectiveResearchCost(s, d.id, d.cost) }))
     .sort((a, b) => a.cost - b.cost)
@@ -876,7 +876,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     yields.culture / 50,
     yields.faith / 50,
     Math.max(-1, Math.min(1, playerSeat(s).treasury / 500)),
-    (s.research.techs.length + s.research.civics.length) / 50,
+    (playerSeat(s).research.techs.length + playerSeat(s).research.civics.length) / 50,
     Math.min(1, barbs / 6),
     Math.min(1, pillaged / 10),
     hpDeficit,

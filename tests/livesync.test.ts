@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { parseLiveSync, syncSummary } from '../src/core/livesync';
 import { tileIndex } from '../src/core/hex';
 
@@ -34,8 +35,8 @@ describe('live sync parser', () => {
 
     const { state, report } = parseLiveSync(text);
     expect(state.turn).toBe(42);
-    expect(state.research.techs).toEqual(['POTTERY', 'WRITING']);
-    expect(state.research.civics).toEqual(['CODE_OF_LAWS']);
+    expect(playerSeat(state).research.techs).toEqual(['POTTERY', 'WRITING']);
+    expect(playerSeat(state).research.civics).toEqual(['CODE_OF_LAWS']);
     expect(report.skipped['tech']).toBe(1);
     expect(report.skipped['building']).toBe(1);
 

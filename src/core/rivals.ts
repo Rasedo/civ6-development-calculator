@@ -1617,7 +1617,7 @@ export function rivalSuzerainCount(state: GameState, rivalId: number): number {
 export function worldCongress(state: GameState): void {
   if (state.turn % CONGRESS_INTERVAL !== 0) return;
   const eras = [
-    civEraIndex(state.research.techs, state.research.civics),
+    civEraIndex(playerSeat(state).research.techs, playerSeat(state).research.civics),
     ...state.rivals.map((rv) => civEraIndex(rv.research.techs, rv.research.civics)),
   ];
   if (!eras.some((e) => e >= CONGRESS_MIN_ERA)) return;
@@ -2415,7 +2415,7 @@ function issueRivalQuest(state: GameState, rival: RivalCiv, cs: CityState): City
  * base (50 + 25 per ring past 2, GAME_SPEED-scaled) x (1 + 4 x the civ's best
  * research fraction) + a flat step per tile this civ has already bought — but
  * keyed on THIS rival's techs/civics and its own borderCostMult-carrying
- * modifiers, exactly as the player's reads state.research and getModifiers.
+ * modifiers, exactly as the player's reads playerSeat(state).research and getModifiers.
  */
 function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity, tileIndex: number): number {
   const center = state.map.tiles[rc.centerIndex];

@@ -18,6 +18,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { playerSeat } from '../src/core/seats';
 import {
   createGame,
   endTurn,
@@ -311,7 +312,7 @@ for (const game of roll.games) {
       } // a === NB+1: idle — queue nothing
     }
     if (!bad && act?.r !== undefined) {
-      if (state.research.tech !== null) {
+      if (playerSeat(state).research.tech !== null) {
         fail(`turn ${state.turn}: tech pick while research busy`);
         bad = true;
       } else {
@@ -323,7 +324,7 @@ for (const game of roll.games) {
       }
     }
     if (!bad && act?.c !== undefined) {
-      if (state.research.civic !== null) {
+      if (playerSeat(state).research.civic !== null) {
         fail(`turn ${state.turn}: civic pick while civic busy`);
         bad = true;
       } else {

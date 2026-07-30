@@ -207,7 +207,7 @@ describe('district projects', () => {
     // sits in techProgress instead of completing something mid-turn.
     grantTechs(state, 'POTTERY', 'ANIMAL_HUSBANDRY', 'MINING', 'SAILING', 'ARCHERY', 'ASTROLOGY', 'IRRIGATION', 'WRITING', 'MASONRY', 'BRONZE_WORKING', 'WHEEL');
     state.autoResearch = false;
-    state.research.tech = null;
+    playerSeat(state).research.tech = null;
     const r = queueProject(state, city.id, 'RESEARCH_GRANTS');
     expect(r.ok).toBe(true);
     const cost = itemCost(city.queue[0]);
@@ -220,7 +220,7 @@ describe('district projects', () => {
     const gpp = Math.round(cost * PROJECT_GPP_FRACTION);
     expect(city.queue.length).toBe(0);
     expect(playerSeat(state).scienceTotal - sciBefore).toBeGreaterThanOrEqual(lump);
-    expect(state.research.techProgress).toBeGreaterThanOrEqual(lump);
+    expect(playerSeat(state).research.techProgress).toBeGreaterThanOrEqual(lump);
     expect(state.greatPeople.points.SCIENTIST ?? 0).toBeGreaterThanOrEqual(gpp);
     expect(state.eventLog.some((e) => e.includes('Research Grants'))).toBe(true);
 

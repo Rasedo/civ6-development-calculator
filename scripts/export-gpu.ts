@@ -1715,7 +1715,7 @@ for (let s = 0; s < N_SEEDS; s++) {
   const ownerInit = map.tiles.map((t) => t.cityId);
   const C_MAX = 1 + N_EXTRA;
 
-  const knownBoosts = new Set(state.research.boosted);
+  const knownBoosts = new Set(playerSeat(state).research.boosted);
   const boostSchedule: { turn: number; kind: string; idx: number }[] = [];
   const trace: number[][] = [];
   let settlersQueued = 0;
@@ -1764,7 +1764,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     for (const spec of SCAFFOLD_DISTRICTS) {
       const di = PLACEABLE_DISTRICTS.indexOf(spec.id);
       // B9-R1: civic-unlocked scaffold entries gate on the civic tree.
-      const unlocked = (spec.unlockKind === 'civic' ? state.research.civics : state.research.techs).includes(spec.unlockId);
+      const unlocked = (spec.unlockKind === 'civic' ? playerSeat(state).research.civics : playerSeat(state).research.techs).includes(spec.unlockId);
       if (placedDistricts.has(di) || !unlocked) continue;
       let best = -1;
       let bestAdj = -1;
@@ -1906,7 +1906,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       const hole = cityIds.findIndex((id) => !state.cities.some((x) => x.id === id));
       if (hole >= 0) cityIds[hole] = c.id;
     }
-    for (const id of state.research.boosted) {
+    for (const id of playerSeat(state).research.boosted) {
       if (knownBoosts.has(id)) continue;
       knownBoosts.add(id);
       if (techIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'tech', idx: techIdx.get(id)! });

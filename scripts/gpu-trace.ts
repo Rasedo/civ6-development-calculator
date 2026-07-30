@@ -62,8 +62,8 @@ export type TraceCol<T> = { name: string; tol: 0 | 2; get(state: GameState, x: T
 
 const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'turn', tol: 0, get: (s) => s.turn },
-  { name: 'techs', tol: 0, get: (s) => s.research.techs.length },
-  { name: 'civics', tol: 0, get: (s) => s.research.civics.length },
+  { name: 'techs', tol: 0, get: (s) => playerSeat(s).research.techs.length },
+  { name: 'civics', tol: 0, get: (s) => playerSeat(s).research.civics.length },
   { name: 'settlers', tol: 0, get: (s) => s.settlers },
   { name: 'nCities', tol: 0, get: (s) => s.cities.length },
   { name: 'treasury', tol: 2, get: (s) => Math.round(playerSeat(s).treasury * 1000) },
@@ -95,8 +95,8 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   // per-turn yield side is unmodeled) — tracing it would just go red. Recorded
   // as task #53 / gpu/AUDIT.md, to be fixed by giving the player the rival's
   // economy rather than by widening the trace around the gap.
-  { name: 'techProg', tol: 2, get: (s) => Math.round(s.research.techProgress * 1000) },
-  { name: 'civicProg', tol: 2, get: (s) => Math.round(s.research.civicProgress * 1000) },
+  { name: 'techProg', tol: 2, get: (s) => Math.round(playerSeat(s).research.techProgress * 1000) },
+  { name: 'civicProg', tol: 2, get: (s) => Math.round(playerSeat(s).research.civicProgress * 1000) },
   { name: 'warWeariness', tol: 0, get: (s) => playerSeat(s).warWeariness },
 ];
 

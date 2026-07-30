@@ -43,7 +43,7 @@ export const TURN_LIMIT = 250;
 /** Eureka/inspiration discount applied to a research cost. */
 export function effectiveResearchCost(state: GameState, id: string, baseCost: number): number {
   // B-24 (#79): a GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost.
-  return effectiveResearchCostIn(state.research, id, baseCost, goldenBoostBonus(state, 0, !TECHS[id]));
+  return effectiveResearchCostIn(playerSeat(state).research, id, baseCost, goldenBoostBonus(state, 0, !TECHS[id]));
 }
 
 /**
@@ -81,7 +81,7 @@ export function districtDiscounted(state: GameState, type: DistrictId): boolean 
 }
 
 export function districtCost(state: GameState, type?: DistrictId): number {
-  const base = districtCostIn(state.research);
+  const base = districtCostIn(playerSeat(state).research);
   return type !== undefined && districtDiscounted(state, type) ? Math.floor(base * 0.6) : base;
 }
 
@@ -111,7 +111,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     nextCityId: 0,
     turn: 1,
     sandbox,
-    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null },
@@ -139,7 +138,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0 }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] } }],
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -390,7 +389,7 @@ export function availableProjects(state: GameState, city: City): ProjectDef[] {
     }
     if (!p.space) return true;
     if (done.includes(p.id)) return false; // one-time
-    if (p.requiresTech && !state.research.techs.includes(p.requiresTech)) return false;
+    if (p.requiresTech && !playerSeat(state).research.techs.includes(p.requiresTech)) return false;
     if (p.requiresProject && !done.includes(p.requiresProject)) return false;
     return true;
   });
@@ -618,8 +617,8 @@ export function tilePurchaseCost(state: GameState, city: City, tileIndex?: numbe
     const t = state.map.tiles[tileIndex];
     ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
   }
-  const tPct = state.research.techs.length / Object.keys(TECHS).length;
-  const cPct = state.research.civics.length / Object.keys(CIVICS).length;
+  const tPct = playerSeat(state).research.techs.length / Object.keys(TECHS).length;
+  const cPct = playerSeat(state).research.civics.length / Object.keys(CIVICS).length;
   const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
   const step = Math.round(5 * GAME_SPEED);
   return Math.round(
@@ -651,7 +650,7 @@ export function setTechResearch(state: GameState, techId: string): RuleResult {
   if (!availableTechs(state).some((t) => t.id === techId)) {
     return { ok: false, reason: 'Tech not available (missing prerequisites or already researched).' };
   }
-  state.research.tech = techId;
+  playerSeat(state).research.tech = techId;
   return { ok: true };
 }
 
@@ -659,7 +658,7 @@ export function setCivicResearch(state: GameState, civicId: string): RuleResult 
   if (!availableCivics(state).some((c) => c.id === civicId)) {
     return { ok: false, reason: 'Civic not available (missing prerequisites or already researched).' };
   }
-  state.research.civic = civicId;
+  playerSeat(state).research.civic = civicId;
   return { ok: true };
 }
 
@@ -720,18 +719,18 @@ export function setPolicy(state: GameState, slotIndex: number, policyId: string 
 function autoPickResearch(state: GameState): void {
   if (state.autoResearch === false) return; // someone else drives research
   const eff = (id: string, cost: number) => effectiveResearchCost(state, id, cost);
-  if (state.research.tech === null) {
+  if (playerSeat(state).research.tech === null) {
     const next = availableTechs(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
-    if (next) state.research.tech = next.id;
+    if (next) playerSeat(state).research.tech = next.id;
   }
-  if (state.research.civic === null) {
+  if (playerSeat(state).research.civic === null) {
     const next = availableCivics(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
-    if (next) state.research.civic = next.id;
+    if (next) playerSeat(state).research.civic = next.id;
   }
 }
 
 function advanceResearch(state: GameState, science: number, culture: number): void {
-  const r = state.research;
+  const r = playerSeat(state).research;
   autoPickResearch(state);
 
   r.techProgress += science;
@@ -761,7 +760,7 @@ function advanceResearch(state: GameState, science: number, culture: number): vo
   // Gated INERT behind GOVERNMENTS_ADOPTION_LIVE (see the flag's note); until
   // flipped the player keeps the pre-A-7r free-Chiefdom-only behavior.
   if (GOVERNMENTS_ADOPTION_LIVE) {
-    const adopted = computeAdoption(state.research);
+    const adopted = computeAdoption(playerSeat(state).research);
     state.government.current = adopted.government;
     state.government.policies = adopted.policies;
   } else if (!state.government.current && computeUnlocks(state).governments.has('CHIEFDOM')) {
@@ -797,7 +796,7 @@ export function endTurn(state: GameState): void {
   // the GPU computes the same pick inside _apply_loyalty_and_flips.
   const govPicks = governorPicks(
     state.cities.map((c) => Math.round((c.loyalty ?? 100) * 1000)),
-    governorTitles(state.research.civics.length),
+    governorTitles(playerSeat(state).research.civics.length),
   );
   const govIds = new Set([...govPicks].map((i) => state.cities[i].id));
 
@@ -1151,7 +1150,7 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
   const person = GREAT_PEOPLE[cls][n];
   if (!person) return; // class exhausted
   const fx = person.effect;
-  if (fx.science) state.research.techProgress += fx.science;
+  if (fx.science) playerSeat(state).research.techProgress += fx.science;
   // B-20: WRITER/MUSICIAN slot Great Works (+2 culture/turn each, deferred
   // yield); charges with no open slot fall back to the instant culture lump
   // (one lump per overflow charge). Other classes apply culture instantly.
@@ -1167,9 +1166,9 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
         0,
       );
     const overflow = placeGreatWorks(state.cities, kind, wonderSlots); // #73: per-kind (writing/art/music)
-    if (fx.culture) state.research.civicProgress += fx.culture * overflow;
+    if (fx.culture) playerSeat(state).research.civicProgress += fx.culture * overflow;
   } else if (fx.culture) {
-    state.research.civicProgress += fx.culture;
+    playerSeat(state).research.civicProgress += fx.culture;
   }
   if (fx.faith) playerSeat(state).faith += fx.faith;
   if (fx.gold) playerSeat(state).treasury += fx.gold;
@@ -1305,11 +1304,11 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0 },
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] } },
     ...(state.rivals ?? []),
   ];
-  state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
-  state.research.boosted ??= [];
+  playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
+  playerSeat(state).research.boosted ??= [];
   state.government ??= { current: null, policies: [] };
   state.greatPeople ??= { points: {}, earned: [] };
   for (const t of state.map.tiles as (Tile & { wonder?: string | null })[]) {

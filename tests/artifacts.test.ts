@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity } from '../src/core/game';
 import { spawnUnit, archaeologistExcavate, trainableUnits } from '../src/core/units';
@@ -100,7 +101,7 @@ describe('B-20 (#79): artifacts and archaeology', () => {
     const has = () => trainableUnits(state, city).some((d) => d.id === 'ARCHAEOLOGIST');
     expect(has()).toBe(false); // no civic, no museum
     grantTechs(state); // (techs only — the civic gate is separate)
-    state.research.civics.push('NATURAL_HISTORY');
+    playerSeat(state).research.civics.push('NATURAL_HISTORY');
     expect(has()).toBe(false); // civic in, but still no museum
     city.buildings.push(ARTIFACT_BUILDING);
     expect(has()).toBe(true);

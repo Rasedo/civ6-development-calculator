@@ -138,13 +138,13 @@ describe('great people', () => {
     queueBuilding(state, city.id, 'LIBRARY');
     expect(greatPersonPointsPerTurn(state).SCIENTIST).toBe(2); // district + library
 
-    const before = state.research.techProgress;
+    const before = playerSeat(state).research.techProgress;
     const turns = Math.ceil(gpCost(0) / 2);
     for (let i = 0; i < turns; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'SCIENTIST')).toBe(1);
     expect(state.greatPeople.earned[0]).toBe('GP_ARYABHATA');
     // +50 science landed somewhere in tech progress (research also ticked normally)
-    expect(state.research.techProgress + 1e-9).toBeGreaterThanOrEqual(before);
+    expect(playerSeat(state).research.techProgress + 1e-9).toBeGreaterThanOrEqual(before);
   });
 
   it('merchants pay out gold', () => {

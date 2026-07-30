@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, placeImprovement, endTurn, serialize, deserialize } from '../src/core/game';
 import {
@@ -160,7 +161,7 @@ describe('builders', () => {
 
   it('a builder disbands on its last charge; chopping works', () => {
     const { state } = unitsState();
-    state.research.techs.push('MINING'); // unlock chops
+    playerSeat(state).research.techs.push('MINING'); // unlock chops
     const woods = tileAtCoords(state.map, 9, 8);
     woods.feature = 'WOODS';
     const builder = spawnUnit(state, 'BUILDER', woods.index)!;

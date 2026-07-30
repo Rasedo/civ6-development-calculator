@@ -19,7 +19,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv } from './seats';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -46,10 +46,10 @@ export function unitPassable(tile: Tile, unit?: { type: string }): boolean {
   return naval ? isWater(tile) : !isWater(tile);
 }
 
-/** The owner's completed techs for a unit (player → state.research; rival →
+/** The owner's completed techs for a unit (player → playerSeat(state).research; rival →
  * its own ResearchState; barbarians have none). */
 function ownerTechs(state: GameState, unit: { owner: Unit['owner']; civId?: number }): string[] {
-  if (unit.owner === 'player') return state.research.techs;
+  if (unit.owner === 'player') return playerSeat(state).research.techs;
   if (unit.owner === 'rival') return state.rivals.find((r) => r.id === unit.civId)?.research.techs ?? [];
   return [];
 }

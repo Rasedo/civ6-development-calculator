@@ -316,7 +316,6 @@ export interface GameState {
   turn: number;
   /** Sandbox: districts/buildings complete instantly, cost nothing, and ignore tech gating. */
   sandbox: boolean;
-  research: ResearchState;
   government: GovernmentState;
   greatPeople: {
     points: Partial<Record<GreatPersonClass, number>>;
@@ -477,6 +476,10 @@ export interface Seat {
   faith: number;
   /** Cumulative tourism. */
   tourism: number;
+
+  /** Tech + civic progress. Player and rival already shared this exact type —
+   *  the only thing that differed was WHERE it hung. (S1.2c) */
+  research: ResearchState;
 }
 
 export interface RivalCiv extends Seat {
@@ -527,7 +530,6 @@ export interface RivalCiv extends Seat {
    *  start + TRADE_ROUTE_DURATION (B-23 duration). */
   tradeRoutes?: { from: number; to?: number; toCs?: number; toPlayer?: number; expiresTurn?: number }[];
   /** Real tech/civic trees (C1-B3): same shape as the player's. */
-  research: ResearchState;
 
   /** Great-person race points per class. */
   gpp: Partial<Record<GreatPersonClass, number>>;

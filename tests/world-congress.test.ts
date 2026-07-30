@@ -35,7 +35,7 @@ function newGame(rivals = 1) {
 
 /** Force every civ past the Medieval gate by handing them a Medieval tech. */
 function medieval(state: ReturnType<typeof newGame>) {
-  state.research.techs.push('APPRENTICESHIP'); // Medieval
+  playerSeat(state).research.techs.push('APPRENTICESHIP'); // Medieval
   for (const rv of state.rivals) rv.research.techs.push('APPRENTICESHIP');
 }
 

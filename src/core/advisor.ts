@@ -249,8 +249,8 @@ export function projectTurns(
     faithTotal: playerSeat(clone).faith,
     treasury: playerSeat(clone).treasury,
     completed,
-    techs: clone.research.techs.length,
-    civics: clone.research.civics.length,
+    techs: playerSeat(clone).research.techs.length,
+    civics: playerSeat(clone).research.civics.length,
   };
 }
 

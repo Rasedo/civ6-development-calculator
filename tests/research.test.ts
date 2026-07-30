@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, grantCivics } from './helpers';
 import { foundCity, endTurn, setTechResearch, setGovernment, setPolicy, removeFeature, queueDistrict, queueBuilding } from '../src/core/game';
 import { validImprovements } from '../src/core/rules';
@@ -25,19 +26,19 @@ describe('research progression', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index);
     let guard = 0;
-    while (state.research.techs.length === 0 && guard++ < 30) endTurn(state);
-    expect(state.research.techs.length).toBe(1);
-    expect(TECHS[state.research.techs[0]].cost).toBe(Math.min(...Object.values(TECHS).map((t) => t.cost))); // cheapest tier first
+    while (playerSeat(state).research.techs.length === 0 && guard++ < 30) endTurn(state);
+    expect(playerSeat(state).research.techs.length).toBe(1);
+    expect(TECHS[playerSeat(state).research.techs[0]].cost).toBe(Math.min(...Object.values(TECHS).map((t) => t.cost))); // cheapest tier first
     // a fresh current tech was auto-picked
-    expect(state.research.tech).not.toBeNull();
+    expect(playerSeat(state).research.tech).not.toBeNull();
   });
 
   it('completing Code of Laws installs Chiefdom automatically', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index);
     let guard = 0;
-    while (state.research.civics.length === 0 && guard++ < 40) endTurn(state);
-    expect(state.research.civics).toContain('CODE_OF_LAWS');
+    while (playerSeat(state).research.civics.length === 0 && guard++ < 40) endTurn(state);
+    expect(playerSeat(state).research.civics).toContain('CODE_OF_LAWS');
     expect(state.government.current).toBe('CHIEFDOM');
     expect(state.government.policies.length).toBe(2); // 1 military + 1 economic
   });

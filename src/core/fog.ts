@@ -94,11 +94,11 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
     case 3: {
       // Eureka for a random unboosted, unresearched tech.
       const candidates = Object.keys(TECHS).filter(
-        (id) => !state.research.techs.includes(id) && !state.research.boosted.includes(id),
+        (id) => !playerSeat(state).research.techs.includes(id) && !playerSeat(state).research.boosted.includes(id),
       );
       if (candidates.length > 0) {
         const pick = candidates[Math.floor(nextRandom(state) * candidates.length)];
-        state.research.boosted.push(pick);
+        playerSeat(state).research.boosted.push(pick);
         text = `ancient knowledge (eureka for ${TECHS[pick].name})`;
       } else {
         playerSeat(state).scienceTotal += 30;
@@ -111,7 +111,7 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
       text = 'maps of the surrounding lands';
       break;
     default:
-      state.research.civicProgress += 20;
+      playerSeat(state).research.civicProgress += 20;
       text = '20 culture from tribal storytellers';
       break;
   }

@@ -82,13 +82,13 @@ let campusQueued = false;
 for (let i = 0; i < 60; i++) {
   endTurn(state);
   if (
-    !state.research.techs.includes('WRITING') &&
-    state.research.tech !== 'WRITING' &&
+    !playerSeat(state).research.techs.includes('WRITING') &&
+    playerSeat(state).research.tech !== 'WRITING' &&
     availableTechs(state).some((t) => t.id === 'WRITING')
   ) {
     setTechResearch(state, 'WRITING');
   }
-  if (!campusQueued && state.research.techs.includes('WRITING')) {
+  if (!campusQueued && playerSeat(state).research.techs.includes('WRITING')) {
     const spots = districtPlacementTiles(state, city, 'CAMPUS');
     if (spots.length) {
       queueDistrict(state, city.id, 'CAMPUS', spots[0]);
@@ -108,8 +108,8 @@ console.log(`  buildings: ${city.buildings.join(', ')}`);
 console.log(`  districts: ${city.districts.map((d) => d.type).join(', ')}`);
 console.log(`  borders: ${state.map.tiles.filter((t) => t.cityId === city.id).length} tiles owned ` +
   `(${city.tilesAcquired} grown culturally)`);
-console.log(`  techs: ${state.research.techs.map((t) => TECHS[t].name).join(', ') || 'none'}`);
-console.log(`  civics: ${state.research.civics.map((c) => CIVICS[c].name).join(', ') || 'none'}`);
+console.log(`  techs: ${playerSeat(state).research.techs.map((t) => TECHS[t].name).join(', ') || 'none'}`);
+console.log(`  civics: ${playerSeat(state).research.civics.map((c) => CIVICS[c].name).join(', ') || 'none'}`);
 console.log(`  government: ${state.government.current ?? 'none'}`);
 console.log(`  empire: treasury ${playerSeat(state).treasury.toFixed(0)}, science total ${playerSeat(state).scienceTotal.toFixed(0)}`);
 

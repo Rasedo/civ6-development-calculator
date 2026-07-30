@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity, availableProjects } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { SPACE_PROJECTS } from '../src/data/projects';
@@ -41,7 +42,7 @@ describe('B-25 science victory', () => {
     expect(availableProjects(state, city).some((p) => p.space)).toBe(false);
 
     // All techs, but nothing completed: only step 1 (no requiresProject) is open.
-    state.research.techs.push(...GATING_TECHS);
+    playerSeat(state).research.techs.push(...GATING_TECHS);
     let avail = availableProjects(state, city).filter((p) => p.space).map((p) => p.id);
     expect(avail).toEqual(['LAUNCH_EARTH_SATELLITE']);
 
@@ -53,7 +54,7 @@ describe('B-25 science victory', () => {
 
   it('completing the whole chain sets victoryType 3 (player science win)', () => {
     const { state, city } = newGameWithCampus();
-    state.research.techs.push(...GATING_TECHS);
+    playerSeat(state).research.techs.push(...GATING_TECHS);
     for (const id of CHAIN) {
       // Drive completion through the real endTurn queue path (progress pre-filled).
       city.queue = [{ kind: 'project', project: id, progress: 100000, cost: 1 }];

@@ -16,7 +16,7 @@ import { RESOURCES } from '../data/resources';
  * we scale with completed research: ~20 ancient, ~150 late).
  */
 export function chopValue(state: GameState): number {
-  const done = state.research.techs.length + state.research.civics.length;
+  const done = playerSeat(state).research.techs.length + playerSeat(state).research.civics.length;
   return Math.round(20 + 2.5 * done);
 }
 
@@ -61,12 +61,12 @@ export function applyLumpYield(state: GameState, tileIndex: number, grant: LumpG
     return;
   }
   if (key === 'science') {
-    state.research.techProgress += amount;
+    playerSeat(state).research.techProgress += amount;
     playerSeat(state).scienceTotal += amount;
     return;
   }
   if (key === 'culture') {
-    state.research.civicProgress += amount;
+    playerSeat(state).research.civicProgress += amount;
     playerSeat(state).cultureTotal += amount;
     return;
   }

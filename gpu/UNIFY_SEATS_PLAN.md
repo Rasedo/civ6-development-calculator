@@ -237,6 +237,44 @@ Route every `state.cities`/`rival.cities` scan through `citiesOf`/`allCities` (w
 *Gate:* `tsc` + full vitest + parity/rollout **against unchanged fixtures**. Fixtures byte-identical is the bar.
 
 **S1.2 — Storage flip to `state.seats: Seat[]`. [R]**
+
+**IN PROGRESS 2026-07-30 — SPLIT INTO BLOCKS, one byte-identical gate each.** The
+stage as written is ~400 player-field references in one pass; that is a bet, not
+a migration. Landed so far, each with its own battery:
+- **S1.2a diplomacy** (`b8c7012`): warmonger, warWeariness, diploFavor,
+  diploPoints, influencePoints, envoysAvailable.
+- **S1.2b economy** (`9fcd365`): treasury, scienceTotal, cultureTotal, plus the
+  two-names-one-quantity collapses `faithTotal`->`faith`,
+  `tourismTotal`->`tourism`. `scienceTotal` gains the rival field that never
+  existed (storage only; the mechanic gap stays recorded).
+- **S1.2c research**: the largest single block, and the easiest — player and
+  rival already shared the exact `ResearchState` type.
+
+`state.seats[r+1]` IS the same object as `state.rivals[r]` during the migration
+so both views see every mutation; `rivals` goes when the last field has moved.
+
+**THREE METHOD RULES LEARNED THE HARD WAY HERE — apply them to every remaining
+block:**
+1. **`tsc` does NOT cover `scripts/`** (`include` was `["src","tests"]`), and
+   `scripts/` is the whole parity harness. A field move left `gpu-trace.ts`
+   writing `null` into all 12 fixtures and silently stopped the scripted policy
+   assigning envoys. **Grep `scripts/` by hand after every block.** Only
+   `gpu-trace.ts` and `gpu-actions.ts` are typechecked (the rest needs
+   `@types/node`, not installed).
+2. **Never regex a field out of an interface.** Doing so left five dangling
+   `/**` openers in the committed `types.ts` that `tsc` could not see. Delete by
+   exact line.
+3. **`` matches after a dot** — `env.state.research` became
+   `env.playerSeat(state).research`. Use `(?<![.\w])` on the receiver.
+
+Remaining, and each is a SHAPE reconciliation rather than a move, so each needs
+its own declared delta: `religion` (72 refs; the rival's eight flat fields vs the
+player's one `ReligionState`), `greatPeople` (29; the shared-array/`prophets`
+shadow counter), `government` (47; rivals DERIVE it per read instead of storing).
+
+---
+
+ORIGINAL STAGE TEXT:
 Move every player-level `GameState` field and every `RivalCiv` field onto `Seat`. Delete `GameState.rivals` (becomes a derived view) and `RivalCiv`. Resolve the shape mismatches now:
 - Rival religion's **eight flat fields** (`pantheonClaimed/pantheon/religionFounded/followerBelief/founderBelief/enhancerClaimed/enhancerBelief/holyTile`) become one `ReligionState`, gaining the missing `worship` and `name`.
 - `faithTotal`/`faith` → one `faith`. `tourismTotal`/`tourism` → one. `scienceTotal` gains a rival field (it has never existed).

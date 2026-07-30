@@ -405,7 +405,7 @@ function killUnit(state: GameState, unit: Unit): void {
 export function markAntiquitySite(state: GameState, tileIndex: number): void {
   const t = state.map.tiles[tileIndex];
   if (!t || t.antiquity || isWater(t) || t.district || t.builtWonder) return;
-  if (civEraIndex(state.research.techs, state.research.civics) >= MODERN_ERA_INDEX) return;
+  if (civEraIndex(playerSeat(state).research.techs, playerSeat(state).research.civics) >= MODERN_ERA_INDEX) return;
   t.antiquity = true;
 }
 

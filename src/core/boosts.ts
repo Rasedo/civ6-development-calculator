@@ -1,6 +1,7 @@
 /** Evaluation of eureka/inspiration conditions against the game state. */
 
 import { dedicationEvent } from './eras';
+import { playerSeat } from './seats';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/rivals';
 import type { GameState, ResearchState, RivalCiv } from './types';
 import { neighbors } from './hex';
@@ -61,7 +62,7 @@ function checkSatisfied(state: GameState, check: BoostCheck): boolean {
     case 'coastalCity':
       return state.cities.some((c) => isCoastalLand(state.map, state.map.tiles[c.centerIndex]));
     case 'tech':
-      return state.research.techs.includes(check.id);
+      return playerSeat(state).research.techs.includes(check.id);
     case 'greatPeople': {
       if (check.class) {
         const ids = new Set(GREAT_PEOPLE[check.class].map((p) => p.id));
@@ -85,7 +86,7 @@ function checkSatisfied(state: GameState, check: BoostCheck): boolean {
 }
 
 export function isBoosted(state: GameState, id: string): boolean {
-  return state.research.boosted.includes(id);
+  return playerSeat(state).research.boosted.includes(id);
 }
 
 /** Auto-detect satisfied eureka/inspiration conditions (idempotent). */
@@ -93,10 +94,10 @@ export function detectBoosts(state: GameState): string[] {
   const newly: string[] = [];
   for (const [id, def] of Object.entries(BOOSTS)) {
     if (!def.check) continue;
-    if (state.research.boosted.includes(id)) continue;
-    if (state.research.techs.includes(id) || state.research.civics.includes(id)) continue;
+    if (playerSeat(state).research.boosted.includes(id)) continue;
+    if (playerSeat(state).research.techs.includes(id) || playerSeat(state).research.civics.includes(id)) continue;
     if (checkSatisfied(state, def.check)) {
-      state.research.boosted.push(id);
+      playerSeat(state).research.boosted.push(id);
       // B-24 (#77): FREE INQUIRY pays era score per EUREKA, PEN BRUSH AND
       // VOICE per INSPIRATION — a tech boost is a eureka, a civic boost an
       // inspiration.
@@ -109,9 +110,9 @@ export function detectBoosts(state: GameState): string[] {
 
 /** Manually toggle a boost (for conditions the calculator can't observe). */
 export function toggleBoost(state: GameState, id: string): void {
-  const i = state.research.boosted.indexOf(id);
-  if (i >= 0) state.research.boosted.splice(i, 1);
-  else state.research.boosted.push(id);
+  const i = playerSeat(state).research.boosted.indexOf(id);
+  if (i >= 0) playerSeat(state).research.boosted.splice(i, 1);
+  else playerSeat(state).research.boosted.push(id);
 }
 
 /** AUDIT A-3: checkSatisfied from a RIVAL's seat — its cities, research,

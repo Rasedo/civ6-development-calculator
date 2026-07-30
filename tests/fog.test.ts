@@ -100,8 +100,8 @@ function serializeRewards(state: ReturnType<typeof makeState>): string {
     playerSeat(state).treasury,
     playerSeat(state).faith,
     playerSeat(state).scienceTotal,
-    state.research.boosted,
-    state.research.civicProgress,
+    playerSeat(state).research.boosted,
+    playerSeat(state).research.civicProgress,
     state.cities.map((c) => c.population),
     state.explored.filter((e) => e === 1).length,
   ]);

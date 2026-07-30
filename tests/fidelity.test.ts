@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
 import { foundCity, queueDistrict, queueBuilding, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost } from '../src/core/game';
 import { detectBoosts, toggleBoost, isBoosted } from '../src/core/boosts';
@@ -26,9 +27,9 @@ describe('eurekas & inspirations', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index); // grassland interior -> no coast
     endTurn(state);
-    const count = state.research.boosted.length;
+    const count = playerSeat(state).research.boosted.length;
     endTurn(state);
-    expect(state.research.boosted.length).toBe(count); // idempotent
+    expect(playerSeat(state).research.boosted.length).toBe(count); // idempotent
   });
 
   it('manual boosts toggle', () => {

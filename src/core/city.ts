@@ -468,10 +468,10 @@ function resortTourism(state: GameState, owns: (t: Tile) => boolean): number {
 export function playerTourism(state: GameState): number {
   let t = 0;
   // B-20 (#74): PRINTING doubles Great Work of Writing tourism.
-  const printing = state.research.techs.includes(GW_PRINTING_TECH);
+  const printing = playerSeat(state).research.techs.includes(GW_PRINTING_TECH);
   for (const c of state.cities) t += greatWorkTourism(c, printing) + relicTourism(c) + artifactTourism(c); // B-20 (#73) relics, (#79) artifacts
   const owns = (tile: Tile) => tile.cityId !== -1;
-  const era = civEraIndex(state.research.techs, state.research.civics);
+  const era = civEraIndex(playerSeat(state).research.techs, playerSeat(state).research.civics);
   return t + resortTourism(state, owns) + wonderTourism(state, era, owns);
 }
 

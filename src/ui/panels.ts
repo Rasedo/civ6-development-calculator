@@ -1069,12 +1069,12 @@ export function renderResearchPanel(
   cb: PanelCallbacks,
 ): void {
   const defs: (TechDef | CivicDef)[] = Object.values(kind === 'tech' ? TECHS : CIVICS);
-  const completed = new Set(kind === 'tech' ? state.research.techs : state.research.civics);
+  const completed = new Set(kind === 'tech' ? playerSeat(state).research.techs : playerSeat(state).research.civics);
   const availableIds = new Set(
     (kind === 'tech' ? availableTechs(state) : availableCivics(state)).map((d) => d.id),
   );
-  const current = kind === 'tech' ? state.research.tech : state.research.civic;
-  const progress = kind === 'tech' ? state.research.techProgress : state.research.civicProgress;
+  const current = kind === 'tech' ? playerSeat(state).research.tech : playerSeat(state).research.civic;
+  const progress = kind === 'tech' ? playerSeat(state).research.techProgress : playerSeat(state).research.civicProgress;
 
   const rows = ERAS.map((era) => {
     const inEra = defs.filter((d) => d.era === era);
@@ -1438,7 +1438,7 @@ export function renderAiAdvisorPanel(
 // ---------------------------------------------------------------------------
 
 export function renderEmpireSummary(container: HTMLElement, state: GameState): void {
-  const research = state.research;
+  const research = playerSeat(state).research;
   const techLine = research.tech
     ? `${TECHS[research.tech]?.name} ${fmt(research.techProgress)}/${TECHS[research.tech]?.cost}`
     : research.techs.length === Object.keys(TECHS).length

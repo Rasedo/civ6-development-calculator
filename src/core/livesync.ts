@@ -8,6 +8,7 @@
  */
 
 import type { City, DistrictId, GameState, QueueItem, Tile } from './types';
+import { playerSeat } from './seats';
 import { parseCivExport } from './importer';
 import { createGameFromMap, districtCost, settlerCost, projectCost } from './game';
 import { tileIndex, inBounds, tilesWithin, hexDistance } from './hex';
@@ -202,12 +203,12 @@ export function parseLiveSync(text: string): SyncResult {
   // --- research ---------------------------------------------------------------
   for (const t of techs) {
     const id = t.replace(/^TECH_/, '');
-    if (TECHS[id]) state.research.techs.push(id);
+    if (TECHS[id]) playerSeat(state).research.techs.push(id);
     else skip(report, 'tech');
   }
   for (const c of civics) {
     const id = c.replace(/^CIVIC_/, '');
-    if (CIVICS[id]) state.research.civics.push(id);
+    if (CIVICS[id]) playerSeat(state).research.civics.push(id);
     else skip(report, 'civic');
   }
 
