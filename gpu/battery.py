@@ -236,6 +236,7 @@ def main() -> int:
                 ("watermill", [py, "gpu/watermill_test.py"], 4),
                 ("unit_head", [py, "gpu/unit_head_test.py"], 4),  # #51/S0.3: action enum == mask width == RL head width
                 ("state_discipline", [py, "gpu/state_discipline_test.py"], 4),  # #51/S0.4: alias-rebind + _MUTABLE drift net
+                ("inplace", [py, "gpu/inplace_discipline_test.py"], 1),  # #51/S3.1: static — no self-rebinds, no stale captures
                 ("fort", [py, "gpu/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
             ],
             [

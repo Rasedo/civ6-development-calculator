@@ -1707,28 +1707,16 @@ class BatchSim:
         # RANGED pair (4 = ARCHER 15/25·2, 5 = CROSSBOWMAN 15/40·2). The
         # exporter is the source of truth; the tail below only pads a rules.json
         # exported BEFORE S5 so a stale fixture cannot index out of range.
-        _uc = list(cb.get("unitCombat", [20, 25, 41, 55]))
-        _urs = list(cb.get("unitRangedStrength", []))
-        _urr = list(cb.get("unitRangedRange", []))
-        _urs += [0] * (len(_uc) - len(_urs))
-        _urr += [0] * (len(_uc) - len(_urr))
-        for _c, _s, _r in ((15, 25, 2), (15, 40, 2))[max(0, len(_uc) - 4):]:
-            _uc.append(_c)
-            _urs.append(_s)
-            _urr.append(_r)
-        self._unit_combat = torch.tensor(_uc, dtype=torch.long, device=device)
-        # B-26 (2026-07-27): barb NAVAL flags + the two hull u_types, in the
-        # BARB table's own index space (not the roster's).
-        _un = rules.combat.get("unitNaval", []) or [0] * len(_uc)
-        self._u_naval = torch.tensor(list(_un) + [0] * 8, dtype=torch.bool, device=device)
+        # #51/S3.2: the barb ladder maps a ladder POSITION (0/1/2/3 melee,
+        # 4/5 ranged, 6 scout, 7/8 naval) to a ROSTER index. u_type holds the
+        # roster index, exactly like p_type and v_type, so combat / moves /
+        # ranged strength / ranged range / naval all come from the one roster
+        # table instead of five parallel arrays in a second index space.
+        _bl = list(cb.get("barbLadder") or [])
+        self._barb_ladder = torch.tensor(_bl or [0], dtype=torch.long, device=device)
         _bn = rules.combat.get("barbNavalTypes", []) or []
         self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
         self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
-        # #70/S5 (B-26): barb ranged strength / range, parallel to _unit_combat
-        # (0 = melee-only). The u_ twins of _p_rng_str / _p_rng_rng.
-        self._u_rng_str = torch.tensor(_urs, dtype=torch.long, device=device)
-        self._u_moves = torch.tensor(list(cb.get("unitMoves") or [2, 2, 2, 2, 2, 2, 3]), dtype=torch.long, device=device)  # B-26 (#71)
-        self._u_rng_rng = torch.tensor(_urr, dtype=torch.long, device=device)
         # #45/B-6 EMBARK: flat embarked MP, the LIVE war-march water-step master
         # switch (N1 ships it INERT — mirrors TS embarkState.live; poke
         # sim._embark_live=True to exercise the path), and the embark/ocean tech
@@ -5008,7 +4996,9 @@ class BatchSim:
         slot = self.next_slot[rows]
         assert int(slot.max()) < U_MAX, "barbarian slot pool exhausted — raise U_MAX"
         self.u_alive[rows, slot] = True
-        self.u_type[rows, slot] = unit_type
+        # #51/S3.2: callers pass a ladder POSITION; u_type stores the ROSTER
+        # index it names, so every downstream read uses the roster tables.
+        self.u_type[rows, slot] = int(self._barb_ladder[unit_type])
         self.u_tile[rows, slot] = spot[rows]
         self.u_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.u_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
@@ -6284,7 +6274,7 @@ class BatchSim:
             if bool(att.any()):
                 is_b = bslot >= 0
                 atk_cs = self._p_combat[self.p_type[:, p]]
-                b_cs = self._unit_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
+                b_cs = self._p_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -6378,7 +6368,7 @@ class BatchSim:
             if bool(r_att.any()):
                 is_b = bslot >= 0
                 atk_rs = self._p_rng_str[self.p_type[:, p]]
-                b_cs = self._unit_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
+                b_cs = self._p_combat[self.u_type.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 v_cs = self._p_combat[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)]
                 b_fy = self.u_fortify.gather(1, bslot.clamp(min=0).unsqueeze(1)).squeeze(1)
                 v_fy = self.v_fortify.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -6840,7 +6830,7 @@ class BatchSim:
         # whole batch. Used at ALL THREE spawn sites (new camp, empty-camp
         # regarrison, the 0.1-roll raid). Ranged raiders are a recorded residual.
         # B-26 (#71): barb u_type 6 = SCOUT (see the exported unitCombat table).
-        self._barb_scout_type = 6 if self._unit_combat.numel() > 6 else 0
+        self._barb_scout_type = 6 if self._barb_ladder.numel() > 6 else 0
         self._barb_scout_live = bool(self.rules.combat.get("barbScoutOpenerLive", False))  # B-26 (#71): inert pending its hunt
         melee_type = (
             3 if self.turn > cb.get("musketmanAfterTurn", 180)
@@ -6996,7 +6986,7 @@ class BatchSim:
         # Hoisted — nothing spawns barbs inside the raider loop, so u_type is
         # fixed here; the batch-wide flag keeps the pre-S5 melee-only path at
         # ONE extra host sync per turn instead of one per slot.
-        u_rngd_all = self.u_alive & (self._u_rng_str[self.u_type.clamp(min=0, max=self._u_rng_str.numel() - 1)] > 0)
+        u_rngd_all = self.u_alive & (self._p_rng_str[self.u_type.clamp(min=0, max=self.NU - 1)] > 0)
         any_rngd = bool(u_rngd_all.any())
         for u in u_live:
             act = self.u_alive[:, u] & ~guard[:, u]
@@ -7033,7 +7023,7 @@ class BatchSim:
             # ranged barb pays nothing for the [B, T] scan.
             rngd = u_rngd_all[:, u]
             if any_rngd and bool((act & rngd).any()):
-                rng_u = self._u_rng_rng[self.u_type[:, u].clamp(min=0, max=self._u_rng_rng.numel() - 1)]
+                rng_u = self._p_rng_rng[self.u_type[:, u].clamp(min=0, max=self.NU - 1)]
                 d_all = self.pair_dist[here.clamp(min=0)].to(torch.long)  # [B, T]
                 r_valid = (
                     (d_all >= 1)
@@ -7187,7 +7177,7 @@ class BatchSim:
             # correct only while every barb type had 2 MP — the SCOUT opener
             # has 3, and the mismatch showed up as a barb-count + draw-count
             # split at seed 9287 t250.
-            full_mp = self._u_moves[self.u_type[:, u].clamp(min=0, max=self._u_moves.numel() - 1)]
+            full_mp = self._p_moves[self.u_type[:, u].clamp(min=0, max=self.NU - 1)]
             mp = full_mp.clone()
             cur = here.clone()
             d_cur = d_here.clone()
@@ -7199,7 +7189,7 @@ class BatchSim:
                 # hulls and water hulls never share a plane, so this is the
                 # whole change the barb march needs (TS's tileFreeForUnit
                 # already branches on UNITS[type].naval).
-                _navm = self._u_naval[self.u_type[:, u].clamp(min=0)].unsqueeze(1)
+                _navm = self.unit_naval[self.u_type[:, u].clamp(min=0)].unsqueeze(1)
                 _plane = torch.where(
                     _navm,
                     self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c),  # no CARTOGRAPHY
@@ -7280,7 +7270,7 @@ class BatchSim:
                 is_barb = b_slot >= 0
                 is_rmil = ~is_barb & (m_slot >= 0)  # military first (barb > rival mil > rival civ)
                 is_rciv = ~is_barb & ~is_rmil & (c_slot >= 0)
-                d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
+                d_cs_barb = self._p_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
                 d_cs_rmil = self._p_combat[self.v_type[bidx, m_slot.clamp(min=0)]]
                 d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
                 # B-4: only a rival MILITARY target (is_rmil) carries veterancy.
@@ -7378,7 +7368,7 @@ class BatchSim:
                 is_barb = b_slot >= 0
                 is_rmil = ~is_barb & (m_slot >= 0)  # military first (barb > rival mil > rival civ)
                 is_rciv = ~is_barb & ~is_rmil & (c_slot >= 0)
-                d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
+                d_cs_barb = self._p_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
                 d_cs_rmil = self._p_combat[self.v_type[bidx, m_slot.clamp(min=0)]]
                 d_cs_rciv = self._p_combat[self.v_type[bidx, c_slot.clamp(min=0)]]
                 def_xp = torch.where(is_rmil, self._xp_lvl_bonus(self.v_xp[bidx, m_slot.clamp(min=0)]), torch.zeros_like(tt))
@@ -7453,11 +7443,11 @@ class BatchSim:
             )
             _unbes = self.alive & ~besieged  # [B, C]
             _heal_t = _enc_t & _unbes.gather(1, self.owner.clamp(min=0))
-            self.encamp_hp = torch.where(
+            self.encamp_hp.copy_(torch.where(
                 _heal_t,
                 (self.encamp_hp + cb.get("cityHealPerTurn", 20)).clamp(max=self._encamp_hp_max),
                 self.encamp_hp,
-            )
+            ))
 
     # --- city-states (phase 4c) ---------------------------------------------------
 
@@ -10144,7 +10134,7 @@ class BatchSim:
         if atk_kind == "barb":
             a_hp, a_tile, a_at = self.u_hp, self.u_tile, self.barb_at
             a_alive = self.u_alive
-            atk_cs_all = self._unit_combat[self.u_type[:, u]]
+            atk_cs_all = self._p_combat[self.u_type[:, u]]
             blocked_side = "barb"
         else:
             a_hp, a_tile, a_at = self.v_hp, self.v_tile, self.rv_at
@@ -10180,7 +10170,7 @@ class BatchSim:
             def_is_barb = db >= 0
             def_is_rv = (dv >= 0) & ~def_is_barb & (dm < 0)
             d_cs_p = self._p_combat[self.p_type.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)]
-            d_cs_b = self._unit_combat[self.u_type.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)]
+            d_cs_b = self._p_combat[self.u_type.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)]
             d_cs_v = self._p_combat[self.v_type.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)]
             f_p = self.p_fortify.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)
             f_b = self.u_fortify.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)
@@ -10304,7 +10294,7 @@ class BatchSim:
                 # plane is wpass minus OCEAN (no CARTOGRAPHY), which is exactly
                 # what TS's tileFreeForUnit/waterEnterable allows it.
                 adv_terr = torch.where(
-                    self._u_naval[self.u_type[:, u].clamp(min=0)],
+                    self.unit_naval[self.u_type[:, u].clamp(min=0)],
                     self._barb_water_ok(ttc_adv),
                     land_ok,
                 )
@@ -10401,7 +10391,7 @@ class BatchSim:
             _kt = tgt.clamp(min=0)
             _kterr = (
                 torch.where(
-                    self._u_naval[self.u_type[:, u].clamp(min=0)],
+                    self.unit_naval[self.u_type[:, u].clamp(min=0)],
                     self._barb_water_ok(_kt),
                     self.passable.gather(1, _kt.unsqueeze(1)).squeeze(1),
                 )
@@ -10438,7 +10428,7 @@ class BatchSim:
         gslot = self.rv_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         gar = ((gslot >= 0) & (self.v_civ[bidx, gslot.clamp(min=0)] == civ)).long()
         def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
-        atk_cs = self._unit_combat[self.u_type[:, u]]
+        atk_cs = self._p_combat[self.u_type[:, u]]
         atk_e = atk_cs - self._wound(self.u_hp[:, u]) - 5.0 * self._river_cross(self.u_tile[:, u], tgt)  # B-29 wound + river (city not a unit)
         # #70/S2 (B-8): attackRivalCity's atkCS now carries the general/admiral
         # aura — but this caller's attacker is a BARBARIAN (unified civ -1: barbs
@@ -10998,7 +10988,7 @@ class BatchSim:
         draws exactly twice, in TS's order (damage-to-district, then counter)."""
         if atk_kind == "barb":
             a_hp, a_at, a_tile, a_alive = self.u_hp, self.barb_at, self.u_tile, self.u_alive
-            atk_cs = self._unit_combat[self.u_type[:, u]]
+            atk_cs = self._p_combat[self.u_type[:, u]]
         elif atk_kind == "player":
             a_hp, a_at, a_tile, a_alive = self.p_hp, self.pmil_at, self.p_tile, self.p_alive
             atk_cs = self._p_combat[self.p_type[:, u]]
@@ -11066,7 +11056,7 @@ class BatchSim:
         aware defense, city-first rolls, sack at 0 HP."""
         if atk_kind == "barb":
             a_hp, a_at, a_tile, a_alive = self.u_hp, self.barb_at, self.u_tile, self.u_alive
-            atk_cs = self._unit_combat[self.u_type[:, u]]
+            atk_cs = self._p_combat[self.u_type[:, u]]
         else:
             a_hp, a_at, a_tile, a_alive = self.v_hp, self.rv_at, self.v_tile, self.v_alive
             atk_cs = self._p_combat[self.v_type[:, u]]
@@ -11173,8 +11163,8 @@ class BatchSim:
         ttc = tgt.clamp(min=0)
         barb = atk_kind == "barb"
         if barb:
-            ut0 = self.u_type[:, u].clamp(min=0, max=self._u_rng_str.numel() - 1)
-            atk_rs = self._u_rng_str[ut0]
+            ut0 = self.u_type[:, u].clamp(min=0, max=self.NU - 1)
+            atk_rs = self._p_rng_str[ut0]
             a_hp, a_tile = self.u_hp[:, u], self.u_tile[:, u]
             a_lvl = torch.zeros_like(a_hp)  # B-4: barbarians never accrue XP
             # A barb hull IS naval since B-26, but this flag only selects the
@@ -11229,7 +11219,7 @@ class BatchSim:
             def_is_vc = (dm < 0) & (db < 0) & (dv < 0) & (dc_ < 0) & (dvc >= 0)
             civ_def = def_is_c | def_is_vc  # a lone CIVILIAN defender (either owner)
             d_cs_p = self._p_combat[self.p_type.gather(1, dm.clamp(min=0).unsqueeze(1)).squeeze(1)]
-            d_cs_b = self._unit_combat[self.u_type.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)]
+            d_cs_b = self._p_combat[self.u_type.gather(1, db.clamp(min=0).unsqueeze(1)).squeeze(1)]
             d_cs_v = self._p_combat[self.v_type.gather(1, dv.clamp(min=0).unsqueeze(1)).squeeze(1)]
             d_cs_c = self._p_combat[self.p_type.gather(1, dc_.clamp(min=0).unsqueeze(1)).squeeze(1)]
             d_cs_vc = self._p_combat[self.v_type.gather(1, dvc.clamp(min=0).unsqueeze(1)).squeeze(1)]
@@ -13080,7 +13070,7 @@ class BatchSim:
                             is_barb = b_slot >= 0
                             is_pmil = ~is_barb & (pm_slot >= 0)  # military first (barb > player mil > player civ)
                             is_pciv = ~is_barb & ~is_pmil & (pc_slot >= 0)
-                            d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
+                            d_cs_barb = self._p_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
                             d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
                             d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
                             # B-4: only a player MILITARY target (is_pmil) carries veterancy.
@@ -13172,7 +13162,7 @@ class BatchSim:
                             is_barb = b_slot >= 0
                             is_pmil = ~is_barb & (pm_slot >= 0)  # military first (barb > player mil > player civ)
                             is_pciv = ~is_barb & ~is_pmil & (pc_slot >= 0)
-                            d_cs_barb = self._unit_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
+                            d_cs_barb = self._p_combat[self.u_type[bidx, b_slot.clamp(min=0)]]
                             d_cs_pmil = self._p_combat[self.p_type[bidx, pm_slot.clamp(min=0)]]
                             d_cs_pciv = self._p_combat[self.p_type[bidx, pc_slot.clamp(min=0)]]
                             def_xp = torch.where(is_pmil, self._xp_lvl_bonus(self.p_xp[bidx, pm_slot.clamp(min=0)]), torch.zeros_like(tt))
@@ -14520,21 +14510,21 @@ class BatchSim:
             # pool needs the same gate the other two always had — without it a
             # barb GALLEY dug in for +6 defense that TS never grants it (seed
             # 9212 t80, a 6.0 CS split on every hull the player attacked).
-            u_mil = (self._unit_combat[self.u_type] > 0) & ~self._u_naval[self.u_type]
-            self.u_fortify = torch.where(
-                self.u_alive & u_mil & ~self.u_acted, (self.u_fortify + 1).clamp(max=2),
-                torch.where(self.u_alive & u_mil & self.u_acted, torch.zeros_like(self.u_fortify), self.u_fortify),
-            )
-            v_mil = (self._p_combat[self.v_type] > 0) & ~self.unit_naval[self.v_type]
-            self.v_fortify = torch.where(
-                self.v_alive & v_mil & ~self.v_acted, (self.v_fortify + 1).clamp(max=2),
-                torch.where(self.v_alive & v_mil & self.v_acted, torch.zeros_like(self.v_fortify), self.v_fortify),
-            )
-            p_mil = (self._p_combat[self.p_type] > 0) & ~self.unit_naval[self.p_type]
-            self.p_fortify = torch.where(
-                self.p_alive & p_mil & ~self.p_acted, (self.p_fortify + 1).clamp(max=2),
-                torch.where(self.p_alive & p_mil & self.p_acted, torch.zeros_like(self.p_fortify), self.p_fortify),
-            )
+            # #51/S3.2: ONE fortify rule, three pools. These were three
+            # transcriptions of the same expression, and they only LOOKED
+            # like they might legitimately differ while the barb pool read a
+            # separate combat table — which is exactly how the barb GALLEY
+            # missed the naval gate for a while (seed 9212 t80).
+            for _pre in ("u", "v", "p"):
+                _alive = getattr(self, f"{_pre}_alive")
+                _typ = getattr(self, f"{_pre}_type")
+                _acted = getattr(self, f"{_pre}_acted")
+                _fort = getattr(self, f"{_pre}_fortify")
+                _mil = (self._p_combat[_typ] > 0) & ~self.unit_naval[_typ]
+                _fort.copy_(torch.where(
+                    _alive & _mil & ~_acted, (_fort + 1).clamp(max=2),
+                    torch.where(_alive & _mil & _acted, torch.zeros_like(_fort), _fort),
+                ))
             # the movesLeft reset (TS refreshUnits): a fresh turn begins
             self.p_acted.zero_()
             self.u_acted.zero_()
@@ -14766,12 +14756,12 @@ class BatchSim:
         # B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level,
         # right after the city loop and BEFORE the loyalty collapses, exactly
         # where TS puts it.
-        self.tourism_total = self.tourism_total + self._tourism_of(
+        self.tourism_total.copy_(self.tourism_total + self._tourism_of(
             self.gw_writing, self.gw_art, self.gw_music, self.alive, self.owner >= 0, self._civ_era(self.techs, self.civics),
             self.relics,  # B-20 (#73)
             self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,  # B-20 (#74)
             self.artifacts,  # B-20 (#79)
-        )
+        ))
         # B-22 (#75): DIPLOMATIC FAVOR — government TIER + suzerainties, once
         # per turn at the civ level, the TS twin position.
         self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._player_suzerain_count())
@@ -14782,11 +14772,11 @@ class BatchSim:
         # (no diplomacy action exists in the RL space); the CAPTURE accrual does
         # mirror, in _capture_rival_city. Recorded asymmetry — it lands with the
         # #50 player-verb work if a DoW action is ever added.
-        self.p_warmonger = torch.where(
+        self.p_warmonger.copy_(torch.where(
             (self.p_warmonger > 0) & ~self.r_atwar.any(dim=1),
             self.p_warmonger - 1,
             self.p_warmonger,
-        )
+        ))
 
         # --- loyalty & defections (inside/right after the TS city loop) --------------------
         self._apply_loyalty_and_flips(tier_fresh, pop_loyal)
@@ -15053,22 +15043,28 @@ class BatchSim:
             # era boundary — latched here, the site TS latches it at too.
             self.road_bridged = True
             sc = self.era_score
-            _was = self.civ_age  # B-24 (#71): the PREVIOUS age, the Heroic test's substrate
-            self.civ_age = torch.where(
+            # B-24 (#71): the PREVIOUS age, the Heroic test's substrate. CLONED:
+            # civ_age is written IN PLACE below (#51/S3.1), so a bare reference
+            # would read back the NEW age and the Dark->Golden test could never
+            # fire. That is exactly what it did — parity went red on techProg.
+            _was = self.civ_age.clone()
+            self.civ_age.copy_(torch.where(
                 sc < self._era_dark,
                 torch.zeros_like(self.civ_age),
                 torch.where(sc >= self._era_gold, torch.full_like(self.civ_age, 2), torch.ones_like(self.civ_age)),
-            )
+            ))
             # B-24 (#71): DEDICATIONS. One per civ per era, except the HEROIC
             # age — Dark -> Golden — which grants heroicDedications. The
             # current age alone cannot tell a Heroic age from an ordinary
             # Golden one, which is exactly why prev_age is substrate.
-            self.prev_age = _was
-            self.dedications = torch.where(
+            # prev_age is preallocated in __init__; write it rather than rebind
+            # it, so it stays the same tensor for aliasing and _MUTABLE.
+            self.prev_age.copy_(_was)
+            self.dedications.copy_(torch.where(
                 (_was == 0) & (self.civ_age == 2),
                 torch.full_like(self.dedications, self._heroic_ded),
                 torch.ones_like(self.dedications),
-            )
+            ))
             # B-24 (#77): commit to NAMED dedications — the TS stateless
             # round-robin twin: catalog index (era + civ + k) % N, taking
             # `dedications[c]` entries (three on a Heroic age).

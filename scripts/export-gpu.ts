@@ -928,47 +928,35 @@ const rules = {
     wallsHp: WALLS_HP, // AUDIT B-1: the ANCIENT_WALLS outer-defense pool cap
     encampHp: ENCAMPMENT_HP, // B-17 (#71): the ENCAMPMENT garrison pool cap
     unitHealPerTurn: 10,
-    // B-26 era ladder: barb u_type 0/1/2/3 = WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN.
-    // #70/S5 appends the RANGED pair: 4 = ARCHER, 5 = CROSSBOWMAN; #71/B-26
-    // appends 6 = SCOUT (the scout-then-raid opener). `unitCombat`
-    // is the DEFENSE strength (a ranged unit defends on UNITS.combat, 15 for
-    // both); the strike itself reads unitRangedStrength / unitRangedRange —
-    // the barb (u_*) twins of the roster's rangedStrength / rangedRange.
-    unitCombat: [
-      UNITS.WARRIOR.combat,
-      UNITS.SPEARMAN.combat,
-      UNITS.PIKEMAN.combat,
-      UNITS.MUSKETMAN.combat,
-      UNITS.ARCHER.combat,
-      UNITS.CROSSBOWMAN.combat,
-      UNITS.SCOUT.combat, // B-26 (#71): 6 = SCOUT — the scout-then-raid opener
-      // B-26 (2026-07-27): 7 = GALLEY, 8 = QUADRIREME — the barb NAVAL ladder
-      // for coastal camps. Appended LAST: this array's order IS the GPU's barb
-      // u_type, so anything but an append renumbers every existing barb.
-      UNITS.GALLEY.combat,
-      UNITS.QUADRIREME.combat,
-    ],
-    // B-26 (#71): the barb MOVES table. The GPU raider march used to hardcode
-    // 2 MP, which was correct only while every barb type had 2 — the SCOUT
-    // opener has 3, so the march must read the type.
+    // #51/S3.2: the barb era ladder is now a list of ROSTER INDICES, not a
+    // second index space. Ladder POSITION is structural in the engine —
+    // 0/1/2/3 melee (WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN), 4/5 ranged
+    // (ARCHER/CROSSBOWMAN), 6 SCOUT, 7/8 naval (GALLEY/QUADRIREME) — and each
+    // entry says which roster unit that position IS. u_type is therefore a
+    // roster index like p_type and v_type, so combat/moves/ranged/naval all
+    // read the one roster table.
+    //
+    // This replaces unitCombat / unitMoves / unitRangedStrength /
+    // unitRangedRange / unitNaval, five parallel arrays that restated roster
+    // values under a different numbering. Appending a barb type is still an
+    // append: the position is the index into THIS array.
     barbScoutOpenerLive: BARB_SCOUT_OPENER_LIVE, // B-26 (#71): inert pending its hunt
-    unitMoves: [
-      UNITS.WARRIOR.moves ?? 2,
-      UNITS.SPEARMAN.moves ?? 2,
-      UNITS.PIKEMAN.moves ?? 2,
-      UNITS.MUSKETMAN.moves ?? 2,
-      UNITS.ARCHER.moves ?? 2,
-      UNITS.CROSSBOWMAN.moves ?? 2,
-      UNITS.SCOUT.moves ?? 2,
-      UNITS.GALLEY.moves ?? 3,
-      UNITS.QUADRIREME.moves ?? 3,
-    ],
-    unitRangedStrength: [0, 0, 0, 0, UNITS.ARCHER.ranged?.strength ?? 0, UNITS.CROSSBOWMAN.ranged?.strength ?? 0, 0, 0, UNITS.QUADRIREME.ranged?.strength ?? 0],
-    unitRangedRange: [0, 0, 0, 0, UNITS.ARCHER.ranged?.range ?? 0, UNITS.CROSSBOWMAN.ranged?.range ?? 0, 0, 0, UNITS.QUADRIREME.ranged?.range ?? 0],
-    // B-26 (2026-07-27): which barb u_types are NAVAL hulls — the barb twin of
-    // the roster's `naval` flag, so the raider march can pick the water plane.
-    unitNaval: [0, 0, 0, 0, 0, 0, 0, 1, 1],
-    barbNavalTypes: [7, 8], // GALLEY, then QUADRIREME past crossbowmanAfterTurn
+    barbLadder: [
+      'WARRIOR',
+      'SPEARMAN',
+      'PIKEMAN',
+      'MUSKETMAN',
+      'ARCHER',
+      'CROSSBOWMAN',
+      'SCOUT',
+      'GALLEY',
+      'QUADRIREME',
+    ].map((id) => {
+      const i = Object.keys(UNITS).indexOf(id);
+      if (i < 0) throw new Error(`barbLadder: ${id} is not in the unit roster`);
+      return i;
+    }),
+    barbNavalTypes: [7, 8], // ladder POSITIONS: GALLEY, then QUADRIREME past crossbowmanAfterTurn
     campClearReward: 50,
     dmgBase: Array.from({ length: 4001 }, (_, i) => 30 * Math.exp((0.04 * (i - 2000)) / 10)),
     // #45/B-6 EMBARK: flat embarked MP, the LIVE water-step master switch (N1
