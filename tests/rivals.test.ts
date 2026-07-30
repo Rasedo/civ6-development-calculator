@@ -15,7 +15,7 @@ import { canFoundCity } from '../src/core/rules';
 import { tilesWithin, hexDistance } from '../src/core/hex';
 import { rivalPhase, declareWar, sueForPeace, rivalUnits, rivalCityYields, assertRivalRegistryCoherent } from '../src/core/rivals';
 import { meleeAttack, attackTargets, captureCityState, captureRivalCity } from '../src/core/combat';
-import { rivalRouteRaidedAt, routeRaidedAt, tradeCapacity } from '../src/core/trade';
+import { routeRaidedAt, tradeCapacity } from '../src/core/trade';
 import { spawnUnit, unitsHostile } from '../src/core/units';
 import { gpCost } from '../src/data/greatPeople';
 import { BUILDINGS } from '../src/data/buildings';
@@ -530,16 +530,16 @@ describe('rival trade routes (A-11)', () => {
     const rival = addRival(state, 8, 8);
     const center = state.map.tiles[rival.cities[0].centerIndex];
     const ends = [center.index];
-    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false);
+    expect(routeRaidedAt(state, ends, civOfRival(rival.id))).toBe(false);
     const mine = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index)!;
-    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false); // at peace
+    expect(routeRaidedAt(state, ends, civOfRival(rival.id))).toBe(false); // at peace
     rival.atWar = true;
-    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(true);
+    expect(routeRaidedAt(state, ends, civOfRival(rival.id))).toBe(true);
     state.units = state.units.filter((u) => u.id !== mine.id);
-    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(false);
+    expect(routeRaidedAt(state, ends, civOfRival(rival.id))).toBe(false);
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, center.col + 2, center.row).index, BARB_SEAT);
     rival.atWar = false;
-    expect(rivalRouteRaidedAt(state, rival, ends)).toBe(true); // barbs always
+    expect(routeRaidedAt(state, ends, civOfRival(rival.id))).toBe(true); // barbs always
   });
 
   it('player routes suspend for AT-WAR rival units (the A-11 symmetry fix)', () => {
