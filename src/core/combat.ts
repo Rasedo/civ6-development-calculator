@@ -40,9 +40,9 @@ import {
 import { EMBARK_MOVES, EMBARKED_DEFENSE_CS, embarkState } from '../data/constants';
 import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type BeliefEffects } from '../data/religion';
 import { revealAround } from './fog';
-import { transferCityToRival, transferRivalCityToRival, civsAtWar, relocatePalace } from './rivals';
+import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV } from './civs';
+import { tileForeignTo, tileOwnedByCiv, civOfRival, PLAYER_CIV, unitSeat, civsAtWar } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
 
 const ok: RuleResult = { ok: true };
@@ -563,7 +563,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
           // A-19/B-33 (S2): an at-war rival attacker targets an ENEMY rival's
           // city (never its own); civsAtWar already gates the target scan.
           const rc = rivalCityAt(state, targetIndex);
-          return rc && rc.rival.id !== attacker.civId && civsAtWar(state, (attacker.civId ?? -1) + 1, rc.rival.id + 1)
+          return rc && rc.rival.id !== attacker.civId && civsAtWar(state, unitSeat(attacker), rc.rival.id + 1)
             ? rc
             : undefined;
         })()
@@ -843,7 +843,7 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
         return (
           rc !== undefined &&
           rc.rival.id !== unit.civId &&
-          civsAtWar(state, (unit.civId ?? -1) + 1, rc.rival.id + 1)
+          civsAtWar(state, unitSeat(unit), rc.rival.id + 1)
         );
       })();
     // A-12b join-the-suzerain's-war: an AT-WAR rival MELEE unit may attack
@@ -1230,7 +1230,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // player's improvements alone. Rival-rival improvement pillage is out of
   // scope (residual) — enemy rival TILES are never a pillage/march target here.
   const atWarWithPlayer =
-    unit.owner === 'barbarian' || (unit.owner === 'rival' && civsAtWar(state, (unit.civId ?? -1) + 1, 0));
+    unit.owner === 'barbarian' || (unit.owner === 'rival' && civsAtWar(state, unitSeat(unit), 0));
   const hereOwned = (here.cityId !== -1 && atWarWithPlayer) || (unit.owner === 'barbarian' && here.rivalId !== undefined);
   if (here.improvement && !here.pillaged && hereOwned) {
     here.pillaged = true;
@@ -1289,7 +1289,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     // center tile index.
     const attackPlayer =
       unit.owner === 'barbarian' ||
-      (unit.owner === 'rival' && civsAtWar(state, (unit.civId ?? -1) + 1, 0));
+      (unit.owner === 'rival' && civsAtWar(state, unitSeat(unit), 0));
     let pcTarget: Tile | null = null;
     let pcDist = Infinity;
     if (attackPlayer && state.cities.length > 0) {

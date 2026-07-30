@@ -114,7 +114,7 @@ import {
   RIVAL_ENGINEER_LIVE,
 } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic } from './civs';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -349,41 +349,6 @@ export function rivalProximity(state: GameState, rival: RivalCiv): number {
 // (symmetric by construction). S1 ships these INERT (nothing reads them yet).
 // ---------------------------------------------------------------------------
 
-/** Are unified civs `a` and `b` at war right now? */
-export function civsAtWar(state: GameState, a: number, b: number): boolean {
-  if (a === b) return false;
-  // A player pair (one side is civ 0) reads the rival's war-with-player bool.
-  if (a === 0 || b === 0) {
-    const rivalUnified = a === 0 ? b : a;
-    return state.rivals.find((r) => r.id === rivalUnified - 1)?.atWar ?? false;
-  }
-  // A rival↔rival pair: membership in either side's list (symmetric).
-  return state.rivals.find((r) => r.id === a - 1)?.atWarRivals?.includes(b - 1) ?? false;
-}
-
-/** Set the war state between unified civs `a` and `b` (both sides written). */
-export function setRivalWar(state: GameState, a: number, b: number, on: boolean): void {
-  if (a === b) return;
-  if (a === 0 || b === 0) {
-    // The player pair rides the existing single boolean (both engines).
-    const rival = state.rivals.find((r) => r.id === (a === 0 ? b : a) - 1);
-    if (rival) rival.atWar = on;
-    return;
-  }
-  const ra = state.rivals.find((r) => r.id === a - 1);
-  const rb = state.rivals.find((r) => r.id === b - 1);
-  if (!ra || !rb) return;
-  const add = (r: RivalCiv, otherRivalId: number) => {
-    const list = (r.atWarRivals ??= []);
-    if (on) {
-      if (!list.includes(otherRivalId)) list.push(otherRivalId);
-    } else {
-      r.atWarRivals = list.filter((x) => x !== otherRivalId);
-    }
-  };
-  add(ra, b - 1);
-  add(rb, a - 1);
-}
 
 /** Closest city-pair distance between two rivals (Infinity if either is
  *  cityless). The rival↔rival twin of `rivalProximity`. */
@@ -1549,7 +1514,7 @@ function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number)
   let def: Unit | null = null;
   for (const u of state.units) {
     if ((UNITS[u.type]?.religiousStrength ?? 0) <= 0) continue;
-    const ug = u.owner === 'player' ? 0 : (u.civId ?? -1) + 1;
+    const ug = unitSeat(u);
     if (ug === g) continue; // same religion — no contest
     const ut2 = state.map.tiles[u.tileIndex];
     if (hexDistance(at.col, at.row, ut2.col, ut2.row) !== 1) continue;
@@ -1563,12 +1528,12 @@ function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number)
   def.hp -= toDef;
   att.hp -= toAtk;
   att.movesLeft = 0;
-  const loserRel = def.hp <= 0 ? (def.owner === 'player' ? 0 : (def.civId ?? -1) + 1) : att.hp <= 0 ? g : -1;
-  const winnerRel = def.hp <= 0 ? g : att.hp <= 0 ? (def.owner === 'player' ? 0 : (def.civId ?? -1) + 1) : -1;
+  const loserRel = def.hp <= 0 ? unitSeat(def) : att.hp <= 0 ? g : -1;
+  const winnerRel = def.hp <= 0 ? g : att.hp <= 0 ? unitSeat(def) : -1;
   if (winnerRel >= 0) {
     const deadTile = def.hp <= 0 ? def.tileIndex : att.tileIndex;
     const dt = state.map.tiles[deadTile];
-    for (const c of [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)]) {
+    for (const c of allCities(state)) {
       const ct = state.map.tiles[c.centerIndex];
       if (hexDistance(dt.col, dt.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
       let pres = c.religionPressure;
@@ -1587,7 +1552,7 @@ function theologicalCombat(state: GameState, att: Unit, g: number, nRel: number)
   // A dead MISSIONARY yields nothing. Granted in the SAME order as the two
   // disbands below (defender first, then attacker) so slot placement is
   // order-exact across engines.
-  if (def.hp <= 0 && def.type === 'APOSTLE') grantRelic(state, def.owner === 'player' ? 0 : (def.civId ?? -1) + 1);
+  if (def.hp <= 0 && def.type === 'APOSTLE') grantRelic(state, unitSeat(def));
   if (att.hp <= 0) grantRelic(state, g); // the attacker is always an APOSTLE
   if (def.hp <= 0) disbandUnit(state, def.id);
   if (att.hp <= 0) disbandUnit(state, att.id);
@@ -1668,7 +1633,7 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
   const nTiles = state.map.tiles.length;
   const eb = rival.enhancerBelief ? ENHANCER_BELIEFS[rival.enhancerBelief]?.effects : undefined;
   const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
-  const allCities: City[] = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
+  const cities = allCities(state) as City[];
   for (const u of [...state.units]) {
     if (u.owner !== 'rival' || u.civId !== rival.id || (u.charges ?? 0) <= 0) continue;
     if (u.type !== 'MISSIONARY' && u.type !== 'APOSTLE') continue; // B-18 (#71): apostles spread too
@@ -1682,7 +1647,7 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
     const ut = state.map.tiles[u.tileIndex];
     let target: City | null = null;
     let bestKey = Infinity;
-    for (const c of allCities) {
+    for (const c of cities) {
       if (c.followedReligion === g) continue;
       const ct = state.map.tiles[c.centerIndex];
       const key = hexDistance(ut.col, ut.row, ct.col, ct.row) * (nTiles + 1) + c.centerIndex;

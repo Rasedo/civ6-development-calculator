@@ -46,7 +46,7 @@ import {
   amenityTier,
   type AmenityTier,
 } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV } from './civs';
+import { tileForeignTo, PLAYER_CIV } from './seats';
 
 export interface CityStats {
   city: City;

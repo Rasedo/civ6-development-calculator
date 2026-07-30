@@ -11,7 +11,7 @@ import { tileYields } from './yields';
 import { fogActive, isExplored } from './fog';
 import { unitsHostile, unitDomain } from './units';
 import { RESOURCES } from '../data/resources';
-import { tileForeignTo, PLAYER_CIV } from './civs';
+import { tileForeignTo, PLAYER_CIV } from './seats';
 
 export const SPATIAL_PLANES = [
   'water',

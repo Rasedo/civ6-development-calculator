@@ -3,7 +3,7 @@ import { UNITS } from '../src/data/units';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { trainableUnits, queueUnit } from '../src/core/units';
-import { civHasStrategic, PLAYER_CIV } from '../src/core/civs';
+import { civHasStrategic, PLAYER_CIV } from '../src/core/seats';
 
 /** Units-mode game with the capital at (8,8), and a resource tile inside
  * borders that the caller can configure. Returns the state, city and the tile. */

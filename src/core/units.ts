@@ -19,7 +19,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv } from './civs';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };

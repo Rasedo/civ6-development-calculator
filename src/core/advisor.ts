@@ -19,7 +19,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { computeUnlocks } from './effects';
 import { CITY_WORK_RADIUS } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV } from './civs';
+import { tileForeignTo, PLAYER_CIV } from './seats';
 
 /** Balanced yield weights used to value a tile's raw output. */
 const YIELD_WEIGHTS: Yields = {

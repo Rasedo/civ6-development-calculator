@@ -8,7 +8,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { PLAYER_CIV } from './civs';
+import { PLAYER_CIV } from './seats';
 import { csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
 
 // ---------------------------------------------------------------------------

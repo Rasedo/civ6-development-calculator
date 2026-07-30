@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, tileAtCoords } from './helpers';
-import { rivalPhase, civsAtWar, setRivalWar, isFormalWar, rivalStrength } from '../src/core/rivals';
+import { rivalPhase, isFormalWar, rivalStrength } from '../src/core/rivals';
+import { civsAtWar, setRivalWar } from '../src/core/seats';
 import { hostileRangedStrike, attackTargets } from '../src/core/combat';
 import { unitsHostile, spawnUnit } from '../src/core/units';
 import { tilesWithin } from '../src/core/hex';

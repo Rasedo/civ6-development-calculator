@@ -34,7 +34,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed, civOfRival } from './civs';
+import { tileClaimed, civOfRival, allCities } from './seats';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -1236,8 +1236,8 @@ function spreadReligiousPressure(state: GameState): void {
     if (eb) range[i + 1] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
   }
   const tiles = state.map.tiles;
-  const allCities: City[] = [...state.cities, ...state.rivals.flatMap((rv) => rv.cities)];
-  for (const city of allCities) {
+  const cities = allCities(state) as City[];
+  for (const city of cities) {
     let pres = city.religionPressure;
     if (!pres || pres.length !== nRel) {
       pres = new Array(nRel).fill(0);

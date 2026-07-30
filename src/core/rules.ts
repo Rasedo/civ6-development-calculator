@@ -17,7 +17,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS, type BuildingDef, buildingsForDistrict } from '../data/buildings';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { CITY_MIN_DIST, CITY_WORK_RADIUS, maxSpecialtyDistricts } from '../data/constants';
-import { tileRivalCiv } from './civs';
+import { tileRivalCiv } from './seats';
 
 export interface RuleResult {
   ok: boolean;
