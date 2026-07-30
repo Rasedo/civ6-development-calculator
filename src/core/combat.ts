@@ -408,12 +408,16 @@ export function markAntiquitySite(state: GameState, tileIndex: number): void {
   t.antiquity = true;
 }
 
-/** Sack: population and gold loss, improvements around the center pillaged. */
-function sackCity(state: GameState, city: City): void {
+/** Sack: population and gold loss, improvements around the center pillaged.
+ *  Barbarians sack; they never govern. `seat` owns the city being sacked. */
+function sackCity(state: GameState, city: City | RivalCity, seat: number): void {
   city.population = Math.max(1, Math.floor(city.population * 0.75));
   // GS: milli-round the treasury before ×0.2 so a sub-milli non-dyadic-gold drift can't tip the
   // round across a .5 boundary and desync the sack by 1 gold vs the GPU (which mirrors this).
-  playerSeat(state).treasury -= Math.min(100, Math.round((Math.round(playerSeat(state).treasury * 1000) / 1000) * 0.2));
+  const owner = seatOf(state, seat);
+  if (owner) {
+    owner.treasury -= Math.min(100, Math.round((Math.round(owner.treasury * 1000) / 1000) * 0.2));
+  }
   const center = state.map.tiles[city.centerIndex];
   for (const t of neighbors(state.map, center)) {
     if (t.improvement && !t.pillaged) t.pillaged = true;
@@ -421,57 +425,93 @@ function sackCity(state: GameState, city: City): void {
   city.hp = Math.round(CITY_MAX_HP / 2);
 }
 
-function attackCity(state: GameState, attacker: Unit, city: City): void {
-  // B-29: the attacker's wound penalty reduces its CS; a river-crossing melee
-  // takes −5. The city center is not a unit (cityDefenseStrength unchanged).
-  const atkCS =
+/**
+ * The attacker's combat strength for an assault on ANY fortified target — a
+ * city center, a city-state center, or an Encampment. Six terms that were
+ * written out four times and had to be kept in lockstep by comment:
+ *
+ * B-29 the wound penalty, B-29 the −5 river crossing, B-4 attacker veterancy
+ * (a city is not a unit, so no defender xp), the #71 enhancer adder, and the
+ * #70/S2 (B-8) great-general aura.
+ *
+ * #71 (debt): the enhancer adders apply to city assaults too — Crusade/Just
+ * War raise the UNIT's combat strength by where it STANDS, not by what it
+ * hits. Scoped to RIVAL attackers only, because the GPU never sets the
+ * PLAYER's holy city (holy_tile[:, 0] is written nowhere), so a player
+ * religion exists in TS and not on the GPU. That asymmetry is PRE-EXISTING
+ * (the unit-vs-unit sites carry it too, dormant) but applying the term here
+ * made it REACHABLE off-script — rollout seeds 9183/9235 went red on draw
+ * counts. Record as a G-item; drop this guard the moment the GPU grows a
+ * player holy city (it rides #50's religion verb).
+ */
+function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): number {
+  return (
     (UNITS[attacker.type]?.combat ?? 0) -
     woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker) + // B-4: attacker veterancy (the city is not a unit — no defender xp)
-    // #71 (debt): the enhancer attacker adders apply to city assaults too —
-    // Crusade/Just War raise the UNIT's combat strength by where it STANDS,
-    // not by what it hits. Scoped to RIVAL attackers only, because the GPU
-    // never sets the PLAYER's holy city (holy_tile[:, 0] is written nowhere),
-    // so a player religion exists in TS and not on the GPU. That asymmetry is
-    // PRE-EXISTING (the unit-vs-unit sites carry it too, dormant) but applying
-    // the term here made it REACHABLE off-script — rollout seeds 9183/9235 went
-    // red on draw counts. Record as a G-item; drop this guard the moment the
-    // GPU grows a player holy city (it rides #50's religion verb).
-    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, city.centerIndex) : 0) +
-    generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8): the aura covers city assaults too
+    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[targetIndex])
+      ? RIVER_ATTACK_PENALTY
+      : 0) +
+    xpLevelBonus(attacker) +
+    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat)
+      ? religionAttackCS(state, attacker, targetIndex)
+      : 0) +
+    generalAuraCS(state, attacker, attacker.tileIndex)
+  );
+}
+
+/**
+ * One assault exchange against a city center, whoever owns it. Both rolls are
+ * drawn in stream order — the city's damage first, the attacker's second —
+ * which is what the player and rival copies each did; nothing between them
+ * touches the RNG, so this is the same stream either way.
+ *
+ * AUDIT B-1: the ANCIENT_WALLS outer pool soaks the hit first — only the
+ * spillover reaches city HP (a deliberate simplification of Civ 6's
+ * percentage wall rules: outer absorbs the whole roll until depleted).
+ * No walls → outerHp absent (0) → the full roll lands.
+ *
+ * The caller decides what happens if the city falls; that branch is still
+ * per-owner because a City and a RivalCity live in different registries.
+ */
+function cityAssault(
+  state: GameState,
+  attacker: Unit,
+  city: City | RivalCity,
+  kCity: string,
+  kAttacker: string,
+): void {
+  const atkCS = assaultAtkCS(state, attacker, city.centerIndex);
   const defCS = cityDefenseStrength(state, city);
-  const dmgToCity = damageRoll(state, atkCS - defCS, 'pcty', city.centerIndex);
-  const dmgToAttacker = damageRoll(state, defCS - atkCS, 'pctyc', city.centerIndex);
+  const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
+  const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
-  // AUDIT B-1: the ANCIENT_WALLS outer pool soaks the hit first — only the
-  // spillover reaches city HP (a deliberate simplification of Civ 6's
-  // percentage wall rules: outer absorbs the whole roll until depleted).
-  // No walls → outerHp absent (0) → the full roll lands, exactly as before.
   const outer = city.outerHp ?? 0;
   const absorbed = Math.min(outer, dmgToCity);
   if (absorbed > 0) city.outerHp = outer - absorbed;
-  city.hp = city.hp - (dmgToCity - absorbed);
+  city.hp -= dmgToCity - absorbed;
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
   if (attacker.hp <= 0) killUnit(state, attacker);
-  if (city.hp <= 0) {
-    // V-W2 symmetric: a RIVAL conqueror takes the city (the loyalty-flip
-    // transfer); barbarians still merely sack.
-    if (isRivalSeat(attacker.seat)) {
-      const rival = rivalOfSeat(state, attacker.seat);
-      if (rival) {
-        // P5/S1 (C-11b): the conqueror plunders +40, symmetric with the
-        // player's captureRivalCity — but only on a real transfer; the
-        // C-5 raze (city cap) mirrors TS's raze early-return: no gold.
-        if (transferCityToRival(state, city, rival, 'conquered')) {
-          rival.treasury = (rival.treasury ?? 0) + 40;
-        }
-        return;
+}
+
+function attackCity(state: GameState, attacker: Unit, city: City): void {
+  cityAssault(state, attacker, city, 'pcty', 'pctyc');
+  if (city.hp > 0) return;
+  // V-W2 symmetric: a RIVAL conqueror takes the city (the loyalty-flip
+  // transfer); barbarians still merely sack.
+  if (isRivalSeat(attacker.seat)) {
+    const rival = rivalOfSeat(state, attacker.seat);
+    if (rival) {
+      // P5/S1 (C-11b): the conqueror plunders +40, symmetric with the
+      // player's captureRivalCity — but only on a real transfer; the
+      // C-5 raze (city cap) mirrors TS's raze early-return: no gold.
+      if (transferCityToRival(state, city, rival, 'conquered')) {
+        rival.treasury = (rival.treasury ?? 0) + 40;
       }
+      return;
     }
-    sackCity(state, city);
   }
+  sackCity(state, city, PLAYER_CIV);
 }
 
 /**
@@ -482,8 +522,7 @@ function attackCity(state: GameState, attacker: Unit, city: City): void {
  * and silences its strike — the game's "occupied Encampment". The attacker does
  * NOT advance: entry costs a separate move, exactly like a city assault.
  *
- * The attacker's CS is assembled EXACTLY as `attackCity` assembles it (wound,
- * river, veterancy, the gated religion adder, aura) so the two assault kinds
+ * The attacker's CS comes from the shared `assaultAtkCS`, so the assault kinds
  * cannot drift; only the target pool and the roll keys differ.
  */
 function attackEncampment(
@@ -494,13 +533,7 @@ function attackEncampment(
   k: string,
 ): void {
   const tile = state.map.tiles[tileIndex];
-  const atkCS =
-    (UNITS[attacker.type]?.combat ?? 0) -
-    woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], tile) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker) +
-    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, tileIndex) : 0) +
-    generalAuraCS(state, attacker, attacker.tileIndex);
+  const atkCS = assaultAtkCS(state, attacker, tileIndex);
   const dmgToEncamp = damageRoll(state, atkCS - defCS, k, tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, k + 'c', tileIndex);
   gainXp(attacker, XP_ATTACK);
@@ -875,60 +908,28 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 // ---------------------------------------------------------------------------
 
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
-  const atkCS =
-    (UNITS[attacker.type]?.combat ?? 0) -
-    woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[city.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker) + // B-29 wound + river (city not a unit) + B-4 attacker veterancy
-    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, city.centerIndex) : 0) + // #71 (debt): see attackCity
-    generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
-  const defCS = cityDefenseStrength(state, city);
-  // AUDIT B-1: the outer wall pool absorbs first (same rule as attackCity).
-  const dmgToCity = damageRoll(state, atkCS - defCS, 'rcty', city.centerIndex);
-  const outer = city.outerHp ?? 0;
-  const absorbed = Math.min(outer, dmgToCity);
-  if (absorbed > 0) city.outerHp = outer - absorbed;
-  city.hp -= dmgToCity - absorbed;
-  attacker.hp -= damageRoll(state, defCS - atkCS, 'rctyc', city.centerIndex);
-  attacker.movesLeft = 0;
-  gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
-  if (attacker.hp <= 0) killUnit(state, attacker);
-  if (city.hp <= 0) {
-    if (isPlayerSeat(attacker.seat)) {
-      captureRivalCity(state, rival, city);
-    } else if (isRivalSeat(attacker.seat)) {
-      // A-19/B-33 (S2): a rival conqueror TAKES the enemy rival's city via the
-      // EXISTING loyalty-flip transfer (B-30 infra-carry + POOL-END already in
-      // place). No +40 plunder for the rival-vs-rival path (v1) and no raze cap
-      // (RC=24 slots absorb it, like the loyalty flips).
-      const toRival = rivalOfSeat(state, attacker.seat);
-      if (toRival) transferRivalCityToRival(state, rival, toRival, city);
-    } else {
-      // Barbarians sack, they don't govern. P5/S1 (C-10): a rival sack now
-      // mirrors sackCity — gold loss (milli-rounded 20%, cap 100) and the
-      // pillage ring around the center, not just the pop hit.
-      city.population = Math.max(1, Math.floor(city.population * 0.75));
-      rival.treasury =
-        (rival.treasury ?? 0) -
-        Math.min(100, Math.round((Math.round((rival.treasury ?? 0) * 1000) / 1000) * 0.2));
-      for (const t of neighbors(state.map, state.map.tiles[city.centerIndex])) {
-        if (t.improvement && !t.pillaged) t.pillaged = true;
-      }
-      city.hp = Math.round(200 / 2);
-      state.eventLog.push(`Barbarians sacked ${city.name} (${rival.name}).`);
-    }
+  cityAssault(state, attacker, city, 'rcty', 'rctyc');
+  if (city.hp > 0) return;
+  if (isPlayerSeat(attacker.seat)) {
+    captureRivalCity(state, rival, city);
+  } else if (isRivalSeat(attacker.seat)) {
+    // A-19/B-33 (S2): a rival conqueror TAKES the enemy rival's city via the
+    // EXISTING loyalty-flip transfer (B-30 infra-carry + POOL-END already in
+    // place). No +40 plunder for the rival-vs-rival path (v1) and no raze cap
+    // (RC=24 slots absorb it, like the loyalty flips).
+    const toRival = rivalOfSeat(state, attacker.seat);
+    if (toRival) transferRivalCityToRival(state, rival, toRival, city);
+  } else {
+    // P5/S1 (C-10): a rival sack is the player's sack — gold loss (milli-
+    // rounded 20%, cap 100) and the pillage ring, not just the pop hit.
+    sackCity(state, city, civOfRival(rival.id));
+    state.eventLog.push(`Barbarians sacked ${city.name} (${rival.name}).`);
   }
 }
 
 /** Player siege of a city-state (attacking it IS the declaration of war). */
 function attackCityState(state: GameState, attacker: Unit, cs: CityState): void {
-  const atkCS =
-    (UNITS[attacker.type]?.combat ?? 0) -
-    woundPenalty(attacker) -
-    (crossesRiver(state.map.tiles[attacker.tileIndex], state.map.tiles[cs.centerIndex]) ? RIVER_ATTACK_PENALTY : 0) +
-    xpLevelBonus(attacker) + // B-29 wound + river (CS center not a unit) + B-4 attacker veterancy
-    (CITY_RELIGION_ADDER_LIVE && isRivalSeat(attacker.seat) ? religionAttackCS(state, attacker, cs.centerIndex) : 0) + // #71 (debt): see attackCity
-    generalAuraCS(state, attacker, attacker.tileIndex); // #70/S2 (B-8)
+  const atkCS = assaultAtkCS(state, attacker, cs.centerIndex);
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
