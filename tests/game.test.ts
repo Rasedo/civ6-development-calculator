@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs, expandBorders } from './helpers';
 import {
   growthFoodNeeded,
@@ -125,8 +126,8 @@ describe('citizens and growth', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index);
     endTurn(state);
-    expect(state.treasury).toBeGreaterThan(0); // palace gold
-    expect(state.scienceTotal).toBeGreaterThan(0);
+    expect(playerSeat(state).treasury).toBeGreaterThan(0); // palace gold
+    expect(playerSeat(state).scienceTotal).toBeGreaterThan(0);
     expect(state.turn).toBe(2);
   });
 });

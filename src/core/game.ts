@@ -111,10 +111,6 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     nextCityId: 0,
     turn: 1,
     sandbox,
-    treasury: 0,
-    scienceTotal: 0,
-    cultureTotal: 0,
-    faithTotal: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
     government: { current: null, policies: [] },
     greatPeople: { points: {}, earned: [] },
@@ -143,7 +139,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0 }],
+    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0 }],
     rivals: [],
     claimedPantheons: [],
     claimedBeliefs: [],
@@ -488,12 +484,12 @@ export function purchaseBuilding(state: GameState, cityId: number, buildingId: s
   if (!state.sandbox) {
     if (worship) {
       const cost = buildingFaithCost(buildingId);
-      if (!goldAffordable(state.faithTotal, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
-      state.faithTotal -= cost;
+      if (!goldAffordable(playerSeat(state).faith, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
+      playerSeat(state).faith -= cost;
     } else {
       const cost = buildingPurchaseCost(buildingId);
-      if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
-      state.treasury -= cost;
+      if (!goldAffordable(playerSeat(state).treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+      playerSeat(state).treasury -= cost;
     }
   }
   city.buildings.push(buildingId);
@@ -512,12 +508,12 @@ export function purchaseUnit(state: GameState, cityId: number, unitType: string)
   }
   const cost = unitPurchaseCost(state, unitType);
   if (!state.sandbox) {
-    if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
-    state.treasury -= cost;
+    if (!goldAffordable(playerSeat(state).treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    playerSeat(state).treasury -= cost;
   }
   const unit = spawnUnit(state, unitType, city.centerIndex);
   if (!unit) {
-    if (!state.sandbox) state.treasury += cost; // refund: nowhere to stand
+    if (!state.sandbox) playerSeat(state).treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
   // B-17 (ROUND B7): a purchased MILITARY unit starts with the city's
@@ -536,8 +532,8 @@ export function purchaseSettler(state: GameState, cityId: number): RuleResult {
   if (!city) return { ok: false, reason: 'No such city.' };
   const cost = settlerCost(state) * GOLD_PURCHASE_MULT;
   if (!state.sandbox) {
-    if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
-    state.treasury -= cost;
+    if (!goldAffordable(playerSeat(state).treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    playerSeat(state).treasury -= cost;
   }
   state.settlers += 1;
   // P4/D-6: purchased settlers cost the pop too (real Civ 6).
@@ -640,8 +636,8 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number): Ru
   }
   const cost = tilePurchaseCost(state, city, tileIndex);
   if (!state.sandbox) {
-    if (!goldAffordable(state.treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
-    state.treasury -= cost;
+    if (!goldAffordable(playerSeat(state).treasury, cost)) return { ok: false, reason: `Not enough gold (${cost} needed).` };
+    playerSeat(state).treasury -= cost;
   }
   // P4/D-17: purchases claim the tile but do NOT advance the culture-growth
   // counter (real Civ 6 keeps the two schedules separate).
@@ -894,10 +890,10 @@ export function endTurn(state: GameState): void {
     }
 
     // --- empire accumulators ---------------------------------------------------
-    state.treasury += stats.total.gold;
-    state.scienceTotal += stats.total.science;
-    state.cultureTotal += stats.total.culture;
-    state.faithTotal += stats.total.faith;
+    playerSeat(state).treasury += stats.total.gold;
+    playerSeat(state).scienceTotal += stats.total.science;
+    playerSeat(state).cultureTotal += stats.total.culture;
+    playerSeat(state).faith += stats.total.faith;
     turnScience += stats.total.science;
     turnCulture += stats.total.culture;
   }
@@ -905,7 +901,7 @@ export function endTurn(state: GameState): void {
   // B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level, right
   // after the city loop, so the GPU mirrors at the same position. Great Works
   // plus every owned Seaside Resort (worth its tile's appeal).
-  state.tourismTotal = (state.tourismTotal ?? 0) + playerTourism(state);
+  playerSeat(state).tourism = (playerSeat(state).tourism ?? 0) + playerTourism(state);
   // B-22 (#75): DIPLOMATIC FAVOR — government tier + suzerainties, accumulated
   // once per turn at the civ level, the same position the rival seat uses.
   playerSeat(state).diploFavor =
@@ -921,12 +917,12 @@ export function endTurn(state: GameState): void {
   for (const city of defectors) flipCityToRival(state, city);
 
   if (state.unitsMode) {
-    state.treasury -= unitMaintenance(state);
+    playerSeat(state).treasury -= unitMaintenance(state);
     // GV-5 bankruptcy: an insolvent treasury disbands ONE unit per turn (Civ 6
     // rule) — the priciest player unit, tie -> lowest id (= oldest spawn; a
     // deterministic order the GPU shares slot-for-slot, both append-only). No
     // refund; the eased upkeep pulls the treasury back over the next turns.
-    if (Math.round(state.treasury * 1000) < 0) {
+    if (Math.round(playerSeat(state).treasury * 1000) < 0) {
       // GS: test at milli precision — the treasury accumulates non-dyadic 0.05-unit
       // gold, so a sub-milli float drift must not spuriously trip < 0 vs the GPU.
       let victim: Unit | undefined;
@@ -975,7 +971,7 @@ export function endTurn(state: GameState): void {
   // dedication COUNT so a Heroic age pays triple. Immediately after the
   // boundary so the GPU mirrors at the same position.
   applyDedications(state, (civ, amt) => {
-    if (civ === 0) state.faithTotal += amt;
+    if (civ === 0) playerSeat(state).faith += amt;
     else {
       const rv = state.rivals[civ - 1];
       if (rv) rv.faith = (rv.faith ?? 0) + amt;
@@ -1062,8 +1058,8 @@ function cultureVictor(state: GameState): number {
   const nCivs = 1 + state.rivals.length;
   const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
   const alive = [state.cities.length > 0, ...state.rivals.map((rv) => rv.cities.length > 0)];
-  const tourism = [state.tourismTotal ?? 0, ...state.rivals.map((rv) => rv.tourism ?? 0)];
-  const culture = [state.cultureTotal, ...state.rivals.map((rv) => rv.cultureTotal ?? 0)];
+  const tourism = [playerSeat(state).tourism ?? 0, ...state.rivals.map((rv) => rv.tourism ?? 0)];
+  const culture = [playerSeat(state).cultureTotal, ...state.rivals.map((rv) => rv.cultureTotal ?? 0)];
   // Milli-rounded before the floor: culture is a non-dyadic float accumulator,
   // so a sub-milli drift must not move a tourist count across engines (the
   // GS bankruptcy-test convention).
@@ -1175,8 +1171,8 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
   } else if (fx.culture) {
     state.research.civicProgress += fx.culture;
   }
-  if (fx.faith) state.faithTotal += fx.faith;
-  if (fx.gold) state.treasury += fx.gold;
+  if (fx.faith) playerSeat(state).faith += fx.faith;
+  if (fx.gold) playerSeat(state).treasury += fx.gold;
   if (fx.productionToCapital) {
     const capital = state.cities.find((c) => c.isCapital);
     if (capital && capital.queue.length > 0) {
@@ -1309,7 +1305,7 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0 },
+    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0 },
     ...(state.rivals ?? []),
   ];
   state.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
@@ -1410,8 +1406,8 @@ export function deserialize(json: string): GameState {
 
 export function canChoosePantheon(state: GameState): RuleResult {
   if (state.religion.pantheon) return { ok: false, reason: 'Pantheon already chosen.' };
-  if (!state.sandbox && state.faithTotal < PANTHEON_FAITH_COST) {
-    return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(state.faithTotal)} banked).` };
+  if (!state.sandbox && playerSeat(state).faith < PANTHEON_FAITH_COST) {
+    return { ok: false, reason: `Needs ${PANTHEON_FAITH_COST} faith (${Math.floor(playerSeat(state).faith)} banked).` };
   }
   return { ok: true };
 }
@@ -1423,7 +1419,7 @@ export function choosePantheon(state: GameState, beliefId: string): RuleResult {
   if (state.claimedPantheons.includes(beliefId)) {
     return { ok: false, reason: 'A rival civilization already follows that pantheon.' };
   }
-  if (!state.sandbox) state.faithTotal -= PANTHEON_FAITH_COST;
+  if (!state.sandbox) playerSeat(state).faith -= PANTHEON_FAITH_COST;
   state.religion.pantheon = beliefId;
   addEraScore(state, 0, ERA_SCORE_PANTHEON); // B-24: player verb — gate-unreachable, TS-only (rival hook mirrors)
   return { ok: true };

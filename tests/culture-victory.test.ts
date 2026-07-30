@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { createGame, endTurn, foundCity } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../src/data/rivals';
@@ -41,8 +42,8 @@ describe('B-25 culture victory', () => {
   it('the player out-touring every rival wins (victoryType 7)', () => {
     const state = newGame(1);
     const rv = state.rivals[0];
-    state.tourismTotal = tourismFor(5, 2);
-    state.cultureTotal = cultureFor(1);
+    playerSeat(state).tourism = tourismFor(5, 2);
+    playerSeat(state).cultureTotal = cultureFor(1);
     rv.cultureTotal = cultureFor(4); // 5 visiting > 4 domestic
     rv.tourism = 0;
     endTurn(state);
@@ -55,8 +56,8 @@ describe('B-25 culture victory', () => {
     const rv = state.rivals[0];
     rv.tourism = tourismFor(9, 2);
     rv.cultureTotal = cultureFor(1);
-    state.cultureTotal = cultureFor(3); // rival 9 visiting > player 3 domestic
-    state.tourismTotal = 0;
+    playerSeat(state).cultureTotal = cultureFor(3); // rival 9 visiting > player 3 domestic
+    playerSeat(state).tourism = 0;
     endTurn(state);
     expect(state.victoryType).toBe(8);
     expect(state.gameOver).toBe(true);
@@ -65,8 +66,8 @@ describe('B-25 culture victory', () => {
   it('EQUAL counts do not win — the bar is strictly greater', () => {
     const state = newGame(1);
     const rv = state.rivals[0];
-    state.tourismTotal = tourismFor(4, 2);
-    state.cultureTotal = cultureFor(1);
+    playerSeat(state).tourism = tourismFor(4, 2);
+    playerSeat(state).cultureTotal = cultureFor(1);
     rv.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
     rv.tourism = 0;
     endTurn(state);
@@ -76,8 +77,8 @@ describe('B-25 culture victory', () => {
 
   it('it must beat EVERY other civ, not just one', () => {
     const state = newGame(2);
-    state.tourismTotal = tourismFor(6, 3);
-    state.cultureTotal = cultureFor(1);
+    playerSeat(state).tourism = tourismFor(6, 3);
+    playerSeat(state).cultureTotal = cultureFor(1);
     state.rivals[0].cultureTotal = cultureFor(2); // beaten
     state.rivals[1].cultureTotal = cultureFor(9); // NOT beaten
     for (const rv of state.rivals) rv.tourism = 0;
@@ -90,16 +91,16 @@ describe('B-25 culture victory', () => {
     // The SAME lifetime tourism buys fewer visiting tourists in a bigger game:
     // 6 tourists' worth at nCivs=2 is only 4 at nCivs=3.
     const two = newGame(1);
-    two.tourismTotal = tourismFor(6, 2);
-    two.cultureTotal = cultureFor(1);
+    playerSeat(two).tourism = tourismFor(6, 2);
+    playerSeat(two).cultureTotal = cultureFor(1);
     two.rivals[0].cultureTotal = cultureFor(5);
     two.rivals[0].tourism = 0;
     endTurn(two);
     expect(two.victoryType).toBe(7); // 6 > 5
 
     const three = newGame(2);
-    three.tourismTotal = tourismFor(6, 2); // same raw tourism as above
-    three.cultureTotal = cultureFor(1);
+    playerSeat(three).tourism = tourismFor(6, 2); // same raw tourism as above
+    playerSeat(three).cultureTotal = cultureFor(1);
     for (const rv of three.rivals) {
       rv.cultureTotal = cultureFor(5);
       rv.tourism = 0;
@@ -114,8 +115,8 @@ describe('B-25 culture victory', () => {
     rv.tourism = tourismFor(9, 2);
     rv.cultureTotal = cultureFor(1);
     rv.cities = []; // wiped off the map, but its lifetime totals remain
-    state.cultureTotal = cultureFor(3);
-    state.tourismTotal = 0;
+    playerSeat(state).cultureTotal = cultureFor(3);
+    playerSeat(state).tourism = 0;
     endTurn(state);
     expect(state.victoryType).not.toBe(8);
   });
@@ -133,8 +134,8 @@ describe('B-25 culture victory', () => {
       c.religionPressure = pres;
     }
     // … while the player would ALSO win on culture this very turn.
-    state.tourismTotal = tourismFor(5, 2);
-    state.cultureTotal = cultureFor(1);
+    playerSeat(state).tourism = tourismFor(5, 2);
+    playerSeat(state).cultureTotal = cultureFor(1);
     rv.cultureTotal = cultureFor(4);
     rv.tourism = 0;
     endTurn(state);

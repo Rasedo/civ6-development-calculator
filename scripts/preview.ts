@@ -6,6 +6,7 @@
  */
 
 import { writeFileSync } from 'node:fs';
+import { playerSeat } from '../src/core/seats';
 import { deflateSync } from 'node:zlib';
 import { generateMap } from '../src/core/mapgen';
 import { makePreviewPng } from './png';
@@ -110,7 +111,7 @@ console.log(`  borders: ${state.map.tiles.filter((t) => t.cityId === city.id).le
 console.log(`  techs: ${state.research.techs.map((t) => TECHS[t].name).join(', ') || 'none'}`);
 console.log(`  civics: ${state.research.civics.map((c) => CIVICS[c].name).join(', ') || 'none'}`);
 console.log(`  government: ${state.government.current ?? 'none'}`);
-console.log(`  empire: treasury ${state.treasury.toFixed(0)}, science total ${state.scienceTotal.toFixed(0)}`);
+console.log(`  empire: treasury ${playerSeat(state).treasury.toFixed(0)}, science total ${playerSeat(state).scienceTotal.toFixed(0)}`);
 
 // --- 2b. build-choice comparison demo ---------------------------------------------
 console.log('\nBuild comparison over the next 20 turns:');

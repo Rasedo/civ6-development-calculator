@@ -606,7 +606,7 @@ function purchaseCandidates(state: GameState, city: City): Candidate[] {
   const affordable = availableBuildings(s, city)
     .filter((b) => buildingCompletable(s, city, b.id))
     .filter((b) =>
-      b.worship ? s.faithTotal >= buildingFaithCost(b.id) : s.treasury >= buildingPurchaseCost(b.id),
+      b.worship ? playerSeat(s).faith >= buildingFaithCost(b.id) : playerSeat(s).treasury >= buildingPurchaseCost(b.id),
     )
     .sort((a, b) => a.cost - b.cost)
     .slice(0, 2);
@@ -630,7 +630,7 @@ function purchaseCandidates(state: GameState, city: City): Candidate[] {
         tileFreeForUnit(s, t.index, { type, owner: 'player' }),
       );
     const units = trainableUnits(s)
-      .filter((u) => s.treasury >= unitPurchaseCost(s, u.id))
+      .filter((u) => playerSeat(s).treasury >= unitPurchaseCost(s, u.id))
       .filter((u) => u.charges !== undefined || u.combat > 0)
       .filter((u) => spawnable(u.id)); // a failed instant-buy would livelock the decision loop
     const builder = units.find((u) => u.charges !== undefined);
@@ -644,7 +644,7 @@ function purchaseCandidates(state: GameState, city: City): Candidate[] {
       );
     }
   }
-  if (s.treasury >= settlerCost(s) * 4) {
+  if (playerSeat(s).treasury >= settlerCost(s) * 4) {
     out.push(
       makeCandidate(state, { kind: 'purchaseSettler' }, 'Buy Settler', 'purchase', {
         cost: settlerCost(s),
@@ -875,7 +875,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     yields.science / 50,
     yields.culture / 50,
     yields.faith / 50,
-    Math.max(-1, Math.min(1, s.treasury / 500)),
+    Math.max(-1, Math.min(1, playerSeat(s).treasury / 500)),
     (s.research.techs.length + s.research.civics.length) / 50,
     Math.min(1, barbs / 6),
     Math.min(1, pillaged / 10),
@@ -887,7 +887,7 @@ export function envObservation(state: GameState, horizon: number): number[] {
     Math.min(1, builders / 3),
     Math.min(1, military / 4),
     owned.length ? improvable / owned.length : 0,
-    Math.min(1, s.faithTotal / 500),
+    Math.min(1, playerSeat(s).faith / 500),
     Math.min(1, gpProgress),
     emptySlots,
     Math.min(1, playerSeat(s).envoysAvailable / 3),

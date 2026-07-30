@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
   createGame,
@@ -38,6 +39,11 @@ function addRival(
     diploPoints: 0,
     influencePoints: 0,
     envoysAvailable: 0,
+    treasury: 0,
+    scienceTotal: 0,
+    cultureTotal: 0,
+    faith: 0,
+    tourism: 0,
     cities: [],
     nextCityId: 0,
     atWar: false,
@@ -183,7 +189,7 @@ describe('races', () => {
     expect(state.claimedPantheons.length).toBe(1);
     expect(rival.faith ?? 0).toBeLessThan(25); // the claim spent it
     const taken = state.claimedPantheons[0];
-    state.faithTotal = 100;
+    playerSeat(state).faith = 100;
     expect(choosePantheon(state, taken).ok).toBe(false);
   });
 
@@ -231,7 +237,7 @@ describe('war and peace', () => {
     const rival = addRival(state, 8, 8, { atWar: true, warTurns: 0 });
     expect(sueForPeace(state, rival.id).ok).toBe(false); // too soon
     rival.warTurns = 10;
-    state.treasury = 0;
+    playerSeat(state).treasury = 0;
     expect(sueForPeace(state, rival.id).ok).toBe(false); // too broke
 
     // Conquest path instead: batter the city down and take it.

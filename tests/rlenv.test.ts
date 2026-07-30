@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import {
   CivEnv,
   runEpisode,
@@ -52,7 +53,7 @@ describe('RL environment', () => {
     while (!r.done && !r.candidates.some((c) => c.action.kind === 'building')) {
       r = env.step(0);
     }
-    env.state.treasury = 5000;
+    playerSeat(env.state).treasury = 5000;
     const kinds = new Set(env.candidates().map((c) => c.action.kind));
     expect(
       kinds.has('purchaseBuilding') || kinds.has('purchaseUnit') || kinds.has('purchaseSettler'),

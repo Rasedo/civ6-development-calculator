@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, purchaseUnit } from '../src/core/game';
 import {
@@ -42,6 +43,11 @@ function addWarRival(state: GameState, col: number, row: number, techs: string[]
     diploPoints: 0,
     influencePoints: 0,
     envoysAvailable: 0,
+    treasury: 0,
+    scienceTotal: 0,
+    cultureTotal: 0,
+    faith: 0,
+    tourism: 0,
     cities: [],
     nextCityId: 0,
     atWar: true,
@@ -218,6 +224,11 @@ function bareRival(state: GameState, atWar = true): RivalCiv {
     diploPoints: 0,
     influencePoints: 0,
     envoysAvailable: 0,
+    treasury: 0,
+    scienceTotal: 0,
+    cultureTotal: 0,
+    faith: 0,
+    tourism: 0,
     cities: [],
     nextCityId: 0,
     atWar,
@@ -256,7 +267,7 @@ describe('#45/B-6 N2 production gating', () => {
     expect(trainableUnits(state, inlandCity).some((d) => d.id === 'GALLEY')).toBe(false);
     expect(queueUnit(state, inlandCity.id, 'GALLEY').ok).toBe(false);
     // purchase is gated the same way
-    state.treasury = 100000;
+    playerSeat(state).treasury = 100000;
     expect(purchaseUnit(state, inlandCity.id, 'GALLEY').ok).toBe(false);
     expect(purchaseUnit(state, coastCity.id, 'GALLEY').ok).toBe(true);
   });

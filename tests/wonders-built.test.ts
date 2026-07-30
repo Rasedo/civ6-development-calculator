@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, queueDistrict, queueBuilding, queueWonder, setSpecialists, setGovernment, endTurn } from '../src/core/game';
 import { greatPersonPointsPerTurn, greatPeopleEarned } from '../src/core/game';
@@ -150,9 +151,9 @@ describe('great people', () => {
     const { state, city } = sandboxCity();
     queueDistrict(state, city.id, 'COMMERCIAL_HUB', tileAtCoords(state.map, 9, 8).index);
     queueBuilding(state, city.id, 'MARKET');
-    const before = state.treasury;
+    const before = playerSeat(state).treasury;
     for (let i = 0; i < 30; i++) endTurn(state);
     expect(greatPeopleEarned(state, 'MERCHANT')).toBeGreaterThanOrEqual(1);
-    expect(state.treasury).toBeGreaterThan(before + 100); // Colaeus +100 plus income
+    expect(playerSeat(state).treasury).toBeGreaterThan(before + 100); // Colaeus +100 plus income
   });
 });

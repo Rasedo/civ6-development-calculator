@@ -279,7 +279,6 @@ export interface GameState {
    *  capitals), 3 science (space race), 4 science-defeat (a rival finished
    *  the space race first). */
   victoryType?: number;
-  /** B-15: player war-weariness accumulator (integer turn counter); the
   /** B-24 (task #68): per-era "historic moment" score, UNIFIED civ ids
    *  (0 = player, r+1 = rival r). Lazy — absent entries read 0. Resets at
    *  every ERA_LENGTH boundary (`eraBoundary`, core/eras.ts). */
@@ -303,15 +302,9 @@ export interface GameState {
   /** B-20 (#71): the player's cumulative TOURISM. Fed by Great Works and
    *  Seaside Resorts; wonders/relics/artifacts/National Parks are recorded
    *  residuals, and the Culture VICTORY itself rides B-25. */
-  tourismTotal?: number;
-  /** B-22 (#75): the PLAYER's cumulative DIPLOMATIC FAVOR — the World Congress
   /** B-22 (#76): World Congress sessions held so far (both engines count the
    *  same sessions; traced so parity proves the schedule). */
   congressSessions?: number;
-  /** B-22 (#74): the PLAYER's WARMONGER score (grievances) — the exact twin of
-   *  RivalCiv.warmonger. Grows on declaring war and on taking a rival city,
-   *  decays 1/turn while at peace with every rival. Past RR_WARMONGER_GANG a
-   *  rival may declare on the player WITHOUT the usual strength advantage,
   /** B-25: completed space-race project ids (empire-wide chain progress). */
   spaceProjects?: string[];
   /** GV-3: original capital tiles, civ-indexed (0 player, r+1 rival r).
@@ -323,10 +316,6 @@ export interface GameState {
   turn: number;
   /** Sandbox: districts/buildings complete instantly, cost nothing, and ignore tech gating. */
   sandbox: boolean;
-  treasury: number;
-  scienceTotal: number;
-  cultureTotal: number;
-  faithTotal: number;
   research: ResearchState;
   government: GovernmentState;
   greatPeople: {
@@ -471,6 +460,23 @@ export interface Seat {
   influencePoints: number;
   /** Envoys banked and not yet assigned. */
   envoysAvailable: number;
+
+  // --- economy (S1.2b) ----------------------------------------------------
+  // The player's `faithTotal`/`tourismTotal` and the rival's `faith`/`tourism`
+  // were the SAME quantity under two names; one name each now. `scienceTotal`
+  // gains a rival field that never existed — the STORAGE is symmetric even
+  // though nothing accrues rival science yet (that mechanic gap is recorded in
+  // gpu/AUDIT.md, not papered over here).
+  /** Gold in the bank. */
+  treasury: number;
+  /** Lifetime science. */
+  scienceTotal: number;
+  /** Lifetime culture. */
+  cultureTotal: number;
+  /** Faith banked. */
+  faith: number;
+  /** Cumulative tourism. */
+  tourism: number;
 }
 
 export interface RivalCiv extends Seat {
@@ -506,17 +512,12 @@ export interface RivalCiv extends Seat {
    *  construction (both sides written), broken by a denouncement or a war.
    *  Allies never declare war on each other. Empty at t0. */
   alliedRivals?: number[];
-  /** B-22 (2026-07-27): this civ's WARMONGER score (grievances). Grows on
-   *  declaring war and taking cities, decays 1/turn at peace. Blocks
-  /** B-15: this civ's war-weariness accumulator (integer), symmetric with the
   /** B-20 (#71): this rival's cumulative TOURISM (the player's twin). */
-  tourism?: number;
   /** B-25 (#72): this rival's cumulative LIFETIME CULTURE — the twin of the
    *  player's `cultureTotal`. Real Civ 6 derives DOMESTIC TOURISTS from
    *  lifetime culture, so the Culture victory cannot be judged without it;
    *  `research.civicProgress` is spent down by every completed civic and is
    *  therefore NOT a lifetime total. */
-  cultureTotal?: number;
   /** B-25: this civ's completed space-race project ids (chain progress). */
   spaceProjects?: string[];
   /** AUDIT A-11/A-12b: this civ's trade routes — `from` is always an own
@@ -547,9 +548,7 @@ export interface RivalCiv extends Seat {
    * source of its religion's pressure spread (mirror of ReligionState.holyTile). */
   holyTile?: number | null;
   /** VP-G1: banked gold — accrues from worked tiles; no scripted spender. */
-  treasury?: number;
   /** P5/S5 (C-17): banked faith — the pantheon's consumer. */
-  faith?: number;
   /** P5/S5 (C-16): PROPHET-class great people this civ claimed (religion gate). */
   prophets?: number;
   /** P4/D-10: this civ's builders ever trained (its own cost escalator). */

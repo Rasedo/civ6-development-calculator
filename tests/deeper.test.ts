@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeState, makeMap, tileAtCoords } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { tilesWithin } from '../src/core/hex';
@@ -30,6 +31,11 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     diploPoints: 0,
     influencePoints: 0,
     envoysAvailable: 0,
+    treasury: 0,
+    scienceTotal: 0,
+    cultureTotal: 0,
+    faith: 0,
+    tourism: 0,
     cities: [],
     nextCityId: 0,
     atWar: false,
@@ -212,11 +218,11 @@ describe('city-state conquest and levies', () => {
     const state = makeState();
     state.unitsMode = true;
     const cs = addCs(state, 8, 8, 'militaristic', 3);
-    state.treasury = LEVY_GOLD_COST;
+    playerSeat(state).treasury = LEVY_GOLD_COST;
     expect(levyUnits(state, cs.id).ok).toBe(true);
     expect(state.units.filter((u) => u.owner === 'player').length).toBe(LEVY_UNITS);
-    expect(state.treasury).toBe(0);
-    state.treasury = LEVY_GOLD_COST;
+    expect(playerSeat(state).treasury).toBe(0);
+    playerSeat(state).treasury = LEVY_GOLD_COST;
     expect(levyUnits(state, cs.id).ok).toBe(false); // cooldown
 
     const nonMil = addCs(state, 2, 2, 'scientific', 3);

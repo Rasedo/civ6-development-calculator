@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { borderGrowthCost } from '../src/data/constants';
 import { foundCity, endTurn, buyTile, tilePurchaseCost } from '../src/core/game';
@@ -42,7 +43,7 @@ describe('cultural border growth', () => {
   it('buying tiles costs ring-priced gold on its own schedule (D-17)', () => {
     const state = makeState(makeMap(18, 18));
     const city = foundCity(state, tileAtCoords(state.map, 9, 9).index).city!;
-    state.treasury = 1000;
+    playerSeat(state).treasury = 1000;
 
     const target = tileAtCoords(state.map, 11, 9);
     expect(borderCandidates(state, city)).toContain(target.index);
@@ -51,7 +52,7 @@ describe('cultural border growth', () => {
 
     expect(buyTile(state, city.id, target.index).ok).toBe(true);
     expect(target.cityId).toBe(city.id);
-    expect(state.treasury).toBe(1000 - cost);
+    expect(playerSeat(state).treasury).toBe(1000 - cost);
     expect(city.tilesAcquired).toBe(0); // purchases don't advance the culture counter
     expect(state.tilesPurchased).toBe(1);
     expect(tilePurchaseCost(state, city)).toBe(33); // +5 (speed-scaled → 3) per purchase
@@ -64,7 +65,7 @@ describe('cultural border growth', () => {
   it('refuses purchases the treasury cannot afford', () => {
     const state = makeState(makeMap(18, 18));
     const city = foundCity(state, tileAtCoords(state.map, 9, 9).index).city!;
-    state.treasury = 10;
+    playerSeat(state).treasury = 10;
     const target = tileAtCoords(state.map, 11, 9);
     expect(buyTile(state, city.id, target.index).ok).toBe(false);
     expect(target.cityId).toBe(-1);

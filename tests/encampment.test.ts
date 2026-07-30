@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, purchaseUnit } from '../src/core/game';
 import { spawnUnit } from '../src/core/units';
@@ -56,7 +57,7 @@ describe('B-17 Encampment', () => {
   it('training XP end-to-end: a purchased military unit starts veteran', () => {
     const { state, city } = battlefield();
     city.buildings.push('BARRACKS');
-    state.treasury = 9999;
+    playerSeat(state).treasury = 9999;
     const before = state.units.length;
     const res = purchaseUnit(state, city.id, 'WARRIOR');
     expect(res.ok).toBe(true);

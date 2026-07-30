@@ -4,6 +4,7 @@
  * every field here has a twin there, keyed by TILE/CENTER index (never array slot).
  */
 import { getCityHp, terrainDefense } from '../src/core/combat';
+import { playerSeat } from '../src/core/seats';
 import { rivalCityYields } from '../src/core/rivals';
 import { empireScore, rivalEmpireScore } from '../src/core/empirePlanner';
 import { isWater } from '../src/core/query';
@@ -41,8 +42,8 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
 
   const pu = state.units.filter((u) => u.owner === 'player');
   L.push(
-    `${p}PT = treas:${Math.round(state.treasury*1000)} sci:${Math.round(state.scienceTotal*1000)} ` +
-      `cul:${Math.round(state.cultureTotal*1000)} ntech:${state.research.techs.length} ` +
+    `${p}PT = treas:${Math.round(playerSeat(state).treasury*1000)} sci:${Math.round(playerSeat(state).scienceTotal*1000)} ` +
+      `cul:${Math.round(playerSeat(state).cultureTotal*1000)} ntech:${state.research.techs.length} ` +
       `nciv:${state.research.civics.length} nset:${state.settlers} ncity:${state.cities.length} nunit:${pu.length} ` +
       `umaint:${Math.round(unitMaintenance(state)*1000)} ` +
       `gp:${GP_CLASSES.map((cls) => greatPeopleEarned(state, cls)).join(',')} ` +

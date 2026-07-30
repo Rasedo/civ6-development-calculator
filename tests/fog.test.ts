@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { canFoundCity } from '../src/core/rules';
@@ -96,9 +97,9 @@ describe('tribal villages', () => {
 
 function serializeRewards(state: ReturnType<typeof makeState>): string {
   return JSON.stringify([
-    state.treasury,
-    state.faithTotal,
-    state.scienceTotal,
+    playerSeat(state).treasury,
+    playerSeat(state).faith,
+    playerSeat(state).scienceTotal,
     state.research.boosted,
     state.research.civicProgress,
     state.cities.map((c) => c.population),

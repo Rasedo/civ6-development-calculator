@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders, grantCivics } from './helpers';
 import { foundCity, queueDistrict, queueBuilding, choosePantheon, canFoundReligion, foundReligion, canEnhanceReligion, enhanceReligion, endTurn } from '../src/core/game';
 import { computeCityStats } from '../src/core/city';
@@ -20,9 +21,9 @@ describe('pantheons', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index);
     expect(choosePantheon(state, 'GOD_OF_THE_OPEN_SKY').ok).toBe(false); // no faith yet
-    state.faithTotal = 30;
+    playerSeat(state).faith = 30;
     expect(choosePantheon(state, 'GOD_OF_THE_OPEN_SKY').ok).toBe(true);
-    expect(state.faithTotal).toBe(5);
+    expect(playerSeat(state).faith).toBe(5);
 
     const pasture = tileAtCoords(state.map, 9, 8);
     pasture.resource = 'CATTLE';

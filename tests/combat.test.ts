@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { spawnUnit, builderRepair } from '../src/core/units';
@@ -75,12 +76,12 @@ describe('combat', () => {
     def.tileIndex = campTile.index;
     def.hp = 5;
 
-    const gold = state.treasury;
+    const gold = playerSeat(state).treasury;
     expect(meleeAttack(state, atk.id, campTile.index).ok).toBe(true);
     expect(state.units.some((u) => u.id === def.id)).toBe(false);
     expect(atk.tileIndex).toBe(campTile.index);
     expect(state.barbCamps.length).toBe(0);
-    expect(state.treasury).toBe(gold + 50);
+    expect(playerSeat(state).treasury).toBe(gold + 50);
   });
 
   // B-26 (2026-07-27): NAVAL barbarians. Two invariants the GPU mirror got
@@ -161,7 +162,7 @@ describe('barbarians', () => {
   it('cities take siege damage, get sacked at 0, and heal when clear', () => {
     const { state, city } = battlefield();
     city.population = 8;
-    state.treasury = 200;
+    playerSeat(state).treasury = 200;
     const barb = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 10, 9).index, 'barbarian')!;
     barb.tileIndex = tileAtCoords(state.map, 10, 9).index;
 

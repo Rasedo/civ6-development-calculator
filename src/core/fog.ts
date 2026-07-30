@@ -6,6 +6,7 @@
  */
 
 import type { GameState, Unit } from './types';
+import { playerSeat } from './seats';
 import { tilesWithin, hexDistance } from './hex';
 import { nextRandom } from './rand';
 import { isWater, isImpassable } from './query';
@@ -58,11 +59,11 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
   let text: string;
   switch (roll) {
     case 0:
-      state.treasury += 40;
+      playerSeat(state).treasury += 40;
       text = 'a stash of 40 gold';
       break;
     case 1:
-      state.faithTotal += 20;
+      playerSeat(state).faith += 20;
       text = '20 faith from local mystics';
       break;
     case 2: {
@@ -85,7 +86,7 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
         city.population += 1;
         text = `settlers joining ${city.name} (+1 population)`;
       } else {
-        state.treasury += 40;
+        playerSeat(state).treasury += 40;
         text = 'a stash of 40 gold';
       }
       break;
@@ -100,7 +101,7 @@ export function claimGoodyHut(state: GameState, unit: Unit): void {
         state.research.boosted.push(pick);
         text = `ancient knowledge (eureka for ${TECHS[pick].name})`;
       } else {
-        state.scienceTotal += 30;
+        playerSeat(state).scienceTotal += 30;
         text = '30 science';
       }
       break;

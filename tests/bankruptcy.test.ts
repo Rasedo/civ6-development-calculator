@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { endTurn } from '../src/core/game';
 import { spawnUnit } from '../src/core/units';
@@ -14,7 +15,7 @@ describe('GV-5 bankruptcy', () => {
     spawnUnit(state, 'SPEARMAN', tileAtCoords(state.map, 8, 5).index, 'player'); // maint 1
     const h2 = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 11, 5).index, 'player'); // maint 2
     // upkeep = 2 + 1 + 2 = 5; treasury 1 -> -4 after settle -> bankruptcy.
-    state.treasury = 1;
+    playerSeat(state).treasury = 1;
     endTurn(state);
 
     const players = state.units.filter((u) => u.owner === 'player');
@@ -27,7 +28,7 @@ describe('GV-5 bankruptcy', () => {
     const state = makeState();
     state.unitsMode = true;
     spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 5, 5).index, 'player');
-    state.treasury = 100; // 100 - 2 upkeep = 98 >= 0
+    playerSeat(state).treasury = 100; // 100 - 2 upkeep = 98 >= 0
     endTurn(state);
     expect(state.units.filter((u) => u.owner === 'player').length).toBe(1);
   });
@@ -36,7 +37,7 @@ describe('GV-5 bankruptcy', () => {
     const state = makeState();
     state.unitsMode = true;
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 'player'); // maint 0
-    state.treasury = -50; // already deep in the red, but nothing costs upkeep
+    playerSeat(state).treasury = -50; // already deep in the red, but nothing costs upkeep
     endTurn(state);
     expect(state.units.filter((u) => u.owner === 'player').length).toBe(1); // WARRIOR kept
   });

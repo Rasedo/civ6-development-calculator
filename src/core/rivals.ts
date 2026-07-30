@@ -279,6 +279,11 @@ export function placeRivals(state: GameState, count?: number): void {
       diploPoints: 0,
       influencePoints: 0,
       envoysAvailable: 0,
+      treasury: 0,
+      scienceTotal: 0,
+      cultureTotal: 0,
+      faith: 0,
+      tourism: 0,
       spaceProjects: [], // B-25
       research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
       gpp: {},
@@ -555,8 +560,8 @@ export function sueForPeace(state: GameState, rivalId: number): RuleResult {
   }
   const cost = PEACE_GOLD_COST(rival.warTurns);
   if (!state.sandbox) {
-    if (!goldAffordable(state.treasury, cost)) return no(`Peace costs ${cost} gold right now.`);
-    state.treasury -= cost;
+    if (!goldAffordable(playerSeat(state).treasury, cost)) return no(`Peace costs ${cost} gold right now.`);
+    playerSeat(state).treasury -= cost;
   }
   makePeace(state, rival);
   return ok;
@@ -594,8 +599,8 @@ export function levyUnits(state: GameState, csId: number): RuleResult {
     return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
   }
   if (!state.sandbox) {
-    if (!goldAffordable(state.treasury, LEVY_GOLD_COST)) return no(`Levy costs ${LEVY_GOLD_COST} gold.`);
-    state.treasury -= LEVY_GOLD_COST;
+    if (!goldAffordable(playerSeat(state).treasury, LEVY_GOLD_COST)) return no(`Levy costs ${LEVY_GOLD_COST} gold.`);
+    playerSeat(state).treasury -= LEVY_GOLD_COST;
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
   for (let i = 0; i < LEVY_UNITS; i++) {

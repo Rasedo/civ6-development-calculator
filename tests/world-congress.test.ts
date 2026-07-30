@@ -135,8 +135,8 @@ describe('B-22/B-25 diplomatic victory', () => {
   it('a CULTURE victory outranks a diplomatic one on the same turn', () => {
     const state = newGame(1);
     // player would win on culture ...
-    state.tourismTotal = 5 * 2 * 200;
-    state.cultureTotal = 100;
+    playerSeat(state).tourism = 5 * 2 * 200;
+    playerSeat(state).cultureTotal = 100;
     state.rivals[0].cultureTotal = 400;
     state.rivals[0].tourism = 0;
     // ... and on diplomacy

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { playerSeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import {
   foundCity,
@@ -41,19 +42,19 @@ describe('gold & faith purchases', () => {
     const city = foundAt(state, 5, 5);
     const cost = buildingPurchaseCost('MONUMENT');
     expect(cost).toBeGreaterThan(0);
-    state.treasury = cost + 10;
+    playerSeat(state).treasury = cost + 10;
     const r = purchaseBuilding(state, city.id, 'MONUMENT');
     expect(r.ok).toBe(true);
     expect(city.buildings).toContain('MONUMENT');
-    expect(state.treasury).toBe(10);
+    expect(playerSeat(state).treasury).toBe(10);
   });
 
   it('refuses purchases you cannot afford or complete', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
-    state.treasury = 5;
+    playerSeat(state).treasury = 5;
     expect(purchaseBuilding(state, city.id, 'MONUMENT').ok).toBe(false);
-    state.treasury = 10000;
+    playerSeat(state).treasury = 10000;
     // Library needs a completed Campus — not even offered without one.
     expect(purchaseBuilding(state, city.id, 'LIBRARY').ok).toBe(false);
   });
@@ -65,32 +66,32 @@ describe('gold & faith purchases', () => {
     city.buildings.push('SHRINE', 'TEMPLE');
     state.religion.worship = 'CATHEDRAL';
     const cost = buildingFaithCost('CATHEDRAL');
-    state.faithTotal = cost + 3;
-    state.treasury = 0;
+    playerSeat(state).faith = cost + 3;
+    playerSeat(state).treasury = 0;
     const r = purchaseBuilding(state, city.id, 'CATHEDRAL');
     expect(r.ok).toBe(true);
     expect(city.buildings).toContain('CATHEDRAL');
-    expect(state.faithTotal).toBe(3);
-    expect(state.treasury).toBe(0); // gold untouched
+    expect(playerSeat(state).faith).toBe(3);
+    expect(playerSeat(state).treasury).toBe(0); // gold untouched
   });
 
   it('buys units and settlers with gold', () => {
     const state = makeState();
     state.unitsMode = true;
     const city = foundAt(state, 5, 5);
-    state.treasury = unitPurchaseCost(state, 'BUILDER');
+    playerSeat(state).treasury = unitPurchaseCost(state, 'BUILDER');
     expect(purchaseUnit(state, city.id, 'BUILDER').ok).toBe(true);
     expect(state.units.length).toBe(1);
-    expect(state.treasury).toBe(0);
+    expect(playerSeat(state).treasury).toBe(0);
     expect(state.buildersTrained).toBe(1); // P4/D-10
     expect(unitPurchaseCost(state, 'BUILDER')).toBeGreaterThan(120); // escalated
     expect(purchaseUnit(state, city.id, 'BUILDER').ok).toBe(false); // broke
 
     const sCost = settlerCost(state) * 4;
-    state.treasury = sCost;
+    playerSeat(state).treasury = sCost;
     expect(purchaseSettler(state, city.id).ok).toBe(true);
     expect(state.settlers).toBe(1);
-    expect(state.treasury).toBe(0);
+    expect(playerSeat(state).treasury).toBe(0);
   });
 });
 
@@ -213,12 +214,12 @@ describe('district projects', () => {
     expect(cost).toBe(projectCost(state));
 
     city.queue[0].progress = cost; // about to finish
-    const sciBefore = state.scienceTotal;
+    const sciBefore = playerSeat(state).scienceTotal;
     endTurn(state);
     const lump = Math.round(cost * PROJECT_YIELD_FRACTION);
     const gpp = Math.round(cost * PROJECT_GPP_FRACTION);
     expect(city.queue.length).toBe(0);
-    expect(state.scienceTotal - sciBefore).toBeGreaterThanOrEqual(lump);
+    expect(playerSeat(state).scienceTotal - sciBefore).toBeGreaterThanOrEqual(lump);
     expect(state.research.techProgress).toBeGreaterThanOrEqual(lump);
     expect(state.greatPeople.points.SCIENTIST ?? 0).toBeGreaterThanOrEqual(gpp);
     expect(state.eventLog.some((e) => e.includes('Research Grants'))).toBe(true);

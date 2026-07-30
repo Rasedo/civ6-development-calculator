@@ -19,7 +19,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { computeUnlocks } from './effects';
 import { CITY_WORK_RADIUS } from '../data/constants';
-import { tileForeignTo, PLAYER_CIV } from './seats';
+import { tileForeignTo, PLAYER_CIV, playerSeat } from './seats';
 
 /** Balanced yield weights used to value a tile's raw output. */
 const YIELD_WEIGHTS: Yields = {
@@ -244,10 +244,10 @@ export function projectTurns(
     ...base,
     pop: city.population,
     yields: stats.total,
-    scienceTotal: clone.scienceTotal,
-    cultureTotal: clone.cultureTotal,
-    faithTotal: clone.faithTotal,
-    treasury: clone.treasury,
+    scienceTotal: playerSeat(clone).scienceTotal,
+    cultureTotal: playerSeat(clone).cultureTotal,
+    faithTotal: playerSeat(clone).faith,
+    treasury: playerSeat(clone).treasury,
     completed,
     techs: clone.research.techs.length,
     civics: clone.research.civics.length,

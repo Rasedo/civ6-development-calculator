@@ -4,6 +4,8 @@
  * Lives outside game.ts so units.ts can use it without an import cycle.
  */
 
+import { playerSeat } from './seats';
+
 import type { GameState, Tile, YieldKey } from './types';
 import { computeUnlocks } from './effects';
 import { FEATURES } from '../data/features';
@@ -51,21 +53,21 @@ export function harvestGrant(state: GameState, tile: Tile): LumpGrant | null {
 export function applyLumpYield(state: GameState, tileIndex: number, grant: LumpGrant): void {
   const { key, amount } = grant;
   if (key === 'gold') {
-    state.treasury += amount;
+    playerSeat(state).treasury += amount;
     return;
   }
   if (key === 'faith') {
-    state.faithTotal += amount;
+    playerSeat(state).faith += amount;
     return;
   }
   if (key === 'science') {
     state.research.techProgress += amount;
-    state.scienceTotal += amount;
+    playerSeat(state).scienceTotal += amount;
     return;
   }
   if (key === 'culture') {
     state.research.civicProgress += amount;
-    state.cultureTotal += amount;
+    playerSeat(state).cultureTotal += amount;
     return;
   }
   const city = state.cities.find((c) => c.id === state.map.tiles[tileIndex].cityId);

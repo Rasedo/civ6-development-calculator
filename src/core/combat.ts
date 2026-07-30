@@ -60,7 +60,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   state.barbCamps.splice(camp, 1);
   markAntiquitySite(state, tileIndex); // B-20 (#79): a razed outpost leaves a dig
   if (unit.owner === 'player') {
-    state.treasury += CAMP_CLEAR_REWARD;
+    playerSeat(state).treasury += CAMP_CLEAR_REWARD;
   } else {
     const rival = state.rivals.find((r) => r.id === unit.civId);
     if (rival) rival.treasury = (rival.treasury ?? 0) + CAMP_CLEAR_REWARD;
@@ -414,7 +414,7 @@ function sackCity(state: GameState, city: City): void {
   city.population = Math.max(1, Math.floor(city.population * 0.75));
   // GS: milli-round the treasury before ×0.2 so a sub-milli non-dyadic-gold drift can't tip the
   // round across a .5 boundary and desync the sack by 1 gold vs the GPU (which mirrors this).
-  state.treasury -= Math.min(100, Math.round((Math.round(state.treasury * 1000) / 1000) * 0.2));
+  playerSeat(state).treasury -= Math.min(100, Math.round((Math.round(playerSeat(state).treasury * 1000) / 1000) * 0.2));
   const center = state.map.tiles[city.centerIndex];
   for (const t of neighbors(state.map, center)) {
     if (t.improvement && !t.pillaged) t.pillaged = true;
@@ -1156,7 +1156,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   state.cityHp[String(id)] = Math.round(CITY_MAX_HP / 2);
   revealAround(state, city.centerIndex, 3);
   if (plunder) {
-    state.treasury += 40;
+    playerSeat(state).treasury += 40;
     state.eventLog.push(`${city.name} captured from ${rival.name}!`);
   }
   // Losing a city stings: the war ends if it was their last, else they fight on.

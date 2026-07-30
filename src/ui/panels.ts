@@ -457,10 +457,10 @@ export function renderCityPanel(
       if (!state.sandbox && buildingCompletable(state, city, b.id)) {
         if (b.worship) {
           const cost = buildingFaithCost(b.id);
-          buyBtn = `<button data-act="buy-bld" data-id="${b.id}" ${state.faithTotal >= cost ? '' : 'disabled'}>Buy ${cost} faith</button>`;
+          buyBtn = `<button data-act="buy-bld" data-id="${b.id}" ${playerSeat(state).faith >= cost ? '' : 'disabled'}>Buy ${cost} faith</button>`;
         } else {
           const cost = buildingPurchaseCost(b.id);
-          buyBtn = `<button data-act="buy-bld" data-id="${b.id}" ${state.treasury >= cost ? '' : 'disabled'}>Buy ${cost}g</button>`;
+          buyBtn = `<button data-act="buy-bld" data-id="${b.id}" ${playerSeat(state).treasury >= cost ? '' : 'disabled'}>Buy ${cost}g</button>`;
         }
       }
       return `<div class="build-row"><span>${b.name} <span class="muted">[${DISTRICTS[b.district].name}]${turns}</span><br>
@@ -530,10 +530,10 @@ export function renderCityPanel(
       <button data-act="compare">Compare builds…</button>
       <button data-act="plan">Plan build order…</button>
       ${state.sandbox ? '' : `<button data-act="settler" title="Needed to found further cities">Train settler (${settlerCost(state)}⚙)</button>
-      <button data-act="buy-settler" title="Buy a settler outright" ${state.treasury >= settlerCost(state) * 4 ? '' : 'disabled'}>Buy settler (${settlerCost(state) * 4}g)</button>`}
+      <button data-act="buy-settler" title="Buy a settler outright" ${playerSeat(state).treasury >= settlerCost(state) * 4 ? '' : 'disabled'}>Buy settler (${settlerCost(state) * 4}g)</button>`}
       ${trainableUnits(state, city)
         .map((u) => `<button data-act="train-unit" data-id="${u.id}" title="${u.description}">Train ${u.name} (${u.cost}⚙)</button>
-          ${state.sandbox ? '' : `<button data-act="buy-unit" data-id="${u.id}" title="Buy with gold" ${state.treasury >= unitPurchaseCost(state, u.id) ? '' : 'disabled'}>Buy (${unitPurchaseCost(state, u.id)}g)</button>`}`)
+          ${state.sandbox ? '' : `<button data-act="buy-unit" data-id="${u.id}" title="Buy with gold" ${playerSeat(state).treasury >= unitPurchaseCost(state, u.id) ? '' : 'disabled'}>Buy (${unitPurchaseCost(state, u.id)}g)</button>`}`)
         .join('')}
     </div>
     <div class="row"><b>Yields/turn:</b> ${yieldsHtml(stats.total)}</div>
@@ -730,7 +730,7 @@ export function renderReligionPanel(container: HTMLElement, state: GameState, cb
 
   container.innerHTML = `
     <h2>Religion</h2>
-    <div class="row muted">Faith banked: ${fmt(state.faithTotal)}. Spread isn't modeled — once founded, every one of your cities follows your religion.</div>
+    <div class="row muted">Faith banked: ${fmt(playerSeat(state).faith)}. Spread isn't modeled — once founded, every one of your cities follows your religion.</div>
     ${pantheonHtml}
     ${religionHtml}
   `;
@@ -1471,10 +1471,10 @@ export function renderEmpireSummary(container: HTMLElement, state: GameState): v
   container.innerHTML = `
     <div>${state.cities.length} city(ies), pop ${pop} · ${gov}${settlers}</div>
     <div class="statgrid">
-      <span class="y-science">Science</span><span>+${fmt(totals.science)} (${fmt(state.scienceTotal)})</span>
-      <span class="y-culture">Culture</span><span>+${fmt(totals.culture)} (${fmt(state.cultureTotal)})</span>
-      <span class="y-gold">Gold</span><span>+${fmt(totals.gold)} (${fmt(state.treasury)})</span>
-      <span class="y-faith">Faith</span><span>+${fmt(totals.faith)} (${fmt(state.faithTotal)})</span>
+      <span class="y-science">Science</span><span>+${fmt(totals.science)} (${fmt(playerSeat(state).scienceTotal)})</span>
+      <span class="y-culture">Culture</span><span>+${fmt(totals.culture)} (${fmt(playerSeat(state).cultureTotal)})</span>
+      <span class="y-gold">Gold</span><span>+${fmt(totals.gold)} (${fmt(playerSeat(state).treasury)})</span>
+      <span class="y-faith">Faith</span><span>+${fmt(totals.faith)} (${fmt(playerSeat(state).faith)})</span>
       <span class="y-science">Tech</span><span>${techLine}</span>
       <span class="y-culture">Civic</span><span>${civicLine}</span>
     </div>`;
