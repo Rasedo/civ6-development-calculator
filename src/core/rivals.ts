@@ -3031,6 +3031,11 @@ export function rivalPhase(state: GameState): void {
           if (q.kind === 'settler') {
             // #51/S4.1r: BANK a settler that finds no site, exactly as the
             // player's does. It is re-tried from the bank on later turns.
+            // #51/S4.1r: the SETTLER'S POPULATION COST, which only the player
+            // paid. Civ 6: a Settler "can be built or purchased ... Population
+            // is lowered by 1" and is "consumed in the process".
+            //   https://civilization.fandom.com/wiki/Settler_(Civ6)
+            rc.population = Math.max(1, rc.population - 1);
             if (!tryFoundCity(state, rival)) rival.settlers += 1;
           }
           else if (q.kind === 'district') {
