@@ -20,7 +20,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, NO_SEAT, rivalsOf } from './seats';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, seatOfCityState, NO_SEAT, rivalsOf } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -205,9 +205,24 @@ export function unitDomain(type: string): 'civilian' | 'military' {
   return UNITS[type]?.charges !== undefined ? 'civilian' : 'military';
 }
 
-/** Side key: rival civs are distinct sides; everyone else is their owner. */
+/**
+ * Side key: one string per side, so "same side" is a string compare.
+ *
+ * #51/S6.3: a CITY-STATE used to fall off the end of this chain and come back
+ * `'barbarian'` — every seat that was neither the player nor a rival did. It
+ * has never fired (neither engine gives a city-state units yet) and it would
+ * have fired the moment Round 6 did, in the worst possible way: a minor's unit
+ * would have stacked freely with barbarians (`tileFreeForUnit` compares side
+ * keys) and been unable to fight them (`unitsHostile` returns false for a
+ * same-side pair). Same class as the `"rival"` side string that fell through
+ * to "everything blocks" in S3.4 — a default arm standing in for a case
+ * nobody had thought about.
+ */
 export function unitSide(unit: { seat: number }): string {
-  return isRivalSeat(unit.seat) ? `rival:${rivalOfCiv(unit.seat)}` : isPlayerSeat(unit.seat) ? 'player' : 'barbarian';
+  if (isRivalSeat(unit.seat)) return `rival:${rivalOfCiv(unit.seat)}`;
+  if (isPlayerSeat(unit.seat)) return 'player';
+  if (isCityStateSeat(unit.seat)) return `cs:${unit.seat}`; // each minor is its own side
+  return 'barbarian';
 }
 
 /**
@@ -228,6 +243,19 @@ export function unitsHostile(
     // units↔rivals import cycle.
     if (a.seat === b.seat) return false; // same seat is never hostile to itself
     return rivalOfSeat(state, a.seat)?.atWarRivals?.includes(rivalOfCiv(b.seat)) ?? false;
+  }
+  // #51/S6.3: a CITY-STATE on either side. Without this the line below asks
+  // `rivalOfSeat` about a seat that is not a rival and gets `false`, so a
+  // city-state unit would be hostile to nobody — the same hole `civsAtWar`
+  // had. Inert while neither engine gives a city-state units; it stops being
+  // inert the moment Round 6 does.
+  if (isCityStateSeat(a.seat) || isCityStateSeat(b.seat)) {
+    const csSeat = isCityStateSeat(a.seat) ? a.seat : b.seat;
+    const other = csSeat === a.seat ? b.seat : a.seat;
+    if (isCityStateSeat(other)) return false;
+    if (!isPlayerSeat(other)) return false; // rival<->CS war is not modelled
+    const cs = (state.cityStates ?? []).find((c) => seatOfCityState(c.id) === csSeat);
+    return cs?.atWar ?? false;
   }
   const rivalSeat = isRivalSeat(a.seat) ? a.seat : b.seat;
   return rivalOfSeat(state, rivalSeat)?.atWar ?? false;

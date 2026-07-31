@@ -496,9 +496,27 @@ else (proven to bite by injecting a call from `sync_war`).
 `[B, 1+R+S, RC]`; `cs_alive/cs_center/cs_pop/cs_hp` become the minor section
 (row 1+R+s, slot 0), at the same row index the war matrix uses.
 
+**S6.3 — the TS war predicates cover every seat pair. DONE.** `civsAtWar` and
+`unitsHostile` branched on "one side is civ 0" and "both are rivals" and fell
+through `rivalOfSeat(...) ?? false` for anything else, so a CITY-STATE seat
+answered PEACE even with `CityState.atWar` true — the hole the GPU closed in
+S6.0. Landed before the storage moves, per
+[[migrate-comparisons-before-storage]]. Rival<->CS war stays NOT MODELLED and
+says so in code and in a test, rather than being guessed at.
+
+FOUND BY THE TEST, not by reading: `unitSide` classified every seat that was
+neither the player nor a rival as `'barbarian'` — city-states included. Never
+fired (no minor has units yet) and would have fired the moment Round 6 gave
+them any, in the worst way: a minor's unit would stack freely with barbarians
+(`tileFreeForUnit` compares side keys) and be unable to fight them
+(`unitsHostile` returns false for a same-side pair). Each minor is its own side
+now. Same class as S3.4's `"rival"` string falling through to "everything
+blocks".
+
 Remaining: the `cs_*` planes that are genuinely city-state-specific
-(`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_war_turns`, `cs_at`) and the TS
-half — `src/core/types.ts:CityState` becoming a `Seat` with one `City`.
+(`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_war_turns`, `cs_at`) and the rest
+of the TS half — `src/core/types.ts:CityState` becoming a `Seat` with one
+`City`, which needs the `caps` table the target-shape section describes.
 
 ---
 

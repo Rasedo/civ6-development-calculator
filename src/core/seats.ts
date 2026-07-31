@@ -287,6 +287,20 @@ export function caps(state: GameState, seat: number): (City | RivalCity)[] {
  */
 export function civsAtWar(state: GameState, a: number, b: number): boolean {
   if (a === b) return false;
+  // #51/S6.3: a CITY-STATE pair. The GPU answers every pair from one matrix
+  // (S6.0); this used to fall through the rival branches and report PEACE for
+  // a city-state whose `atWar` was true. Player<->CS is `CityState.atWar`.
+  // Rival<->CS war is NOT MODELLED — a rival can conquer a city-state (A-12b)
+  // without any war state between them ever existing — so it answers false and
+  // says so, rather than guessing a suzerain-drag rule nothing writes.
+  if (isCityStateSeat(a) || isCityStateSeat(b)) {
+    const csSeat = isCityStateSeat(a) ? a : b;
+    const other = csSeat === a ? b : a;
+    if (isCityStateSeat(other)) return false; // two minors never fight
+    if (other !== PLAYER_CIV) return false; // rival<->CS: not modelled
+    const cs = (state.cityStates ?? []).find((c) => seatOfCityState(c.id) === csSeat);
+    return cs?.atWar ?? false;
+  }
   // A player pair (one side is civ 0) reads the rival's war-with-player bool.
   if (a === 0 || b === 0) {
     const rivalUnified = a === 0 ? b : a;
