@@ -76,6 +76,39 @@ One battery **at the end of the round only** (`[[verify-loop-cost]]` rule 6). Pe
 - Rewrite `gpu/government_test.py:183`'s surrounding inertness comment and drop `tilePurchaseMult` from `export-gpu.ts`'s "TS-only" list. New poke lane: `cost(seat with LAND_SURVEYORS) == round(0.8 × cost(same seat without))`, both engines.
 
 ### S7.10a — ranged/melee **city-first precedence** for the player seat
+> **ATTEMPTED AND BACKED OUT 2026-07-31 — not a scope cut, a sequencing call.**
+> The TS half is ~6 lines and was written and green (tsc + 498/498 vitest):
+> `meleeAttack`'s `rivalTarget`/`csTarget` arms drop their `enemies.length === 0`
+> guard (the `enemyCity` arm never had one — that asymmetry IS the bug), and
+> `rangedAttack`'s city block stops being gated on `enemies.length === 0`, with
+> `if (enemies.length === 0) return no(...)` moved BELOW it so the garrison
+> fall-through survives.
+>
+> **It is NOT shippable alone.** Player attack paths are structurally unreachable
+> in scripted parity (`export-gpu.ts` never calls melee/rangedAttack), so fixtures
+> stay byte-identical and PARITY STAYS GREEN while the ROLLOUT silently diverges.
+> Both engines must land together.
+>
+> **What the GPU half actually requires** (read this session, so the next attempt
+> starts here). The six player branches are mutually exclusive by construction,
+> so BOTH sides of that exclusivity must move:
+>   * `siege` (melee vs rival city), `r_sieg` (ranged vs rival city), `cs_hit`
+>     (melee vs CS), `r_cs` (ranged vs CS) — DROP `(bslot < 0) & ~v_ok & ~rvc_ok`.
+>   * `att` / `r_att` (vs unit), `r_civ` (ranged vs rival civilian) and `civk`
+>     (civilian capture) — ADD `& ~city_here`.
+>   * `city_here = rc_ok | cs_centre_here`, where
+>     `cs_centre_here = (cs_s >= 0) & (cs_center[cs_sc] == tgt) & cs_alive[cs_sc]`.
+>   * **The blocker:** `cs_s`/`cs_sc` are defined ~230 lines BELOW `siege` and
+>     `att`, so they must be hoisted above the first branch that reads them.
+>   * `encampmentDefense` KEEPS unit-first on both engines (separately sourced) —
+>     do not fold it into `city_here`.
+>
+> A single exclusivity error here is a subtle red of exactly the kind that cost
+> three multi-step hunts this session, so it wants a fresh budget and its own
+> parity run, not the tail of a long one. The MANDATORY poke lane (garrisoned
+> at-war rival centre; assert the CITY takes the roll under key `rngrc` and the
+> garrison's HP is unchanged) is still unwritten.
+
 - **Channel:** target precedence — a City Center takes the hit before its garrison.
 - **Engines:** BOTH. TS `combat.ts:rangedAttack` (drop the `enemies.length === 0` guard on the city fallback) **and `meleeAttack`'s `rivalTarget`/`csTarget` arms** — otherwise the same rule stays split across two functions. `encampTarget` keeps unit-first (sourced). GPU player `r_att`/`r_civ`/`r_sieg`/`r_cs` branches.
 - **RNG draw count:** **NO — neutral and order-preserving.** `damageRoll` consumes exactly one draw regardless of the strength delta; the shot that today rolls `'rng'` against the garrison tomorrow rolls `'rngrc'` against the city at the same stream position.
