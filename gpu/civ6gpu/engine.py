@@ -6819,6 +6819,23 @@ class BatchSim:
                 rngd = self._p_rng_str[self.p_type[:, p]] > 0
             else:
                 rngd = torch.zeros_like(alive)
+            # #51/S7.10a: CITY-FIRST over a MILITARY garrison. `cs_s`/`cs_sc`
+            # were built ~230 lines below, after the branches that now need
+            # them, so they are hoisted here beside the other target predicates.
+            cs_s = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+            cs_sc = cs_s.clamp(min=0)
+            cs_here = (
+                (cs_s >= 0)
+                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
+                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+            )
+            city_here = rc_ok | cs_here
+            # A LONE CIVILIAN still beats the city: B-31 kills it ROLL-FREE and
+            # P2's reshuffle pinned that against TS at seed 9053 t204 (a rival
+            # builder on an at-war rival centre — besieging there cost 2 extra
+            # draws). Civilians cannot defend, so a city is never attacked
+            # "through" one. The city only wins where a MILITARY occupant is.
+            garrisoned = (bslot >= 0) | v_ok
             # TS meleeAttack: units ON the tile take the hit FIRST. A lone
             # hostile CIVILIAN is simply killed, ROLL-FREE ("Civ 6 captures;
             # we don't model capture"), then the attacker advances if the
@@ -6850,7 +6867,7 @@ class BatchSim:
                 self.p_next[kr] += 1
                 self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
                 self.p_mp[:, p] = torch.where(civk, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
-            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
+            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)  # #51/S7.10a
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
                 self.p_mp[:, p] = torch.where(siege, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
@@ -6875,7 +6892,7 @@ class BatchSim:
                 if bool(enc_att.any()):
                     self._attack_encampment(enc_att, tc, "player", p)
                     self.p_mp[:, p] = torch.where(enc_att, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
-            att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
+            att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & garrisoned & ~city_here & (self._p_combat[self.p_type[:, p]] > 0)  # #51/S7.10a
             # V-R: ranged units strike instead of meleeing (rangedAttack —
             # one roll, no retaliation, no advance). The mask above is
             # unchanged: legality is the same adjacent-hostile condition.
@@ -7079,14 +7096,10 @@ class BatchSim:
             # order), attacker consumed, NO advance; capture at 0 HP (the
             # city-state joins the empire). Ranged bombardment has its own
             # branches below (P4/D-23): one roll, floor 1 HP, no capture.
-            cs_s = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1)
-            cs_sc = cs_s.clamp(min=0)
+            # #51/S7.10a: cs_s/cs_sc are hoisted to the predicate block above.
             cs_hit = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & (bslot < 0) & ~v_ok & ~rvc_ok & (rc_civ_t < 0)
-                & (cs_s >= 0)
-                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
-                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
                 & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
             )
             if bool(cs_hit.any()):
@@ -7119,7 +7132,7 @@ class BatchSim:
             # --- P4/D-23: ranged BOMBARDMENT of cities (rangedAttack's city
             # fallback) — one roll against the D-22 defense, no retaliation,
             # HP floors at 1 (ranged never captures; melee finishes).
-            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd
+            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd  # #51/S7.10a
             if bool(r_sieg.any()):
                 bidx2 = torch.arange(self.B, device=self.device)
                 civ2 = rc_civ_t.clamp(min=0)
@@ -7149,10 +7162,7 @@ class BatchSim:
                 self.p_mp[:, p] = torch.where(r_sieg, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             r_cs = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & (bslot < 0) & ~v_ok & ~rvc_ok & (rc_civ_t < 0)
-                & (cs_s >= 0)
-                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
-                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
                 & (self._p_combat[self.p_type[:, p]] > 0) & rngd
             )
             if bool(r_cs.any()):
