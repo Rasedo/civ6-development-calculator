@@ -1,6 +1,6 @@
 import type { GameState } from './types';
-import { rivalCount } from './seats';
-import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/rivals';
+import { rivalCount, isBarbSeat } from './seats';
+import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
 // B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
@@ -126,22 +126,33 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
 }
 
 /**
- * B-24 (#79): the MOVEMENT halves of MONUMENTALITY (+2 Builders) and EXODUS
- * (+2 Missionaries/Apostles) are DEFERRED TO THE SEAT UNIFICATION (task #51,
- * gpu/UNIFY_SEATS_PLAN.md Round 5), not abandoned.
+ * B-24: the MOVEMENT half of the golden dedications, keyed on the unit's OWN
+ * seat so a rival in a Golden age gets it exactly as the player does.
  *
- * They were implemented on both engines and hunted hard. Scripted parity went
- * green once `spawnUnit` was included (TS wrote `movesLeft: def.moves` with no
- * bonus while the GPU recomputed full MP at walk time), but the OFF-SCRIPT gate
- * still diverged on the `rng` DRAW COUNT at seed 9015 t199 — a symptom of the
- * model split itself, not of a missed call site: TS kept movement points as
- * STATE while the GPU kept none, recomputing `full_mp` inside every walker and
- * giving its PLAYER pool no MP counter at all.
- * #51/S5.2 closed that split — MP is now state on both engines, reset at the
- * same three moments and spent through one step contract — so these two
- * bonuses can be re-landed as a single edit each.
- * The four NON-movement golden effects below are parity-clean and stay.
+ * SOURCE (Civilopedia, Gathering Storm):
+ *   MONUMENTALITY — "If chosen at the start of a Golden Age, +2 Movement for
+ *     all Builders."
+ *   EXODUS OF THE EVANGELISTS — "If chosen at the start of a Golden Age, +2
+ *     Movement for all Missionaries, Apostles, and Inquisitors." This roster
+ *     has no INQUISITOR, so the pair below is the whole class.
+ *
+ * These two were implemented for #79, hunted, and reverted: scripted parity
+ * went green but the off-script gate diverged on the `rng` DRAW COUNT at seed
+ * 9015 t199, because TS kept movement points as STATE while the GPU kept none
+ * and rebuilt `full_mp` inside every walker. #51/S5.1–S5.3 closed that split —
+ * one resident MP pool, one reset rule, one step contract — so the bonus now
+ * has exactly one place to live on each engine.
  */
+export function goldenMoveBonus(state: GameState, unit: { type: string; seat: number }): number {
+  const civ = isBarbSeat(unit.seat) ? -1 : unit.seat; // barbarians hold no dedications
+  if (unit.type === 'BUILDER') {
+    return goldenDedication(state, civ, DED_MONUMENTALITY) ? GOLDEN_MOVE_BONUS : 0;
+  }
+  if (unit.type === 'MISSIONARY' || unit.type === 'APOSTLE') {
+    return goldenDedication(state, civ, DED_EXODUS) ? GOLDEN_MOVE_BONUS : 0;
+  }
+  return 0;
+}
 
 /** B-24 (#79): EXODUS golden — +4 Great Prophet points per turn. */
 export function goldenProphetPoints(state: GameState, civ: number): number {

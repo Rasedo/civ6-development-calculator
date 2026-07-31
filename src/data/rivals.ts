@@ -286,6 +286,11 @@ export const HEROIC_DEDICATIONS = 3;
 /** Faith per turn per dedication while in a GOLDEN/HEROIC age (the
  * Monumentality flavour — a Golden age dedicates to a BONUS). */
 export const DEDICATION_FAITH = 2;
+/** B-24: MONUMENTALITY / EXODUS OF THE EVANGELISTS grant +2 Movement to
+ *  Builders and to Missionaries/Apostles/Inquisitors respectively, for the
+ *  duration of the GOLDEN age that committed them (Civilopedia, Gathering
+ *  Storm). Exported to the GPU as `eras.goldenMoveBonus`. */
+export const GOLDEN_MOVE_BONUS = 2;
 /** Era score per turn per dedication while DARK or NORMAL — real Civ 6's
  * climb-out dedications pay in era score, not yields. */
 export const DEDICATION_ERA_SCORE = 1;

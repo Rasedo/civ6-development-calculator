@@ -3297,9 +3297,41 @@ gap; likewise GS disasters are modeled minus sea-level rise
   just the walkers. That asymmetry is the general lesson, not a one-off.
 
   B-24 -> 85%. STILL OPEN: the other eight catalog entries (four of which
-  need spies / air units / artifacts / Giant Death Robots), the named
-  GOLDEN bonuses, dark-age policies, governor establishment/promotions,
-  and per-civ tech-era drift.
+  need spies / air units / artifacts / Giant Death Robots), dark-age
+  policies, governor establishment/promotions, and per-civ tech-era drift.
+
+  **THE MOVEMENT HALVES WERE REVERTED, AND ARE BACK 2026-07-31 (#51/S5.4).**
+  Correction to the block above: MONUMENTALITY's and EXODUS's +2 Movement did
+  NOT survive #79. They were reverted, and `eras.ts` carried a note deferring
+  them to the seat unification, "because TS kept movement points as STATE while
+  the GPU kept none and rebuilt `full_mp` inside every walker" — the off-script
+  gate diverged on the rng DRAW COUNT at seed 9015 t199. #51/S5.1-S5.3 removed
+  that split (one resident MP pool, one reset rule, one step contract), so each
+  engine now has exactly ONE place for the bonus: `unitFullMoves` in TS,
+  `_full_mp`/`_golden_move_mp` on the GPU. Re-verified against the Civilopedia
+  (Gathering Storm) rather than off the deferral note — the roster has no
+  INQUISITOR, so EXODUS covers MISSIONARY + APOSTLE.
+  Two shape decisions, both matching TS's `unitFullMoves`: the bonus is added to
+  the TYPE pool and then overridden by the embark pool (embarkation speed is not
+  a unit's own movement), and it is keyed on the unit's OWN SEAT, so a rival in a
+  Golden age gets it exactly as the player does.
+  ONE BUG, caught by the parity gate on the first run: the GPU applied the bonus
+  only on the `not _embark_live` path — and `embarkLive` is 1, not 0. Three
+  engine comments still claimed embark ships INERT "so the gates are
+  byte-identical"; they are corrected. Do not trust an inert-by-default comment
+  without reading rules.json.
+  REACHABILITY (12 seeds x 250t): 862 Builder-turns carry MONUMENTALITY's +2 and
+  1,345 Missionary/Apostle-turns carry EXODUS's, over 4,104 civ-turns spent in a
+  Golden age. Lanes: `gpu/golden_move_test.py` (6 cases) and
+  `tests/golden-movement.test.ts` (8), each with a negative twin per case so
+  neither can pass by granting everyone +2.
+  STILL PLAYER-ONLY, recorded not fixed: the other three golden faces are called
+  with a hardcoded civ 0 — `goldenBoostBonus(state, 0, ...)`,
+  `goldenProphetPoints(state, 0)`, `goldenCulturePerDistrict(state, 0)` — so a
+  RIVAL in a Golden age gets the movement bonus but not the research discount,
+  the prophet points or the culture. Same asymmetry class as the rest of #51.
+  B-24 3 -> 90% (per-item; the chapter rounds to 99% either way, so the table
+  above is unchanged — this is a per-item note, not a delta applied to a sum).
 - B-25 (re-scoped 2026-07-17, Round B2). LANDED: Science victory — a
   6-step space-race project chain gated on late techs, `victoryType` 3
   (player win) / 4 (rival completion = defeat) in `endTurn`; Campus is

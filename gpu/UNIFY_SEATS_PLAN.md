@@ -423,13 +423,18 @@ behaviour bug — and the right place to collapse it is **Round 6**, where
 city-states and barbarians become seats and "each seat refreshes at the start
 of its own phase" can be one rule instead of three sweeps.
 
-**Still owed from this round's scope:** the MOVEMENT halves of MONUMENTALITY
-and EXODUS. The plan named a `goldenMoveBonus` guard to lift — there is no such
-function; the bonuses were REVERTED, and `eras.ts` carries only the note saying
-they were deferred here because the two engines modelled MP differently. That
-blocker is gone. Re-landing them is a behaviour change on both engines and
-needs its own gated slice **with the Civ 6 rule verified from a real source
-first** (the deferral note is a brief, not a citation).
+**S5.4 — the golden movement dedications, re-landed. DONE.** The plan named a
+`goldenMoveBonus` guard to lift; there was no such function — #79 REVERTED both
+bonuses and left only a note deferring them here. Verified against the
+Civilopedia (Gathering Storm), not the note, and re-landed on both engines
+through the single MP rule this round created: `unitFullMoves` in TS,
+`_full_mp` + `_golden_move_mp` on the GPU, keyed on the unit's OWN seat so a
+rival in a Golden age gets it too. Reachability 862 Builder-turns / 1,345
+Missionary+Apostle-turns over 12 seeds x 250t. See the B-24 entry in
+gpu/AUDIT.md, including the parity-caught bug (`embarkLive` is 1, not 0 —
+three engine comments claiming otherwise are corrected) and the recorded
+residual: the other three golden faces are still called with a hardcoded
+civ 0, so a rival gets the movement bonus but not the research discount.
 
 ---
 

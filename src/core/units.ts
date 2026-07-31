@@ -14,6 +14,7 @@ import { clearCampFor } from './combat';
 import { UNITS, UNIT_HP, ENCAMPMENT_HP, type UnitDef } from '../data/units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat'; // A-21 (#50): the shared heal set
 import { generalAuraMP } from './aura'; // #70/S3 (B-8): the aura's +1 MP half
+import { goldenMoveBonus } from './eras'; // B-24: MONUMENTALITY / EXODUS +2 MP
 import { GAME_SPEED, EMBARK_MOVES } from '../data/constants';
 import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
@@ -525,10 +526,28 @@ export type StepOutcome =
  * walker: hostileUnitAct is fed only by barbUnits/rivalUnits, and the rival
  * civilian walkers iterate one rival's units.
  */
+/**
+ * The movement pool a unit is GRANTED for a turn, BEFORE the general/admiral
+ * aura: its type's `moves`, or the flat EMBARK_MOVES pool while embarked
+ * (#45/B-6), plus whatever golden dedication its seat holds (B-24). An
+ * embarked unit keeps EMBARK_MOVES — embarkation speed is not a unit's own
+ * movement, so the dedication does not touch it.
+ *
+ * #51/S5.4: FOUR sites computed this expression — stepUnit, refreshUnits,
+ * rivalPhase and spawnUnit — and a bonus added to one of them is a bonus the
+ * other three silently disagree about. That is exactly how the #79 attempt
+ * failed. The GPU's twin is `_full_mp`.
+ */
+export function unitFullMoves(state: GameState, unit: { type: string; seat: number; embarked?: boolean }): number {
+  const def = UNITS[unit.type];
+  if (unit.embarked && !def?.naval) return EMBARK_MOVES;
+  return (def?.moves ?? 2) + goldenMoveBonus(state, unit);
+}
+
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const from = state.map.tiles[unit.tileIndex];
   const naval = !!UNITS[unit.type]?.naval;
-  const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
+  const full = unitFullMoves(state, unit);
   const transition = !naval && isWater(from) !== isWater(to);
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
   const cost = transition
@@ -732,7 +751,7 @@ export function spawnUnit(
     type: unitType,
     seat,
     tileIndex: spot.index,
-    movesLeft: def.moves,
+    movesLeft: def.moves + goldenMoveBonus(state, { type: unitType, seat }),
     hp: UNIT_HP,
     charges: def.charges ?? null,
     path: null,
@@ -789,7 +808,7 @@ export function refreshUnits(state: GameState): void {
     // (naval units keep their own moves). The heal/fortify "spent no MP" gate
     // below reads this same `full`.
     const naval = !!UNITS[unit.type]?.naval;
-    const full = unit.embarked && !naval ? EMBARK_MOVES : UNITS[unit.type]?.moves ?? 2;
+    const full = unitFullMoves(state, unit);
     // P4/D-2 (real Civ 6, unifies AUDIT C-7/C-8): a unit heals only if it
     // spent NO movement since its last refresh (the heal runs before the
     // reset below, so any move/attack/build blocks it) — +20 in a friendly

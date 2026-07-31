@@ -105,6 +105,7 @@ import {
   RIVAL_TILE_BUY_LIVE,
   ADMIRAL_MARCH_LIVE,
   DEDICATION_FAITH,
+  GOLDEN_MOVE_BONUS,
   DEDICATION_ERA_SCORE,
   DEDICATION_PAYOUTS_LIVE,
   RR_ALLY_MIN_PEACE,
@@ -610,7 +611,7 @@ const rules = {
     // S3: governors — stateless greedy loyalty anchors.
     govCivicsPerTitle: GOV_CIVICS_PER_TITLE,
     govMaxTitles: GOV_MAX_TITLES,
-    rrAllyMinPeace: RR_ALLY_MIN_PEACE, rrWarmongerDow: RR_WARMONGER_DOW, rrWarmongerCapture: RR_WARMONGER_CAPTURE, rrWarmongerGang: RR_WARMONGER_GANG, diploFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], dedicationFaith: DEDICATION_FAITH, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
+    rrAllyMinPeace: RR_ALLY_MIN_PEACE, rrWarmongerDow: RR_WARMONGER_DOW, rrWarmongerCapture: RR_WARMONGER_CAPTURE, rrWarmongerGang: RR_WARMONGER_GANG, diploFavorPerSuzerain: DIPLO_FAVOR_PER_SUZERAIN, congressInterval: CONGRESS_INTERVAL, congressMinEra: CONGRESS_MIN_ERA, dvpPerResolution: DVP_PER_RESOLUTION, diploVictoryPoints: DIPLO_VICTORY_POINTS, rivalTileBuyLive: RIVAL_TILE_BUY_LIVE, dedicationPayoutsLive: DEDICATION_PAYOUTS_LIVE, dedMonumentality: DED_MONUMENTALITY, dedFreeInquiry: DED_FREE_INQUIRY, dedPenBrush: DED_PEN_BRUSH_AND_VOICE, dedExodus: DED_EXODUS, heroicDedications: HEROIC_DEDICATIONS, dedEventScore: [...DED_EVENT_SCORE], dedicationFaith: DEDICATION_FAITH, goldenMoveBonus: GOLDEN_MOVE_BONUS, dedicationEraScore: DEDICATION_ERA_SCORE, governorLoyalty: GOVERNOR_LOYALTY,
   },
   boosts: boostRows,
   // City-state rules (mirrors data/cityStates.ts; covered scope only — the

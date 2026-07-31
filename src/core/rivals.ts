@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { seatAccumulators } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
@@ -54,7 +54,6 @@ import {
   amenitiesNeeded,
   amenityTier,
   LUXURY_AMENITY_CITIES,
-  EMBARK_MOVES,
   EMBARKED_DEFENSE_CS,
   embarkState,
   type AmenityTier,
@@ -2290,7 +2289,7 @@ export function rivalPhase(state: GameState): void {
   // (before any of them moves) is also what keeps the GPU snapshot turn-exact.
   for (const u of state.units) {
     if (!isRivalSeat(u.seat)) continue;
-    const fullR = u.embarked && !UNITS[u.type]?.naval ? EMBARK_MOVES : UNITS[u.type]?.moves ?? 2;
+    const fullR = unitFullMoves(state, u);
     u.movesLeft = fullR + generalAuraMP(state, u);
     u.movesFull = u.movesLeft;
   }

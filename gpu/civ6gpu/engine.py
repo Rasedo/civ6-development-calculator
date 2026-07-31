@@ -859,6 +859,10 @@ class BatchSim:
         self._ded_monumentality = int(_er.get("dedMonumentality", 0))
         self._ded_free_inquiry = int(_er.get("dedFreeInquiry", 1))
         self._ded_pen_brush = int(_er.get("dedPenBrush", 2))
+        # B-24: +2 Movement from MONUMENTALITY (Builders) / EXODUS
+        # (Missionaries, Apostles). Defaults to 0 so a STALE rules.json fails
+        # LOUDLY at the parity gate instead of quietly disagreeing with TS.
+        self._golden_move = int(_er.get("goldenMoveBonus", 0))
         self._ded_exodus = int(_er.get("dedExodus", 3))  # B-24 (#71): substrate live, payouts inert
         self._heroic_ded = int(_er.get("heroicDedications", 3))
         # B-24 (#77): the NAMED dedication catalog — per-kind event era score.
@@ -1850,11 +1854,11 @@ class BatchSim:
         _bn = rules.combat.get("barbNavalTypes", []) or []
         self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
         self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
-        # #45/B-6 EMBARK: flat embarked MP, the LIVE war-march water-step master
-        # switch (N1 ships it INERT — mirrors TS embarkState.live; poke
-        # sim._embark_live=True to exercise the path), and the embark/ocean tech
-        # gate indices (military embarks on SHIPBUILDING, civilians on SAILING,
-        # OCEAN needs CARTOGRAPHY).
+        # #45/B-6 EMBARK: flat embarked MP, the water-step master switch
+        # (`embarkState.live` on the TS side — LIVE since N2, do not read the
+        # old "N1 ships it INERT" note as current; every gate runs with it on),
+        # and the embark/ocean tech gate indices (military embarks on
+        # SHIPBUILDING, civilians on SAILING, OCEAN needs CARTOGRAPHY).
         self._embark_moves = int(cb.get("embarkMoves", 2))
         self._embarked_defense_cs = float(cb.get("embarkedDefenseCs", 10))
         self._embark_live = bool(cb.get("embarkLive", 0))
@@ -3312,7 +3316,11 @@ class BatchSim:
         so an embarked barbarian's afford rule (`mp >= full`) used the wrong
         pool while TS's stepUnit used the embark-aware one."""
         typ = getattr(self, f"{pre}_type").clamp(min=0, max=self.NU - 1)
-        base = self._p_moves[typ]
+        # B-24: the golden dedication raises the unit's OWN movement, so it is
+        # added to the type pool and then OVERRIDDEN by the embark pool below —
+        # embarkation speed is not a unit's movement stat. TS's unitFullMoves
+        # has the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
+        base = self._p_moves[typ] + self._golden_move_mp(pre)
         if self._embark_live:
             emb = getattr(self, f"{pre}_emb")
             base = torch.where(
@@ -5264,10 +5272,11 @@ class BatchSim:
         self.u_tile[rows, slot] = spot[rows]
         self.u_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.u_fortify[rows, slot] = 0  # B-5: a fresh (possibly reclaimed) slot starts undug
-        _m = self._p_moves[self.u_type[rows, slot].clamp(min=0, max=self.NU - 1)]  # #51/S5.2: TS spawnUnit writes `movesLeft: def.moves` and
-        # leaves movesFull undefined (the `?? full` fallback) — a unit
-        # trained mid-turn CAN move before its first refresh, and a
-        # reclaimed slot must not inherit the dead unit's remainder.
+        # #51/S5.2: TS spawnUnit writes `movesLeft: def.moves` (#51/S5.4: plus
+        # the seat's golden dedication) and leaves movesFull undefined — a unit
+        # trained mid-turn CAN move before its first refresh, and a reclaimed
+        # slot must not inherit the dead unit's remainder.
+        _m = self._full_mp("u")[rows, slot]
         self.u_mp[rows, slot] = _m
         self.u_mp_full[rows, slot] = _m
         self.occ_mil[(rows, spot[rows])] = slot + P_MAX + U_MAX  # #51/S3.4b
@@ -5307,10 +5316,8 @@ class BatchSim:
         # `?? full` fallback means no aura, so 0 is the faithful mirror (and it
         # scrubs a reclaimed slot's stale value).
         self.p_aura_mp[rows, slot] = 0
-        _m = self._p_moves[self.p_type[rows, slot].clamp(min=0, max=self.NU - 1)]  # #51/S5.2: TS spawnUnit writes `movesLeft: def.moves` and
-        # leaves movesFull undefined (the `?? full` fallback) — a unit
-        # trained mid-turn CAN move before its first refresh, and a
-        # reclaimed slot must not inherit the dead unit's remainder.
+        # #51/S5.2, S5.4: `movesLeft: def.moves` + the seat's golden dedication.
+        _m = self._full_mp("p")[rows, slot]
         self.p_mp[rows, slot] = _m
         self.p_mp_full[rows, slot] = _m
         self.p_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
@@ -5361,6 +5368,40 @@ class BatchSim:
 
 
 
+    def _golden_ded_table(self, kind: int) -> torch.Tensor:
+        """[B, 1+R] bool — which civs are in a GOLDEN age holding `kind`."""
+        return (self.civ_age == 2) & (self.ded_picks == kind).any(dim=2)
+
+    def _golden_move_mp(self, pre: str) -> torch.Tensor:
+        """[B, U] — the `goldenMoveBonus` twin (B-24).
+
+        Civilopedia (Gathering Storm): MONUMENTALITY is "+2 Movement for all
+        Builders", EXODUS OF THE EVANGELISTS "+2 Movement for all Missionaries,
+        Apostles, and Inquisitors" — this roster has no INQUISITOR. Keyed on the
+        unit's OWN seat, so a rival in a Golden age gets it exactly as the
+        player does; barbarians and city-states hold no dedications."""
+        typ = getattr(self, f"{pre}_type").clamp(min=0, max=self.NU - 1)
+        out = torch.zeros_like(typ)
+        if self._golden_move <= 0:
+            return out
+        seat = getattr(self, f"{pre}_seat")
+        civ_ok = (seat >= 0) & (seat < self.civ_age.shape[1])
+        civ = torch.where(civ_ok, seat, torch.zeros_like(seat))
+        for kind, types in (
+            (self._ded_monumentality, (self._builder_idx,)),
+            (self._ded_exodus, (self._missionary_idx, self._apostle_idx)),
+        ):
+            tsel = None
+            for t in types:
+                if t < 0:
+                    continue
+                tsel = (typ == t) if tsel is None else (tsel | (typ == t))
+            if tsel is None:
+                continue
+            holds = self._golden_ded_table(kind).gather(1, civ)
+            out = torch.where(civ_ok & tsel & holds, torch.full_like(out, self._golden_move), out)
+        return out
+
     def _golden_ded(self, civ, kind: int) -> torch.Tensor:
         """B-24 (#79) [B] bool: is `civ` in a GOLDEN age holding dedication
         `kind`? The goldenDedication twin. `civ` is a unified civ index — an int
@@ -5368,13 +5409,10 @@ class BatchSim:
         varies per row (`_rival_unit_war_act` is keyed by unit SLOT, not civ).
         A Golden age trades the Dark/Normal era-score payout for the standing
         bonuses below, so every one of them gates on exactly this."""
+        tab = self._golden_ded_table(kind)
         if torch.is_tensor(civ):
-            c = civ.clamp(min=0)
-            age = self.civ_age.gather(1, c.unsqueeze(1)).squeeze(1)
-            k = self.ded_picks.shape[2]
-            picks = self.ded_picks.gather(1, c.reshape(-1, 1, 1).expand(-1, 1, k)).squeeze(1)
-            return (age == 2) & (picks == kind).any(dim=1)
-        return (self.civ_age[:, civ] == 2) & (self.ded_picks[:, civ] == kind).any(dim=1)
+            return tab.gather(1, civ.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return tab[:, civ]
 
     def _cliff_block_dirs(self, cur: torch.Tensor, nb6: torch.Tensor, own: torch.Tensor | None = None) -> torch.Tensor:
         """B-26 (#79) [B, 6]: per-direction, is the step cur->neighbour a
@@ -7882,10 +7920,8 @@ class BatchSim:
         # B-4/B-17: a fresh slot starts at 0 xp unless the training city grants Encampment XP (all rival spawns here are military).
         self.v_xp[rows, slot] = 0 if init_xp is None else init_xp[rows]
         self.v_aura_mp[rows, slot] = 0  # #70/S3 (B-8): no frozen grant until the first refresh (TS movesFull undefined)
-        _m = self._p_moves[self.v_type[rows, slot].clamp(min=0, max=self.NU - 1)]  # #51/S5.2: TS spawnUnit writes `movesLeft: def.moves` and
-        # leaves movesFull undefined (the `?? full` fallback) — a unit
-        # trained mid-turn CAN move before its first refresh, and a
-        # reclaimed slot must not inherit the dead unit's remainder.
+        # #51/S5.2, S5.4: `movesLeft: def.moves` + the seat's golden dedication.
+        _m = self._full_mp("v")[rows, slot]
         self.v_mp[rows, slot] = _m
         self.v_mp_full[rows, slot] = _m
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
@@ -8352,10 +8388,8 @@ class BatchSim:
         self.v_fortify[rows, slot] = 0  # B-5: civilian never fortifies; keep the (reclaimed) slot clean
         self.v_xp[rows, slot] = 0  # B-4: civilian never fights; keep the (reclaimed) slot at 0 xp
         self.v_aura_mp[rows, slot] = 0  # #70/S3 (B-8): civilian never auras; keep the (reclaimed) slot clean
-        _m = self._p_moves[self.v_type[rows, slot].clamp(min=0, max=self.NU - 1)]  # #51/S5.2: TS spawnUnit writes `movesLeft: def.moves` and
-        # leaves movesFull undefined (the `?? full` fallback) — a unit
-        # trained mid-turn CAN move before its first refresh, and a
-        # reclaimed slot must not inherit the dead unit's remainder.
+        # #51/S5.2, S5.4: `movesLeft: def.moves` + the seat's golden dedication.
+        _m = self._full_mp("v")[rows, slot]
         self.v_mp[rows, slot] = _m
         self.v_mp_full[rows, slot] = _m
         self.v_emb[rows, slot] = False  # #45/B-6: a fresh (possibly reclaimed) slot is ashore
@@ -11303,9 +11337,9 @@ class BatchSim:
         # default "any unit blocks" — an at-war rival MILITARY unit must be able to stack onto
         # its OWN-civ civilian (Civ 6 cross-domain), matching TS tileFreeForUnit; else it detours.
         arange6 = torch.arange(6, device=dev)
-        # #45/B-6 EMBARK: the ONLY walker whose passability changes v1 — a land
-        # unit may take WATER steps (embark) when `_embark_live`. INERT by
-        # default (mirrors TS embarkState.live) so the gates are byte-identical.
+        # #45/B-6 EMBARK: a land unit may take WATER steps (embark) when
+        # `_embark_live` — which is ON (`embarkState.live = true`), so this
+        # branch runs in every gate.
         if self._embark_live:
             bidx_e = torch.arange(B, device=dev)
             civ_r = self.v_civ[:, v].clamp(min=0)
@@ -11743,8 +11777,8 @@ class BatchSim:
         # #45/B-6: the peace-act mirror of the war-march embark handling — a
         # NAVAL galley patrols on water; an EMBARKED land unit that survived a
         # war-march into a peace turn comes home coherently (EMBARK_MOVES pool +
-        # disembark transition). Water steps are LIVE-gated; a grounded land unit
-        # stays land-only, so with the flag off this is byte-identical to pre-N2.
+        # disembark transition). A grounded land unit stays land-only: no
+        # embarking at peace.
         if self._embark_live:
             bidx_p = torch.arange(B, device=dev)
             civ_rp = self.v_civ[:, v].clamp(min=0)
