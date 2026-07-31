@@ -13531,7 +13531,21 @@ class BatchSim:
                 win3a = tiles_from_offsets(_ctr_r.reshape(-1), self._off3, self.W, self.H).reshape(B, self.RC, -1)
                 w3f = win3a.clamp(min=0).reshape(B, -1)
                 imp_w3 = self.improvement.gather(1, w3f).reshape_as(win3a)
-                imp_own = (win3a >= 0) & (self.rival_at.gather(1, w3f).reshape_as(win3a) == r) & (imp_w3 >= 0)
+                # #51/S7.3: the tile must belong to THIS CITY, not merely to
+                # this civ. Keyed on the civ, one Farm inside two same-civ
+                # cities' radius-3 windows paid housing to BOTH — and the
+                # frozen statelog shows 5-6 such city pairs PER CIV. The player
+                # twin above has always compared `owner` to the city slot.
+                # Civ 6 pays the improvement's housing to the city whose
+                # CULTURE BORDERS contain the tile, and a tile lies inside
+                # exactly one. https://civilization.fandom.com/wiki/Housing_(Civ6)
+                _own_rc = self.rc_tile_id.gather(1, w3f).reshape_as(win3a)  # [B, RC, M]
+                imp_own = (
+                    (win3a >= 0)
+                    & (self.rival_at.gather(1, w3f).reshape_as(win3a) == r)
+                    & (_own_rc == self.rc_id[:, r].unsqueeze(2))
+                    & (imp_w3 >= 0)
+                )
                 farm = (self._imp_housing[imp_w3.clamp(min=0)].double() * imp_own.double()).sum(dim=2)
                 # B9-R3: PALACE housing on the capital slot (rivalHousing sums
                 # rc.buildings, which now hold the founding PALACE; CITY_CENTER

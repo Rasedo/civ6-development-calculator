@@ -1702,9 +1702,22 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
     total += appealTier(tileAppeal(map, dt)).housing;
   }
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
-  const civ = civOfRival(rival.id);
+  // #51/S7.3: the improvement's housing accrues to the city that OWNS the
+  // tile, not to every city of the civ whose radius reaches it. This read
+  // `tileOwnedByCiv(t, civ)`, so with two same-civ cities within six hexes —
+  // which the frozen statelog shows 5-6 times PER CIV — one Farm paid housing
+  // to BOTH. The player's computeHousing has always used `tileBelongsTo`.
+  //
+  // Civ 6: "+0.5 Housing for every such improvement within 3 tiles of the City
+  // Center ... it is sufficient that those improvements are on tiles that are
+  // within your city's workable range AND INSIDE ITS CULTURE BORDERS."
+  //   https://civilization.fandom.com/wiki/Housing_(Civ6)
+  // A tile lies inside exactly one city's borders, so it pays exactly once.
+  //
+  // The un-swept sibling of A-23, which found the same civ-vs-city confusion
+  // double-counting 1719 WORKED TILES.
   for (const t of tilesWithin(map, center.col, center.row, CITY_WORK_RADIUS)) {
-    if (!tileOwnedByCiv(t, civ) || !t.improvement) continue;
+    if (!tileBelongsTo(t, rc) || !t.improvement) continue;
     total += IMPROVEMENTS[t.improvement as keyof typeof IMPROVEMENTS]?.housing ?? 0;
   }
   return total;
