@@ -4729,6 +4729,14 @@ class BatchSim:
         # replaces RC identical per-j calls; elementwise scaling is exact.
         # G4: the economy loop passes its loop-top FROZEN factors instead
         # (the per-j twin's amen_yf contract).
+        # #51/S7.2c: the CITIZENS bucket, INSIDE the tier — where
+        # computeCityStats has always put it. These two terms used to be added
+        # by the caller AFTER `yf`, so a rival's citizen science and culture
+        # escaped the amenity multiplier the player's paid. Civ 6 applies the
+        # Amenities yield modifier to the city's whole non-food output.
+        _popa = self.rc_pop[:, r].double()  # [B, RC]
+        sci = sci + self.rules.citizen_science * _popa
+        cul = cul + self.rules.citizen_culture * _popa
         yf = amen_yf if amen_yf is not None else self._rival_amenity(r)[2]  # [B, RC]
         prod = prod * yf
         sci = sci * yf
@@ -10202,9 +10210,15 @@ class BatchSim:
             cul = cul + _pb_j.to(cul.dtype) * self._rc_spec_count(r)[:, j].to(cul.dtype) * mask.to(cul.dtype)
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
-        # FRESH; the phase loop passes its loop-top frozen factors. The
-        # CALLER's citizen science/culture terms stay unscaled — TS adds
-        # them outside rivalCityYields (a spec quirk, mirrored).
+        # FRESH; the phase loop passes its loop-top frozen factors.
+        # #51/S7.2c: the CITIZENS bucket, INSIDE the tier — where
+        # computeCityStats has always put it. These two terms used to be added
+        # by the caller AFTER `yf`, so a rival's citizen science and culture
+        # escaped the amenity multiplier the player's paid. Civ 6 applies the
+        # Amenities yield modifier to the city's whole non-food output.
+        _popj = self.rc_pop[:, r, j].double()
+        sci = sci + self.rules.citizen_science * _popj
+        cul = cul + self.rules.citizen_culture * _popj
         yf = amen_yf if amen_yf is not None else self._rival_amenity(r)[2][:, j]
         prod = prod * yf
         sci = sci * yf
@@ -13615,8 +13629,10 @@ class BatchSim:
                 # desugars to sciSum + (y.science + 0.7*pop) — the city term
                 # sums FIRST. (cul_sum + cul) + 0.3*pop is one ulp off and
                 # flips completions when a cost lands inside it (seed 9079).
-                sci_sum = torch.where(cact, sci_sum + (sci + self.rules.citizen_science * self.rc_pop[:, r, j].double()), sci_sum)
-                cul_c = cul + self.rules.citizen_culture * self.rc_pop[:, r, j].double()  # P5/S4: pre-growth pop, feeds civics AND this city's border box
+                # #51/S7.2c: the citizens' term is already inside sci/cul — and
+                # inside the amenity tier with it, where the player's has always been.
+                sci_sum = torch.where(cact, sci_sum + sci, sci_sum)
+                cul_c = cul  # P5/S4: pre-growth pop, feeds civics AND this city's border box
                 cul_sum = torch.where(cact, cul_sum + cul_c, cul_sum)
                 # P5/S1 (C-12): net of the city's upkeep — completed districts
                 # + buildings, the player's tables (TS: y.gold - maintenance

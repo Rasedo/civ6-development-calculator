@@ -2064,6 +2064,15 @@ export function rivalCityYields(
       }
     }
   }
+  // #51/S7.2c: the CITIZENS bucket, where computeCityStats puts it — BEFORE the
+  // amenity tier. `rivalPhase` used to add these two terms to its running sums
+  // AFTER this function had already applied `t.yieldFactor`, so a rival's
+  // citizen science and culture escaped the amenity multiplier that the
+  // player's paid. Civ 6 applies the Amenities yield modifier to the city's
+  // whole non-food output; there is no exemption for the population term.
+  //   https://civilization.fandom.com/wiki/Amenities_(Civ6)
+  total.science += CITIZEN_SCIENCE * rc.population;
+  total.culture += CITIZEN_CULTURE * rc.population;
   // P5/S6 (C-20): the amenity tier scales non-food yields, exactly like
   // computeCityStats. External callers (score/statelog) re-rank FRESH;
   // the phase loop passes its loop-top frozen map — the player's luxMap
@@ -2983,10 +2992,11 @@ export function rivalPhase(state: GameState): void {
       faithSum += y.faith; // P5/S5 (C-17): the faith yield gains its consumer
       const food = y.food;
       const production = y.production;
-      // C1-B3a: rival science/culture streams — tile+center columns plus
-      // the citizens' contribution, exactly like the player path.
-      sciSum += y.science + CITIZEN_SCIENCE * rc.population;
-      const culC = y.culture + CITIZEN_CULTURE * rc.population;
+      // C1-B3a + #51/S7.2: rival science/culture streams. The citizens' term
+      // is already inside `y` — and now inside the amenity tier with it, which
+      // is where the player's has always been.
+      sciSum += y.science;
+      const culC = y.culture;
       culSum += culC;
       // C1-B1: the real growth accounting — true surplus (can be negative),
       // the unscaled Civ 6 growth curve, grow subtracts the need instead of

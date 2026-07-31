@@ -1258,8 +1258,9 @@ function cheapestBuilding(state: GameState, city: City): string | null {
 // covering collapse trajectories, so no coverage is lost. Diagnose a dying
 // seed with CIV6_EXPORT_DEBUG=<seed> (per-turn event narration).
 const SEED_OVERRIDES: Record<number, number> = {
+  9: 9119,  // #51/S7.2c: rerolled (citizen yields joined the amenity tier)
   0: 9002,
-  1: 9015,  // #78/#47: rival units no longer freeze, so the world is harsher
+  1: 9018,  // #51/S7.2c: rerolled
   2: 9029,
   4: 9056,  // #51/S5.5: 9054 dies now that rivals hold their own golden dedications
   6: 9080,
