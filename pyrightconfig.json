@@ -1,0 +1,12 @@
+{
+  "include": ["gpu"],
+  "exclude": ["**/__pycache__", "gpu/fixtures", "gpu/fixtures_o4", "gpu/runs", "python", ".venv"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+
+  "//": "PHASE 1 (task #55). 3401 of 3559 errors are BatchSim's setattr-created tensor planes, which pyright cannot see. Silenced here so the other 158 are readable at all; flipped to \"error\" once the generated annotation block lands. Everything in the Optional/argument family stays OFF at the gate: 55 of 95 reportArgumentType are one dynamic Rules(**{...}) splat, and the rest are the lazy-None-cache idiom pyright cannot narrow.",
+  "reportAttributeAccessIssue": "none"
+}
