@@ -9624,17 +9624,33 @@ class BatchSim:
         # war; #51/S7.1 (#59) RIVAL units at war with THIS rival — the arm that
         # never existed because the twin was written before A-19. Read off the
         # war matrix (S6.0) so it cannot drift from civsAtWar.
-        near = torch.zeros(B, RC, dtype=torch.bool, device=self.device)
-        if self.u_tile.numel():
-            d_b = self.pair_dist[centers.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, U]
-            near = near | (d_b & self.u_alive.unsqueeze(1)).any(dim=2)
-        if self.p_tile.numel():
-            d_p = self.pair_dist[centers.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, P]
-            near = near | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].reshape(B, 1))
+        # #51/S7.1 (#59): the LIVING RIVAL units hostile to this civ, once.
+        # TS asks `routeRaidedAt(state, [origin, dest], seat)` and that walks
+        # every unit for EVERY endpoint, so this mask belongs to all THREE of
+        # the endpoint scans below — the rival's own cities, a city-state
+        # destination, and a player-city destination. Adding it to only the
+        # first is what the rollout caught ([[measure-every-path]]).
+        _v_host = None
         if self.v_tile.numel():
-            d_v = self.pair_dist[centers.unsqueeze(2), self.v_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, RC, V]
             _hv = self.war[:, int(self._seat_row[r + 1]), :].gather(1, self._seat_row[self.v_seat.clamp(min=0)])  # [B, V]
-            near = near | (d_v & (self.v_alive & _hv).unsqueeze(1)).any(dim=2)
+            _v_host = self.v_alive & _hv  # [B, V]
+
+        def _near_of(tiles: torch.Tensor, player_arm: bool = True) -> torch.Tensor:
+            """Hostiles within 3 of each tile in `tiles` [B, N] — the
+            `routeRaidedAt` twin for one set of endpoints."""
+            out = torch.zeros(*tiles.shape, dtype=torch.bool, device=self.device)
+            if self.u_tile.numel():  # barbarians: always
+                d_b = self.pair_dist[tiles.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3
+                out = out | (d_b & self.u_alive.unsqueeze(1)).any(dim=2)
+            if player_arm and self.p_tile.numel():  # the player: only at war
+                d_p = self.pair_dist[tiles.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3
+                out = out | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].reshape(B, 1))
+            if _v_host is not None:  # #51/S7.1 (#59): a rival, only at war
+                d_v = self.pair_dist[tiles.unsqueeze(2), self.v_tile.clamp(min=0).unsqueeze(1)] <= 3
+                out = out | (d_v & _v_host.unsqueeze(1)).any(dim=2)
+            return out
+
+        near = _near_of(centers)
         inc = torch.zeros(B, RC * 6, dtype=torch.float64, device=self.device)
         # domestic legs
         raided_d = near.gather(1, from_j) | near.gather(1, dest_j)  # [B, K]
@@ -9661,13 +9677,7 @@ class BatchSim:
             cs_gold = float(_tr.get("csRouteGold", 3))
             cs_spec = float(_tr.get("csRouteSpec", 1))
             csc = self.cs_center[:, :S].clamp(min=0)  # [B, S]
-            near_cs = torch.zeros(B, S, dtype=torch.bool, device=self.device)
-            if self.u_tile.numel():
-                d_bc = self.pair_dist[csc.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, S, U]
-                near_cs = near_cs | (d_bc & self.u_alive.unsqueeze(1)).any(dim=2)
-            if self.p_tile.numel():
-                d_pc = self.pair_dist[csc.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, S, P]
-                near_cs = near_cs | ((d_pc & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].reshape(B, 1))
+            near_cs = _near_of(csc)
             cs_ok = self.cs_alive[:, :S].gather(1, cs_s) & (cs_s < S)
             raided_c = near.gather(1, from_j) | near_cs.gather(1, cs_s)
             pays_c = act & is_cs & has_from & cs_ok & ~raided_c
@@ -9694,10 +9704,10 @@ class BatchSim:
             )  # [B, C]
             spec_dest = p_city_spec.gather(1, dest_slot.clamp(min=0))  # [B, K]
             gold_i = (self._trade_intl_gold + spec_dest).double()
-            near_dest = torch.zeros(B, self.r_routes.shape[2], dtype=torch.bool, device=self.device)
-            if self.u_tile.numel():
-                d_bi = self.pair_dist[dest_tile.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3  # [B, K, U]
-                near_dest = near_dest | (d_bi & self.u_alive.unsqueeze(1)).any(dim=2)
+            # player arm off: `pays_i` already requires PEACE with the player,
+            # so a player-unit term cannot change the answer. A hostile RIVAL
+            # can, and TS's routeRaidedAt has always counted one.
+            near_dest = _near_of(dest_tile, player_arm=False)
             raided_i = near.gather(1, from_j) | near_dest
             pays_i = act & intl & has_from & valid_dest & ~self.r_atwar[:, r].reshape(B, 1) & ~raided_i
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
