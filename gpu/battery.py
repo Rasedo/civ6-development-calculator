@@ -66,6 +66,7 @@ POKE_COST = {
     "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0,
     "rr_strike": 12.0,
     "spawn_reclaim": 6.0,
+    "city_first": 14.0,
 }
 
 results: list[tuple[str, float, int]] = []
@@ -214,7 +215,8 @@ def main() -> int:
                 ("melee", [py, "gpu/melee_test.py"], 4),  # #51/S3.4: was UNGATED — an S3.2 regression hid here
                 ("peace_target", [py, "gpu/peace_target_test.py"], 2),  # #51: no attack without a war
                 ("rr_strike", [py, "gpu/rr_strike_test.py"], 2),  # #51/S7.1 (#59): a rival city fires on an enemy RIVAL
-                ("spawn_reclaim", [py, "gpu/spawn_reclaim_test.py"], 2),  # #51/S7.2: a reclaimed slot hands on no drowned unit's MP
+                ("spawn_reclaim", [py, "gpu/spawn_reclaim_test.py"], 2),
+                ("city_first", [py, "gpu/city_first_test.py"], 2),  # #51/S7.10a: a garrison shields no city  # #51/S7.2: a reclaimed slot hands on no drowned unit's MP
                 ("stack_rules", [py, "gpu/stack_rules_test.py"], 2),  # #51: cross-domain stacking + Encampment spawn wall
                 ("golden_move", [py, "gpu/golden_move_test.py"], 2),  # B-24: MONUMENTALITY / EXODUS +2 MP, per seat
                 ("bankruptcy", [py, "gpu/bankruptcy_test.py"], 4),

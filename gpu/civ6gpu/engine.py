@@ -6819,6 +6819,18 @@ class BatchSim:
                 rngd = self._p_rng_str[self.p_type[:, p]] > 0
             else:
                 rngd = torch.zeros_like(alive)
+            # #51/S7.10a: CITY-FIRST for the PLAYER's own attacks too — the third
+            # of the three dispatch surfaces. `cs_s`/`cs_sc` were built ~230
+            # lines below, after the branches that need them, so they hoist here.
+            cs_s = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+            cs_sc = cs_s.clamp(min=0)
+            cs_here = (
+                (cs_s >= 0)
+                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
+                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+            )
+            city_here = rc_ok | cs_here
+            garrisoned = (bslot >= 0) | v_ok
             # TS meleeAttack: units ON the tile take the hit FIRST. A lone
             # hostile CIVILIAN is simply killed, ROLL-FREE ("Civ 6 captures;
             # we don't model capture"), then the attacker advances if the
@@ -6850,7 +6862,7 @@ class BatchSim:
                 self.p_next[kr] += 1
                 self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
                 self.p_mp[:, p] = torch.where(civk, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
-            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
+            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)  # #51/S7.10a
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
                 self.p_mp[:, p] = torch.where(siege, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
@@ -6875,7 +6887,7 @@ class BatchSim:
                 if bool(enc_att.any()):
                     self._attack_encampment(enc_att, tc, "player", p)
                     self.p_mp[:, p] = torch.where(enc_att, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
-            att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
+            att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & garrisoned & ~city_here & (self._p_combat[self.p_type[:, p]] > 0)  # #51/S7.10a
             # V-R: ranged units strike instead of meleeing (rangedAttack —
             # one roll, no retaliation, no advance). The mask above is
             # unchanged: legality is the same adjacent-hostile condition.
@@ -7079,14 +7091,9 @@ class BatchSim:
             # order), attacker consumed, NO advance; capture at 0 HP (the
             # city-state joins the empire). Ranged bombardment has its own
             # branches below (P4/D-23): one roll, floor 1 HP, no capture.
-            cs_s = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1)
-            cs_sc = cs_s.clamp(min=0)
             cs_hit = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & (bslot < 0) & ~v_ok & ~rvc_ok & (rc_civ_t < 0)
-                & (cs_s >= 0)
-                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
-                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
                 & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
             )
             if bool(cs_hit.any()):
@@ -7119,7 +7126,7 @@ class BatchSim:
             # --- P4/D-23: ranged BOMBARDMENT of cities (rangedAttack's city
             # fallback) — one roll against the D-22 defense, no retaliation,
             # HP floors at 1 (ranged never captures; melee finishes).
-            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd
+            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd  # #51/S7.10a
             if bool(r_sieg.any()):
                 bidx2 = torch.arange(self.B, device=self.device)
                 civ2 = rc_civ_t.clamp(min=0)
@@ -7149,10 +7156,7 @@ class BatchSim:
                 self.p_mp[:, p] = torch.where(r_sieg, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             r_cs = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & (bslot < 0) & ~v_ok & ~rvc_ok & (rc_civ_t < 0)
-                & (cs_s >= 0)
-                & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
-                & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
                 & (self._p_combat[self.p_type[:, p]] > 0) & rngd
             )
             if bool(r_cs.any()):
@@ -7645,15 +7649,23 @@ class BatchSim:
             tgt_city = self.center_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
             # #51/S3.4b: a NON-BARBARIAN unit stands on the target tile.
             has_u = self._nonbarb_unit_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+            # #51/S7.10a: a RIVAL centre is attacked THROUGH its garrison, as a
+            # PLAYER centre already was (`city_att` never tested `has_u`). A LONE
+            # CIVILIAN still wins — B-31 kills it roll-free, pinned at seed 9053
+            # t204 — so the city only beats a MILITARY occupant.
+            _has_mil = self._nonbarb_mil_plane().gather(1, ttc.unsqueeze(1)).squeeze(1)
+            _civ_only = has_u & ~_has_mil
+            _rvc_here = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
+            _city_wins = _rvc_here & ~_civ_only
             city_att = attack & ~rngd & (tgt_city >= 0)
-            unit_att = attack & ~rngd & (tgt_city < 0) & has_u
-            rvc_att = attack & ~rngd & (tgt_city < 0) & ~has_u & (self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0)
+            unit_att = attack & ~rngd & (tgt_city < 0) & has_u & ~_city_wins
+            rvc_att = attack & ~rngd & (tgt_city < 0) & _city_wins
             enc_att = (
                 attack
                 & ~rngd
                 & (tgt_city < 0)
                 & ~has_u
-                & (self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1) < 0)
+                & ~_rvc_here
                 & self._encamp_block(ttc.unsqueeze(1), BARB_SEAT).squeeze(1)
                 if self._encamp_didx >= 0
                 else None
@@ -11159,6 +11171,17 @@ class BatchSim:
         mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
         return ((mil >= 0) & (mseat != BARB_SEAT)) | (self.occ_civ >= 0)
 
+    def _nonbarb_mil_plane(self) -> torch.Tensor:
+        """#51/S7.10a: the MILITARY-only twin of `_nonbarb_unit_plane`.
+
+        City-first needs to tell a GARRISON from a LONE CIVILIAN: a city is
+        attacked THROUGH a military garrison, but a lone civilian is still
+        killed first (B-31 roll-free; pinned at seed 9053 t204). The combined
+        plane cannot answer that, so the military arm is written on its own."""
+        mil = self.occ_mil
+        mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
+        return (mil >= 0) & (mseat != BARB_SEAT)
+
     # ------------------------------------------------------------------
     # #51/S3.4b: the five legacy occupancy maps, as DERIVED READ-ONLY views.
     #
@@ -11474,6 +11497,9 @@ class BatchSim:
         _mps = torch.where(_mp >= 0, self.unit_seat.gather(1, _mp.clamp(min=0)), torch.full_like(_mp, -1))
         _cps = torch.where(_cp >= 0, self.unit_seat.gather(1, _cp.clamp(min=0)), torch.full_like(_cp, -1))
         units_pl = (((_mps == PLAYER_SEAT) | (_cps == PLAYER_SEAT)) & hp.unsqueeze(1)) | (_mps == BARB_SEAT) | rr_units
+        # #51/S7.10a: the MILITARY-only twin — city-first must tell a GARRISON
+        # from a LONE CIVILIAN (the latter still wins; seed 9053 t204).
+        mil_pl = ((_mps == PLAYER_SEAT) & hp.unsqueeze(1)) | (_mps == BARB_SEAT) | (war_m & ~rngd.unsqueeze(1))
         # enemy AT-WAR rival city center (rvcity_at holds the owning civ) — a
         # MELEE-only d==1 target (rivalVsRivalCity; ranged-vs-rival-city out of
         # scope, like csWar). Own / non-at-war centers are NOT targets.
@@ -11547,12 +11573,20 @@ class BatchSim:
         tgt_city = self.center_at.gather(1, ttc.unsqueeze(1)).squeeze(1)
         has_u = units_pl.gather(1, ttc.unsqueeze(1)).squeeze(1)
         tgt_enemy_rc = enemy_rc.gather(1, ttc.unsqueeze(1)).squeeze(1)  # A-19/B-33
+        # #51/S7.10a: an enemy RIVAL centre is attacked THROUGH its garrison,
+        # exactly as a PLAYER centre already was. These two lines used to say the
+        # asymmetry out loud — "player city: garrison ignored" beside "a
+        # garrisoned enemy rival center hits the garrison here". A LONE CIVILIAN
+        # still wins (B-31 roll-free, seed 9053 t204), so the city beats only a
+        # MILITARY occupant.
+        _has_mil = mil_pl.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        _city_wins = tgt_enemy_rc & ~(has_u & ~_has_mil)
         city_att = attack & (tgt_city >= 0) & ~rngd  # player city: garrison ignored (enemyCity-first)
-        unit_att = attack & (tgt_city < 0) & has_u & ~rngd  # a garrisoned enemy rival center hits the garrison here (TS enemies.length>0)
+        unit_att = attack & (tgt_city < 0) & has_u & ~_city_wins & ~rngd
         # A-19/B-33 (S2): an UNGARRISONED enemy rival center is battered/captured
         # (attackRivalCity via _transfer_rc_to_rc); own/other rival centers with
         # no unit stay the no-op quirk (fall through to the march).
-        rc_att = attack & (tgt_city < 0) & ~has_u & tgt_enemy_rc & ~rngd
+        rc_att = attack & (tgt_city < 0) & _city_wins & ~rngd  # #51/S7.10a
 
         if bool(city_att.any()):
             self._hostile_city_attack(city_att, tgt_city, "rival", v)
