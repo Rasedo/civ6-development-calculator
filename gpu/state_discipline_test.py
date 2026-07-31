@@ -84,7 +84,10 @@ def main() -> None:
     # --- 3) _MUTABLE shape/dtype drift is detected -------------------------
     s2 = build(paths, rules)
     s2.step()
-    nm = next(k for k in _MUTABLE if hasattr(s2, k))
+    # #51/S4: skip ALIASED names — rebinding one trips the alias check
+    # first (correctly: a broken view is the more fundamental error), so
+    # the dtype-drift probe needs a plane that owns its own storage.
+    nm = next(k for k in _MUTABLE if hasattr(s2, k) and k not in s2._aliases)
     setattr(s2, nm, getattr(s2, nm).to(torch.int8) if getattr(s2, nm).dtype != torch.int8 else getattr(s2, nm).float())
     try:
         s2._check_state_discipline()

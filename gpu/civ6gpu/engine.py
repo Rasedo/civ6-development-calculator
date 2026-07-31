@@ -460,6 +460,68 @@ class BatchSim:
         C = len(f0["cities"])
         assert all(len(f["cities"]) == C for f in fixtures), "fixtures must share a city-slot count"
         self.C = C
+        # ------------------------------------------------------------------
+        # #51/S4.1: THE CITY BLOCK. Twenty player/rival pairs — `alive` and
+        # `rc_alive`, `city_hp` and `rc_hp`, `site` and `rc_center`, ... —
+        # become one `cty_x [B, 1+R, RC]` plane each, with the old names as
+        # VIEWS:
+        #     player: cty_x[:, 0, :C]        (C <= RC, the rest unused)
+        #     rivals: cty_x[:, 1:, :]
+        # Eight of the pairs did not even share a NAME (site/rc_center,
+        # food_box/rc_growth, culture_box/rc_cbox, cur_cost/rc_cost,
+        # q_dtile/rc_qtile, buildings/rc_bldg, tiles_acquired/rc_acquired,
+        # city_hp/rc_hp), which is how two spellings of one concept survive.
+        #
+        # DTYPE: the float planes take `dtype`. The player's already did; the
+        # rival's hardcoded float64. Merging forces one, and hardcoding f64
+        # would make the f32 eval lanes meaningless for this arithmetic. In
+        # the f64 gates (parity, rollout) this is a no-op; in f32 eval it is a
+        # DECLARED score-band re-baseline, per the plan's dtype decision and
+        # [[dtype-equality-not-invariant]].
+        #
+        # Two pairs disagreed on their INITIAL FILL and both are preserved:
+        # city_hp starts at cityMaxHp while rc_hp starts at 0, and `site`
+        # starts at -1 while rc_center starts at 0.
+        # ------------------------------------------------------------------
+        self.R = int(f0.get("rMax", 0))
+        self.RC = 24  # rival city slots per civ (settling caps at maxCities;
+        # loyalty flips can exceed — a strong Harbor-fed rival accumulates many
+        # by t300; bumped 10->24, empty slots are cty_alive=False so inert)
+        _rp, _rcp = max(self.R, 1), self.RC
+        self._aliases: dict = {}
+        for _k, _pa, _ra, _dt, _rf, _pf, _ex in (
+            ("alive", "alive", "rc_alive", torch.bool, False, None, None),
+            ("center", "site", "rc_center", torch.long, 0, -1, None),
+            ("pop", "pop", "rc_pop", torch.long, 0, None, None),
+            ("hp", "city_hp", "rc_hp", torch.long, 0, int((rules.combat or {}).get("cityMaxHp", 200)), None),
+            ("outer_hp", "outer_hp", "rc_outer_hp", torch.long, 0, None, None),
+            ("is_cap", "is_cap", "rc_is_cap", torch.bool, False, None, None),
+            ("loyalty", "loyalty", "rc_loyalty", dtype, 100.0, None, None),
+            ("acquired", "tiles_acquired", "rc_acquired", torch.long, 0, None, None),
+            ("growth", "food_box", "rc_growth", dtype, 0, None, None),
+            ("cbox", "culture_box", "rc_cbox", dtype, 0, None, None),
+            ("current", "current", "rc_current", torch.long, -1, None, None),
+            ("progress", "progress", "rc_progress", dtype, 0, None, None),
+            ("cost", "cur_cost", "rc_cost", dtype, 0, None, None),
+            ("qtile", "q_dtile", "rc_qtile", torch.long, -1, None, None),
+            ("gw_writing", "gw_writing", "rc_gw_writing", torch.long, 0, None, None),
+            ("gw_art", "gw_art", "rc_gw_art", torch.long, 0, None, None),
+            ("gw_music", "gw_music", "rc_gw_music", torch.long, 0, None, None),
+            ("relics", "relics", "rc_relics", torch.long, 0, None, None),
+            ("artifacts", "artifacts", "rc_artifacts", torch.long, 0, None, None),
+            ("bldg", "buildings", "rc_bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
+        ):
+            _shape = (B, 1 + _rp, _rcp) + ((_ex,) if _ex else ())
+            _base = torch.full(_shape, _rf, dtype=_dt, device=device)
+            setattr(self, f"cty_{_k}", _base)
+            _pv = _base[:, 0, :C] if _ex is None else _base[:, 0, :C, :]
+            if _pf is not None:
+                _pv.fill_(_pf)
+            setattr(self, _pa, _pv)
+            setattr(self, _ra, _base[:, 1:])
+            self.register_alias(_pa, (lambda sim, k=_k, e=_ex: getattr(sim, f"cty_{k}")[:, 0, :sim.C]
+                                      if e is None else getattr(sim, f"cty_{k}")[:, 0, :sim.C, :]))
+            self.register_alias(_ra, lambda sim, k=_k: getattr(sim, f"cty_{k}")[:, 1:])
 
         def ften(getter, shape_tail=()):
             return torch.tensor([getter(f) for f in fixtures], dtype=dtype, device=device).reshape(B, *shape_tail)
@@ -517,7 +579,6 @@ class BatchSim:
             [[bool(c["riverAtCenter"]) for c in f["cities"]] for f in fixtures], dtype=torch.bool, device=device
         )
 
-        self.site = torch.full((B, C), -1, dtype=torch.long, device=device)
         self.center_yields = torch.zeros(B, C, 6, dtype=dtype, device=device)
         self.center_raw_food = torch.zeros(B, C, dtype=dtype, device=device)
         self.base_maintenance = torch.zeros(B, C, dtype=dtype, device=device)
@@ -545,7 +606,6 @@ class BatchSim:
         # (P7-FULL: the rc side carries the same identity — rc_is_cap +
         # cap_tile_rival — because _reclaim_rc compaction retires the old
         # "slot 0 ≡ rc capital" invariant.)
-        self.is_cap = torch.zeros(B, C, dtype=torch.bool, device=device)
         self.is_cap[:, 0] = True
         import os as _os
         self._reclaim_at = int(_os.environ.get("CIV6_RECLAIM_AT", U_MAX - 24))
@@ -612,12 +672,10 @@ class BatchSim:
         self._cs_b1idx = torch.tensor(cs_b1, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
         self._cs_b2idx = torch.tensor(cs_b2, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
         self._cs_suz_amt = float(rules.cs.get("suzerainYield", 3))  # B-21: flat suzerain capital-yield amount
-        self.loyalty = torch.full((B, C), 100.0, dtype=dtype, device=device)
 
         # --- rival civs (phase 4c) ---------------------------------------------
         rr = rules.rivals
         n_gp = len(rr.get("gpClassDistrict", [])) or 5  # GP class count (7: Scientist..General; was truncated to 5)
-        self.R = int(f0.get("rMax", 0))
         # C1-A3: seats. Civ 0 = the player ([B, C] tensors); civ r+1 = rival
         # index r. O becomes a real tensor axis per-subsystem in the C1-B
         # stages; until then it is metadata for the seat convention.
@@ -626,7 +684,6 @@ class BatchSim:
         assert int(cv.get("player", PLAYER_CIV)) == PLAYER_CIV and int(cv.get("rivalBase", 1)) == 1, (
             "fixture civ numbering disagrees with engine constants (civs.ts drift?)"
         )
-        self.RC = 24  # rival city slots per civ (settling caps at maxCities; loyalty flips can exceed — a strong Harbor-fed rival accumulates many by t300; bumped 10->24, empty slots are rc_alive=False so inert)
         # P7-FULL (C-3): rc slots append at last-alive+1 (order-preserving),
         # so churn can exhaust the space while holes sit below — compact at
         # the step end once the high-water nears the cap (forced low for
@@ -701,11 +758,6 @@ class BatchSim:
             _row[100 + _c] = 1 + r_pad + _c
         _row[BARB_SEAT] = self.BARB_ROW
         self._seat_row = _row
-        # #51/S0.4: alias registry (name -> fn(self) returning the base slice
-        # it must remain a view of). Declared before the FIRST merged plane —
-        # the per-seat scalars below register into it, and they now allocate
-        # earlier than the unit pool.
-        self._aliases: dict = {}
         self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
 
         # ------------------------------------------------------------------
@@ -820,9 +872,6 @@ class BatchSim:
         self.r_peaceturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # C1-B2: per-city production queues replace the pooled stocks.
         # rc_current: -1 idle, 0 settler, 1+u trains roster unit u.
-        self.rc_current = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
-        self.rc_progress = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
-        self.rc_cost = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
         # C1-B3a: real per-rival research trees — the SAME tech/civic tables
         # as the player, cheapest-first at raw cost; researched techs feed
         # the consumers (production divisor, city defense, unit gates).
@@ -850,11 +899,9 @@ class BatchSim:
         # district tiles (one per type; queued counts for cap/one-per-type,
         # exactly like city.districts in TS).
         nd_b4 = max(len(rules.districts or []), 1)
-        self.rc_qtile = torch.full((B, r_pad, rc_pad), -1, dtype=torch.long, device=device)
         self.rc_dist_tile = torch.full((B, r_pad, rc_pad, nd_b4), -1, dtype=torch.long, device=device)
         # C1-B4b-2: per-city built-buildings registry (queue codes above
         # NU + nScaffold complete into it)
-        self.rc_bldg = torch.zeros(B, r_pad, rc_pad, max(len(rules.b_cost), 1), dtype=torch.bool, device=device)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_faith = torch.zeros(B, r_pad, dtype=torch.float64, device=device)  # P5/S5 (C-17): the pantheon's funding
@@ -868,19 +915,9 @@ class BatchSim:
         # keeps the tiles paved but the conquering city's registry holds only
         # CITY_CENTER (no yields/upkeep/counts; the paving still blocks).
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
-        self.rc_alive = torch.zeros(B, r_pad, rc_pad, dtype=torch.bool, device=device)
-        self.rc_center = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_pop = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_growth = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)
-        self.rc_cbox = torch.zeros(B, r_pad, rc_pad, dtype=torch.float64, device=device)  # P5/S4: rc.cultureBox
-        self.rc_loyalty = torch.full((B, r_pad, rc_pad), 100.0, dtype=torch.float64, device=device)  # P5/S6 (C-19)
-        self.rc_acquired = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_hp = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_outer_hp = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)  # AUDIT B-1: ANCIENT_WALLS outer pool
         self.rc_id = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         # P7-FULL (C-3): rc.isCapital as identity (TS find(isCapital)) — the
         # old "slot 0 ≡ capital" invariant dies with _reclaim_rc compaction.
-        self.rc_is_cap = torch.zeros(B, r_pad, rc_pad, dtype=torch.bool, device=device)
         # capitalTiles[r+1] — static like TS's (game.ts:234): only an
         # isCapital founding (t0 or a total-collapse refound) writes it.
         self.cap_tile_rival = torch.zeros(B, r_pad, dtype=torch.long, device=device)
@@ -1263,21 +1300,11 @@ class BatchSim:
         # banks the same per-turn `cul_sum` that feeds r_civic_prog, which
         # civic completions SPEND, so a separate total is required.
         self.r_culture = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
-        self.gw_writing = torch.zeros(B, C, dtype=torch.long, device=device)  # AMPHITHEATER slots used, per player city
-        self.gw_art = torch.zeros(B, C, dtype=torch.long, device=device)      # #73: ART MUSEUM slots used
-        self.gw_music = torch.zeros(B, C, dtype=torch.long, device=device)    # #73: BROADCAST CENTER slots used
-        self.rc_gw_writing = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_gw_art = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_gw_music = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
         # B-20 (#73): RELICS, per city, held in the TEMPLE's single slot.
-        self.relics = torch.zeros(B, C, dtype=torch.long, device=device)
-        self.artifacts = torch.zeros(B, C, dtype=torch.long, device=device)  # B-20 (#79)
         # B-20 (#79): ANTIQUITY SITES — the markAntiquitySite twin. Created by
         # PRE-MODERN events (a razed camp, a unit death) and excavated into
         # Artifacts by an Archaeologist.
         self.antiquity = torch.zeros(B, self.T, dtype=torch.bool, device=device)
-        self.rc_relics = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        self.rc_artifacts = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)  # B-20 (#79)
         self._loyalty_amenity = torch.tensor(rr.get("loyaltyAmenity", [6, 3, 0, -3, -6]), dtype=dtype, device=device)
         self._off3 = tiles_within_offsets(int(rr.get("workRadius", 3))).to(device)
         self._off5 = tiles_within_offsets(5).to(device)  # P5/S4: rival border growth radius (= player BORDER_MAX_RADIUS)
@@ -1716,15 +1743,9 @@ class BatchSim:
         # --- dynamic state ------------------------------------------------------
         z = lambda *shape, dt=dtype: torch.zeros(*shape, dtype=dt, device=device)
         self.turn = 1
-        self.alive = torch.zeros(B, C, dtype=torch.bool, device=device)
         self.alive[:, 0] = True
-        self.pop = torch.zeros(B, C, dtype=torch.long, device=device)
         self.pop[:, 0] = 1
-        self.food_box = z(B, C)
-        self.culture_box = z(B, C)
-        self.tiles_acquired = torch.zeros(B, C, dtype=torch.long, device=device)
         self.owner = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
-        self.buildings = torch.zeros(B, C, NB, dtype=torch.bool, device=device)
         self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # B9-R1: exclusive-sibling index lists
@@ -1745,10 +1766,6 @@ class BatchSim:
         self._temple_bidx = int(rules.temple_bidx)
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # B6-S2: missionary buy gate
-        self.current = torch.full((B, C), -1, dtype=torch.long, device=device)
-        self.cur_cost = z(B, C)
-        self.q_dtile = torch.full((B, C), -1, dtype=torch.long, device=device)  # P2: the queued district's target tile
-        self.progress = z(B, C)
         self.prod_bank = z(B, C)  # V-H1: chop production banked while the queue is empty
         self.settlers = torch.zeros(B, dtype=torch.long, device=device)
         self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
@@ -1763,8 +1780,6 @@ class BatchSim:
         self.K = int(self.max_camps.max().item()) if self.units_mode else 0
         # The in-state mulberry32, one u32 per game, mirrored draw for draw.
         self.rng_state = torch.tensor([f.get("rngInit", 0) for f in fixtures], dtype=torch.int64, device=device)
-        self.city_hp = torch.full((B, C), int(cb.get("cityMaxHp", 200)), dtype=torch.long, device=device)
-        self.outer_hp = torch.zeros(B, C, dtype=torch.long, device=device)  # AUDIT B-1: ANCIENT_WALLS outer pool (0 = no walls)
         self.center_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # city slot at tile
         self.center_at.scatter_(1, self.site[:, :1], 0)  # the capital
         # Tile → unit-slot occupancy maps. Stacking mirrors tileFreeForUnit:
