@@ -590,10 +590,21 @@ the plane deleted, and the invariant's rival comparison dropped because there
 is no longer a second copy to disagree with. `_retag_tiles` now rebuilds only
 the PLAYER part; everything `>= 1` is stored in `tile_seat` itself.
 
-TWO of the three planes are gone. `owner` is last and is the one that needs
-design: it stores WHICH city owns the tile, TS's `ownerCity`, which
-`tile_seat` does not carry — so it needs a `tile_city` plane beside the seat,
-not a view. That is S6.10.
+**S6.10 — the THIRD plane dies, and tile ownership is ONE pair. DONE.**
+`owner` was the one that could not simply become a view, because it answers a
+different question: not "whose tile" but "whose CITY". So `tile_city` joins
+`tile_seat` — exactly the `ownerSeat` + `ownerCity` pair TS has had since S1.3
+— and `owner` is the two read together.
+
+With that, `_retag_tiles` and the whole drift invariant RETIRE. There is
+nothing left to retag and nothing left to drift: "a tile has one owner" stopped
+being something three planes have to agree about and became a property of the
+encoding. The exclusivity count stays as a cheap tripwire in case a future
+write reintroduces a second store.
+
+**The GPU's tile ownership is now the TS model, field for field.** 160 call
+sites still spell it three ways, and they can stay that way indefinitely —
+they are views over one pair, and cannot disagree with it.
 
 Remaining: the `cs_*` planes that are genuinely city-state-specific
 (`cs_type`, `cs_suz_key`, `cs_last_levy`) and the rest
