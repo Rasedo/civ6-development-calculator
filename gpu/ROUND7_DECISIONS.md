@@ -104,6 +104,41 @@ One battery **at the end of the round only** (`[[verify-loop-cost]]` rule 6). Pe
 > but WHICH SEATS a function serves. One TS function ↔ N GPU appliers is the
 > shape to check on every future TS-side behaviour merge.
 >
+> **THE MECHANICAL RECIPE (attempt 5 starts here — no analysis left to redo).**
+> The precedence is decided at the DISPATCH SITES, not inside the appliers, and
+> the rival site states the asymmetry in its own comments:
+>
+> ```python
+> city_att = attack & (tgt_city >= 0) & ~rngd          # PLAYER city: garrison IGNORED
+> unit_att = attack & (tgt_city < 0) & has_u & ~rngd   # garrisoned RIVAL centre -> hits the garrison
+> rc_att   = attack & (tgt_city < 0) & ~has_u & tgt_enemy_rc & ~rngd
+> ```
+>
+> The same attacker goes THROUGH a garrison into a PLAYER city and is BLOCKED by
+> one at a RIVAL city. Three dispatch sites need the same treatment:
+>   * rival attacker  (`city_att`/`unit_att`/`rc_att`, near `_hostile_city_attack(..., "rival", v)`)
+>   * barb attacker   (`city_att`/`unit_att`/`rvc_att`, near `..., "barb", u)`)
+>   * the player branches already specified above (`siege`/`r_sieg`/`cs_hit`/`r_cs`/`att`)
+>
+> **New predicates:**
+> ```python
+> civ_only  = has_u & ~has_mil          # a LONE CIVILIAN — keeps beating the city
+> city_wins = tgt_enemy_rc & ~civ_only
+> rc_att    = attack & (tgt_city < 0) & city_wins & ~rngd
+> unit_att  = attack & (tgt_city < 0) & has_u & ~city_wins & ~rngd
+> ```
+>
+> **THE ONE PIECE OF REAL WORK:** `has_mil` does not exist. `units_pl` is built
+> from BOTH `occ_mil` AND `occ_civ`
+> (`units_pl = ((_mps == PLAYER_SEAT) | (_cps == PLAYER_SEAT)) & hp | (_mps == BARB_SEAT) | rr_units`),
+> so `has_u` is "any unit". A MILITARY-ONLY twin is needed — drop the `_cps`
+> arm and split `rr_units` the same way — at BOTH dispatch sites. Without it the
+> civilian precedent (seed 9053 t204) breaks again.
+>
+> Gate: parity CANNOT see any of this (`export-gpu.ts` issues no player attack and
+> the rival paths need a garrisoned enemy centre), so the confirming run is the
+> FULL BATTERY plus the poke lane from `f84040f`. Budget one battery per attempt.
+>
 > **ATTEMPTED AND BACKED OUT 2026-07-31 — not a scope cut, a sequencing call.**
 > The TS half is ~6 lines and was written and green (tsc + 498/498 vitest):
 > `meleeAttack`'s `rivalTarget`/`csTarget` arms drop their `enemies.length === 0`
