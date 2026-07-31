@@ -65,7 +65,7 @@ import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable } from './units';
+import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builderCost } from './units';
 import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
@@ -2497,7 +2497,7 @@ export function rivalPhase(state: GameState): void {
           kind: 'unit',
           unit: 'BUILDER',
           progress: 0,
-          cost: Math.round((50 + 4 * (rival.buildersTrained ?? 0)) * GAME_SPEED),
+          cost: builderCost(state, civOfRival(rival.id)), // #51/S7.7a: the ONE escalator
         });
         unitCount += 1;
       } else if (

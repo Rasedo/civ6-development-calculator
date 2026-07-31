@@ -639,16 +639,27 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
 // Training & upkeep
 // ---------------------------------------------------------------------------
 
-/** P4/D-10 (real Civ 6): builder cost escalates — 50 + 4 (pre-speed) per
- * builder ever trained/purchased or currently in a queue, empire-wide,
- * rounded after the game-speed scale like every unit cost (data/units U()).
- * The exporter mirrors the 50/4 literals as scenario.builderBase/builderPer. */
-export function builderCost(state: GameState): number {
-  const queued = state.cities.reduce(
-    (n, c) => n + c.queue.filter((q) => q.kind === 'unit' && q.unit === 'BUILDER').length,
-    0,
-  );
-  return Math.round((50 + 4 * ((playerSeat(state).buildersTrained ?? 0) + queued)) * GAME_SPEED);
+/**
+ * P4/D-10 (real Civ 6): the builder price escalator — 50 + 4 (pre-speed) per
+ * builder THIS SEAT HAS ALREADY PRODUCED, rounded after the game-speed scale
+ * like every unit cost (data/units U()). The exporter mirrors the 50/4 literals
+ * as scenario.builderBase/builderPer.
+ *
+ * #51/S7.7a: ONE escalator for every seat, and the QUEUED term is GONE.
+ *
+ * The player counted builders "ever trained/purchased OR CURRENTLY IN A QUEUE";
+ * the rival counted only those trained. Civ 6 counts neither queue: the unit
+ * cost progression is `CostProgressionParam1="4"` applied to the "number of
+ * unit already produced" — producing is the event, and an item sitting in a
+ * queue has produced nothing. So the RIVAL was right and the PLAYER was wrong,
+ * which is exactly why this task's rule is "pick the behaviour closer to real
+ * Civ 6", never "mirror the TypeScript engine".
+ *   https://forums.civfanatics.com/threads/600489/
+ *
+ * `seat` defaults to the player so the UI call sites are untouched.
+ */
+export function builderCost(state: GameState, seat: number = PLAYER_CIV): number {
+  return Math.round((50 + 4 * (seatOf(state, seat)?.buildersTrained ?? 0)) * GAME_SPEED);
 }
 
 /**

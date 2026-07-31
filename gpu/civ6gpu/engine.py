@@ -4924,9 +4924,8 @@ class BatchSim:
                 if self._builder_idx >= 0:
                     # P4/D-10: the builder column prices off the live escalator
                     # (trained + queued), like TS unitPurchaseCost at mask time.
-                    bq = (self.current == self.UNIT_BASE + self._builder_idx).sum(dim=1)
                     u_cost = u_cost.clone()
-                    u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained + bq)
+                    u_cost[:, self._builder_idx] = self._builder_cost(self.builders_trained)  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
                 pu = (u_ok & self._afford(tre.unsqueeze(1), u_cost * mult)).unsqueeze(1).expand(-1, C, -1)
                 if bool(self.unit_naval.any()):
                     pu = pu & ~self.unit_naval.reshape(1, 1, -1)  # #45/B-6: no controlled-player naval buy (rides #50)
@@ -8330,7 +8329,7 @@ class BatchSim:
             u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
             if self._builder_idx >= 0:
                 # P4/D-10: the builder column prices off THIS rival's escalator
-                rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
+                rb_n = self.r_builders_trained[:, r]  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
                 u_cost_r = u_cost_r.clone()
                 u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
             afford_u = self._afford(self.r_treasury[:, r].unsqueeze(1), u_cost_r * mult)
@@ -8493,7 +8492,7 @@ class BatchSim:
                     cost_u = self._p_cost.gather(0, ui).double() * mult
                     if self._builder_idx >= 0:
                         # P4/D-10: bought rival builders price off THEIR escalator
-                        rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
+                        rb_n = self.r_builders_trained[:, r]  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
                         cost_u = torch.where(ui == self._builder_idx, self._builder_cost(rb_n).double() * mult, cost_u)
                     ok_now = is_pu & self._afford(self.r_treasury[:, r], cost_u)
                     if bool(ok_now.any()):
@@ -8521,7 +8520,7 @@ class BatchSim:
                 if self._builder_idx >= 0:
                     # P4/D-10: queued rival builders lock the escalated price
                     # (earlier j-slots' queues are already in rc_current).
-                    rb_n = self.r_builders_trained[:, r] + (self.rc_current[:, r] == self._builder_idx + 1).sum(dim=1)
+                    rb_n = self.r_builders_trained[:, r]  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
                     cost_q = torch.where(ui == self._builder_idx, self._builder_cost(rb_n).double(), cost_q)
                 self.rc_current[:, r, j] = torch.where(is_u, ui + 1, self.rc_current[:, r, j])
                 self.rc_cost[:, r, j] = torch.where(is_u, cost_q, self.rc_cost[:, r, j])
@@ -14692,7 +14691,6 @@ class BatchSim:
         # EARLIER turns plus, as the walk proceeds, this turn's queues and
         # purchases (TS applies act.p sequentially; both move builderCost).
         bcode_w = (self.UNIT_BASE + self._builder_idx) if self._builder_idx >= 0 else -999
-        bqueued_live = (self.current == bcode_w).sum(dim=1)
         for c in range(C):
             ac = act[:, c]
             # --- queue a settler (cost from the live counters, queueSettler)
@@ -14711,11 +14709,10 @@ class BatchSim:
             if self._builder_idx >= 0:
                 is_bq = (ac == bcode_w) & self.alive[:, c] & (self.current[:, c] == -1)
                 if bool(is_bq.any()):
-                    b_cost = self._builder_cost(self.builders_trained + bqueued_live)
+                    b_cost = self._builder_cost(self.builders_trained)  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
                     self.progress[:, c] = torch.where(is_bq, torch.zeros_like(self.progress[:, c]), self.progress[:, c])
                     self.cur_cost[:, c] = torch.where(is_bq, b_cost, self.cur_cost[:, c])
                     self.current[:, c] = torch.where(is_bq, torch.full_like(self.current[:, c], bcode_w), self.current[:, c])
-                    bqueued_live = bqueued_live + is_bq.long()
             pi = ac - pbase
             # --- buy a building (purchaseBuilding: _buildable ∧ gold; instant)
             is_pb = (pi >= 0) & (pi < self.NB)
@@ -14760,7 +14757,8 @@ class BatchSim:
                 cost = self._p_cost[utp] * mult
                 if self._builder_idx >= 0:
                     # P4/D-10: bought builders price off the live escalator…
-                    b_now = self._builder_cost(self.builders_trained + bqueued_live) * mult
+                    b_now = self._builder_cost(self.builders_trained)  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
+                    b_now = b_now * mult
                     cost = torch.where(utp == self._builder_idx, b_now, cost)
                 found, _ = self._first_free_spot(self.site[:, c], "player", self._p_civ[utp])
                 can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
@@ -15090,8 +15088,8 @@ class BatchSim:
                 ).any(dim=1)
                 cap_empty = cap_live & (self.current.gather(1, cap_col.unsqueeze(1)).squeeze(1) == -1)
                 want_b = cap_empty & (cap_pop >= 2) & ~b_have & b_job
-                # P4/D-10: escalated price (queued count read BEFORE the write)
-                b_cost = self._builder_cost(self.builders_trained + (self.current == bcode).sum(dim=1))
+                # P4/D-10 + #51/S7.7a: escalated on builders ALREADY PRODUCED
+                b_cost = self._builder_cost(self.builders_trained)
                 if bool(want_b.any()):
                     rows = want_b.nonzero(as_tuple=True)[0]
                     cc = cap_col[rows]
@@ -15254,10 +15252,11 @@ class BatchSim:
                 # price (current is pre-decision here, exactly like base_q).
                 is_bu = valid_u & (ut == self._builder_idx)
                 if bool(is_bu.any()):
-                    bcode_q = self.UNIT_BASE + self._builder_idx
-                    base_bq = (self.current == bcode_q).sum(dim=1, keepdim=True)
-                    prefix_b = is_bu.long().cumsum(dim=1) - is_bu.long()
-                    bq_n = self.builders_trained.unsqueeze(1) + base_bq + prefix_b
+                    # #51/S7.7a: the queued terms go, the BLOCK STAYS — this is
+                    # also the only line that overrides the static roster price
+                    # with the escalator, so deleting it would price every
+                    # RL-queued builder at a flat 30 forever.
+                    bq_n = self.builders_trained.unsqueeze(1)
                     self.cur_cost.copy_(torch.where(is_bu, self._builder_cost(bq_n), self.cur_cost))
             self.current.copy_(torch.where(valid_b | valid_u, act, self.current))
             if not self._rl_purchase_active:
