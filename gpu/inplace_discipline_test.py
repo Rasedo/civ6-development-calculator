@@ -89,6 +89,17 @@ ALIASED: frozenset[str] = frozenset(
     # #51/S6.4: the five pairs whose sides never shared a name.
     + ["culture_total", "r_culture", "player_faith", "r_faith", "tourism_total",
        "r_tourism", "p_warmonger", "r_warmonger", "player_gp_points", "r_gpp"]
+    # #51/S6.5: the seat-indexed war clocks.
+    + ["r_warturns", "r_peaceturns", "cs_war_turns"]
+    # #51/S6.2: the city block's player and rival views (the base is registered).
+    + ["alive", "site", "pop", "city_hp", "outer_hp", "is_cap", "loyalty",
+       "tiles_acquired", "food_box", "culture_box", "current", "progress",
+       "cur_cost", "q_dtile", "gw_writing", "gw_art", "gw_music", "relics",
+       "artifacts", "buildings"]
+    + ["rc_alive", "rc_center", "rc_pop", "rc_hp", "rc_outer_hp", "rc_is_cap",
+       "rc_loyalty", "rc_acquired", "rc_growth", "rc_cbox", "rc_current",
+       "rc_progress", "rc_cost", "rc_qtile", "rc_gw_writing", "rc_gw_art",
+       "rc_gw_music", "rc_relics", "rc_artifacts", "rc_bldg"]
 )
 
 

@@ -531,8 +531,19 @@ rival-only planes with no player twin at all, which is a different problem:
 either the player genuinely lacks the mechanic (#52 embark, #53 faith economy,
 rival science) or stores it derived rather than stored (`r_prophets`).
 
+**S6.5 — the two war CLOCKS become seat-indexed. DONE.** `r_warturns [B,R]`
+and `cs_war_turns [B,S]` count the same thing — how long that seat has been at
+war with the player — so they are the rival and minor slices of one
+`war_turns [B, NS]`, at the same `_seat_row` index `war` uses. `peace_turns`
+takes the same shape; only its rival slice is written, because there is no
+city-state peace clock — the S6.2 rule again: the FIELDS are uniform, the RULES
+are not. Also swept the S6.2 leftovers into rule 4's guarded list: the city
+block's forty player/rival view names were never there (135 guarded now, from
+92), so a rebind of `rc_pop` or `buildings` would have detached a section of
+the block silently.
+
 Remaining: the `cs_*` planes that are genuinely city-state-specific
-(`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_war_turns`, `cs_at`) and the rest
+(`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_at`) and the rest
 of the TS half — `src/core/types.ts:CityState` becoming a `Seat` with one
 `City`, which needs the `caps` table the target-shape section describes.
 

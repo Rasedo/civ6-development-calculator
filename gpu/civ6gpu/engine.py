@@ -400,11 +400,11 @@ _MUTABLE = [
     "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_quest_district", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
+    "cs_quest_district", "cs_at",  # A-18 (#79): player<->CS war
     "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
+    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
     "rc_dist_tile",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -446,6 +446,9 @@ _MUTABLE = [
     # block a MINOR section that neither view reaches. Registering the base is
     # the only spelling that stays complete when the block grows a section.
     "cty_alive", "cty_center", "cty_pop", "cty_hp", "cty_outer_hp", "cty_is_cap", "cty_loyalty", "cty_acquired", "cty_growth", "cty_cbox", "cty_current", "cty_progress", "cty_cost", "cty_qtile", "cty_gw_writing", "cty_gw_art", "cty_gw_music", "cty_relics", "cty_artifacts", "cty_bldg",
+    # #51/S6.5: the two seat-indexed war clocks (r_warturns / cs_war_turns /
+    # r_peaceturns are VIEWS of these).
+    "war_turns", "peace_turns",
 ]
 
 
@@ -688,7 +691,18 @@ class BatchSim:
         self.register_alias("cs_atwar", lambda sim: sim.war[:, 0, 1 + max(sim.R, 1):1 + max(sim.R, 1) + max(sim.S, 1)])
         # #50 (#79): turns since the player declared — the csWarTurns twin,
         # gating when peace may be offered (PEACE_MIN_WAR_TURNS).
-        self.cs_war_turns = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # #51/S6.5: the two war CLOCKS are seat-indexed like the matrix they
+        # count. `war_turns[b, row]` is how long that seat has been at war with
+        # the PLAYER — `r_warturns` and `cs_war_turns` are the rival and minor
+        # slices of it, at the same `_seat_row` index `war` uses. `peace_turns`
+        # is the same shape; only its rival slice is written today (there is no
+        # city-state peace clock), which is the S6.2 rule again: the FIELDS are
+        # uniform, the RULES are not.
+        self.war_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
+        self.peace_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
+        _cs0 = 1 + max(self.R, 1)
+        self.cs_war_turns = self.war_turns[:, _cs0:_cs0 + s_pad]
+        self.register_alias("cs_war_turns", lambda sim: sim.war_turns[:, 1 + max(sim.R, 1):1 + max(sim.R, 1) + max(sim.S, 1)])
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
         self._cs_yidx = torch.tensor(cs_yidx, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
         cs_didx = rules.cs.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
@@ -881,9 +895,11 @@ class BatchSim:
         self._ded_faith = int(_er.get("dedicationFaith", 2))
         self._ded_era = int(_er.get("dedicationEraScore", 1))
         self._gov_loy = float(_er.get("governorLoyalty", 8))
-        self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        self.r_warturns = self.war_turns[:, 1:1 + r_pad]  # #51/S6.5
+        self.register_alias("r_warturns", lambda sim: sim.war_turns[:, 1:1 + max(sim.R, 1)])
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
-        self.r_peaceturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        self.r_peaceturns = self.peace_turns[:, 1:1 + r_pad]  # #51/S6.5
+        self.register_alias("r_peaceturns", lambda sim: sim.peace_turns[:, 1:1 + max(sim.R, 1)])
         # C1-B2: per-city production queues replace the pooled stocks.
         # rc_current: -1 idle, 0 settler, 1+u trains roster unit u.
         # C1-B3a: real per-rival research trees — the SAME tech/civic tables
