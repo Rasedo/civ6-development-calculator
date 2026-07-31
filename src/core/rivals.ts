@@ -1702,6 +1702,15 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
     total += appealTier(tileAppeal(map, dt)).housing;
   }
   if (m.riverCity && hasRiver(center)) total += m.riverCity.housing;
+  // #51/S7.4a: the seat's GOVERNMENT/POLICY housing, which `computeHousing`
+  // has always added (`total += m.housingAll`) and `rivalHousing` never did.
+  // A government's effects belong to the civ that ADOPTED it — rivals adopt
+  // governments on both engines (computeAdoption / _adopted_gov), so a rival
+  // running MONARCHY was simply being denied its own housing.
+  // NOTE, and deliberately NOT fixed here: data/policies.ts gives MONARCHY a
+  // FLAT housingAll, which is a separate residual about the VALUE. This slice
+  // is about the CHANNEL — that the rival seat reads it at all.
+  total += m.housingAll;
   // #51/S7.3: the improvement's housing accrues to the city that OWNS the
   // tile, not to every city of the civ whose radius reaches it. This read
   // `tileOwnedByCiv(t, civ)`, so with two same-civ cities within six hexes —

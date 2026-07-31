@@ -2864,8 +2864,8 @@ class BatchSim:
         card-table order (TS findIndex: a card whose kind slots are full takes
         the first open W; every catalog government lists its W slots LAST, so
         kind-first matches findIndex — MONARCHY's W takes GOD_KING at ~t117).
-        housingAll is the PLAYER-only channel: TS rivalHousing is mods-free,
-        so the rival call sites discard it."""
+        #51/S7.4a: housingAll is consumed by EVERY seat now — the rival call
+        sites used to discard it, denying a rival its own government's housing."""
         B = civics2.shape[0]
         dev, dt = self.device, self.dtype
         city_y = torch.zeros(B, 6, dtype=dt, device=dev)
@@ -4638,7 +4638,7 @@ class BatchSim:
         # rivalCityYields `bonuses` position (rivals.ts). Same channels as the
         # player path (getRivalModifiers layers gov+policy into these mods).
         if self._gov_has_effects:
-            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
+            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # #51/S7.4a: housing IS consumed now (rival housing); ymult/slots still are not
             acell = alive.double()  # [B, RC]
             gisc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
             food = food + gcity[:, 0].unsqueeze(1) * acell + gcap[:, 0].unsqueeze(1) * gisc
@@ -10130,7 +10130,7 @@ class BatchSim:
         # A-7r: government + slotted-policy flat yields (cityYields all cities,
         # capitalYields the capital) — pre-tier, the batched twin's addition.
         if self._gov_has_effects:
-            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # housing/ymult/slots discarded (TS rival paths don't consume them)
+            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # #51/S7.4a: housing IS consumed now (rival housing); ymult/slots still are not
             mcell = mask.double()  # [B]
             gisc = (self.rc_is_cap[:, r, j] & mask).double()  # [B]
             food = food + gcity[:, 0] * mcell + gcap[:, 0] * gisc
@@ -13545,7 +13545,13 @@ class BatchSim:
                 # B9-R3: PALACE housing on the capital slot (rivalHousing sums
                 # rc.buildings, which now hold the founding PALACE; CITY_CENTER
                 # never pillages so no darkness gate).
-                housing = water + bh + self._palace_housing * (self.rc_is_cap[:, r] & self.rc_alive[:, r]).double() + farm
+                # #51/S7.4a: + this seat's GOVERNMENT/POLICY housing. The player
+                # path has always added it (`housing + gpc_hous`); the rival
+                # discarded it, so a rival running MONARCHY was denied its own
+                # government's housing. A government belongs to the civ that
+                # ADOPTED it, and rivals adopt on both engines.
+                _gp_hous = self._gov_policy_mods_cached(r, self.r_civics[:, r])[2].double()
+                housing = water + bh + self._palace_housing * (self.rc_is_cap[:, r] & self.rc_alive[:, r]).double() + farm + _gp_hous.unsqueeze(1)
                 # A-9 (#71): appeal-based NEIGHBORHOOD housing, the player twin
                 # (computeHousing). rc tiles are keyed by the A-17 per-city
                 # registry (rc_tile_id), so sum per rc SLOT over its own tiles.
