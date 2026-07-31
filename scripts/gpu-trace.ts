@@ -208,7 +208,7 @@ const PER_RIVAL_COLS: TraceCol<RivalCiv | undefined>[] = [
  * here is alive-masked, and `rc_id` is zero-initialised (colliding with the
  * capital's id), which makes the mask load-bearing rather than cosmetic.
  */
-export const RIVAL_CITY_MAX = 16; // MEASURED 2026-07-30: max 8 rival cities across 12 seeds x 250 turns; WIDENED 12->16 by #51/S4.1r, whose settler POP COST shifts trajectories enough that a rival reached 13 (RIVAL_MAX_CITIES caps SETTLING, not CAPTURES). Both engines ASSERT no rival exceeds this, so a 17th city fails loudly instead of silently losing coverage.
+export const RIVAL_CITY_MAX = 12; // MEASURED 2026-07-30: max 8 rival cities across 12 seeds x 250 turns. Both engines ASSERT no rival exceeds this, so a 13th city fails loudly instead of silently losing coverage.
 
 const PER_RIVAL_CITY_COLS: TraceCol<{ rival: RivalCiv; rc: RivalCity } | undefined>[] = [
   { name: 'pop', tol: 0, get: (_s, x) => x?.rc.population ?? 0 },
