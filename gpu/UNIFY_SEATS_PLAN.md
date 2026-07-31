@@ -552,8 +552,29 @@ proves they never claim the same tile — nothing had ever checked that, and a
 claim that writes `rival_at` without clearing `owner` would leave every
 consumer picking a different winner depending on which plane it read. It holds
 across 12 seeds x 250t and is proven to BITE on an injected double claim.
-Flipping the ~160 readers and deleting the three planes is the S3.4b-scale
-follow-on.
+**S6.7 — the cache, and the first 28 readers flipped. DONE.** A derived
+`tile_seat` recomputed at each of ~160 call sites would add ~480 kernel
+launches per step, and dispatch is already 83% of a step at B=12 (task #57) —
+a derived read has to be FREE before call sites can move to it. It is cached
+on `_tile_owner_ver`, which every tile-ownership write bumps, and a MISSED
+bump is not silent: the step invariant compares the cache against a fresh
+derivation. The 28 `self.owner >= 0` reads — "does the PLAYER own this tile",
+the seat question — now ask `tile_seat == PLAYER_SEAT`. `owner` keeps the
+CITY question (`owner == c`), which is TS's `ownerCity`, and stays.
+
+TWO MISSED WRITES, both found by the staleness check within minutes of the
+readers flipping, neither visible to a scan for `self.owner[...] =`:
+  1. `restore()` rewrites all three planes through a generic
+     `getattr(self, k).copy_(v)` loop.
+  2. FOUR claim sites index with a NESTED subscript —
+     `self.rival_at[rows[free], n_d[free]] = r` — which a
+     `\[[^\]]*\]` scan cannot match. The bracket-aware rescan found them.
+That is the same family as S3.1's line-scanner missing eight multi-line
+statements: a regex over source is a heuristic, and the invariant is what
+makes it safe to rely on one.
+
+Flipping the remaining ~130 readers and deleting the three planes is the rest
+of the S3.4b-scale follow-on.
 
 Remaining: the `cs_*` planes that are genuinely city-state-specific
 (`cs_type`, `cs_suz_key`, `cs_last_levy`) and the rest
