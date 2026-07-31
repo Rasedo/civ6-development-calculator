@@ -641,21 +641,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     return ok;
   }
 
-  // #51/S7.10a: CITY-FIRST over a MILITARY garrison. The `enemyCity` arm above
-  // has never been gated on `enemies.length === 0`, so a garrison standing in a
-  // PLAYER city shielded nothing while the same garrison shielded a RIVAL city
-  // — the asymmetry this task exists to destroy. In Civ 6 a garrisoned unit
-  // adds its strength to the CITY's defence; it is not a separate defender
-  // standing in front of it. https://forums.civfanatics.com/threads/669378/
-  //
-  // A LONE CIVILIAN still wins, and that is not an oversight: B-31 kills it
-  // ROLL-FREE and advances, and P2's reshuffle pinned that against TS at seed
-  // 9053 t204 (a rival builder on an at-war rival centre — besieging the city
-  // there cost 2 extra draws). Civilians cannot defend, so they cannot be the
-  // thing a city is attacked "through".
-  const garrisoned = enemies.some((u) => unitDomain(u.type) === 'military');
-  const cityFirst = enemies.length === 0 || garrisoned;
-  if (rivalTarget && cityFirst) {
+  if (enemies.length === 0 && rivalTarget) {
     if (isPlayerSeat(attacker.seat) && !rivalTarget.rival.atWar) {
       return no(`You are at peace with ${rivalTarget.rival.name} — declare war first.`);
     }
@@ -663,7 +649,7 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     return ok;
   }
 
-  if (csTarget && cityFirst) {
+  if (enemies.length === 0 && csTarget) {
     attackCityState(state, attacker, csTarget);
     return ok;
   }
@@ -745,9 +731,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
     return no('Out of range.');
   }
   const enemies = unitsAt(state, targetIndex).filter((u) => unitsHostile(state, attacker, u));
-  // #51/S7.10a: city-first over a MILITARY garrison; a lone civilian still
-  // takes the shot (see meleeAttack for the rule and its seed-9053 precedent).
-  if (enemies.length === 0 || enemies.some((u) => unitDomain(u.type) === 'military')) {
+  if (enemies.length === 0) {
     // P4/D-23 (real Civ 6): ranged units CAN bombard cities — same fallback
     // chain as meleeAttack (rival city, then city-state center), one roll,
     // no retaliation. Ranged fire never captures: the city holds at 1 HP
@@ -770,9 +754,8 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
         return ok;
       }
     }
+    return no('Nothing to attack there.');
   }
-  // #51/S7.10a: no city took the shot — fall through to the unit, or bail.
-  if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = enemies.find((u) => unitDomain(u.type) === 'military') ?? enemies[0];
   // B-5 + B-29 + B-7 support (no flanking: a ranged attacker takes no
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
@@ -934,12 +917,6 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
   cityAssault(state, attacker, city, 'rcty', 'rctyc');
   if (city.hp > 0) return;
-  // #51/S7.10a: DAMAGE goes through a garrison, CAPTURE does not. Civ 6 takes a
-  // city by MOVING INTO the centre, which a surviving defender forbids — so a
-  // city battered to 0 HP with a garrison still standing holds at 0 until the
-  // garrison dies. Before city-first this was unreachable (the garrison was
-  // attacked instead of the city), so the capture path never had to say it.
-  if (unitsAt(state, city.centerIndex).some((u) => unitsHostile(state, attacker, u))) return;
   if (isPlayerSeat(attacker.seat)) {
     captureRivalCity(state, rival, city);
   } else if (isRivalSeat(attacker.seat)) {
