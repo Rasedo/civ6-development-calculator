@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeState, tileAtCoords } from './helpers';
 import { rivalPhase, isFormalWar, rivalStrength } from '../src/core/rivals';
-import { civsAtWar, setRivalWar, civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount } from '../src/core/seats';
+import { civsAtWar, setRivalWar, civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount , emptySeat } from '../src/core/seats';
 import { hostileRangedStrike, attackTargets } from '../src/core/combat';
 import { unitsHostile, spawnUnit } from '../src/core/units';
 import { tilesWithin } from '../src/core/hex';
@@ -18,6 +18,7 @@ import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',

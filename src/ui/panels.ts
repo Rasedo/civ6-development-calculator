@@ -265,7 +265,7 @@ export function renderTilePanel(
       </div>
     </div>`;
   }
-  if (state.unitsMode && state.barbCamps.includes(tileIndex)) {
+  if (state.unitsMode && state.barbSeat.camps.includes(tileIndex)) {
     unitsHtml += '<div class="row bad">Barbarian camp — clear it with a military unit (+50 gold).</div>';
   }
   if (tile.pillaged) {

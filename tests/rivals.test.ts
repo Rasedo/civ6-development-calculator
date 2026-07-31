@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CITY_MAX_HP } from '../src/data/units';
-import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV, rivalOfCiv, isPlayerSeat, isRivalSeat, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
+import { playerSeat, civOfRival, BARB_SEAT, isBarbSeat, PLAYER_CIV, rivalOfCiv, isPlayerSeat, isRivalSeat, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, rivalsOf, rivalCount , emptySeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import {
   createGame,
@@ -29,6 +29,7 @@ function addRival(
 ): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
@@ -559,6 +560,7 @@ describe('rival CS trade routes (A-12b)', () => {
   function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> = {}): CityState {
     const center = tileAtCoords(state.map, col, row);
     const cs: CityState = {
+      ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
       id: state.cityStates.length,
       name: `Testopolis ${state.cityStates.length}`,
       type: 'scientific',

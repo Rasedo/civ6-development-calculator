@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount , emptySeat } from '../src/core/seats';
 import { dedicationEvent } from '../src/core/eras';
 import { DED_MONUMENTALITY, DED_EXODUS, DED_EVENT_SCORE } from '../src/data/rivals';
 import { makeState, tileAtCoords } from './helpers';
@@ -28,6 +28,7 @@ import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',

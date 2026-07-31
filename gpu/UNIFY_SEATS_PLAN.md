@@ -607,9 +607,167 @@ sites still spell it three ways, and they can stay that way indefinitely —
 they are views over one pair, and cannot disagree with it.
 
 Remaining: the `cs_*` planes that are genuinely city-state-specific
-(`cs_type`, `cs_suz_key`, `cs_last_levy`) and the rest
-of the TS half — `src/core/types.ts:CityState` becoming a `Seat` with one
-`City`, which needs the `caps` table the target-shape section describes.
+(`cs_type`, `cs_suz_key`, `cs_last_levy`).
+
+---
+
+**S6.11 — the capability table, and the ten bits it refuses. DONE.**
+`src/data/seats.ts` + `gpu/civ6gpu/engine.py:SEAT_CAPS`.
+
+§3 proposed twelve bits and a hard cap of twelve. Applying §3's OWN
+admissibility rule — *a bit is admissible only where the empty/zero data value
+would be WRONG* — admits **two**:
+
+| bit | why zero is a LIE |
+|---|---|
+| `xp` | a barbarian carrying `xp = 0` ACCUMULATES from its next attack. Civ 6 barbarians have no promotions. |
+| `alwaysHostile` | the war relation is one symmetric matrix (S6.0) and an all-false row means PEACE. Barbarians never declare and never make peace. |
+
+The other ten (`research`, `found`, `expandBorders`, `produce`, `greatPeople`,
+`trade`, `diplomacy`, `envoys`, `suzerainable`, `victory`) are each answered by
+a datum the seat already carries — an empty tech list, zero settlers, an empty
+queue, zero culture, zero gpp, an empty route list, zero favour, zero envoys,
+the minor's own `type`, and thresholds on totals that never accrue. They are
+recorded in `src/data/seats.ts` with the datum beside each, because a flag that
+restates data reads like a rule and is not one.
+
+**The table is NOT stored on the Seat**, which §3's target shape had. The class
+is a function of the absolute seat id (task #54), so a stored copy would be a
+second source of truth for a fact the id carries — the admissibility rule one
+level up. `capsOf(seat)` is a pure function; the trigger that would flip this
+is a per-CIV trait varying a capability WITHIN a class, and nothing does.
+
+Three call sites, and only three: `combat.ts:gainXp`, `units.ts:spawnUnit`,
+`units.ts:unitsHostile`. `units.ts` no longer imports `isBarbSeat` at all —
+every barbarian branch in that file was a capability wearing an identity's
+clothes. The ones that stay ARE identities: `state.units.filter(isBarbSeat)`
+asks *which units are the barbarians'*, and rewriting it through the table
+would make the table mean "barbarian", which is exactly the coupling it breaks.
+
+GPU: the same two bits, resolved where this engine branches. `atk_kind ==
+"barb"` was a PYTHON-level branch picking a whole code path, so the cap is a
+dict lookup at that granularity — building a `[BARB_SEAT+1]` tensor to gather
+would add dispatch (#57: 83% of a step at B=12 is already dispatch) to answer
+a question a dict answers free. The tensor-level `torch.where(is_barb, 0, ...)`
+gates stay: two of them mask an INVALID GATHER (a barb defender's `vslot` is
+-1, clamped to 0, so it would read rival slot 0's xp), which is a bounds guard
+and not a capability. The third one's comment claimed to be "belt and braces
+rather than load-bearing" — a claim nothing checked. `_check_seat_invariant`
+checks it now, so "a barb slot holds no xp" is proven every step under
+`CIV6_ALIAS_CHECK=1` instead of asserted in prose.
+
+Lane: `tests/seat-caps.test.ts`, 6 cases, every one with its negative twin (a
+capability table's failure mode is answering the same thing for everybody).
+
+---
+
+**S6.12 — `seatOf` becomes TOTAL. DONE.**
+
+`seatOf(state, seat)` was `state.seats[seat]`. That array holds the player at 0
+and the rivals at 1..R, so for a MINOR seat (100+) or the BARBARIANS (200) it
+returned `undefined`, silently. **Half the seat space had no seat object** —
+generic code written against `Seat` could not run for two of the four classes,
+which is this task's asymmetry expressed in the type system.
+
+* `CityState extends Seat` — a minor carries the same civ-level state everyone
+  does, at zero. Not padding: a total function needs a value of the right TYPE
+  for every id, and S6.11's rule says the zero is the RIGHT answer (a minor
+  banks nothing and researches nothing), not a missing one.
+* `GameState.barbSeat` — one Seat for the hostile class, same reason.
+* `emptySeat(id)` — the ONE constructor. Three copies of a 700-character inline
+  literal (`deserialize`, `createGameFromMap`, `tests/helpers.ts`) collapse
+  into it, so a field added to `Seat` can no longer be added to two of three.
+* `allSeats(state)` — every actor in seat order, the same order `_seat_row`
+  uses on the GPU.
+
+**Storage is deliberately NOT merged.** `state.cityStates` stays the minor
+storage and `state.seats` the major storage. One absolute-indexed array would
+carry holes at 2..99 and 101..199 — 194 `null`s through `JSON.stringify` in
+every save — and the mandate asks that a reader cannot tell the classes apart,
+which is a property of the TYPE and of `seatOf`, not of which array the object
+sits in.
+
+GPU: nothing. It already has the total seat INDEX (`_seat_row`, `NS`) and the
+minors' cities in the shared block (S6.2). Its per-seat scalar planes stay
+`[B, 1+R]` until a rule reads a minor's treasury — a plane with no reader is
+memory, not unification.
+
+---
+
+**S6.13 — the barbarians hold their camps. DONE.**
+
+`GameState.barbCamps` was a global list of tiles belonging, in fact, to one
+actor — the same shape mistake as `GameState.cityHp` and `GameState.rivals`
+(S1.3j). `camps` joins `Seat` (empty for every other class, which is the right
+answer and not a missing one, so it is data and not a thirteenth cap bit) and
+the barbarian seat holds the game's camps. 32 readers re-homed.
+
+The payoff is `clearCampFor`, which opened `if (isBarbSeat(unit.seat)) return;`
+— an identity test standing in for a rule. The rule is *you do not clear your
+own camps*, and with the camps on a seat and `seatOf` total it is now sayable:
+`if (seatOf(state, unit.seat) === state.barbSeat) return;`.
+
+Camps STAY A LIST of tile indices. They are not cities — no population, no
+queue, no borders — and promoting them to cities to make the shape uniform
+would invent mechanics neither engine has.
+
+**A save-migration trap, caught by its own lane.** The first migration read
+`state.barbSeat.camps ??= legacy ?? []`, which never fires: `emptySeat` has
+already put an EMPTY ARRAY there and `[]` is not nullish, so every camp in a
+pre-move save was silently dropped. The legacy field is read BEFORE the seat is
+built now. Same family as `[[boolean-to-comparison-precedence]]` — `tsc` and
+485 tests both passed the broken version.
+
+Lane: `tests/seat-total.test.ts`, 9 cases (totality with six DISTINCT objects,
+`allSeats` ordering, save round-trip, the pre-move save, a reloaded minor).
+
+---
+
+**S6.14 — §7 item 12, the half that is free. DONE.**
+
+The per-turn refresh healed every unit through a THREE-ARMED branch:
+
+| class | rule |
+|---|---|
+| player | own centre 20 / own land 15 / neutral 10 / foreign 5 |
+| rival | own centre 20 / own land 15 / neutral 10 / foreign 5 |
+| barbarian | own camp 20 / — / neutral 10 / foreign 5 |
+
+The first two are the SAME RULE written twice: for a player unit
+`isPlayerSeat(tileSeat(t))` and `tileSeat(t) === unit.seat` are the same
+predicate, because its seat IS `PLAYER_CIV`. The third stops being special once
+the camps belong to a seat (S6.13). One rule covers all three — *own centre 20,
+own land 15, own camp 20, neutral 10, foreign 5* — because the terms that do
+not apply to a class are EMPTY for it: a major holds no camps, the barbarians
+hold no land. Data, not a class branch; the same test that keeps the capability
+table at two bits.
+
+**It could not have been written before this round.** "Is this MY land" was
+three different planes on the GPU — `owner`, `rival_at`, `cs_at` — and each arm
+asked a different one. S6.8–S6.10 collapsed them into `tile_seat`, so the
+question has one form for every seat, and `_seat_heal` is that form. The pools
+stay three (the FORTIFY loop's shape, which S3.2 landed in this same block);
+merging them into the single unit pool is #57's op-count win, not this slice's.
+
+The barbarian phase's MP reset also joined the one contract. It read the unit's
+raw `UNITS[type].moves` and left `movesFull` alone — the only MP reset in either
+engine that bypassed `unitFullMoves`. Value-identical today (a barbarian holds
+no golden dedication and never embarks) and a divergence waiting for the first
+rule that gives the hostile class either.
+
+Fixtures BYTE-IDENTICAL across both halves, which is the proof that "the three
+arms were one rule" was a claim about the code and not about behaviour.
+
+**WHAT §7 ITEM 12 STILL OWES, and why it is not here.** The decision also said
+each seat should refresh at the start of ITS OWN phase — real Civ 6 refreshes a
+civ when its turn begins, which is what `rivalPhase`/`barbarianPhase` already
+half-do. Moving the CALL SITE is a BEHAVIOUR change, not a representation one:
+`refreshUnits` heals and fortifies as well as resetting MP, so a rival healing
+in its own phase heals AFTER the player's attacks instead of before, and its HP
+differs mid-turn. That is a Round 7 B-stage with a declared logdiff delta
+(§9 stop-condition 2), not something to land inside an R-stage. Round 5's
+"value-identical today" was true of the MP reset alone; the heal is coupled to
+it and is not.
 
 ---
 
@@ -705,7 +863,7 @@ These are **game-rule** differences, not disabled rules. Each must be **verified
 | 9 | **`greatPeople.earned`**: one shared array vs per-seat + a global denial set. | S1.2 |
 | 10 | **Government**: stored state (player) vs pure function of research (rival, `effects.ts:computeAdoption`). Decision: store on every seat. | S1.2 |
 | 11 | **City-state combat**: HP 150 vs 200, unconditional +10 regen vs besieged-gated +20, no ranged strike at all. | S6 |
-| 12 | **The double MP reset** — **DECIDED (Round 5)**: not an artefact. Civ 6 refreshes a civ at the start of ITS turn, so `rivalPhase`/`barbarianPhase` are the faithful resets and `refreshUnits`' all-units sweep is the odd one. Value-identical today; collapse to "each seat refreshes in its own phase" at Round 6. | S5 decided, S6 acts |
+| 12 | **The double MP reset** — **DECIDED (Round 5)**: not an artefact. Civ 6 refreshes a civ at the start of ITS turn, so `rivalPhase`/`barbarianPhase` are the faithful resets and `refreshUnits`' all-units sweep is the odd one. **S6.14 landed the free half** (one heal rule, no class branch; the barb MP reset on the shared contract — byte-identical). The CALL-SITE move is a behaviour change and is **not** value-identical: `refreshUnits` heals and fortifies too, so a rival refreshing in its own phase heals AFTER the player's attacks. | S5 decided, **S6.14 (repr.)**, **R7 (behaviour)** |
 
 ---
 
@@ -752,6 +910,12 @@ State these up front so they are decisions, not retreats:
 | 7 Reconciliation | S7.1–S7.14 | B ×14 | one re-export each | 1 (at end) |
 | 8 RL + oracle | S8.1–S8.3 | B | rollout schema | 1 + eval baseline |
 
-**Total: 26 stages, 9 batteries, 5 rounds that touch fixtures, 2 permitted draw-count changes, 12 capability bits, 12 fidelity decisions.**
+**Total: 26 stages, 9 batteries, 5 rounds that touch fixtures, 2 permitted draw-count changes, ~~12~~ **2** capability bits, 12 fidelity decisions.**
+
+The bit count is the plan's own admissibility rule doing its job: ten of the
+twelve proposed bits are answered by data the seat already carries, and S6.11
+records each with the datum that answers it rather than carrying a flag that
+restates it. §9's stop condition 5 (a 13th bit means the mechanic is a
+DECISION, not a capability) still stands and now has ten bits of headroom.
 
 The single most important line in this document: **an R-stage that goes red is always a real bug, and a B-stage that moves a `logdiff` line outside its declared set is always a regression.** Everything else is scaffolding around those two properties.

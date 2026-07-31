@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, civOfRival } from '../src/core/seats';
+import { playerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, civOfRival , emptySeat } from '../src/core/seats';
 import { makeState, tileAtCoords } from './helpers';
 import { createGame, foundCity, endTurn, serialize, deserialize } from '../src/core/game';
 import { canFoundCity } from '../src/core/rules';
@@ -18,6 +18,7 @@ function addCs(
 ): CityState {
   const center = tileAtCoords(state.map, col, row);
   const cs: CityState = {
+    ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
     name: `Testopolis ${state.cityStates.length}`,
     type: 'scientific',

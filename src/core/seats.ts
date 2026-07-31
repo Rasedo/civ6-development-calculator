@@ -21,6 +21,8 @@
  */
 
 import type { City, GameState, RivalCity, RivalCiv, Seat, Tile, Unit } from './types';
+import type { SeatCaps, SeatClass } from '../data/seats';
+import { SEAT_CAPS } from '../data/seats';
 import { RESOURCES } from '../data/resources';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 
@@ -206,9 +208,52 @@ export function playerSeat(state: GameState): Seat {
   return state.seats[PLAYER_CIV];
 }
 
-/** The seat record for any seat id (player or rival). */
+/**
+ * #51/S6.12: an EMPTY seat — every field of `Seat` at its zero.
+ *
+ * The one constructor. `deserialize` used to carry this as a 700-character
+ * inline literal, which meant a field added to `Seat` had exactly one place
+ * that could forget it and no way to notice. Three call sites share it now
+ * (the player fallback, a city-state, the barbarians).
+ */
+export function emptySeat(seat: number): Seat {
+  return {
+    seat,
+    warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0,
+    influencePoints: 0, envoysAvailable: 0,
+    treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
+    research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },
+    government: { current: null, policies: [] },
+    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
+    gpp: {}, gpEarned: [],
+    settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0,
+    spaceProjects: [], camps: [],
+  };
+}
+
+/**
+ * The seat record for ANY seat id — player, rival, city-state or barbarian.
+ *
+ * #51/S6.12: this used to be `state.seats[seat]`, which answered `undefined`
+ * for the whole minor range and for the barbarians. A generic function written
+ * against `Seat` therefore could not run for half the seat space, which is the
+ * asymmetry this task destroys, expressed in the type system. It is TOTAL now:
+ * the three storages differ, the answer does not.
+ */
 export function seatOf(state: GameState, seat: number): Seat | undefined {
+  if (isCityStateSeat(seat)) return state.cityStates?.[cityStateOfSeat(seat)];
+  if (isBarbSeat(seat)) return state.barbSeat;
   return state.seats[seat];
+}
+
+/**
+ * Every actor in the game, in SEAT ORDER: the player, the rivals, the
+ * city-states, the barbarians. The order is the seat-id order, which is the
+ * same order the GPU's `_seat_row` uses, so "walk every seat" means the same
+ * sequence on both engines.
+ */
+export function allSeats(state: GameState): Seat[] {
+  return [...state.seats, ...(state.cityStates ?? []), ...(state.barbSeat ? [state.barbSeat] : [])];
 }
 
 /** Is this the human/agent seat? */
@@ -216,6 +261,30 @@ export const isPlayerSeat = (seat: number): boolean => seat === PLAYER_CIV;
 
 /** Is this a barbarian? They act but hold no territory, research or diplomacy. */
 export const isBarbSeat = (seat: number): boolean => seat === BARB_SEAT;
+
+/**
+ * #51/S6.11: which KIND of actor this seat is. The absolute seat space encodes
+ * it already (task #54), so this reads the id rather than storing a duplicate.
+ * `NO_SEAT` is not an actor and never reaches here.
+ */
+export function seatClass(seat: number): SeatClass {
+  if (isBarbSeat(seat)) return 'hostile';
+  if (isCityStateSeat(seat)) return 'minor';
+  return 'major'; // the player and the rivals
+}
+
+/**
+ * #51/S6.11: what this seat MAY do — see src/data/seats.ts for the table and
+ * for the ten proposed bits the admissibility rule threw out.
+ *
+ * Ask this, never `isBarbSeat`, when the question is a RULE ("do its units
+ * promote?"). Ask `isBarbSeat` when the question is IDENTITY ("which units are
+ * the barbarians'?"). Conflating the two is how one rule ended up spelled four
+ * different ways.
+ */
+export function capsOf(seat: number): SeatCaps {
+  return SEAT_CAPS[seatClass(seat)];
+}
 
 /**
  * Is this a rival civ? Rival seats are 1..R.

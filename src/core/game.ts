@@ -35,7 +35,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, WORSHIP
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
-import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV, setTileOwner, rivalsOf, rivalCount } from './seats';
+import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV, setTileOwner, rivalsOf, rivalCount, emptySeat, BARB_SEAT, seatOfCityState } from './seats';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -119,7 +119,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     units: [],
     nextUnitId: 0,
     rngState: (map.seed ^ 0x9e3779b9) >>> 0,
-    barbCamps: [],
+    barbSeat: emptySeat(BARB_SEAT), // #51/S6.12: the hostile class has a seat too
     disasters: false,
     gameOver: false, // GV-2
     victoryType: 0, // GV-4/GV-3
@@ -131,7 +131,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     // #51/S1.2: the player is seat 0 and holds the SAME shape a rival does.
     // Rival seats are appended by the rival factory (they are the same objects
     // as `rivals[]` while the field-by-field migration proceeds).
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [], settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0, spaceProjects: [] }],
+    seats: [emptySeat(PLAYER_CIV)],
     claimedPantheons: [],
     claimedBeliefs: [],
     claimedEnhancers: [],
@@ -1290,7 +1290,7 @@ export function deserialize(json: string): GameState {
   // them here. (Caught by the rival-determinism test, which is exactly what it
   // is for.) The redundancy disappears when `rivals` does, at the end of S1.2.
   state.seats = [
-    state.seats?.[0] ?? { seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [], settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0, spaceProjects: [] },
+    state.seats?.[0] ?? emptySeat(PLAYER_CIV),
     ...(rivalsOf(state) ?? []),
   ];
   playerSeat(state).research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
@@ -1320,7 +1320,16 @@ export function deserialize(json: string): GameState {
   state.units ??= [];
   state.nextUnitId ??= 0;
   state.rngState ??= (state.map.seed ^ 0x9e3779b9) >>> 0;
-  state.barbCamps ??= [];
+  // #51/S6.12: saves written before the minor/hostile seats existed carry
+  // neither, and `seatOf` is TOTAL now — an older save must not make it lie.
+  // #51/S6.13: such a save keeps its camps too — they were `state.barbCamps`,
+  // which is the barbarian seat's `camps` now. Read the legacy field BEFORE
+  // building the seat: `emptySeat` already puts an EMPTY ARRAY there, and `[]`
+  // is not nullish, so a `??=` afterwards would silently drop every camp.
+  const legacyCamps = (state as unknown as { barbCamps?: number[] }).barbCamps;
+  state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: legacyCamps ?? [] };
+  state.barbSeat.camps ??= legacyCamps ?? [];
+  for (const cs of state.cityStates ?? []) Object.assign(cs, { ...emptySeat(seatOfCityState(cs.id)), ...cs });
   state.disasters ??= false;
   // GV-2 gameOver is recomputed every endTurn (turn > TURN_LIMIT); no migration
   // needed, and adding ??= would break serialize round-trip idempotence for

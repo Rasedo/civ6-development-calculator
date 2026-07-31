@@ -260,6 +260,39 @@ P_MAX = 256  # player unit slots per game (append-only; runtime-asserted)
 # The absolute SEAT space, shared with TS core/seats.ts.
 PLAYER_SEAT = 0  # #51/S3.4: the player, TS seats.ts PLAYER_CIV
 BARB_SEAT = 200  # #51/S3.3: the barbarians, TS seats.ts BARB_SEAT
+
+# #51/S6.11: WHAT A SEAT MAY DO — the twin of src/data/seats.ts, same two bits,
+# same reasons. See that file for the ADMISSIBILITY RULE and for the ten bits
+# the plan proposed that the rule threw out (each because the empty/zero data
+# value is already the right answer).
+#
+#   xp             this seat's units accrue experience and promote.
+#   always_hostile hostile to everyone with NO war state — the one thing the
+#                  war matrix cannot say, since an all-false row means peace.
+SEAT_CAPS = {
+    "major": {"xp": True, "always_hostile": False},   # the player and the rivals
+    "minor": {"xp": True, "always_hostile": False},   # city-states
+    "hostile": {"xp": False, "always_hostile": True},  # barbarians
+}
+
+#: Which class each UNIT POOL belongs to. The pools are already split by class
+#: ("p" player, "v" rival, "u" barbarian), so a pool name answers "what may
+#: this actor do?" without touching the batch.
+POOL_CLASS = {"p": "major", "v": "major", "u": "hostile"}
+
+#: `atk_kind` as the attack paths spell it, mapped to the same classes.
+ATK_KIND_CLASS = {"player": "major", "rival": "major", "barb": "hostile"}
+
+
+def seat_class(seat: int) -> str:
+    """#51/S6.11: which kind of actor an ABSOLUTE seat id is — the twin of
+    core/seats.ts `seatClass`. The id space encodes it (task #54), so nothing
+    stores a duplicate."""
+    if seat == BARB_SEAT:
+        return "hostile"
+    if 100 <= seat < BARB_SEAT:
+        return "minor"
+    return "major"
 NO_SEAT = -1  # #51/S6.6: "nobody" — the TS seats.ts NO_SEAT twin
 
 # AUDIT B-7 flanking & support (mirrors combat.ts). A melee attacker gains +2 CS
@@ -2087,6 +2120,14 @@ class BatchSim:
             raise AssertionError("SEAT DRIFT: a RIVAL slot's seat != civOfRival(v_civ)")
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
+        # #51/S6.11: `caps.xp` is FALSE for the hostile class, and the TS twin
+        # enforces it by never giving a barbarian unit an `xp` field at all
+        # (units.ts spawnUnit). The GPU cannot leave a field out of a dense
+        # plane, so the same fact is an invariant: a barb slot's xp stays 0.
+        # Whole pool, dead slots included — a dead slot is reused by the next
+        # spawn, so a stale non-zero xp there is a veteran waiting to happen.
+        if not SEAT_CAPS[POOL_CLASS["u"]]["xp"] and not bool((self.unit_xp[:, u:ue] == 0).all()):
+            raise AssertionError("CAP VIOLATION: a BARB slot carries xp, but caps.xp is False for the hostile class")
 
     #: #51/S6.1: (name, dtype, fill) for every relation a CIV holds with a
     #: CITY-STATE. Each becomes one `csr_<name> [B, 1+R, S]` plane; `cs_<name>`
@@ -3434,6 +3475,41 @@ class BatchSim:
         there. #70/S3: the predicate moved to _gen_aura_hit (shared with the
         +MP half); this is unchanged externally."""
         return self._gen_aura_hit(civ_unified, tile, naval).to(self.dtype) * self._gen_aura_cs_val
+
+    def _seat_heal(self, pre: str) -> torch.Tensor:
+        """#51/S6.14 (P4/D-2, TS refreshUnits): what this pool's units heal.
+
+        ONE rule for every seat: this seat's own city centre 20, its own land
+        15, its own CAMP 20, neutral ground 10, anyone else's land 5.
+
+        It reads as three rules only if you look at which terms are non-empty
+        per class. A major holds no camps, so its camp term never fires; the
+        barbarians hold no land, so their `home` term never does. That is data,
+        not a class branch — the same test that keeps the capability table down
+        to two bits (#51/S6.11).
+
+        It could not be written this way before Round 6: "is this MY land" was
+        three different planes (`owner`, `rival_at`, `cs_at`) that S6.8-S6.10
+        collapsed into `tile_seat`, and the camps only became a SEAT's in
+        S6.13. `seat` is a tensor because a rival's varies per slot; for the
+        other two pools `torch.full_like` makes it the same expression rather
+        than a second one."""
+        t = getattr(self, f"{pre}_tile").clamp(min=0)
+        seat = getattr(self, f"{pre}_seat")
+        here = self.tile_seat.gather(1, t)
+        home = here == seat
+        # a city CENTRE here — any seat's; `home` already restricts it to this
+        # one, and the one-owner invariant makes a centre tile its own seat's.
+        center = (self.center_at.gather(1, t) >= 0) | (self.rvcity_at.gather(1, t) >= 0)
+        camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "u" else None
+        heal = torch.where(home & center, torch.full_like(t, 20),
+               torch.where(home, torch.full_like(t, 15),
+               torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
+        if camp is not None:
+            # the camp beats neutral/foreign ground but not this seat's own
+            # land, which is unreachable for the only class that holds camps.
+            heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
+        return heal
 
     def _spent_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — the P4/D-2 gate: has this unit spent MP since its last
@@ -10663,8 +10739,10 @@ class BatchSim:
             ds0 = d_slot.clamp(min=0)
             d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
             def_fort = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1) * 3  # B-5
-            # B-4: defender veterancy. Barbs hold 0 in the merged xp plane, so
-            # the explicit barb gate is belt and braces rather than load-bearing.
+            # B-4: defender veterancy — the VECTORIZED form of #51/S6.11
+            # `caps.xp`. That barbs hold 0 in the merged plane (which would make
+            # this gate redundant) is no longer a comment: _check_seat_invariant
+            # proves it every step under CIV6_ALIAS_CHECK=1.
             def_xp = torch.where(
                 def_is_barb, torch.zeros_like(mslot_raw),
                 self._xp_lvl_bonus(self.unit_xp.gather(1, ds0.unsqueeze(1)).squeeze(1)),
@@ -10677,8 +10755,10 @@ class BatchSim:
             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
             # B-29: attacker AND defender fight at HP-reduced strength.
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
-            # B-4: attacker veterancy — a rival attacker via v_xp; barbs never accrue.
-            atk_lvl5 = torch.zeros_like(a_hp[:, u]) if atk_kind == "barb" else self._xp_lvl_bonus(self.v_xp[:, u])
+            # B-4: attacker veterancy, gated on the attacking class's #51/S6.11
+            # `caps.xp` — one table, not a hardcoded pool name.
+            atk_lvl5 = (self._xp_lvl_bonus(self.v_xp[:, u]) if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]
+                        else torch.zeros_like(a_hp[:, u]))
             atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt) + atk_lvl5  # B-29 river + B-4 veterancy
             def_e = def_cs - self._wound(def_hp)
             # B-7: flanking helps the hostile attacker (barb/rival at `here`),
@@ -11751,8 +11831,10 @@ class BatchSim:
         gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
         def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
         _ct = self.site.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
-        # B-4: attacker veterancy — a rival attacker via v_xp; barbs never accrue.
-        atk_lvl5 = torch.zeros_like(a_hp[:, u]) if atk_kind == "barb" else self._xp_lvl_bonus(self.v_xp[:, u])
+        # B-4: attacker veterancy, gated on the attacking class's #51/S6.11
+        # `caps.xp` (see _hostile_vs_unit for the same line).
+        atk_lvl5 = (self._xp_lvl_bonus(self.v_xp[:, u]) if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]
+                    else torch.zeros_like(a_hp[:, u]))
         atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], _ct) + atk_lvl5  # B-29 wound + river (city not a unit) + B-4 veterancy
         # #70/S2 (B-8): attackCity's atkCS carries the aura. Only a RIVAL
         # attacker has one (unified civ v_civ+1); a BARBARIAN is civ -1 and
@@ -15187,26 +15269,14 @@ class BatchSim:
         # hostile-phase acts from the PREVIOUS step both gate. -------------------
         if self.units_mode:
             cap = self.rules.combat.get("unitHp", 100)
-            # barbarians: the camp is home
-            ut = self.u_tile.clamp(min=0)
-            u_owned = (self.owner.gather(1, ut) >= 0) | (self.rival_at.gather(1, ut) >= 0) | (self.cs_at.gather(1, ut) >= 0)
-            u_camp = (self.camp_tile.unsqueeze(2) == ut.unsqueeze(1)).any(dim=1)
-            u_heal = torch.where(u_camp, torch.full_like(ut, 20), torch.where(u_owned, torch.full_like(ut, 5), torch.full_like(ut, 10)))
-            self.u_hp.copy_(torch.where(self.u_alive & ~self._spent_mp("u"), (self.u_hp + u_heal).clamp(max=cap), self.u_hp))
-            # rival units: own civ's land / own center
-            vt = self.v_tile.clamp(min=0)
-            v_own = self.rival_at.gather(1, vt) == self.v_civ
-            v_center = self.rvcity_at.gather(1, vt) == self.v_civ
-            v_owned_any = (self.owner.gather(1, vt) >= 0) | (self.rival_at.gather(1, vt) >= 0) | (self.cs_at.gather(1, vt) >= 0)
-            v_heal = torch.where(v_own & v_center, torch.full_like(vt, 20), torch.where(v_own, torch.full_like(vt, 15), torch.where(v_owned_any, torch.full_like(vt, 5), torch.full_like(vt, 10))))
-            self.v_hp.copy_(torch.where(self.v_alive & ~self._spent_mp("v"), (self.v_hp + v_heal).clamp(max=cap), self.v_hp))
-            # player units
-            pt = self.p_tile.clamp(min=0)
-            p_own = self.owner.gather(1, pt) >= 0
-            p_center = self.center_at.gather(1, pt) >= 0
-            p_owned_any = p_own | (self.rival_at.gather(1, pt) >= 0) | (self.cs_at.gather(1, pt) >= 0)
-            p_heal = torch.where(p_own & p_center, torch.full_like(pt, 20), torch.where(p_own, torch.full_like(pt, 15), torch.where(p_owned_any, torch.full_like(pt, 5), torch.full_like(pt, 10))))
-            self.p_hp.copy_(torch.where(self.p_alive & ~self._spent_mp("p"), (self.p_hp + p_heal).clamp(max=cap), self.p_hp))
+            # #51/S6.14: ONE heal rule, three pools — the shape the FORTIFY
+            # rule took in S3.2, three lines below. See _seat_heal.
+            for _pre in ("u", "v", "p"):
+                _hp = getattr(self, f"{_pre}_hp")
+                _hp.copy_(torch.where(
+                    getattr(self, f"{_pre}_alive") & ~self._spent_mp(_pre),
+                    (_hp + self._seat_heal(_pre)).clamp(max=cap), _hp,
+                ))
             # B-5 FORTIFY: co-located with the D-2 heal and keyed on the EXACT
             # SAME gate (movesLeft >= movesFull = spent no MP since the last
             # refresh). A live MILITARY unit that stayed put digs in (+1, cap

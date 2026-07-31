@@ -68,7 +68,7 @@ describe('combat', () => {
   it('a slain defender lets the victor advance; camps are cleared with reward', () => {
     const { state } = battlefield();
     const campTile = tileAtCoords(state.map, 12, 9);
-    state.barbCamps.push(campTile.index);
+    state.barbSeat.camps.push(campTile.index);
     const atk = spawnUnit(state, 'HORSEMAN', tileAtCoords(state.map, 11, 9).index)!;
     atk.tileIndex = tileAtCoords(state.map, 11, 9).index;
     const def = spawnUnit(state, 'WARRIOR', campTile.index, BARB_SEAT)!;
@@ -79,7 +79,7 @@ describe('combat', () => {
     expect(meleeAttack(state, atk.id, campTile.index).ok).toBe(true);
     expect(state.units.some((u) => u.id === def.id)).toBe(false);
     expect(atk.tileIndex).toBe(campTile.index);
-    expect(state.barbCamps.length).toBe(0);
+    expect(state.barbSeat.camps.length).toBe(0);
     expect(playerSeat(state).treasury).toBe(gold + 50);
   });
 
@@ -92,9 +92,9 @@ describe('combat', () => {
     state.unitsMode = true;
     foundCity(state, tileAtCoords(state.map, 9, 9).index);
     // campNo % 4 === 1 is the naval camp, so camp 0 is a landlocked decoy.
-    state.barbCamps.push(tileAtCoords(state.map, 3, 3).index);
+    state.barbSeat.camps.push(tileAtCoords(state.map, 3, 3).index);
     const camp1 = tileAtCoords(state.map, 15, 15);
-    state.barbCamps.push(camp1.index);
+    state.barbSeat.camps.push(camp1.index);
     for (const n of neighbors(state.map, camp1)) n.terrain = 'COAST';
 
     let galley: ReturnType<typeof spawnUnit> = null;
@@ -146,8 +146,8 @@ describe('barbarians', () => {
     const { state } = battlefield();
     const farm = tileAtCoords(state.map, 10, 9);
     farm.improvement = 'FARM';
-    for (let i = 0; i < 60 && state.barbCamps.length === 0; i++) barbarianPhase(state);
-    expect(state.barbCamps.length).toBeGreaterThan(0);
+    for (let i = 0; i < 60 && state.barbSeat.camps.length === 0; i++) barbarianPhase(state);
+    expect(state.barbSeat.camps.length).toBeGreaterThan(0);
     for (let i = 0; i < 120 && !farm.pillaged; i++) barbarianPhase(state);
     expect(farm.pillaged).toBe(true);
 

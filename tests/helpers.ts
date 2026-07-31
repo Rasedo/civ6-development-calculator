@@ -1,7 +1,7 @@
 /** Shared test fixtures: small synthetic maps with uniform terrain. */
 
 import type { City, GameMap, GameState, TerrainId, Tile } from '../src/core/types';
-import { playerSeat, isPlayerSeat, tileSeat, NO_SEAT, setTileOwner } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, tileSeat, NO_SEAT, setTileOwner , emptySeat, BARB_SEAT } from '../src/core/seats';
 import { tilesWithin } from '../src/core/hex';
 import { defaultModifiers, type YieldCtx } from '../src/core/effects';
 
@@ -43,6 +43,7 @@ export function makeMap(width = 12, height = 12, terrain: TerrainId = 'GRASSLAND
 export function makeState(map: GameMap = makeMap()): GameState {
   return {
     map,
+    barbSeat: emptySeat(BARB_SEAT), // #51/S6.12
     cities: [],
     nextCityId: 0,
     turn: 1,
@@ -54,13 +55,12 @@ export function makeState(map: GameMap = makeMap()): GameState {
     units: [],
     nextUnitId: 0,
     rngState: 42,
-    barbCamps: [],
     disasters: false,
     fogOfWar: false,
     explored: [],
     eventLog: [],
     cityStates: [],
-    seats: [{ seat: 0, warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0, influencePoints: 0, envoysAvailable: 0, treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0, research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] }, government: { current: null, policies: [] }, religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, gpp: {}, gpEarned: [], settlers: 0, buildersTrained: 0, bestMeleeCS: 0, tilesPurchased: 0, spaceProjects: [] }],
+    seats: [emptySeat(0)],
     claimedPantheons: [],
     claimedBeliefs: [],
     claimedEnhancers: [],

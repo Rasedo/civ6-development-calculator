@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, cityStateOfSeat, rivalCount , emptySeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, expandBorders } from './helpers';
 import { foundCity } from '../src/core/game';
 import { tilesWithin } from '../src/core/hex';
@@ -31,6 +31,7 @@ function addCompletedCampus(state: GameState, city: City, col: number, row: numb
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',

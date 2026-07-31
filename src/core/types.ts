@@ -355,7 +355,7 @@ export interface GameState {
   /** Seeded RNG state for all in-game randomness (serialized => replayable). */
   rngState: number;
   /** Barbarian camp tile indexes (units mode only). */
-  barbCamps: number[];
+
   /** City HP keyed by city id (string for JSON); missing = full (200). */
   /** Random natural disasters (floods, eruptions, droughts, storms). */
   disasters: boolean;
@@ -373,6 +373,13 @@ export interface GameState {
   eventLog: string[];
   /** Independent city-states on the map ([] = none / feature off). */
   cityStates: CityState[];
+  /**
+   * #51/S6.12: the BARBARIANS' seat — the `hostile` class, one object so that
+   * `seatOf(state, BARB_SEAT)` answers like every other seat. Its civ-level
+   * state is zero and stays zero (barbarians bank nothing, research nothing);
+   * what it is FOR is that generic seat code has something to read.
+   */
+  barbSeat: Seat;
   /** Scripted rival civilizations ([] = none / feature off). */
   /** Pantheon beliefs claimed by rivals (unavailable to the player). */
   claimedPantheons: string[];
@@ -525,6 +532,17 @@ export interface Seat {
   tilesPurchased: number;
   /** Completed space-race project ids (B-25). */
   spaceProjects: string[];
+  /**
+   * #51/S6.13: tile indices of the CAMPS this seat holds — the barbarians'
+   * `state.barbSeat.camps`, re-homed onto the actor it always described. Empty for
+   * every other class, which is the right answer and not a missing one (a
+   * major holds no camps), so this is data and not a capability bit.
+   *
+   * A camp stays a TILE INDEX. It is not a city: no population, no queue, no
+   * borders. Promoting it to one to make the shape uniform would invent
+   * mechanics neither engine has.
+   */
+  camps: number[];
   /** Great-person ids THIS seat recruited. New information: previously only the
    *  global list existed, which is why `RivalCiv.prophets` had to exist as a
    *  shadow counter — the shared array could not answer "how many did I get?".
@@ -647,7 +665,15 @@ export interface CityStateQuest {
   campIndex?: number;
 }
 
-export interface CityState {
+/**
+ * #51/S6.12: a city-state is a SEAT — the `minor` class. It carries the same
+ * civ-level state every seat does, at zero, because `seatOf` can only be total
+ * if an object of the right type exists for every id in the seat space. The
+ * zeros are the RULE, not padding: see src/data/seats.ts on why a minor needs
+ * no `research`/`trade`/`found` capability bit — its empty data already says
+ * it never researches, trades or settles.
+ */
+export interface CityState extends Seat {
   id: number;
   name: string;
   type: CityStateType;

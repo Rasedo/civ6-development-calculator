@@ -40,8 +40,13 @@ import { ENHANCER_BELIEFS, JUST_WAR_RANGE, CITY_RELIGION_ADDER_LIVE, type Belief
 import { revealAround } from './fog';
 import { transferCityToRival, transferRivalCityToRival, relocatePalace } from './rivals';
 import type { RuleResult } from './rules';
-import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile, rivalsOf, seatOf } from './seats';
-import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
+import { tileForeignTo, civOfRival, PLAYER_CIV, unitSeat, civsAtWar, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, BARB_SEAT, tileSeat, tileCity, NO_SEAT, setTileOwner, seatOfCityState, tileBelongsTo, cityAtTile, rivalsOf, seatOf, capsOf } from './seats';
+import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } from './aura'; // #70/S2/S3 (B-8): the shared aura predicate
+// #51/S6.14: the ONE full-MP contract, so the barbarian phase's reset cannot
+// drift from every other seat's. units.ts already imports from here, so this
+// closes a cycle — both directions are called at RUN time, never at module
+// init, which is what makes that safe.
+import { unitFullMoves } from './units';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -52,10 +57,13 @@ export const MAX_BARB_PER_CAMP = 3;
 /** P5/S7 (C-3): any non-barbarian unit entering a camp tile clears it —
  * +50 to ITS civ's treasury (rivals bank it like the player). */
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
-  if (isBarbSeat(unit.seat)) return;
-  const camp = state.barbCamps.indexOf(tileIndex);
+  // #51/S6.13: you do not clear your OWN camps. This was `isBarbSeat(...)` —
+  // an identity test standing in for that rule, which only became sayable once
+  // the camps belonged to a seat and `seatOf` answered for every seat.
+  if (seatOf(state, unit.seat) === state.barbSeat) return;
+  const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
-  state.barbCamps.splice(camp, 1);
+  state.barbSeat.camps.splice(camp, 1);
   markAntiquitySite(state, tileIndex); // B-20 (#79): a razed outpost leaves a dig
   if (isPlayerSeat(unit.seat)) {
     playerSeat(state).treasury += CAMP_CLEAR_REWARD;
@@ -163,9 +171,10 @@ export function encampmentTrainXp(buildings: readonly string[]): number {
   return best;
 }
 
-/** B-4: award XP to a unit (barbarians never accrue). */
+/** B-4: award XP to a unit — only where the seat's class allows it (#51/S6.11
+ *  `caps.xp`; false for barbarians, who have no promotions in Civ 6). */
 function gainXp(unit: Unit, amount: number): void {
-  if (isBarbSeat(unit.seat)) return;
+  if (!capsOf(unit.seat).xp) return;
   unit.xp = (unit.xp ?? 0) + amount;
 }
 
@@ -1177,7 +1186,7 @@ function campCandidates(state: GameState): Tile[] {
         if (hexDistance(ct.col, ct.row, t.col, t.row) < 5) return false;
       }
     }
-    for (const campIdx of state.barbCamps) {
+    for (const campIdx of state.barbSeat.camps) {
       const camp = state.map.tiles[campIdx];
       if (hexDistance(camp.col, camp.row, t.col, t.row) < 5) return false;
     }
@@ -1374,7 +1383,7 @@ function barbMeleeType(turn: number): string {
 
 /**
  * #70/S5 (B-26): the RANGED barb ladder — real Civ 6 barbarian camps field
- * archers alongside melee. Every third camp (by its index in `state.barbCamps`,
+ * archers alongside melee. Every third camp (by its index in `state.barbSeat.camps`,
  * NOT its tile) raids with a ranged unit instead of the melee ladder type.
  * Spawn TYPE only: the 0.1 raid roll above is untouched, so this is
  * draw-count neutral in both engines. TS needed no dispatch work —
@@ -1412,9 +1421,18 @@ function barbScoutType(): string {
 /** Camps spawn, garrison, raid; cities heal when unbothered. */
 export function barbarianPhase(state: GameState): void {
   const map = state.map;
-  // Barbarians get their movement in their own phase (self-contained for tests/RL).
+  // Barbarians get their movement in their own phase (self-contained for
+  // tests/RL). #51/S6.14: through the SAME contract every other seat uses.
+  // This line read the unit's raw type moves and left `movesFull` alone — the
+  // one MP reset in the codebase that bypassed `unitFullMoves`. Value-identical
+  // today (a barbarian holds no golden dedication and never embarks, so its
+  // full pool IS its type's moves, and `refreshUnits` had already written the
+  // same `movesFull` this step), but it was a divergence waiting for the first
+  // rule that gives the hostile class either.
   for (const u of state.units) {
-    if (isBarbSeat(u.seat)) u.movesLeft = UNITS[u.type]?.moves ?? 2;
+    if (!isBarbSeat(u.seat)) continue;
+    u.movesLeft = unitFullMoves(state, u) + generalAuraMP(state, u);
+    u.movesFull = u.movesLeft;
   }
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
@@ -1422,11 +1440,11 @@ export function barbarianPhase(state: GameState): void {
   // rivals count, not just the player (the roll-gate short-circuit is part
   // of the draw-count contract; both engines change together).
   const anyCivCity = state.cities.length > 0 || rivalsOf(state).some((r) => r.cities.length > 0);
-  if (anyCivCity && state.barbCamps.length < maxCamps && nextRandom(state) < 0.08) {
+  if (anyCivCity && state.barbSeat.camps.length < maxCamps && nextRandom(state) < 0.08) {
     const candidates = campCandidates(state);
     if (candidates.length > 0) {
       const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
-      state.barbCamps.push(spot.index);
+      state.barbSeat.camps.push(spot.index);
       // B-26 (#71): the SCOUT opener is landed INERT (BARB_SCOUT_OPENER_LIVE),
       // the substrate-then-flip pattern used for B-18/A-5r/A-9 this round.
       // barbScoutType + the barb u_type 6 column + the type-aware barb march
@@ -1443,8 +1461,8 @@ export function barbarianPhase(state: GameState): void {
   const barbs = barbUnits(state);
   // #70/S5: indexed loop (identical iteration ORDER, so no draw-order change)
   // because the ranged ladder keys off the camp's INDEX, not its tile.
-  for (let campNo = 0; campNo < state.barbCamps.length; campNo++) {
-    const campIdx = state.barbCamps[campNo];
+  for (let campNo = 0; campNo < state.barbSeat.camps.length; campNo++) {
+    const campIdx = state.barbSeat.camps[campNo];
     const camp = map.tiles[campIdx];
     const nearCamp = barbs.filter(
       (u) =>
@@ -1453,7 +1471,7 @@ export function barbarianPhase(state: GameState): void {
     if (nearCamp.length === 0) {
       spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT); // B-26 era ladder
     } else if (
-      barbUnits(state).length < state.barbCamps.length * MAX_BARB_PER_CAMP &&
+      barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
       nextRandom(state) < 0.1
     ) {
       // #70/S5 (B-26): every third camp raids RANGED, the rest melee.
@@ -1485,7 +1503,7 @@ export function barbarianPhase(state: GameState): void {
 
   // Raider actions: everyone but one guard per camp marches.
   const guards = new Set<number>();
-  for (const campIdx of state.barbCamps) {
+  for (const campIdx of state.barbSeat.camps) {
     const camp = map.tiles[campIdx];
     const guard = barbUnits(state).find(
       (u) =>

@@ -7,7 +7,7 @@
  */
 
 import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
-import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat, rivalsOf, civOfRival, rivalOfCiv, isPlayerSeat, PLAYER_CIV } from './seats';
+import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat, rivalsOf, civOfRival, rivalOfCiv, isPlayerSeat, PLAYER_CIV, emptySeat } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
 import { isWater, isImpassable, hasFreshWater } from './query';
@@ -88,6 +88,9 @@ export function placeCityStates(state: GameState, count?: number): void {
       names.find((n) => !usedNames.has(n)) ?? `${names[0]} ${i}`;
     usedNames.add(name);
     const cs: CityState = {
+      // #51/S6.12: a minor is a Seat — the civ-level fields at zero, which is
+      // the RULE (it banks and researches nothing), not a placeholder.
+      ...emptySeat(seatOfCityState(i)),
       id: i,
       name,
       type,
@@ -249,7 +252,7 @@ export function assignEnvoy(state: GameState, csId: number): RuleResult {
 function questSatisfied(state: GameState, cs: CityState, quest: CityStateQuest): boolean {
   switch (quest.kind) {
     case 'clearCamp':
-      return quest.campIndex !== undefined && !state.barbCamps.includes(quest.campIndex);
+      return quest.campIndex !== undefined && !state.barbSeat.camps.includes(quest.campIndex);
     case 'sendTradeRoute':
       return state.tradeRoutes.some((r) => r.toCs === cs.id);
     case 'buildDistrict':
@@ -264,7 +267,7 @@ function questSatisfied(state: GameState, cs: CityState, quest: CityStateQuest):
 function issueQuest(state: GameState, cs: CityState): CityStateQuest | null {
   const center = state.map.tiles[cs.centerIndex];
   const options: CityStateQuest[] = [];
-  const camp = state.barbCamps.find((i) => {
+  const camp = state.barbSeat.camps.find((i) => {
     const t = state.map.tiles[i];
     return hexDistance(t.col, t.row, center.col, center.row) <= 6;
   });

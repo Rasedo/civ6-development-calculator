@@ -81,7 +81,7 @@ export function spatialObservation(state: GameState): Uint8Array {
       if (isPlayerSeat(tileSeat(tile))) out[at(P.myDistrict, i)] = 1;
     }
     if (tile.improvement) out[at(P.improvement, i)] = tile.pillaged ? 2 : 1;
-    if (state.barbCamps.includes(i)) out[at(P.hostiles, i)] = 3;
+    if (state.barbSeat.camps.includes(i)) out[at(P.hostiles, i)] = 3;
   }
 
   for (const city of state.cities) {

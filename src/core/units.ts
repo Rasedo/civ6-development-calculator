@@ -20,7 +20,7 @@ import { revealAround, claimGoodyHut, nearestUnexplored } from './fog';
 import { chopGrant, harvestGrant, applyLumpYield } from './economy';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
-import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, seatOfCityState, NO_SEAT, rivalsOf } from './seats';
+import { civHasStrategic, PLAYER_CIV, tileRivalCiv, playerSeat, isPlayerSeat, isRivalSeat, rivalOfSeat, rivalOfCiv, tileSeat, isCityStateSeat, seatOfCityState, NO_SEAT, rivalsOf, capsOf, seatOf } from './seats';
 import type { ImprovementId } from './types';
 
 const ok: RuleResult = { ok: true };
@@ -235,7 +235,9 @@ export function unitsHostile(
   b: { seat: number },
 ): boolean {
   if (unitSide(a) === unitSide(b)) return false;
-  if (isBarbSeat(a.seat) || isBarbSeat(b.seat)) return true;
+  // #51/S6.11: hostility with NO war state — the one thing the war matrix
+  // cannot express, because an all-false row means peace.
+  if (capsOf(a.seat).alwaysHostile || capsOf(b.seat).alwaysHostile) return true;
   if (isRivalSeat(a.seat) && isRivalSeat(b.seat)) {
     // A-19/B-33 (S2): rival↔rival hostility off the per-pair war state
     // (atWarRivals stores 0-based rival ids = civId). Symmetric; same-civ /
@@ -786,8 +788,10 @@ export function spawnUnit(
   };
   // B-5 FORTIFY: military units carry a fortify counter (civilians never do).
   if (def.charges === undefined) unit.fortifyTurns = 0;
-  // AUDIT B-4 XP: player & rival units start at 0 experience (barbs never accrue).
-  if (!isBarbSeat(seat)) unit.xp = 0;
+  // AUDIT B-4 XP: a unit carries an experience counter iff its seat's class
+  // can earn any (#51/S6.11 `caps.xp`). Leaving the field ABSENT for a seat
+  // that cannot is what keeps `xp = 0` from reading as "a veteran-in-waiting".
+  if (capsOf(seat).xp) unit.xp = 0;
   state.units.push(unit);
   if (isPlayerSeat(seat)) revealAround(state, unit.tileIndex);
   // P4/D-22: track the strongest MELEE unit each civ has ever fielded —
@@ -848,21 +852,20 @@ export function refreshUnits(state: GameState): void {
     // units that have never been refreshed.
     const grantedLast = unit.movesFull ?? full;
     if (unit.movesLeft >= grantedLast) {
-      const unowned = tileSeat(tile) === NO_SEAT;
-      let heal: number;
-      if (isPlayerSeat(unit.seat)) {
-        if (isPlayerSeat(tileSeat(tile)) && tile.district === 'CITY_CENTER') heal = 20;
-        else if (isPlayerSeat(tileSeat(tile))) heal = 15;
-        else heal = unowned ? 10 : 5;
-      } else if (isRivalSeat(unit.seat)) {
-        if (tileSeat(tile) === unit.seat && tile.district === 'CITY_CENTER') heal = 20;
-        else if (tileSeat(tile) === unit.seat) heal = 15;
-        else heal = unowned ? 10 : 5;
-      } else {
-        // barbarian: the camp is home
-        if (state.barbCamps.includes(unit.tileIndex)) heal = 20;
-        else heal = unowned ? 10 : 5;
-      }
+      // #51/S6.14: ONE heal rule for every seat. This was three arms — player,
+      // rival, barbarian — of which the first two were the same predicate
+      // written twice (a player unit's seat IS `PLAYER_CIV`, so
+      // `isPlayerSeat(tileSeat(t))` and `tileSeat(t) === unit.seat` agree), and
+      // the third stopped being special once the camps belonged to a seat
+      // (S6.13). Each term is simply EMPTY for the classes it does not apply
+      // to: a major holds no camps, the barbarians hold no land.
+      const home = tileSeat(tile) === unit.seat;
+      const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
+      const heal = home && tile.district === 'CITY_CENTER' ? 20
+        : home ? 15
+        : onCamp ? 20
+        : tileSeat(tile) === NO_SEAT ? 10
+        : 5;
       unit.hp = Math.min(UNIT_HP, unit.hp + heal);
     }
     // B-5 FORTIFY: reuse the EXACT D-2 heal gate (movesLeft >= full = spent

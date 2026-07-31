@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, BARB_SEAT, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, rivalCount } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, BARB_SEAT, tileSeat, tileCity, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, rivalCount , emptySeat } from '../src/core/seats';
 import { makeState, makeMap, tileAtCoords } from './helpers';
 import { foundCity, endTurn } from '../src/core/game';
 import { tilesWithin } from '../src/core/hex';
@@ -20,6 +20,7 @@ import type { CityState, CityStateType, GameState, RivalCity, RivalCiv } from '.
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
@@ -89,6 +90,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
 function addCs(state: GameState, col: number, row: number, type: CityStateType, envoys = 0): CityState {
   const center = tileAtCoords(state.map, col, row);
   const cs: CityState = {
+    ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
     name: 'Valletta',
     type,

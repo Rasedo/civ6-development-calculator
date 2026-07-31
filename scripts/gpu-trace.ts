@@ -70,7 +70,7 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'culture', tol: 2, get: (s) => Math.round(playerSeat(s).cultureTotal * 1000) },
   { name: 'score', tol: 2, get: (s) => Math.round(empireScore(s, 'balanced') * 1000) },
   { name: 'rng', tol: 0, get: (s) => s.rngState >>> 0 },
-  { name: 'nCamps', tol: 0, get: (s) => s.barbCamps.length },
+  { name: 'nCamps', tol: 0, get: (s) => s.barbSeat.camps.length },
   { name: 'nBarbs', tol: 0, get: (s) => s.units.filter((u) => isBarbSeat(u.seat)).length },
   { name: 'nPlayerUnits', tol: 0, get: (s) => s.units.filter((u) => isPlayerSeat(u.seat)).length },
   { name: 'envoysAvail', tol: 0, get: (s) => playerSeat(s).envoysAvailable },

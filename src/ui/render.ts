@@ -356,7 +356,7 @@ export class MapRenderer {
     if (state.unitsMode) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const camps = new Set(state.barbCamps);
+      const camps = new Set(state.barbSeat.camps);
       const byTile = new Map<number, { code: string; fill: string; text: string }>();
       for (const u of state.units) {
         let fill = '#6fa8dc';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, NO_SEAT, rivalCount } from '../src/core/seats';
+import { civOfRival, isPlayerSeat, tileSeat, isCityStateSeat, setTileOwner, seatOfCityState, cityStateOfSeat, NO_SEAT, rivalCount , emptySeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords } from './helpers';
 import { rivalPhase, rivalUnits } from '../src/core/rivals';
 import { cityStatePhase, isSuzerain } from '../src/core/cityStates';
@@ -21,6 +21,7 @@ import type { CityState, CityStateType, GameState, RivalCiv, RivalCity } from '.
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
   const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
@@ -90,6 +91,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
 function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> & { type?: CityStateType } = {}): CityState {
   const center = tileAtCoords(state.map, col, row);
   const cs: CityState = {
+    ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
     name: `CS${state.cityStates.length}`,
     type: 'scientific',
@@ -230,7 +232,7 @@ describe('A-12 (B8-L): rival quests (deterministic, zero-draw)', () => {
     const near = tilesWithin(state.map, ct.col, ct.row, 2).filter((t) => t.index !== cs.centerIndex);
     const far = near[near.length - 1].index;
     const close = near[0].index;
-    state.barbCamps = [far, close]; // out of array order — nearest must still win
+    state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
     const rng0 = state.rngState;
     rivalPhase(state);
     const q = cs.rivalQuest?.[rival.id];
@@ -249,7 +251,7 @@ describe('A-12 (B8-L): rival quests (deterministic, zero-draw)', () => {
     cs.rivalQuest[rival.id] = { kind: 'clearCamp', campIndex: 999 };
     cs.rivalQuestIssuedTurn = [];
     cs.rivalQuestIssuedTurn[rival.id] = state.turn;
-    state.barbCamps = []; // camp 999 gone
+    state.barbSeat.camps = []; // camp 999 gone
     const env0 = cs.rivalEnvoys![rival.id];
     const rng0 = state.rngState;
     rivalPhase(state);
@@ -290,7 +292,7 @@ describe('A-12 (B8-L): PLAYER quest draw-count neutrality', () => {
     cs2.rivalMet[rival.id] = true;
     cs2.rivalEnvoys = [];
     cs2.rivalEnvoys[rival.id] = 3;
-    state.barbCamps = [];
+    state.barbSeat.camps = [];
     const rng0 = state.rngState;
     rivalPhase(state);
     // both a resolve and an issue happened, drawing nothing
@@ -306,7 +308,7 @@ describe('A-12 (B8-L): PLAYER quest draw-count neutrality', () => {
     state.turn = 20;
     const cs = addCs(state, 16, 10, { type: 'scientific', met: true });
     cs.questIssuedTurn = state.turn - QUEST_COOLDOWN; // due to issue
-    state.barbCamps = [];
+    state.barbSeat.camps = [];
     // capture the exact rng sequence a bare 2-draw issue would consume
     const probe = makeState(makeMap(24, 24));
     probe.rngState = state.rngState;

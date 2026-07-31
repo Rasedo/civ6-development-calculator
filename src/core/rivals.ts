@@ -70,7 +70,7 @@ import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints, goldenCulturePerDistrict } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount , emptySeat } from './seats';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -213,6 +213,7 @@ export function placeRivals(state: GameState, count?: number): void {
   picked.forEach((tile, i) => {
     const leader = RIVAL_LEADERS[i % RIVAL_LEADERS.length];
     const rival: RivalCiv = {
+      ...emptySeat(civOfRival(i)), // #51/S6.12: one Seat constructor, every seat
       id: i,
       name: leader.name,
       color: leader.color,
@@ -2217,7 +2218,7 @@ function rivalQuestSatisfied(
 ): boolean {
   switch (quest.kind) {
     case 'clearCamp':
-      return quest.campIndex !== undefined && !state.barbCamps.includes(quest.campIndex);
+      return quest.campIndex !== undefined && !state.barbSeat.camps.includes(quest.campIndex);
     case 'sendTradeRoute':
       // READ-ONLY on the rival's own route list (slice T owns trade.ts).
       return (rival.tradeRoutes ?? []).some((r) => r.toCs === cs.id);
@@ -2241,7 +2242,7 @@ function issueRivalQuest(state: GameState, rival: RivalCiv, cs: CityState): City
   let campIndex: number | undefined;
   let campKey = Infinity;
   const span = state.map.tiles.length + 1;
-  for (const i of state.barbCamps) {
+  for (const i of state.barbSeat.camps) {
     const t = state.map.tiles[i];
     const d = hexDistance(t.col, t.row, center.col, center.row);
     if (d > 6) continue;

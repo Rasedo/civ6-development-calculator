@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat, tileCity, setTileOwner, rivalCount } from '../src/core/seats';
+import { playerSeat, isRivalSeat, civOfRival, PLAYER_CIV, isPlayerSeat, tileCity, setTileOwner, rivalCount , emptySeat } from '../src/core/seats';
 import { makeMap, makeState, tileAtCoords, grantTechs } from './helpers';
 import { foundCity, purchaseUnit } from '../src/core/game';
 import {
@@ -32,6 +32,7 @@ afterEach(() => setEmbarkLive(false)); // never leak the switch into other suite
 
 function addWarRival(state: GameState, col: number, row: number, techs: string[]): RivalCiv {
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Rome',
     color: '#8e3db8',
@@ -219,6 +220,7 @@ describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
 
 function bareRival(state: GameState, atWar = true): RivalCiv {
   const rival: RivalCiv = {
+    ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
     name: 'Carthage',
     color: '#2d8',
