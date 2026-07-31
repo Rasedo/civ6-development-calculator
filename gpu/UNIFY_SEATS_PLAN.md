@@ -583,9 +583,17 @@ step invariant comparing the two halves, so a write that skips the retag is
 caught rather than silently splitting readers by which plane they ask. Proven
 to bite; `cs_at` verified to be a property over 21 real city-state tiles.
 
-Deleting `owner` and `rival_at` the same way is the rest of the follow-on.
-`owner` needs `tile_city` first — it stores WHICH city, TS's `ownerCity`, which
-`tile_seat` does not carry.
+**S6.9 — the SECOND plane dies. DONE.** `rival_at` follows `cs_at` by the
+pattern S6.8 proved: eight writers redirected to `tile_seat` (`= r` becomes
+`= r + 1`, `= -1` becomes `= NO_SEAT`), the name kept as a cached property,
+the plane deleted, and the invariant's rival comparison dropped because there
+is no longer a second copy to disagree with. `_retag_tiles` now rebuilds only
+the PLAYER part; everything `>= 1` is stored in `tile_seat` itself.
+
+TWO of the three planes are gone. `owner` is last and is the one that needs
+design: it stores WHICH city owns the tile, TS's `ownerCity`, which
+`tile_seat` does not carry — so it needs a `tile_city` plane beside the seat,
+not a view. That is S6.10.
 
 Remaining: the `cs_*` planes that are genuinely city-state-specific
 (`cs_type`, `cs_suz_key`, `cs_last_levy`) and the rest
