@@ -66,10 +66,10 @@ import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builderCost } from './units';
-import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
+import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
+import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS,  ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints, goldenCulturePerDistrict } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount , emptySeat } from './seats';
 
@@ -121,7 +121,7 @@ function siteQuality(state: GameState, tile: Tile): number {
   return q;
 }
 
-function nextCityName(rival: RivalCiv): string {
+export function nextCityName(rival: RivalCiv): string {
   const leader = RIVAL_LEADERS.find((l) => l.name === rival.name);
   const names = leader?.cityNames ?? [rival.name];
   const n = rival.nextCityId;
@@ -129,55 +129,11 @@ function nextCityName(rival: RivalCiv): string {
 }
 
 function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCity {
-  const city: RivalCity = {
-    id: rival.nextCityId++,
-    name: nextCityName(rival),
-    seat: civOfRival(rival.id),
-    centerIndex: tile.index,
-    // P5/S3 (C-14): pop 1 like foundCity — the capital's old pop-3 head
-    // start was an asymmetric pacing crutch.
-    population: 1,
-    foodBox: 0,
-    cultureBox: 0,
-    tilesAcquired: 0,
-    lockedTiles: [],
-    focus: 'balanced',
-    queue: [],
-    isCapital: rival.cities.length === 0,
-    // B9-R3 (A-9): a civ's FIRST city gets the PALACE, the foundCity mirror.
-    // No relocation on capital loss — B-30 strips it on every capture/
-    // transfer path and nothing re-grants one (recorded residual).
-    buildings: rival.cities.length === 0 ? ['PALACE'] : [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
-    wonders: [],
-    specialists: {},
-    hp: CITY_MAX_HP,
-    foundedTurn: state.turn,
-  };
-  tile.district = 'CITY_CENTER';
-  tile.districtComplete = true;
-  // P5/S3 (C-14): founding strips like foundCity — the improvement and the
-  // removable feature die with the center (yields, +3 defense, lent
-  // district adjacency all read the live map).
-  tile.improvement = null;
-  if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
-  setTileOwner(tile, civOfRival(rival.id), city.id); // A-17: per-city registry
-  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    // Mirrors foundCity: the full first ring, water included — a coastal
-    // rival must own its harbor water (AUDIT C-1; the water skip made the
-    // whole Harbor line structurally unreachable for rivals).
-    if (!tileClaimed(t)) {
-      setTileOwner(t, civOfRival(rival.id), city.id);
-    }
-  }
-  rival.cities.push(city);
-  addEraScore(state, civOfRival(rival.id), ERA_SCORE_FOUND); // B-24: founded a city (t0 capitals included — exported)
-  // GV-3: rival r's capital tile lives at civ index r+1, static once founded.
-  if (city.isCapital) {
-    if (!state.capitalTiles) state.capitalTiles = [];
-    state.capitalTiles[rival.id + 1] = tile.index;
-  }
-  return city;
+  // #51/S4.1r: ONE founding mutation for every seat (game.ts:foundCityAt).
+  // This was a 51-line near-copy of foundCity's body; the seven things that
+  // differed were per-seat inputs, not rules. The rival is PASSED, never looked
+  // up from the seat — see foundCityAt for why that distinction is load-bearing.
+  return foundCityAt(state, civOfRival(rival.id), tile, rival);
 }
 
 /** Place `count` rival civs on distant good sites (seeded, deterministic). */

@@ -16,7 +16,7 @@ import { barbarianPhase, encampmentTrainXp } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
-import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress } from './rivals';
+import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress, nextCityName } from './rivals';
 import { seatAccumulators } from './seatTurn';
 import { expirePlayerRoutes } from './trade';
 import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
@@ -165,6 +165,64 @@ function cityName(id: number): string {
   return round === 0 ? base : `${base} ${round + 1}`;
 }
 
+/**
+ * #51/S4.1r: THE founding mutation, for every seat.
+ *
+ * `foundCity` and `foundRivalCity` had converged to seven differences and not
+ * one was a RULE: two per-seat inputs (id counter, namer), a rival-only field
+ * (`foundedTurn`, now on every City), one CORRECT asymmetry (`revealAround` —
+ * fog is player-only here), a no-op ordering difference (`tilesWithin(...,1)`
+ * covers the centre, so claiming it before or after the ring lands the same
+ * tiles), the container, and the caller-side settler spend.
+ *
+ * The OWNER is PASSED, never re-derived from the seat. An earlier attempt
+ * resolved it via `citiesOf(state, seat)`, whose `rivalOfSeat(...)?.cities ??
+ * []` returns a FRESH ARRAY when the lookup misses — the push then succeeds
+ * silently and the city is lost. 16 tests caught it. Passing the owner makes
+ * that unrepresentable.
+ */
+export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: RivalCiv | null): City {
+  const list: City[] = owner ? owner.cities : state.cities;
+  const id = owner ? owner.nextCityId++ : state.nextCityId++;
+  const city: City = {
+    id,
+    seat,
+    name: owner ? nextCityName(owner) : cityName(id),
+    centerIndex: tile.index,
+    population: 1,
+    foodBox: 0,
+    cultureBox: 0,
+    tilesAcquired: 0,
+    lockedTiles: [],
+    focus: 'balanced',
+    queue: [],
+    isCapital: list.length === 0,
+    buildings: list.length === 0 ? ['PALACE'] : [],
+    districts: [{ type: 'CITY_CENTER', tileIndex: tile.index }],
+    wonders: [],
+    specialists: {},
+    hp: CITY_MAX_HP,
+    foundedTurn: state.turn,
+  };
+  tile.district = 'CITY_CENTER';
+  tile.districtComplete = true;
+  tile.improvement = null;
+  if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
+  // Civ 6: a new city starts with its center plus the first ring only.
+  setTileOwner(tile, seat, id);
+  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
+    if (!tileClaimed(t)) setTileOwner(t, seat, id);
+  }
+  list.push(city);
+  addEraScore(state, seat, ERA_SCORE_FOUND); // B-24
+  if (city.isCapital) {
+    if (!state.capitalTiles) state.capitalTiles = [];
+    state.capitalTiles[seat] = tile.index;
+  }
+  if (isPlayerSeat(seat)) revealAround(state, tile.index, 3); // fog is player-only
+  return city;
+}
+
 export function foundCity(state: GameState, tileIndex: number): RuleResult & { city?: City } {
   const check = canFoundCity(state, tileIndex);
   if (!check.ok) return check;
@@ -178,49 +236,11 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
     playerSeat(state).settlers -= 1;
   }
 
-  const tile = state.map.tiles[tileIndex];
-  const id = state.nextCityId++;
-  const city: City = {
-    id,
-    seat: PLAYER_CIV, // #51/S1.3d: a player city says so explicitly
-    name: cityName(id),
-    centerIndex: tileIndex,
-    population: 1,
-    foodBox: 0,
-    cultureBox: 0,
-    tilesAcquired: 0,
-    lockedTiles: [],
-    focus: 'balanced',
-    queue: [],
-    isCapital: state.cities.length === 0,
-    buildings: state.cities.length === 0 ? ['PALACE'] : [],
-    districts: [{ type: 'CITY_CENTER', tileIndex }],
-    wonders: [],
-    specialists: {},
-    hp: CITY_MAX_HP,
-    foundedTurn: state.turn,  // #51/S4.1r
-  };
-
-  tile.district = 'CITY_CENTER';
-  tile.districtComplete = true;
-  tile.improvement = null;
-  if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
-
-  // Civ 6: a new city starts with its center plus the first ring only;
-  // everything beyond comes from culture growth or tile purchase.
-  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
-    if (!tileClaimed(t)) setTileOwner(t, PLAYER_CIV, id);
-  }
-  setTileOwner(tile, PLAYER_CIV, id);
-  revealAround(state, tileIndex, 3);
-
-  state.cities.push(city);
-  addEraScore(state, 0, ERA_SCORE_FOUND); // B-24: founded a city (t0 capital included — exported with the fixture)
-  // GV-3: the player's capital tile (civ 0), static once founded.
-  if (city.isCapital) {
-    if (!state.capitalTiles) state.capitalTiles = [];
-    state.capitalTiles[0] = tileIndex;
-  }
+  // #51/S4.1r: the shared mutation. What stays HERE is the player's own
+  // precondition (canFoundCity + the settler spend); the rival's caller keeps
+  // its own. That split is the seventh difference in the table — a caller
+  // concern, not part of founding itself.
+  const city = foundCityAt(state, PLAYER_CIV, state.map.tiles[tileIndex], null);
   return { ok: true, city };
 }
 
