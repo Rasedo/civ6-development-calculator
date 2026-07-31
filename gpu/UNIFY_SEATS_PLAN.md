@@ -771,6 +771,100 @@ it and is not.
 
 ---
 
+# ROUND 7 — RECONCILIATION (behaviour merges, one named channel each)
+
+**S7.2 — a reclaimed slot handed on the drowned unit's movement pool. DONE.**
+A PRE-EXISTING GPU bug, found while hunting a forced-compaction red that S7.1
+EXPOSED but did not cause. Every spawn site computed movement BEFORE clearing
+the slot's embarked flag:
+
+    _m = self._full_mp(pre)[rows, slot]     # READS <pre>_emb
+    self.<pre>_emb[rows, slot] = False      # ...three lines too late
+
+`_full_mp` overrides an embarked unit's pool to the flat EMBARK_MOVES, so a
+unit spawned into the slot of one that DROWNED started on 2 MP instead of its
+type's moves plus any golden dedication. TS cannot have this: `spawnUnit`
+builds a NEW object with `movesLeft: def.moves + goldenMoveBonus(...)` and no
+embark term. All four spawn paths had it; the BARBARIAN pool never cleared
+`emb` at all — the sibling the guard was missing from entirely.
+
+It needs SLOT REUSE, and slot reuse needs a compaction, which is why only the
+forced-compaction gate could see it. Lane `gpu/spawn_reclaim_test.py` poisons
+the next slot with a drowned unit's residue; verified to FAIL pre-fix.
+
+THREE HYPOTHESES DIED ON MEASUREMENT during the hunt, and recording them is the
+point: the route cache (identical divergence with it disabled), float
+associativity (state bit-identical for 162 turns, then a clean 60), and the
+raid arm itself (its mask output identical). An early split reading
+"strike-only is green, so the raid is the cause" was WRONG for the reason
+[[trajectory-bisect-lies]] names — the raid STEERS the rollout, so removing it
+makes the seed play a different game that never reaches the bug.
+
+---
+
+**S7.1 (task #59) — a rival's war with another rival becomes a real war. DONE.**
+
+One named channel: **rival↔rival wars now reach the two mechanics that ignored
+them.**
+
+| mechanic | what it did |
+|---|---|
+| walls / Encampment STRIKE | a rival city fired at the player and at barbarians, never at an enemy RIVAL's units |
+| trade route RAIDING | a rival's routes were suspended by barbarians and at-war PLAYER units, never by an enemy RIVAL's |
+
+Both predate A-19 (which made rival↔rival war real) and both said so in their
+own comments; `RIVAL_RIVAL_RAIDS_LIVE = false` was the same gap with a flag on
+it, left by S2.3 for exactly this round. The engines AGREED, so no gate caught
+it — a fidelity gap against Civ 6, which the owner's directive makes the source
+of truth over the TS oracle.
+
+VERIFIED BEFORE IMPLEMENTING, against a real source rather than the task text:
+a Civ 6 city with at least Ancient Walls gains a ranged strike, and it targets
+**the weakest modified-strength unit within range** — a rule about combat
+strength with no term for which enemy the unit belongs to.
+`civilization.fandom.com/wiki/City_combat_(Civ6)`. (Our engines target
+nearest-then-lowest-index rather than weakest. That is a pre-existing
+difference, out of this slice's scope, and is NOT adopted as correct here.)
+
+REACHED, measured: **4 of 12 gate seeds move.** Lanes: `gpu/rr_strike_test.py`
+(builds the configuration by hand; 24 damage at war, 0 at peace — and it FAILS
+against the pre-fix engine, verified by reverting the two lines) and
+`tests/rival-rival-war.test.ts` (the shared predicate plus three negative twins:
+a neutral third rival, a rival's own unit, the unchanged player arm).
+
+**WIDENING THE TARGET SET CREATED TWO LATENT BUGS** — [[measure-every-path]].
+Once a rival can be the target, every term written for the old set is wrong:
+
+1. **Support side.** `_flank_support` takes the defender's seat and the
+   player's own strike sites already pass `d_seat`; the two rival sites
+   hand-built a `BARB_SEAT if is_barb else PLAYER_SEAT` BINARY, so a struck
+   rival counted the PLAYER's adjacent military as its own support.
+2. **Defender aura civ.** Hardcoded to 0 (the player), so a struck rival would
+   have been shielded by the PLAYER's Great General.
+
+TS had both right all along (`supportCount(state, bestTile, defender)`,
+`generalAuraCS(state, defender, ...)`), so no gate could have flagged them
+before the widening — they only become wrong the moment a rival is eligible.
+
+**THE HUNT, and the process failure that caused it.** Parity went red at seed
+9040 t158 with a 1-HP delta on a rival city, `rng` still matching for 57 more
+turns — a VALUE difference, not a draw-count one. Two hypotheses were checked
+and DISCARDED rather than built on: the old `war` term binds cleanly to
+`r_atwar[:, r]` (the player arm is untouched), and the GPU's besieged test is
+already rival-symmetric (S3.4b) despite the HP direction fitting that story.
+Reverting the raid hunk alone reproduced t158 exactly, which localised it to
+the strike. Matched probes on both engines, tagged by seed, then split the CS
+into its terms and every one agreed except `sup` (TS 1, GPU 0).
+
+The cause was fix (1) NOT BEING IN THE FILE. Its codemod accumulates edits in
+memory and writes once at the end; a later `sub()` raised on a comment whose
+`→` had been transcribed as `->`, so the run wrote NOTHING — after having
+already printed `x2` for the `_flank_support` substitution. **A codemod's
+progress output is not evidence of a write.** Grep the changed line before
+spending a gate run.
+
+---
+
 ### ROUND 6 — original plan
 
 Widen to `NS = 1+R+S+1`. Delete the `cs_*` family and `src/core/types.ts:CityState`. A city-state is a `Seat` with `cls=Minor`, one `City`, `caps` minus research/found/expand/victory plus `suzerainable`. The barbarian is one `Seat` with `cls=Hostile`, `caps.alwaysHostile`, no diplomatic row; `barbCamps`/`camp_tile` re-home onto it and **stay a camp list**.
