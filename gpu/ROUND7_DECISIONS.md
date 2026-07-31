@@ -230,3 +230,62 @@ These cost nothing but a plan edit and (where noted) a dead-code deletion. Batch
 **Ten slices, of which:** three (S7.7a, S7.10a, and the free-close batch) expect **byte-identical fixtures** — the cheapest tripwires in the round and the reason they go first. Seven need a full re-export. Two need the **forced-compaction** gate (S7.6, S4.1r). **One** consumes a permitted draw-count budget (S7.14). One battery, at the end.
 
 **Parked, not guessed:** citizen assignment (D1), CS meeting, CS combat, per-seat heal timing, the religion attack adder, ranged D2, own-territory founding, the settler `+queued` term, the GPU multi-item queue, the un-multiplied bank, and three CS-quest sub-rules. That is 11 parked against 10 landed — which is the correct ratio when four separate research reports shipped a fabricated quote.
+---
+
+## §7-6 WAR WEARINESS — the REAL model, recorded for a future slice
+
+`#51/S7.8r` landed the deletion (one rate for every seat, the invented x2 gone).
+What follows is the SOURCED target for the full model, which is STRUCTURALLY
+different from this repo's and is therefore its own slice, not a constant swap.
+
+Source: https://civilization.fandom.com/wiki/War_weariness_(Civ6)
+PROVENANCE CAVEAT, stated so it is not re-discovered: that page's reference [1]
+is CivFanatics thread 623207 — the same Victoria thread whose internal
+contradictions were catalogued during this round (the author writes "WW is not
+scaled on Era" a day before publishing the era table; a reader asks the source
+of a term and is answered "I have to fix the table, there are some errors";
+later, "things change, it's an old thread"). The wiki is that thread's PUBLISHED
+form, not independent corroboration. It is nonetheless the best available
+source, it is internally consistent, and it CONTRADICTS the "+3 additive
+surprise" reading that was flagged as a parsing artifact.
+
+**The model.** WWP is scored PER BATTLE, not per turn:
+
+    WWP = (EraBase * LocationMultiplier) + Death
+    LocationMultiplier = 1 fighting in your own borders, 2 abroad
+    Death              = 3 * EraBase
+    city combat        = the "fighting abroad" column
+    nuke               = 12 * EraBase
+
+**Era Base table** (fighting at home; abroad = 2x):
+
+| Era | Formal | Surprise |
+|---|---|---|
+| Ancient | 16 | 16 |
+| Classical | 22 | 25 |
+| Medieval | 28 | 34 |
+| Renaissance | 34 | 43 |
+| Industrial and later | 40 | 52 |
+
+The surprise premium is 1.00 at Ancient rising to 1.30 at Industrial+ — never a
+flat 2, which is what made `WW_SURPRISE_MULT = 2` indefensible.
+
+**Decay and conversion:**
+* -50 WWP at the end of every turn AT WAR WITHOUT A BATTLE
+* -200 WWP per turn at peace with everyone
+* -2000 WWP on making peace
+* -1 Amenity per 400 WWP held; **any remainder is LOST — every turn starts at 0**
+* multiple simultaneous wars score separately; only the HIGHEST counts that turn
+* accumulated by attacker AND defender "without any discrimination"
+
+**Why this is a large slice, not a retune.** The repo accrues +1 PER TURN into a
+capped accumulator (cap 32) and converts at -1 Amenity per 8. Civ 6 scores per
+BATTLE and RESETS every turn. Adopting it needs: a per-battle hook on every
+damage-roll site on both engines, a location multiplier keyed on whose borders
+the TARGET tile is in, a death term, the per-turn reset, and a re-scaled amenity
+conversion — plus RR_DOW_WW_MAX / RR_PEACE_WW rebuilt against the new units.
+
+**Not in the game data.** `EFFECT_ADJUST_WAR_WEARINESS` takes only
+`{Amount, Overall|Domestic|Enemy}` — no era argument, no casus-belli argument on
+any of its seven consumers. The scaling is hardcoded in the C++ DLL, so the
+table above is as close to the source as any datamining will get.
