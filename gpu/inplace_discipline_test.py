@@ -83,6 +83,9 @@ ALIASED: frozenset[str] = frozenset(
     # relation from the other and every gate stays green.
     + [f"cs_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
     + [f"cs_r_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
+    # #51/S6.2: a minor's city is the city block's minor section, so these four
+    # are views like every other city field.
+    + ["cs_alive", "cs_center", "cs_pop", "cs_hp"]
 )
 
 

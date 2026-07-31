@@ -400,7 +400,7 @@ _MUTABLE = [
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_pop", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
+    "cs_quest_district", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
     "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
@@ -490,7 +490,13 @@ class BatchSim:
         self.RC = 24  # rival city slots per civ (settling caps at maxCities;
         # loyalty flips can exceed — a strong Harbor-fed rival accumulates many
         # by t300; bumped 10->24, empty slots are cty_alive=False so inert)
-        _rp, _rcp = max(self.R, 1), self.RC
+        # #51/S6.2: the block covers MINORS too. A city-state's one city is
+        # slot 0 of its own seat row, at the same row index the war matrix
+        # uses, so "which row is this seat" has one answer everywhere. `S` is
+        # hoisted here beside `R` for the same reason `R` was.
+        self.S = int(f0.get("csMax", 0))
+        _rp, _rcp, _sp = max(self.R, 1), self.RC, max(self.S, 1)
+        self._CTY_MINOR0 = 1 + _rp
         self._aliases: dict = {}
         for _k, _pa, _ra, _dt, _rf, _pf, _ex in (
             ("alive", "alive", "rc_alive", torch.bool, False, None, None),
@@ -514,17 +520,17 @@ class BatchSim:
             ("artifacts", "artifacts", "rc_artifacts", torch.long, 0, None, None),
             ("bldg", "buildings", "rc_bldg", torch.bool, False, None, max(len(rules.b_cost), 1)),
         ):
-            _shape = (B, 1 + _rp, _rcp) + ((_ex,) if _ex else ())
+            _shape = (B, 1 + _rp + _sp, _rcp) + ((_ex,) if _ex else ())
             _base = torch.full(_shape, _rf, dtype=_dt, device=device)
             setattr(self, f"cty_{_k}", _base)
             _pv = _base[:, 0, :C] if _ex is None else _base[:, 0, :C, :]
             if _pf is not None:
                 _pv.fill_(_pf)
             setattr(self, _pa, _pv)
-            setattr(self, _ra, _base[:, 1:])
+            setattr(self, _ra, _base[:, 1:1 + _rp])
             self.register_alias(_pa, (lambda sim, k=_k, e=_ex: getattr(sim, f"cty_{k}")[:, 0, :sim.C]
                                       if e is None else getattr(sim, f"cty_{k}")[:, 0, :sim.C, :]))
-            self.register_alias(_ra, lambda sim, k=_k: getattr(sim, f"cty_{k}")[:, 1:])
+            self.register_alias(_ra, lambda sim, k=_k, rp=_rp: getattr(sim, f"cty_{k}")[:, 1:1 + rp])
 
         def ften(getter, shape_tail=()):
             return torch.tensor([getter(f) for f in fixtures], dtype=dtype, device=device).reshape(B, *shape_tail)
@@ -625,12 +631,17 @@ class BatchSim:
         )
 
         # --- city-states (phase 4c): static minors placed at game creation ----
-        self.S = int(f0.get("csMax", 0))
-        s_pad = max(self.S, 1)
-        self.cs_alive = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        s_pad = max(self.S, 1)  # #51/S6.2: self.S is set with the city block
+        # #51/S6.2: a city-state's city IS a city — these four are the minor
+        # section of the city block, not planes of their own. Row 1+R+s, slot 0.
+        _m0 = self._CTY_MINOR0
+        self.cs_alive = self.cty_alive[:, _m0:_m0 + s_pad, 0]
+        self.register_alias("cs_alive", lambda sim: sim.cty_alive[:, sim._CTY_MINOR0:sim._CTY_MINOR0 + max(sim.S, 1), 0])
         self.cs_type = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        self.cs_center = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        self.cs_pop = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        self.cs_center = self.cty_center[:, _m0:_m0 + s_pad, 0]
+        self.register_alias("cs_center", lambda sim: sim.cty_center[:, sim._CTY_MINOR0:sim._CTY_MINOR0 + max(sim.S, 1), 0])
+        self.cs_pop = self.cty_pop[:, _m0:_m0 + s_pad, 0]
+        self.register_alias("cs_pop", lambda sim: sim.cty_pop[:, sim._CTY_MINOR0:sim._CTY_MINOR0 + max(sim.S, 1), 0])
         # B-21: per-CS-instance suzerain unique-perk yield column (-1 = descoped
         # row). Name-keyed in the exporter, constant thereafter.
         self.cs_suz_key = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -654,7 +665,12 @@ class BatchSim:
         self.cs_last_levy = torch.full((B, s_pad), -self._levy_cooldown, dtype=torch.long, device=device)
         self._alloc_war(B, max(self.R, 1), s_pad, device)
         # V-CS: siege hit points (attackCityState) — TS `cs.hp ?? CS_MAX_HP`.
-        self.cs_hp = torch.full((B, s_pad), int(rules.cs.get("maxHp", 150)), dtype=torch.long, device=device)
+        self.cs_hp = self.cty_hp[:, _m0:_m0 + s_pad, 0]
+        # a minor's row was filled with the RIVAL fill (0); its own maximum is
+        # its own constant, so write it once here rather than teach the block
+        # a third fill it would only ever use for this one plane.
+        self.cs_hp.fill_(int(rules.cs.get("maxHp", 150)))
+        self.register_alias("cs_hp", lambda sim: sim.cty_hp[:, sim._CTY_MINOR0:sim._CTY_MINOR0 + max(sim.S, 1), 0])
         # A-18 (#79): the player<->city-state war state (CityState.atWar twin).
         # Peace is the default; a city-state is a separate player you must
         # DECLARE on, and the attack mask/resolver both read this.
