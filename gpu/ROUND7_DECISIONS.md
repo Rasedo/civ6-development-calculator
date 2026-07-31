@@ -352,3 +352,39 @@ conversion — plus RR_DOW_WW_MAX / RR_PEACE_WW rebuilt against the new units.
 `{Amount, Overall|Domestic|Enemy}` — no era argument, no casus-belli argument on
 any of its seven consumers. The scaling is hardcoded in the C++ DLL, so the
 table above is as close to the source as any datamining will get.
+
+
+---
+
+## S4.1r REMAINDER — the settler POP COST, attempted and backed out 2026-07-31
+
+The BANK half is landed (`f7740b3`, battery green). The POPULATION COST is not,
+and this is what it costs to try naively.
+
+**The rule is sourced and HIGH-confidence.** Civ 6: a Settler "can be built or
+purchased ... Population is lowered by 1" and is "consumed in the process".
+  https://civilization.fandom.com/wiki/Settler_(Civ6)
+The player pays it (`game.ts` ×3, GPU `pop[:, c] - 1`); a rival pays NOTHING on
+either path. The rival's only `population - 1` is STARVATION, not the settler.
+
+**The naive edit fails two ways at once**, both measured:
+1. **Parity RED** — seed 9105 t11, `r1c0.pop` TS=2 GPU=1 (and `r1.popSum`,
+   `r1.rGScore` with it). Both engines decrement at "settler queue item
+   completes", so the delta is an ORDERING difference against CITY GROWTH: TS
+   runs growth (`rc.foodBox >= need`) BEFORE the queue block, and the GPU's
+   growth sits elsewhere in its phase. **Establish the two orders before
+   editing** — that is the whole slice, not the decrement itself.
+2. **A gate seed DIES** — the export throws before finishing all 12. Rivals
+   losing a pop per settler is a large trajectory change, so `SEED_OVERRIDES`
+   needs re-deriving as part of the slice (the spec already warned of this).
+
+**The PURCHASE half has no attribution rule yet.** Civ 6 charges the purchasing
+city, and the player's path does. The rival's settler purchase founds via
+`tryFoundCity` with NO city in scope — `buyCity` belongs to the building-purchase
+branch above it. Do not invent a payer (the capital? the picker's city?); find
+what the rival purchase should be attributed to, or leave the purchase half as a
+declared residual.
+
+Order for the next attempt: (i) print both engines' growth-vs-queue order and
+make them agree, (ii) land the BUILD-path decrement, (iii) re-derive
+SEED_OVERRIDES, (iv) only then decide the purchase attribution.
