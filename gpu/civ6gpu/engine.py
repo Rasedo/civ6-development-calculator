@@ -400,8 +400,8 @@ _MUTABLE = [
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
-    "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
+    "cs_pop", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
+    "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
     "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
@@ -410,7 +410,7 @@ _MUTABLE = [
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
     "r_route_dest",  # B-23: international dest player-city CENTER TILE (>=0), else -1 (domestic/CS)
     "r_route_exp",   # B-23: per-route expiry turn (start + trade.duration), -1 = free slot
-    "cs_r_envoys", "cs_r_met",  # A-12: rival↔CS diplomacy
+     # A-12: rival↔CS diplomacy
      # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
@@ -435,6 +435,9 @@ _MUTABLE = [
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
     # #51/S4.2: per-seat scalar bases (the x / r_x views live on these)
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_war_weariness", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
+    # #51/S6.1: the (civ, city-state) relation bases — cs_x is row 0 and
+    # cs_r_x rows 1.., both VIEWS, so only the base may be registered.
+    "csr_met", "csr_envoys", "csr_quest", "csr_quest_camp", "csr_quest_issued",
 ]
 
 
@@ -639,11 +642,10 @@ class BatchSim:
                 self.cs_pop[b, s] = cs["pop"]
                 self.cs_suz_key[b, s] = cs.get("suzKey", -1)
         self.cs_at = torch.tensor([[t.get("cs", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        self.cs_met = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
-        self.cs_envoys = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        self.cs_quest = torch.zeros(B, s_pad, dtype=torch.long, device=device)  # 0 none / 1 clearCamp / 2 trade / 3 district
-        self.cs_quest_camp = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.cs_quest_issued = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # #51/S6.1: the five (civ, city-state) relations live on `csr_*`
+        # [B, 1+R, S] planes allocated below — `cs_met` and `cs_r_met` are the
+        # `[:, 0]` and `[:, 1:]` views of ONE tensor, and so on. Allocated
+        # after r_pad is known.
         self.cs_quest_district = torch.full((B, s_pad), -1, dtype=torch.long, device=device)  # askable idx of a buildDistrict quest (0=CAMPUS)
         # A-12 (B8-L): RIVAL LEVY cooldown — per CS, SHARED across seats (TS
         # cs.lastLevyTurn, `?? -LEVY_COOLDOWN`). Init to -levyCooldown so a
@@ -931,17 +933,14 @@ class BatchSim:
         # AUDIT A-12: rival↔CS diplomacy — per-rival envoys/met planes plus
         # the influence/envoy-bank accumulators (the player twins). t0
         # fixtures carry none of it (rivals start unmet, zero everywhere).
-        self.cs_r_envoys = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
-        self.cs_r_met = torch.zeros(B, r_pad, s_pad, dtype=torch.bool, device=device)
+        self._alloc_cs_pairs(B, r_pad, s_pad, device)
         # A-12 (B8-L): RIVAL city-state quests — ONE per (rival, CS), the
         # zero-draw twin of cs_quest. kind 0 none / 1 clearCamp / 2 trade /
         # 3 district; the buildDistrict target is deterministic (the CS type's
         # district, from _cs_didx) so no per-quest district plane is needed.
         # cs_r_quest_issued zeros init → first issue at turn≥questCooldown (the
         # TS `rqi[r] ?? 0` default). t0 fixtures carry none (rivals start unmet).
-        self.cs_r_quest = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
-        self.cs_r_quest_camp = torch.full((B, r_pad, s_pad), -1, dtype=torch.long, device=device)
-        self.cs_r_quest_issued = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
+
         self.rvcity_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at rival centers
         # ---------------------------------------------------------------------
         # #51/S3.3: ONE UNIT POOL.
@@ -2022,6 +2021,30 @@ class BatchSim:
             raise AssertionError("SEAT DRIFT: a RIVAL slot's seat != civOfRival(v_civ)")
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
+
+    #: #51/S6.1: (name, dtype, fill) for every relation a CIV holds with a
+    #: CITY-STATE. Each becomes one `csr_<name> [B, 1+R, S]` plane; `cs_<name>`
+    #: is row 0 and `cs_r_<name>` is rows 1.., both views.
+    _CS_PAIR_FIELDS = (
+        ("met", torch.bool, False),
+        ("envoys", torch.long, 0),
+        ("quest", torch.long, 0),        # 0 none / 1 clearCamp / 2 trade / 3 district
+        ("quest_camp", torch.long, -1),
+        ("quest_issued", torch.long, 0),
+    )
+
+    def _alloc_cs_pairs(self, B: int, r_pad: int, s_pad: int, device) -> None:
+        """#51/S6.1: one plane per (civ, city-state) relation, old names as
+        views. The player's envoys and a rival's envoys stop being different
+        variables — which is the whole of #51 in miniature, applied to the
+        relation a city-state actually has."""
+        for _nm, _dt, _fill in self._CS_PAIR_FIELDS:
+            _base = torch.full((B, 1 + r_pad, s_pad), _fill, dtype=_dt, device=device)
+            setattr(self, f"csr_{_nm}", _base)
+            setattr(self, f"cs_{_nm}", _base[:, 0])
+            setattr(self, f"cs_r_{_nm}", _base[:, 1:])
+            self.register_alias(f"cs_{_nm}", lambda sim, k=_nm: getattr(sim, f"csr_{k}")[:, 0])
+            self.register_alias(f"cs_r_{_nm}", lambda sim, k=_nm: getattr(sim, f"csr_{k}")[:, 1:])
 
     def _alloc_war(self, B: int, r_pad: int, s_pad: int, device) -> None:
         """#51/S4.3: ONE war relation. `war[b, i, j]` is symmetric and covers

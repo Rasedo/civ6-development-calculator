@@ -78,6 +78,11 @@ ALIASED: frozenset[str] = frozenset(
     # detach the relation from the matrix every reader consults, and every gate
     # would stay green while the two halves drifted apart.
     + ["r_atwar", "rr_war", "cs_atwar"]
+    # #51/S6.1: the five (civ, city-state) relations — cs_x is row 0 of
+    # csr_x and cs_r_x is rows 1.., so a rebind detaches one side of the
+    # relation from the other and every gate stays green.
+    + [f"cs_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
+    + [f"cs_r_{n}" for n in ("met", "envoys", "quest", "quest_camp", "quest_issued")]
 )
 
 
@@ -163,10 +168,16 @@ def rule3_setattr_rebinds(tree: ast.AST) -> list[tuple[int, str]]:
     unit pool builds its ten bases and thirty views through exactly this call.
     Everywhere else, setattr on self means rebinding something that already
     exists, which is the thing that must not happen.
+
+    #51/S6.1: `_alloc_*` helpers are exempt on the same grounds — they are
+    __init__ split into named pieces so it does not become a thousand lines.
+    The exemption is CHECKED, not assumed: `_alloc_callers_ok` proves every
+    one of them is called from __init__ and nowhere else, so "allocator" can
+    never quietly become "thing that reruns mid-game and orphans the views".
     """
     bad = []
     for fn in _functions(tree):
-        if fn.name == "__init__":
+        if fn.name == "__init__" or fn.name.startswith("_alloc_"):
             continue
         for node in ast.walk(fn):
             if (
@@ -179,6 +190,32 @@ def rule3_setattr_rebinds(tree: ast.AST) -> list[tuple[int, str]]:
             ):
                 bad.append((node.lineno, ast.unparse(node.args[1])[:60]))
     return bad
+
+
+def rule3b_alloc_callers(tree: ast.AST) -> list[tuple[int, str]]:
+    """Every `_alloc_*` method must be called from __init__ and nowhere else.
+
+    This is what buys rule 3's exemption for them. An allocator invoked from a
+    step path would rebind live planes and silently orphan every alias — the
+    p_aura_mp class, but wholesale."""
+    init_calls, other_calls = set(), []
+    for fn in _functions(tree):
+        for node in ast.walk(fn):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "self"
+                and node.func.attr.startswith("_alloc_")
+            ):
+                if fn.name == "__init__":
+                    init_calls.add(node.func.attr)
+                else:
+                    other_calls.append((node.lineno, f"{fn.name} calls self.{node.func.attr}()"))
+    for fn in _functions(tree):
+        if fn.name.startswith("_alloc_") and fn.name not in init_calls:
+            other_calls.append((fn.lineno, f"{fn.name} is never called from __init__"))
+    return other_calls
 
 
 def rule4_aliased_rebinds(tree: ast.AST) -> list[tuple[int, str]]:
@@ -202,6 +239,7 @@ def main() -> int:
     rebinds = rule1_rebinds(tree)
     stale = rule2_stale_captures(tree)
     setattrs = rule3_setattr_rebinds(tree)
+    allocs = rule3b_alloc_callers(tree)
     aliased = rule4_aliased_rebinds(tree)
 
     for line, name in rebinds:
@@ -222,16 +260,24 @@ def main() -> int:
             f"— write it in place instead, or aliases of it are orphaned"
         )
 
+    for line, what in allocs:
+        print(
+            f"ALLOC   engine.py:{line}: {what} — an _alloc_* helper is __init__ "
+            f"split up, so it may only run from __init__; anywhere else it "
+            f"rebinds live planes and orphans every view of them"
+        )
+
     for line, name in aliased:
         print(
             f"ALIAS   engine.py:{line}: `self.{name} = ...` rebinds a VIEW of the "
             f"merged unit pool — write it in place, or the pool stops seeing it"
         )
 
-    if rebinds or stale or setattrs or aliased:
+    if rebinds or stale or setattrs or allocs or aliased:
         print(
             f"\nin-place discipline FAILED — {len(rebinds)} rebind(s), "
             f"{len(stale)} stale capture(s), {len(setattrs)} setattr rebind(s), "
+            f"{len(allocs)} misplaced allocator call(s), "
             f"{len(aliased)} aliased-plane rebind(s)"
         )
         return 1
@@ -249,7 +295,7 @@ def main() -> int:
     print(
         f"in-place discipline OK — {n_inplace} in-place self writes, "
         f"0 self-referential rebinds, 0 stale captures, 0 setattr rebinds, "
-        f"{len(ALIASED)} pooled views guarded"
+        f"{len(ALIASED)} pooled views guarded, allocators __init__-only"
     )
     return 0
 

@@ -470,7 +470,39 @@ Factor `_walk(unit_mask, target, stop_pred)` and rewrite the six copies (`_barba
 
 ---
 
-### ROUND 6 — City-states and barbarians become seats [B]
+### ROUND 6 — City-states and barbarians become seats [B] — IN PROGRESS
+
+**S6.0 — ONE war relation. DONE (`c29af04`).** `r_atwar [B,R]`, `rr_war
+[B,R,R]` and `cs_atwar [B,S]` are SLICES of `war [B,NS,NS]` now, not tensors
+beside it, so the drift class is gone by construction. `_check_war_invariant`
+loses two checks that became tautologies and keeps the one code can still
+break — symmetry, plus a zero diagonal. `sync_war` stops rebuilding and
+becomes the transpose closure with the UPPER triangle authoritative (not an
+OR: peace clears one cell, and ORing the transpose back would undo it).
+FOUND: the player<->CS war verb is unreachable in a GAME — see AUDIT A-18.
+
+**S6.1 — the five (civ, city-state) relations. DONE.** `cs_met`/`cs_r_met`,
+`cs_envoys`/`cs_r_envoys`, `cs_quest`/`cs_r_quest`, `cs_quest_camp`/…,
+`cs_quest_issued`/… are one `csr_x [B, 1+R, S]` plane each with the old names
+as `[:, 0]` / `[:, 1:]` views — the S4.2 pattern applied to the relation a
+city-state actually has. `cs_quest_district` keeps its own plane: rivals never
+ask for a district (B8-L picks the first satisfiable option), so that
+asymmetry is in the RULE, not the storage. The in-place lane gained rule 3b —
+`_alloc_*` helpers may use `setattr` because they are __init__ split up, and
+that exemption is CHECKED: every one must be called from __init__ and nowhere
+else (proven to bite by injecting a call from `sync_war`).
+
+**S6.2 — a minor's city joins the city block.** `cty_x` widens to
+`[B, 1+R+S, RC]`; `cs_alive/cs_center/cs_pop/cs_hp` become the minor section
+(row 1+R+s, slot 0), at the same row index the war matrix uses.
+
+Remaining: the `cs_*` planes that are genuinely city-state-specific
+(`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_war_turns`, `cs_at`) and the TS
+half — `src/core/types.ts:CityState` becoming a `Seat` with one `City`.
+
+---
+
+### ROUND 6 — original plan
 
 Widen to `NS = 1+R+S+1`. Delete the `cs_*` family and `src/core/types.ts:CityState`. A city-state is a `Seat` with `cls=Minor`, one `City`, `caps` minus research/found/expand/victory plus `suzerainable`. The barbarian is one `Seat` with `cls=Hostile`, `caps.alwaysHostile`, no diplomatic row; `barbCamps`/`camp_tile` re-home onto it and **stay a camp list**.
 Fold CS combat into the shared path: `cs_hp`/`CS_MAX_HP=150` → `city_hp`/`CITY_MAX_HP=200`; `combat.ts:attackCityState`'s literal `15 + cs.population + (militaristic ? 6 : 0)` → `cityDefenseStrength`; the unconditional +10/turn CS regen → the besieged-gated +20 heal; city-states gain the walls/Encampment strike they have never had (there is no `csstk` damage key anywhere). `combat.ts:attackTargets`' three mutually exclusive CS arms (`csPlayerWar` needing `cs.atWar`; `csWar` needing the player to be suzerain; barbarians having **no arm**) become one "at war with seat X" test. `rivals.ts:levyUnits`' hardcoded `spawnUnit(..., 'player')` takes a seat.
