@@ -406,10 +406,11 @@ export interface Unit {
    * `movesLeft >= movesFull`. It used to be derived as `movesLeft >= (the unit
    * type's moves)`, correct only while the granted pool was constant per type;
    * the Great General/Admiral +1 MP aura breaks that, since the pool now
-   * varies per turn with a general's position. The GPU needs no mirror — it
-   * already tracks the same fact explicitly as p_acted/u_acted/v_acted, so
-   * this field converges TS onto the GPU's model. Undefined on units that
-   * predate a refresh (the `?? full` fallback reproduces the old behaviour).
+   * varies per turn with a general's position. #51/S5.2b: the GPU asks the
+   * same question the same way — it kept a parallel `acted` boolean until the
+   * two representations were proven identical and the boolean was deleted.
+   * Undefined on units that predate a refresh (the `?? full` fallback
+   * reproduces the old behaviour).
    */
   movesFull?: number;
   hp: number;

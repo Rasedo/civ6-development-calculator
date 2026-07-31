@@ -61,7 +61,8 @@ def add_builder(sim, r: int, t: int) -> int:
     sim.v_tile[0, slot] = t
     sim.v_hp[0, slot] = 100
     sim.v_charges[0, slot] = 1
-    sim.v_acted[0, slot] = False
+    sim.v_mp[0, slot] = sim._p_moves[sim._builder_idx]  # #51/S5.2b: a fresh unit is unspent
+    sim.v_mp_full[0, slot] = sim.v_mp[0, slot]
     sim.v_fortify[0, slot] = 0
     sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
     sim.v_next[0] += 1

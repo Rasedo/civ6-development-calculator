@@ -14,8 +14,9 @@ import type { GameState } from '../src/core/types';
 // movement points during a turn, the unit will not start healing until the next
 // turn", so the heal / B-5 fortify gates must compare against what the unit was
 // GRANTED, not against its type's base moves — the aura makes the granted pool
-// vary per turn. (The GPU already tracks this as p_acted/u_acted/v_acted; this
-// field is TS converging onto that model.)
+// vary per turn. (#51/S5.2b: the GPU asks it the same way, off the same two
+// numbers — it kept a parallel `acted` boolean until the two were proven
+// identical and the boolean was deleted.)
 
 function newGame(): GameState {
   const state = createGame({

@@ -1331,8 +1331,8 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
       bt.pillaged = false;
       // P5/S4 gate-catch (seed 9066 t44, hunted via the new RU a-flags):
       // building spends the turn — the D-2 heal gate must see it (real
-      // Civ 6; the GPU sets v_acted here). A working builder healing +20
-      // every turn was the asymmetry.
+      // Civ 6; the GPU zeroes this builder's MP here too). A working builder
+      // healing +20 every turn was the asymmetry.
       u.movesLeft = 0;
       u.charges = (u.charges ?? 1) - 1;
       if (u.charges <= 0) disbandUnit(state, u.id);
@@ -1359,7 +1359,7 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // per step: the free neighbor strictly closer (first-found wins ties =
     // direction order), walkPath's charge (tile cost + 3 per river; a
     // full-MP unit always affords its first step). Any step still blocks
-    // the D-2 heal (movesLeft < full — the GPU v_acted twin).
+    // the D-2 heal (movesLeft < full, the same expression on both engines).
     const jt = state.map.tiles[best];
     for (;;) {
       const at = state.map.tiles[u.tileIndex];

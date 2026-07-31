@@ -77,7 +77,7 @@ def gpu_state_lines(sim, b):
             t_ = int(sim.u_tile[b, u])
             _bn[t_] += 1
             _bh[t_] += int(sim.u_hp[b, u])
-            _ba[t_] += int(bool(sim.u_acted[b, u]))
+            _ba[t_] += int(bool(sim.u_mp[b, u] < sim.u_mp_full[b, u]))
     for tile in sorted(_bn):
         L.append(f"{p}BU {tile} = {_bn[tile]} hp{_bh[tile]} a{_ba[tile]}")
     # barb CAMPS (P5/S6 hunt: camp LOCATIONS were invisible — only the
@@ -92,7 +92,7 @@ def gpu_state_lines(sim, b):
                 k = (int(sim.v_civ[b, v]), int(sim.v_tile[b, v]), int(sim.v_type[b, v]))
                 _rn[k] += 1
                 _rh[k] += int(sim.v_hp[b, v])
-                _ra[k] += int(bool(sim.v_acted[b, v]))
+                _ra[k] += int(bool(sim.v_mp[b, v] < sim.v_mp_full[b, v]))
         for k in sorted(_rn):
             L.append(f"{p}RU{k[0]} {k[1]} t{k[2]} = {_rn[k]} hp{_rh[k]} a{_ra[k]}")
 

@@ -432,7 +432,7 @@ _MUTABLE = [
     # #51/S3.3: the merged unit pool. The BASES are registered, never the
     # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
     # plane instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
     # #51/S4.2: per-seat scalar bases (the x / r_x views live on these)
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_war_weariness", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
 ]
@@ -984,7 +984,6 @@ class BatchSim:
         self._UNIT_PLANES: list = []
         for _pl, _dt in (
             ("alive", torch.bool),      # a slot holds a living unit
-            ("acted", torch.bool),      # P4/D-2: spent MP since the last refresh (blocks healing)
             ("emb", torch.bool),        # #45/B-6: embarked — a land unit standing on water
             ("type", torch.long),       # roster index (#51/S3.2: barbs too)
             ("tile", torch.long),
@@ -2068,30 +2067,9 @@ class BatchSim:
         if not bool((w == w.transpose(1, 2)).all()):
             raise AssertionError("WAR DRIFT: the matrix is not symmetric")
 
-    def _check_mp_invariant(self) -> None:
-        """#51/S5.2: `acted` and `movesLeft` are the SAME fact. TS has one way
-        to say a unit is done — `movesLeft < movesFull` — and the GPU carried a
-        second, independently maintained boolean. They are maintained side by
-        side for exactly one stage; this asserts they never disagree, on every
-        live slot of every pool, every step under CIV6_ALIAS_CHECK. S5.2b
-        deletes the boolean."""
-        for pre in ("p", "v", "u"):
-            alive = getattr(self, f"{pre}_alive")
-            acted = getattr(self, f"{pre}_acted")
-            spent = getattr(self, f"{pre}_mp") < getattr(self, f"{pre}_mp_full")
-            bad = alive & (acted != spent)
-            if bool(bad.any()):
-                b, u = [int(x[0]) for x in bad.nonzero(as_tuple=True)]
-                raise AssertionError(
-                    f"MP DRIFT: {pre} slot {u} game {b} — acted={bool(acted[b, u])} but "
-                    f"mp={int(getattr(self, f'{pre}_mp')[b, u])}/"
-                    f"{int(getattr(self, f'{pre}_mp_full')[b, u])}"
-                )
-
     def _check_state_discipline(self) -> None:
         self._check_seat_invariant()
         self._check_war_invariant()
-        self._check_mp_invariant()
         for name, fn in self._aliases.items():
             cur = getattr(self, name)
             want = fn(self)
@@ -3313,6 +3291,14 @@ class BatchSim:
         there. #70/S3: the predicate moved to _gen_aura_hit (shared with the
         +MP half); this is unchanged externally."""
         return self._gen_aura_hit(civ_unified, tile, naval).to(self.dtype) * self._gen_aura_cs_val
+
+    def _spent_mp(self, pre: str) -> torch.Tensor:
+        """[B, U] — the P4/D-2 gate: has this unit spent MP since its last
+        refresh? TS asks `unit.movesLeft < grantedLast` and nothing else.
+
+        #51/S5.2b: this used to be a stored boolean plane, written at 39 sites
+        immediately beside the MP arithmetic that already implied it."""
+        return getattr(self, f"{pre}_mp") < getattr(self, f"{pre}_mp_full")
 
     def _full_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — TS refreshUnits' `full + generalAuraMP(state, unit)`, one
@@ -5770,7 +5756,6 @@ class BatchSim:
                         camp_civ=torch.full((B,), r, dtype=torch.long, device=dev),
                     )
                     srows = stepped.nonzero(as_tuple=True)[0]
-                    self.v_acted[srows, sc[srows]] = True  # P4/D-2
             # --- attacks 6-11 (military only; the shared resolution handles
             # barb/player defenders, lone civilians and city targets) ---
             atk = act & (a >= 6) & (a < 12) & ~is_civ
@@ -5799,11 +5784,9 @@ class BatchSim:
                         one[b_] = True
                         if bool(unit_att[b_]):
                             self._hostile_vs_unit(one, tgt, "rival", v)
-                            self.v_acted[b_, v] = True  # P4/D-2
                             self.v_mp[b_, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                         elif bool(city_att[b_]):
                             self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "rival", v)
-                            self.v_acted[b_, v] = True  # P4/D-2
                             self.v_mp[b_, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             # --- builds 13-15 (builders) ---
             # C3-sym V-H1: rival chop (16) — strip + grant into the owning
@@ -5849,7 +5832,6 @@ class BatchSim:
                     else:
                         self.rc_progress[b2, r, j] += amt
                 self.v_charges[rows_c, sc[rows_c]] -= 1
-                self.v_acted[rows_c, sc[rows_c]] = True  # P4/D-2
                 self.v_mp[rows_c, sc[rows_c]] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 spent_c = chp & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
                 if bool(spent_c.any()):
@@ -5885,7 +5867,6 @@ class BatchSim:
                 if bool(did.any()):
                     rows_ = did.nonzero(as_tuple=True)[0]
                     self.v_charges[rows_, sc[rows_]] -= 1
-                    self.v_acted[rows_, sc[rows_]] = True  # P4/D-2
                     self.v_mp[rows_, sc[rows_]] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1
                     spent = did & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
@@ -5931,14 +5912,13 @@ class BatchSim:
             district_free = self.district.gather(1, hc.unsqueeze(1)).squeeze(1) < 0  # a district paves the tile (validImprovements returns [] there)
             wonder_free = self.built_wonder.gather(1, hc.unsqueeze(1)).squeeze(1) < 0  # A-8 gate-catch: in-flight wonder paves too
             # #56 H2: REPAIR first — an owned pillaged tile underfoot clears
-            # the flag (no charge, the turn is spent via p_acted), exactly the
+            # the flag (no charge, the turn is spent — movesLeft = 0), exactly the
             # rival A-13 branch and the exporter's repair-first order.
             pill_h = self.pillaged.gather(1, hc.unsqueeze(1)).squeeze(1)
             rep = act & owned_here & pill_h
             if bool(rep.any()):
                 rrows = rep.nonzero(as_tuple=True)[0]
                 self.pillaged[rrows, here[rrows]] = False
-                self.p_acted[:, p] = self.p_acted[:, p] | rep
                 self.p_mp[:, p] = torch.where(rep, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 self._eff_version += 1
             build = (act & ~rep) & owned_here & not_center & unimproved & district_free & wonder_free & (flat_h | (hill_h & civ_done))
@@ -5946,7 +5926,6 @@ class BatchSim:
                 rows = build.nonzero(as_tuple=True)[0]
                 self.improvement[rows, here[rows]] = self.FARM
                 self.p_charges[rows, p] -= 1
-                self.p_acted[:, p] = self.p_acted[:, p] | build  # P4/D-2
                 self.p_mp[:, p] = torch.where(build, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 self._eff_version += 1
                 gone = build & (self.p_charges[:, p] <= 0)
@@ -5981,7 +5960,6 @@ class BatchSim:
                     move, torch.full_like(here, p), here, dest, dir_i,
                     PLAYER_SEAT, torch.ones_like(move),
                 )
-                self.p_acted[:, p] = self.p_acted[:, p] | stepped  # P4/D-2
                 # #46r gate-catch (seed 9170 t160): walkPath clears camps for
                 # ANY landing unit (+50 player treasury) — the scripted
                 # builder was the ONLY mover in the engine missing the
@@ -6472,7 +6450,7 @@ class BatchSim:
         # game. A slot HOLD/invalid in EVERY game runs a fully masked no-op:
         # every mutation mask (civk/siege/att/r_att/r_civ/cs_hit/r_sieg/r_cs/
         # ok_c/bld/mv/ok) carries (a in 6..11)/(a==16)/(a in 13..15)/(a in 0..5)
-        # and is all-False; the single unconditional write (p_acted |= att|r_att)
+        # and is all-False; the single unconditional spend (att|r_att -> mp 0)
         # is |False; and every _damage_roll sits inside an if-any block keyed on
         # one of those masks, so a HOLD unit draws no RNG — the skip is exact and
         # draw-count-neutral.
@@ -6529,7 +6507,7 @@ class BatchSim:
                 # attack but does NOT advance (single-occupancy model). Pool
                 # TRANSFER: despawn from the rival v_* pool, append to the
                 # player p_* pool in spawn order (last-alive+1) with hp and
-                # charges carried; movesLeft=0 -> p_acted so the D-2 heal skips
+                # charges carried; movesLeft=0, so the D-2 heal skips
                 # it this turn, exactly like TS's defender.movesLeft = 0.
                 kr = civk.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[kr]
@@ -6544,12 +6522,10 @@ class BatchSim:
                 self.occ_civ[(kr, ct)] = nslot + self.POOL_LO["p"]  # #51/S3.4b
                 self.p_next[kr] += 1
                 self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
-                self.p_acted[:, p] = self.p_acted[:, p] | civk  # P4/D-2: TS meleeAttack spends MP
                 self.p_mp[:, p] = torch.where(civk, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & (bslot < 0) & ~v_ok & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
-                self.p_acted[:, p] = self.p_acted[:, p] | siege  # P4/D-2
                 self.p_mp[:, p] = torch.where(siege, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             # B-17 (#71): a LIVE enemy Encampment on the target tile is assaulted
             # (meleeAttack's encamp arm). Requires the tile to hold no unit and
@@ -6571,7 +6547,6 @@ class BatchSim:
                 )
                 if bool(enc_att.any()):
                     self._attack_encampment(enc_att, tc, "player", p)
-                    self.p_acted[:, p] = self.p_acted[:, p] | enc_att
                     self.p_mp[:, p] = torch.where(enc_att, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ((bslot >= 0) | v_ok) & (self._p_combat[self.p_type[:, p]] > 0)
             # V-R: ranged units strike instead of meleeing (rangedAttack —
@@ -6725,7 +6700,6 @@ class BatchSim:
                     self.unit_xp[surv_rv, vslot[surv_rv] + self.POOL_LO["v"]] += XP_DEFEND
             # P4/D-2: any fight spends the attacker's MP (att|r_att = the
             # original validated attack set — both branches always execute)
-            self.p_acted[:, p] = self.p_acted[:, p] | att | r_att
             self.p_mp[:, p] = torch.where(att | r_att, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
 
             # TS rangedAttack with no military defender falls back to
@@ -6769,7 +6743,6 @@ class BatchSim:
                 self.occ_civ[(rows[dead], tc[rows[dead]])] = -1  # #51/S3.4b
                 if bool(dead.any()):
                     self._gen_ver += 1  # B7-G (B-8): the killed civilian may be a general → invalidate the aura plane
-                self.p_acted[:, p] = self.p_acted[:, p] | r_civ
                 self.p_mp[:, p] = torch.where(r_civ, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
 
             # --- V-CS: melee vs a CITY-STATE CENTER — meleeAttack's csTarget
@@ -6814,7 +6787,6 @@ class BatchSim:
                 cap = cs_hit & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
                 if bool(cap.any()):
                     self._capture_city_state(cap.nonzero(as_tuple=True)[0], cs_sc)
-                self.p_acted[:, p] = self.p_acted[:, p] | cs_hit  # P4/D-2
                 self.p_mp[:, p] = torch.where(cs_hit, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
 
             # --- P4/D-23: ranged BOMBARDMENT of cities (rangedAttack's city
@@ -6847,7 +6819,6 @@ class BatchSim:
                     self.rc_hp[rows2, civ2[rows2], slot2[rows2]] - d_city2[rows2],
                     torch.ones_like(d_city2[rows2]),
                 )
-                self.p_acted[:, p] = self.p_acted[:, p] | r_sieg
                 self.p_mp[:, p] = torch.where(r_sieg, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             r_cs = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
@@ -6874,7 +6845,6 @@ class BatchSim:
                     self.cs_hp[rows3, cs_sc[rows3]] - d_cs3[rows3],
                     torch.ones_like(d_cs3[rows3]),
                 )
-                self.p_acted[:, p] = self.p_acted[:, p] | r_cs
                 self.p_mp[:, p] = torch.where(r_cs, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
 
             # B-4: the player attacker earns +5 for ANY attack it executed this
@@ -6930,7 +6900,6 @@ class BatchSim:
                     if bool(_pd.any()):
                         _r4 = _pd.nonzero(as_tuple=True)[0]
                         self.district_pillaged[_r4, hc0[_r4]] = True
-                    self.p_acted[:, p] = self.p_acted[:, p] | ok_pl
                     self.p_mp[:, p] = torch.where(ok_pl, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1
                 # A-18 (#50): 18-23 = place a RESOURCE improvement (or the
@@ -6986,7 +6955,6 @@ class BatchSim:
                     self.pillaged[rr_[_imp], tt_[_imp]] = False
                     _dis = ~_imp & self.district_pillaged[rr_, tt_]
                     self.district_pillaged[rr_[_dis], tt_[_dis]] = False
-                    self.p_acted[:, p] = self.p_acted[:, p] | ok_rp
                     self.p_mp[:, p] = torch.where(ok_rp, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1
                 ftu_t = self.tile_ftu.gather(1, hc0.unsqueeze(1)).squeeze(1)
@@ -7003,7 +6971,6 @@ class BatchSim:
                 if bool(ok_c.any()):
                     rows_c = ok_c.nonzero(as_tuple=True)[0]
                     tiles_c = hc0[rows_c]
-                    self.p_acted[:, p] = self.p_acted[:, p] | ok_c  # P4/D-2: builderRemoveFeature spends MP
                     self.p_mp[:, p] = torch.where(ok_c, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._strip_feature_at(rows_c, tiles_c)
                     if self.LUMBER >= 0:
@@ -7059,7 +7026,6 @@ class BatchSim:
                         rows = bld.nonzero(as_tuple=True)[0]
                         self.improvement[rows, here[rows]] = imp
                         self.p_charges[rows, p] -= 1
-                        self.p_acted[:, p] = self.p_acted[:, p] | bld  # P4/D-2: builderImprove spends MP
                         self.p_mp[:, p] = torch.where(bld, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                         self._eff_version += 1
                         gone = bld & (self.p_charges[:, p] <= 0)
@@ -7089,7 +7055,6 @@ class BatchSim:
                 stepped = self._step_verb(  # #51/S5.2: the shared contract
                     ok, torch.full_like(here, p), here, tgt, dirs, PLAYER_SEAT, civ,
                 )
-                self.p_acted[:, p] = self.p_acted[:, p] | stepped  # P4/D-2
 
     def _bankrupt_disband(self) -> None:
         """GV-5: an insolvent treasury disbands ONE player unit per turn — the
@@ -7390,7 +7355,6 @@ class BatchSim:
             r_att = attack & rngd
             if any_rngd and bool(r_att.any()):
                 acted_att = acted_att | self._hostile_ranged_strike(r_att, ttc, "barb", u)
-            self.u_acted[:, u] = self.u_acted[:, u] | acted_att  # P4/D-2
             self.u_mp[:, u] = torch.where(acted_att, torch.zeros_like(self.u_mp[:, u]), self.u_mp[:, u])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
 
             # Pillage: a raider that did not attack, standing on an owned,
@@ -7410,7 +7374,6 @@ class BatchSim:
                     rows = pillage.nonzero(as_tuple=True)[0]
                     heal_r = self._imp_heals[self.improvement[rows, here[rows]].clamp(min=0)]
                     self.pillaged[rows, here[rows]] = True
-                    self.u_acted[rows, u] = True  # P4/D-2
                     self.u_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1  # a farm's yield just dropped
                     hp_cap = self.rules.combat.get("unitHp", 100)
@@ -7434,7 +7397,6 @@ class BatchSim:
                 if bool(dist_pillage.any()):
                     rows = dist_pillage.nonzero(as_tuple=True)[0]
                     self.district_pillaged[rows, here[rows]] = True
-                    self.u_acted[rows, u] = True  # P4/D-2
                     self.u_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1  # CACHE: rival/player district yields just dropped
 
@@ -7477,7 +7439,7 @@ class BatchSim:
             # affords its first step. An improvement target is walked ONTO; a
             # CITY target stops the march ADJACENT (dir >= 1 — enemy centers
             # can't be entered, and the start-of-phase attack scan already met
-            # any adjacent target). Any step sets u_acted (movesLeft < full →
+            # any adjacent target). Any step spends MP (movesLeft < full →
             # the D-2 heal is blocked). EVERY barb ladder type (WARRIOR /
             # SPEARMAN / PIKEMAN / MUSKETMAN and #70/S5's ARCHER /
             # CROSSBOWMAN) has UNITS.moves == 2, so full_mp stays 2. Camps are
@@ -7527,7 +7489,6 @@ class BatchSim:
                 self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.occ_mil[(rows, dest[rows])] = u + P_MAX + U_MAX  # #51/S3.4b
                 self.u_tile[rows, u] = dest[rows]
-                self.u_acted[rows, u] = True  # P4/D-2
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 self.u_mp[:, u] = mp  # #51/S5.1
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
@@ -8447,7 +8408,7 @@ class BatchSim:
             if _eng_row is not None and bool(_eng_row.any()):
                 jobm = torch.where(_eng_row.unsqueeze(1), self._rival_fort_job_mask(r, techs=techs0), jobm)
             # A-13: REPAIR first — TS checks bt.pillaged && owns(bt) before
-            # any build/walk; no charge is spent, movesLeft goes 0 (v_acted),
+            # any build/walk; no charge is spent, movesLeft goes 0,
             # and the yield change bumps the version.
             own_h = self.rival_at.gather(1, here.unsqueeze(1)).squeeze(1) == r
             pill_h = self.pillaged.gather(1, here.unsqueeze(1)).squeeze(1)
@@ -8455,7 +8416,6 @@ class BatchSim:
             if bool(rep.any()):
                 rows = rep.nonzero(as_tuple=True)[0]
                 self.pillaged[rows, here[rows]] = False
-                self.v_acted[rows, u] = True
                 self.v_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 self._eff_version += 1
                 act = act & ~rep
@@ -8469,7 +8429,6 @@ class BatchSim:
             if bool(rep_d.any()):
                 rows = rep_d.nonzero(as_tuple=True)[0]
                 self.district_pillaged[rows, here[rows]] = False
-                self.v_acted[rows, u] = True
                 self.v_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 self._eff_version += 1
                 act = act & ~rep_d
@@ -8563,7 +8522,6 @@ class BatchSim:
                     self.improvement[rows, here[rows]] = pick[rows]
                     self.pillaged[rows, here[rows]] = False
                     self.v_charges[rows, u] -= 1
-                    self.v_acted[rows, u] = True  # P4/D-2
                     self.v_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                     self._eff_version += 1
                     spent = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -8585,7 +8543,7 @@ class BatchSim:
             # — per step: the free neighbor strictly closer (rciv-blocked,
             # ties to direction order), walkPath's charge (1 + tmove//3 + 3
             # per river crossing); a full-MP unit always affords its first
-            # step. Any step still gates the D-2 heal via v_acted.
+            # step. Any step still gates the D-2 heal (movesLeft < full).
             arange6 = torch.arange(6, device=dev)
             # #70/S3 (B-8): TS `granted = full + generalAuraMP`, read off the
             # refresh-site SNAPSHOT (never recomputed here — generals move).
@@ -8620,7 +8578,6 @@ class BatchSim:
                 self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
                 self.v_tile[rows, u] = dest[rows]
-                self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # P5/S7 (C-3): mirrors walkPath's any-unit clear
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: the builder (a civilian mover) halts adjacent to a
@@ -8672,7 +8629,6 @@ class BatchSim:
             j = first.long().argmax(dim=1)  # defender slot
             self.v_hp[rows, j[rows]] = self.v_hp[rows, j[rows]] - to_def[rows].to(self.v_hp.dtype)
             self.v_hp[rows, u] = self.v_hp[rows, u] - to_atk[rows].to(self.v_hp.dtype)
-            self.v_acted[rows, u] = True
             self.v_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             fought[rows, u] = True
             def_dead = self.v_hp[rows, j[rows]] <= 0
@@ -8871,7 +8827,6 @@ class BatchSim:
                         self.rc_pressure[rrows, rr_, rj, g] += lump[rrows]
                 rows = sp.nonzero(as_tuple=True)[0]
                 self.v_charges[rows, u] -= 1
-                self.v_acted[rows, u] = True  # P4/D-2: the spread spends the turn
                 self.v_mp[rows, u] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 dead = sp & (self.v_charges[:, u] <= 0)
                 if bool(dead.any()):
@@ -8914,7 +8869,6 @@ class BatchSim:
                 self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
                 self.v_tile[rows, u] = dest[rows]
-                self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile
@@ -9004,7 +8958,6 @@ class BatchSim:
                 self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
                 self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
                 self.v_tile[rows, u] = dest[rows]
-                self.v_acted[rows, u] = True  # P4/D-2
                 self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile military unit.
@@ -10658,7 +10611,7 @@ class BatchSim:
                 # CAPTURES it — roll-free (draw-count neutral), no advance
                 # (single-occupancy). Pool TRANSFER p_* -> v_* in spawn order
                 # (last-alive+1), keyed to the attacker's civ, hp and charges
-                # carried; movesLeft=0 -> v_acted so the D-2 heal skips it,
+                # carried; movesLeft=0, so the D-2 heal skips it,
                 # exactly like TS's defender.movesLeft = 0.
                 ct = ttc[rows]
                 self.p_alive[rows, ds] = False
@@ -11247,7 +11200,6 @@ class BatchSim:
                 if bool(cap.any()):
                     self._capture_city_state_rival(cap.nonzero(as_tuple=True)[0], cs_sc, v)
                 acted_att = acted_att | cs_att
-        self.v_acted[:, v] = self.v_acted[:, v] | acted_att  # P4/D-2
         self.v_mp[:, v] = torch.where(acted_att, torch.zeros_like(self.v_mp[:, v]), self.v_mp[:, v])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
 
         # Pillage: a war unit that did not attack, standing on an owned
@@ -11268,7 +11220,6 @@ class BatchSim:
                 rows = pillage.nonzero(as_tuple=True)[0]
                 heal_r = self._imp_heals[self.improvement[rows, hc[rows]].clamp(min=0)]
                 self.pillaged[rows, hc[rows]] = True
-                self.v_acted[rows, v] = True  # P4/D-2
                 self.v_mp[rows, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 self._eff_version += 1
                 hp_cap = self.rules.combat.get("unitHp", 100)
@@ -11289,7 +11240,6 @@ class BatchSim:
             if bool(dist_pillage.any()):
                 rows = dist_pillage.nonzero(as_tuple=True)[0]
                 self.district_pillaged[rows, hc[rows]] = True
-                self.v_acted[rows, v] = True  # P4/D-2
                 self.v_mp[rows, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
                 self._eff_version += 1  # CACHE: player district yields just dropped
 
@@ -11431,7 +11381,6 @@ class BatchSim:
             self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
             self.occ_mil[(rows, dest[rows])] = v + P_MAX  # #51/S3.4b
             self.v_tile[rows, v] = dest[rows]
-            self.v_acted[rows, v] = True  # P4/D-2
             self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
             mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
             if self._embark_live:
@@ -11805,7 +11754,6 @@ class BatchSim:
         acted_pk = attack & ~rngd
         if bool((attack & rngd).any()):
             acted_pk = acted_pk | self._hostile_ranged_strike(attack & rngd, ttc, "rival", v)
-        self.v_acted[:, v] = self.v_acted[:, v] | acted_pk  # P4/D-2
         self.v_mp[:, v] = torch.where(acted_pk, torch.zeros_like(self.v_mp[:, v]), self.v_mp[:, v])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
         patrol = act & ~attack
         if not bool(patrol.any()):
@@ -11895,7 +11843,6 @@ class BatchSim:
             self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
             self.occ_mil[(rows, dest[rows])] = v + P_MAX  # #51/S3.4b
             self.v_tile[rows, v] = dest[rows]
-            self.v_acted[rows, v] = True  # P4/D-2
             self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
             mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
             if self._embark_live:
@@ -14431,7 +14378,7 @@ class BatchSim:
     _CAPTURE_CARRY = ("type", "hp", "charges", "emb", "xp", "mp_full")
     #: Reset on an ownership change: a captured civilian never fortifies, never
     #: auras, and has movesLeft = 0 (acted) so the D-2 heal skips it this turn.
-    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "acted": True, "mp": 0}
+    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0}
 
     def _carry_capture(self, rows: torch.Tensor, src: torch.Tensor, dst: torch.Tensor) -> None:
         """Move a unit's per-slot state from MERGED slot `src` to `dst`.
@@ -15007,25 +14954,26 @@ class BatchSim:
             u_owned = (self.owner.gather(1, ut) >= 0) | (self.rival_at.gather(1, ut) >= 0) | (self.cs_at.gather(1, ut) >= 0)
             u_camp = (self.camp_tile.unsqueeze(2) == ut.unsqueeze(1)).any(dim=1)
             u_heal = torch.where(u_camp, torch.full_like(ut, 20), torch.where(u_owned, torch.full_like(ut, 5), torch.full_like(ut, 10)))
-            self.u_hp.copy_(torch.where(self.u_alive & ~self.u_acted, (self.u_hp + u_heal).clamp(max=cap), self.u_hp))
+            self.u_hp.copy_(torch.where(self.u_alive & ~self._spent_mp("u"), (self.u_hp + u_heal).clamp(max=cap), self.u_hp))
             # rival units: own civ's land / own center
             vt = self.v_tile.clamp(min=0)
             v_own = self.rival_at.gather(1, vt) == self.v_civ
             v_center = self.rvcity_at.gather(1, vt) == self.v_civ
             v_owned_any = (self.owner.gather(1, vt) >= 0) | (self.rival_at.gather(1, vt) >= 0) | (self.cs_at.gather(1, vt) >= 0)
             v_heal = torch.where(v_own & v_center, torch.full_like(vt, 20), torch.where(v_own, torch.full_like(vt, 15), torch.where(v_owned_any, torch.full_like(vt, 5), torch.full_like(vt, 10))))
-            self.v_hp.copy_(torch.where(self.v_alive & ~self.v_acted, (self.v_hp + v_heal).clamp(max=cap), self.v_hp))
+            self.v_hp.copy_(torch.where(self.v_alive & ~self._spent_mp("v"), (self.v_hp + v_heal).clamp(max=cap), self.v_hp))
             # player units
             pt = self.p_tile.clamp(min=0)
             p_own = self.owner.gather(1, pt) >= 0
             p_center = self.center_at.gather(1, pt) >= 0
             p_owned_any = p_own | (self.rival_at.gather(1, pt) >= 0) | (self.cs_at.gather(1, pt) >= 0)
             p_heal = torch.where(p_own & p_center, torch.full_like(pt, 20), torch.where(p_own, torch.full_like(pt, 15), torch.where(p_owned_any, torch.full_like(pt, 5), torch.full_like(pt, 10))))
-            self.p_hp.copy_(torch.where(self.p_alive & ~self.p_acted, (self.p_hp + p_heal).clamp(max=cap), self.p_hp))
+            self.p_hp.copy_(torch.where(self.p_alive & ~self._spent_mp("p"), (self.p_hp + p_heal).clamp(max=cap), self.p_hp))
             # B-5 FORTIFY: co-located with the D-2 heal and keyed on the EXACT
-            # SAME gate (~X_acted = spent no MP since the last refresh). A live
-            # MILITARY unit that stayed put digs in (+1, cap 2); a move/attack
-            # (X_acted) resets it. Civilians never fortify. Symmetric across pools.
+            # SAME gate (movesLeft >= movesFull = spent no MP since the last
+            # refresh). A live MILITARY unit that stayed put digs in (+1, cap
+            # 2); a move or attack resets it. Civilians never fortify.
+            # Symmetric across pools.
             # #45/B-6: NAVAL units never fortify (TS refreshUnits gates on
             # !naval). B-26 (2026-07-27): barbs CAN be naval now, so the barb
             # pool needs the same gate the other two always had — without it a
@@ -15039,17 +14987,14 @@ class BatchSim:
             for _pre in ("u", "v", "p"):
                 _alive = getattr(self, f"{_pre}_alive")
                 _typ = getattr(self, f"{_pre}_type")
-                _acted = getattr(self, f"{_pre}_acted")
+                _spent = self._spent_mp(_pre)
                 _fort = getattr(self, f"{_pre}_fortify")
                 _mil = (self._p_combat[_typ] > 0) & ~self.unit_naval[_typ]
                 _fort.copy_(torch.where(
-                    _alive & _mil & ~_acted, (_fort + 1).clamp(max=2),
-                    torch.where(_alive & _mil & _acted, torch.zeros_like(_fort), _fort),
+                    _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
+                    torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
                 ))
             # the movesLeft reset (TS refreshUnits): a fresh turn begins
-            self.p_acted.zero_()
-            self.u_acted.zero_()
-            self.v_acted.zero_()
             # #70/S3 (B-8): …and with it TS's `granted = full + generalAuraMP`.
             # Frozen HERE, co-located with the acted-flag zeroing, because this
             # block IS the refreshUnits mirror — every later walker reads the

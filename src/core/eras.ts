@@ -132,17 +132,14 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
  *
  * They were implemented on both engines and hunted hard. Scripted parity went
  * green once `spawnUnit` was included (TS wrote `movesLeft: def.moves` with no
- * bonus while the GPU recomputes full MP at walk time), but the OFF-SCRIPT gate
- * still diverged on the `rng` DRAW COUNT at seed 9015 t199 — and that is a
- * symptom of the model split itself, not of a missed call site:
- *   TS keeps movement points as STATE, written at THREE sites (spawnUnit,
- *   refreshUnits, rivalPhase's re-reset) and spent down by walkPath;
- *   the GPU keeps NO movement state and recomputes `full_mp` inside every
- *   walker, and its PLAYER pool has no MP counter at all (`p_acted` is a bool,
- *   and `unit_action_mask` has no movement-cost term).
- * Any MP modifier therefore has to be mirrored across two structurally
- * different models, which is precisely what Round 5 removes. Re-land both
- * bonuses there, where one seat model makes them a single edit.
+ * bonus while the GPU recomputed full MP at walk time), but the OFF-SCRIPT gate
+ * still diverged on the `rng` DRAW COUNT at seed 9015 t199 — a symptom of the
+ * model split itself, not of a missed call site: TS kept movement points as
+ * STATE while the GPU kept none, recomputing `full_mp` inside every walker and
+ * giving its PLAYER pool no MP counter at all.
+ * #51/S5.2 closed that split — MP is now state on both engines, reset at the
+ * same three moments and spent through one step contract — so these two
+ * bonuses can be re-landed as a single edit each.
  * The four NON-movement golden effects below are parity-clean and stay.
  */
 
