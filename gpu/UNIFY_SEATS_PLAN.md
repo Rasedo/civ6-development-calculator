@@ -542,8 +542,21 @@ block's forty player/rival view names were never there (135 guarded now, from
 92), so a rebind of `rc_pop` or `buildings` would have detached a section of
 the block silently.
 
+**S6.6 — `tile_seat`, and the first check that a tile has ONE owner. DONE.**
+TS has answered "who owns this tile" with one field since S1.3
+(`Tile.ownerSeat`); the GPU answers it with three planes that each know a
+third — `owner` (the player's city slot), `rival_at`, `cs_at`. `tile_seat` is
+the derived `tileSeat` twin, so readers can start asking the one question
+while the three planes stay the writable surface. `_check_tile_owner_invariant`
+proves they never claim the same tile — nothing had ever checked that, and a
+claim that writes `rival_at` without clearing `owner` would leave every
+consumer picking a different winner depending on which plane it read. It holds
+across 12 seeds x 250t and is proven to BITE on an injected double claim.
+Flipping the ~160 readers and deleting the three planes is the S3.4b-scale
+follow-on.
+
 Remaining: the `cs_*` planes that are genuinely city-state-specific
-(`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_at`) and the rest
+(`cs_type`, `cs_suz_key`, `cs_last_levy`) and the rest
 of the TS half — `src/core/types.ts:CityState` becoming a `Seat` with one
 `City`, which needs the `caps` table the target-shape section describes.
 

@@ -246,16 +246,21 @@ def load_fixture(path: Path) -> dict:
 
 BORDER_LOOPS = 4  # TS expands in a while-loop; 4 covers any realistic culture
 RESEARCH_LOOPS = 40  # > tree size: complete all ready techs/civics per turn (TS uses an unbounded while); early-exit keeps it free
-U_MAX = 256  # barbarian/rival unit slots per game (append-only; runtime-asserted).
-PLAYER_SEAT = 0  # #51/S3.4: the player seat, TS seats.ts PLAYER_CIV
-BARB_SEAT = 200  # #51/S3.3: the TS seats.ts BARB_SEAT, same absolute seat space
-             # Raised 96→256 for horizon-300 (G-S cliff #1): barbs high-water
-             # ~160 ever-spawned by t300, rivals ~55. Behavior-preserving at the
-             # horizon-100 gate (barb_hi ~33 there, cap never touched; fixtures
-             # are TS-exported and don't encode this). Append-only is still a
-             # band-aid — true fix = dead-slot reclamation (a future G-S stage,
-             # parity-core risk: unit-order-is-spec).
+# Barbarian/rival unit slots per game (append-only; runtime-asserted). Raised
+# 96->256 for horizon-300 (G-S cliff #1): barbs high-water ~160 ever-spawned by
+# t300, rivals ~55. Behavior-preserving at the horizon-100 gate (barb_hi ~33
+# there, cap never touched; fixtures are TS-exported and don't encode this).
+# Append-only was a band-aid; dead-slot reclamation (`_reclaim_pool`) is the
+# real fix and has since shipped.
+# (#51/S6.6: this block sat BELOW the three seat constants, three lines away
+# from the assignment it describes. Moved back onto it.)
+U_MAX = 256
 P_MAX = 256  # player unit slots per game (append-only; runtime-asserted)
+
+# The absolute SEAT space, shared with TS core/seats.ts.
+PLAYER_SEAT = 0  # #51/S3.4: the player, TS seats.ts PLAYER_CIV
+BARB_SEAT = 200  # #51/S3.3: the barbarians, TS seats.ts BARB_SEAT
+NO_SEAT = -1  # #51/S6.6: "nobody" — the TS seats.ts NO_SEAT twin
 
 # AUDIT B-7 flanking & support (mirrors combat.ts). A melee attacker gains +2 CS
 # per OTHER unit adjacent to the defender that is hostile to the defender
@@ -2171,6 +2176,7 @@ class BatchSim:
     def _check_state_discipline(self) -> None:
         self._check_seat_invariant()
         self._check_war_invariant()
+        self._check_tile_owner_invariant()
         for name, fn in self._aliases.items():
             cur = getattr(self, name)
             want = fn(self)
@@ -10985,6 +10991,40 @@ class BatchSim:
     @property
     def barb_at(self) -> torch.Tensor:
         return self._pool_at(self.occ_mil, "u")
+
+    @property
+    def tile_seat(self) -> torch.Tensor:
+        """[B, T] — the absolute seat that owns each tile, -1 for nobody.
+
+        #51/S6.6: the `tileSeat` twin. TS answers this with ONE field
+        (`Tile.ownerSeat`, since S1.3); the GPU answers it with three planes
+        that each know a third of it — `owner` (the player's city slot),
+        `rival_at` (which rival) and `cs_at` (which city-state). Derived, not
+        stored: the three planes stay the writable surface for now and this is
+        the one question every reader should be asking. `_check_tile_owner_invariant`
+        proves the three can never claim the same tile, which is what makes
+        the derivation well-defined."""
+        base = torch.full_like(self.owner, NO_SEAT)
+        base = torch.where(self.owner >= 0, torch.zeros_like(base), base)
+        base = torch.where(self.rival_at >= 0, self.rival_at + 1, base)
+        return torch.where(self.cs_at >= 0, self.cs_at + 100, base)
+
+    def _check_tile_owner_invariant(self) -> None:
+        """#51/S6.6: a tile has at most ONE owner.
+
+        Three planes hold that one fact, and nothing has ever checked they
+        agree — a claim that writes `rival_at` without clearing `owner` leaves
+        a tile owned by two civs, and every consumer picks a different winner
+        depending on which plane it happens to read. Checked every step under
+        CIV6_ALIAS_CHECK for exactly as long as the three planes live."""
+        n = (self.owner >= 0).long() + (self.rival_at >= 0).long() + (self.cs_at >= 0).long()
+        if not bool((n <= 1).all()):
+            b, t = [int(x[0]) for x in (n > 1).nonzero(as_tuple=True)]
+            raise AssertionError(
+                f"TILE OWNER DRIFT: game {b} tile {t} is claimed by "
+                f"{int(n[b, t])} seats at once — owner={int(self.owner[b, t])}, "
+                f"rival_at={int(self.rival_at[b, t])}, cs_at={int(self.cs_at[b, t])}"
+            )
 
     def _seats_hostile(self, a_seat, b_plane: torch.Tensor) -> torch.Tensor:
         """unitsHostile over a PLANE of seats — [B, T] bool.
