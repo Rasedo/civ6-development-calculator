@@ -69,7 +69,7 @@ import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builder
 import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
+import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints, goldenCulturePerDistrict } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount , emptySeat } from './seats';
 
@@ -2356,15 +2356,12 @@ export function rivalPhase(state: GameState): void {
     // is fixed for this turn by the phase-top DoW pass, so anyWar is stable
     // through this block (peace resolves after the loop).
     const anyWarTop = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
-    // B-22 (S3): casus-belli accrual multiplier — rival↔rival ONLY. A rival in a
-    // SURPRISE rival↔rival war (not marked FORMAL) accrues ×WW_SURPRISE_MULT;
-    // otherwise (a war ONLY with the player, or an all-FORMAL warmonger) it
-    // accrues ×WW_FORMAL_MULT (the S2 baseline). The player-war axis is thus
-    // unchanged — the casus-belli differential is a rival diplomacy feature.
-    const surpriseActive = (rival.atWarRivals ?? []).some((id) => !isFormalWar(rival, id));
-    const wwMult = surpriseActive ? WW_SURPRISE_MULT : WW_FORMAL_MULT;
+    // #51/S7.8r: ONE accrual rate for every seat. The rival↔rival axis used to
+    // accrue at ×2 for a SURPRISE war while any war involving the PLAYER accrued
+    // at ×1 — an invented magnitude on a seat-dependent split. See the note on
+    // the deleted WW_SURPRISE_MULT in data/rivals.ts.
     rival.warWeariness = anyWarTop
-      ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN * wwMult)
+      ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
       : Math.max(0, (rival.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
 
     // AUDIT A-3: eurekas/inspirations fire from the RIVAL's seat too — the

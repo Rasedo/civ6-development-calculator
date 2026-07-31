@@ -86,8 +86,6 @@ import {
   RR_DOW_WW_MAX,
   RR_PEACE_WW,
   RR_FORMAL_MIN_TURNS,
-  WW_SURPRISE_MULT,
-  WW_FORMAL_MULT,
   ERA_LENGTH,
   ERA_SCORE_FOUND,
   ERA_SCORE_CONQUER,
@@ -591,8 +589,6 @@ const rules = {
     perAmenity: WAR_WEARINESS_PER_AMENITY,
     cap: WAR_WEARINESS_CAP,
     // B-22 (S3): casus-belli accrual multipliers (SURPRISE ×2, FORMAL ×1).
-    surpriseMult: WW_SURPRISE_MULT,
-    formalMult: WW_FORMAL_MULT,
   },
   // B-24 (task #68): era score / Ages (mirrors data/rivals.ts; S1 = the
   // accumulator constants; age thresholds + governor constants land S2/S3).

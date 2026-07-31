@@ -12773,15 +12773,10 @@ class BatchSim:
             # rival) accrues weariness; decays only at FULL peace. rr_war is
             # fixed for this turn by the phase-top DoW pass.
             atw_r = self.r_atwar[:, r] | self.rr_war[:, r, : self.R].any(dim=1)
-            # B-22 (S3): casus-belli accrual multiplier — rival↔rival ONLY. A
-            # SURPRISE rival↔rival war (rr_war & ~rr_warkind) → ×surpriseMult;
-            # otherwise (only a player war, or all-FORMAL) → ×formalMult (the S2
-            # baseline). The player-war axis stays unchanged (mirror of TS).
-            rr_surprise = self.rr_war[:, r, : self.R] & ~self.rr_warkind[:, r, : self.R]
-            surprise_r = rr_surprise.any(dim=1)
+            # #51/S7.8r: ONE accrual rate for every seat — the invented ×2
+            # surprise multiplier and its seat-dependent split are gone.
             per = int(rww.get("perTurn", 1))
-            mult_r = torch.where(surprise_r, per * int(rww.get("surpriseMult", 2)), per * int(rww.get("formalMult", 1)))
-            inc_r = (self.r_war_weariness[:, r] + mult_r).clamp(max=int(rww.get("cap", 24)))
+            inc_r = (self.r_war_weariness[:, r] + per).clamp(max=int(rww.get("cap", 24)))
             dec_r = (self.r_war_weariness[:, r] - int(rww.get("decay", 4))).clamp(min=0)
             self.r_war_weariness[:, r] = torch.where(active, torch.where(atw_r, inc_r, dec_r), self.r_war_weariness[:, r])
             # AUDIT A-3: eurekas/inspirations from this rival's seat — the

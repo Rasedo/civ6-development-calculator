@@ -113,15 +113,33 @@ export const WAR_WEARINESS_PER_AMENITY = 8;
  *  Math.min; the GPU inc clamp) — warWearinessPenalty's Math.min is
  *  belt-and-braces, never the live clamp. */
 export const WAR_WEARINESS_CAP = 32;
-/** B-22 (task #55 S3): rival↔rival war-weariness accrual multipliers — the
- *  modeled casus-belli benefit. A SURPRISE war (no prior denouncement) is TWICE
- *  as wearying as a FORMAL one (denounced ≥ RR_FORMAL_MIN_TURNS earlier),
- *  matching real Civ 6's reduced grievances/ww for justified wars. Applies to
- *  the rival↔rival axis ONLY: a war WITH THE PLAYER (either seat) accrues at the
- *  baseline (×1, the S2 rate) since the player has no denounce/grievance verb —
- *  keeping the fixture-critical player path pristine. Integer, no float assoc. */
-export const WW_SURPRISE_MULT = 2;
-export const WW_FORMAL_MULT = 1;
+/* #51/S7.8r: WW_SURPRISE_MULT / WW_FORMAL_MULT DELETED — an invented constant
+ * and a seat-dependent split, both unsupported.
+ *
+ * THE MAGNITUDE. Nothing in any Civ 6 ruleset carries a x2 war-weariness term.
+ * The only surprise-vs-formal number in shipped data is
+ * `DiplomaticActions.WarmongerPercent` 150 (SURPRISE) vs 100 (FORMAL) = 1.5 —
+ * a WARMONGER/GRIEVANCE column, not a weariness one, and its own description
+ * string reads "Normal warmonger penalties increased by 50%".
+ *
+ * THE SPLIT. Keying the differential on the OPPONENT'S SEAT made the identical
+ * war more wearying between two rivals than between a rival and the player.
+ * Nothing in Civ 6 makes weariness seat-dependent; the old comment's own
+ * justification ("the player has no denounce/grievance verb") is an ENGINE
+ * limitation laundered into a game rule — exactly what #51 exists to remove.
+ *
+ * WHAT IS STILL TRUE, AND DELIBERATELY UNDER-MODELLED. The GS Civilopedia says
+ * weariness is "increased depending on the era and if you declared war without
+ * using a Casus Belli", so the DIRECTION is real. The MAGNITUDE is unobtainable:
+ * `EFFECT_ADJUST_WAR_WEARINESS` takes only {Amount, Overall|Domestic|Enemy} —
+ * no era argument and no casus-belli argument on any of its seven consumers —
+ * so the scaling lives in the C++ DLL and no datamining will ever produce it.
+ * Under-modelling a sourced direction is an honest recorded residual;
+ * over-modelling a magnitude by 33-100% with a borrowed constant is not.
+ *
+ * The twelve WAR_WEARINESS_* GlobalParameters rows ARE settled (byte-identical
+ * Base = R&F = GS, unchanged Oct-2016 through Jul-2024) — the repo's perTurn /
+ * decay / cap are not in question here, only the invented multiplier. */
 /** B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages. The game is
  *  divided into fixed ERA_LENGTH-turn eras (no per-civ tech-era drift —
  *  recorded residual). Each civ accrues an INTEGER era score from zero-draw

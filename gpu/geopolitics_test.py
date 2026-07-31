@@ -25,7 +25,7 @@ Covered:
   e. Peace: EITHER side past rrPeaceWw ends the war and clears the FORMAL flag
      both directions; the denouncement grudge SURVIVES the peace.
   f. Weariness differential (the real _rival_phase accrual): SURPRISE war
-     +perTurn*surpriseMult/turn, FORMAL +perTurn*formalMult, full peace decays,
+     +perTurn/turn on EVERY seat pair (#51/S7.8r), full peace decays,
      the PLAYER-war axis stays at the x1 baseline, the cap clamps.
   g. _transfer_rc_to_rc: source slot dies with full registry hygiene, receiver
      appends at the END of the alive pool, the A-17 tile registry re-keys to
@@ -208,26 +208,39 @@ def poke_peace(rules, path):
 
 
 def poke_ww_differential(rules, path):
-    """f. The casus-belli accrual through the REAL _rival_phase: SURPRISE
-    x surpriseMult, FORMAL x formalMult, peace decays, player axis x1, cap."""
+    """f. War-weariness accrual through the REAL _rival_phase.
+
+    #51/S7.8r: this lane used to assert a CASUS-BELLI DIFFERENTIAL — surprise
+    wars accruing at x2 and only on the rival<->rival axis. That magnitude was
+    invented (no Civ 6 ruleset carries a x2 weariness term; the only
+    surprise/formal number in shipped data is WarmongerPercent 150 vs 100, a
+    GRIEVANCE column) and the split was keyed on the OPPONENT'S SEAT, making the
+    same war wearier between two rivals than between a rival and the player.
+
+    It now asserts the opposite and stronger property: SURPRISE, FORMAL and
+    PLAYER wars accrue IDENTICALLY. The war KIND is still tracked; what is gone
+    is the unsourced number attached to it."""
     sim, _, _ = controlled_pair(rules, path, extra_for_a=False)  # 8 v 8: no organic DoW/denounce
     rww = sim.rules.war_weariness
     per = int(rww.get("perTurn", 1))
-    s_mult, f_mult = int(rww.get("surpriseMult", 2)), int(rww.get("formalMult", 1))
     decay, cap = int(rww.get("decay", 4)), int(rww.get("cap", 16))
 
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True  # SURPRISE (kind False)
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     snap = sim.snapshot()
     sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == per * s_mult and int(sim.r_war_weariness[0, 1]) == per * s_mult, (
-        f"a SURPRISE war must accrue {per * s_mult}/turn (got {int(sim.r_war_weariness[0, 0])}/{int(sim.r_war_weariness[0, 1])})"
+    assert int(sim.r_war_weariness[0, 0]) == per and int(sim.r_war_weariness[0, 1]) == per, (
+        f"a SURPRISE war accrues the ONE rate {per}/turn (got "
+        f"{int(sim.r_war_weariness[0, 0])}/{int(sim.r_war_weariness[0, 1])})"
     )
 
     sim.restore(snap)
     sim.rr_warkind[0, 0, 1] = sim.rr_warkind[0, 1, 0] = True  # FORMAL
     sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == per * f_mult, f"a FORMAL war must accrue {per * f_mult}/turn"
+    assert int(sim.r_war_weariness[0, 0]) == per, (
+        f"a FORMAL war accrues the SAME {per}/turn as a surprise one — the "
+        f"differential was invented (#51/S7.8r)"
+    )
 
     sim.restore(snap)
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False  # full peace decays
@@ -241,13 +254,16 @@ def poke_ww_differential(rules, path):
     sim.r_atwar[0, 0] = True
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == per * f_mult, "the player-war axis must stay at the x1 baseline"
+    assert int(sim.r_war_weariness[0, 0]) == per, (
+        "the PLAYER-war axis accrues the same rate as a rival<->rival war — "
+        "weariness is not seat-dependent (#51/S7.8r)"
+    )
 
     sim.restore(snap)  # SURPRISE at the cap clamps
     sim.r_war_weariness[0, 0] = cap - 1
     sim._rival_phase()
     assert int(sim.r_war_weariness[0, 0]) == cap, f"accrual must clamp at the cap {cap}"
-    print(f"  f ww differential OK (surprise +{per * s_mult}, formal +{per * f_mult}, decay -{decay}, player x1, cap {cap})")
+    print(f"  f ww ONE RATE OK (surprise = formal = player = +{per}, decay -{decay}, cap {cap})")
 
 
 def poke_transfer(rules, path):

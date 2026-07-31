@@ -9,8 +9,7 @@ import {
   RR_DOW_WW_MAX,
   RR_FORMAL_MIN_TURNS,
   RR_PEACE_WW,
-  WW_FORMAL_MULT,
-  WW_SURPRISE_MULT,
+  WAR_WEARINESS_PER_TURN,
 } from '../src/data/rivals';
 import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
 
@@ -164,19 +163,27 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
     // the DoW fired the same turn — the grudge is 0 turns old, so SURPRISE
     expect(civsAtWar(state, 1, 2)).toBe(true);
     expect(isFormalWar(r0, r1.id)).toBe(false);
-    // same-turn accrual at the surprise rate, both participants
-    expect(r0.warWeariness).toBe(WW_SURPRISE_MULT);
-    expect(r1.warWeariness).toBe(WW_SURPRISE_MULT);
+    // #51/S7.8r: ONE accrual rate. This used to assert the invented x2
+    // "surprise" rate; a surprise war now accrues exactly what any other war
+    // does, on any seat. The war KIND is still marked (asserted above) — what
+    // is gone is the unsourced magnitude attached to it.
+    expect(r0.warWeariness).toBe(WAR_WEARINESS_PER_TURN);
+    expect(r1.warWeariness).toBe(WAR_WEARINESS_PER_TURN);
   });
 
-  it('an old denouncement makes the war FORMAL at the x1 accrual', () => {
+  it('an old denouncement makes the war FORMAL — at the SAME accrual (#51/S7.8r)', () => {
     const { state, r0, r1 } = pairState();
     r0.denouncedTurn = { [r1.id]: state.turn - RR_FORMAL_MIN_TURNS };
     rivalPhase(state);
     expect(civsAtWar(state, 1, 2)).toBe(true);
     expect(isFormalWar(r0, r1.id)).toBe(true);
     expect(isFormalWar(r1, r0.id)).toBe(true); // symmetric mark
-    expect(r0.warWeariness).toBe(WW_FORMAL_MULT);
+    // the point of the pair: FORMAL and SURPRISE now accrue IDENTICALLY, so
+    // this asserts the same number as the surprise case above. The differential
+    // was invented (no Civ 6 ruleset carries a x2 weariness term) and keyed on
+    // the opponent's SEAT, which made the same war wearier between two rivals
+    // than between a rival and the player.
+    expect(r0.warWeariness).toBe(WAR_WEARINESS_PER_TURN);
   });
 
   it('anti-thrash: weary targets and weary aggressors block the DoW', () => {
