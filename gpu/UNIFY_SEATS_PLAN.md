@@ -573,8 +573,19 @@ That is the same family as S3.1's line-scanner missing eight multi-line
 statements: a regex over source is a heuristic, and the invariant is what
 makes it safe to rely on one.
 
-Flipping the remaining ~130 readers and deleting the three planes is the rest
-of the S3.4b-scale follow-on.
+**S6.8 — the first of the three planes actually DIES. DONE.** `tile_seat` is
+STATE now, not a cache, and the CITY-STATE third of tile ownership is stored
+only there: `cs_at` is a cached property over it and the plane is gone. Its two
+writers (the ring-clear when a city-state is captured or destroyed) write
+`tile_seat` directly. `owner` and `rival_at` still store the player and rival
+thirds and are RETAGGED into `tile_seat` at every write — 17 sites — with the
+step invariant comparing the two halves, so a write that skips the retag is
+caught rather than silently splitting readers by which plane they ask. Proven
+to bite; `cs_at` verified to be a property over 21 real city-state tiles.
+
+Deleting `owner` and `rival_at` the same way is the rest of the follow-on.
+`owner` needs `tile_city` first — it stores WHICH city, TS's `ownerCity`, which
+`tile_seat` does not carry.
 
 Remaining: the `cs_*` planes that are genuinely city-state-specific
 (`cs_type`, `cs_suz_key`, `cs_last_levy`) and the rest

@@ -405,7 +405,10 @@ _MUTABLE = [
     "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_quest_district", "cs_at",  # A-18 (#79): player<->CS war
+    # #51/S6.8: `tile_seat` is STATE — the city-state part of tile ownership is
+    # stored only here (`cs_at` is a view of it), so it must round-trip.
+    "tile_seat",
+    "cs_quest_district",  # A-18 (#79): player<->CS war
     "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
@@ -668,7 +671,9 @@ class BatchSim:
                 self.cs_center[b, s] = cs["center"]
                 self.cs_pop[b, s] = cs["pop"]
                 self.cs_suz_key[b, s] = cs.get("suzKey", -1)
-        self.cs_at = torch.tensor([[t.get("cs", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # #51/S6.8: a city-state's tile ownership lives in `tile_seat` (seeded
+        # below, once `owner` and `rival_at` exist); `cs_at` is a derived view.
+        self._cs_at_init = torch.tensor([[t.get("cs", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # #51/S6.1: the five (civ, city-state) relations live on `csr_*`
         # [B, 1+R, S] planes allocated below — `cs_met` and `cs_r_met` are the
         # `[:, 0]` and `[:, 1:]` views of ONE tensor, and so on. Allocated
@@ -1780,13 +1785,24 @@ class BatchSim:
         self.alive[:, 0] = True
         self.pop[:, 0] = 1
         self.owner = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
-        # #51/S6.7: bumped by EVERY write to owner / rival_at / cs_at; keys the
-        # `tile_seat` cache. Not a tensor — it is python state, so it does not
-        # belong in _MUTABLE, and snapshot/restore reconstructs the cache on the
-        # next read either way.
+        # #51/S6.7: bumped by EVERY write to owner / rival_at; keys the derived
+        # views below. Not a tensor — python state, so it is not in _MUTABLE.
         self._tile_owner_ver = 0
-        self._tile_seat_ver = -1
-        self._tile_seat_cache: torch.Tensor | None = None
+        self._cs_at_ver = -1
+        self._cs_at_cache: torch.Tensor | None = None
+        # #51/S6.8: `tile_seat` is STATE now, not a cache. The player and rival
+        # parts still mirror `owner` / `rival_at` (checked every step), but the
+        # CITY-STATE part is stored ONLY here — `cs_at` is a view of it. That is
+        # the first third of the three planes actually collapsing into one.
+        self.tile_seat = torch.where(
+            self._cs_at_init >= 0, self._cs_at_init + 100,
+            torch.where(
+                self.owner >= 0, torch.zeros_like(self.owner),
+                torch.where(self.rival_at >= 0, self.rival_at + 1,
+                            torch.full_like(self.owner, NO_SEAT)),
+            ),
+        )
+        del self._cs_at_init
         self._b_req_district = rules.b_req_district.to(device)  # [NB] required district idx (-1 none)
         self._b_req_buildings = rules.b_req_buildings  # list of prereq-building-index lists
         self._b_excl_buildings = rules.b_excl_buildings  # B9-R1: exclusive-sibling index lists
@@ -6262,7 +6278,7 @@ class BatchSim:
             self.r_route_dest[b, r][kill] = -1  # B-23
             self.r_route_exp[b, r][kill] = -1   # B-23
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], -1), self.rival_at[b])
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], -1), self.rc_tile_id[b])  # A-17
             # P5/S2 gate-catch (seed 9235 t241): TS APPENDS the captured city
             # (its trace keeps dead cities' columns and the new city gets a
@@ -6292,7 +6308,7 @@ class BatchSim:
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
             self.owner[b, c_t] = c_new
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             # AUDIT B-30: conquest KEEPS the captured city's COMPLETE districts
             # (the tiles are re-owned to c_new above and their district/complete
             # planes are untouched, so completed districts become LIVE player
@@ -6372,9 +6388,11 @@ class BatchSim:
             self.r_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.r_routes[b], -1), self.r_routes[b])
             self.r_route_dest[b] = torch.where(dead_cs, torch.full_like(self.r_route_dest[b], -1), self.r_route_dest[b])  # B-23
             self.r_route_exp[b] = torch.where(dead_cs, torch.full_like(self.r_route_exp[b], -1), self.r_route_exp[b])    # B-23
-            ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
-            self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
+            self.tile_seat[b] = torch.where(
+                ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b]
+            )  # #51/S6.8: the city-state part of ownership lives here now
+            self._tile_owner_ver += 1
             # AUDIT A-16: raze at TS's count (state.cities.length >= 6) —
             # the CS dies and its ring frees, but NO city is founded (TS
             # early-returns before nextCityId++).
@@ -6399,7 +6417,7 @@ class BatchSim:
             self.center_at[b, c_t] = c_new
             self.owner[b] = torch.where(ring & (self.owner[b] < 0), torch.full_like(self.owner[b], c_new), self.owner[b])
             self.owner[b, c_t] = c_new
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
@@ -6443,9 +6461,11 @@ class BatchSim:
             self.r_routes[b] = torch.where(dead_cs.unsqueeze(2), torch.full_like(self.r_routes[b], -1), self.r_routes[b])
             self.r_route_dest[b] = torch.where(dead_cs, torch.full_like(self.r_route_dest[b], -1), self.r_route_dest[b])  # B-23
             self.r_route_exp[b] = torch.where(dead_cs, torch.full_like(self.r_route_exp[b], -1), self.r_route_exp[b])    # B-23
-            ring = (self.pair_dist[c_t] <= 2) & (self.cs_at[b] == s)
-            self.cs_at[b] = torch.where(ring, torch.full_like(self.cs_at[b], -1), self.cs_at[b])
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            ring = (self.pair_dist[c_t] <= 2) & (self.tile_seat[b] == 100 + s)
+            self.tile_seat[b] = torch.where(
+                ring, torch.full_like(self.tile_seat[b], NO_SEAT), self.tile_seat[b]
+            )  # #51/S6.8: the city-state part of ownership lives here now
+            self._tile_owner_ver += 1
             if int(self.rc_alive[b, r].sum()) >= int(self.rules.rivals.get("maxCities", 6)):
                 continue  # razed: the CS dies, its ring frees, NO city (TS early-return)
             alive_w = self.rc_alive[b, r].nonzero(as_tuple=True)[0]
@@ -6453,7 +6473,7 @@ class BatchSim:
             assert slot < self.RC, "rival city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
             new_id = int(self.r_next_city_id[b, r])
             self.rival_at[b] = torch.where(ring, torch.full_like(self.rival_at[b], r), self.rival_at[b])
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self.rc_tile_id[b] = torch.where(ring, torch.full_like(self.rc_tile_id[b], new_id), self.rc_tile_id[b])
             self.rc_alive[b, r, slot] = True
             self.era_score[b, r + 1] += self._era_pts["conquer"]  # B-24: gained a city (rival CS conquest; raze continued above)
@@ -10243,7 +10263,7 @@ class BatchSim:
         self.r_route_dest[b, r_from][kill] = -1  # B-23
         self.r_route_exp[b, r_from][kill] = -1   # B-23
         self.rival_at[b] = torch.where(own_t, torch.full_like(self.rival_at[b], r_to), self.rival_at[b])
-        self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+        self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
         # A-17: re-tagged tiles register to the receiving rc (its id is
         # assigned below from r_next_city_id — same value, read here first)
         self.rc_tile_id[b] = torch.where(own_t, torch.full_like(self.rc_tile_id[b], int(self.r_next_city_id[b, r_to])), self.rc_tile_id[b])
@@ -10395,7 +10415,7 @@ class BatchSim:
                 rows = claim.nonzero(as_tuple=True)[0]
                 spot = tiles[rows, best[rows]]
                 self.rival_at[rows, spot] = r
-                self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+                self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
                 self.rc_tile_id[rows, spot] = self.rc_id[rows, r, j]  # A-17: claim registers to THIS city
                 # G4: invalidate the batched-yields cache ONLY if this claim
                 # can change a later column — i.e. the spot lands inside a
@@ -10536,7 +10556,7 @@ class BatchSim:
         self.r_next_city_id[rows, r] += 1
         self.rvcity_at[rows, s_idx] = r
         self.rival_at[rows, s_idx] = r
-        self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+        self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
         self.rc_tile_id[rows, s_idx] = _new_cid  # A-17
         # P5/S3 (C-14): rival founding strips like foundCity — the removable
         # feature dies (tdef drops to the hills component, feature yields
@@ -10578,7 +10598,7 @@ class BatchSim:
                 & (self.rival_at[rows, ndc] < 0)
             )
             self.rival_at[rows[free], n_d[free]] = r
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self.rc_tile_id[rows[free], n_d[free]] = _new_cid[free]  # A-17: ring joins the founder's registry
         self._eff_version += 1  # feat_stripped / d_static_adj changed
 
@@ -11015,32 +11035,36 @@ class BatchSim:
     def barb_at(self) -> torch.Tensor:
         return self._pool_at(self.occ_mil, "u")
 
-    def _derive_tile_seat(self) -> torch.Tensor:
-        """[B, T] — the absolute seat owning each tile, from the three planes."""
-        base = torch.full_like(self.owner, NO_SEAT)
-        base = torch.where(self.owner >= 0, torch.zeros_like(base), base)
+    def _retag_tiles(self) -> None:
+        """#51/S6.8: rebuild `tile_seat`'s PLAYER and RIVAL parts from the two
+        planes that still store them, leaving the CITY-STATE part alone — that
+        part is stored in `tile_seat` itself and has no plane behind it.
+
+        Safe because a tile has at most one owner (`_check_tile_owner_invariant`):
+        a CS-owned tile is never simultaneously claimed by `owner` or
+        `rival_at`, so "keep the CS answer" can never overwrite a real claim."""
+        s = self.tile_seat
+        keep_cs = s >= 100
+        base = torch.where(self.owner >= 0, torch.zeros_like(s), torch.full_like(s, NO_SEAT))
         base = torch.where(self.rival_at >= 0, self.rival_at + 1, base)
-        return torch.where(self.cs_at >= 0, self.cs_at + 100, base)
+        s.copy_(torch.where(keep_cs, s, base))
 
     @property
-    def tile_seat(self) -> torch.Tensor:
-        """[B, T] — the absolute seat that owns each tile, -1 for nobody.
+    def cs_at(self) -> torch.Tensor:
+        """[B, T] — which city-state owns each tile, -1 for nobody.
 
-        #51/S6.6: the `tileSeat` twin. TS answers this with ONE field
-        (`Tile.ownerSeat`, since S1.3); the GPU answers it with three planes
-        that each know a third of it — `owner` (the player's city slot),
-        `rival_at` (which rival) and `cs_at` (which city-state).
+        #51/S6.8: a VIEW of `tile_seat` now, not a plane. Cached on
+        `_tile_owner_ver` for the same reason `tile_seat` was in S6.7: 25 call
+        sites recomputing a `where` each would be 25 more kernel launches in a
+        step that is already dispatch-bound."""
+        if self._cs_at_ver != self._tile_owner_ver:
+            self._cs_at_cache = torch.where(
+                self.tile_seat >= 100, self.tile_seat - 100,
+                torch.full_like(self.tile_seat, -1),
+            )
+            self._cs_at_ver = self._tile_owner_ver
+        return self._cs_at_cache
 
-        #51/S6.7: CACHED on `_tile_owner_ver`, which every tile-ownership write
-        bumps. Recomputing three [B, T] `where`s at each of the ~160 call sites
-        would add ~480 kernel launches per step, and dispatch is already 83% of
-        a step at B=12 (task #57) — a derived read has to be free before those
-        call sites can flip to it. A MISSED bump is not silent: the step
-        invariant compares this cache against a fresh derivation."""
-        if self._tile_seat_ver != self._tile_owner_ver:
-            self._tile_seat_cache = self._derive_tile_seat()
-            self._tile_seat_ver = self._tile_owner_ver
-        return self._tile_seat_cache
 
     def _check_tile_owner_invariant(self) -> None:
         """#51/S6.6: a tile has at most ONE owner.
@@ -11050,16 +11074,24 @@ class BatchSim:
         a tile owned by two civs, and every consumer picks a different winner
         depending on which plane it happens to read. Checked every step under
         CIV6_ALIAS_CHECK for exactly as long as the three planes live."""
-        # #51/S6.7: a WRITE that forgot to bump `_tile_owner_ver` would leave
-        # `tile_seat` serving a stale answer for a whole step, and every gate
-        # would stay green because the three planes are still right. Compare
-        # the cache against a fresh derivation before anything else.
-        if self._tile_seat_ver == self._tile_owner_ver and self._tile_seat_cache is not None:
-            if not bool((self._tile_seat_cache == self._derive_tile_seat()).all()):
-                raise AssertionError(
-                    "TILE SEAT STALE: a tile-ownership write did not bump "
-                    "_tile_owner_ver, so `tile_seat` is serving last turn's answer"
-                )
+        # #51/S6.8: `tile_seat` is state; `owner` and `rival_at` still store the
+        # player and rival parts of it. A write to either that does not retag
+        # leaves the two disagreeing, and readers split by which one they ask —
+        # so the two halves are compared every step. (The city-state part has no
+        # plane behind it any more, so there is nothing left to disagree with.)
+        seat = self.tile_seat
+        if not bool(((seat == PLAYER_SEAT) == (self.owner >= 0)).all()):
+            raise AssertionError(
+                "TILE SEAT DRIFT: a write to `owner` did not retag `tile_seat` "
+                "(call self._retag_tiles() after any tile-ownership write)"
+            )
+        rv = (seat >= 1) & (seat < 100)
+        if not bool((rv == (self.rival_at >= 0)).all()):
+            raise AssertionError(
+                "TILE SEAT DRIFT: a write to `rival_at` did not retag `tile_seat`"
+            )
+        if not bool((torch.where(rv, seat - 1, self.rival_at) == self.rival_at).all()):
+            raise AssertionError("TILE SEAT DRIFT: tile_seat names a different rival than rival_at")
         n = (self.tile_seat == PLAYER_SEAT).long() + (self.rival_at >= 0).long() + (self.cs_at >= 0).long()
         if not bool((n <= 1).all()):
             b, t = [int(x[0]) for x in (n > 1).nonzero(as_tuple=True)]
@@ -13185,7 +13217,7 @@ class BatchSim:
                         _rows = _buy.nonzero(as_tuple=True)[0]
                         self.r_treasury[_rows, r] -= _cost[_rows]
                         self.rival_at[_rows, _tgt[_rows]] = r
-                        self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+                        self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
                         self.rc_tile_id[_rows, _tgt[_rows]] = self.rc_id[_rows, r, _j]
                         self.rc_acquired[_rows, r, _j] += 1
                         self.r_tiles_purchased[_rows, r] += 1
@@ -14390,7 +14422,7 @@ class BatchSim:
         if conquest and int(self.rc_alive[b, w_].sum()) >= int(self.rules.rivals.get("maxCities", 6)):
             s_t = int(self.site[b, c])
             self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self.center_at[b, s_t] = -1
             self.district[b, s_t] = -1
             self.district_complete[b, s_t] = False
@@ -14398,7 +14430,7 @@ class BatchSim:
             return False
         self.owner[b] = torch.where(owned, torch.full_like(self.owner[b], -1), self.owner[b])
         self.rival_at[b] = torch.where(owned, torch.full_like(self.rival_at[b], w_), self.rival_at[b])
-        self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+        self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
         # A-17: the defecting city's tiles register to the receiving rc (id
         # assigned below from r_next_city_id — same value, read here first)
         self.rc_tile_id[b] = torch.where(owned, torch.full_like(self.rc_tile_id[b], int(self.r_next_city_id[b, w_])), self.rc_tile_id[b])
@@ -15384,7 +15416,7 @@ class BatchSim:
                 if expand.any():
                     rows = expand.nonzero(as_tuple=True)[0]
                     self.owner[rows, best[rows]] = col[rows]
-                    self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+                    self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
                     # D-13: each claim flips ONE tile (-1 → col, per the
                     # cand_b owner==-1 gate), so adjacency-to-col only GROWS,
                     # and only at the claimed tile's ≤6 on-map neighbours —
@@ -15604,7 +15636,7 @@ class BatchSim:
             # Claim the center (unconditionally, as foundCity does) plus any
             # unowned first-ring tiles; the center becomes a district tile.
             self.owner[rows, s_idx] = c_new
-            self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+            self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self.workable[rows, s_idx] = False
             self.center_at[rows, s_idx] = c_new
             # foundCity strips the removable feature — exactly the woods/
@@ -15658,7 +15690,7 @@ class BatchSim:
                     & (self.rival_at[rows, ndc] < 0)
                 )
                 self.owner[rows[free_nb], n_d[free_nb]] = c_new[free_nb]
-                self._tile_owner_ver += 1  # #51/S6.7: tile ownership changed
+                self._tile_owner_ver += 1; self._retag_tiles()  # #51/S6.8
             self._eff_version += 1  # d_static_adj changed
 
         # --- P7 (C-3): dead-slot reclamation — at the step END, never the
