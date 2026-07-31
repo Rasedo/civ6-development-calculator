@@ -5516,7 +5516,11 @@ class BatchSim:
         on_map = nb >= 0
         civ = self._p_civ[self.p_type]
         dom = torch.where(civ.unsqueeze(2), pciv, pmil)
-        alive = self.p_alive.unsqueeze(2)
+        # #51/S5.3: TS walkPath loops while `movesLeft > 0` and attackTargets
+        # returns [] at `movesLeft <= 0`. The player pool has MP now, so the
+        # mask can finally ask. Builds are NOT gated (builderImprove checks
+        # charges, never MP).
+        alive = self.p_alive.unsqueeze(2) & (self.p_mp > 0).unsqueeze(2)
         move = on_map & passable & ~barb & ~rv_any & ~rvc_civ_n & ~dom & alive
         can_fight = (self._p_combat[self.p_type] > 0).unsqueeze(2)
         # P4/D-23: rangedAttack bombards cities too — rc_war is a target for
@@ -5716,6 +5720,10 @@ class BatchSim:
         ftu_t = self.tile_ftu.gather(1, tc)
         unlocked = self.r_techs[:, r, :].gather(1, ftu_t.clamp(min=0)) & (ftu_t >= 0)
         chop = (is_civ.squeeze(2) & (self.v_charges.gather(1, sc) > 0) & (ftr_t > 0) & unlocked & ~self.feat_stripped.gather(1, tc)).unsqueeze(2)
+        # #51/S5.3: the same MP gate as the player's mask — one rule, both seats.
+        has_mp = (self.v_mp.gather(1, sc) > 0).unsqueeze(2)
+        move = move & has_mp
+        attack = attack & has_mp
         return torch.cat([move, attack, hold, build_f, build_m, build_l, chop], dim=2)
 
     def _apply_rival_unit_actions(self, r: int, actions: torch.Tensor) -> None:
@@ -7448,10 +7456,9 @@ class BatchSim:
             # correct only while every barb type had 2 MP — the SCOUT opener
             # has 3, and the mismatch showed up as a barb-count + draw-count
             # split at seed 9287 t250.
-            full_mp = self.u_mp_full[:, u]  # #51/S5.2: the resident budget
-            mp = self.u_mp[:, u].clone()
             cur = here.clone()
             d_cur = d_here.clone()
+            gslot = torch.full_like(cur, u + self.POOL_LO["u"])  # #51/S5.3
             moving = march & has_tgt
             while bool(moving.any()):
                 nb2 = self.neigh[cur.clamp(min=0)]
@@ -7472,34 +7479,23 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb2.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                _terr, _riv = self._road_terms(  # B-23 (#71): roads
-                    cur, dest, 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-                )
-                cost = 1 + _terr + _riv
-                mv = (
+                # A-8: an improvement target is walked ONTO; a CITY target
+                # stops the march adjacent. #51/S5.3: everything past the
+                # destination — cost, afford, the occupancy pair, the tile, the
+                # MP spend, the B-3 ZOC halt — is the shared step contract.
+                mv = self._step_verb(
                     moving
                     & (best < 10**9)
                     & (torch.div(best, 8, rounding_mode="floor") < d_cur)
-                    & (has_imp | (torch.div(best, 8, rounding_mode="floor") >= 1))
-                    & ((mp >= cost) | (mp >= full_mp))
+                    & (has_imp | (torch.div(best, 8, rounding_mode="floor") >= 1)),
+                    gslot, cur, dest, dir_i, BARB_SEAT, torch.zeros_like(moving),
+                    clear_camp=False,  # TS clearCampFor no-ops for a barbarian
                 )
                 if not bool(mv.any()):
                     break
-                rows = mv.nonzero(as_tuple=True)[0]
-                self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
-                self.occ_mil[(rows, dest[rows])] = u + P_MAX + U_MAX  # #51/S3.4b
-                self.u_tile[rows, u] = dest[rows]
-                mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
-                self.u_mp[:, u] = mp  # #51/S5.1
+                mp = self.u_mp[:, u]
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
-                # AUDIT B-26/B-3 ZOC (ROUND B10): a march step ending adjacent
-                # to a hostile (player OR rival) non-embarked military halts the
-                # barb (mp := 0), mirroring hostileUnitAct's per-step inEnemyZoc
-                # check now that barbs obey ZOC. No new draws (pure geometry).
-                zoc = mv & self._in_enemy_zoc(cur, BARB_SEAT)
-                mp = torch.where(zoc, torch.zeros_like(mp), mp)
-                self.u_mp[:, u] = mp  # #51/S5.1
                 moving = mv & (mp > 0)
 
         # AUDIT B-2: a PLAYER city with ANCIENT_WALLS fires once/turn at the
@@ -8547,8 +8543,7 @@ class BatchSim:
             arange6 = torch.arange(6, device=dev)
             # #70/S3 (B-8): TS `granted = full + generalAuraMP`, read off the
             # refresh-site SNAPSHOT (never recomputed here — generals move).
-            full_mp = self.v_mp_full[:, u]  # #51/S5.2: the resident budget
-            mp = self.v_mp[:, u].clone()
+            gslot = torch.full_like(here, u + self.POOL_LO["v"])  # #51/S5.3
             cur = here.clone()
             d_cur = self.pair_dist[here, tgt].to(torch.long)
             moving = walk
@@ -8562,28 +8557,20 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                _terr, _riv = self._road_terms(  # B-23 (#71): roads
-                    curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-                )
-                cost = 1 + _terr + _riv
-                mv = (
+                # #51/S5.3: the shared step contract — cost, afford, the
+                # occupancy pair, the tile, the camp clear, the MP spend and
+                # the B-3 ZOC halt (a civilian mover halts adjacent to a
+                # hostile military too; only the EXERTER must be military).
+                mv = self._step_verb(
                     moving
                     & (best < 10**9)
-                    & (torch.div(best, 8, rounding_mode="floor") < d_cur)
-                    & ((mp >= cost) | (mp >= full_mp))
+                    & (torch.div(best, 8, rounding_mode="floor") < d_cur),
+                    gslot, cur, dest, dir_i, r + 1, torch.ones_like(moving),
+                    camp_civ=self.v_civ[:, u],
                 )
                 if not bool(mv.any()):
                     break
-                rows = mv.nonzero(as_tuple=True)[0]
-                self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
-                self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
-                self.v_tile[rows, u] = dest[rows]
-                self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # P5/S7 (C-3): mirrors walkPath's any-unit clear
-                mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
-                # B-3 ZOC: the builder (a civilian mover) halts adjacent to a
-                # hostile military unit too — only the EXERTER must be military.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
-                self.v_mp[:, u] = mp  # #51/S5.1
+                mp = self.v_mp[:, u]
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
@@ -8838,8 +8825,7 @@ class BatchSim:
                 continue
             # the rivalBuilderActions step loop verbatim, with the ≤1 stop
             # #70/S3 (B-8): + the frozen aura MP (0 for a civilian missionary).
-            full_mp = self.v_mp_full[:, u]  # #51/S5.2: the resident budget
-            mp = self.v_mp[:, u].clone()
+            gslot = torch.full_like(here, u + self.POOL_LO["v"])  # #51/S5.3
             cur = here.clone()
             d_cur = d0.clone()
             moving = walk
@@ -8853,28 +8839,20 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                _terr, _riv = self._road_terms(  # B-23 (#71): roads
-                    curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-                )
-                cost = 1 + _terr + _riv
-                mv = (
+                # #51/S5.3: the shared step contract — cost, afford, the
+                # occupancy pair, the tile, the camp clear, the MP spend and
+                # the B-3 ZOC halt (a civilian mover halts adjacent to a
+                # hostile military too; only the EXERTER must be military).
+                mv = self._step_verb(
                     moving
                     & (best < 10**9)
-                    & (torch.div(best, 8, rounding_mode="floor") < d_cur)
-                    & ((mp >= cost) | (mp >= full_mp))
+                    & (torch.div(best, 8, rounding_mode="floor") < d_cur),
+                    gslot, cur, dest, dir_i, r + 1, torch.ones_like(moving),
+                    camp_civ=self.v_civ[:, u],
                 )
                 if not bool(mv.any()):
                     break
-                rows = mv.nonzero(as_tuple=True)[0]
-                self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
-                self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
-                self.v_tile[rows, u] = dest[rows]
-                self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
-                mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
-                # B-3 ZOC: a civilian mover halts adjacent to a hostile
-                # military unit — only the EXERTER must be military.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
-                self.v_mp[:, u] = mp  # #51/S5.1
+                mp = self.v_mp[:, u]
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > 1)
@@ -8927,8 +8905,7 @@ class BatchSim:
             # #70/S3 (B-8): + the frozen aura MP. Structurally 0 here — the
             # GENERAL/ADMIRAL walking this loop is itself a combat-0 civilian,
             # which _refresh_aura_mp screens out (TS inGeneralAura agrees).
-            full_mp = self.v_mp_full[:, u]  # #51/S5.2: the resident budget
-            mp = self.v_mp[:, u].clone()
+            gslot = torch.full_like(here, u + self.POOL_LO["v"])  # #51/S5.3
             cur = here.clone()
             d_cur = d0.clone()
             moving = act & (d_cur > rng)
@@ -8942,27 +8919,20 @@ class BatchSim:
                 best = skey.min(dim=1).values
                 dir_i = (best % 8).clamp(max=5)
                 dest = nb.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-                _terr, _riv = self._road_terms(  # B-23 (#71): roads
-                    curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-                )
-                cost = 1 + _terr + _riv
-                mv = (
+                # #51/S5.3: the shared step contract — cost, afford, the
+                # occupancy pair, the tile, the camp clear, the MP spend and
+                # the B-3 ZOC halt (a civilian mover halts adjacent to a
+                # hostile military too; only the EXERTER must be military).
+                mv = self._step_verb(
                     moving
                     & (best < 10**9)
-                    & (torch.div(best, 8, rounding_mode="floor") < d_cur)
-                    & ((mp >= cost) | (mp >= full_mp))
+                    & (torch.div(best, 8, rounding_mode="floor") < d_cur),
+                    gslot, cur, dest, dir_i, r + 1, torch.ones_like(moving),
+                    camp_civ=self.v_civ[:, u],
                 )
                 if not bool(mv.any()):
                     break
-                rows = mv.nonzero(as_tuple=True)[0]
-                self.occ_civ[(rows, cur[rows])] = -1  # #51/S3.4b
-                self.occ_civ[(rows, dest[rows])] = u + P_MAX  # #51/S3.4b
-                self.v_tile[rows, u] = dest[rows]
-                self._clear_camp_at(mv, dest, civ=self.v_civ[:, u])  # walkPath's any-unit clear
-                mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
-                # B-3 ZOC: a civilian mover halts adjacent to a hostile military unit.
-                mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
-                self.v_mp[:, u] = mp  # #51/S5.1
+                mp = self.v_mp[:, u]
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > rng)
@@ -10910,6 +10880,7 @@ class BatchSim:
         seat,
         is_civ: torch.Tensor,
         camp_civ: torch.Tensor | None = None,
+        clear_camp: bool = True,
     ) -> torch.Tensor:
         """The `stepUnit` twin for the ACTION appliers — [B] masks in, the
         mask of units that actually stepped out.
@@ -10928,19 +10899,42 @@ class BatchSim:
         writes below are the same two lines whoever is moving — the player
         applier and the controlled-rival applier had transcribed them
         separately, with the rival's carrying a `+ P_MAX` the player's did not.
-        Embark is deliberately NOT here: TS's walkPath calls tileFreeForUnit
-        with allowEmbark=false, so neither engine embarks an ordered unit
-        (task #52 — a shared gap against real Civ 6, not a divergence)."""
+          * EMBARK/DISEMBARK — a LAND unit crossing land<->water pays ALL
+            remaining MP and flips `emb`; a water->water step enters at 1 with
+            no river charge. LIVE-gated (`_embark_live`), like TS's
+            embarkState. The candidate scan stays with the caller: which
+            neighbours are enterable, and the B-26 cliff that closes the
+            transition edge, are target-choice questions.
+          * the camp clear, for any landing unit. `clear_camp=False` is the
+            BARBARIAN mover — TS's clearCampFor no-ops for them.
+
+        #51/S5.3: the six autonomous walkers call this too. What is left of
+        each of them is its candidate set and its stop condition, which is
+        exactly what TS says should differ."""
         hc = here.clamp(min=0)
         river3 = 3 * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
         terr, riv = self._road_terms(here, dest, river3)
-        cost = 1 + terr + riv
-        mp = self.unit_mp.gather(1, gslot.unsqueeze(1)).squeeze(1)
-        full = self.unit_mp_full.gather(1, gslot.unsqueeze(1)).squeeze(1)
+        land_cost = 1 + terr + riv
+        gs1 = gslot.unsqueeze(1)
+        mp = self.unit_mp.gather(1, gs1).squeeze(1)
+        full = self.unit_mp_full.gather(1, gs1).squeeze(1)
+        if self._embark_live:
+            naval = self.unit_naval[
+                self.unit_type.gather(1, gs1).squeeze(1).clamp(min=0, max=self.NU - 1)
+            ]
+            emb = self.unit_emb.gather(1, gs1).squeeze(1)
+            to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
+            transition = (emb != to_water) & ~naval
+            cost = torch.where(
+                transition, mp, torch.where(to_water, torch.ones_like(land_cost), land_cost)
+            )
+        else:
+            cost = land_cost
         moved = ok & ((mp >= cost) | (mp >= full))
         if not bool(moved.any()):
             return moved
         rows = moved.nonzero(as_tuple=True)[0]
+        gs = gslot[rows]
         civ_rows = rows[is_civ[rows]]
         mil_rows = rows[~is_civ[rows]]
         if len(civ_rows):
@@ -10949,14 +10943,17 @@ class BatchSim:
         if len(mil_rows):
             self.occ_mil[(mil_rows, here[mil_rows])] = -1
             self.occ_mil[(mil_rows, dest[mil_rows])] = gslot[mil_rows]
-        self.unit_tile[rows, gslot[rows]] = dest[rows]
+        self.unit_tile[rows, gs] = dest[rows]
+        if clear_camp:
+            if camp_civ is None:
+                self._clear_camp_at(moved, dest)
+            else:
+                self._clear_camp_at(moved, dest, civ=camp_civ)
+        if self._embark_live:
+            self.unit_emb[rows, gs] = (to_water & ~naval)[rows]
         spent = (mp - cost).clamp(min=0)
         spent = torch.where(self._in_enemy_zoc(dest, seat), torch.zeros_like(spent), spent)
-        self.unit_mp[rows, gslot[rows]] = spent[rows]
-        if camp_civ is None:
-            self._clear_camp_at(moved, dest)
-        else:
-            self._clear_camp_at(moved, dest, civ=camp_civ)
+        self.unit_mp[rows, gs] = spent[rows]
         return moved
 
     def _in_enemy_zoc(self, dest: torch.Tensor, seat) -> torch.Tensor:
@@ -11309,7 +11306,6 @@ class BatchSim:
         # #45/B-6 EMBARK: the ONLY walker whose passability changes v1 — a land
         # unit may take WATER steps (embark) when `_embark_live`. INERT by
         # default (mirrors TS embarkState.live) so the gates are byte-identical.
-        emb0 = self.v_emb[:, v]
         if self._embark_live:
             bidx_e = torch.arange(B, device=dev)
             civ_r = self.v_civ[:, v].clamp(min=0)
@@ -11327,11 +11323,9 @@ class BatchSim:
         # embark selection, aura and all. This walker used to rebuild both here,
         # which is what let a unit that had already spent MP this phase start
         # its march on a fresh budget.
-        full_mp = self.v_mp_full[:, v]
-        mp = self.v_mp[:, v].clone()
         cur = here.clone()
         d_cur = d_here.clone()
-        emb = emb0.clone()
+        gslot = torch.full_like(here, v + self.POOL_LO["v"])  # #51/S5.3
         moving = march & has_tgt
         while bool(moving.any()):
             nb2 = self.neigh[cur.clamp(min=0)]
@@ -11352,48 +11346,27 @@ class BatchSim:
             best = skey.min(dim=1).values
             dir_i = (best % 8).clamp(max=5)
             dest = nb2.gather(1, dir_i.unsqueeze(1)).squeeze(1)
-            _terr, _riv = self._road_terms(  # B-23 (#71): roads
-                cur, dest, 3 * ((self.river_mask.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-            )
-            land_cost = 1 + _terr + _riv
-            if self._embark_live:
-                # embark/disembark (a LAND unit crossing land↔water) costs ALL
-                # remaining MP; a water→water step enters at 1 (no river charge).
-                to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
-                transition = (emb != to_water) & ~is_naval
-                cost = torch.where(transition, mp, torch.where(to_water, torch.ones_like(land_cost), land_cost))
-            else:
-                cost = land_cost
             # A-8: an improvement target is walked ONTO (pillage reads the
             # tile underfoot); a CITY target stops the march adjacent —
             # enemy centers can't be entered (real Civ 6), and a unit
             # standing on one could never attack it (the d>=1 scan).
-            mv = (
+            # #51/S5.3: cost (embark transition included), afford, the
+            # occupancy pair, the tile, the camp clear, the MP spend and the
+            # B-3 ZOC halt are the shared step contract.
+            mv = self._step_verb(
                 moving
                 & (best < 10**9)
                 & (torch.div(best, 8, rounding_mode="floor") < d_cur)
-                & (has_imp | (torch.div(best, 8, rounding_mode="floor") >= 1))
-                & ((mp >= cost) | (mp >= full_mp))
+                & (has_imp | (torch.div(best, 8, rounding_mode="floor") >= 1)),
+                gslot, cur, dest, dir_i, self.v_seat[:, v], torch.zeros_like(moving),
+                camp_civ=self.v_civ[:, v],
             )
             if not bool(mv.any()):
                 break
-            rows = mv.nonzero(as_tuple=True)[0]
-            self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
-            self.occ_mil[(rows, dest[rows])] = v + P_MAX  # #51/S3.4b
-            self.v_tile[rows, v] = dest[rows]
-            self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
-            mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
-            if self._embark_live:
-                emb = torch.where(mv, to_water & ~is_naval, emb)  # embarked ⟺ on a water tile
-            # B-3 ZOC: a march step ending adjacent to a hostile military unit
-            # halts (movesLeft:=0 after paying the enter cost above).
-            mp = torch.where(mv & self._in_enemy_zoc(dest, self.v_seat[:, v]), torch.zeros_like(mp), mp)
-            self.v_mp[:, v] = mp  # #51/S5.1
+            mp = self.v_mp[:, v]
             d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
-        if self._embark_live:
-            self.v_emb[:, v] = emb  # persist embark state across turns
 
     def _attack_encampment(self, att: torch.Tensor, tile: torch.Tensor, atk_kind: str, u: int) -> None:
         """B-17 (#71): the `attackEncampment` twin — a melee assault ON an
@@ -11772,18 +11745,16 @@ class BatchSim:
         # war-march into a peace turn comes home coherently (EMBARK_MOVES pool +
         # disembark transition). Water steps are LIVE-gated; a grounded land unit
         # stays land-only, so with the flag off this is byte-identical to pre-N2.
-        emb0 = self.v_emb[:, v]
         if self._embark_live:
             bidx_p = torch.arange(B, device=dev)
             civ_rp = self.v_civ[:, v].clamp(min=0)
             cart_p = (self.r_techs[bidx_p, civ_rp, self._cartography_tech] if self._cartography_tech >= 0 else torch.zeros(B, dtype=torch.bool, device=dev))
             is_naval_p = self.unit_naval[vt0]
-        full_mp = self.v_mp_full[:, v]  # #51/S5.2: the resident budget (see the war-march)
-        mp = self.v_mp[:, v].clone()
         cur = here.clone()
-        emb = emb0.clone()
+        gslot = torch.full_like(here, v + self.POOL_LO["v"])  # #51/S5.3
         moving = patrol & (hkey.min(dim=1).values < 10**9)
         while bool(moving.any()):
+            emb = self.v_emb[:, v]  # #51/S5.3: _step_verb keeps the plane current
             curc = cur.clamp(min=0)
             d_home = self.pair_dist[curc, home].to(torch.long)
             roam = moving & (d_home > 3)
@@ -11821,40 +11792,20 @@ class BatchSim:
             pdir = (best % 8).clamp(max=5)
             dest = nbp.gather(1, pdir.unsqueeze(1)).squeeze(1)
             true_dir = perm_t[pdir]  # river bits index the NEIGH direction, not the patrol order
-            _terr, _riv = self._road_terms(  # B-23 (#71): roads
-                curc, dest, 3 * ((self.river_mask.gather(1, curc.unsqueeze(1)).squeeze(1) >> true_dir) & 1)
-            )
-            land_cost = 1 + _terr + _riv
-            if self._embark_live:
-                to_water = self.wpass.gather(1, dest.clamp(min=0).unsqueeze(1)).squeeze(1)
-                transition = (emb != to_water) & ~is_naval_p
-                cost = torch.where(transition, mp, torch.where(to_water, torch.ones_like(land_cost), land_cost))
-            else:
-                cost = land_cost
-            mv = (
+            # #51/S5.3: the shared step contract. `true_dir` (not the patrol
+            # permutation index) is what the river bits are keyed on.
+            mv = self._step_verb(
                 roam
                 & (best < 10**9)
-                & (torch.div(best, 8, rounding_mode="floor") < d_home)
-                & ((mp >= cost) | (mp >= full_mp))
+                & (torch.div(best, 8, rounding_mode="floor") < d_home),
+                gslot, cur, dest, true_dir, self.v_seat[:, v], torch.zeros_like(roam),
+                camp_civ=self.v_civ[:, v],
             )
             if not bool(mv.any()):
                 break
-            rows = mv.nonzero(as_tuple=True)[0]
-            self.occ_mil[(rows, cur[rows])] = -1  # #51/S3.4b
-            self.occ_mil[(rows, dest[rows])] = v + P_MAX  # #51/S3.4b
-            self.v_tile[rows, v] = dest[rows]
-            self._clear_camp_at(mv, dest, civ=self.v_civ[:, v])  # P5/S7 (C-3)
-            mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
-            if self._embark_live:
-                emb = torch.where(mv, to_water & ~is_naval_p, emb)  # embarked ⟺ on a water tile
-            # B-3 ZOC: a patrol step adjacent to a hostile military unit halts
-            # (at peace only barbarians exert it — aw is False here).
-            mp = torch.where(mv & self._in_enemy_zoc(dest, self.v_seat[:, v]), torch.zeros_like(mp), mp)
-            self.v_mp[:, v] = mp  # #51/S5.1
+            mp = self.v_mp[:, v]
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
-        if self._embark_live:
-            self.v_emb[:, v] = emb  # persist embark state across turns
 
     def _rival_cs_phase(self, r: int, active: torch.Tensor) -> None:
         """AUDIT A-12: CS diplomacy from the rival's seat — the rivalPhase

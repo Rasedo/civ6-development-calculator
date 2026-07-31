@@ -384,7 +384,56 @@ All 26 `x`/`r_x` pairs → `civ_* [B, NS, ...]` by aliasing. Gaps close by const
 
 ---
 
-### ROUND 5 — Movement points
+### ROUND 5 — Movement points — **DONE** (2d6f8fd, 9cbe1d0, 04b806e, S5.3)
+
+**What shipped, against what was planned.** The stage shapes held; two things
+came out differently and one plan item moved to Round 8.
+
+* **S5.1** landed as written: `unit_mp` / `unit_mp_full` join the merged pool,
+  the walkers write them where they already computed the values. Deriving
+  `acted` did NOT belong here — it depends on the player path having MP at all
+  — so it moved to S5.2b. `_reclaim_pool`'s field list stopped being three
+  hand-written lists and is derived from the pool; the "u" list had already
+  drifted (no xp/charges/aura_mp/emb).
+* **S5.2a** is the pivot, and it is smaller than the plan expected: the afford
+  rule is **measurably inert** under the current driver (33,114 steps offered,
+  **0 refused**), because each unit gets one order per turn and therefore
+  always steps at full MP. The plan's "applier loops until every unit is out of
+  MP" is the part that would make it bite, and that needs the RL action space —
+  **it is Round 8**, not Round 5. No re-export was needed (fixtures are
+  scenarios, not recordings); `rollout.json` was re-recorded three times over
+  the round and replays 36/36.
+* **S5.2b** deleted `p_acted`/`v_acted`/`u_acted` after `_check_mp_invariant`
+  proved `acted == (mp < mp_full)` on every live slot, every step, across all
+  three gates.
+* **S5.3** is `_step_verb`, not `_walk(...)`. Factoring the whole loop was the
+  wrong cut: TS already says the loop body is what differs ("The CALLER still
+  picks the destination... candidate sets, occupancy tests, stop conditions").
+  What was actually duplicated is everything DOWNSTREAM of the destination, and
+  that is now one function called by all six walkers and all three action
+  appliers. −155/+106 lines.
+
+**§7 item 12 — the double MP reset. DECIDED: keep both, and it is not an
+artefact of ours.** Real Civ 6 refreshes a civ's movement at the start of THAT
+civ's turn, so `rivalPhase`'s reset is the faithful one and `barbarianPhase`'s
+is too. The artefact is the other direction: `refreshUnits` sweeping ALL units
+at the player's turn boundary. The two are value-identical today (nothing
+spends rival MP between them), so this is a naming/structure debt, not a
+behaviour bug — and the right place to collapse it is **Round 6**, where
+city-states and barbarians become seats and "each seat refreshes at the start
+of its own phase" can be one rule instead of three sweeps.
+
+**Still owed from this round's scope:** the MOVEMENT halves of MONUMENTALITY
+and EXODUS. The plan named a `goldenMoveBonus` guard to lift — there is no such
+function; the bonuses were REVERTED, and `eras.ts` carries only the note saying
+they were deferred here because the two engines modelled MP differently. That
+blocker is gone. Re-landing them is a behaviour change on both engines and
+needs its own gated slice **with the Civ 6 rule verified from a real source
+first** (the deferral note is a brief, not a citation).
+
+---
+
+### ROUND 5 — Movement points *(original plan, for reference)*
 
 **S5.1 — MP becomes state, player-inert. [R]**
 Add `unit_mp`/`unit_mp_full` for every seat; rivals and barbarians **write** them where they currently compute a phase-local (`full_mp = self._p_moves[_vt] + self.v_aura_mp[:,u] + self._golden_move_bonus(...)`, `mp = full_mp.clone()`). Values identical; only residency changes. Derive `unit_acted` as `unit_mp < unit_mp_full` (TS's own gate in `units.ts:refreshUnits`) and delete `p_acted`/`v_acted`/`u_acted`.
@@ -497,7 +546,7 @@ These are **game-rule** differences, not disabled rules. Each must be **verified
 | 9 | **`greatPeople.earned`**: one shared array vs per-seat + a global denial set. | S1.2 |
 | 10 | **Government**: stored state (player) vs pure function of research (rival, `effects.ts:computeAdoption`). Decision: store on every seat. | S1.2 |
 | 11 | **City-state combat**: HP 150 vs 200, unconditional +10 regen vs besieged-gated +20, no ranged strike at all. | S6 |
-| 12 | **The double MP reset**: does `rivalPhase` re-resetting `movesLeft` after `refreshUnits` correspond to any Civ 6 rule, or is it an artefact? | S5.1 (decide), S5.3 (act) |
+| 12 | **The double MP reset** — **DECIDED (Round 5)**: not an artefact. Civ 6 refreshes a civ at the start of ITS turn, so `rivalPhase`/`barbarianPhase` are the faithful resets and `refreshUnits`' all-units sweep is the odd one. Value-identical today; collapse to "each seat refreshes in its own phase" at Round 6. | S5 decided, S6 acts |
 
 ---
 
@@ -539,7 +588,7 @@ State these up front so they are decisions, not retreats:
 | 2 TS de-duplication | S2.1–S2.4 | R R R R | **byte-identical** | 1 |
 | 3 GPU units | S3.1–S3.4 | R, B(rules), B(order), R | S3.2 rules.json, S3.3 re-export | 1 |
 | 4 GPU cities/scalars/war | S4.1–S4.3 | B(dtype), R, R | S4.1 re-export | 1 |
-| 5 Movement points | S5.1–S5.3 | R, **B(pivot)**, R | S5.2 re-export + re-record rollout | 1 |
+| 5 Movement points **DONE** | S5.1, S5.2a/b, S5.3 | R, B, R, R | no re-export needed; rollout re-recorded | 1 (399s green) |
 | 6 CS + barbarians | S6 | B | re-export | 1 |
 | 7 Reconciliation | S7.1–S7.14 | B ×14 | one re-export each | 1 (at end) |
 | 8 RL + oracle | S8.1–S8.3 | B | rollout schema | 1 + eval baseline |
