@@ -76,6 +76,34 @@ One battery **at the end of the round only** (`[[verify-loop-cost]]` rule 6). Pe
 - Rewrite `gpu/government_test.py:183`'s surrounding inertness comment and drop `tilePurchaseMult` from `export-gpu.ts`'s "TS-only" list. New poke lane: `cost(seat with LAND_SURVEYORS) == round(0.8 × cost(same seat without))`, both engines.
 
 ### S7.10a — ranged/melee **city-first precedence** for the player seat
+> **ROOT CAUSE FOUND 2026-07-31 (attempt 4) — the earlier three all looked at
+> the wrong seat.** `gpu/logdiff.py` on the failing game named it in one run:
+>
+> ```
+> 48 CB0      GPU: k:mel  t:779 c:3248381858 ...   TS: k:rcty t:779 c:3248381858 ...
+> 48 RC1 779  GPU: hp200                            TS: hp177
+> 48 RU1 779  GPU: (absent)                         TS: 1 hp38
+> ```
+>
+> Tile 779 is rival 1's CITY CENTRE with rival 1's own WARRIOR on it. Same RNG
+> counter on both sides, so it is the SAME actor at the SAME draw: TS attacks
+> the CITY (`rcty`), the GPU attacks the UNIT (`mel`) and kills it.
+>
+> A probe on the PLAYER melee branch printed NOTHING for tile 779 — because
+> `k="mel"` is emitted at TWO sites, and the one firing is `_hostile_vs_unit`,
+> **the RIVAL/BARB ATTACKER path**, which the slice never touched.
+>
+> **TS's `meleeAttack` is ONE SEAT-GENERIC FUNCTION**, so editing it made
+> city-first apply to EVERY seat. The GPU has SEPARATE PER-SEAT APPLIERS, and
+> only the player's was changed. That is the whole divergence.
+>
+> **THE NEXT ATTEMPT** must apply city-first to the GPU's rival/barb attacker
+> path as well — `_hostile_vs_unit` and its rival-vs-rival city siege twin — in
+> the SAME commit as the player branches. [[measure-every-path]] on a fourth
+> axis: not downstream terms, not sibling scans, not callers outside the file,
+> but WHICH SEATS a function serves. One TS function ↔ N GPU appliers is the
+> shape to check on every future TS-side behaviour merge.
+>
 > **ATTEMPTED AND BACKED OUT 2026-07-31 — not a scope cut, a sequencing call.**
 > The TS half is ~6 lines and was written and green (tsc + 498/498 vitest):
 > `meleeAttack`'s `rivalTarget`/`csTarget` arms drop their `enemies.length === 0`
