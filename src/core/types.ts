@@ -179,6 +179,10 @@ export type GreatPersonClass =
   | 'MUSICIAN';
 
 export interface City {
+  /** #51/S4.1r: the turn this city was FOUNDED. Was `RivalCity.foundedTurn`,
+   *  the last field that made a rival's city a different TYPE from the
+   *  player's; every seat's founding sets it now. */
+  foundedTurn: number;
   /** City HP. #51/S1.3: was `RivalCity.hp` for a rival and a side-map entry
    *  (`GameState.cityHp[id]`, defaulting to CITY_MAX_HP) for the player. One
    *  field now — the side map and `getCityHp` are gone, and so is the duplicate
@@ -449,9 +453,10 @@ export interface Unit {
  * the heuristic in rivalPhase still drives everything. `foodBox` carries
  * what the heuristic used to call growthBox.
  */
-export interface RivalCity extends City {
-  foundedTurn: number;
-}
+/** #51/S4.1r: RivalCity is now EXACTLY a City — `foundedTurn` moved onto City,
+ *  which every seat's founding sets. Kept as an alias so the ~200 existing
+ *  RivalCity annotations stay readable. */
+export type RivalCity = City;
 
 /** A scripted rival empire: real map presence, real per-city economy. */
 /**

@@ -198,6 +198,7 @@ export function foundCity(state: GameState, tileIndex: number): RuleResult & { c
     wonders: [],
     specialists: {},
     hp: CITY_MAX_HP,
+    foundedTurn: state.turn,  // #51/S4.1r
   };
 
   tile.district = 'CITY_CENTER';

@@ -342,6 +342,7 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
       state.cities.push({
         id: state.nextCityId++,
         seat: PLAYER_CIV,
+        foundedTurn: state.turn,  // #51/S4.1r
         name: `P${i}`,
         centerIndex: 20 + i,
         population: 1,

@@ -240,6 +240,7 @@ export function parseLiveSync(text: string): SyncResult {
       wonders: [],
       specialists: {},
       hp: CITY_MAX_HP,
+      foundedTurn: state.turn,  // #51/S4.1r
     };
     center.district = 'CITY_CENTER';
     center.districtComplete = true;

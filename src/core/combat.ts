@@ -1020,6 +1020,7 @@ export function captureCityState(state: GameState, cs: CityState): void {
   state.cities.push({
     id,
     seat: PLAYER_CIV, // #51/S1.3d: a conquered city-state joins the PLAYER's seat
+    foundedTurn: state.turn,  // #51/S4.1r
     name: cs.name,
     centerIndex: cs.centerIndex,
     population: Math.max(1, Math.floor(cs.population * 0.75)),
@@ -1151,6 +1152,7 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   const captured: City = {
     id,
     seat: PLAYER_CIV, // #51/S1.3d: a player city says so explicitly
+    foundedTurn: state.turn,  // #51/S4.1r
     name: city.name,
     centerIndex: city.centerIndex,
     population: Math.max(1, Math.floor(city.population * 0.75)),
