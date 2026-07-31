@@ -446,3 +446,40 @@ So the collapse is a MECHANICAL merge, not a fidelity question: one
 namer and the container, all of which `seatOf`/`citiesOf` already serve.
 Keep `revealAround` gated on the player seat and carry `foundedTurn` for
 everyone. Expect BYTE-IDENTICAL fixtures; anything else is a bug in the merge.
+
+
+**MERGE ATTEMPTED 2026-07-31 — the type half LANDED, the mutation half did NOT.**
+
+Landed (`d51c4ae`, byte-identical fixtures + parity 0.0): `foundedTurn` moved
+onto `City` and `RivalCity` became a plain alias. That was the last FIELD making
+a rival's city a different type from the player's.
+
+The MUTATION merge (`foundCityAt(state, seat, tile)`, with `foundRivalCity`
+collapsing to a one-line call) was written, typechecked clean — and broke
+**16 tests**. The cause is a trap worth knowing before the next attempt:
+
+```ts
+export function citiesOf(state, seat) {
+  if (seat === PLAYER_CIV) return state.cities;
+  return rivalOfSeat(state, seat)?.cities ?? [];   // <-- THROWAWAY on a miss
+}
+```
+
+`foundCityAt` pushed into `citiesOf(state, seat)`. Where the seat lookup MISSES
+— a `RivalCiv` object that is not reachable at `state.seats[seat]`, which
+several test helpers construct — the `?? []` hands back a FRESH ARRAY, the push
+succeeds silently, and the city is never added to the rival. Downstream reads
+then hit `undefined.centerIndex`.
+
+The old body sidestepped this by pushing onto the `rival` object it was HANDED,
+never by looking the seat up.
+
+**For the next attempt:** do not push through `citiesOf` while `?? []` can
+absorb it. Either (a) make `citiesOf` return `undefined` for an unknown seat and
+force callers to handle it, (b) have `foundCityAt` take the owner it was given
+rather than re-deriving it from the seat, or (c) fix the test helpers to
+register rivals in `state.seats` — but (c) alone leaves the silent-swallow trap
+live for production code.
+
+`citiesOf`'s `?? []` is worth auditing on its own: any WRITE through it has this
+failure mode, and reads simply see an empty empire.
