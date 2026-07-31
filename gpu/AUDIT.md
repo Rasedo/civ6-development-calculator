@@ -3325,13 +3325,44 @@ gap; likewise GS disasters are modeled minus sea-level rise
   Golden age. Lanes: `gpu/golden_move_test.py` (6 cases) and
   `tests/golden-movement.test.ts` (8), each with a negative twin per case so
   neither can pass by granting everyone +2.
-  STILL PLAYER-ONLY, recorded not fixed: the other three golden faces are called
-  with a hardcoded civ 0 — `goldenBoostBonus(state, 0, ...)`,
+  **AND THE OTHER THREE FACES BECAME PER-SEAT 2026-07-31 (#51/S5.5).** They
+  were called with a hardcoded civ 0 — `goldenBoostBonus(state, 0, ...)`,
   `goldenProphetPoints(state, 0)`, `goldenCulturePerDistrict(state, 0)` — so a
-  RIVAL in a Golden age gets the movement bonus but not the research discount,
-  the prophet points or the culture. Same asymmetry class as the rest of #51.
-  B-24 3 -> 90% (per-item; the chapter rounds to 99% either way, so the table
+  RIVAL in a Golden age was asked about a civ that was not it, and got nothing.
+  Every civ picks dedications in this model (`applyDedications` loops them all,
+  `dedicationPicks[civ]` is per civ), and in Civ 6 a Golden face belongs to
+  whichever civ committed it. Now keyed on the seat, both engines:
+    * FREE_INQUIRY / PEN_BRUSH_AND_VOICE's extra 10% joins the rival research
+      path at FOUR sites — both auto-picks and both completion tests. The PICK
+      KEY needs it as much as the test does: the discount changes which item is
+      cheapest, which is precisely bug (1) of #79's player-side hunt.
+    * EXODUS's +4 PROPHET points join `claimGreatPeople` BEFORE its
+      `accrue > 0` guard, mirroring greatPersonPointsPerTurn adding them
+      outside its per-city loop (district-free, civ-wide).
+    * PEN_BRUSH_AND_VOICE's +1 Culture per completed SPECIALTY district joins
+      BOTH rival-yield paths (the batched `_rival_city_yields_all` and the
+      per-city `_rival_city_yields`) at the city.ts twin position — PRE-tier,
+      so it rides the amenity factor like every other culture term.
+  CONSEQUENCE, worth stating plainly: the rivals got stronger and the exporter
+  threw — seed 9054 (index 4) now loses every player city by t250. Rerolled to
+  9056 per the SEED_OVERRIDES mechanism, whose own comment covers exactly this
+  case ("rivals grew strong enough to conquer the capital — the world working
+  as designed"). Off-script rollout games still cover collapse trajectories.
+  Lanes: gpu/golden_move_test.py cases 7-8 (a rival's FREE_INQUIRY discounts
+  its own research; the PLAYER's Golden age does not) and
+  tests/golden-movement.test.ts's second block (EXODUS pays a RIVAL exactly
+  +4 PROPHET a turn over 6 turns against a control run).
+  REACHABILITY (12 seeds x 250t, per civ-turn holding the dedication in a
+  Golden age): rival PEN_BRUSH 1,122, rival EXODUS 712, rival FREE_INQUIRY 250,
+  over 3,030 rival civ-turns spent Golden. All three were dead code for rivals
+  before this; none is a rare path now.
+  B-24 3 -> 95% (per-item; the chapter rounds to 99% either way, so the table
   above is unchanged — this is a per-item note, not a delta applied to a sum).
+  STILL OPEN on B-24: Monumentality's faith-purchase of civilians and its 30%
+  discount, Exodus's +2 charges on newly trained religious units, Free
+  Inquiry's Commercial-Hub/Harbor gold-adjacency-also-gives-Science clause,
+  the eight unmodelled catalog entries, dark-age policies, governor
+  establishment/promotions, and per-civ tech-era drift.
 - B-25 (re-scoped 2026-07-17, Round B2). LANDED: Science victory — a
   6-step space-race project chain gated on late techs, `victoryType` 3
   (player win) / 4 (rival completion = defeat) in `endTurn`; Campus is

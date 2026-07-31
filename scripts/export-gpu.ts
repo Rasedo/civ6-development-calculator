@@ -1261,7 +1261,7 @@ const SEED_OVERRIDES: Record<number, number> = {
   0: 9002,
   1: 9015,  // #78/#47: rival units no longer freeze, so the world is harsher
   2: 9029,
-  4: 9054,
+  4: 9056,  // #51/S5.5: 9054 dies now that rivals hold their own golden dedications
   6: 9080,
   10: 9133,  // #78/#47: rival units no longer freeze, so the world is harsher
   12: 9158,

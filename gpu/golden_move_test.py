@@ -68,7 +68,6 @@ def golden(sim: BatchSim, civ: int, kind: int) -> None:
 
 
 def main() -> None:
-    bonus = sim_const = None
     sim = build()
     bonus = sim._golden_move
     assert bonus > 0, (
@@ -134,6 +133,37 @@ def main() -> None:
             "embarkation speed is not a unit's own movement (TS unitFullMoves)"
         )
         print(f"  6 embarked: {base(sim4, bld) + bonus} -> {sim4._embark_moves} (the flat pool, bonus dropped)")
+
+    # ---- 7. #51/S5.5: the OTHER three faces are keyed on the seat too ----
+    # They were called with a hardcoded civ 0, so a rival in a Golden age got
+    # the research discount / prophet points / culture of a civ that was not it.
+    sim5 = build()
+    if sim5.R > 0:
+        fi, pb = sim5._ded_free_inquiry, sim5._ded_pen_brush
+        cost = torch.full((sim5.B,), 200.0, dtype=sim5.dtype)
+        boosted = torch.ones(sim5.B, dtype=torch.bool)
+        plain = sim5._eff_cost(cost, boosted)
+        golden(sim5, 1, fi)  # rival 0 = unified civ 1
+        rival_g = sim5._eff_cost(cost, boosted, golden_civ=1)
+        assert float(rival_g[0]) < float(plain[0]), (
+            "a RIVAL in a golden FREE_INQUIRY got no extra discount — the call "
+            "site is still asking about civ 0"
+        )
+        # ...and the PLAYER's Golden age must not pay for the rival
+        sim6 = build()
+        golden(sim6, 0, fi)
+        assert float(sim6._eff_cost(cost, boosted, golden_civ=1)[0]) == float(plain[0]), (
+            "the PLAYER's dedication discounted a RIVAL's research"
+        )
+        print(f"  7 FREE_INQUIRY: rival cost {float(plain[0]):.0f} -> {float(rival_g[0]):.0f}; the player's own age does not pay for it")
+
+        # EXODUS's +4 prophet points and PEN_BRUSH's culture read the same table
+        assert bool(sim5._golden_ded(1, fi)[0]) and not bool(sim5._golden_ded(0, fi)[0])
+        sim7 = build()
+        golden(sim7, 1, pb)
+        assert bool(sim7._golden_ded(1, pb)[0]), "PEN_BRUSH unreachable for a rival"
+        assert not bool(sim7._golden_ded(0, pb)[0]), "PEN_BRUSH leaked to the player"
+        print("  8 per-seat table: a dedication answers for the civ that committed it, and only that civ")
 
     print("GOLDEN MOVE (B-24) OK — +2 MP for the seat that holds the dedication")
 

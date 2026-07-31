@@ -4115,6 +4115,14 @@ class BatchSim:
             yt = yt + F[:, j] * float(w[0]) + PR[:, j] * float(w[1]) + GO[:, j] * float(w[2]) + SC[:, j] * float(w[3]) + CU[:, j] * float(w[4]) + FA[:, j] * float(w[5])
         return yt.to(self.dtype)
 
+    def _rc_spec_count(self, r: int) -> torch.Tensor:
+        """[B, RC] — COMPLETED SPECIALTY districts per city of rival r, the
+        `completedDistrictCount(specialtyOnly)` twin: countsTowardLimit AND
+        districtComplete, CITY_CENTER excluded by countsTowardLimit."""
+        reg = self.rc_dist_tile[:, r]  # [B, RC, nD]
+        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape(reg.shape)
+        return (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
+
     def _rival_city_yields_all(self, r: int, amen_yf: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """D-9: the batched-j twin of _rival_city_yields for the POST-STEP
         score/trace path (FRESH amenity factors, state frozen between j's)
@@ -4482,6 +4490,13 @@ class BatchSim:
         ) * alive.double()
         # B-20 (#73): RELIC faith, the city.ts twin position.
         faith = faith + self._relic_faith * self.rc_relics[:, r].double() * alive.double()
+        # #51/S5.5 (B-24): golden PEN, BRUSH AND VOICE — +1 Culture per COMPLETED
+        # SPECIALTY district, this rival's own dedication (it used to be read off
+        # civ 0). PRE-TIER, like every other culture term here, so it rides `yf`.
+        _pb_r = self._golden_ded(r + 1, self._ded_pen_brush)
+        if bool(_pb_r.any()):
+            _spec_r = self._rc_spec_count(r)
+            cul = cul + _pb_r.to(cul.dtype).unsqueeze(1) * _spec_r.to(cul.dtype) * alive.to(cul.dtype)
         # P5/S6 (C-20): FRESH amenity tier (external-caller path) — one call
         # replaces RC identical per-j calls; elementwise scaling is exact.
         # G4: the economy loop passes its loop-top FROZEN factors instead
@@ -9898,6 +9913,10 @@ class BatchSim:
         ) * mask.double()
         # B-20 (#73): RELIC faith, the batched twin's position.
         faith = faith + self._relic_faith * self.rc_relics[:, r, j].double() * mask.double()
+        # #51/S5.5 (B-24): golden PEN, BRUSH AND VOICE, the batched twin's position.
+        _pb_j = self._golden_ded(r + 1, self._ded_pen_brush)
+        if bool(_pb_j.any()):
+            cul = cul + _pb_j.to(cul.dtype) * self._rc_spec_count(r)[:, j].to(cul.dtype) * mask.to(cul.dtype)
         # P5/S6 (C-20): the amenity tier scales the non-food columns like
         # computeCityStats (rivalCityYields tail). External callers re-rank
         # FRESH; the phase loop passes its loop-top frozen factors. The
@@ -13706,7 +13725,7 @@ class BatchSim:
             nb_t = self.r_tech_boosted[:, r]
             nb_c = self.r_civic_boosted[:, r]
             auto_r = active & ~self.controlled[:, r]  # C2b: controlled rivals pick via the net
-            picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
+            picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t, golden_civ=r + 1)  # #51/S5.5 (B-24): THIS rival's golden dedication, not civ 0's
             self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             self.r_tech_prog[:, r] = torch.where(active, self.r_tech_prog[:, r] + sci_sum, self.r_tech_prog[:, r])
             self.r_treasury[:, r] = torch.where(active, self.r_treasury[:, r] + gold_sum, self.r_treasury[:, r])  # VP-G1
@@ -13740,6 +13759,7 @@ class BatchSim:
                 cost_t = self._eff_cost(
                     rdv.t_cost.gather(0, curt.clamp(min=0)),
                     self.r_tech_boosted[:, r].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
+                    golden_civ=r + 1,  # #51/S5.5 (B-24): golden FREE_INQUIRY, per seat
                 ).double()
                 fin = active & (curt >= 0) & (self.r_tech_prog[:, r] >= cost_t)
                 if not bool(fin.any()):
@@ -13749,7 +13769,7 @@ class BatchSim:
                 self._eff_version += 1  # D-2: the per-r farm-adj/mine planes key on it (the trace re-reads this civ post-completion)
                 self.r_tech_prog[:, r] = torch.where(fin, self.r_tech_prog[:, r] - cost_t, self.r_tech_prog[:, r])
                 self.r_cur_tech[:, r] = torch.where(fin, torch.full_like(curt, -1), self.r_cur_tech[:, r])
-                picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t)
+                picked = self._auto_pick(self.r_cur_tech[:, r], self.r_techs[:, r], nb_t, rdv.t_cost, self._prereq_t, golden_civ=r + 1)  # #51/S5.5 (B-24): THIS rival's golden dedication, not civ 0's
                 self.r_cur_tech[:, r] = torch.where(auto_r, picked, self.r_cur_tech[:, r])
             no_t = active & (self.r_cur_tech[:, r] == -1) & ~self._available_mask(self.r_techs[:, r], self._prereq_t).any(dim=1)
             self.r_tech_prog[:, r] = torch.where(no_t, torch.minimum(self.r_tech_prog[:, r], torch.zeros_like(self.r_tech_prog[:, r])), self.r_tech_prog[:, r])
@@ -13779,7 +13799,7 @@ class BatchSim:
                 self.r_warmonger[:, r] - 1,
                 self.r_warmonger[:, r],
             )
-            picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
+            picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c, golden_civ=r + 1, is_civic=True)  # #51/S5.5 (B-24): THIS rival's golden dedication, not civ 0's
             self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             self.r_civic_prog[:, r] = torch.where(active, self.r_civic_prog[:, r] + cul_sum, self.r_civic_prog[:, r])
             # B-25 (#72): LIFETIME culture — the TS `rival.cultureTotal` twin,
@@ -13791,6 +13811,7 @@ class BatchSim:
                 cost_c = self._eff_cost(
                     rdv.c_cost.gather(0, curc.clamp(min=0)),
                     self.r_civic_boosted[:, r].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
+                    golden_civ=r + 1, is_civic=True,  # #51/S5.5 (B-24): golden PEN_BRUSH_AND_VOICE
                 ).double()  # A-3
                 fin = active & (curc >= 0) & (self.r_civic_prog[:, r] >= cost_c)
                 if not bool(fin.any()):
@@ -13800,7 +13821,7 @@ class BatchSim:
                 self._eff_version += 1  # D-2: Feudalism moves this civ's farm-adj plane
                 self.r_civic_prog[:, r] = torch.where(fin, self.r_civic_prog[:, r] - cost_c, self.r_civic_prog[:, r])
                 self.r_cur_civic[:, r] = torch.where(fin, torch.full_like(curc, -1), self.r_cur_civic[:, r])
-                picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c)
+                picked = self._auto_pick(self.r_cur_civic[:, r], self.r_civics[:, r], nb_c, rdv.c_cost, self._prereq_c, golden_civ=r + 1, is_civic=True)  # #51/S5.5 (B-24): THIS rival's golden dedication, not civ 0's
                 self.r_cur_civic[:, r] = torch.where(auto_r, picked, self.r_cur_civic[:, r])
             no_c = active & (self.r_cur_civic[:, r] == -1) & ~self._available_mask(self.r_civics[:, r], self._prereq_c).any(dim=1)
             self.r_civic_prog[:, r] = torch.where(no_c, torch.minimum(self.r_civic_prog[:, r], torch.zeros_like(self.r_civic_prog[:, r])), self.r_civic_prog[:, r])
@@ -13837,6 +13858,12 @@ class BatchSim:
                     pts = (comp_c.double() * (1.0 + gflat + nb_of.double())).sum(dim=1)
                 else:
                     pts = torch.zeros(B, dtype=torch.float64, device=dev)
+                # #51/S5.5 (B-24): golden EXODUS pays +4 PROPHET points a turn,
+                # civ-wide and district-free — greatPersonPointsPerTurn adds it
+                # OUTSIDE its per-city loop, so it joins `pts` before the
+                # `pts > 0` guard rather than after it.
+                if cls == self._prophet_cls:
+                    pts = pts + self._golden_ded(r + 1, self._ded_exodus).double() * 4.0
                 self.r_gpp[:, r, cls] = torch.where(
                     active & (pts > 0), self.r_gpp[:, r, cls] + pts, self.r_gpp[:, r, cls]
                 )

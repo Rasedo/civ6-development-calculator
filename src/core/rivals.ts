@@ -69,7 +69,7 @@ import { districtCostIn, goldAffordable, buildingFaithCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, WW_SURPRISE_MULT, WW_FORMAL_MULT, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
-import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles } from './eras';
+import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints, goldenCulturePerDistrict } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount } from './seats';
 
 const ok: RuleResult = { ok: true };
@@ -816,6 +816,10 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
         continue;
       accrue += 1 + gppFlat + rc.buildings.filter((b) => BUILDINGS[b]?.district === gpDist).length;
     }
+    // #51/S5.5 (B-24): golden EXODUS pays +4 PROPHET points a turn, civ-wide
+    // and district-free — greatPersonPointsPerTurn adds it OUTSIDE its
+    // per-city loop, so it lands here before the `accrue > 0` guard.
+    if (cls === 'PROPHET') accrue += goldenProphetPoints(state, civOfRival(rival.id));
     if (accrue > 0) rival.gpp[cls] = (rival.gpp[cls] ?? 0) + accrue;
     // P5/S5 (C-16): the player's advanceGreatPeople loop — overflow KEPT
     // (pts −= cost, not zeroed) and the person's effect lands in the
@@ -1950,6 +1954,20 @@ export function rivalCityYields(
   total.culture += greatWorkCulture(rc);
   total.faith += relicFaith(rc); // B-20 (#73): relics pay faith, the city.ts twin position
   total.culture += artifactCulture(rc); // B-20 (#79): artifacts pay culture, the city.ts twin
+  // #51/S5.5 (B-24): golden PEN, BRUSH AND VOICE — +1 Culture per COMPLETED
+  // SPECIALTY district, the city.ts:582 twin at the same position. The
+  // specialty set is `countsTowardLimit && districtComplete`, matching
+  // completedDistrictCount(specialtyOnly) exactly.
+  {
+    const pb = goldenCulturePerDistrict(state, civOfRival(rival.id));
+    if (pb > 0) {
+      total.culture +=
+        pb *
+        rc.districts.filter(
+          (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
+        ).length;
+    }
+  }
   // A-4: wonder flat city yields + the belief faithPerWonder (city.ts:435-437
   // positions — pre-tier, with the buildings).
   for (const wd of rcWonders) {
@@ -3208,22 +3226,28 @@ export function rivalPhase(state: GameState): void {
     const rsr = rival.research;
     // A-3: cheapest-first by EFFECTIVE cost, like the player's auto-pick
     // (boosts discount the pick key; stable sort keeps table-order ties).
+    // #51/S5.5 (B-24): the golden FREE_INQUIRY / PEN_BRUSH_AND_VOICE extra
+    // 10% belongs to THIS rival, not to civ 0. It is in the pick KEY as well
+    // as the completion test because the discount changes which item is
+    // cheapest — that is exactly what #79's hunt found on the player side.
+    const gTech = goldenBoostBonus(state, civOfRival(rival.id), false);
+    const gCivic = goldenBoostBonus(state, civOfRival(rival.id), true);
     const pickNext = () => {
       if (rsr.tech === null)
         rsr.tech = availableTechsIn(rsr).sort(
-          (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost) - effectiveResearchCostIn(rsr, b.id, b.cost),
+          (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost, gTech) - effectiveResearchCostIn(rsr, b.id, b.cost, gTech),
         )[0]?.id ?? null;
       if (rsr.civic === null)
         rsr.civic = availableCivicsIn(rsr).sort(
-          (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost) - effectiveResearchCostIn(rsr, b.id, b.cost),
+          (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost, gCivic) - effectiveResearchCostIn(rsr, b.id, b.cost, gCivic),
         )[0]?.id ?? null;
     };
     pickNext();
     rsr.techProgress += sciSum;
     // A-3: boosted techs complete at the discounted cost, like the player's
     // advanceResearch (effectiveResearchCostIn — same rounding).
-    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost)) {
-      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost);
+    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech)) {
+      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech);
       rsr.techs.push(rsr.tech);
       rsr.tech = null;
       pickNext();
@@ -3259,8 +3283,8 @@ export function rivalPhase(state: GameState): void {
       }
       if (victim) disbandUnit(state, victim.id);
     }
-    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost)) {
-      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost);  // A-3
+    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic)) {
+      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic);  // A-3
       rsr.civics.push(rsr.civic);
       rsr.civic = null;
       pickNext();

@@ -436,6 +436,17 @@ three engine comments claiming otherwise are corrected) and the recorded
 residual: the other three golden faces are still called with a hardcoded
 civ 0, so a rival gets the movement bonus but not the research discount.
 
+**S5.5 — the other three golden faces, per seat. DONE.** That residual closed
+in the same session: FREE_INQUIRY / PEN_BRUSH_AND_VOICE's extra 10% now joins
+the rival research path at all four sites (both auto-picks and both completion
+tests — the pick KEY needs it as much as the test, which is #79's own bug (1)),
+EXODUS's +4 PROPHET points join `claimGreatPeople` before its `accrue > 0`
+guard, and PEN_BRUSH's +1 culture per specialty district joins BOTH rival-yield
+paths at the city.ts twin position. The rivals got measurably stronger: the
+exporter threw on seed 9054 (index 4 lost every player city by t250) and it was
+rerolled to 9056 through SEED_OVERRIDES, the documented mechanism for exactly
+this. See the B-24 entry in gpu/AUDIT.md.
+
 ---
 
 ### ROUND 5 — Movement points *(original plan, for reference)*

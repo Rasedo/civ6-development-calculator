@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { PLAYER_CIV, BARB_SEAT, civOfRival } from '../src/core/seats';
-import { createGame, foundCity } from '../src/core/game';
+import { PLAYER_CIV, BARB_SEAT, civOfRival, rivalsOf } from '../src/core/seats';
+import { createGame, foundCity, endTurn } from '../src/core/game';
 import { scoreSettleSites } from '../src/core/advisor';
 import { spawnUnit, refreshUnits, unitFullMoves } from '../src/core/units';
-import { GOLDEN_MOVE_BONUS, DED_MONUMENTALITY, DED_EXODUS } from '../src/data/rivals';
+import { GOLDEN_MOVE_BONUS, DED_MONUMENTALITY, DED_EXODUS, DED_FREE_INQUIRY } from '../src/data/rivals';
+import { goldenBoostBonus } from '../src/core/eras';
+import { effectiveResearchCostIn } from '../src/core/boosts';
+import { TECHS } from '../src/data/techs';
 import { UNITS } from '../src/data/units';
 import type { GameState, Unit } from '../src/core/types';
 
@@ -125,5 +128,51 @@ describe('B-24 golden movement dedications', () => {
     refreshUnits(state);
     expect(b.movesLeft).toBe(UNITS.BUILDER.moves + GOLDEN_MOVE_BONUS);
     expect(b.movesFull).toBe(b.movesLeft);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #51/S5.5 — the OTHER three golden faces were wired with a hardcoded civ 0,
+// so a rival in a Golden age got the research discount, the prophet points and
+// the culture of a civ that was not it. These are CALL-SITE tests: the helpers
+// were always civ-keyed; what was broken was who they were asked about.
+// ---------------------------------------------------------------------------
+
+describe('B-24 golden dedications reach the rival that committed them', () => {
+  function rivalRun(kind: number | null, turns: number): GameState {
+    const state = newGame();
+    if (kind !== null) golden(state, civOfRival(0), kind);
+    for (let t = 0; t < turns; t++) {
+      if (kind !== null) golden(state, civOfRival(0), kind); // survive era boundaries
+      endTurn(state);
+    }
+    return state;
+  }
+
+  it('EXODUS pays a RIVAL +4 Great Prophet points a turn', () => {
+    const T = 6;
+    const withDed = rivalRun(DED_EXODUS, T);
+    const without = rivalRun(null, T);
+    const a = rivalsOf(withDed)[0].gpp.PROPHET ?? 0;
+    const b = rivalsOf(without)[0].gpp.PROPHET ?? 0;
+    expect(a - b).toBe(4 * T);
+  });
+
+  it('FREE_INQUIRY discounts a RIVAL boosted tech by an extra 10%', () => {
+    const state = newGame();
+    const rival = rivalsOf(state)[0];
+    const id = rival.research.techs.length ? null : Object.keys(TECHS)[0];
+    expect(id).toBeTruthy();
+    rival.research.boosted.push(id!);
+    const base = TECHS[id!].cost;
+    const plain = effectiveResearchCostIn(rival.research, id!, base);
+    golden(state, civOfRival(0), DED_FREE_INQUIRY);
+    const g = goldenBoostBonus(state, civOfRival(0), false);
+    expect(g).toBeGreaterThan(0);
+    expect(effectiveResearchCostIn(rival.research, id!, base, g)).toBeLessThan(plain);
+    // ...and the PLAYER's Golden age does not pay for the rival
+    const other = newGame();
+    golden(other, 0, DED_FREE_INQUIRY);
+    expect(goldenBoostBonus(other, civOfRival(0), false)).toBe(0);
   });
 });
