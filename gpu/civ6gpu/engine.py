@@ -15789,7 +15789,28 @@ class BatchSim:
             cap_ok = self.alive.sum(dim=1) < 6
             hole = first_argmax((~self.alive).long())
             slot_new = torch.where(self.founded_n < C, self.founded_n, hole)
-            ok = free & (dcity.min(dim=1).values >= 4) & (drc.min(dim=1).values >= 4) & cap_ok  # P4/D-5: CITY_MIN_DIST = 4
+            # #51/S7.3f: the two canFoundCity clauses this mask never carried,
+            # though the comment above already claimed one of them.
+            #  * NO DISTRICT on the tile (`if (tile.district) return no(...)`).
+            #  * >= CITY_MIN_DIST from a CITY-STATE CENTRE. `free` above tests
+            #    city-state TERRITORY, which is not the same thing: a minor's
+            #    borders can be pushed back or never claimed, leaving its centre
+            #    legal to settle beside.
+            # Both are legality clauses the SCRIPTED player already obeys because
+            # export-gpu.ts pre-bakes its site list from canFoundCity itself, so
+            # this is latent for the gate and load-bearing for the RL head, which
+            # picks sites from the mask.
+            no_district = self.district.gather(1, sc.unsqueeze(1)).squeeze(1) < 0
+            cs_ctr = self.cs_center[:, : max(self.S, 1)].clamp(min=0)
+            dcs = torch.where(
+                self.cs_alive[:, : max(self.S, 1)],
+                self.pair_dist[sc.unsqueeze(1), cs_ctr].to(torch.long),
+                torch.full_like(cs_ctr, 999),
+            )
+            ok = (
+                free & (dcity.min(dim=1).values >= 4) & (drc.min(dim=1).values >= 4)
+                & no_district & (dcs.min(dim=1).values >= 4) & cap_ok
+            )  # P4/D-5: CITY_MIN_DIST = 4
             valid = can & ok
             self.next_site_ptr.add_(can.long())  # consumed either way
             if not bool(valid.any()):
