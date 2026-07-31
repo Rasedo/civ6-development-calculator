@@ -13757,6 +13757,12 @@ class BatchSim:
                         self.rc_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_cost[:, r, j]), self.rc_cost[:, r, j])
                         found_s = done_q & (cur == 0)
                         if bool(found_s.any()):
+                            # #51/S4.1r: the settler's POPULATION COST — the
+                            # producing city pays 1, floored at 1, exactly as the
+                            # player's does.
+                            self.rc_pop[:, r, j] = torch.where(
+                                found_s, (self.rc_pop[:, r, j] - 1).clamp(min=1), self.rc_pop[:, r, j]
+                            )
                             _nb_s = self.rc_alive[:, r].sum(dim=1)
                             self._rival_try_found(r, found_s)
                             # #51/S4.1r: BANK the paid settler that found no
@@ -16136,7 +16142,7 @@ class BatchSim:
     # only as civ-level SUMS before, which is how #71's rFaith and #79's
     # rGScore1 each survived several green gates — a sum cancels two opposite
     # per-city errors.
-    _TRACE_RC_MAX = 12  # MEASURED: max 8 rival cities over 12 seeds x 250 turns; asserted, never silently truncated
+    _TRACE_RC_MAX = 16  # MEASURED: max 8 rival cities over 12 seeds x 250 turns; WIDENED 12->16 by #51/S4.1r (a rival reached 13 once the settler pop cost shifted trajectories); asserted, never silently truncated
     _TRACE_PER_RIVAL_CITY = [
         "pop", "owned", "bldgs", "acquired", "foodBox", "cultureBox", "hp", "loyalty",
         "followed", "progress", "cost",
