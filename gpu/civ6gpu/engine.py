@@ -432,7 +432,7 @@ _MUTABLE = [
     # #51/S3.3: the merged unit pool. The BASES are registered, never the
     # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
     # plane instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
+    "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
     # #51/S4.2: per-seat scalar bases (the x / r_x views live on these)
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_war_weariness", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
 ]
@@ -981,6 +981,7 @@ class BatchSim:
         self.UNIT_MAX = P_MAX + 2 * U_MAX
         self.POOL_LO = {"p": 0, "v": P_MAX, "u": P_MAX + U_MAX}
         self.POOL_HI = {"p": P_MAX, "v": P_MAX + U_MAX, "u": P_MAX + 2 * U_MAX}
+        self._UNIT_PLANES: list = []
         for _pl, _dt in (
             ("alive", torch.bool),      # a slot holds a living unit
             ("acted", torch.bool),      # P4/D-2: spent MP since the last refresh (blocks healing)
@@ -992,6 +993,13 @@ class BatchSim:
             ("xp", torch.long),         # B-4: combat experience
             ("charges", torch.long),    # builder/missionary charges
             ("aura_mp", torch.long),    # #70/S3 (B-8): frozen general/admiral +MP
+            # #51/S5.1: MOVEMENT POINTS as state. Every walker used to hold
+            # the remainder in a local and rebuild the full pool from
+            # _p_moves[type] each turn, so "how much movement has this unit
+            # left?" was unanswerable between phases. INERT here: the values
+            # and the arithmetic are unchanged, only where they live.
+            ("mp", torch.long),
+            ("mp_full", torch.long),
             # #51/S3.3: the OWNER of whatever sits in this slot, in the SAME
             # absolute seat space TS uses (0 player, 1..99 rivals, 200 barbs).
             # Today a unit's owner is implied by which slot RANGE it lives in,
@@ -1003,6 +1011,7 @@ class BatchSim:
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
+            self._UNIT_PLANES.append(_pl)
             for _pre in ("p", "v", "u"):
                 setattr(self, f"{_pre}_{_pl}", _base[:, self.POOL_LO[_pre]:self.POOL_HI[_pre]])
                 # S0.4 built this net for exactly this moment: assert forever
@@ -7395,6 +7404,8 @@ class BatchSim:
             # split at seed 9287 t250.
             full_mp = self._p_moves[self.u_type[:, u].clamp(min=0, max=self.NU - 1)]
             mp = full_mp.clone()
+            self.u_mp_full[:, u] = full_mp  # #51/S5.1
+            self.u_mp[:, u] = mp
             cur = here.clone()
             d_cur = d_here.clone()
             moving = march & has_tgt
@@ -7436,6 +7447,7 @@ class BatchSim:
                 self.u_tile[rows, u] = dest[rows]
                 self.u_acted[rows, u] = True  # P4/D-2
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
+                self.u_mp[:, u] = mp  # #51/S5.1
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 # AUDIT B-26/B-3 ZOC (ROUND B10): a march step ending adjacent
@@ -7444,6 +7456,7 @@ class BatchSim:
                 # check now that barbs obey ZOC. No new draws (pure geometry).
                 zoc = mv & self._in_enemy_zoc(cur, BARB_SEAT)
                 mp = torch.where(zoc, torch.zeros_like(mp), mp)
+                self.u_mp[:, u] = mp  # #51/S5.1
                 moving = mv & (mp > 0)
 
         # AUDIT B-2: a PLAYER city with ANCIENT_WALLS fires once/turn at the
@@ -8481,6 +8494,8 @@ class BatchSim:
             # refresh-site SNAPSHOT (never recomputed here — generals move).
             full_mp = self._p_moves[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] + self.v_aura_mp[:, u]
             mp = full_mp.clone()
+            self.v_mp_full[:, u] = full_mp  # #51/S5.1
+            self.v_mp[:, u] = mp
             cur = here.clone()
             d_cur = self.pair_dist[here, tgt].to(torch.long)
             moving = walk
@@ -8516,6 +8531,7 @@ class BatchSim:
                 # B-3 ZOC: the builder (a civilian mover) halts adjacent to a
                 # hostile military unit too — only the EXERTER must be military.
                 mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
+                self.v_mp[:, u] = mp  # #51/S5.1
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
@@ -8772,6 +8788,8 @@ class BatchSim:
             # #70/S3 (B-8): + the frozen aura MP (0 for a civilian missionary).
             full_mp = self._p_moves[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] + self.v_aura_mp[:, u]
             mp = full_mp.clone()
+            self.v_mp_full[:, u] = full_mp  # #51/S5.1
+            self.v_mp[:, u] = mp
             cur = here.clone()
             d_cur = d0.clone()
             moving = walk
@@ -8807,6 +8825,7 @@ class BatchSim:
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile
                 # military unit — only the EXERTER must be military.
                 mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
+                self.v_mp[:, u] = mp  # #51/S5.1
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > 1)
@@ -8861,6 +8880,8 @@ class BatchSim:
             # which _refresh_aura_mp screens out (TS inGeneralAura agrees).
             full_mp = self._p_moves[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] + self.v_aura_mp[:, u]
             mp = full_mp.clone()
+            self.v_mp_full[:, u] = full_mp  # #51/S5.1
+            self.v_mp[:, u] = mp
             cur = here.clone()
             d_cur = d0.clone()
             moving = act & (d_cur > rng)
@@ -8895,6 +8916,7 @@ class BatchSim:
                 mp = torch.where(mv, (mp - cost).clamp(min=0), mp)
                 # B-3 ZOC: a civilian mover halts adjacent to a hostile military unit.
                 mp = torch.where(mv & self._in_enemy_zoc(dest, r + 1), torch.zeros_like(mp), mp)
+                self.v_mp[:, u] = mp  # #51/S5.1
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0) & (d_cur > rng)
@@ -11205,6 +11227,8 @@ class BatchSim:
         # that walks later this step cannot retro-change this pool.
         full_mp = full_mp + self.v_aura_mp[:, v]
         mp = full_mp.clone()
+        self.v_mp_full[:, v] = full_mp  # #51/S5.1
+        self.v_mp[:, v] = mp
         cur = here.clone()
         d_cur = d_here.clone()
         emb = emb0.clone()
@@ -11265,6 +11289,7 @@ class BatchSim:
             # B-3 ZOC: a march step ending adjacent to a hostile military unit
             # halts (movesLeft:=0 after paying the enter cost above).
             mp = torch.where(mv & self._in_enemy_zoc(dest, self.v_seat[:, v]), torch.zeros_like(mp), mp)
+            self.v_mp[:, v] = mp  # #51/S5.1
             d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
@@ -11659,6 +11684,8 @@ class BatchSim:
             full_mp = self._p_moves[vt0]
         full_mp = full_mp + self.v_aura_mp[:, v]  # #70/S3 (B-8), the war-march mirror (after the embark selection)
         mp = full_mp.clone()
+        self.v_mp_full[:, v] = full_mp  # #51/S5.1
+        self.v_mp[:, v] = mp
         cur = here.clone()
         emb = emb0.clone()
         moving = patrol & (hkey.min(dim=1).values < 10**9)
@@ -11730,6 +11757,7 @@ class BatchSim:
             # B-3 ZOC: a patrol step adjacent to a hostile military unit halts
             # (at peace only barbarians exert it — aw is False here).
             mp = torch.where(mv & self._in_enemy_zoc(dest, self.v_seat[:, v]), torch.zeros_like(mp), mp)
+            self.v_mp[:, v] = mp  # #51/S5.1
             cur = torch.where(mv, dest, cur)
             moving = mv & (mp > 0)
         if self._embark_live:
@@ -14280,12 +14308,17 @@ class BatchSim:
         draws unchanged). Tile->slot maps remap by VALUE through the
         inverse permutation — no semantic rebuild. CIV6_RECLAIM_AT lowers
         the trigger for forced-compaction validation gates."""
-        if prefix == "u":
-            fields, counter, maps = ["u_acted", "u_type", "u_tile", "u_hp", "u_fortify", "u_seat"], "next_slot", []
-        elif prefix == "v":
-            fields, counter, maps = ["v_acted", "v_civ", "v_seat", "v_type", "v_tile", "v_hp", "v_charges", "v_fortify", "v_xp", "v_aura_mp", "v_emb"], "v_next", []
-        else:
-            fields, counter, maps = ["p_acted", "p_seat", "p_type", "p_tile", "p_hp", "p_charges", "p_fortify", "p_xp", "p_aura_mp", "p_emb"], "p_next", []
+        # #51/S5.1: the field list is DERIVED from the pool's plane list, not
+        # transcribed. Three hand-written lists is the exact shape of the bug
+        # that lost rc_relics to a compaction (see _RC_SLOT_FIELDS below), and
+        # the "u" list had already drifted — it omitted xp/charges/aura_mp/emb,
+        # which S3.2 gave the barbarian pool. `alive` permutes separately, and
+        # v_civ is the one field that is not a merged plane.
+        counter = {"u": "next_slot", "v": "v_next"}.get(prefix, "p_next")
+        maps: list = []
+        fields = [f"{prefix}_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
+        if prefix == "v":
+            fields.append("v_civ")
         alive = getattr(self, f"{prefix}_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept
