@@ -65,6 +65,7 @@ def main() -> None:
     sim.r_route_dest[0, 0, 0] = dest_tile
     sim.r_route_exp[0, 0, 0] = int(sim.turn) + sim._trade_duration
     sim.r_atwar[0, 0] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim._rival_route_cache = None
     inc = sim._rival_route_income(0)
     assert inc is not None, "income must resolve with an active route"
@@ -76,10 +77,12 @@ def main() -> None:
 
     # destination-civ interdiction: war with the player suspends the income
     sim.r_atwar[0, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim._rival_route_cache = None
     inc = sim._rival_route_income(0)
     assert inc is None or abs(float(inc[0, 0, 2])) < 1e-9, "intl income must be suspended at war"
     sim.r_atwar[0, 0] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
 
     # a completed player specialty district raises the income by 1 gold/district
     own = (sim.owner[0] == 0)  # capital-owned tiles

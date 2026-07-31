@@ -61,10 +61,12 @@ def build(rules, path, steps: int = 18, dtype=torch.float64):
 def clear_pairs(sim):
     """Wipe every pair-war artifact so a poke starts from a clean matrix."""
     sim.rr_war[:] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.rr_warkind[:] = False
     sim.rr_denounced[:] = -1
     sim.r_war_weariness[:] = 0
     sim.r_atwar[:] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
 
 
 def keep_capital_only(sim, r) -> int:
@@ -115,6 +117,7 @@ def poke_substrate(rules, path):
     snap = sim.snapshot()
     w0, k0, d0 = sim.rr_war.clone(), sim.rr_warkind.clone(), sim.rr_denounced.clone()
     sim.rr_war[:] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.rr_warkind[:] = True
     sim.rr_denounced[:] = 7
     sim.restore(snap)
@@ -138,6 +141,7 @@ def poke_denounce(rules, path):
 
     sim.rr_denounced[0, 0, 1] = -1
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True  # at-war pairs skip
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim._rival_rival_denounce()
     assert int(sim.rr_denounced[0, 0, 1]) == -1, "an at-war pair must not denounce"
     print("  b denounce OK (turn-stamped, directed, once, war-gated)")
@@ -187,6 +191,7 @@ def poke_peace(rules, path):
     sim, _, _ = controlled_pair(rules, path)
     peace_ww = int(sim.rules.rivals.get("rrPeaceWw", 10))
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.rr_warkind[0, 0, 1] = sim.rr_warkind[0, 1, 0] = True
     sim.rr_denounced[0, 0, 1] = 2
 
@@ -212,6 +217,7 @@ def poke_ww_differential(rules, path):
     decay, cap = int(rww.get("decay", 4)), int(rww.get("cap", 16))
 
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True  # SURPRISE (kind False)
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     snap = sim.snapshot()
     sim._rival_phase()
     assert int(sim.r_war_weariness[0, 0]) == per * s_mult and int(sim.r_war_weariness[0, 1]) == per * s_mult, (
@@ -225,6 +231,7 @@ def poke_ww_differential(rules, path):
 
     sim.restore(snap)
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False  # full peace decays
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.r_war_weariness[0, 0] = decay + 1
     sim._rival_phase()
     assert int(sim.r_war_weariness[0, 0]) == 1, f"full peace must decay ww by {decay}"
@@ -232,6 +239,7 @@ def poke_ww_differential(rules, path):
     sim.restore(snap)
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False  # PLAYER war: the pristine x1 axis
     sim.r_atwar[0, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim._rival_phase()
     assert int(sim.r_war_weariness[0, 0]) == per * f_mult, "the player-war axis must stay at the x1 baseline"
 
@@ -326,6 +334,7 @@ def main() -> None:
     assert int(s3.p_warmonger[0]) == 7, "p_warmonger must survive snapshot/restore"
     # decay only at peace on EVERY axis, floored at 0
     s3.r_atwar[:] = False
+    s3.sync_war()  # #51/S4.3: pokes write the legacy stores
     s3.p_warmonger[:] = 2
     s3.step()
     assert int(s3.p_warmonger[0]) <= 1, "grievances must decay at peace"

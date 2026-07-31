@@ -511,6 +511,7 @@ def poke_messenger_route(rules, rj, path):
     E = enh_rows(sim)
     sim.r_religion_done[:, r] = True
     sim.r_atwar[:, r] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.u_alive[:] = False
     sim.occ_mil[:] = -1  # no raiders suspend the route + sim.POOL_LO["u"]
 

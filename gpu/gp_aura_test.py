@@ -272,6 +272,7 @@ def poke_aura_in_combat(rules, rj, path):
         gi = sim._general_unit_idx
         clear_all_units(sim)
         sim.r_atwar[:, 0] = True
+        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
         ctr = int(sim.site[0, 0])
         # player defender at a free tile; rival attacker adjacent to it
         dtile = tile_within(sim, ctr, 4)
@@ -316,6 +317,7 @@ def poke_rival_walk(rules, rj, path):
     rng = sim._gen_aura_range
     clear_all_units(sim)
     sim.r_atwar[:, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     ctr = int(sim.site[0, 0])  # player capital = the war-march target
     start = tile_within(sim, ctr, 6)
     if start < 0:
@@ -331,6 +333,7 @@ def poke_rival_walk(rules, rj, path):
     sim2 = build(rules, path)
     clear_all_units(sim2)
     sim2.r_atwar[:, 0] = False
+    sim2.sync_war()  # #51/S4.3: pokes write the legacy stores
     u2 = place_rciv(sim2, 0, start, gi)
     sim2._rival_general_actions(0, torch.tensor([True]))
     assert int(sim2.v_tile[0, u2]) == start, "general moved at peace (must hold)"
@@ -345,6 +348,7 @@ def poke_capture(rules, rj, path):
     gi = sim._general_unit_idx
     clear_all_units(sim)
     sim.r_atwar[:, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     ctr = int(sim.site[0, 0])
     gtile = tile_within(sim, ctr, 4)
     atile = adj_free(sim, gtile, banned=[ctr])

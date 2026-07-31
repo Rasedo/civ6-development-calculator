@@ -125,6 +125,7 @@ def build_strike_scene(rules, path):
     sim.v_civ[0, vslot] = 0
     sim.v_emb[0, vslot] = False
     sim.r_atwar[0, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     return sim, enc_tile, tgt, vslot
 
 

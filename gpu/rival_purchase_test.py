@@ -78,6 +78,7 @@ def prep_peace(sim) -> None:
     sim.rc_progress[:, R] = 0.0
     sim.rc_cost[:, R] = 0.0
     sim.r_atwar[:, R] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
 
 
 def empty_land_tiles(sim, k: int) -> list[int]:

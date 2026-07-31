@@ -185,6 +185,7 @@ def poke_galley_city(rules, path, GALLEY):
         sim.step()
     r, j, ctr = first_rival_city(sim)
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     # the center must hold no unit (else the melee hits the occupant / civilian)
     clear_tile(sim, ctr)
     wt = empty_neighbor(sim, ctr)
@@ -262,6 +263,7 @@ def poke_quadrireme_unit(rules, path, QUAD, WARRIOR):
     assert float(sim._p_rng_str[QUAD]) > 0 and bool(sim.unit_naval[QUAD]), "quadrireme must be a naval ranged unit"
     r, j, ctr = first_rival_city(sim)
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     # a defender tile + an adjacent water tile for the ship (both cleared/empty)
     dt = empty_neighbor(sim, ctr)
     assert dt >= 0
@@ -289,6 +291,7 @@ def poke_quadrireme_city(rules, path, QUAD):
         sim.step()
     r, j, ctr = first_rival_city(sim)
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     clear_tile(sim, ctr)
     wt = empty_neighbor(sim, ctr)
     assert wt >= 0
@@ -320,6 +323,7 @@ def poke_player_naval(rules, path, GALLEY, WARRIOR):
         sim.step()
     r, j, ctr = first_rival_city(sim)
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     # spawn: an anchor land tile with exactly one free WATER neighbour -> the
     # naval probe skips the (land) anchor and lands the ship on the water tile.
     anchor = empty_neighbor(sim, ctr)  # a free land-ish neighbour of the city
@@ -436,6 +440,7 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     sim.buildings[0, c, sim._walls_bidx] = True
     r = 0
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
 
     # -- ship struck: isolate the wall strike (no barb / other-rival confounds).
     neutralize_barbs(sim)
@@ -476,6 +481,7 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     # make rival r the ONLY aggressor; strip its army/economy so nothing else fires
     sim.r_atwar[:] = False
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     clear_all_rival_units(sim)
     sim.u_alive[:] = False
     _pl = sim.occ_mil  # #51: clear only this pool's entries
@@ -522,6 +528,7 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
         sim.step()
     r = 0
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     # a land tile for the player warrior + an adjacent (water) tile for the
     # embarked rival builder.
     r2, j, ctr = first_rival_city(sim)
@@ -564,6 +571,7 @@ def poke_flank_support(rules, path, GALLEY):
         sim.step()
     r = 0
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     # an isolated defender tile whose six neighbours are on-map and empty.
     dt = -1
     for t in range(sim.T):

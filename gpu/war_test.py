@@ -78,6 +78,11 @@ def test_declare(rules, path):
     # equivalence: poke declareWar's exact effect, then step plain
     sim.restore(snap)
     sim.r_atwar[:, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    # #51/S4.3: the poke must move the war MATRIX too — it is the
+    # representation the engine reads now.
+    sim.war[:, 0, 1 + (0)] = True
+    sim.war[:, 1 + (0), 0] = True
     sim.r_warturns[:, 0] = 0
     sim.step()
     d = drift(sim, after)
@@ -111,6 +116,11 @@ def test_peace(rules, path):
     sim.restore(snap)
     sim.treasury = sim.treasury - cost
     sim.r_atwar[:, 0] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    # #51/S4.3: the poke must move the war MATRIX too — it is the
+    # representation the engine reads now.
+    sim.war[:, 0, 1 + (0)] = False
+    sim.war[:, 1 + (0), 0] = False
     sim.r_warturns[:, 0] = 0
     sim.r_peaceturns[:, 0] = 0
     sim.step()
@@ -119,6 +129,11 @@ def test_peace(rules, path):
     # broke → column closed
     sim.treasury[:] = 0.0
     sim.r_atwar[:, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    # #51/S4.3: the poke must move the war MATRIX too — it is the
+    # representation the engine reads now.
+    sim.war[:, 0, 1 + (0)] = True
+    sim.war[:, 1 + (0), 0] = True
     sim.r_warturns[:, 0] = need + 1
     assert not bool(sim.war_mask()[0, sim.R]), "peace column open at 0 gold"
     print(f"  sue-for-peace OK (cost {cost:.0f} at warTurns {wt}, bit-equal transition)")
@@ -135,6 +150,11 @@ def test_capture_plunder(rules, path):
     assert len(idx), "no rival city by t20 on this seed"
     r = int(idx[0, 0])
     sim.r_atwar[0, r] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    # #51/S4.3: the poke must move the war MATRIX too — it is the
+    # representation the engine reads now.
+    sim.war[0, 0, 1 + (r)] = True
+    sim.war[0, 1 + (r), 0] = True
     caps = 0
     # capture rival r's cities one by one until eliminated (or player slots full)
     while bool(sim.rc_alive[0, r].any()) and bool((~sim.alive[0]).any()):
@@ -159,6 +179,11 @@ def test_capture_plunder(rules, path):
         r2, j2 = int(idx2[0, 0]), int(idx2[0, 1])
         sim.alive[0, :] = True
         sim.r_atwar[0, r2] = True
+        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+        # #51/S4.3: the poke must move the war MATRIX too — it is the
+        # representation the engine reads now.
+        sim.war[0, 0, 1 + (r2)] = True
+        sim.war[0, 1 + (r2), 0] = True
         t1 = float(sim.treasury[0])
         sim._capture_rival_city(
             torch.tensor([0]), torch.tensor([r2]), torch.tensor([j2]),

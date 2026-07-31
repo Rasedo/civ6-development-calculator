@@ -125,6 +125,7 @@ def prep_levy(sim, s: int, envoys: int = 5) -> None:
     clear_queues(sim)
     sim.r_atwar[0, R] = True
     sim.r_atwar[0, OTHER] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.r_treasury[0, OTHER] = 0.0  # the shared v_next pool must not grow from OTHER's buys
     make_suzerain_mil(sim, s, envoys)
     meet_quota(sim, R)
@@ -173,6 +174,7 @@ def main() -> None:
     sim.restore(base)
     prep_levy(sim, S0)
     sim.r_atwar[0, R] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.r_treasury[0, R] = cost
     sim._rival_phase()
     assert int(sim.cs_last_levy[0, S0]) != T, "L2: a peaceful rival levied"

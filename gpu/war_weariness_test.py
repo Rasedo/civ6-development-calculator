@@ -41,17 +41,20 @@ def main() -> None:
     for _ in range(8):
         sim.step()
     sim.r_atwar[:] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.war_weariness[:] = 0
     sim.r_war_weariness[:] = 0
 
     # --- accrual: force rival 0 to war, step, watch the accumulator climb ------
     sim.r_atwar[:, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     base_p = int(sim.war_weariness[0])
     base_r = int(sim.r_war_weariness[0, 0])
     # Step across the first amenity threshold (PER_AMENITY war turns).
     penalties_seen = []
     for k in range(1, per_amen + 2):
         sim.r_atwar[:, 0] = True  # keep the war live each turn
+        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
         sim.step()
         pw = int(sim.war_weariness[0])
         pen = pw // per_amen
@@ -66,6 +69,7 @@ def main() -> None:
     # --- cap: sustained war saturates at the ceiling ---------------------------
     for _ in range(cap + 5):
         sim.r_atwar[:, 0] = True
+        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
         sim.step()
     assert int(sim.war_weariness[0]) == cap, f"player weariness must saturate at cap {cap}, got {int(sim.war_weariness[0])}"
     assert int(sim.r_war_weariness[0, 0]) == cap, "rival weariness must saturate at cap"
@@ -75,6 +79,7 @@ def main() -> None:
     # war state before this phase's organic re-declaration), so the accumulators
     # can only fall — otherwise an organic war restart would resume accrual.
     sim.r_atwar[:] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     before = int(sim.war_weariness[0])
     sim.step()
     after = int(sim.war_weariness[0])
@@ -83,6 +88,7 @@ def main() -> None:
     # --- floor: decay never goes negative --------------------------------------
     for _ in range(cap):
         sim.r_atwar[:] = False  # hold peace so accrual can't restart organically
+        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
         sim.step()
     assert int(sim.war_weariness[0]) == 0, "player weariness must floor at 0"
 

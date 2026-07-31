@@ -37,8 +37,10 @@ def main() -> None:
     assert sim.cs_atwar.shape == (sim.B, sim.S), f"cs_atwar shape {tuple(sim.cs_atwar.shape)}"
     assert not bool(sim.cs_atwar.any()), "peace is the default — no city-state starts at war"
     sim.cs_atwar[0, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     snap = sim.snapshot()
     sim.cs_atwar[0, 0] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.restore(snap)
     assert bool(sim.cs_atwar[0, 0]), "cs_atwar must survive snapshot/restore"
 
@@ -70,12 +72,14 @@ def main() -> None:
     b, cs, ctr, u, spot = found
     s2.p_tile[b, u] = spot
     s2.cs_atwar[b, cs] = False
+    s2.sync_war()  # #51/S4.3: pokes write the legacy stores
     m_peace = s2.unit_action_mask()[b, u, 6:12]
     dirs = [i for i, n in enumerate(s2.neigh[spot].tolist()) if n == ctr]
     assert dirs, "the planted tile is not adjacent to the centre"
     d = dirs[0]
     assert not bool(m_peace[d]), "a PEACEFUL city-state must never appear in the attack mask"
     s2.cs_atwar[b, cs] = True
+    s2.sync_war()  # #51/S4.3: pokes write the legacy stores
     m_war = s2.unit_action_mask()[b, u, 6:12]
     assert bool(m_war[d]), "after a declaration the city-state centre MUST be attackable"
     print("  a cs_atwar plane: peace default, _MUTABLE, snapshot round-trip OK")

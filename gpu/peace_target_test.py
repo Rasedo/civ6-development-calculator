@@ -92,9 +92,11 @@ def run(ranged: bool) -> None:
 
     # rival 0 is AT PEACE with the player, and AT WAR with rival 1.
     sim.r_atwar[0, 0] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     if sim.R > 1:
         sim.rr_war[0, 0, 1] = True
         sim.rr_war[0, 1, 0] = True
+        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
 
     before = int(sim.p_hp[0, p])
     att = torch.zeros(sim.B, dtype=torch.bool)
@@ -115,6 +117,7 @@ def run(ranged: bool) -> None:
     # ...and the SAME attack lands once war is declared, so the assertion above
     # is about the peace treaty and not about a broken scenario.
     sim.r_atwar[0, 0] = True
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     if ranged:
         sim._hostile_ranged_strike(att, tgt, "rival", v)
     else:
