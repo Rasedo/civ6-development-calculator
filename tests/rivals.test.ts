@@ -36,7 +36,7 @@ function addRival(
     aggression: 0.5,
     seat: 1,
     warmonger: 0,
-    warWeariness: 0,
+    ww: {}, wwTurn: {},
     diploFavor: 0,
     diploPoints: 0,
     influencePoints: 0,

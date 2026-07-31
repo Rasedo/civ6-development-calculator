@@ -473,8 +473,21 @@ export interface Seat {
   seat: number;
   /** Grievances others hold against this seat (B-22). */
   warmonger: number;
-  /** Accumulated war weariness (B-15). */
-  warWeariness: number;
+  /**
+   * War weariness points, PER WAR (B-15, #51/S7.8f). Keyed by the OPPONENT's
+   * absolute seat, because every rule that touches it is per-war: a battle
+   * scores against one enemy, `-50` decays a war in which nobody fought, and
+   * `-2000` is deducted when a peace treaty is signed with ONE civ. The
+   * amenity penalty reads the HIGHEST of them, never the sum — simultaneous
+   * wars score separately and only the worst one is felt.
+   *
+   * Absent key = 0. Integer-like keys, so JS iterates them in ascending
+   * numeric order on every engine — the serialisation is deterministic.
+   */
+  ww: Record<number, number>;
+  /** Turn of the last battle against that opponent (`ww`'s key space), so the
+   *  end-of-turn decay can tell a war being fought from a phoney one. */
+  wwTurn: Record<number, number>;
   /** Cumulative diplomatic favor (B-22). */
   diploFavor: number;
   /** Diplomatic victory points (B-22). */

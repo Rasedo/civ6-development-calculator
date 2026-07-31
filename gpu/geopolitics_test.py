@@ -64,7 +64,7 @@ def clear_pairs(sim):
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     sim.rr_warkind[:] = False
     sim.rr_denounced[:] = -1
-    sim.r_war_weariness[:] = 0
+    sim.ww[:] = 0
     sim.r_atwar[:] = False
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
 
@@ -175,12 +175,12 @@ def poke_anti_thrash(rules, path):
     peace_ww = int(sim.rules.rivals.get("rrPeaceWw", 10))
     ww_max = int(sim.rules.rivals.get("rrDowWwMax", 6))
 
-    sim.r_war_weariness[0, 1] = peace_ww + 1  # target would sue out the same turn
+    sim.ww[0, 2, 1] = peace_ww + 1  # target would sue out the same turn
     sim._rival_rival_declare_wars()
     assert not bool(sim.rr_war[0, 0, 1]), "a target past rrPeaceWw must never be declared on (same-turn thrash)"
 
     clear_pairs(sim)
-    sim.r_war_weariness[0, 0] = ww_max  # war-weary aggressor opens no front
+    sim.ww[0, 1, 2] = ww_max  # war-weary aggressor opens no front
     sim._rival_rival_declare_wars()
     assert not bool(sim.rr_war[0, 0, 1]), "an aggressor at rrDowWwMax must not declare"
     print(f"  d anti-thrash OK (target ww > {peace_ww} skipped; aggressor ww >= {ww_max} inert)")
@@ -195,11 +195,11 @@ def poke_peace(rules, path):
     sim.rr_warkind[0, 0, 1] = sim.rr_warkind[0, 1, 0] = True
     sim.rr_denounced[0, 0, 1] = 2
 
-    sim.r_war_weariness[0, 0] = peace_ww  # at the bar, not past -> war persists
+    sim.ww[0, 1, 2] = peace_ww  # at the bar, not past -> war persists
     sim._rival_rival_make_peace()
     assert bool(sim.rr_war[0, 0, 1]), "peace must not fire AT the threshold (strictly greater)"
 
-    sim.r_war_weariness[0, 0] = peace_ww + 1
+    sim.ww[0, 1, 2] = peace_ww + 1
     sim._rival_rival_make_peace()
     assert not bool(sim.rr_war[0, 0, 1]) and not bool(sim.rr_war[0, 1, 0]), "peace must clear rr_war both directions"
     assert not bool(sim.rr_warkind[0, 0, 1]) and not bool(sim.rr_warkind[0, 1, 0]), "the ended war's FORMAL flag must clear"
@@ -222,48 +222,63 @@ def poke_ww_differential(rules, path):
     is the unsourced number attached to it."""
     sim, _, _ = controlled_pair(rules, path, extra_for_a=False)  # 8 v 8: no organic DoW/denounce
     rww = sim.rules.war_weariness
-    per = int(rww.get("perTurn", 1))
-    decay, cap = int(rww.get("decay", 4)), int(rww.get("cap", 16))
+    at_war = int(rww["decayAtWar"])
+    at_peace = int(rww["decayAtPeace"])
 
+    # #51/S7.8f: a war DECLARED is not a war FOUGHT. This block used to assert
+    # a flat +1/turn on declaration; under the per-battle model a fresh war
+    # with no battle in it costs both sides NOTHING, and that is the shape the
+    # old model could not express.
     sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = True  # SURPRISE (kind False)
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     snap = sim.snapshot()
     sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == per and int(sim.r_war_weariness[0, 1]) == per, (
-        f"a SURPRISE war accrues the ONE rate {per}/turn (got "
-        f"{int(sim.r_war_weariness[0, 0])}/{int(sim.r_war_weariness[0, 1])})"
+    assert int(sim._ww_max(1)[0]) == 0 and int(sim._ww_max(2)[0]) == 0, (
+        f"a declared but UNFOUGHT war accrued weariness "
+        f"({int(sim._ww_max(1)[0])}/{int(sim._ww_max(2)[0])})"
     )
 
+    # ...and it DECAYS while it sits there, at the at-war rate.
+    sim.restore(snap)
+    sim.ww[0, 1, 2] = at_war + 7
+    sim._rival_phase()
+    assert int(sim.ww[0, 1, 2]) == 7, (
+        f"a war nobody fought must shed {at_war} (got {int(sim.ww[0, 1, 2])})"
+    )
+
+    # FORMAL vs SURPRISE picks the era COLUMN, not a multiplier. At Ancient the
+    # two columns are equal (16 = 16) — which is exactly why the deleted flat
+    # x2 surprise multiplier was indefensible.
     sim.restore(snap)
     sim.rr_warkind[0, 0, 1] = sim.rr_warkind[0, 1, 0] = True  # FORMAL
-    sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == per, (
-        f"a FORMAL war accrues the SAME {per}/turn as a surprise one — the "
-        f"differential was invented (#51/S7.8r)"
+    formal = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
+    sim.restore(snap)
+    surprise = int(sim._ww_era_base(torch.tensor([1]), torch.tensor([2]))[0])
+    assert formal == int(rww["eraFormal"][0]) and surprise == int(rww["eraSurprise"][0]), (
+        f"the casus belli must pick the COLUMN (formal {formal} / surprise {surprise})"
     )
 
+    # full peace drains four times faster than a phoney war
     sim.restore(snap)
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False  # full peace decays
+    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-    sim.r_war_weariness[0, 0] = decay + 1
+    sim.ww[0, 1, 2] = at_peace + 3
     sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == 1, f"full peace must decay ww by {decay}"
+    assert int(sim.ww[0, 1, 2]) == 3, f"full peace must shed {at_peace}"
 
+    # the PLAYER-war axis behaves identically — weariness is not seat-dependent
     sim.restore(snap)
-    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False  # PLAYER war: the pristine x1 axis
+    sim.rr_war[0, 0, 1] = sim.rr_war[0, 1, 0] = False
     sim.r_atwar[0, 0] = True
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    sim.ww[0, 1, 0] = at_war + 11
     sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == per, (
-        "the PLAYER-war axis accrues the same rate as a rival<->rival war — "
-        "weariness is not seat-dependent (#51/S7.8r)"
+    assert int(sim.ww[0, 1, 0]) == 11, (
+        "the PLAYER-war axis decays at the same rate as a rival<->rival war — "
+        "weariness is not seat-dependent (#51/S7.8r, S7.8f)"
     )
 
-    sim.restore(snap)  # SURPRISE at the cap clamps
-    sim.r_war_weariness[0, 0] = cap - 1
-    sim._rival_phase()
-    assert int(sim.r_war_weariness[0, 0]) == cap, f"accrual must clamp at the cap {cap}"
-    print(f"  f ww ONE RATE OK (surprise = formal = player = +{per}, decay -{decay}, cap {cap})")
+    print(f"  f ww PER-BATTLE OK (declared-but-unfought = 0, decay -{at_war} at war / -{at_peace} at peace)")
 
 
 def poke_transfer(rules, path):

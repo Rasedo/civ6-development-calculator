@@ -9,9 +9,12 @@ import {
   RR_DOW_WW_MAX,
   RR_FORMAL_MIN_TURNS,
   RR_PEACE_WW,
-  WAR_WEARINESS_PER_TURN,
+  WW_ERA_BASE_FORMAL,
+  WW_DECAY_AT_WAR,
+  WW_ERA_BASE_SURPRISE,
 } from '../src/data/rivals';
 import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
+import { wwMax, wwEraBase } from '../src/core/weariness';
 
 // -- local builders (the rivals.test.ts pattern) ------------------------------
 function addRival(state: GameState, col: number, row: number, opts: Partial<RivalCiv> = {}): RivalCiv {
@@ -24,7 +27,7 @@ function addRival(state: GameState, col: number, row: number, opts: Partial<Riva
     aggression: 0.5,
     seat: 1,
     warmonger: 0,
-    warWeariness: 0,
+    ww: {}, wwTurn: {},
     diploFavor: 0,
     diploPoints: 0,
     influencePoints: 0,
@@ -163,12 +166,14 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
     // the DoW fired the same turn — the grudge is 0 turns old, so SURPRISE
     expect(civsAtWar(state, 1, 2)).toBe(true);
     expect(isFormalWar(r0, r1.id)).toBe(false);
-    // #51/S7.8r: ONE accrual rate. This used to assert the invented x2
-    // "surprise" rate; a surprise war now accrues exactly what any other war
-    // does, on any seat. The war KIND is still marked (asserted above) — what
-    // is gone is the unsourced magnitude attached to it.
-    expect(r0.warWeariness).toBe(WAR_WEARINESS_PER_TURN);
-    expect(r1.warWeariness).toBe(WAR_WEARINESS_PER_TURN);
+    // #51/S7.8f: a war DECLARED is not a war FOUGHT. Under the per-battle
+    // model a fresh war with no battle in it costs neither side anything —
+    // that is the whole point, and the old flat +1/turn could not express it.
+    expect(wwMax(r0)).toBe(0);
+    expect(wwMax(r1)).toBe(0);
+    // ...and the SURPRISE column is the one this war will be scored at, which
+    // is where the casus belli survives now that the invented x2 is gone.
+    expect(wwEraBase(state, 1, 2)).toBe(WW_ERA_BASE_SURPRISE[0]); // Ancient
   });
 
   it('an old denouncement makes the war FORMAL — at the SAME accrual (#51/S7.8r)', () => {
@@ -178,22 +183,23 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
     expect(civsAtWar(state, 1, 2)).toBe(true);
     expect(isFormalWar(r0, r1.id)).toBe(true);
     expect(isFormalWar(r1, r0.id)).toBe(true); // symmetric mark
-    // the point of the pair: FORMAL and SURPRISE now accrue IDENTICALLY, so
-    // this asserts the same number as the surprise case above. The differential
-    // was invented (no Civ 6 ruleset carries a x2 weariness term) and keyed on
-    // the opponent's SEAT, which made the same war wearier between two rivals
-    // than between a rival and the player.
-    expect(r0.warWeariness).toBe(WAR_WEARINESS_PER_TURN);
+    // The point of the pair: the casus belli picks the COLUMN, and at Ancient
+    // the two columns are equal (16 = 16) — the surprise premium only opens
+    // from Classical on. That is the sourced table, and it is exactly why the
+    // deleted flat x2 was indefensible.
+    expect(wwEraBase(state, 1, 2)).toBe(WW_ERA_BASE_FORMAL[0]);
+    expect(WW_ERA_BASE_FORMAL[0]).toBe(WW_ERA_BASE_SURPRISE[0]);
+    expect(WW_ERA_BASE_SURPRISE[1]).toBeGreaterThan(WW_ERA_BASE_FORMAL[1]);
   });
 
   it('anti-thrash: weary targets and weary aggressors block the DoW', () => {
     const weary = pairState();
-    (weary.state.seats[1 + 1] as RivalCiv).warWeariness = RR_PEACE_WW + 1; // would sue out the same turn
+    (weary.state.seats[1 + 1] as RivalCiv).ww = { 1: RR_PEACE_WW + 1 }; // would sue out the same turn
     rivalPhase(weary.state);
     expect(civsAtWar(weary.state, 1, 2)).toBe(false);
 
     const aggr = pairState();
-    (aggr.state.seats[0 + 1] as RivalCiv).warWeariness = RR_DOW_WW_MAX; // war-weary aggressor
+    (aggr.state.seats[0 + 1] as RivalCiv).ww = { 2: RR_DOW_WW_MAX }; // war-weary aggressor
     rivalPhase(aggr.state);
     expect(civsAtWar(aggr.state, 1, 2)).toBe(false);
   });
@@ -204,7 +210,10 @@ describe('geopolitics (#55 A-19/B-33/B-22)', () => {
     r0.warKindFormal = [r1.id];
     r1.warKindFormal = [r0.id];
     r0.denouncedTurn = { [r1.id]: 7 };
-    r0.warWeariness = RR_PEACE_WW + 1; // either side past the bar ends it
+    // #51/S7.8f: the peace scan runs at the END of rivalPhase, AFTER each
+    // rival's block-top decay, so a war being fought this turn must clear the
+    // bar by more than one turn's shedding to sue out on this pass.
+    r0.ww = { 2: RR_PEACE_WW + WW_DECAY_AT_WAR + 1 }; // either side past the bar ends it
     rivalPhase(state);
     expect(civsAtWar(state, 1, 2)).toBe(false);
     expect(isFormalWar(r0, r1.id)).toBe(false);

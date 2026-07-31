@@ -295,7 +295,36 @@ These cost nothing but a plan edit and (where noted) a dead-code deletion. Batch
 **Parked, not guessed:** citizen assignment (D1), CS meeting, CS combat, per-seat heal timing, the religion attack adder, ranged D2, own-territory founding, the settler `+queued` term, the GPU multi-item queue, the un-multiplied bank, and three CS-quest sub-rules. That is 11 parked against 10 landed — which is the correct ratio when four separate research reports shipped a fabricated quote.
 ---
 
-## §7-6 WAR WEARINESS — the REAL model, recorded for a future slice
+## §7-6 WAR WEARINESS — SHIPPED as #51/S7.8f (2026-07-31)
+
+**LANDED.** What follows was the recorded target; it is now the code. The
+re-fetch of CivFanatics 623207 done at implementation time found ONE
+disagreement with the wiki's table that this note did not have: the thread's
+own formula, `(16 + min(era-1,4)*6) + 3*min(max(era-1,1),4)`, yields **19** for
+Ancient SURPRISE where its table says **16**. The TABLE is what shipped — it is
+the measured column the formula was fitted to, and the wiki reproduces it.
+
+Delivered on both engines: per-battle accrual at 15 GPU appliers and 13 TS call
+sites, per-WAR accumulators (`Seat.ww` / `self.ww[b, i, j]`, keyed exactly like
+the war matrix), `-2000` on a treaty, `-1` amenity per 400 with no ceiling.
+`RR_DOW_WW_MAX` 6→300 and `RR_PEACE_WW` 10→500 (×50, preserving the AI's
+behaviour in AMENITY terms). Gate seed index 6 rerolled 9080→9081: the harsher
+model wipes 9080's player.
+
+FOUR MISSES THE PARITY GATE CAUGHT, all of them the same mistake — enumerating
+appliers by damage-roll TAG and trusting the enumeration:
+ 1. the three `k="rcty"` rival-city assaults (I had grepped `pcty` only);
+ 2. `pcty`'s attacker DEATH term, never passed at all;
+ 3. the four city-strike death terms, read off tile occupancy BEFORE the damage
+    was applied — now computed from `def_hp - d` at the site;
+ 4. `vrng`'s defender read as the tile's MILITARY occupant, which silently
+    dropped every strike on a lone civilian.
+Each was named by a matched per-battle probe on both engines, never guessed.
+That five appliers implement one rule is now **task #60**.
+
+---
+
+## §7-6 (original note) WAR WEARINESS — the REAL model, recorded for a future slice
 
 `#51/S7.8r` landed the deletion (one rate for every seat, the invented x2 gone).
 What follows is the SOURCED target for the full model, which is STRUCTURALLY

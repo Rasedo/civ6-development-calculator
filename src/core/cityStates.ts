@@ -35,6 +35,7 @@ import {
   QUEST_ENVOYS,
   GOV_INFLUENCE_TIER,
 } from '../data/cityStates';
+import { warWearinessPeace } from './weariness';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -335,6 +336,7 @@ export function sueForPeaceWithCityState(state: GameState, csId: number): RuleRe
   }
   cs.atWar = false;
   cs.csWarTurns = 0;
+  warWearinessPeace(state, PLAYER_CIV, seatOfCityState(cs.id)); // #51/S7.8f
   state.eventLog.push(`You have made peace with ${cs.name}.`);
   return { ok: true };
 }

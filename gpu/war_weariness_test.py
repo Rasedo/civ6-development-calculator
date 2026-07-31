@@ -1,10 +1,24 @@
-"""B-15 war-weariness self-test.
+"""#51/S7.8f — war weariness is scored PER BATTLE. The tests/war-weariness.test.ts twin.
 
-The scripted rollout only exercises a single monotonic war (rivals declare on
-the passive player and rarely make peace), so the ACCRUAL→PENALTY boundary and
-the 4× peace DECAY are poked directly: force a rival to war, step across the
-first −1-amenity threshold, then force peace and watch the accumulator drain 4×
-faster. Also asserts the accumulator round-trips snapshot/restore.
+    python gpu/war_weariness_test.py
+
+WHY THIS EXISTS. The scripted parity gate proves the two engines AGREE, never
+that either agrees with Civ 6, and it reaches only the wars its twelve seeds
+happen to fight — Ancient and Classical bases, no city-state combat, no
+simultaneous wars. Every rule below is poked directly instead, through the same
+seat-generic entry points both engines call.
+
+WHAT REPLACED WHAT. This file used to assert `decay == 4 * per_turn` against a
+flat +1-per-turn accumulator capped at 32. Those were the real Civ 6 numbers
+divided by 50 with the war term's SIGN FLIPPED — Civ 6 charges nothing for a war
+nobody fights and refunds 50 a turn. The old assertions could not survive the
+correction, and weakening them to fit would have hidden the very bug it fixes.
+
+    WWP = (EraBase * Location) + Death
+
+Location 1 at home / 2 abroad; Death = 3 * EraBase to the side that lost a unit;
+any battle with a CITY at the abroad column; both sides score, "without any
+discrimination".
 """
 
 from __future__ import annotations
@@ -16,93 +30,176 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
+from civ6gpu.engine import PLAYER_SEAT
 
 
-def main() -> None:
+def build():
     rules = load_rules()
-    ww = rules.war_weariness
-    per_turn = int(ww["perTurn"])
-    decay = int(ww["decay"])
-    per_amen = int(ww["perAmenity"])
-    cap = int(ww["cap"])
-    assert per_turn > 0 and decay > 0 and per_amen > 0 and cap > 0, "war-weariness constants must be positive"
-    # decay is 4× accrual per the brief.
-    assert decay == 4 * per_turn, f"decay ({decay}) must be 4× per-turn ({per_turn})"
-
     paths = sorted(FIXTURES.glob("seed*.json"))
     assert paths, "no fixtures — run `npm run gpu:export` first"
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    if sim.R == 0:
-        print("WAR-WEARINESS OK (no rivals in fixture — nothing to poke)")
-        return
-
-    # Warm the world a little so cities exist, then clear any organic war so we
-    # control the war state deterministically.
-    for _ in range(8):
+    assert sim.R >= 2, "needs two rivals to poke simultaneous wars"
+    for _ in range(20):
         sim.step()
     sim.r_atwar[:] = False
-    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-    sim.war_weariness[:] = 0
-    sim.r_war_weariness[:] = 0
+    sim.rr_war[:] = False
+    sim.sync_war()  # #51/S4.3: pokes write the legacy stores, sync closes the matrix
+    sim.ww[:] = 0
+    sim.ww_turn[:] = -1
+    return sim
 
-    # --- accrual: force rival 0 to war, step, watch the accumulator climb ------
+
+def one(sim) -> torch.Tensor:
+    return torch.ones(sim.B, dtype=torch.bool)
+
+
+def owned_tile(sim, seat: int) -> torch.Tensor:
+    for t in range(sim.T):
+        if bool((sim.tile_seat[:, t] == seat).all()):
+            return torch.full((sim.B,), t, dtype=torch.long)
+    raise AssertionError(f"no tile owned by seat {seat}")
+
+
+def neutral_tile(sim) -> torch.Tensor:
+    for t in range(sim.T):
+        if bool((sim.tile_seat[:, t] < 0).all()):
+            return torch.full((sim.B,), t, dtype=torch.long)
+    raise AssertionError("no unowned tile")
+
+
+def main() -> None:
+    sim = build()
+    rww = sim.rules.war_weariness
+    abroad, death = int(rww["abroad"]), int(rww["death"])
+    per = int(rww["perAmenity"])
+    # Ancient SURPRISE — the one row where a casus belli buys nothing (16 = 16),
+    # which is itself part of the sourced table and is why a flat x2 surprise
+    # multiplier was indefensible.
+    b = int(rww["eraSurprise"][0])
+    assert int(rww["eraFormal"][0]) == b, "Ancient formal and surprise are equal"
+    assert int(rww["eraSurprise"][1]) > int(rww["eraFormal"][1]), "the premium opens at Classical"
+
+    away, home = neutral_tile(sim), owned_tile(sim, PLAYER_SEAT)
+
+    # --- both sides score, and the aggressor gets no discount --------------
+    sim.ww[:] = 0
+    sim._ww_battle(one(sim), 0, 1, away)
+    assert int(sim.ww[0, 0, 1]) == b * abroad, int(sim.ww[0, 0, 1])
+    assert int(sim.ww[0, 1, 0]) == b * abroad, int(sim.ww[0, 1, 0])
+    print(f"  both sides score {b * abroad} on neutral ground")
+
+    # --- HOME is half of ABROAD, per side, on the SAME battle --------------
+    sim.ww[:] = 0
+    sim._ww_battle(one(sim), 0, 1, home)
+    assert int(sim.ww[0, 0, 1]) == b, "the defender at home pays a single base"
+    assert int(sim.ww[0, 1, 0]) == b * abroad, "the invader pays double"
+    print(f"  one battle, two multipliers: home {b} vs abroad {b * abroad}")
+
+    # --- a CITY forces the abroad column for BOTH --------------------------
+    sim.ww[:] = 0
+    sim._ww_battle(one(sim), 0, 1, home, city=True)
+    assert int(sim.ww[0, 0, 1]) == b * abroad, "a city drags its own defender abroad"
+    print("  a city giving or receiving the attack scores at the abroad column")
+
+    # --- a death costs the side that LOST the unit, and only that side -----
+    sim.ww[:] = 0
+    sim._ww_battle(one(sim), 0, 1, away, d_died=one(sim))
+    assert int(sim.ww[0, 0, 1]) == b * abroad, "the survivor pays no death term"
+    assert int(sim.ww[0, 1, 0]) == b * abroad + death * b, int(sim.ww[0, 1, 0])
+    print(f"  the loser pays {death} more bases: {int(sim.ww[0, 1, 0])} vs {int(sim.ww[0, 0, 1])}")
+
+    # --- BARBARIANS neither accrue it nor inflict it -----------------------
+    sim.ww[:] = 0
+    barb = int(sim.BARB_ROW)
+    sim._ww_battle(one(sim), 0, barb, away, d_died=one(sim))
+    sim._ww_battle(one(sim), barb, 0, away, d_died=one(sim))
+    assert int(sim.ww.sum()) == 0, (
+        "a barbarian fight scored war weariness. Every seat is permanently "
+        "hostile to barbarians, so counting it makes 'at peace with everyone' "
+        "unreachable for the whole game and no accumulator can ever drain"
+    )
+    print("  barbarians score nothing, in either direction")
+
+    # --- a CITY-STATE is a real opponent but holds no accumulator ---------
+    sim.ww[:] = 0
+    cs_row = 1 + sim.R
+    sim._ww_battle(one(sim), 0, cs_row, away, city=True)
+    assert int(sim.ww[0, 0, cs_row]) > 0, "warring a minor wears you down normally"
+    assert int(sim.ww[0, cs_row, :].sum()) == 0, "a minor keeps no accumulator"
+    print("  a city-state is a valid opponent and holds nothing itself")
+
+    # --- wars score SEPARATELY; only the worst is felt --------------------
+    sim.ww[:] = 0
+    sim._ww_battle(one(sim), 0, 1, away)
+    sim._ww_battle(one(sim), 0, 1, away)
+    sim._ww_battle(one(sim), 0, 2, away)
+    step = b * abroad
+    assert int(sim._ww_max(0)[0]) == step * 2, int(sim._ww_max(0)[0])
+    assert int(sim._ww_sum(0)[0]) == step * 3, int(sim._ww_sum(0)[0])
+    print(f"  the max {step * 2} is the worst war, NOT the sum {step * 3}")
+
+    # --- decay: fought this turn / phoney / at peace with everyone --------
+    sim.ww[:] = 0
+    sim.ww_turn[:] = -1
+    sim.ww[:, 0, 1] = 1000
+    sim.ww[:, 0, 2] = 1000
+    sim.ww_turn[:, 0, 1] = int(sim.turn)  # blood was spilled against rival 0
     sim.r_atwar[:, 0] = True
-    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-    base_p = int(sim.war_weariness[0])
-    base_r = int(sim.r_war_weariness[0, 0])
-    # Step across the first amenity threshold (PER_AMENITY war turns).
-    penalties_seen = []
-    for k in range(1, per_amen + 2):
-        sim.r_atwar[:, 0] = True  # keep the war live each turn
-        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-        sim.step()
-        pw = int(sim.war_weariness[0])
-        pen = pw // per_amen
-        penalties_seen.append(pen)
-        assert pw <= cap, f"player weariness {pw} exceeded cap {cap}"
-    # After PER_AMENITY war-turns the penalty must have reached at least 1.
-    assert max(penalties_seen) >= 1, f"penalty never reached 1 in {per_amen + 1} war-turns: {penalties_seen}"
-    # The accumulator must be strictly increasing under sustained war (until cap).
-    assert int(sim.war_weariness[0]) > base_p, "player weariness did not accrue under war"
-    assert int(sim.r_war_weariness[0, 0]) > base_r, "rival weariness did not accrue under war"
+    sim.sync_war()
+    sim._ww_decay(0)
+    assert int(sim.ww[0, 0, 1]) == 1000, "a war fought THIS turn does not decay"
+    assert int(sim.ww[0, 0, 2]) == 1000 - int(rww["decayAtWar"]), int(sim.ww[0, 0, 2])
+    sim.turn += 1
+    sim.r_atwar[:, 0] = False
+    sim.sync_war()
+    sim._ww_decay(0)
+    assert int(sim.ww[0, 0, 1]) == 1000 - int(rww["decayAtPeace"]), int(sim.ww[0, 0, 1])
+    print(f"  decay: 0 fought, {int(rww['decayAtWar'])} phoney, {int(rww['decayAtPeace'])} at peace")
 
-    # --- cap: sustained war saturates at the ceiling ---------------------------
-    for _ in range(cap + 5):
-        sim.r_atwar[:, 0] = True
-        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-        sim.step()
-    assert int(sim.war_weariness[0]) == cap, f"player weariness must saturate at cap {cap}, got {int(sim.war_weariness[0])}"
-    assert int(sim.r_war_weariness[0, 0]) == cap, "rival weariness must saturate at cap"
+    # --- a peace treaty settles THAT war and no other ---------------------
+    sim.ww[:] = 0
+    sim.ww[:, 0, 1] = 900
+    sim.ww[:, 0, 2] = 900
+    sim._ww_peace(one(sim), 0, 1)
+    assert int(sim.ww[0, 0, 1]) == 0, "the treaty sheds 2000, floored at zero"
+    assert int(sim.ww[0, 0, 2]) == 900, "the OTHER war is untouched"
+    print(f"  a treaty sheds {int(rww['peaceTreaty'])} from one war only")
 
-    # --- decay: make peace, watch it drain 4× per turn -------------------------
-    # Force peace at the TOP of every step (the player/rival accrual reads the
-    # war state before this phase's organic re-declaration), so the accumulators
-    # can only fall — otherwise an organic war restart would resume accrual.
-    sim.r_atwar[:] = False
-    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-    before = int(sim.war_weariness[0])
-    sim.step()
-    after = int(sim.war_weariness[0])
-    assert after == max(0, before - decay), f"peace decay must shed {decay}/turn: {before} -> {after}"
+    # --- the amenity conversion, with no ceiling -------------------------
+    sim.ww[:] = 0
+    sim.ww[:, 0, 1] = per * 12 + (per - 1)
+    assert int(sim._ww_penalty_player()[0]) == 12, int(sim._ww_penalty_player()[0])
+    assert int(sim._ww_penalty_rival(0)[0]) == 0, "rival 0 has fought nothing"
+    sim.ww[:, 0, 1] = per - 1
+    assert int(sim._ww_penalty_player()[0]) == 0, "the remainder buys nothing"
+    print(f"  {per} points buy one amenity, remainder lost, and 12 is reachable (no cap)")
 
-    # --- floor: decay never goes negative --------------------------------------
-    for _ in range(cap):
-        sim.r_atwar[:] = False  # hold peace so accrual can't restart organically
-        sim.sync_war()  # #51/S4.3: pokes write the legacy stores
-        sim.step()
-    assert int(sim.war_weariness[0]) == 0, "player weariness must floor at 0"
-
-    # --- snapshot/restore round-trips the accumulators -------------------------
-    sim.war_weariness[0] = 9
-    sim.r_war_weariness[0, 0] = 5
+    # --- the accumulator round-trips snapshot/restore ---------------------
+    sim.ww[:] = 0
+    sim.ww[:, 0, 1] = 4321
+    sim.ww_turn[:, 0, 1] = 7
     snap = sim.snapshot()
-    sim.war_weariness[0] = 0
-    sim.r_war_weariness[0, 0] = 0
+    sim.ww[:, 0, 1] = 0
+    sim.ww_turn[:, 0, 1] = -1
     sim.restore(snap)
-    assert int(sim.war_weariness[0]) == 9, "war_weariness not in snapshot"
-    assert int(sim.r_war_weariness[0, 0]) == 5, "r_war_weariness not in snapshot"
+    assert int(sim.ww[0, 0, 1]) == 4321, "ww lost in snapshot/restore"
+    assert int(sim.ww_turn[0, 0, 1]) == 7, "ww_turn lost in snapshot/restore"
+    print("  ww and ww_turn round-trip snapshot/restore")
 
-    print("WAR-WEARINESS OK")
+    # --- a war DECLARED but never fought costs nothing -------------------
+    sim = build()
+    sim.r_atwar[:, 0] = True
+    sim.sync_war()
+    for _ in range(30):
+        sim.step()
+    assert int(sim._ww_max(0)[0]) == 0, (
+        f"a phoney war accrued {int(sim._ww_max(0)[0])}. The per-BATTLE model's "
+        "whole point is that DECLARING a war costs nothing — the old flat "
+        "+1/turn could not tell a phoney war from a bloody one"
+    )
+    print("  30 turns of a declared, unfought war cost nothing")
+
+    print("WAR WEARINESS OK — per-battle accrual, per-war accumulators, no ceiling")
 
 
 if __name__ == "__main__":

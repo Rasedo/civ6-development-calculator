@@ -219,7 +219,7 @@ export function playerSeat(state: GameState): Seat {
 export function emptySeat(seat: number): Seat {
   return {
     seat,
-    warmonger: 0, warWeariness: 0, diploFavor: 0, diploPoints: 0,
+    warmonger: 0, ww: {}, wwTurn: {}, diploFavor: 0, diploPoints: 0,
     influencePoints: 0, envoysAvailable: 0,
     treasury: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] },

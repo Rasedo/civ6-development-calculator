@@ -47,6 +47,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PLAYER_CIV, playerSeat, isPlayerSeat, tileSeat, setTileOwner, tileBelongsTo, tileOwnedByCiv, seatOf, citiesOf, tileClaimed } from './seats';
+import { wwMax } from './weariness';
 
 export interface CityStats {
   city: City;
@@ -606,7 +607,7 @@ export function computeCityStats(
   // B-15: war weariness is a flat empire-wide amenity drag, applied AFTER the
   // luxury grant (whose ranking stays building-amenities-based) so it shifts the
   // balance/tier without touching the relative luxury distribution.
-  have -= warWearinessPenalty(playerSeat(state).warWeariness ?? 0);
+  have -= warWearinessPenalty(wwMax(playerSeat(state)));
   const specialtyCount = completedDistrictCount(state, city, true);
   for (const rule of m.amenitiesIfSpecialty) {
     if (specialtyCount >= rule.min) have += rule.amenities;

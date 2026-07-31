@@ -17,6 +17,7 @@ import { BUILDINGS } from '../src/data/buildings';
 import { RESOURCES } from '../src/data/resources';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import type { GameState, RivalCiv } from '../src/core/types';
+import { wwMax } from '../src/core/weariness';
 
 function frontCost(rc: any): number {
   const q = rc.queue[0];
@@ -114,7 +115,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     L.push(
       `${p}RT${r} = ncity${rival.cities.length} pop${pop} treas${Math.round((rival.treasury ?? 0)*1000)} fai${Math.round((rival.faith ?? 0)*1000)} ` +
         `ntech${rival.research.techs.length} nciv${rival.research.civics.length} war${rival.atWar ? 1 : 0} ` +
-        `ww${rival.warWeariness ?? 0} rrw${(rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0)} rrk${(rival.warKindFormal ?? []).reduce((m, id) => m | (1 << id), 0)} ers${state.eraScore?.[rival.id + 1] ?? 0} age${state.civAges?.[rival.id + 1] ?? 1} ` +
+        `ww${wwMax(rival)} rrw${(rival.atWarRivals ?? []).reduce((m, id) => m | (1 << id), 0)} rrk${(rival.warKindFormal ?? []).reduce((m, id) => m | (1 << id), 0)} ers${state.eraScore?.[rival.id + 1] ?? 0} age${state.civAges?.[rival.id + 1] ?? 1} ` +
         `terr:${rt.length} wterr:${rt.filter((t) => isWater(t)).length} ` +
         `tsum:${rt.reduce((s, t) => s + t.index, 0)} ` +
         `rsc:${Math.round(rivalEmpireScore(state, rival) * 1000)}`,

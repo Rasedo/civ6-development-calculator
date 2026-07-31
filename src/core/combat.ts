@@ -47,6 +47,7 @@ import { inGeneralAura, GENERAL_AURA_CS, GENERAL_AURA_RANGE, generalAuraMP } fro
 // closes a cycle — both directions are called at RUN time, never at module
 // init, which is what makes that safe.
 import { unitFullMoves } from './units';
+import { warWearinessBattle, warWearinessPeace } from './weariness';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -498,6 +499,12 @@ function cityAssault(
   city.hp -= dmgToCity - absorbed;
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
+  // #51/S7.8f: a CITY is receiving the attack, so both sides score at the
+  // abroad column whoever's borders it stands in. Scored BEFORE killUnit and
+  // before the caller's capture branch — the location multiplier is the one
+  // that applied while the battle was fought, not after the tile changes hands.
+  warWearinessBattle(state, attacker.seat, city.seat, city.centerIndex,
+    { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) killUnit(state, attacker);
 }
 
@@ -547,6 +554,10 @@ function attackEncampment(
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - dmgToEncamp);
   attacker.hp -= dmgToAttacker;
   attacker.movesLeft = 0;
+  // #51/S7.8f: an Encampment is part of its city's defenses (B-17) and fights
+  // at that city's strength, so it scores as city combat for both sides.
+  warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex,
+    { aDied: attacker.hp <= 0, city: true });
   if (attacker.hp <= 0) killUnit(state, attacker);
 }
 
@@ -713,6 +724,10 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
     attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
     awardDefenseXp(defender); // B-4: +2 to a surviving military defender
+    // #51/S7.8f: scored on the TARGET's tile, before either death is applied —
+    // both sides pay, and the loser pays 3 bases more.
+    warWearinessBattle(state, attacker.seat, defender.seat, targetIndex,
+      { aDied: attacker.hp <= 0 && defender.hp > 0, dDied: defender.hp <= 0 });
     if (defender.hp <= 0) {
       killUnit(state, defender);
       if (attacker.hp <= 0) attacker.hp = 1; // victor survives
@@ -757,6 +772,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       if (rc && rc.rival.atWar) {
         const defCS = cityDefenseStrength(state, rc.city);
         rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
+        warWearinessBattle(state, attacker.seat, rc.city.seat, targetIndex, { city: true }); // #51/S7.8f
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
         return ok;
@@ -765,6 +781,7 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
       if (cs && cs.centerIndex === targetIndex) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
         cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
+        warWearinessBattle(state, attacker.seat, seatOfCityState(cs.id), targetIndex, { city: true }); // #51/S7.8f
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
         return ok;
@@ -780,6 +797,10 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rng', targetIndex); // B6-S1 + B7-G (B-8)
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged attack executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender (civilians excluded)
+  // #51/S7.8f: "the target location is always the location, including for
+  // ranged units" — a ranged attacker takes no retaliation but wearies all the
+  // same, at the multiplier of the tile it FIRED ON, not the one it stands on.
+  warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   if (defender.hp <= 0) killUnit(state, defender);
   attacker.movesLeft = 0;
   return ok;
@@ -809,6 +830,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
       1,
       enemyCity.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + (CITY_RELIGION_ADDER_LIVE ? religionAttackCS(state, attacker, targetIndex) : 0) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrngc', targetIndex), // #70/S2 (B-8)
     );
+    warWearinessBattle(state, attacker.seat, enemyCity.seat, targetIndex, { city: true }); // #51/S7.8f
     attacker.movesLeft = 0;
     gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit)
     return;
@@ -830,6 +852,7 @@ export function hostileRangedStrike(state: GameState, attacker: Unit, targetInde
   // retaliation). #45/B-6: defenderCS applies the embarked-defender override.
   const defCS = defenderCS(state, defender, targetIndex);
   defender.hp -= damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'vrng', targetIndex); // B6-S1 + B7-G (B-8)
+  warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 }); // #51/S7.8f
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the ranged strike executed
   awardDefenseXp(defender); // B-4: +2 to a surviving military defender
   if (defender.hp <= 0) killUnit(state, defender);
@@ -963,6 +986,11 @@ function attackCityState(state: GameState, attacker: Unit, cs: CityState): void 
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
   cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
   attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
+  // #51/S7.8f: warring a city-state wearies you exactly as warring a major
+  // does. The minor keeps no accumulator of its own (no amenities, no research
+  // to date an era from) — see holdsWeariness.
+  warWearinessBattle(state, attacker.seat, seatOfCityState(cs.id), cs.centerIndex,
+    { aDied: attacker.hp <= 0, city: true });
   attacker.movesLeft = 0;
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker);
@@ -1184,6 +1212,8 @@ export function captureRivalCity(state: GameState, rival: RivalCiv, city: RivalC
   // Losing a city stings: the war ends if it was their last, else they fight on.
   if (rival.cities.length === 0) {
     rival.atWar = false;
+    // #51/S7.8f: elimination ends the war, so it settles like any other peace.
+    warWearinessPeace(state, PLAYER_CIV, civOfRival(rival.id));
     state.eventLog.push(`${rival.name} has been eliminated.`);
   }
 }
@@ -1589,6 +1619,9 @@ export function barbarianPhase(state: GameState): void {
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCSa, 'pcstk', bestTile);
     awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city — no attacker xp)
+    // #51/S7.8f: a city GIVING the attack is city combat too.
+    warWearinessBattle(state, city.seat, defender.seat, bestTile,
+      { dDied: defender.hp <= 0, city: true });
     if (defender.hp <= 0) killUnit(state, defender);
   }
 
@@ -1625,6 +1658,8 @@ export function barbarianPhase(state: GameState): void {
     const atkCS = cityDefenseStrength(state, city);
     defender.hp -= damageRoll(state, atkCS - defCSa, 'pestk', bestTile);
     awardDefenseXp(defender);
+    warWearinessBattle(state, city.seat, defender.seat, bestTile,
+      { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pcstk rule
     if (defender.hp <= 0) killUnit(state, defender);
   }
 

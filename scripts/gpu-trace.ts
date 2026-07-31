@@ -32,6 +32,7 @@ import { UNITS } from '../src/data/units';
 import { BUILDINGS } from '../src/data/buildings';
 import { BUILT_WONDERS } from '../src/data/builtWonders';
 import type { City, CityState, GameState, RivalCity, RivalCiv } from '../src/core/types';
+import { wwMax, wwSum } from '../src/core/weariness';
 
 /**
  * The price of a queue front item. ONE definition, shared by the civ-level
@@ -96,7 +97,8 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   // economy rather than by widening the trace around the gap.
   { name: 'techProg', tol: 2, get: (s) => Math.round(playerSeat(s).research.techProgress * 1000) },
   { name: 'civicProg', tol: 2, get: (s) => Math.round(playerSeat(s).research.civicProgress * 1000) },
-  { name: 'warWeariness', tol: 0, get: (s) => playerSeat(s).warWeariness },
+  { name: 'warWeariness', tol: 0, get: (s) => wwMax(playerSeat(s)) },
+  { name: 'wwSum', tol: 0, get: (s) => wwSum(playerSeat(s)) },
 ];
 
 // Keyed by id (== the GPU's static slot), NOT array position: a captured
@@ -176,7 +178,8 @@ const PER_RIVAL_COLS: TraceCol<RivalCiv | undefined>[] = [
   // B-15 (#78 HUNT): WAR WEARINESS — untraced until then, which is how an
   // rGScore divergence hid: weariness feeds the amenity tier, the tier scales
   // city yields, and rivalEmpireScore is pop*3 + weighted yields.
-  { name: 'warWeariness', tol: 0, get: (_s, r) => r?.warWeariness ?? 0 },
+  { name: 'warWeariness', tol: 0, get: (_s, r) => wwMax(r) },
+  { name: 'wwSum', tol: 0, get: (_s, r) => wwSum(r) },
   // #51/S0.2: one-sided holes — the PLAYER has traced these since the start and
   // the rival planes existed untraced. Rival SCIENCE has no twin on EITHER
   // engine (no scienceTotal on RivalCiv, no r_science plane), so it is recorded

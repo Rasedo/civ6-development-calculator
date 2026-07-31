@@ -69,9 +69,10 @@ import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builder
 import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
-import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS,  ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
+import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS,  ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints, goldenCulturePerDistrict } from './eras';
-import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount , emptySeat } from './seats';
+import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount , emptySeat, seatOfCityState } from './seats';
+import { warWearinessBattle, warWearinessPeace, warWearinessTurn, wwMax } from './weariness';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -183,7 +184,7 @@ export function placeRivals(state: GameState, count?: number): void {
       // #51/S1.2: the SEAT block — identical on the player's seat 0.
       seat: i + 1,
       warmonger: 0,
-      warWeariness: 0, // B-15
+      ww: {}, wwTurn: {}, // B-15 / #51/S7.8f: per-WAR points, keyed by opponent seat
       diploFavor: 0,
       diploPoints: 0,
       influencePoints: 0,
@@ -391,7 +392,7 @@ function rivalRivalDeclareWars(state: GameState): void {
     const ri = (state.seats[(a) + 1] as RivalCiv);
     if (ri.cities.length === 0 || used.has(ri.id)) continue;
     // anti-thrash: a war-weary civ never opens a new front (documented).
-    if ((ri.warWeariness ?? 0) >= RR_DOW_WW_MAX) continue;
+    if (wwMax(ri) >= RR_DOW_WW_MAX) continue;
     const si = rivalStrength(state, ri);
     for (let b = 0; b < rivalCount(state); b++) {
       if (a === b) continue;
@@ -410,7 +411,7 @@ function rivalRivalDeclareWars(state: GameState): void {
       // RR_PEACE_WW) is thus off-limits until it recovers. This root-causes the
       // S3 magnitude reshuffle's declare/peace thrash (surfaced a dormant S2
       // war-act divergence — the pair matrix was inert in S1). Zero-draw.
-      if ((rj.warWeariness ?? 0) > RR_PEACE_WW) continue;
+      if (wwMax(rj) > RR_PEACE_WW) continue;
       // B-22 (2026-07-27): ALLIES NEVER DECLARE ON EACH OTHER (real Civ 6).
       if ((ri.alliedRivals ?? []).includes(rj.id)) continue;
       setRivalWar(state, ri.id + 1, rj.id + 1, true);
@@ -442,8 +443,9 @@ function rivalRivalMakePeace(state: GameState): void {
     for (let b = a + 1; b < rivalCount(state); b++) {
       const rj = (state.seats[(b) + 1] as RivalCiv);
       if (!civsAtWar(state, ri.id + 1, rj.id + 1)) continue;
-      if ((ri.warWeariness ?? 0) > RR_PEACE_WW || (rj.warWeariness ?? 0) > RR_PEACE_WW) {
+      if (wwMax(ri) > RR_PEACE_WW || wwMax(rj) > RR_PEACE_WW) {
         setRivalWar(state, ri.id + 1, rj.id + 1, false);
+        warWearinessPeace(state, civOfRival(ri.id), civOfRival(rj.id)); // #51/S7.8f
         setWarKindFormal(state, ri.id + 1, rj.id + 1, false); // B-22 (S3): war ended
         state.eventLog.push(`${ri.name} and ${rj.name} make peace.`);
       }
@@ -482,6 +484,11 @@ export function sueForPeace(state: GameState, rivalId: number): RuleResult {
 
 function makePeace(state: GameState, rival: RivalCiv): void {
   rival.atWar = false;
+  // #51/S7.8f: a peace treaty sheds 2000 WWP from THAT war, on both sides.
+  // Deliberately larger than any plausible accumulation — it is how the source
+  // stops a settled war haunting a civ forever, since the residual of a war you
+  // are no longer in has no decay rule of its own.
+  warWearinessPeace(state, PLAYER_CIV, civOfRival(rival.id));
   rival.warTurns = 0;
   rival.peaceTurns = 0;
   // #50 (#79) SOURCED: "making peace with a civ always forces peace with all
@@ -495,6 +502,7 @@ function makePeace(state: GameState, rival: RivalCiv): void {
     if (cs.atWar && isSuzerain(cs, civOfRival(rival.id))) {
       cs.atWar = false;
       cs.csWarTurns = 0;
+      warWearinessPeace(state, PLAYER_CIV, seatOfCityState(cs.id)); // #51/S7.8f
       state.eventLog.push(`${cs.name} makes peace alongside its suzerain.`);
     }
   }
@@ -1738,7 +1746,7 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   const ownerRel = rivalsOf(state).indexOf(rival) + 1;
   // B-15: this rival's flat war-weariness amenity penalty (symmetric with the
   // player's), applied to the tier balance after the luxury grants.
-  const wwPenalty = warWearinessPenalty(rival.warWeariness ?? 0);
+  const wwPenalty = warWearinessPenalty(wwMax(rival));
   const tiers = new Map<number, AmenityTier>();
   for (const rc of rival.cities) {
     const m = withFollowerBelief(state, base, followerReligionForCity(rc.followedReligion, ownerRel));
@@ -2321,20 +2329,12 @@ export function rivalPhase(state: GameState): void {
   for (const rival of rivalsOf(state)) {
     if (rival.cities.length === 0) continue; // eliminated
 
-    // B-15: war weariness — symmetric with the player's endTurn-top update,
-    // read at this rival's block top before rivalAmenityTiers uses it.
-    // A-19/B-33 (S2): a rival at war with ANYONE (the player OR another rival)
-    // accrues weariness; it decays only at FULL peace. The pairwise war state
-    // is fixed for this turn by the phase-top DoW pass, so anyWar is stable
-    // through this block (peace resolves after the loop).
-    const anyWarTop = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
-    // #51/S7.8r: ONE accrual rate for every seat. The rival↔rival axis used to
-    // accrue at ×2 for a SURPRISE war while any war involving the PLAYER accrued
-    // at ×1 — an invented magnitude on a seat-dependent split. See the note on
-    // the deleted WW_SURPRISE_MULT in data/rivals.ts.
-    rival.warWeariness = anyWarTop
-      ? Math.min(WAR_WEARINESS_CAP, (rival.warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
-      : Math.max(0, (rival.warWeariness ?? 0) - WAR_WEARINESS_DECAY);
+    // B-15 / #51/S7.8f: war weariness settles at this rival's block top, before
+    // rivalAmenityTiers uses it — the same call the player's endTurn makes, in
+    // the same relative position. The pairwise war state is fixed for this turn
+    // by the phase-top DoW pass, so the "at war with somebody" test inside is
+    // stable through this block (peace resolves after the loop).
+    warWearinessTurn(state, civOfRival(rival.id));
 
     // AUDIT A-3: eurekas/inspirations fire from the RIVAL's seat too — the
     // mirror of the player's endTurn-top detectBoosts (same conditions,
@@ -3159,6 +3159,8 @@ export function rivalPhase(state: GameState): void {
           const atkCS = cityDefenseStrength(state, rc);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'rcstk', bestTile);
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
+          warWearinessBattle(state, rc.seat, defender.seat, bestTile,
+            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pcstk twin
           if (defender.hp <= 0) disbandUnit(state, defender.id);
         }
       }
@@ -3198,6 +3200,8 @@ export function rivalPhase(state: GameState): void {
           const atkCS = cityDefenseStrength(state, rc);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'restk', bestTile);
           awardDefenseXp(defender);
+          warWearinessBattle(state, rc.seat, defender.seat, bestTile,
+            { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pestk twin
           if (defender.hp <= 0) disbandUnit(state, defender.id);
         }
       }

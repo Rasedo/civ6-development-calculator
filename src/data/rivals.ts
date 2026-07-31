@@ -86,33 +86,54 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 };
 
 // --- war weariness (B-15) ------------------------------------------------------
-// A flat per-turn amenity drag while at war, decaying 4× faster in peace, real-
-// anchored to Civ 6's war-weariness unhappiness. Accrual is per-turn-at-war
-// (combat-location sensitivity is not cheaply/deterministically detectable in
-// this model, so the brief's flat option is used). The accumulator is an INTEGER
-// (turn counter), so the derived amenity penalty is integer too — no float
-// association risk. Applied empire-wide through the existing amenity aggregation
-// for the player AND, symmetrically, per rival civ.
-/** Accumulator gained per turn while at war with any live opponent. */
-export const WAR_WEARINESS_PER_TURN = 1;
-/** Accumulator shed per turn at peace (4× the accrual rate). */
-export const WAR_WEARINESS_DECAY = 4;
-/** Accumulator points per −1 amenity. With the B-22 casus-belli accrual
- *  multiplier a SURPRISE rival↔rival war accrues 2/turn → −1 amenity per 4
- *  war-turns (per 8 for a FORMAL one). Kept at 8 (not lowered): the CAP + the
- *  ×2 multiplier already deliver the B-15 magnitude raise for rival-rival wars
- *  without a per-turn change that would also steepen the player war. */
-export const WAR_WEARINESS_PER_AMENITY = 8;
-/** Accumulator ceiling → caps the amenity penalty at CAP / PER_AMENITY (= −4).
- *  RAISED 16→32 (#69, closes B-15): a long un-sued war now reaches the real
- *  Civ-6-magnitude −4 empire penalty (−1 per 8 war-turns for the player and
- *  FORMAL rival wars; −1 per 4 for a SURPRISE rival↔rival war via the ×2
- *  accrual). The #55-S3 deferral (a −3/−4-tier divergence sighting on seed
- *  9092 under cap 32 — AUDIT G-8) is re-verified/hunted with this change.
- *  BOTH engines clamp the ACCUMULATOR at the cap (game.ts/rivals.ts accrual
- *  Math.min; the GPU inc clamp) — warWearinessPenalty's Math.min is
- *  belt-and-braces, never the live clamp. */
-export const WAR_WEARINESS_CAP = 32;
+// #51/S7.8f: WAR WEARINESS IS SCORED PER BATTLE, NOT PER TURN.
+//
+// The previous model added +1 per turn at war and shed 4 per turn at peace,
+// into an accumulator capped at 32 that converted at 8 per amenity. Those are
+// the real Civ 6 numbers divided by 50 — and with the SIGN of the war term
+// flipped, which is the actual fidelity gap: in Civ 6 a war in which nobody
+// fights DECAYS. A phoney war costs nothing; a bloody one is ruinous.
+//
+//     WWP  = (EraBase * Location) + Death
+//     Location = 1 fighting inside your own borders, 2 anywhere else
+//     Death    = 3 * EraBase, to the side whose unit died
+//     any battle with a CITY on either side scores at the abroad column
+//
+// Source: https://civilization.fandom.com/wiki/War_weariness_(Civ6), whose
+// reference [1] is CivFanatics thread 623207 (re-fetched 2026-07-31; its
+// formula and its table agree everywhere except Ancient SURPRISE, where the
+// formula's `3 * min(max(era-1,1),4)` yields 19 and the table says 16 — the
+// TABLE is taken, being the measured column the formula was fitted to).
+// PROVENANCE: the wiki page is that thread's published form, not independent
+// corroboration, and its author flags multi-war behaviour as untested. It is
+// the best available source: the scaling lives in the C++ DLL —
+// `EFFECT_ADJUST_WAR_WEARINESS` takes only {Amount, Overall|Domestic|Enemy},
+// with no era and no casus-belli argument on any of its seven consumers — so
+// no datamining will ever improve on it.
+//
+// UNITS ARE NOW REAL WWP. The accumulator stays an INTEGER, so the derived
+// amenity penalty is integer too and there is no float-association risk.
+
+/** Per-battle base, at home, by era index `min(era - 1, 4)` — FORMAL war. */
+export const WW_ERA_BASE_FORMAL = [16, 22, 28, 34, 40] as const;
+/** The same table for a SURPRISE war (no casus belli). The premium runs 1.00
+ *  at Ancient to 1.30 at Industrial+ — never the flat 2 that S7.8r deleted. */
+export const WW_ERA_BASE_SURPRISE = [16, 25, 34, 43, 52] as const;
+/** Fighting outside your own borders doubles the base. */
+export const WW_ABROAD_MULT = 2;
+/** A unit of yours dying in the battle adds this many bases, to YOUR side. */
+export const WW_DEATH_MULT = 3;
+/** Shed per turn in a war in which no battle was fought this turn. */
+export const WW_DECAY_AT_WAR = 50;
+/** Shed per turn by a seat that is at war with nobody. */
+export const WW_DECAY_AT_PEACE = 200;
+/** Shed by both sides of a pair the turn they sign peace. */
+export const WW_PEACE_TREATY = 2000;
+/** Accumulator points per −1 amenity: "for every 400 WWP you currently have
+ *  you gain -1 war weariness". The remainder buys nothing — that is the floor
+ *  in `warWearinessPenalty`, not a per-turn reset (the decay rules above only
+ *  make sense on an accumulator that PERSISTS). */
+export const WAR_WEARINESS_PER_AMENITY = 400;
 /* #51/S7.8r: WW_SURPRISE_MULT / WW_FORMAL_MULT DELETED — an invented constant
  * and a seat-dependent split, both unsupported.
  *
@@ -341,9 +362,13 @@ export const RR_ALLY_MIN_PEACE = 30;
 export const RR_WARMONGER_DOW = 4;
 export const RR_WARMONGER_CAPTURE = 3;
 export const RR_WARMONGER_GANG = 6;
-/** Empire-wide amenity penalty (≥0) for a weariness accumulator value. */
+/** Amenity penalty (≥0) a city takes for a weariness accumulator value.
+ *  #51/S7.8f: no ceiling. "-1 Amenity per 400 WWP you currently have" is the
+ *  whole conversion; nothing in the source caps it, and the deleted CAP was a
+ *  repo constant whose own comment justified it by MAGNITUDE, not by citation.
+ *  What bounds a long war now is the decay, and the AI's RR_PEACE_WW. */
 export function warWearinessPenalty(weariness: number): number {
-  return Math.floor(Math.min(weariness, WAR_WEARINESS_CAP) / WAR_WEARINESS_PER_AMENITY);
+  return Math.floor(Math.max(0, weariness) / WAR_WEARINESS_PER_AMENITY);
 }
 
 // --- A-19/B-33 rival↔rival war (task #55 S2) ----------------------------------
@@ -358,7 +383,12 @@ export function warWearinessPenalty(weariness: number): number {
 export const RR_DOW_PROXIMITY = 9;
 /** Aggressor strength must exceed target × this — the player gate (1.3). */
 export const RR_DOW_STRENGTH_RATIO = 1.3;
-/** An aggressor at or above this war-weariness will not open a new war. */
-export const RR_DOW_WW_MAX = 6;
+/** An aggressor at or above this war-weariness will not open a new war.
+ *  #51/S7.8f: 6 -> 300. These two are ENGINE AI heuristics, not Civ 6 rules,
+ *  and they are denominated in accumulator units. The accumulator's amenity
+ *  conversion moved 8 -> 400 WWP per amenity, so preserving the AI's behaviour
+ *  IN AMENITY TERMS is exactly x50. Both still sit below/above each other the
+ *  same way, so the anti-thrash argument above is unchanged. */
+export const RR_DOW_WW_MAX = 300;
 /** A warring pair sues out once EITHER side's war-weariness exceeds this. */
-export const RR_PEACE_WW = 10;
+export const RR_PEACE_WW = 500;

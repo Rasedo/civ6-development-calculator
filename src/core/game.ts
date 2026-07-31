@@ -19,7 +19,7 @@ import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress, nextCityName } from './rivals';
 import { seatAccumulators } from './seatTurn';
 import { expirePlayerRoutes } from './trade';
-import { WAR_WEARINESS_PER_TURN, WAR_WEARINESS_DECAY, WAR_WEARINESS_CAP, ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
+import { ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
 import { FEATURES } from '../data/features';
@@ -36,6 +36,7 @@ import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf, type Proj
 import { CITY_NAMES, borderGrowthCost, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, GAME_SPEED } from '../data/constants';
 import { applyLumpYield } from './economy';
 import { tileClaimed, civOfRival, allCities, playerSeat, isPlayerSeat, PLAYER_CIV, setTileOwner, rivalsOf, rivalCount, emptySeat, BARB_SEAT, seatOfCityState } from './seats';
+import { warWearinessTurn } from './weariness';
 
 /** GV-2: the game is over once this many turns are played (score victory at
  * the limit; domination can end it earlier). Config for the horizon. */
@@ -789,18 +790,13 @@ export function endTurn(state: GameState): void {
   const luxMap = luxuryAmenities(state);
   const mods = getModifiers(state);
 
-  // B-15: war weariness accrues once per turn while at war with any live rival
-  // (rival war-state as left by last turn's rivalPhase), decays 4× in peace.
-  // Read here, before the city loop, so this turn's amenities reflect it — the
-  // GPU updates at the same relative point (top of step, after the war block).
-  // B-22 (task #55 S3): the player war accrues at the BASELINE rate (×1). The
-  // casus-belli ww differential (SURPRISE ×2 / FORMAL ×1) is rival↔rival only —
-  // the player has no denounce verb, and doubling the player path surfaced a
-  // dormant −3/−4-tier economic divergence (seed 9092). Unchanged from S2.
-  const atWarNow = rivalsOf(state).some((rv) => rv.atWar && rv.cities.length > 0);
-  playerSeat(state).warWeariness = atWarNow
-    ? Math.min(WAR_WEARINESS_CAP, (playerSeat(state).warWeariness ?? 0) + WAR_WEARINESS_PER_TURN)
-    : Math.max(0, (playerSeat(state).warWeariness ?? 0) - WAR_WEARINESS_DECAY);
+  // B-15 / #51/S7.8f: war weariness SETTLES here — the accrual happened per
+  // BATTLE as the fighting resolved, and what is left for the turn boundary is
+  // the decay. Read here, before the city loop, so this turn's amenities
+  // reflect it; the GPU updates at the same relative point (top of step, after
+  // the war block), and each rival does the same at its own block top through
+  // the SAME function. There is no longer a player rule and a rival rule.
+  warWearinessTurn(state, PLAYER_CIV);
 
   let turnScience = 0;
   let turnCulture = 0;

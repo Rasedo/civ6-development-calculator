@@ -229,7 +229,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
         c_prereqs=[c["prereqs"] for c in r["civics"]],
-        war_weariness=r.get("warWeariness", {"perTurn": 1, "decay": 4, "perAmenity": 4, "cap": 24}),
+        war_weariness=r.get("warWeariness", {}),
         trade=r.get("trade", {}),
         eras=r.get("eras", {}),
         actions=r.get("actions", {}),
@@ -473,9 +473,9 @@ _MUTABLE = [
     # #51/S3.3: the merged unit pool. The BASES are registered, never the
     # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
     # plane instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war", "ww", "ww_turn",
     # #51/S4.2: per-seat scalar bases (the x / r_x views live on these)
-    "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_war_weariness", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
+    "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
     # #51/S6.1: the (civ, city-state) relation bases — cs_x is row 0 and
     # cs_r_x rows 1.., both VIEWS, so only the base may be registered.
     "csr_met", "csr_envoys", "csr_quest", "csr_quest_camp", "csr_quest_issued",
@@ -845,7 +845,7 @@ class BatchSim:
             ("cur_tech", torch.long, -1), ("diplo_favor", torch.long, 0),
             ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
-            ("treasury", dtype, 0), ("war_weariness", torch.long, 0),
+            ("treasury", dtype, 0),
         )
         for _nm, _dt, _fill in _civ_scalars:
             _base = torch.full((B, 1 + r_pad), _fill, dtype=_dt, device=device)
@@ -2208,7 +2208,28 @@ class BatchSim:
             _row[100 + _c] = 1 + r_pad + _c
         _row[BARB_SEAT] = self.BARB_ROW
         self._seat_row = _row
+        # #51/S7.8f: the INVERSE. `_seat_row` answers "which row is this seat";
+        # the weariness rules ask the other way round ("is the tile owned by the
+        # seat sitting in this row"), and a row-indexed lookup keeps that a
+        # gather rather than a Python branch per seat class.
+        _rs = torch.full((self.NS,), NO_SEAT, dtype=torch.long, device=device)
+        _rs[0] = PLAYER_SEAT
+        for _r in range(r_pad):
+            _rs[1 + _r] = _r + 1
+        for _c in range(s_pad):
+            _rs[1 + r_pad + _c] = 100 + _c
+        _rs[self.BARB_ROW] = BARB_SEAT
+        self._ROW_SEAT = _rs
         self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
+        # #51/S7.8f: WAR WEARINESS is keyed exactly like WAR, because every rule
+        # that touches it is per-war — a battle scores against one enemy, the
+        # -50 decays a war nobody fought, and the -2000 settles ONE treaty.
+        # `ww[b, i, j]` is row i's points from its war with row j (NOT
+        # symmetric: each side accrues its own). `ww_turn` stamps the last turn
+        # a battle was fought there, which tells a war being fought from a
+        # phoney one. The barbarian row exists and is never written.
+        self.ww = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
+        self.ww_turn = torch.full((B, self.NS, self.NS), -1, dtype=torch.long, device=device)
 
     def sync_war(self) -> None:
         """#51/S6.0: close the war matrix under TRANSPOSE.
@@ -2367,17 +2388,201 @@ class BatchSim:
             out.scatter_add_(1, top_i, grant.to(self.dtype))
         return out
 
+    # ------------------------------------------------------------------
+    # #51/S7.8f - WAR WEARINESS. The core/weariness.ts twin, seat-generic.
+    #
+    #     WWP = (EraBase * Location) + Death
+    #
+    # scored PER BATTLE, by both sides, "without any discrimination". There is
+    # one function per rule and every one of them takes a SEAT ROW; the
+    # player's row is 0 and a rival's is r+1, exactly as the war matrix indexes
+    # them. No player function, no rival function.
+    # ------------------------------------------------------------------
+
+    def _ww_max(self, row: int) -> torch.Tensor:
+        """[B] long - the worst of this seat's wars, which is the one it feels.
+        Simultaneous wars score separately and only the highest counts."""
+        return self.ww[:, row, :].max(dim=1).values
+
+    def _ww_sum(self, row: int) -> torch.Tensor:
+        """[B] long - every war added up. NOT a game rule: a GATE column, so a
+        disagreement about WHICH war holds the maximum cannot hide behind an
+        equal maximum. The `wwSum` twin."""
+        return self.ww[:, row, :].sum(dim=1)
+
+    def _tile_mil_seat(self, tile: torch.Tensor) -> torch.Tensor:
+        """[B] long - the SEAT of the military unit on `tile`, NO_SEAT if none.
+        #51/S3.3 made the unit pool one plane with `unit_seat` carrying
+        ownership, so this is one gather rather than a per-pool chain."""
+        s = self.occ_mil.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return torch.where(s >= 0, self.unit_seat.gather(1, s.clamp(min=0).unsqueeze(1)).squeeze(1),
+                           torch.full_like(s, NO_SEAT))
+
+    def _tile_civ_seat(self, tile: torch.Tensor) -> torch.Tensor:
+        """[B] long - the SEAT of the civilian on `tile`, NO_SEAT if none."""
+        s = self.occ_civ.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        return torch.where(s >= 0, self.unit_seat.gather(1, s.clamp(min=0).unsqueeze(1)).squeeze(1),
+                           torch.full_like(s, NO_SEAT))
+
+    def _atk_seat(self, atk_kind: str, u: int) -> torch.Tensor:
+        """[B] long - the SEAT of the hostile attacker in pool slot `u`.
+        `_hostile_vs_unit` and `_hostile_ranged_strike` are pool-generic over
+        atk_kind, so their seat is too."""
+        if atk_kind == "rival":
+            return self.v_seat[:, u]
+        if atk_kind == "player":
+            return self.p_seat[:, u]
+        return self.u_seat[:, u]
+
+    def _row_of(self, seat: torch.Tensor) -> torch.Tensor:
+        """[B] long - the war-matrix ROW for each game's absolute seat, with
+        NO_SEAT passed through as -1 (which `_ww_battle` reads as "nobody")."""
+        return torch.where(seat >= 0, self._seat_row[seat.clamp(min=0)], torch.full_like(seat, -1))
+
+    def _ww_occ(self, tile: torch.Tensor) -> torch.Tensor:
+        """[B] long - an occupancy BITMASK for `tile`.
+
+        Sampled either side of a resolution, a bit that FELL is exactly "the
+        defender died": nothing else clears the tile's occupancy mid-battle.
+        It needs no knowledge of which pool or slot the defender lived in, and
+        that pool-blindness is the point - the same expression works at every
+        battle site, where a per-pool death mask would be five different ones.
+        """
+        t = tile.clamp(min=0).unsqueeze(1)
+        # Bit 0 is the military map, bit 1 the civilian one. They are read
+        # SEPARATELY and not ORed: a tile can hold one of each, and ORing them
+        # hides a military death behind the civilian still standing there.
+        return ((self.occ_mil.gather(1, t).squeeze(1) >= 0).long()
+                | ((self.occ_civ.gather(1, t).squeeze(1) >= 0).long() << 1))
+
+    def _ww_holds(self, row: int) -> bool:
+        """Only MAJOR civs keep an accumulator: rows 0..R. A city-state is a
+        real OPPONENT - warring one wears you down normally - but has no
+        amenities to lose and no research to date its era from. The barbarian
+        row is never a war at all."""
+        return 0 <= row <= self.R
+
+    def _ww_era_base(self, row: torch.Tensor, foe_row: torch.Tensor) -> torch.Tensor:
+        """[B] long - each game's per-battle base for the seat in `row` fighting
+        the seat in `foe_row`: that seat's OWN era's entry in the formal or
+        surprise column, clamped at Industrial and beyond.
+
+        Rows are TENSORS because a GPU battle site resolves many games at once
+        and the defender is a different civ in each of them.
+
+        The casus belli picks the column. Only the rival-rival axis can ever
+        answer FORMAL, because denouncing is the only casus-belli verb either
+        engine has and only rivals hold it - a missing VERB, not a seat rule
+        (`isFormalWarSeats` says the same thing in the same words). SURPRISE is
+        the harsher column, so the default costs the defaulting seat.
+        """
+        rww = self.rules.war_weariness
+        formal = torch.tensor(rww.get("eraFormal", [16, 22, 28, 34, 40]), dtype=torch.long, device=self.device)
+        surprise = torch.tensor(rww.get("eraSurprise", [16, 25, 34, 43, 52]), dtype=torch.long, device=self.device)
+        civ = row.clamp(0, self.R)  # civ_techs/civ_civics cover rows 0..R only
+        T, C = self.civ_techs.shape[2], self.civ_civics.shape[2]
+        techs = self.civ_techs.gather(1, civ.view(-1, 1, 1).expand(-1, 1, T)).squeeze(1)
+        civics = self.civ_civics.gather(1, civ.view(-1, 1, 1).expand(-1, 1, C)).squeeze(1)
+        era = self._civ_era(techs, civics).clamp(0, formal.numel() - 1)
+        rr = (row >= 1) & (row <= self.R) & (foe_row >= 1) & (foe_row <= self.R)
+        n = self.rr_warkind.shape[1]
+        flat = (row.clamp(1, max(n, 1)) - 1) * n + (foe_row.clamp(1, max(n, 1)) - 1)
+        kind = self.rr_warkind.reshape(self.B, -1).gather(1, flat.unsqueeze(1)).squeeze(1) & rr
+        return torch.where(kind, formal[era], surprise[era])
+
+    def _ww_battle(self, hit: torch.Tensor, a_row, d_row, tile: torch.Tensor,
+                   a_died=None, d_died=None, city: bool = False) -> None:
+        """One BATTLE, scored for both sides - the `warWearinessBattle` twin.
+
+        `hit` [B] masks the games in which the battle happened; `a_row`/`d_row`
+        are seat ROWS, an int (the same seat in every game) or a [B] tensor.
+        `tile` [B] is the TARGET's tile ("the target location is always the
+        location, including for ranged units"), whose OWNER decides each side's
+        location multiplier: 1 in your own borders, 2 anywhere else. `city`
+        forces the abroad column for both sides, which is what a city giving or
+        receiving an attack does regardless of whose land it stands on.
+
+        Call it after the rolls and after the deaths are known but BEFORE any
+        capture - the multiplier is the one that applied while the battle was
+        fought, not the one that applies once the tile changes hands.
+        """
+        rww = self.rules.war_weariness
+        abroad = int(rww.get("abroad", 2))
+        death = int(rww.get("death", 3))
+        zeros = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        a_row = zeros + a_row if isinstance(a_row, int) else a_row.long()
+        d_row = zeros + d_row if isinstance(d_row, int) else d_row.long()
+        owner = self.tile_seat.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        turn = zeros + int(self.turn)
+        # Barbarians neither accrue weariness nor inflict it: every seat is
+        # permanently hostile to them, so counting it would make "at peace with
+        # everyone" unreachable and no accumulator could ever drain.
+        live = hit & (a_row >= 0) & (d_row >= 0) & (a_row != d_row) \
+            & (a_row != self.BARB_ROW) & (d_row != self.BARB_ROW)
+        if not bool(live.any()):
+            return
+        NS = self.NS
+        flat_ww = self.ww.view(self.B, NS * NS)
+        flat_turn = self.ww_turn.view(self.B, NS * NS)
+        for self_row, foe_row, died in ((a_row, d_row, a_died), (d_row, a_row, d_died)):
+            # Only MAJOR civs (rows 0..R) keep an accumulator - a city-state is
+            # a real opponent but has no amenities to lose and no research to
+            # date its era from.
+            score = live & (self_row >= 0) & (self_row <= self.R)
+            if not bool(score.any()):
+                continue
+            base = self._ww_era_base(self_row, foe_row)
+            at_home = (owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))) & (not city)
+            gain = base * torch.where(at_home, 1, abroad)
+            if died is not None:
+                gain = gain + torch.where(died, base * death, zeros)
+            idx = (self_row.clamp(min=0) * NS + foe_row.clamp(min=0)).unsqueeze(1)
+            flat_ww.scatter_add_(1, idx, torch.where(score, gain, zeros).unsqueeze(1))
+            flat_turn.scatter_(1, idx, torch.where(
+                score, turn, flat_turn.gather(1, idx).squeeze(1)).unsqueeze(1))
+
+    def _ww_decay(self, row: int, mask: torch.Tensor | None = None) -> None:
+        """The end-of-turn decay for ONE seat - the `warWearinessTurn` twin,
+        called from that seat's own block top.
+
+          * a war in which a battle was fought THIS turn does not decay
+          * any other war sheds 50 while this seat is at war with somebody
+          * a seat at war with nobody sheds 200 from every war it remembers
+        """
+        if not self._ww_holds(row):
+            return
+        rww = self.rules.war_weariness
+        at_war = self.war[:, row, :].any(dim=1, keepdim=True)
+        shed = torch.where(at_war,
+                           torch.tensor(int(rww.get("decayAtWar", 50)), dtype=torch.long, device=self.device),
+                           torch.tensor(int(rww.get("decayAtPeace", 200)), dtype=torch.long, device=self.device))
+        fought = self.ww_turn[:, row, :] == int(self.turn)
+        if mask is not None:
+            fought = fought | ~mask.unsqueeze(1)  # an eliminated civ's block is skipped
+        self.ww[:, row, :] = torch.where(fought, self.ww[:, row, :],
+                                         (self.ww[:, row, :] - shed).clamp(min=0))
+
+    def _ww_peace(self, mask: torch.Tensor, a_row: int, b_row: int) -> None:
+        """A peace treaty sheds 2000 from THAT war on both sides - deliberately
+        larger than any plausible accumulation, which is how the source stops a
+        settled war haunting a civ forever. The `warWearinessPeace` twin."""
+        shed = int(self.rules.war_weariness.get("peaceTreaty", 2000))
+        for i, j in ((a_row, b_row), (b_row, a_row)):
+            if not self._ww_holds(i) or i == j:
+                continue
+            self.ww[:, i, j] = torch.where(mask, (self.ww[:, i, j] - shed).clamp(min=0), self.ww[:, i, j])
+
     def _ww_penalty_player(self) -> torch.Tensor:
-        """B-15: player war-weariness amenity penalty [B] (integer floor → dtype),
-        mirrors warWearinessPenalty(state.warWeariness)."""
-        per = int(self.rules.war_weariness.get("perAmenity", 4))
-        return torch.div(self.war_weariness, per, rounding_mode="floor").to(self.dtype)
+        """B-15: player war-weariness amenity penalty [B] (integer floor, then
+        dtype) - the `warWearinessPenalty(wwMax(playerSeat(state)))` twin."""
+        per = int(self.rules.war_weariness.get("perAmenity", 400))
+        return torch.div(self._ww_max(0), per, rounding_mode="floor").to(self.dtype)
 
     def _ww_penalty_rival(self, r: int) -> torch.Tensor:
-        """B-15: rival r's war-weariness amenity penalty [B] (integer floor → float64),
-        mirrors warWearinessPenalty(rival.warWeariness)."""
-        per = int(self.rules.war_weariness.get("perAmenity", 4))
-        return torch.div(self.r_war_weariness[:, r], per, rounding_mode="floor").to(torch.float64)
+        """B-15: rival r's amenity penalty [B] - the same function on row r+1.
+        `warWearinessPenalty(wwMax(rival))`."""
+        per = int(self.rules.war_weariness.get("perAmenity", 400))
+        return torch.div(self._ww_max(r + 1), per, rounding_mode="floor").to(torch.float64)
 
     def _amenity_factors(self, balance: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         growth = torch.full_like(balance, self.rules.amenity_tiers[-1][1])
@@ -6681,8 +6886,16 @@ class BatchSim:
         absorbed = torch.minimum(outer, d_city[rows])
         self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
         self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
+
         self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
         died = att & (self.p_hp[:, p] <= 0)
+        # #51/S7.8f: a CITY is receiving the attack, so both sides score at
+        # the abroad column. MISSED on the first pass because these three
+        # appliers carry the k="rcty" tag, not the k="pcty" I enumerated by -
+        # [[measure-every-path]], and the parity gate named it at seed 9119
+        # t41 (rival 1 assaulting rival 2's city, TS 32 / GPU 0).
+        self._ww_battle(att, self._row_of(self.p_seat[:, p]), self._row_of(civ + 1), tgt,
+                        a_died=died, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             here_d = self.p_tile[dr, p]
@@ -6939,6 +7152,12 @@ class BatchSim:
                 def_naval = v_embd | torch.where(is_b, torch.zeros_like(v_embd), _v_def_nav)
                 def_civ_u = torch.where(is_b, torch.full_like(v_civ, -1), v_civ + 1)
                 def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+                # #51/S7.8f: sample the defender BEFORE the rolls. Reading it
+                # at the hook point returns NO_SEAT once the death has cleared
+                # `occ_mil`, so every KILL scored nothing - the rollout named it
+                # at seed 9002 rng 2026006079 t74 (TS 350 / GPU 300 = 2 x 25,
+                # one Classical surprise base abroad).
+                _wwp, _wwps = self._ww_occ(tgt), self._tile_mil_seat(tgt)
                 d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
                 d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
                 rows = att.nonzero(as_tuple=True)[0]
@@ -6966,6 +7185,11 @@ class BatchSim:
                 both = def_dead & atk_dead
                 self.p_hp[:, p] = torch.where(both, torch.ones_like(self.p_hp[:, p]), self.p_hp[:, p])  # victor survives
                 atk_dead = atk_dead & ~def_dead
+                # #51/S7.8f: ONE battle, scored for both sides - before the
+                # advance moves anybody and before the tile can change hands.
+                self._ww_battle(att, self._row_of(self.p_seat[:, p]),
+                                self._row_of(_wwps), tgt,
+                                a_died=atk_dead, d_died=(_wwp & ~self._ww_occ(tgt)) != 0)
                 if bool(atk_dead.any()):
                     ar = atk_dead.nonzero(as_tuple=True)[0]
                     self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
@@ -7021,6 +7245,7 @@ class BatchSim:
                 _v_def_nav = self.unit_naval[self.v_type.gather(1, vslot.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)]
                 def_naval = v_embd | torch.where(is_b, torch.zeros_like(v_embd), _v_def_nav)
                 def_e = def_e + self._gen_aura_cs(torch.where(is_b, torch.full_like(v_civ, -1), v_civ + 1), tgt, def_naval).to(def_e.dtype)
+                _wwr = (self._ww_occ(tgt), self._tile_mil_seat(tgt))  # #51/S7.8f
                 d_def = self._damage_roll(r_att, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_att.nonzero(as_tuple=True)[0]
                 r_def_dead = torch.zeros_like(r_att)
@@ -7038,6 +7263,12 @@ class BatchSim:
                     self.unit_alive[_gd, _ds[_dead]] = False
                     self.occ_mil[_gd, _td] = -1
                 # B-4: a surviving rival MILITARY defender earns +2 (rv_at map).
+                # #51/S7.8f: "the target location is always the location,
+                # including for ranged units" - the multiplier comes off the
+                # TARGET tile, not the one the archer is standing on.
+                self._ww_battle(r_att, self._row_of(self.p_seat[:, p]),
+                                self._row_of(_wwr[1]), tgt,
+                                d_died=(_wwr[0] & ~self._ww_occ(tgt)) != 0)
                 surv_rv = (r_att & ~is_b & ~r_def_dead).nonzero(as_tuple=True)[0]
                 if len(surv_rv) > 0:
                     self.unit_xp[surv_rv, vslot[surv_rv] + self.POOL_LO["v"]] += XP_DEFEND
@@ -7077,6 +7308,7 @@ class BatchSim:
                 # so no defender term joins here.
                 atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
                 atk_e = atk_e + self._gen_aura_cs(torch.zeros(self.B, dtype=torch.long, device=self.device), self.p_tile[:, p], atk_naval).to(atk_e.dtype)
+                _wwc = (self._ww_occ(tgt), self._tile_civ_seat(tgt))  # #51/S7.8f
                 d_def = self._damage_roll(r_civ, atk_e - def_e, k="rng", tile=tgt)
                 rows = r_civ.nonzero(as_tuple=True)[0]
                 ks = rvc_slot_t[rows]
@@ -7084,6 +7316,9 @@ class BatchSim:
                 dead = self.v_hp[rows, ks] <= 0
                 self.v_alive[rows[dead], ks[dead]] = False
                 self.occ_civ[(rows[dead], tc[rows[dead]])] = -1  # #51/S3.4b
+                self._ww_battle(r_civ, self._row_of(self.p_seat[:, p]),  # #51/S7.8f
+                                self._row_of(_wwc[1]), tgt,
+                                d_died=(_wwc[0] & ~self._ww_occ(tgt)) != 0)
                 if bool(dead.any()):
                     self._gen_ver += 1  # B7-G (B-8): the killed civilian may be a general → invalidate the aura plane
                 self.p_mp[:, p] = torch.where(r_civ, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
@@ -7122,6 +7357,13 @@ class BatchSim:
                     ar = atk_dead.nonzero(as_tuple=True)[0]
                     self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
                     self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
+                # #51/S7.8f: warring a city-state wearies you exactly as
+                # warring a major does; the minor keeps no accumulator (no
+                # amenities, no research to date an era from). Scored BEFORE
+                # the capture branch, so the multiplier is the pre-capture one.
+                self._ww_battle(cs_hit, self._row_of(self.p_seat[:, p]),
+                                self._row_of(100 + cs_sc), tgt,
+                                a_died=atk_dead, city=True)
                 cap = cs_hit & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
                 if bool(cap.any()):
                     self._capture_city_state(cap.nonzero(as_tuple=True)[0], cs_sc)
@@ -7152,6 +7394,8 @@ class BatchSim:
                     torch.zeros(self.B, dtype=torch.long, device=self.device), self.p_tile[:, p], _rngrc_nav
                 ).to(atk_e2.dtype)
                 d_city2 = self._damage_roll(r_sieg, atk_e2 - def_cs2, k="rngrc", tile=tgt)
+                self._ww_battle(r_sieg, self._row_of(self.p_seat[:, p]),  # #51/S7.8f
+                                self._row_of(civ2 + 1), tgt, city=True)
                 rows2 = r_sieg.nonzero(as_tuple=True)[0]
                 self.rc_hp[rows2, civ2[rows2], slot2[rows2]] = torch.maximum(
                     self.rc_hp[rows2, civ2[rows2], slot2[rows2]] - d_city2[rows2],
@@ -7175,6 +7419,8 @@ class BatchSim:
                 atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
                 atk_e3 = atk_e3 + self._gen_aura_cs(torch.zeros_like(here), self.p_tile[:, p], atk_naval).to(atk_e3.dtype)
                 d_cs3 = self._damage_roll(r_cs, atk_e3 - def_cs3, k="rngcs", tile=tgt)
+                self._ww_battle(r_cs, self._row_of(self.p_seat[:, p]),  # #51/S7.8f
+                                self._row_of(100 + cs_sc), tgt, city=True)
                 rows3 = r_cs.nonzero(as_tuple=True)[0]
                 self.cs_hp[rows3, cs_sc[rows3]] = torch.maximum(
                     self.cs_hp[rows3, cs_sc[rows3]] - d_cs3[rows3],
@@ -7911,6 +8157,9 @@ class BatchSim:
                 _def_nav = torch.where(is_rmil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                 def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                 d = self._damage_roll(strike, atk_cs - def_e, k="pcstk", tile=tt)
+                # #51/S7.8f: a city GIVING the attack is city combat too.
+                self._ww_battle(strike, 0, self._row_of(d_seat), tt,
+                                d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
                 rows = strike.nonzero(as_tuple=True)[0]
                 # #51/S3.4b: one merged write per DOMAIN. Clearing every legacy
                 # map of that domain is branch-free and exact — only one of
@@ -8005,6 +8254,9 @@ class BatchSim:
                 _def_nav = torch.where(is_rmil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                 def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                 d = self._damage_roll(strike, atk_cs - def_e, k="pestk", tile=tt)
+                # #51/S7.8f: a city GIVING the attack is city combat too.
+                self._ww_battle(strike, 0, self._row_of(d_seat), tt,
+                                d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
                 rows = strike.nonzero(as_tuple=True)[0]
                 # #51/S3.4b: one merged write per DOMAIN. Clearing every legacy
                 # map of that domain is branch-free and exact — only one of
@@ -10871,10 +11123,12 @@ class BatchSim:
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+            _wwh = self._ww_occ(tgt)  # #51/S7.8f
             d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
             d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
             rows = mil_att.nonzero(as_tuple=True)[0]
             def_dead = torch.zeros_like(mil_att)
+            _wwd = self._tile_mil_seat(tgt)  # #51/S7.8f: the defender, before it falls
             # #51/S3.4b: ONE merged write. The three rows differed only in which
             # pool the defender lived in, which the merged slot already answers.
             if len(rows) > 0:
@@ -10900,6 +11154,11 @@ class BatchSim:
             both = def_dead & atk_dead
             a_hp[:, u] = torch.where(both, torch.ones_like(a_hp[:, u]), a_hp[:, u])  # victor survives
             atk_dead = atk_dead & ~def_dead
+            # #51/S7.8f: the same battle rule the player path scores, on the
+            # seat that happens to be attacking here. Before the advance.
+            self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
+                            self._row_of(_wwd), tgt,
+                            a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
                 a_occ[ar, here[ar]] = -1  # #51/S3.4b
@@ -11059,8 +11318,16 @@ class BatchSim:
         absorbed = torch.minimum(outer, d_city[rows])
         self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
         self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
+
         self.u_hp[:, u] = torch.where(att, self.u_hp[:, u] - d_atk, self.u_hp[:, u])
         died = att & (self.u_hp[:, u] <= 0)
+        # #51/S7.8f: a CITY is receiving the attack, so both sides score at
+        # the abroad column. MISSED on the first pass because these three
+        # appliers carry the k="rcty" tag, not the k="pcty" I enumerated by -
+        # [[measure-every-path]], and the parity gate named it at seed 9119
+        # t41 (rival 1 assaulting rival 2's city, TS 32 / GPU 0).
+        self._ww_battle(att, self._row_of(torch.full_like(tgt, BARB_SEAT)), self._row_of(civ + 1), tgt,
+                        a_died=died, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self.occ_mil[(dr, self.u_tile[dr, u])] = -1  # #51/S3.4b
@@ -11130,8 +11397,16 @@ class BatchSim:
         absorbed = torch.minimum(outer, d_city[rows])
         self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
         self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
+
         self.v_hp[:, u] = torch.where(att, self.v_hp[:, u] - d_atk, self.v_hp[:, u])
         died = att & (self.v_hp[:, u] <= 0)
+        # #51/S7.8f: a CITY is receiving the attack, so both sides score at
+        # the abroad column. MISSED on the first pass because these three
+        # appliers carry the k="rcty" tag, not the k="pcty" I enumerated by -
+        # [[measure-every-path]], and the parity gate named it at seed 9119
+        # t41 (rival 1 assaulting rival 2's city, TS 32 / GPU 0).
+        self._ww_battle(att, self._row_of(self.v_seat[:, u]), self._row_of(civ + 1), tgt,
+                        a_died=died, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self.occ_mil[(dr, self.v_tile[dr, u])] = -1  # #51/S3.4b
@@ -11652,6 +11927,8 @@ class BatchSim:
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, v] + 1, here, atk_naval).to(atk_e.dtype)
                 d_cs = self._damage_roll(cs_att, atk_e - def_cs, k="csty", tile=ttc)
                 d_atk = self._damage_roll(cs_att, def_cs - atk_e, k="cstyc", tile=ttc)
+                self._ww_battle(cs_att, self._row_of(self.v_seat[:, v]),  # #51/S7.8f
+                                self._row_of(100 + cs_sc), ttc, city=True)
                 # B-4: +5 for the attack executed (CS center is not a unit — no defender xp).
                 self.v_xp[:, v] = torch.where(cs_att, self.v_xp[:, v] + XP_ATTACK, self.v_xp[:, v])
                 rows = cs_att.nonzero(as_tuple=True)[0]
@@ -11909,8 +12186,18 @@ class BatchSim:
         if len(rows) > 0:
             tr = tc[rows]
             self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - d_enc[rows]).clamp(min=0)
+        _ww_ad = att & ((a_hp[:, u] - d_self) <= 0)  # #51/S7.8f: before the hp write
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_self, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
+        # #51/S7.8f: an Encampment is part of its city's defenses (B-17) and
+        # fights at that city's strength, so it scores as CITY combat for both
+        # sides - the `attackEncampment` hook's twin. MISSED on the first pass:
+        # this applier's roll keys are penc/renc, and I enumerated the GPU's
+        # battle sites by grepping the tags I already knew. The rollout named
+        # it at seed 9002 rng 2026006079 t101 (TS 2300 / GPU 2250 = 2 x 25).
+        self._ww_battle(att, self._row_of(self._atk_seat(atk_kind, u)),
+                        self._row_of(self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)),
+                        tc, a_died=_ww_ad, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
@@ -11955,6 +12242,8 @@ class BatchSim:
             atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
         d_city = self._damage_roll(att, atk_e - def_cs, k="pcty", tile=_ct)
         d_self = self._damage_roll(att, def_cs - atk_e, k="pctyc", tile=_ct)
+        # #51/S7.8f: the same city combat from the other side of the board.
+        _ww_ad = att & ((a_hp[:, u] - d_self) <= 0)  # #51/S7.8f: BEFORE the hp write
         # B-4: +5 for the attack executed (city is not a unit — no defender xp).
         if atk_kind == "rival":
             self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
@@ -11968,6 +12257,11 @@ class BatchSim:
         self.city_hp[rows, cs] -= d_city[rows] - absorbed
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_self, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
+        # #51/S7.8f: the same city combat from the other side of the board.
+        # The attacker's DEATH term was missing here on the first pass -
+        # parity named it at seed 9144 t47 (TS 80 = 32 + 3x16, GPU 32).
+        self._ww_battle(att, self._row_of(self._atk_seat(atk_kind, u)), 0, _ct,
+                        a_died=_ww_ad, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
@@ -12067,6 +12361,7 @@ class BatchSim:
                 atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile, a_naval).to(atk_e.dtype)
             d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
+            self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), 0, tgt, city=True)  # #51/S7.8f
             rows = city_att.nonzero(as_tuple=True)[0]
             cs_ = tgt_city[rows]
             self.city_hp[rows, cs_] = (self.city_hp[rows, cs_] - d_city[rows]).clamp(min=1)
@@ -12139,6 +12434,7 @@ class BatchSim:
             def_civ_u = torch.where(d_is_mil & ~d_barb, d_seat, neg)
             def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+            def_hp0 = self.unit_hp[torch.arange(self.B, device=self.device), d_slot.clamp(min=0)]  # #51/S7.8f
             d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
             g = unit_att.nonzero(as_tuple=True)[0]
             ds = d_slot[g]  # paired rows — gather(1, …) would read rows 0..|g|
@@ -12154,6 +12450,13 @@ class BatchSim:
             cg, ct2 = gd[~md], td[~md]
             self.occ_mil[mg, mt] = -1
             self.occ_civ[cg, ct2] = -1
+            # #51/S7.8f: `d_seat` is the DEFENDER this arm actually picked,
+            # military or civilian. Reading the tile's MILITARY occupant instead
+            # silently dropped every strike on a lone civilian - parity named it
+            # at seed 9056 t73 (TS 25 player / 50 rival, GPU 0 for both).
+            self._ww_battle(unit_att, self._row_of(self._atk_seat(atk_kind, u)),
+                            self._row_of(d_seat), tgt,
+                            d_died=unit_att & (d_slot >= 0) & ((def_hp0 - d_def) <= 0))
             if bool((unit_att & civ_def).any()):
                 self._gen_ver += 1  # B7-G (B-8): a struck lone civilian may be a general
             # B-4: a surviving MILITARY defender earns +2 (barbs never accrue).
@@ -12715,7 +13018,8 @@ class BatchSim:
         n_c = self.rc_alive.sum(dim=2)  # [B, R]
         alive_civ = self.r_alive[:, : self.R] & (n_c > 0)  # [B, R]
         rstr = self._rr_strengths()
-        ww = self.r_war_weariness[:, : self.R]
+        # #51/S7.8f: the AI reads what the civ FEELS - the worst of its wars.
+        ww = torch.stack([self._ww_max(r + 1) for r in range(self.R)], dim=1)
         prox_max = int(rr.get("rrDowProximity", 9))
         ratio = float(rr.get("rrDowStrengthRatio", 1.3))
         ww_max = int(rr.get("rrDowWwMax", 6))
@@ -12767,7 +13071,7 @@ class BatchSim:
             return
         rr = self.rules.rivals
         peace_ww = int(rr.get("rrPeaceWw", 10))
-        ww = self.r_war_weariness[:, : self.R]
+        ww = torch.stack([self._ww_max(r + 1) for r in range(self.R)], dim=1)  # #51/S7.8f
         for a in range(self.R):
             for b in range(a + 1, self.R):
                 peace = self.rr_war[:, a, b] & ((ww[:, a] > peace_ww) | (ww[:, b] > peace_ww))
@@ -12777,6 +13081,7 @@ class BatchSim:
                     # B-22 (S3): the ended war's kind flag clears (grudge stamp stays).
                     self.rr_warkind[:, a, b] = self.rr_warkind[:, a, b] & ~peace
                     self.rr_warkind[:, b, a] = self.rr_warkind[:, b, a] & ~peace
+                    self._ww_peace(peace, a + 1, b + 1)  # #51/S7.8f: -2000 on the treaty
 
     def _rival_phase(self) -> None:
         """Mirrors rivalPhase, rival by rival in id order — queue picks for
@@ -12806,17 +13111,12 @@ class BatchSim:
             # B-15: this rival's war weariness — accrue while at war, decay in
             # peace (war state as of last turn; declare/peace run later in this
             # phase). Symmetric with the player + the TS rival block top.
-            rww = self.rules.war_weariness
-            # A-19/B-33 (S2): a rival at war with ANYONE (player or another
-            # rival) accrues weariness; decays only at FULL peace. rr_war is
-            # fixed for this turn by the phase-top DoW pass.
-            atw_r = self.r_atwar[:, r] | self.rr_war[:, r, : self.R].any(dim=1)
-            # #51/S7.8r: ONE accrual rate for every seat — the invented ×2
-            # surprise multiplier and its seat-dependent split are gone.
-            per = int(rww.get("perTurn", 1))
-            inc_r = (self.r_war_weariness[:, r] + per).clamp(max=int(rww.get("cap", 24)))
-            dec_r = (self.r_war_weariness[:, r] - int(rww.get("decay", 4))).clamp(min=0)
-            self.r_war_weariness[:, r] = torch.where(active, torch.where(atw_r, inc_r, dec_r), self.r_war_weariness[:, r])
+            # #51/S7.8f: war weariness SETTLES here - the accrual happened per
+            # BATTLE as the fighting resolved, and what is left for the block
+            # top is the decay. The SAME function the player calls, on this
+            # rival's row. rr_war is fixed for this turn by the phase-top DoW
+            # pass, so the "at war with somebody" test inside is stable.
+            self._ww_decay(r + 1, active)
             # AUDIT A-3: eurekas/inspirations from this rival's seat — the
             # TS twin runs at the same point (the rival's block top).
             self._detect_rival_boosts(r, active)
@@ -13980,6 +14280,8 @@ class BatchSim:
                             _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                             d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
+                            self._ww_battle(strike, r + 1, self._row_of(d_seat), tt,
+                                            d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
                             rows = strike.nonzero(as_tuple=True)[0]
                             for grp, occ_map in (
                                 (_okm, self.occ_mil),
@@ -14080,6 +14382,8 @@ class BatchSim:
                             _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
                             d = self._damage_roll(strike, atk_cs - def_e, k="restk", tile=tt)
+                            self._ww_battle(strike, r + 1, self._row_of(d_seat), tt,
+                                            d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
                             rows = strike.nonzero(as_tuple=True)[0]
                             for grp, occ_map in (
                                 (_okm, self.occ_mil),
@@ -15101,17 +15405,9 @@ class BatchSim:
         # t172: the pre-orders read held ww at the cap for one extra turn and
         # dropped the whole economy walk a tier). The RL war verb and last
         # turn's rival phase both precede this point, exactly like TS.
-        rww = self.rules.war_weariness
-        if self.R > 0:
-            live = self.rc_alive[:, : self.R].any(dim=2)  # [B, R]
-            atwar_now = (self.r_atwar[:, : self.R] & live).any(dim=1)  # [B]
-        else:
-            atwar_now = torch.zeros(B, dtype=torch.bool, device=dev)
-        # B-22 (S3): the player war accrues at the BASELINE rate (×1) — the
-        # casus-belli ww differential is rival↔rival only (mirror of game.ts).
-        inc = (self.war_weariness + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
-        dec = (self.war_weariness - int(rww.get("decay", 4))).clamp(min=0)
-        self.war_weariness.copy_(torch.where(atwar_now, inc, dec))
+        # #51/S7.8f: the player settles through the same `_ww_decay` every
+        # rival calls, on row 0. There is no player rule any more.
+        self._ww_decay(0)
 
         # --- envoys --------------------------------------------------------------
         if self.S > 0:
@@ -16125,14 +16421,14 @@ class BatchSim:
         "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions",
         "diploPoints",
         # #51/S0.2: PLAYER twins of long-standing rival columns.
-        "techProg", "civicProg", "warWeariness",
+        "techProg", "civicProg", "warWeariness", "wwSum",  # #51/S7.8f
     ]
     _TRACE_PER_CS = ["envoys", "pop", "questKind"]
     _TRACE_PER_RIVAL = [
         "nCities", "popSum", "nUnits", "atWar", "nTechs", "nCivics", "techProg", "civicProg",
         "qProgSum", "qCostSum", "nDistricts", "nBuildings", "treasury", "rGScore", "rrWarMask",
         "age", "tourism", "faith", "followedSum", "cultureTotal", "diploFavor", "diploPoints",
-        "warWeariness",
+        "warWeariness", "wwSum",  # #51/S7.8f: pins WHICH war holds the max
         # #51/S0.2: rival twins of long-standing player columns.
         "warmonger", "influence", "envoysAvail", "tilesPurchased",
     ]
@@ -16201,7 +16497,8 @@ class BatchSim:
             # #51/S0.2: PLAYER twins of columns the rivals have carried for rounds.
             js_round(self.tech_prog * 1000),
             js_round(self.civic_prog * 1000),
-            self.war_weariness.to(self.dtype),
+            self._ww_max(0).to(self.dtype),
+            self._ww_sum(0).to(self.dtype),  # #51/S7.8f: pins WHICH war holds the max
         ]
         assert len(cols) == len(self._TRACE_HEAD), f"trace head {len(cols)} cols vs {len(self._TRACE_HEAD)} names"
         for s in range(self.S):
@@ -16274,7 +16571,8 @@ class BatchSim:
                 # B-15 (#78 HUNT): rival WAR WEARINESS (appended LAST) — feeds
                 # the amenity tier, which scales city yields, which is what
                 # rGScore sums. Untraced until now.
-                torch.where(live, self.r_war_weariness[:, r].to(self.dtype), zero),
+                torch.where(live, self._ww_max(r + 1).to(self.dtype), zero),
+                torch.where(live, self._ww_sum(r + 1).to(self.dtype), zero),  # #51/S7.8f
                 # #51/S0.2: rival twins of long-standing PLAYER columns. Rival
                 # SCIENCE is deliberately absent — neither engine tracks it
                 # (no scienceTotal on RivalCiv, no r_science plane); recorded

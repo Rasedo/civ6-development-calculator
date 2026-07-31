@@ -77,10 +77,14 @@ import {
   PEACE_GOLD_COST,
   RIVAL_PROD_DIV,
   RIVAL_DEF_PER_TECH,
-  WAR_WEARINESS_PER_TURN,
-  WAR_WEARINESS_DECAY,
+  WW_ERA_BASE_FORMAL,
+  WW_ERA_BASE_SURPRISE,
+  WW_ABROAD_MULT,
+  WW_DEATH_MULT,
+  WW_DECAY_AT_WAR,
+  WW_DECAY_AT_PEACE,
+  WW_PEACE_TREATY,
   WAR_WEARINESS_PER_AMENITY,
-  WAR_WEARINESS_CAP,
   RR_DOW_PROXIMITY,
   RR_DOW_STRENGTH_RATIO,
   RR_DOW_WW_MAX,
@@ -584,10 +588,16 @@ const rules = {
   // B-15 war weariness (mirrors data/rivals.ts): integer accumulator → flat
   // empire-wide amenity penalty for the player AND each rival civ.
   warWeariness: {
-    perTurn: WAR_WEARINESS_PER_TURN,
-    decay: WAR_WEARINESS_DECAY,
+    // #51/S7.8f: the per-BATTLE model. `perTurn`/`cap` are gone — there is no
+    // per-turn accrual and no ceiling.
+    eraFormal: [...WW_ERA_BASE_FORMAL],
+    eraSurprise: [...WW_ERA_BASE_SURPRISE],
+    abroad: WW_ABROAD_MULT,
+    death: WW_DEATH_MULT,
+    decayAtWar: WW_DECAY_AT_WAR,
+    decayAtPeace: WW_DECAY_AT_PEACE,
+    peaceTreaty: WW_PEACE_TREATY,
     perAmenity: WAR_WEARINESS_PER_AMENITY,
-    cap: WAR_WEARINESS_CAP,
     // B-22 (S3): casus-belli accrual multipliers (SURPRISE ×2, FORMAL ×1).
   },
   // B-24 (task #68): era score / Ages (mirrors data/rivals.ts; S1 = the
@@ -1260,7 +1270,7 @@ const SEED_OVERRIDES: Record<number, number> = {
   1: 9018,  // #51/S7.2c: rerolled
   2: 9029,
   4: 9056,  // #51/S5.5: 9054 dies now that rivals hold their own golden dedications
-  6: 9080,
+  6: 9081,  // #51/S7.8f: 9080's player is wiped once war weariness bites per BATTLE
   10: 9133,  // #78/#47: rival units no longer freeze, so the world is harsher
   12: 9158,
   15: 9196,
