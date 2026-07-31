@@ -934,6 +934,12 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
 function attackRivalCity(state: GameState, attacker: Unit, rival: RivalCiv, city: RivalCity): void {
   cityAssault(state, attacker, city, 'rcty', 'rctyc');
   if (city.hp > 0) return;
+  // #51/S7.10a: DAMAGE goes through a garrison, CAPTURE does not. Civ 6 takes a
+  // city by MOVING INTO the centre, which a surviving defender forbids — so a
+  // city battered to 0 HP with a garrison still standing holds at 0 until the
+  // garrison dies. Before city-first this was unreachable (the garrison was
+  // attacked instead of the city), so the capture path never had to say it.
+  if (unitsAt(state, city.centerIndex).some((u) => unitsHostile(state, attacker, u))) return;
   if (isPlayerSeat(attacker.seat)) {
     captureRivalCity(state, rival, city);
   } else if (isRivalSeat(attacker.seat)) {

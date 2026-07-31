@@ -6688,7 +6688,13 @@ class BatchSim:
         # when the attacker DIED to the counter (killUnit precedes the
         # city-hp check) — a scout can trade itself for the city. The old
         # `& ~died` denied mutual-death captures.
-        cap = att
+        # #51/S7.10a: DAMAGE goes through a garrison, CAPTURE does not — Civ 6
+        # takes a city by MOVING INTO the centre, which a surviving defender
+        # forbids. A city at 0 HP with a garrison still on it holds at 0.
+        _occupied = (self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0) | (
+            self.occ_civ.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
+        )
+        cap = att & ~_occupied
         cap_rows = cap.nonzero(as_tuple=True)[0]
         cap_rows = cap_rows[self.rc_hp[cap_rows, civ[cap_rows], slot[cap_rows]] <= 0]
         if len(cap_rows) > 0:
