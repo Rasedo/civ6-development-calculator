@@ -16,6 +16,7 @@ import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captur
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getModifiers, withFollowerBelief, followerReligionForCity } from './effects';
+import type { Modifiers } from './effects';
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
 import { routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity, routeRaidedAt } from './trade';
@@ -2272,7 +2273,7 @@ function issueRivalQuest(state: GameState, rival: RivalCiv, cs: CityState): City
  * keyed on THIS rival's techs/civics and its own borderCostMult-carrying
  * modifiers, exactly as the player's reads playerSeat(state).research and getModifiers.
  */
-function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity, tileIndex: number): number {
+function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity, tileIndex: number, mods: Modifiers): number {
   const center = state.map.tiles[rc.centerIndex];
   const t = state.map.tiles[tileIndex];
   const ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
@@ -2280,12 +2281,15 @@ function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity,
   const cPct = rival.research.civics.length / Object.keys(CIVICS).length;
   const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
   const step = Math.round(5 * GAME_SPEED);
-  // A-5r (#71): tilePurchaseMult stays 1 on the RIVAL seat. It is a
-  // government/policy effect the GPU does not model for rivals (the A-7r
-  // note), so reading it here would desync the two prices the moment a rival
-  // adopted a government carrying it. Flat on both engines until the GPU
-  // grows the channel.
-  return Math.round(base * (1 + 4 * Math.max(tPct, cPct)) + step * (rival.tilesPurchased ?? 0));
+  // #51/S7.7b: this rival's OWN tilePurchaseMult — the player's formula, to
+  // the character. It used to be pinned at 1 with a note calling the flat rate
+  // an agreement between the two engines; it was an agreement to be WRONG
+  // TOGETHER. Civ 6's LAND_SURVEYORS reads "Reduces the cost of purchasing a
+  // tile by 20%" and is a POLICY CARD — nothing about it is the player's alone.
+  // The GPU grew the channel in the same commit (`_gov_policy_mods` -> tpmult).
+  return Math.round(
+    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (rival.tilesPurchased ?? 0)) * mods.tilePurchaseMult,
+  );
 }
 
 export function rivalPhase(state: GameState): void {
@@ -2699,7 +2703,7 @@ export function rivalPhase(state: GameState): void {
         for (const rc of rival.cities) {
           const next = pickBorderTile(state, rc, { map: state.map, mods: getModifiers(state, civOfRival(rival.id)) });
           if (next === null) continue;
-          const cost = rivalTilePurchaseCost(state, rival, rc, next);
+          const cost = rivalTilePurchaseCost(state, rival, rc, next, getModifiers(state, civOfRival(rival.id)));
           if (!goldAffordable(rival.treasury ?? 0, cost)) break;
           rival.treasury = (rival.treasury ?? 0) - cost;
           setTileOwner(state.map.tiles[next], civOfRival(rival.id), rc.id); // A-17 registry

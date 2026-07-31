@@ -1679,6 +1679,7 @@ class BatchSim:
             # PLAYER totals only: TS rivalCityYields never applies yieldMult.
             self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_encamp = torch.tensor([float(g.get("encampmentProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] B9-R1 (no gov carries it today; channel-complete)
+            self._gov_tpmult = torch.tensor([float(g.get("tilePurchaseMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] #51/S7.7b
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)  # [nPol]
@@ -1696,6 +1697,7 @@ class BatchSim:
             # and its buildings — PLAYER queue-head mult (game.ts
             # isEncampmentItem); TS rival accrual is mods-free.
             self._pol_encamp = torch.tensor([float(p.get("encampmentProdMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol]
+            self._pol_tpmult = torch.tensor([float(p.get("tilePurchaseMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol] #51/S7.7b (LAND_SURVEYORS = 0.8)
         # A-7r master switch (rules.governmentsLive), mirrored from the TS
         # GOVERNMENTS_ADOPTION_LIVE. Landed inert; gates every gov/policy
         # application + the influence-tier addition so the two engines flip in
@@ -1703,8 +1705,8 @@ class BatchSim:
         # are inert plumbing until the rival-march latent is fixed).
         self._gov_live = bool(getattr(rules, "governments_live", False))
         self._gov_has_effects = self._gov_live and bool(
-            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_encamp - 1).abs().sum()) > 0)
-            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_encamp - 1).abs().sum()) > 0)
+            (self._ngov and float(self._gov_city_y.abs().sum() + self._gov_cap_y.abs().sum() + self._gov_housing.abs().sum() + (self._gov_ymult - 1).abs().sum() + (self._gov_encamp - 1).abs().sum() + (self._gov_tpmult - 1).abs().sum()) > 0)
+            or (self._npol and float(self._pol_city_y.abs().sum() + self._pol_cap_y.abs().sum() + self._pol_housing.abs().sum() + self._pol_hid_house.abs().sum() + (self._pol_encamp - 1).abs().sum() + (self._pol_tpmult - 1).abs().sum()) > 0)
         )
         self._harbor_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HARBOR"), -1)
         self._hs_idx = next((i for i, d in enumerate(self.districts_cat) if d.get("id") == "HOLY_SITE"), -1)  # A-7: Work Ethic
@@ -2850,7 +2852,9 @@ class BatchSim:
         adopted, has_gov = self._adopted_gov(civics2)
         return torch.where(has_gov, self._gov_tier[adopted], torch.zeros(B, dtype=torch.long, device=self.device))
 
-    def _gov_policy_mods(self, civics2: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _gov_policy_mods(self, civics2: torch.Tensor) -> tuple[
+        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+    ]:
         """A-7r: ([B,6] cityYields, [B,6] capitalYields, [B] housingAll,
         [B,6] yieldMult, [B,nPol] slotted-mask) from a
         seat's adopted government + greedily slotted policies, computed from
@@ -2870,8 +2874,13 @@ class BatchSim:
         ymult = torch.ones(B, 6, dtype=dt, device=dev)
         slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
         emult = torch.ones(B, dtype=dt, device=dev)  # B9-R1: encampmentProdMult product (VETERANCY)
+        # #51/S7.7b: tilePurchaseMult, the SAME shape of channel as emult —
+        # multiplicative, from the adopted government and the slotted cards.
+        # Exported since A-5r but never read, which is why a rival's tile price
+        # ignored LAND_SURVEYORS while the player's did not.
+        tpmult = torch.ones(B, dtype=dt, device=dev)
         if not self._gov_has_effects or not self._ngov:
-            return city_y, cap_y, hous_all, ymult, slotted, emult
+            return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult
         adopted, has_gov = self._adopted_gov(civics2)
         gmask = has_gov.to(dt).unsqueeze(1)
         city_y = city_y + self._gov_city_y[adopted] * gmask
@@ -2879,6 +2888,7 @@ class BatchSim:
         hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         emult = torch.where(has_gov, self._gov_encamp[adopted], emult)
+        tpmult = torch.where(has_gov, self._gov_tpmult[adopted], tpmult)  # #51/S7.7b
         if self._npol:
             nslots = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)  # [B, 4]
             puc = self._pol_unlock_civic  # [nPol]
@@ -2903,7 +2913,10 @@ class BatchSim:
             # B9-R1: multiplicative product over slotted cards (TS applyPolicy
             # mods.encampmentProdMult *= fx — only VETERANCY carries it).
             emult = emult * torch.where(slotted, self._pol_encamp.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
-        return city_y, cap_y, hous_all, ymult, slotted, emult
+            # #51/S7.7b: TS applyPolicy does `mods.tilePurchaseMult *= fx` — the
+            # same multiplicative fold, over the same slotted mask.
+            tpmult = tpmult * torch.where(slotted, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
+        return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult
 
     def _gov_policy_mods_cached(self, seat_tag, civics2: torch.Tensor):
         """G1: (seat_tag, _eff_version)-keyed wrapper over _gov_policy_mods. The
@@ -4126,7 +4139,7 @@ class BatchSim:
         # `bonuses`, city.ts:445-447), summed pre-amenity-factor. Food (col 0)
         # is left unscaled by the amenity factor below, matching TS.
         if self._gov_has_effects:
-            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult = self._gov_policy_mods_cached("p", self.civics)
+            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult, _gpc_tp = self._gov_policy_mods_cached("p", self.civics)
             total += gpc_city.unsqueeze(1)
             total += gpc_cap.unsqueeze(1) * self.is_cap.to(self.dtype).unsqueeze(2)
         else:
@@ -13346,7 +13359,14 @@ class BatchSim:
                     _cpct = self.r_civics[:, r].sum(dim=1).double() / max(1, self.r_civics.shape[2])
                     _base = js_round(torch.full_like(_tpct, 1.0) * (50.0 + 25.0 * (_ring - 2).double()) * self.rules.game_speed)
                     _step = js_round(torch.full_like(_tpct, 5.0 * self.rules.game_speed))
-                    _cost = js_round((_base * (1.0 + 4.0 * torch.maximum(_tpct, _cpct)) + _step * self.r_tiles_purchased[:, r].double()) * 1.0)
+                    # #51/S7.7b: this rival's OWN tilePurchaseMult, where the
+                    # literal 1.0 used to sit. The comment beside its TS twin
+                    # called the flat rate "a two-engine agreement" — it was an
+                    # agreement to be wrong together. Civ 6's LAND_SURVEYORS
+                    # ("Reduces the cost of purchasing a tile by 20%") is a
+                    # policy card, and a card is not the player's to slot alone.
+                    _tpm = self._gov_policy_mods_cached(r, self.r_civics[:, r])[6].double()
+                    _cost = js_round((_base * (1.0 + 4.0 * torch.maximum(_tpct, _cpct)) + _step * self.r_tiles_purchased[:, r].double()) * _tpm)
                     # A-5r HUNT (#71, seed 9158 t157): TS BREAKS out of the rc
                     # loop when the first rc WITH a candidate cannot be
                     # afforded — it does not try the next city. Only a
