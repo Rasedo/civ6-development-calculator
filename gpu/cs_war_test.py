@@ -33,14 +33,22 @@ def main() -> None:
 
     # --- 1) the plane exists, is peace-by-default and survives a round trip --
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    assert "cs_atwar" in _MUTABLE, "cs_atwar must be registered in _MUTABLE"
+    # #51/S6.0: `cs_atwar` is a SLICE of the war matrix now, so what has to be
+    # registered — and what actually carries the state through a round trip —
+    # is `war`. Registering the view instead would restore into a fresh tensor
+    # and silently orphan the matrix.
+    assert "war" in _MUTABLE, "the war matrix must be registered in _MUTABLE"
+    assert "cs_atwar" not in _MUTABLE, "cs_atwar is a VIEW of war — registering it too would double-restore"
+    assert sim.cs_atwar.data_ptr() == sim.war[:, 0, 1 + max(sim.R, 1):].data_ptr(), (
+        "cs_atwar must share storage with war[player, city-state]"
+    )
     assert sim.cs_atwar.shape == (sim.B, sim.S), f"cs_atwar shape {tuple(sim.cs_atwar.shape)}"
     assert not bool(sim.cs_atwar.any()), "peace is the default — no city-state starts at war"
     sim.cs_atwar[0, 0] = True
-    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    sim.sync_war()  # #51/S6.0: close the poke under transpose
     snap = sim.snapshot()
     sim.cs_atwar[0, 0] = False
-    sim.sync_war()  # #51/S4.3: pokes write the legacy stores
+    sim.sync_war()  # #51/S6.0: close the poke under transpose
     sim.restore(snap)
     assert bool(sim.cs_atwar[0, 0]), "cs_atwar must survive snapshot/restore"
 
@@ -72,17 +80,17 @@ def main() -> None:
     b, cs, ctr, u, spot = found
     s2.p_tile[b, u] = spot
     s2.cs_atwar[b, cs] = False
-    s2.sync_war()  # #51/S4.3: pokes write the legacy stores
+    s2.sync_war()  # #51/S6.0: close the poke under transpose
     m_peace = s2.unit_action_mask()[b, u, 6:12]
     dirs = [i for i, n in enumerate(s2.neigh[spot].tolist()) if n == ctr]
     assert dirs, "the planted tile is not adjacent to the centre"
     d = dirs[0]
     assert not bool(m_peace[d]), "a PEACEFUL city-state must never appear in the attack mask"
     s2.cs_atwar[b, cs] = True
-    s2.sync_war()  # #51/S4.3: pokes write the legacy stores
+    s2.sync_war()  # #51/S6.0: close the poke under transpose
     m_war = s2.unit_action_mask()[b, u, 6:12]
     assert bool(m_war[d]), "after a declaration the city-state centre MUST be attackable"
-    print("  a cs_atwar plane: peace default, _MUTABLE, snapshot round-trip OK")
+    print("  a cs_atwar: peace default, a VIEW of war, snapshot round-trip OK")
     print("  b mask: peaceful hidden, declared war reveals the centre OK")
     print("cs_war_test OK — A-18 player<->city-state war gates the attack mask")
 

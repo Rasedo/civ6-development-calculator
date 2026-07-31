@@ -400,11 +400,11 @@ _MUTABLE = [
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
-    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_atwar", "cs_war_turns",  # A-18 (#79): player<->CS war
+    "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
+    "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
     "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -650,12 +650,16 @@ class BatchSim:
         # never-levied CS reads cooldown-ready (turn - (-cd) >= cd for turn≥0).
         self._levy_cooldown = int(rules.cs.get("levyCooldown", 20))
         self.cs_last_levy = torch.full((B, s_pad), -self._levy_cooldown, dtype=torch.long, device=device)
+        self._alloc_war(B, max(self.R, 1), s_pad, device)
         # V-CS: siege hit points (attackCityState) — TS `cs.hp ?? CS_MAX_HP`.
         self.cs_hp = torch.full((B, s_pad), int(rules.cs.get("maxHp", 150)), dtype=torch.long, device=device)
         # A-18 (#79): the player<->city-state war state (CityState.atWar twin).
         # Peace is the default; a city-state is a separate player you must
         # DECLARE on, and the attack mask/resolver both read this.
-        self.cs_atwar = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # #51/S6.0: it is a SLICE of the war matrix now — see `_alloc_war`,
+        # which runs above so the three legacy names can be carved out of it.
+        self.cs_atwar = self.war[:, 0, 1 + max(self.R, 1):1 + max(self.R, 1) + s_pad]
+        self.register_alias("cs_atwar", lambda sim: sim.war[:, 0, 1 + max(sim.R, 1):1 + max(sim.R, 1) + max(sim.S, 1)])
         # #50 (#79): turns since the player declared — the csWarTurns twin,
         # gating when peace may be offered (PEACE_MIN_WAR_TURNS).
         self.cs_war_turns = torch.zeros(B, s_pad, dtype=torch.long, device=device)
@@ -732,33 +736,15 @@ class BatchSim:
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.r_alive = torch.zeros(B, r_pad, dtype=torch.bool, device=device)  # static: placed at creation
         self.r_aggression = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
-        self.r_atwar = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
-        # A-19/B-33 (task #55 S1): per-PAIR rival↔rival war matrix, unified with
-        # the TS `atWarRivals`. rr_war[b, i, j] = rival i is at war with rival j
-        # (symmetric, diagonal false). r_atwar stays the war-with-player [B, R]
-        # vector BESIDE this. INERT in S1 (nothing reads it); _MUTABLE-registered
-        # for snapshot/restore (civ-level — no slot compaction exposure).
-        self.rr_war = torch.zeros(B, r_pad, r_pad, dtype=torch.bool, device=device)
-        # #51/S4.3: ONE war relation. `war[b, i, j]` is symmetric and covers
-        # every pair — player/rival (was r_atwar), rival/rival (was rr_war) and
-        # player/city-state (was cs_atwar). Rows are a COMPACT seat index:
-        #   0            the player
-        #   1 .. R       rivals            (absolute seat r+1)
-        #   1+R .. +S    city-states       (absolute seat 100+s)
-        #   1+R+S        barbarians        (absolute seat 200)
-        # The absolute space is sparse — a dense 201x201 per game would be 40KB
-        # — so `_seat_row` maps absolute seat -> row in one gather.
-        self.NS = 1 + r_pad + s_pad + 1
-        self.BARB_ROW = 1 + r_pad + s_pad
-        _row = torch.zeros(BARB_SEAT + 1, dtype=torch.long, device=device)
-        _row[0] = 0
-        for _r in range(r_pad):
-            _row[_r + 1] = 1 + _r
-        for _c in range(s_pad):
-            _row[100 + _c] = 1 + r_pad + _c
-        _row[BARB_SEAT] = self.BARB_ROW
-        self._seat_row = _row
-        self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
+        # #51/S6.0: the player/rival vector and the rival/rival block are SLICES
+        # of the war matrix (allocated in `_alloc_war` above), not tensors of
+        # their own. A-19/B-33's `rr_war[b, i, j]` and A-18's `r_atwar[b, r]`
+        # still read and write exactly as they did — they are the same memory
+        # the matrix holds, so the two can no longer disagree.
+        self.r_atwar = self.war[:, 0, 1:1 + r_pad]
+        self.register_alias("r_atwar", lambda sim: sim.war[:, 0, 1:1 + max(sim.R, 1)])
+        self.rr_war = self.war[:, 1:1 + r_pad, 1:1 + r_pad]
+        self.register_alias("rr_war", lambda sim: sim.war[:, 1:1 + max(sim.R, 1), 1:1 + max(sim.R, 1)])
 
         # ------------------------------------------------------------------
         # #51/S4.2: PER-SEAT SCALARS. Every `x` / `r_x` pair becomes one
@@ -2037,39 +2023,69 @@ class BatchSim:
         if not bool(((seat[:, u:ue] == BARB_SEAT) | ~al[:, u:ue]).all()):
             raise AssertionError(f"SEAT DRIFT: a living BARB slot does not carry seat {BARB_SEAT}")
 
-    def sync_war(self) -> None:
-        """#51/S4.3: rebuild the war MATRIX from the three legacy stores.
+    def _alloc_war(self, B: int, r_pad: int, s_pad: int, device) -> None:
+        """#51/S4.3: ONE war relation. `war[b, i, j]` is symmetric and covers
+        every pair — player/rival (was r_atwar), rival/rival (was rr_war) and
+        player/city-state (was cs_atwar). Rows are a COMPACT seat index:
+          0            the player
+          1 .. R       rivals            (absolute seat r+1)
+          1+R .. +S    city-states       (absolute seat 100+s)
+          1+R+S        barbarians        (absolute seat 200)
+        The absolute space is sparse — a dense 201x201 per game would be 40KB —
+        so `_seat_row` maps absolute seat -> row in one gather.
 
-        For TEST harnesses that poke r_atwar / rr_war / cs_atwar directly. The
-        engine READS the matrix now, so a poke that only moves a store leaves
-        the two disagreeing — which is what war_test caught by diffing
-        _MUTABLE across a poked and an organic declaration. Scaffolding: it
-        goes when the three stores do.
-        """
-        R = self.r_atwar.shape[1]
-        S = self.cs_atwar.shape[1]
-        self.war.zero_()
-        self.war[:, 0, 1:1 + R] = self.r_atwar
-        self.war[:, 1:1 + R, 0] = self.r_atwar
-        self.war[:, 1:1 + R, 1:1 + R] = self.rr_war
-        cs0 = 1 + R
-        self.war[:, 0, cs0:cs0 + S] = self.cs_atwar
-        self.war[:, cs0:cs0 + S, 0] = self.cs_atwar
+        #51/S6.0: allocated BEFORE the three legacy names, which are now slices
+        of it rather than tensors beside it."""
+        self.NS = 1 + r_pad + s_pad + 1
+        self.BARB_ROW = 1 + r_pad + s_pad
+        _row = torch.zeros(BARB_SEAT + 1, dtype=torch.long, device=device)
+        for _r in range(r_pad):
+            _row[_r + 1] = 1 + _r
+        for _c in range(s_pad):
+            _row[100 + _c] = 1 + r_pad + _c
+        _row[BARB_SEAT] = self.BARB_ROW
+        self._seat_row = _row
+        self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
+
+    def sync_war(self) -> None:
+        """#51/S6.0: close the war matrix under TRANSPOSE.
+
+        It used to REBUILD the matrix from three separate stores. Those stores
+        are slices of the matrix now, so a poke through `r_atwar` / `rr_war` /
+        `cs_atwar` already lands in the right cell — what it does NOT do is
+        write the mirror cell, because a relation stored as a matrix has two of
+        them.
+
+        The UPPER triangle is authoritative and is mirrored down. Deliberately
+        NOT an OR: a poke that makes PEACE clears one cell, and ORing the
+        transpose back in would hand the war straight over again. All three
+        legacy names live in the upper triangle — row 0 for r_atwar/cs_atwar,
+        the a<b half for rr_war — so this is exactly "the stores are the truth,
+        close them under transpose". Idempotent; call it as often as you like."""
+        w = self.war
+        keep = torch.triu(
+            torch.ones(self.NS, self.NS, dtype=torch.bool, device=w.device), diagonal=1
+        )
+        w.copy_(torch.where(keep, w, w.transpose(1, 2).clone()))
 
     def _check_war_invariant(self) -> None:
         """#51/S4.3: the merged war matrix must agree with the three stores it
         replaces, and must be symmetric. Checked every step under
         CIV6_ALIAS_CHECK=1 while both representations are live."""
-        R = self.r_atwar.shape[1]
         w = self.war
-        if not bool((w[:, 0, 1:1 + R] == self.r_atwar).all()):
-            raise AssertionError("WAR DRIFT: war[player, rival] != r_atwar")
-        if not bool((w[:, 1:1 + R, 0] == self.r_atwar).all()):
-            raise AssertionError("WAR DRIFT: war[rival, player] != r_atwar (asymmetric)")
-        if not bool((w[:, 1:1 + R, 1:1 + R] == self.rr_war).all()):
-            raise AssertionError("WAR DRIFT: war[rival, rival] != rr_war")
+        # #51/S6.0: the "matrix agrees with the store" checks are gone with the
+        # stores — r_atwar / rr_war / cs_atwar ARE the matrix now, so comparing
+        # them to it compares memory with itself. SYMMETRY is the one property
+        # left that code can actually break: every write through a legacy name
+        # touches one cell of a pair, and the mirror has to be written too.
         if not bool((w == w.transpose(1, 2)).all()):
-            raise AssertionError("WAR DRIFT: the matrix is not symmetric")
+            bad = (w != w.transpose(1, 2)).nonzero()[0].tolist()
+            raise AssertionError(
+                f"WAR DRIFT: the matrix is not symmetric at (game {bad[0]}, rows "
+                f"{bad[1]}/{bad[2]}) — a declaration wrote one side of the pair"
+            )
+        if not bool((torch.diagonal(w, dim1=1, dim2=2) == False).all()):  # noqa: E712
+            raise AssertionError("WAR DRIFT: a seat is at war with itself")
 
     def _check_state_discipline(self) -> None:
         self._check_seat_invariant()
@@ -8121,8 +8137,7 @@ class BatchSim:
             declare = (w == 0) & self.controlled[:, r] & self.r_alive[:, r] & ~self.r_atwar[:, r]
             if bool(declare.any()):
                 self.r_atwar[:, r] = self.r_atwar[:, r] | declare
-                self.war[:, 0, 1 + r] |= declare  # #51/S4.3
-                self.war[:, 1 + r, 0] |= declare
+                self.war[:, 1 + r, 0] |= declare  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(declare, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
             # P5/S2 (C-13): the controlled rival's peace is no longer free —
             # it pays the player's exact schedule from r_treasury (mask
@@ -8137,8 +8152,7 @@ class BatchSim:
             if bool(peace.any()):
                 self.r_treasury[:, r] = torch.where(peace, self.r_treasury[:, r] - pcost_c, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~peace
-                self.war[:, 0, 1 + r] &= ~peace  # #51/S4.3
-                self.war[:, 1 + r, 0] &= ~peace
+                self.war[:, 1 + r, 0] &= ~peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
         if production is None:
@@ -12329,11 +12343,9 @@ class BatchSim:
                 )
                 if bool(declare.any()):
                     self.rr_war[:, a, b] = self.rr_war[:, a, b] | declare
-                    self.war[:, 1 + a, 1 + b] |= declare  # #51/S4.3
                     # B-22: declaring earns GRIEVANCES.
                     self.r_warmonger[:, a] = self.r_warmonger[:, a] + declare.long() * self._wm_dow
                     self.rr_war[:, b, a] = self.rr_war[:, b, a] | declare
-                    self.war[:, 1 + b, 1 + a] |= declare  # #51/S4.3
                     # B-22 (S3): FORMAL iff a denounced b ≥ formal_min turns ago.
                     dt = self.rr_denounced[:, a, b]
                     formal = declare & (dt >= 0) & ((int(self.turn) - dt) >= formal_min)
@@ -12358,8 +12370,6 @@ class BatchSim:
                 if bool(peace.any()):
                     self.rr_war[:, a, b] = self.rr_war[:, a, b] & ~peace
                     self.rr_war[:, b, a] = self.rr_war[:, b, a] & ~peace
-                    self.war[:, 1 + a, 1 + b] &= ~peace  # #51/S4.3
-                    self.war[:, 1 + b, 1 + a] &= ~peace
                     # B-22 (S3): the ended war's kind flag clears (grudge stamp stays).
                     self.rr_warkind[:, a, b] = self.rr_warkind[:, a, b] & ~peace
                     self.rr_warkind[:, b, a] = self.rr_warkind[:, b, a] & ~peace
@@ -14048,8 +14058,7 @@ class BatchSim:
             if bool(made_peace.any()):
                 self.r_treasury[:, r] = torch.where(made_peace, self.r_treasury[:, r] - pcost, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~made_peace
-                self.war[:, 0, 1 + r] &= ~made_peace  # #51/S4.3
-                self.war[:, 1 + r, 0] &= ~made_peace
+                self.war[:, 1 + r, 0] &= ~made_peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
 
@@ -14092,8 +14101,7 @@ class BatchSim:
             declare = cond & (rw < 0.08 * (0.5 + self.r_aggression[:, r]))
             if bool(declare.any()):
                 self.r_atwar[:, r] = self.r_atwar[:, r] | declare
-                self.war[:, 0, 1 + r] |= declare  # #51/S4.3
-                self.war[:, 1 + r, 0] |= declare
+                self.war[:, 1 + r, 0] |= declare  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(declare, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
         # G3 hardening: drop the G1 route-income cache at phase end. Its key
         # (turn, r, eff, _rp_kill_version) does not cover unit deaths in the
@@ -14578,7 +14586,6 @@ class BatchSim:
                 if bool(decl.any()):
                     oh = torch.nn.functional.one_hot(w.clamp(min=0, max=self.R - 1), self.R).bool() & decl.unsqueeze(1)
                     self.r_atwar.logical_or_(oh)
-                    self.war[:, 0, 1:1 + self.r_atwar.shape[1]] |= oh  # #51/S4.3
                     self.war[:, 1:1 + self.r_atwar.shape[1], 0] |= oh
                     self.r_warturns.copy_(torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns))
                 pea = ok & (w >= self.R)
@@ -14591,7 +14598,6 @@ class BatchSim:
                     oh = torch.nn.functional.one_hot(ri, self.R).bool() & pea.unsqueeze(1)
                     self.treasury.copy_(torch.where(pea, self.treasury - cost, self.treasury))
                     self.r_atwar.logical_and_(~oh)
-                    self.war[:, 0, 1:1 + self.r_atwar.shape[1]] &= ~oh  # #51/S4.3
                     self.war[:, 1:1 + self.r_atwar.shape[1], 0] &= ~oh
                     self.r_warturns.copy_(torch.where(oh, torch.zeros_like(self.r_warturns), self.r_warturns))
                     self.r_peaceturns.copy_(torch.where(oh, torch.zeros_like(self.r_peaceturns), self.r_peaceturns))

@@ -252,6 +252,19 @@ Per-item weights (done% in parens where partial):
   NOT MODELLED, recorded rather than approximated: the diplomatic consequences
   of the declaration (grievances/warmonger with other civs, the suzerain's
   reaction) and any peace-making path back — declaring is one-way here.
+  **RE-STATED SHARPER 2026-07-31 (#51/S6.0): the CS war verb is unreachable in
+  a GAME, not merely in the gate.** `declareWarOnCityState` and
+  `sueForPeaceWithCityState` are called by NOBODY — not `rlenv`, not
+  `scripts/replay-gpu.ts`, not the scripted policy — and the GPU engine never
+  writes `cs_atwar` at all (two reads, zero writes; only test pokes and
+  `sync_war` touch it). This is not a city-state quirk: the player's
+  `declareWar(state, rivalId)` is in the same position. Player-initiated
+  diplomacy is simply not in either engine's action space — rivals declare on
+  the player (the 0.08 roll in `_rival_phase`), never the reverse. That is
+  V-W1, and it belongs to #51 Round 8 (the RL interface), not to a diplomacy
+  patch: inventing a verb channel here would be building the action space out
+  of order. Recorded so the next reader does not mistake "the gate never
+  declares" for "the driver could if it wanted to".
   GATE REACHABILITY: zero by construction — the scripted policy picks only from
   `attackTargets` and never declares, so no city-state is ever at war in-gate
   and scripted parity is 0.0 milli before and after. Proven instead by
