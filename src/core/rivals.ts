@@ -755,7 +755,15 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
  * registry — a rival city can no longer claim across a sibling's frontier,
  * exactly like the player's tileBelongsTo(n, city) check. */
 
-function tryFoundCity(state: GameState, rival: RivalCiv): void {
+/**
+ * #51/S4.1r: returns whether a city was founded, so a PAID-FOR settler that
+ * finds no site can be BANKED instead of evaporating — which is what the
+ * player's has always done (`canFoundCity`: "A refused planned site DROPS ...
+ * while the settler stays banked"). A rival's was simply destroyed: the
+ * production was spent, the queue item shifted, and nothing came back. 12
+ * fully-paid rival settlers died that way in seed 9133 alone.
+ */
+function tryFoundCity(state: GameState, rival: RivalCiv): boolean {
   // Expand near home: best site within reach of the existing cities.
   let best: Tile | null = null;
   let bestQ = 3; // don't settle garbage
@@ -792,7 +800,9 @@ function tryFoundCity(state: GameState, rival: RivalCiv): void {
   if (best) {
     const city = foundRivalCity(state, rival, best);
     state.eventLog.push(`${rival.name} founded ${city.name}.`);
+    return true;
   }
+  return false;
 }
 
 function claimGreatPeople(state: GameState, rival: RivalCiv): void {
@@ -2670,6 +2680,13 @@ export function rivalPhase(state: GameState): void {
       // production-settler site scan (tryFoundCity); pay only on a real found
       // (no site = refund, the spawn-refund convention). The new city joins
       // this turn's amenity map and city loop (both taken after this block).
+      // #51/S4.1r: SPEND THE BANK FIRST. A settler already paid for is re-tried
+      // every turn until a site opens — the player's bank behaves exactly so.
+      // Before this, a rival's paid settler was destroyed the turn it completed
+      // if no site qualified, and buying another cost gold all over again.
+      if (rival.settlers > 0 && rival.cities.length < RIVAL_MAX_CITIES && tryFoundCity(state, rival)) {
+        rival.settlers -= 1;
+      }
       if (!bought && rival.cities.length < RIVAL_MAX_CITIES) {
         const price = RIVAL_SETTLER_COST(rival.cities.length) * GOLD_PURCHASE_MULT;
         if (goldAffordable(rival.treasury ?? 0, price)) {
@@ -3058,7 +3075,11 @@ export function rivalPhase(state: GameState): void {
                 : q.cost ?? 54; // settler / district / project carry their own cost
         if (q.progress >= cost) {
           rc.queue.shift();
-          if (q.kind === 'settler') tryFoundCity(state, rival);
+          if (q.kind === 'settler') {
+            // #51/S4.1r: BANK a settler that finds no site, exactly as the
+            // player's does. It is re-tried from the bank on later turns.
+            if (!tryFoundCity(state, rival)) rival.settlers += 1;
+          }
           else if (q.kind === 'district') {
             const dt = state.map.tiles[q.tileIndex];
             dt.districtComplete = true;

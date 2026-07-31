@@ -421,7 +421,7 @@ def pool_view(snap: dict, pre: str, plane: str):
 
 _MUTABLE = [
     "workable",
-    "settlers", "settlers_queued",
+    "civ_settlers", "settlers_queued",  # #51/S4.1r: `settlers` is a VIEW of civ_settlers
     "science_total",
     "civic_boosted",
     "rng_state", "center_at", "tdef", "tmove",
@@ -1866,7 +1866,6 @@ class BatchSim:
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # B6-S2: missionary buy gate
         self.prod_bank = z(B, C)  # V-H1: chop production banked while the queue is empty
-        self.settlers = torch.zeros(B, dtype=torch.long, device=device)
         self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
         self.science_total = z(B)
 
@@ -2152,6 +2151,11 @@ class BatchSim:
         ("tourism", "tourism_total", "r_tourism", torch.long, None),
         ("warmonger", "p_warmonger", "r_warmonger", torch.long, None),
         ("gpp", "player_gp_points", "r_gpp", None, "_gp_nc"),
+        # #51/S4.1r: the SETTLER BANK. The player has always banked a paid-for
+        # settler and re-tried on a later turn; a rival's simply EVAPORATED when
+        # no site qualified that turn (12 fully-paid settlers destroyed in seed
+        # 9133 alone). One plane, one rule.
+        ("settlers", "settlers", "r_settlers", torch.long, None),
     )
 
     def _alloc_civ_pairs(self, B: int, r_pad: int, dtype, device) -> None:
@@ -13245,6 +13249,16 @@ class BatchSim:
             # [...rival.cities] snapshot taken after this block).
             mult_r5 = self.rules.gold_purchase_mult
             sett_price5 = settle_cost * mult_r5  # settle_cost = settlerBase + settlerPer·(n_cities−1), from the picker
+            # #51/S4.1r: SPEND THE BANK FIRST, one per turn, then re-read the
+            # city count — TS reads `rival.cities.length` fresh at the purchase
+            # gate, so a bank-found on this turn must be visible to it.
+            _bank_ok = active & (self.r_settlers[:, r] > 0) & (n_cities < rr.get("maxCities", 6))
+            if bool(_bank_ok.any()):
+                _nb_b = self.rc_alive[:, r].sum(dim=1)
+                self._rival_try_found(r, _bank_ok)
+                _got_b = _bank_ok & (self.rc_alive[:, r].sum(dim=1) > _nb_b)
+                self.r_settlers[:, r] = torch.where(_got_b, self.r_settlers[:, r] - 1, self.r_settlers[:, r])
+            n_cities = self.rc_alive[:, r].sum(dim=1)
             want_s5 = active & ~bought_r5 & (n_cities < rr.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], sett_price5)
             if bool(want_s5.any()):
                 n_before5 = self.rc_alive[:, r].sum(dim=1)
@@ -13743,7 +13757,16 @@ class BatchSim:
                         self.rc_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_cost[:, r, j]), self.rc_cost[:, r, j])
                         found_s = done_q & (cur == 0)
                         if bool(found_s.any()):
+                            _nb_s = self.rc_alive[:, r].sum(dim=1)
                             self._rival_try_found(r, found_s)
+                            # #51/S4.1r: BANK the paid settler that found no
+                            # site. It used to evaporate — production spent,
+                            # queue shifted, nothing back — while the player's
+                            # stayed banked for a later turn.
+                            _made_s = found_s & (self.rc_alive[:, r].sum(dim=1) > _nb_s)
+                            self.r_settlers[:, r] = torch.where(
+                                found_s & ~_made_s, self.r_settlers[:, r] + 1, self.r_settlers[:, r]
+                            )
                         spawn_u = done_q & (cur >= 1) & (cur <= self.NU)
                         is_bldr = spawn_u & (cur - 1 == self._builder_idx)
                         if bool(is_bldr.any()):
