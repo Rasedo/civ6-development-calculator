@@ -416,3 +416,33 @@ The spec's own reachability note says the 12 destroyed settlers were in seed
 
 Then: (i) land the BUILD-path decrement, (ii) re-derive SEED_OVERRIDES, (iii)
 only then decide the purchase attribution.
+
+
+---
+
+## S4.1r — `foundRivalCity` -> `foundCity`: the collapse is now MECHANICAL
+
+Read both functions side by side 2026-07-31. They are 57 and 51 lines and have
+converged to SEVEN differences, none of them a rule:
+
+| # | player `foundCity` | rival `foundRivalCity` | verdict |
+|---|---|---|---|
+| 1 | `state.nextCityId++` | `rival.nextCityId++` | per-seat counter; `seatOf(state, seat)` reaches both |
+| 2 | `cityName(id)` | `nextCityName(rival)` | per-seat namer |
+| 3 | — | `foundedTurn: state.turn` | rival-only FIELD; `City` can carry it for every seat |
+| 4 | `revealAround(state, tileIndex, 3)` | — | CORRECT asymmetry: fog is player-only in this engine |
+| 5 | ring then centre | centre then ring | **NO-OP** — `tilesWithin(...,1)` includes the centre, so each order lands the same claim |
+| 6 | `state.cities.push` | `rival.cities.push` | `citiesOf(state, seat)` already exists |
+| 7 | `canFoundCity` + settler spend | neither (caller does it) | the caller difference S4.1r's other halves address |
+
+**The one that LOOKED like a rule is not.** The ring claim reads
+`!tileClaimed(t)` for the player and `!tileOwned(t)` for a rival — but
+`rivals.ts:tileOwned` was `function tileOwned(t) { return tileClaimed(t); }`,
+a pure alias. Deleted (byte-identical fixtures, parity 0.0), and with it the
+last apparent asymmetry between the two ring claims.
+
+So the collapse is a MECHANICAL merge, not a fidelity question: one
+`foundCity(state, seat, tile)` whose per-seat parts are the id counter, the
+namer and the container, all of which `seatOf`/`citiesOf` already serve.
+Keep `revealAround` gated on the player seat and carry `foundedTurn` for
+everyone. Expect BYTE-IDENTICAL fixtures; anything else is a bug in the merge.

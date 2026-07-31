@@ -102,17 +102,14 @@ const RIVAL_BUY_UNITS: { id: string; tech?: string }[] = [
 // Placement
 // ---------------------------------------------------------------------------
 
-function tileOwned(t: Tile): boolean {
-  return tileClaimed(t);
-}
 
 function siteQuality(state: GameState, tile: Tile): number {
   if (isWater(tile) || isImpassable(tile)) return -1;
   if (tile.wonder || tile.feature === 'OASIS' || tile.district) return -1;
-  if (tileOwned(tile)) return -1;
+  if (tileClaimed(tile)) return -1;
   let q = hasFreshWater(state.map, tile) ? 8 : 0;
   for (const t of tilesWithin(state.map, tile.col, tile.row, 2)) {
-    if (isWater(t) || isImpassable(t) || tileOwned(t)) continue;
+    if (isWater(t) || isImpassable(t) || tileClaimed(t)) continue;
     const terrain = TERRAINS[t.terrain]?.yields ?? {};
     const feature = t.feature ? FEATURES[t.feature]?.yields ?? {} : {};
     const res = t.resource ? RESOURCES[t.resource]?.yields ?? {} : {};
@@ -169,7 +166,7 @@ function foundRivalCity(state: GameState, rival: RivalCiv, tile: Tile): RivalCit
     // Mirrors foundCity: the full first ring, water included — a coastal
     // rival must own its harbor water (AUDIT C-1; the water skip made the
     // whole Harbor line structurally unreachable for rivals).
-    if (!tileOwned(t)) {
+    if (!tileClaimed(t)) {
       setTileOwner(t, civOfRival(rival.id), city.id);
     }
   }
