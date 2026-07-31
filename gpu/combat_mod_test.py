@@ -138,7 +138,7 @@ def test_integrated(sim, p, code, name) -> None:
     is_barb = int(sim.barb_at[0, tgt]) >= 0
     if is_barb:
         dslot = int(sim.barb_at[0, tgt])
-        def_combat = int(sim._unit_combat[sim.u_type[0, dslot]])
+        def_combat = int(sim._p_combat[sim.u_type[0, dslot]])  # #51/S4.1r: was _unit_combat, an attribute that never existed — this barb branch had simply never been reached until a trajectory change took it
         def set_def_hp(v):
             sim.u_hp[0, dslot] = v
         def_fort = int(sim.u_fortify[0, dslot])
