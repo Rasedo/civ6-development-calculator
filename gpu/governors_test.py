@@ -115,6 +115,24 @@ def two_player_setup(rules, path):
     cols = free[:2]
     add_player_city(sim, cols[0], nb[0], 4, 55.0, 10)
     add_player_city(sim, cols[1], nb[1], 4, 59.0, 11)
+    # #51/S4.1r: GUARANTEE FOREIGN PRESSURE. Loyalty pressure is a RATIO —
+    # `scale * (own - foreign) / (own + foreign)` — so with foreign == 0 it is
+    # `own/own` and the SOURCE-civ age factor CANCELS ALGEBRAICALLY. The lane's
+    # Golden x1.5 assertion then cannot fire, whatever the starting loyalty.
+    # It used to hold only because the fixture happened to park a rival city in
+    # range; a fixture change silently removed that and the lane went from
+    # proving the multiplier to proving nothing. Plant one instead of hoping.
+    if sim.R > 0:
+        cap_tile = int(sim.site[0, cap])
+        near = next(
+            (t for t in range(sim.T)
+             if 1 <= int(sim.pair_dist[cap_tile, t]) <= 3 and bool(sim.passable[0, t])),
+            -1,
+        )
+        assert near >= 0, "no tile in loyalty range of the capital to plant a rival city on"
+        sim.rc_alive[0, 0, 0] = True
+        sim.rc_center[0, 0, 0] = near
+        sim.rc_pop[0, 0, 0] = 6
     sim.civics[:] = False
     return sim, cols
 
