@@ -44,8 +44,13 @@ def main() -> None:
     assert names[sim._relic_bidx] == "TEMPLE", f"relic slot building is {names[sim._relic_bidx]}, want TEMPLE"
 
     # --- 2) _MUTABLE registration + snapshot/restore ------------------------
+    # #51/S6.2: `relics` and `rc_relics` are the player and rival VIEWS of one
+    # `cty_relics` plane, and since S6.2 that plane also has a MINOR section
+    # neither view reaches — so the BASE is what has to be registered.
+    assert "cty_relics" in _MUTABLE, "cty_relics must be registered in _MUTABLE"
     for f in ("relics", "rc_relics"):
-        assert f in _MUTABLE, f"{f} must be registered in _MUTABLE"
+        assert f not in _MUTABLE, f"{f} is a VIEW of cty_relics"
+        assert getattr(sim, f).data_ptr() >= sim.cty_relics.data_ptr()
     sim.relics[:, 0] = 1
     snap = sim.snapshot()
     sim.relics[:, 0] = 0

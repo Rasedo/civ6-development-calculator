@@ -382,11 +382,11 @@ def pool_view(snap: dict, pre: str, plane: str):
 
 
 _MUTABLE = [
-    "alive", "pop", "food_box", "culture_box", "tiles_acquired", "owner", "workable",
-    "buildings", "current", "cur_cost", "progress", "q_dtile", "settlers", "settlers_queued",
-    "science_total", "culture_total",
+    "owner", "workable",
+    "settlers", "settlers_queued",
+    "science_total",
     "civic_boosted",
-    "rng_state", "city_hp", "outer_hp", "center_at", "tdef", "tmove",
+    "rng_state", "center_at", "tdef", "tmove",
     # B-5 FORTIFY (military; cap 2)
     # AUDIT B-4 XP (player/rival units; barbs accrue none — no plane)
     # #70/S3 (B-8) frozen general/admiral +MP (barbs never have generals — no plane)
@@ -397,34 +397,34 @@ _MUTABLE = [
      # P4/D-10 cost escalators
      # P4/D-22 city-defense trackers
     "district_dead",  # P5/S1: captured districts are paved-but-dead
-    "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
-    "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
-    "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
+    "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
+    "next_site_ptr", "founded_n", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
+    "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
     "cs_quest_district", "cs_at", "cs_war_turns",  # A-18 (#79): player<->CS war
     "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
-    "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
+    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
+    "rc_dist_tile",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
-    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
+    "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
     "r_route_dest",  # B-23: international dest player-city CENTER TILE (>=0), else -1 (domestic/CS)
     "r_route_exp",   # B-23: per-route expiry turn (start + trade.duration), -1 = free slot
      # A-12: rival↔CS diplomacy
      # A-3: rival eurekas/inspirations
-    "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
-    "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
+    "rc_id",
+    "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_civ", "v_next",
-    "gp_earned", "player_gp_points", "player_faith", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
+    "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed", "r_pantheon", "r_follower", "r_founder",  # A-7: belief identity
     "enh_claimed", "r_enhancer", "r_enhancer_done",  # B-18: enhancer race
     "holy_tile", "city_pressure", "city_followed", "rc_pressure", "rc_followed",  # B-18: pressure spread
-    "gw_writing", "gw_art", "gw_music", "rc_gw_writing", "rc_gw_art", "rc_gw_music",  # B-20: Great Works per-city counts (#73: ART is a real kind)
+     # B-20: Great Works per-city counts (#73: ART is a real kind)
     # B-20: RELICS per city (#73, TEMPLE slot, 4 faith + 8 tourism) and
     # ARTIFACTS + ANTIQUITY SITES (#79, Archaeological Museum, 3 culture + 3 tourism)
-    "relics", "rc_relics", "artifacts", "rc_artifacts", "antiquity",
-    "tourism_total", "r_tourism",  # B-20 (#71): cumulative TOURISM, player + per rival
-    "r_culture",  # B-25 (#72): per-rival LIFETIME culture (the player's culture_total twin)
+    "antiquity",
+     # B-20 (#71): cumulative TOURISM, player + per rival
+     # B-25 (#72): per-rival LIFETIME culture (the player's culture_total twin)
     "built_wonder", "built_wonder_complete", "rc_wonder",  # A-4: rival world wonders
     "fertility", "drought", "improvement", "pillaged", "district", "dscaffold_placed",
     "district_pillaged",  # B-32: raided-dark districts (tile plane, reclaim-safe)
@@ -438,6 +438,14 @@ _MUTABLE = [
     # #51/S6.1: the (civ, city-state) relation bases — cs_x is row 0 and
     # cs_r_x rows 1.., both VIEWS, so only the base may be registered.
     "csr_met", "csr_envoys", "csr_quest", "csr_quest_camp", "csr_quest_issued",
+    # #51/S6.4: the last five player/rival scalar pairs — the two old names
+    # are VIEWS of these, so only the base may be registered.
+    "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",
+    # #51/S6.2: the CITY BLOCK bases. S4.1 registered the player and rival
+    # VIEWS instead, which covered every cell there was — until S6.2 gave the
+    # block a MINOR section that neither view reaches. Registering the base is
+    # the only spelling that stays complete when the block grows a section.
+    "cty_alive", "cty_center", "cty_pop", "cty_hp", "cty_outer_hp", "cty_is_cap", "cty_loyalty", "cty_acquired", "cty_growth", "cty_cbox", "cty_current", "cty_progress", "cty_cost", "cty_qtile", "cty_gw_writing", "cty_gw_art", "cty_gw_music", "cty_relics", "cty_artifacts", "cty_bldg",
 ]
 
 
@@ -805,9 +813,7 @@ class BatchSim:
         # declare war on each other; a denouncement or a war breaks it.
         self.rr_allied = torch.zeros_like(self.rr_denounced, dtype=torch.bool)
         # B-22 (2026-07-27): per-civ WARMONGER score (grievances).
-        self.r_warmonger = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-22 (#74): the PLAYER's grievance score — the exact r_warmonger twin.
-        self.p_warmonger = torch.zeros(B, dtype=torch.long, device=device)
         # B-22 (#75): DIPLOMATIC FAVOR — the World Congress currency, per civ.
         # B-22 (#76): World Congress sessions held + Diplomatic Victory Points.
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
@@ -912,10 +918,8 @@ class BatchSim:
         # NU + nScaffold complete into it)
         self.r_pantheon_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         self.r_religion_done = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
-        self.r_faith = torch.zeros(B, r_pad, dtype=torch.float64, device=device)  # P5/S5 (C-17): the pantheon's funding
         self.r_prophets = torch.zeros(B, r_pad, dtype=torch.long, device=device)  # P5/S5 (C-16): religion gate
         self.r_next_city_id = torch.zeros(B, r_pad, dtype=torch.long, device=device)
-        self.r_gpp = torch.zeros(B, r_pad, n_gp, dtype=torch.float64, device=device)
         # P4/D-10: builders ever trained — the player's and each rival's own
         # cost escalator (builderCost = round((50 + 4·n) · gameSpeed)).
         # P4/D-22: strongest MELEE unit each civ ever fielded (city defense).
@@ -1249,7 +1253,7 @@ class BatchSim:
         self._gp_effects = torch.tensor(gp_fx if gp_fx else [[[0, 0, 0, 0, 0]] * 4] * n_gp, dtype=dtype, device=device)  # [n_gp, maxN, 5] (P5/S5: col 4 = faith)
         self._prophet_cls = int(rr.get("prophetCls", 3))  # P5/S5: PROPHET's class index
         self._gp_nc = int(self._gp_class_district.numel())
-        self.player_gp_points = torch.zeros(B, self._gp_nc, dtype=dtype, device=device)
+        self._alloc_civ_pairs(B, max(self.R, 1), dtype, device)
         # G-2: the player's faith bank. TS applyGreatPersonEffect banks fx.faith
         # into state.faithTotal (game.ts); the rival GP loop already applies its
         # gpEffects col-4 into r_faith, but the player GP loop did not — an
@@ -1258,7 +1262,6 @@ class BatchSim:
         # worship/pantheon founding is TS-only for the player), so it stays a
         # pure internal accumulator; the per-turn yield-faith side (game.ts:851)
         # remains unmodeled (the larger B-18 player religion-founding work).
-        self.player_faith = torch.zeros(B, dtype=torch.float64, device=device)
         # B-20 (Round B7): Great Works. A claimed WRITER/MUSICIAN slots
         # gwWorksPerPerson works into its civ's cities — writing into the
         # AMPHITHEATER column, music into the MUSEUM column (b_cost catalog
@@ -1307,12 +1310,9 @@ class BatchSim:
         self._wonder_era = torch.tensor(list(_wera), dtype=torch.long, device=device)
         # B-20 (#71): cumulative TOURISM (the `state.tourismTotal` /
         # `RivalCiv.tourism` twins). Integer, zero-draw.
-        self.tourism_total = torch.zeros(B, dtype=torch.long, device=device)
-        self.r_tourism = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-25 (#72): per-rival LIFETIME culture. float64 like r_faith — it
         # banks the same per-turn `cul_sum` that feeds r_civic_prog, which
         # civic completions SPEND, so a separate total is required.
-        self.r_culture = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # B-20 (#73): RELICS, per city, held in the TEMPLE's single slot.
         # B-20 (#79): ANTIQUITY SITES — the markAntiquitySite twin. Created by
         # PRE-MODERN events (a razed camp, a unit death) and excavated into
@@ -1783,7 +1783,6 @@ class BatchSim:
         self.settlers = torch.zeros(B, dtype=torch.long, device=device)
         self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
         self.science_total = z(B)
-        self.culture_total = z(B)
 
         # --- the hostile world (phase 4a: barbarians) -----------------------------
         self.units_mode = bool(f0.get("unitsMode", 0))
@@ -2048,6 +2047,33 @@ class BatchSim:
         ("quest_camp", torch.long, -1),
         ("quest_issued", torch.long, 0),
     )
+
+    #: #51/S6.4: (key, player name, rival name, dtype, trailing dim) for the
+    #: five per-seat scalars whose two sides never shared a NAME — which is why
+    #: S4.2's sixteen-pair sweep walked straight past them. See the module note
+    #: on the dtype decision.
+    _CIV_PAIR_FIELDS = (
+        ("culture", "culture_total", "r_culture", None, None),
+        ("faith", "player_faith", "r_faith", None, None),
+        ("tourism", "tourism_total", "r_tourism", torch.long, None),
+        ("warmonger", "p_warmonger", "r_warmonger", torch.long, None),
+        ("gpp", "player_gp_points", "r_gpp", None, "_gp_nc"),
+    )
+
+    def _alloc_civ_pairs(self, B: int, r_pad: int, dtype, device) -> None:
+        """#51/S6.4: one plane per fact, the player at row 0 and the rivals
+        after — the S4.2 pattern, applied to the five pairs that hid behind
+        mismatched names. `dtype=None` means the merged plane takes the
+        engine's dtype (see the module note)."""
+        for _k, _pa, _ra, _dt, _ex in self._CIV_PAIR_FIELDS:
+            _w = getattr(self, _ex) if _ex else None
+            _shape = (B, 1 + r_pad) + ((_w,) if _w else ())
+            _base = torch.zeros(_shape, dtype=_dt or dtype, device=device)
+            setattr(self, f"civ_{_k}", _base)
+            setattr(self, _pa, _base[:, 0])
+            setattr(self, _ra, _base[:, 1:])
+            self.register_alias(_pa, lambda sim, k=_k: getattr(sim, f"civ_{k}")[:, 0])
+            self.register_alias(_ra, lambda sim, k=_k: getattr(sim, f"civ_{k}")[:, 1:])
 
     def _alloc_cs_pairs(self, B: int, r_pad: int, s_pad: int, device) -> None:
         """#51/S6.1: one plane per (civ, city-state) relation, old names as

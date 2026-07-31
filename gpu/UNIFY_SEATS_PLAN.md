@@ -513,6 +513,24 @@ them any, in the worst way: a minor's unit would stack freely with barbarians
 now. Same class as S3.4's `"rival"` string falling through to "everything
 blocks".
 
+**S6.4 — the last five player/rival SCALAR pairs. DONE.** S4.2 collapsed
+sixteen `x` / `r_x` pairs; five were walked straight past because the two sides
+never shared a NAME — `culture_total`/`r_culture`, `player_faith`/`r_faith`,
+`tourism_total`/`r_tourism`, `p_warmonger`/`r_warmonger`,
+`player_gp_points`/`r_gpp`. Exactly the trap the city block's eight mismatched
+pairs set in S4.1. All five are `civ_<key> [B, 1+R(, NG)]` now, old names as
+views. Merged float planes take `dtype` (the S4.1 precedent): a no-op in the
+f64 gates, a declared re-baseline in f32 eval. NOT merged and recorded:
+`r_prophets` (the player's count is DERIVED from `gp_earned` — unifying that
+is a behaviour change, not a move) and `science_total` (rival science is
+tracked by neither engine).
+
+**A survey now says there is exactly ONE raw `x`/`r_x` pair left in the engine,
+and it is none — the automated pair scan comes back empty.** What remains are
+rival-only planes with no player twin at all, which is a different problem:
+either the player genuinely lacks the mechanic (#52 embark, #53 faith economy,
+rival science) or stores it derived rather than stored (`r_prophets`).
+
 Remaining: the `cs_*` planes that are genuinely city-state-specific
 (`cs_type`, `cs_suz_key`, `cs_last_levy`, `cs_war_turns`, `cs_at`) and the rest
 of the TS half — `src/core/types.ts:CityState` becoming a `Seat` with one

@@ -334,9 +334,17 @@ def main() -> None:
 
     # --- B-22 (#74): the PLAYER's grievance twin -----------------------------
     from civ6gpu.engine import _MUTABLE as _MUT2
-    assert "p_warmonger" in _MUT2, "p_warmonger must be registered in _MUTABLE"
+    # #51/S6.4: `p_warmonger` and `r_warmonger` are the two halves of ONE
+    # `civ_warmonger [B, 1+R]` plane, so the BASE is what carries the state
+    # through a snapshot. Registering a view beside its base would restore into
+    # fresh storage and orphan the other half.
+    assert "civ_warmonger" in _MUT2, "civ_warmonger must be registered in _MUTABLE"
+    assert "p_warmonger" not in _MUT2, "p_warmonger is a VIEW of civ_warmonger"
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert s3.p_warmonger.shape == (1,), s3.p_warmonger.shape
+    assert s3.p_warmonger.data_ptr() == s3.civ_warmonger.data_ptr(), (
+        "p_warmonger must share storage with civ_warmonger[:, 0]"
+    )
     # snapshot/restore round-trip
     s3.p_warmonger[:] = 7
     _snap = s3.snapshot()

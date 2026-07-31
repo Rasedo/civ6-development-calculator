@@ -86,6 +86,9 @@ ALIASED: frozenset[str] = frozenset(
     # #51/S6.2: a minor's city is the city block's minor section, so these four
     # are views like every other city field.
     + ["cs_alive", "cs_center", "cs_pop", "cs_hp"]
+    # #51/S6.4: the five pairs whose sides never shared a name.
+    + ["culture_total", "r_culture", "player_faith", "r_faith", "tourism_total",
+       "r_tourism", "p_warmonger", "r_warmonger", "player_gp_points", "r_gpp"]
 )
 
 

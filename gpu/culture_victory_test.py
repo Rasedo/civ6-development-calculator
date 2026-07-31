@@ -113,9 +113,17 @@ def main() -> None:
     gated = torch.where(rel >= 0, torch.full_like(rel, -1), cul_v)
     assert int(gated[0]) == -1, "a religious win must suppress the culture check"
 
-    # --- 8) r_culture is _MUTABLE (snapshot/restore round-trip) ------------
-    assert "r_culture" in _MUTABLE, "r_culture must be registered in _MUTABLE"
+    # --- 8) the culture plane round-trips (snapshot/restore) ---------------
+    # #51/S6.4: `culture_total` and `r_culture` are the two halves of ONE
+    # `civ_culture [B, 1+R]` plane, so the BASE is what carries the state.
+    # Registering a view beside its base would restore into fresh storage and
+    # orphan the other half.
+    assert "civ_culture" in _MUTABLE, "civ_culture must be registered in _MUTABLE"
+    assert "r_culture" not in _MUTABLE, "r_culture is a VIEW of civ_culture"
     s = _sim(1)
+    assert s.r_culture.data_ptr() == s.civ_culture[:, 1:].data_ptr(), (
+        "r_culture must share storage with civ_culture[:, 1:]"
+    )
     s.r_culture[:, 0] = 1234.5
     snap = s.snapshot()
     s.r_culture[:, 0] = 0.0
