@@ -3119,12 +3119,12 @@ export function rivalPhase(state: GameState): void {
         for (const t of state.map.tiles) {
           const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
-          // A-19/B-33 (S2): the walls/Encampment ranged strike targets the
-          // player + barbarians only — a rival city does NOT counter-strike an
-          // enemy rival's units (v1 scope; the besiege heal-block below IS
-          // symmetric). Excluding rival attackers keeps the GPU strike (already
-          // player/barb-only) byte-exact without a strike-side rival port.
-          if (!unitsAt(state, t.index).some((u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }))) continue;
+          // #51/S7.1 (#59): ANY unit hostile to this civ, which since A-19
+          // includes an enemy RIVAL's. The `!isRivalSeat(u.seat)` term that
+          // stood here predated rival↔rival war and had no Civ 6 basis — a
+          // city's strike picks its target by combat strength, never by which
+          // enemy the unit belongs to.
+          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: civOfRival(rival.id) }))) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
@@ -3132,7 +3132,7 @@ export function rivalPhase(state: GameState): void {
         }
         if (bestTile >= 0) {
           const hostiles = unitsAt(state, bestTile).filter(
-            (u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }),
+            (u) => unitsHostile(state, u, { seat: civOfRival(rival.id) }), // #51/S7.1 (#59)
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];
@@ -3162,12 +3162,12 @@ export function rivalPhase(state: GameState): void {
         for (const t of state.map.tiles) {
           const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
-          // A-19/B-33 (S2): the walls/Encampment ranged strike targets the
-          // player + barbarians only — a rival city does NOT counter-strike an
-          // enemy rival's units (v1 scope; the besiege heal-block below IS
-          // symmetric). Excluding rival attackers keeps the GPU strike (already
-          // player/barb-only) byte-exact without a strike-side rival port.
-          if (!unitsAt(state, t.index).some((u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }))) continue;
+          // #51/S7.1 (#59): ANY unit hostile to this civ, which since A-19
+          // includes an enemy RIVAL's. The `!isRivalSeat(u.seat)` term that
+          // stood here predated rival↔rival war and had no Civ 6 basis — a
+          // city's strike picks its target by combat strength, never by which
+          // enemy the unit belongs to.
+          if (!unitsAt(state, t.index).some((u) => unitsHostile(state, u, { seat: civOfRival(rival.id) }))) continue;
           if (d < bestDist) {
             bestDist = d;
             bestTile = t.index;
@@ -3175,7 +3175,7 @@ export function rivalPhase(state: GameState): void {
         }
         if (bestTile >= 0) {
           const hostiles = unitsAt(state, bestTile).filter(
-            (u) => !isRivalSeat(u.seat) && unitsHostile(state, u, { seat: civOfRival(rival.id) }),
+            (u) => unitsHostile(state, u, { seat: civOfRival(rival.id) }), // #51/S7.1 (#59)
           );
           const defender = hostiles.find((u) => unitDomain(u.type) === 'military') ?? hostiles[0];
           const tt = state.map.tiles[bestTile];

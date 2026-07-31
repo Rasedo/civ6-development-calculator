@@ -5,7 +5,7 @@
  */
 
 import { addYields, emptyYields, type City, type CityState, type GameState, type Yields } from './types';
-import { playerSeat, isPlayerSeat, isBarbSeat, rivalOfSeat, civOfRival, PLAYER_CIV, seatOf, citiesOf, civsAtWar } from './seats';
+import { playerSeat, isBarbSeat, rivalOfSeat, civOfRival, PLAYER_CIV, seatOf, citiesOf, civsAtWar } from './seats';
 import { hexDistance } from './hex';
 import { layTradeRoad } from './units'; // B-23 (#71): Traders lay road
 import { DISTRICTS } from '../data/districts';
@@ -89,34 +89,23 @@ export function csRouteYields(cs: CityState): Yields {
   return out;
 }
 
-/** A route is suspended while hostiles prowl near either endpoint —
- * barbarians always, and (A-11) AT-WAR rival units: the audit-named
- * one-sidedness fix (rivals interdict player trade like barbs do). */
-const RIVAL_RIVAL_RAIDS_LIVE = false; // #51 Round 7: flip, then re-gate
-
 /**
  * A route is suspended while units HOSTILE TO ITS OWNER prowl within 3 of
  * either endpoint.
  *
- * #51/S2.3 — THE ONE FLAGGED MERGE OF THE ROUND. The twins were:
- *   player: barbarians, or a RIVAL whose `atWar` is set
- *   rival:  barbarians, or the PLAYER while that rival is at war
- * Neither covers RIVAL-vs-RIVAL, and the rival twin said why: "rival-rival war
- * is impossible until A-19". A-19 has since LANDED (`atWarRivals`), so that is
- * a stale gap rather than a true statement.
- *
- * Merging on `civsAtWar` alone would START raiding rival-rival routes — a
- * fidelity IMPROVEMENT, but a BEHAVIOUR CHANGE, and Round 2 is byte-identical
- * by contract. The flag reproduces today exactly; flipping it is Round 7.
+ * #51/S2.3 merged the player and rival twins behind a flag, because neither
+ * covered RIVAL-vs-RIVAL and turning it on is a behaviour change that Round 2
+ * was forbidden to make. #51/S7.1 (#59) is Round 7, and turns it on: the flag
+ * and the pair test are gone, and ONE predicate — "is this unit hostile to the
+ * route's owner" — answers for every seat pair. A rival at war with another
+ * rival interdicts its trade exactly as it interdicts the player's, which is
+ * how war works in Civ 6 and was only ever untrue here because the rival twin
+ * was written when rival↔rival war did not exist.
  */
 export function routeRaidedAt(state: GameState, endpoints: number[], seat: number = PLAYER_CIV): boolean {
   if (!state.unitsMode) return false;
   for (const u of state.units) {
-    let hostile = isBarbSeat(u.seat);
-    if (!hostile && u.seat !== seat) {
-      const rivalRivalPair = !isPlayerSeat(u.seat) && !isPlayerSeat(seat);
-      if (!rivalRivalPair || RIVAL_RIVAL_RAIDS_LIVE) hostile = civsAtWar(state, u.seat, seat);
-    }
+    const hostile = isBarbSeat(u.seat) || (u.seat !== seat && civsAtWar(state, u.seat, seat));
     if (!hostile) continue;
     const t = state.map.tiles[u.tileIndex];
     for (const index of endpoints) {
