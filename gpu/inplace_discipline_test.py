@@ -65,8 +65,15 @@ _POOL_PLANES = (
     "alive", "acted", "type", "tile", "hp",
     "fortify", "xp", "charges", "aura_mp", "emb", "seat",
 )
+# #51/S4.2: the per-seat scalars and research vectors are views of civ_*.
+_CIV_FIELDS = (
+    "best_melee", "builders_trained", "civic_prog", "cur_civic", "cur_tech",
+    "diplo_favor", "diplo_points", "envoys_avail", "influence", "tech_prog",
+    "treasury", "war_weariness", "techs", "civics", "tech_boosted", "civic_boosted",
+)
 ALIASED: frozenset[str] = frozenset(
-    f"{pre}_{plane}" for pre in ("p", "v", "u") for plane in _POOL_PLANES
+    [f"{pre}_{plane}" for pre in ("p", "v", "u") for plane in _POOL_PLANES]
+    + [f for n in _CIV_FIELDS for f in (n, f"r_{n}")]
 )
 
 

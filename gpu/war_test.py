@@ -114,7 +114,7 @@ def test_peace(rules, path):
     after = snap_all(sim)
     # equivalence: poke sueForPeace's exact effect, then step plain
     sim.restore(snap)
-    sim.treasury = sim.treasury - cost
+    sim.treasury -= cost  # #51/S4.2: IN PLACE — treasury is a view of civ_treasury
     sim.r_atwar[:, 0] = False
     sim.sync_war()  # #51/S4.3: pokes write the legacy stores
     # #51/S4.3: the poke must move the war MATRIX too — it is the

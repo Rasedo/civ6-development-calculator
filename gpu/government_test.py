@@ -190,14 +190,14 @@ def main() -> None:
     #    Player-only (rivalCheckSatisfied returns false for 'policies').
     mf_idx = civ_idx["MEDIEVAL_FAIRES"]
     simp = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    simp.civics = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"])
+    simp.civics.copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
     _, _, _, _, slp, _ = simp._gov_policy_mods(simp.civics)
     assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
     simp.civic_boosted[:] = False
     simp._detect_boosts()
     assert bool(simp.civic_boosted[0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
     simn = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    simn.civics = civics_with(["CODE_OF_LAWS"])
+    simn.civics.copy_(civics_with(["CODE_OF_LAWS"]))
     _, _, _, _, sln, _ = simn._gov_policy_mods(simn.civics)
     assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
     simn.civic_boosted[:] = False

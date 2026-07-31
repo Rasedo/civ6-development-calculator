@@ -303,6 +303,17 @@ def poke_float32(rules, path):
     print("  h float32 dtype OK (30 turns, pair tensors dtype-stable, no walk crash)")
 
 
+
+def _round_trips(name: str, mut) -> bool:
+    """#51/S4.2: a per-seat field round-trips through snapshot/restore either
+    by NAME or as a view of its merged `civ_*` base. `diplo_favor` is now
+    `civ_diplo_favor[:, 0]`; asserting the old name would be asserting the
+    storage layout, not the property the test cares about."""
+    if name in mut:
+        return True
+    base = name[2:] if name.startswith("r_") else name
+    return f"civ_{base}" in mut
+
 def main() -> None:
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -345,7 +356,7 @@ def main() -> None:
 
     # --- B-22 (#75): DIPLOMATIC FAVOR ---------------------------------------
     for _f in ("diplo_favor", "r_diplo_favor"):
-        assert _f in _MUT2, f"{_f} must be registered in _MUTABLE"
+        assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s4 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert s4._favor_per_suz == 1, f"GS pays 1 favor per suzerainty, got {s4._favor_per_suz}"
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every rival
@@ -377,7 +388,7 @@ def main() -> None:
 
     # --- B-22 (#76): the WORLD CONGRESS + the DIPLOMATIC victory ------------
     for _f in ("congress_sessions", "diplo_points", "r_diplo_points"):
-        assert _f in _MUT2, f"{_f} must be registered in _MUTABLE"
+        assert _round_trips(_f, _MUT2), f"{_f} must round-trip through _MUTABLE"
     s6 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert s6._congress_interval == 30, f"GS convenes every 30 turns, got {s6._congress_interval}"
     assert s6._congress_min_era == 2, f"GS starts at the MEDIEVAL era (index 2), got {s6._congress_min_era}"

@@ -384,8 +384,8 @@ def pool_view(snap: dict, pre: str, plane: str):
 _MUTABLE = [
     "alive", "pop", "food_box", "culture_box", "tiles_acquired", "owner", "workable",
     "buildings", "current", "cur_cost", "progress", "q_dtile", "settlers", "settlers_queued",
-    "treasury", "science_total", "culture_total", "techs", "civics",
-    "tech_boosted", "civic_boosted", "cur_tech", "cur_civic", "tech_prog", "civic_prog",
+    "science_total", "culture_total",
+    "civic_boosted",
     "rng_state", "city_hp", "outer_hp", "center_at", "tdef", "tmove",
     # B-5 FORTIFY (military; cap 2)
     # AUDIT B-4 XP (player/rival units; barbs accrue none — no plane)
@@ -394,24 +394,24 @@ _MUTABLE = [
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # B-25 (Round B3): space-race chain progress
     "p_next", "warrior_trained", "builder_trained",
-    "builders_trained", "r_builders_trained",  # P4/D-10 cost escalators
-    "best_melee", "r_best_melee",  # P4/D-22 city-defense trackers
+     # P4/D-10 cost escalators
+     # P4/D-22 city-defense trackers
     "district_dead",  # P5/S1: captured districts are paved-but-dead
     "site", "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "next_site_ptr", "founded_n", "loyalty", "city_seq", "city_seq_next",  # P5/S3: TS array-order rank per column
     "is_cap", "cap_tile_player",  # P7 (C-1): capital identity + the domination anchor
     "cs_met", "cs_envoys", "cs_pop", "cs_quest", "cs_quest_camp", "cs_quest_issued", "cs_quest_district", "cs_hp", "cs_alive", "cs_at", "cs_atwar", "cs_war_turns",  # A-18 (#79): player<->CS war
     "cs_last_levy", "cs_r_quest", "cs_r_quest_camp", "cs_r_quest_issued",  # A-12 (B8-L): rival levy cooldown + rival CS quests
-    "influence", "envoys_avail",
+    "influence",
     "rival_at", "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "diplo_favor", "r_diplo_favor", "congress_sessions", "diplo_points", "r_diplo_points", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "war_weariness", "r_war_weariness", "r_treasury", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "r_techs", "r_civics", "prod_bank",
-    "r_cur_tech", "r_cur_civic", "r_tech_prog", "r_civic_prog", "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
+    "r_atwar", "rr_war", "rr_warkind", "rr_denounced", "rr_allied", "r_warmonger", "p_warmonger", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "r_warturns", "r_peaceturns", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
+    "rc_current", "rc_progress", "rc_cost", "rc_qtile", "rc_dist_tile", "rc_bldg",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_gpp", "r_faith", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
     "r_route_dest",  # B-23: international dest player-city CENTER TILE (>=0), else -1 (domestic/CS)
     "r_route_exp",   # B-23: per-route expiry turn (start + trade.duration), -1 = free slot
-    "cs_r_envoys", "cs_r_met", "r_influence", "r_envoys_avail",  # A-12: rival↔CS diplomacy
-    "r_tech_boosted", "r_civic_boosted",  # A-3: rival eurekas/inspirations
+    "cs_r_envoys", "cs_r_met",  # A-12: rival↔CS diplomacy
+     # A-3: rival eurekas/inspirations
     "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty", "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id",
     "rc_is_cap", "cap_tile_rival",  # P7-FULL (C-3): rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_civ", "v_next",
@@ -433,6 +433,8 @@ _MUTABLE = [
     # p_/v_/u_ VIEWS into them — snapshot/restore round-trips one tensor per
     # plane instead of three, and a view can never be half-restored.
     "unit_alive", "unit_acted", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war",
+    # #51/S4.2: per-seat scalar bases (the x / r_x views live on these)
+    "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_war_weariness", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
 ]
 
 
@@ -597,8 +599,6 @@ class BatchSim:
         # #50 (#79): turns since the player declared — the csWarTurns twin,
         # gating when peace may be offered (PEACE_MIN_WAR_TURNS).
         self.cs_war_turns = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        self.influence = torch.zeros(B, dtype=dtype, device=device)
-        self.envoys_avail = torch.zeros(B, dtype=torch.long, device=device)
         cs_yidx = rules.cs.get("typeYieldIdx", [3, 4, 2, 1, 1, 5])
         self._cs_yidx = torch.tensor(cs_yidx, dtype=torch.long, device=device)[self.cs_type.clamp(min=0)]  # [B, S]
         cs_didx = rules.cs.get("typeDistrictIdx", [0, 2, 3, 5, 6, 1])  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
@@ -701,7 +701,42 @@ class BatchSim:
             _row[100 + _c] = 1 + r_pad + _c
         _row[BARB_SEAT] = self.BARB_ROW
         self._seat_row = _row
+        # #51/S0.4: alias registry (name -> fn(self) returning the base slice
+        # it must remain a view of). Declared before the FIRST merged plane —
+        # the per-seat scalars below register into it, and they now allocate
+        # earlier than the unit pool.
+        self._aliases: dict = {}
         self.war = torch.zeros(B, self.NS, self.NS, dtype=torch.bool, device=device)
+
+        # ------------------------------------------------------------------
+        # #51/S4.2: PER-SEAT SCALARS. Every `x` / `r_x` pair becomes one
+        # `civ_x [B, 1+R]` plane, with the old names as VIEWS:
+        #     self.x   = civ_x[:, 0]      the player
+        #     self.r_x = civ_x[:, 1:]     the rivals
+        # Layout is identical to the two tensors it replaces, so every reader
+        # and writer is unchanged; what goes away is "the player's treasury
+        # and a rival's treasury are different variables".
+        # ------------------------------------------------------------------
+        _civ_scalars = (
+            ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
+            ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
+            ("cur_tech", torch.long, -1), ("diplo_favor", torch.long, 0),
+            ("diplo_points", torch.long, 0), ("envoys_avail", torch.long, 0),
+            ("influence", dtype, 0), ("tech_prog", dtype, 0),
+            ("treasury", dtype, 0), ("war_weariness", torch.long, 0),
+        )
+        for _nm, _dt, _fill in _civ_scalars:
+            _base = torch.full((B, 1 + r_pad), _fill, dtype=_dt, device=device)
+            setattr(self, f"civ_{_nm}", _base)
+            setattr(self, _nm, _base[:, 0])
+            setattr(self, f"r_{_nm}", _base[:, 1:])
+            self.register_alias(_nm, lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 0])
+            self.register_alias(f"r_{_nm}", lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 1:])
+        # r_treasury's opening balance (was a torch.tensor literal).
+        self.r_treasury.copy_(torch.tensor(
+            [[float(rv.get("treasury", 0.0)) for rv in (f.get("rivals") or [])][:r_pad]
+             + [0.0] * max(0, r_pad - len(f.get("rivals") or []))
+             for f in fixtures], dtype=dtype, device=device))
         # B-22 (task #55 S3): per-PAIR casus belli. rr_warkind[b, i, j] = the
         # (i, j) rival↔rival war is FORMAL (denounced ≥ rrFormalMinTurns earlier);
         # False = SURPRISE (default). Symmetric, only meaningful where rr_war.
@@ -718,12 +753,8 @@ class BatchSim:
         # B-22 (#74): the PLAYER's grievance score — the exact r_warmonger twin.
         self.p_warmonger = torch.zeros(B, dtype=torch.long, device=device)
         # B-22 (#75): DIPLOMATIC FAVOR — the World Congress currency, per civ.
-        self.diplo_favor = torch.zeros(B, dtype=torch.long, device=device)
-        self.r_diplo_favor = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-22 (#76): World Congress sessions held + Diplomatic Victory Points.
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
-        self.diplo_points = torch.zeros(B, dtype=torch.long, device=device)
-        self.r_diplo_points = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-24 (task #68 S1): per-civ era-score accumulator on UNIFIED civ ids
         # (col 0 = player, r+1 = rival r) — the TS `state.eraScore` mirror.
         # Integer, zero-draw event hooks only; resets at every eraLength
@@ -786,12 +817,6 @@ class BatchSim:
         self._gov_loy = float(_er.get("governorLoyalty", 8))
         self.r_warturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # B-15: war-weariness accumulators (integer turn counters), player + per rival
-        self.war_weariness = torch.zeros(B, dtype=torch.long, device=device)
-        self.r_war_weariness = torch.zeros(B, r_pad, dtype=torch.long, device=device)
-        self.r_treasury = torch.tensor(
-            [[float((rv.get("treasury") or 0)) for rv in (f.get("rivals") or [])[:r_pad]] + [0.0] * max(r_pad - len(f.get("rivals") or []), 0) for f in fixtures],
-            dtype=torch.float64, device=device,
-        ) if r_pad > 0 else torch.zeros(B, 0, dtype=torch.float64, device=device)  # VP-G1
         self.r_peaceturns = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # C1-B2: per-city production queues replace the pooled stocks.
         # rc_current: -1 idle, 0 settler, 1+u trains roster unit u.
@@ -802,15 +827,19 @@ class BatchSim:
         # as the player, cheapest-first at raw cost; researched techs feed
         # the consumers (production divisor, city defense, unit gates).
         nt_b3, nc_b3 = len(rules.t_cost), len(rules.c_cost)
-        self.r_techs = torch.zeros(B, r_pad, nt_b3, dtype=torch.bool, device=device)
-        self.r_civics = torch.zeros(B, r_pad, nc_b3, dtype=torch.bool, device=device)
+        # #51/S4.2: the per-seat RESEARCH vectors, merged like the scalars.
+        # Placed here because their width is only known once the rules tables
+        # are read; the player and rival widths were always the same number
+        # spelled two ways (NT/nt_b3).
+        for _nm, _w in (("techs", nt_b3), ("civics", nc_b3),
+                        ("tech_boosted", nt_b3), ("civic_boosted", nc_b3)):
+            _base = torch.zeros(B, 1 + r_pad, _w, dtype=torch.bool, device=device)
+            setattr(self, f"civ_{_nm}", _base)
+            setattr(self, _nm, _base[:, 0])
+            setattr(self, f"r_{_nm}", _base[:, 1:])
+            self.register_alias(_nm, lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 0])
+            self.register_alias(f"r_{_nm}", lambda sim, k=_nm: getattr(sim, f"civ_{k}")[:, 1:])
         # AUDIT A-3: rivals fire eurekas/inspirations too (detectRivalBoosts)
-        self.r_tech_boosted = torch.zeros(B, r_pad, nt_b3, dtype=torch.bool, device=device)
-        self.r_civic_boosted = torch.zeros(B, r_pad, nc_b3, dtype=torch.bool, device=device)
-        self.r_cur_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
-        self.r_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
-        self.r_tech_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
-        self.r_civic_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # C2b: net-controlled rival seats — the scripted PICKER, research
         # auto-pick and unit AI skip these rivals; externally written
         # choices (rc_current, r_cur_*) are honored by the existing
@@ -834,11 +863,7 @@ class BatchSim:
         self.r_gpp = torch.zeros(B, r_pad, n_gp, dtype=torch.float64, device=device)
         # P4/D-10: builders ever trained — the player's and each rival's own
         # cost escalator (builderCost = round((50 + 4·n) · gameSpeed)).
-        self.builders_trained = torch.zeros(B, dtype=torch.long, device=device)
-        self.r_builders_trained = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # P4/D-22: strongest MELEE unit each civ ever fielded (city defense).
-        self.best_melee = torch.zeros(B, dtype=torch.long, device=device)
-        self.r_best_melee = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # P5/S1 gate-catch: districts on CAPTURED territory are DEAD — TS
         # keeps the tiles paved but the conquering city's registry holds only
         # CITY_CENTER (no yields/upkeep/counts; the paving still blocks).
@@ -881,8 +906,6 @@ class BatchSim:
         # fixtures carry none of it (rivals start unmet, zero everywhere).
         self.cs_r_envoys = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
         self.cs_r_met = torch.zeros(B, r_pad, s_pad, dtype=torch.bool, device=device)
-        self.r_influence = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
-        self.r_envoys_avail = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # A-12 (B8-L): RIVAL city-state quests — ONE per (rival, CS), the
         # zero-draw twin of cs_quest. kind 0 none / 1 clearCamp / 2 trade /
         # 3 district; the buildDistrict target is deterministic (the CS type's
@@ -893,11 +916,6 @@ class BatchSim:
         self.cs_r_quest_camp = torch.full((B, r_pad, s_pad), -1, dtype=torch.long, device=device)
         self.cs_r_quest_issued = torch.zeros(B, r_pad, s_pad, dtype=torch.long, device=device)
         self.rvcity_at = torch.full((B, T), -1, dtype=torch.long, device=device)  # civ id at rival centers
-        # #51/S0.4: alias registry (name -> fn(self) returning the base slice it
-        # must remain a view of). Declared here because the merged unit pool
-        # below is the first thing that registers into it.
-        self._aliases: dict = {}
-
         # ---------------------------------------------------------------------
         # #51/S3.3: ONE UNIT POOL.
         #
@@ -1734,17 +1752,8 @@ class BatchSim:
         self.prod_bank = z(B, C)  # V-H1: chop production banked while the queue is empty
         self.settlers = torch.zeros(B, dtype=torch.long, device=device)
         self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
-        self.treasury = z(B)
         self.science_total = z(B)
         self.culture_total = z(B)
-        self.techs = torch.zeros(B, NT, dtype=torch.bool, device=device)
-        self.civics = torch.zeros(B, NC, dtype=torch.bool, device=device)
-        self.tech_boosted = torch.zeros(B, NT, dtype=torch.bool, device=device)
-        self.civic_boosted = torch.zeros(B, NC, dtype=torch.bool, device=device)
-        self.cur_tech = torch.full((B,), -1, dtype=torch.long, device=device)
-        self.cur_civic = torch.full((B,), -1, dtype=torch.long, device=device)
-        self.tech_prog = z(B)
-        self.civic_prog = z(B)
 
         # --- the hostile world (phase 4a: barbarians) -----------------------------
         self.units_mode = bool(f0.get("unitsMode", 0))
@@ -1929,7 +1938,7 @@ class BatchSim:
             self.r_best_melee[:, r_] = torch.where(self.v_civ == r_, cs_v, torch.zeros_like(cs_v)).max(dim=1).values
         pt_ = self.p_type.clamp(min=0, max=self.NU - 1)
         melee_p = self.p_alive & (self._p_rng_str[pt_] == 0)
-        self.best_melee = torch.where(melee_p, self._p_combat[pt_], torch.zeros_like(self.p_type)).max(dim=1).values
+        self.best_melee.copy_(torch.where(melee_p, self._p_combat[pt_], torch.zeros_like(self.p_type)).max(dim=1).values)
 
         # Pristine copy of the mutable state, for reset().
         self._pristine = {k: getattr(self, k).clone() for k in _MUTABLE}
@@ -14466,7 +14475,7 @@ class BatchSim:
         # casus-belli ww differential is rival↔rival only (mirror of game.ts).
         inc = (self.war_weariness + int(rww.get("perTurn", 1))).clamp(max=int(rww.get("cap", 24)))
         dec = (self.war_weariness - int(rww.get("decay", 4))).clamp(min=0)
-        self.war_weariness = torch.where(atwar_now, inc, dec)
+        self.war_weariness.copy_(torch.where(atwar_now, inc, dec))
 
         # --- envoys --------------------------------------------------------------
         if self.S > 0:
