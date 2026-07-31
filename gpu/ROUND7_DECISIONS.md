@@ -385,6 +385,34 @@ branch above it. Do not invent a payer (the capital? the picker's city?); find
 what the rival purchase should be attributed to, or leave the purchase half as a
 declared residual.
 
-Order for the next attempt: (i) print both engines' growth-vs-queue order and
-make them agree, (ii) land the BUILD-path decrement, (iii) re-derive
-SEED_OVERRIDES, (iv) only then decide the purchase attribution.
+**TWO CORRECTIONS to the above, measured after it was written — do not act on
+the original diagnosis:**
+
+1. **The "ordering difference" is NOT the cause.** Both engines run city GROWTH
+   BEFORE the queue block: TS at the `rc.foodBox >= need` block immediately
+   above its queue loop, the GPU at `rc_growth`/`rc_pop` immediately above
+   `found_s`. Same order. That hypothesis is dead.
+2. **`cur == 0` IS the settler** — `rc_current: -1 idle, 0 settler, 1+u trains
+   roster unit u`. The GPU's completion detector is correct, so the mismatch is
+   not a mis-detection either.
+
+**WHAT IS ACTUALLY UNEXPLAINED, and where attempt 2 must start.** Applying the
+pop cost to the TS side ALONE produced BYTE-IDENTICAL fixtures (seed9105.json
+md5 unchanged across apply / stash / re-export). If the TS rival settler-queue
+completion fired anywhere in the 12-seed export, that edit had to move something.
+So either:
+  * the TS rivals in these seeds found via the GOLD-PURCHASE path (which calls
+    `tryFoundCity` directly and has no queue item), never via the production
+    queue — in which case the GPU decrementing on `found_s` at seed 9105 t11 is
+    the divergence, and the question becomes what the GPU completed there that
+    TS did not; or
+  * the byte-identity test was confounded (vite-node module caching across the
+    stash) and must be re-run with a clean process.
+
+RESOLVE THAT FIRST — it decides whether this is a pop-cost slice at all or a
+pre-existing "which path founds a rival city" divergence wearing its clothes.
+The spec's own reachability note says the 12 destroyed settlers were in seed
+**9133**, not 9105, which is consistent with the first branch.
+
+Then: (i) land the BUILD-path decrement, (ii) re-derive SEED_OVERRIDES, (iii)
+only then decide the purchase attribution.
