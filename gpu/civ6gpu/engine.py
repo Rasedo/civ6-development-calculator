@@ -3036,7 +3036,7 @@ class BatchSim:
             on = valid & self.desert[rrm, af.clamp(min=0)]
             self._fertilize(rrm[on], af[on])  # ...and deposits silt on desert tiles
 
-    def _buildable(self) -> torch.Tensor:
+    def _buildable(self, include_worship: bool = False) -> torch.Tensor:
         """[B, C, NB] buildings each city could queue now: unlocked (tech), not
         already built, river gate — and for district buildings, the city owns a
         completed district of the required type and has a prerequisite building
@@ -3056,7 +3056,14 @@ class BatchSim:
             torch.ones(B, NB, dtype=torch.bool, device=dev),
         )  # Temple/Amphitheater/… gate on a civic (mirrors availableBuildings' unlocks.buildings)
         unlocked = unlocked & unlocked_civic
-        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.reshape(1, 1, -1) | self.river_center.unsqueeze(2)) & ~self._b_worship.reshape(1, 1, -1)  # B9-R3: worship is faith-only
+        base = unlocked.unsqueeze(1) & ~self.buildings & (~rd.b_river.reshape(1, 1, -1) | self.river_center.unsqueeze(2))
+        if not include_worship:
+            # B9-R3 / #51/S7.11: worship buildings are faith-purchase ONLY, so
+            # they never enter a PRODUCTION queue (`game.ts:queueBuilding`
+            # refuses them outright) but they ARE legal for `purchaseBuilding`.
+            # The GPU used one mask for both, which is why the player could
+            # never faith-buy while the rival always could.
+            base = base & ~self._b_worship.reshape(1, 1, -1)
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
             valid = (self.district >= 0) & self.district_complete & (self.tile_seat == PLAYER_SEAT) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
@@ -5248,7 +5255,17 @@ class BatchSim:
             # tile there — TS refunds when spawnUnit finds none).
             mult = self.rules.gold_purchase_mult
             tre = self.treasury
-            pb = cols[0] & self._afford(tre.reshape(B, 1, 1), self.rules_dev.b_cost.reshape(1, 1, -1) * mult)
+            # #51/S7.11: the PURCHASE mask admits worship buildings and prices
+            # them in FAITH at the flat worship cost — `purchaseBuilding`
+            # splits on `BUILDINGS[id].worship`, gold otherwise. The rival has
+            # had this since B9-R3; the player's arm was gold-only.
+            _pbuy = self._buildable(include_worship=True)
+            _w = self._b_worship.reshape(1, 1, -1)
+            _gold_ok = self._afford(tre.reshape(B, 1, 1), self.rules_dev.b_cost.reshape(1, 1, -1) * mult)
+            _faith_ok = self._afford(self.player_faith.reshape(B, 1, 1),
+                                     torch.full((1, 1, self.NB), self._worship_cost,
+                                                dtype=self.dtype, device=dev))
+            pb = _pbuy & torch.where(_w, _faith_ok, _gold_ok)
             n_cities = self.alive.sum(dim=1, keepdim=True)
             queued_s = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
             s_cost = self.rules.settler_base + self.rules.settler_per_city * (
@@ -15403,7 +15420,10 @@ class BatchSim:
             if bool(is_pb.any()):
                 idx = pi.clamp(min=0, max=self.NB - 1)
                 cost = rd.b_cost[idx] * mult
-                can = is_pb & buildable[:, c].gather(1, idx.unsqueeze(1)).squeeze(1) & self._afford(self.treasury, cost)
+                _isw = self._b_worship.gather(0, idx)
+                _wcost = torch.full_like(cost, self._worship_cost)
+                can = is_pb & buildable[:, c].gather(1, idx.unsqueeze(1)).squeeze(1) & torch.where(
+                    _isw, self._afford(self.player_faith, _wcost), self._afford(self.treasury, cost))
                 if bool(can.any()):
                     rows = can.nonzero(as_tuple=True)[0]
                     self.buildings[rows, c, idx[rows]] = True
@@ -15413,7 +15433,9 @@ class BatchSim:
                         if len(wm) > 0:
                             self.outer_hp[wm, c] = self._walls_hp
                     self._eff_version += 1  # D-8: _buildable keys on it (a bought building must vanish from later masks)
-                    self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
+                    # #51/S7.11: worship pays FAITH, everything else gold.
+                    self.player_faith.copy_(torch.where(can & _isw, self.player_faith - _wcost, self.player_faith))
+                    self.treasury.copy_(torch.where(can & ~_isw, self.treasury - cost, self.treasury))
             # --- buy a settler (purchaseSettler: settlers += 1 immediately,
             # which raises every later slot's price)
             is_ps = pi == self.NB
@@ -15957,7 +15979,9 @@ class BatchSim:
                 # order-coupled across slots (a queued OR bought settler raises
                 # the next slot's price; every purchase drains shared gold), so
                 # walk slots sequentially like the replay's act.p loop.
-                self._apply_settlers_and_purchases(act, buildable)
+                # #51/S7.11: the PURCHASE-eligible mask (worship included),
+                # not the production one the queue decision uses.
+                self._apply_settlers_and_purchases(act, self._buildable(include_worship=True))
 
             # RL district placement (D5 → P2): the production decision QUEUES a
             # scaffold district — the tile is paved + feature-stripped at once

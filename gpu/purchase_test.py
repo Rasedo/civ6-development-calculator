@@ -244,6 +244,72 @@ def test_builder_escalation(rules, path):
     print(f"  builder escalation OK ({c1:.0f} then {c2:.0f} gold in one turn)")
 
 
+def test_worship_faith_purchase(rules, path):
+    """#51/S7.11: a WORSHIP building is faith-purchase ONLY, for the PLAYER too.
+
+    `game.ts:queueBuilding` refuses worship outright ("purchased with faith, not
+    built") while `purchaseBuilding` prices it in faith. The GPU used ONE
+    `_buildable` mask for both with worship filtered out, so the player could
+    never faith-buy while the rival has had the path since B9-R3.
+
+    THIS POKE IS THE ONLY COVERAGE: measured ZERO player worship purchases in
+    the 36-game rollout, so neither gate reaches the verb ([[gate-reachability]]).
+    """
+    sim = build(rules, path)
+    if not sim._worship_bidx or sim._temple_bidx < 0 or sim._hs_idx < 0:
+        print("  worship faith-purchase SKIPPED (no worship catalog)")
+        return
+    wj = int(sim._worship_bidx[0])
+    sim._rl_purchase_active = True
+    pb = pbase(sim)
+    # the PRODUCTION mask must still refuse it (queueBuilding's rule)
+    assert not bool(sim._buildable()[0, 0, wj]), "worship must never be queueable"
+    # buildingCompletable: a worship building needs a COMPLETED HOLY_SITE in the
+    # city AND the Temple prerequisite. Plant both, plus the faith to pay with.
+    def _endow(s):
+        owned = ((s.owner[0] == 0) & (s.district[0] < 0) & (s.center_at[0] < 0)
+                 & (s.built_wonder[0] < 0)).nonzero(as_tuple=True)[0]
+        assert len(owned), "capital owns no free tile for a HOLY_SITE"
+        t = int(owned[0])
+        s.district[0, t] = s._hs_idx
+        s.district_complete[0, t] = True
+        s.buildings[0, 0, s._temple_bidx] = True
+        s.player_faith.fill_(10_000.0)
+        s._eff_version += 1
+        return t
+    _endow(sim)
+    assert bool(sim._buildable(include_worship=True)[0, 0, wj]), (
+        "worship must be PURCHASE-eligible once its Temple stands"
+    )
+    f0, g0 = float(sim.player_faith[0]), float(sim.treasury[0])
+    sim.step(production=prod(sim, 0, pb + wj))
+    assert bool(sim.buildings[0, 0, wj]), "worship purchase not granted"
+    buy_f, buy_g = f0 - float(sim.player_faith[0]), g0 - float(sim.treasury[0])
+
+    # CONTROL: the identical turn without the purchase. The city EARNS faith
+    # during the step (that is #51/S7.11a) and the bought building pays its own
+    # faith yield the same turn, so a raw before/after delta nets BOTH against
+    # the price. The control therefore holds the building too, granted free —
+    # then the only difference between the two deltas is the price itself.
+    sim2 = build(rules, path)
+    sim2._rl_purchase_active = True
+    _endow(sim2)
+    sim2.buildings[0, 0, wj] = True   # granted FREE: same yields, same upkeep
+    sim2._eff_version += 1
+    f0b, g0b = float(sim2.player_faith[0]), float(sim2.treasury[0])
+    sim2.step(production=prod(sim2, 0, sim2.IDLE))
+    base_f, base_g = f0b - float(sim2.player_faith[0]), g0b - float(sim2.treasury[0])
+
+    assert abs((buy_f - base_f) - sim._worship_cost) < 1e-6, (
+        f"worship must cost exactly {sim._worship_cost} faith, "
+        f"charged {buy_f - base_f}"
+    )
+    assert abs(buy_g - base_g) < 1e-6, (
+        f"a worship purchase must not touch the treasury; gold delta "
+        f"{buy_g - base_g} vs control {base_g}"
+    )
+    print(f"  worship faith-purchase OK (col {wj}, -{sim._worship_cost:.0f} faith, gold untouched)")
+
 def main() -> None:
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -253,6 +319,7 @@ def main() -> None:
     test_inert_when_off(rules, path)
     test_width_and_mask_when_on(rules, path)
     test_building_purchase(rules, path)
+    test_worship_faith_purchase(rules, path)
     test_unit_purchase(rules, path)
     test_builder_escalation(rules, path)
     test_settler_sequencing(rules, path)
