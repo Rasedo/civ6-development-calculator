@@ -91,7 +91,7 @@ per S3 evidence), HANDOFF/memory.
 
 ## Standing rules
 
-Identical to gpu/ROUND_B7.md's section (gates ladder per stage,
+Identical to gpu/docs/rounds/ROUND_B7.md's section (gates ladder per stage,
 draw-count discipline, _MUTABLE/dtype/reclaim/POOL-END,
 _eff_version on yield-bearing writes, AUDIT by SYMBOL,
 statelog-first hunts, budget a hunt per behavior stage — S2

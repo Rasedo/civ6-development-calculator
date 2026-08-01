@@ -102,7 +102,7 @@ currently INERT in the live path).
 
 ## Standing rules in force
 
-Identical to gpu/ROUND_B7.md's section (gates ladder per slice,
+Identical to gpu/docs/rounds/ROUND_B7.md's section (gates ladder per slice,
 never the battery, draw-count neutrality, _MUTABLE/dtype/reclaim/
 POOL-END hygiene, _eff_version on every yield-bearing write, AUDIT
 by SYMBOL with proposed wording in the final report (B-21 →

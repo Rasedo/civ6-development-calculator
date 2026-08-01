@@ -122,7 +122,7 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
   // Writing / Music, which ROUND B7 landed (slots + per-turn yield); the
   // per-person `culture` value below is now only the OVERFLOW lump a charge
   // falls back to when no slot is open anywhere. Tourism stays absent.
-  // Recorded in gpu/ROUND_B2_LOG.md; slot model in the B-20 block below.
+  // Recorded in gpu/docs/rounds/ROUND_B2_LOG.md; slot model in the B-20 block below.
   WRITER: [
     P('WRITER', 'GP_LI_BAI', 'Li Bai', { culture: 45 }, '+45 culture toward the current civic'),
     P('WRITER', 'GP_CHAUCER', 'Geoffrey Chaucer', { culture: 110 }, '+110 culture toward the current civic'),

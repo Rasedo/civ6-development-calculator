@@ -224,7 +224,19 @@ class BatchEnv:
             ],
             dim=2,
         )  # [B, R, 3]
-        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1)], dim=1)
+        # #51/S8.4 (#66): EFFECTIVE research cost per option — the quantity the
+        # decision actually uses, not the boost flag it derives from. Emitting
+        # flags would force the policy to apply `boosted ? base*(1-frac) : base`
+        # itself, and that formula is a RULE: it must live in the engine, or a
+        # rule leaks into the policy and the two can drift.
+        #
+        # FULL WIDTH on purpose, unmasked. The mask carries legality separately;
+        # what the full vector buys is PLANNING — a boosted tech several prereqs
+        # away should change which branch a policy walks toward now, and masking
+        # to the legal frontier would delete exactly that signal.
+        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
+                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.tech_boosted, 0).to(d) / 1000.0,
+                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0], dim=1)
 
     def _rival_unit_features(self, r: int) -> torch.Tensor:
         """[B, P, 8] the player unit-feature layout over the rival's slot
@@ -343,7 +355,19 @@ class BatchEnv:
                 )
             )
         riv = torch.stack(opp_cols, dim=1)  # [B, R, 3]
-        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1)], dim=1)
+        # #51/S8.4 (#66): EFFECTIVE research cost per option — the quantity the
+        # decision actually uses, not the boost flag it derives from. Emitting
+        # flags would force the policy to apply `boosted ? base*(1-frac) : base`
+        # itself, and that formula is a RULE: it must live in the engine, or a
+        # rule leaks into the policy and the two can drift.
+        #
+        # FULL WIDTH on purpose, unmasked. The mask carries legality separately;
+        # what the full vector buys is PLANNING — a boosted tech several prereqs
+        # away should change which branch a policy walks toward now, and masking
+        # to the legal frontier would delete exactly that signal.
+        return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
+                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.r_tech_boosted[:, r], r + 1).to(d) / 1000.0,
+                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.r_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:
         """[B, P, 8] per player-unit-slot features for the units head:

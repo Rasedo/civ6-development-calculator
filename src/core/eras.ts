@@ -3,7 +3,7 @@ import { rivalCount, isBarbSeat } from './seats';
 import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, HEROIC_DEDICATIONS, DEDICATION_FAITH, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS, DED_MONUMENTALITY, GOLDEN_MOVE_BONUS } from '../data/rivals';
 
 // ---------------------------------------------------------------------------
-// B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages.
+// B-24 (task #68, gpu/docs/design/GOVERNORS_DESIGN.md): era score / Ages.
 // Unified civ ids: 0 = the player, r+1 = rival r (the civsAtWar convention).
 // Every hook is a plain `+= const` (zero-draw). Ages: 0 Dark / 1 Normal /
 // 2 Golden, assigned at each era boundary from the just-ended window's score.

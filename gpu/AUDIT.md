@@ -93,23 +93,23 @@ Stage 2: A-11 → 90% — rival domestic trade routes live both engines
 + symmetric route interdiction; rival→CS routes wait on A-12.
 Stage 3a: A-12 → 50% — per-civ envoys/influence/greedy assignment,
 rival envoy bonuses, strict suzerain contest; CS verbs = stage 3b.
-2026-07-18 ROUND B4 Y/AA/Z/AB (brief gpu/ROUND_B4.md): B-7, B-30,
+2026-07-18 ROUND B4 Y/AA/Z/AB (brief gpu/docs/rounds/ROUND_B4.md): B-7, B-30,
 B-31, B-32 all RESOLVED; new A-24 w2 = rival district/tile registry
 consistency latent, split from slice AB's hunt. 2026-07-18 #45
-NAVAL: B-6 RESOLVED — serial N1/N2/N3 off gpu/NAVAL_DESIGN.md, ONE
+NAVAL: B-6 RESOLVED — serial N1/N2/N3 off gpu/docs/design/NAVAL_DESIGN.md, ONE
 end-of-task battery incl. the new `naval` poke lane. 2026-07-19
-ROUND B5 M1/M2/M3 (brief gpu/ROUND_B5.md): B-4, B-9, B-10 RESOLVED;
+ROUND B5 M1/M2/M3 (brief gpu/docs/rounds/ROUND_B5.md): B-4, B-9, B-10 RESOLVED;
 M1's hunt FIXED the GPU advance-after-kill terrain omission (land
 units advancing onto water after killing an embarked defender — both
 red rollout games, one class); new G-5 = the surviving 1-gold
 rival-economy rounding latent M2 dodged by seed reroll. 2026-07-19
-ROUND B9 R1-R3 serial (brief gpu/ROUND_B9.md): A-9 → 90% — scaffold
+ROUND B9 R1-R3 serial (brief gpu/docs/rounds/ROUND_B9.md): A-9 → 90% — scaffold
 5→9, regional channel, worship faith-buy, rival PALACE; R1 fixed
 EIGHT newly-reachable latents (f7b13d3), R2's gates caught the G4
 buildings-are-own-column cache break + the player ww-vs-unit-orders
 ordering latent (faf08cc), R3 hunt-free (73b9e32); G-5 second
 sighting on a war capture → reroll 9301→9302. 2026-07-19 ROUND B6
-S1-S4 serial (brief gpu/ROUND_B6.md): B-18 75%→95% — all 7 enhancer
+S1-S4 serial (brief gpu/docs/rounds/ROUND_B6.md): B-18 75%→95% — all 7 enhancer
 EFFECTS live (S1 5e6ab7b, hunt-free) + the rival MISSIONARY chassis
 (S2 512abe4: faith-buy 60/42 after worship, cap 2, real-MP walk +
 spread lump 10/15, SCRIPTURE/HOLY_ORDER; in-gate 24/24 seeds, 264
@@ -118,7 +118,7 @@ production-mask term — the round's one gate catch); B-25 70%→80% —
 religious victory (S3 79a056f: predominance >half in EVERY alive
 civ, victoryType 5/6 at endTurn, poke-pinned — gate-unreachable at
 250t). 2026-07-19 ROUND B10 R/B/H parallel worktrees (brief
-gpu/ROUND_B10.md, task #66): A-24 RESOLVED (per-rc placement rule
+gpu/docs/rounds/ROUND_B10.md, task #66): A-24 RESOLVED (per-rc placement rule
 `rivalCityId === rc.id`/`rc_tile_id == rc_id`, env-gated invariant
 scan auto-ON under the forced gate, `rc_registry` lane); B-26 → 70%
 (barb era ladder to MUSKETMAN + barbs obey ZOC; ranged barbs
@@ -129,7 +129,7 @@ type — TS fixed, seeds 9222/9301 RESTORED in-gate; the merge added
 the missing `_eff_version` bump on the transfer success path (the
 one unpaired rc_bldg write in the engine); new G-6 = dormant
 founding tie-break sighting (slice R, unverified). 2026-07-19/20
-ROUND B7 E/W/G parallel worktrees (brief gpu/ROUND_B7.md, task
+ROUND B7 E/W/G parallel worktrees (brief gpu/docs/rounds/ROUND_B7.md, task
 #63): B-17 → 85% (Encampment specialist row TS-only + the SECOND
 city strike k=pestk/restk walls-first + training XP 5/10/15 by best
 military building — ALL gate-unreachable, poke lane `encampment`;
@@ -142,7 +142,7 @@ land/naval auras at the quantized sites, rival GENERAL war-walk;
 the slice's hunt: the aura-plane cache missed RL-verb general
 moves → position-fingerprint key; ADMIRAL in-gate 18/24, lane
 `gp_aura`). 2026-07-20 ROUND B8 K/L/T parallel worktrees (brief
-gpu/ROUND_B8.md, task #64): B-21 RESOLVED-minus-rows (K: 3/6-envoy
+gpu/docs/rounds/ROUND_B8.md, task #64): B-21 RESOLVED-minus-rows (K: 3/6-envoy
 channel re-keyed to CS_TYPE_BUILDINGS tiers both seats, suzerain
 perk LIVE 14/24 rows, lane `cs_bonus`; K's hunt found NEW A-25 —
 conquered-city luxuries missing from the GPU empire amenity pool —
@@ -156,7 +156,7 @@ lane `cs_verbs`); B-23 → 70% (T: route duration 20t ALL routes —
 TS player→rival API, gold-only, war-interdicted, lane `trade2`;
 T's hunt: the GPU at-capacity early return skipped route expiry —
 `_expire_rival_routes` now runs on every exit path). 2026-07-20
-task #55 SERIAL S1-S4 (brief gpu/GEOPOLITICS_DESIGN.md; GEO-1 agent
+task #55 SERIAL S1-S4 (brief gpu/docs/design/GEOPOLITICS_DESIGN.md; GEO-1 agent
 S1 992ea13 + S2 00f386b, GEO-H hunt 97ace18 = G-6+G-7 fixes, GEO-2
 agent S3 c007280, S4 main-session): A-19 + B-33 RESOLVED — per-pair
 war state live both engines, rival↔rival DoW/peace/capture in-gate
@@ -172,7 +172,7 @@ the reshuffled trajectories — purchase (founding side-channel bound),
 cs_verbs (levy units war-march off the ring: count by pool+civ+type),
 district_breadth (Encampment placement probes fixtures in order) —
 the B5/B7 poke-lane lesson firing again. 2026-07-20 #69 A25_G8
-SERIAL main-session (brief gpu/A25_G8.md): A-25
+SERIAL main-session (brief gpu/docs/rounds/A25_G8.md): A-25
 RESOLVED-AS-VERIFIED-CORRECT (S1: the 9196 repro dissolved under the
 #55 reshuffle — no capture on the current trajectory; the
 capture→luxury-pool path poke-verified via `rc_registry` lane poke
@@ -184,7 +184,7 @@ without re-export); B-15 CLOSED (the −4 ceiling live). No engine
 fix shipped the whole round — both closures were re-verification,
 the G-3 rule's biggest single payoff yet. Battery 36 lanes 516s.
 2026-07-20 #68 B-24 GOVERNORS/ERAS (38f862c..78f4f52, brief
-gpu/GOVERNORS_DESIGN.md, serial S1-S3 main-session + S4 Opus
+gpu/docs/design/GOVERNORS_DESIGN.md, serial S1-S3 main-session + S4 Opus
 coverage agent — ALL FOUR STAGES HUNT-FREE, the first fully
 hunt-free multi-stage behavior round): S1 era-score substrate inert
 (12 hook pairs, statelog-logdiff hook-parity proof, threshold
@@ -198,7 +198,7 @@ the DEDICATION system (Golden bonuses, Normal/Dark dedication,
 HEROIC Age w/ prevAge substrate), dark-age policies and governor
 establishment/promotions stay open (owner-confirmed enumeration).
 Battery 37 lanes 543s. 2026-07-26 #70 ROUND SMALLS (brief
-gpu/ROUND_SMALLS.md, owner-directed EXPERIMENTAL batched mode — all
+gpu/docs/rounds/ROUND_SMALLS.md, owner-directed EXPERIMENTAL batched mode — all
 slices implemented FIRST, ONE ladder at the end, no per-slice gates):
 S1 B-20 music yields per kind, S2 B-8 aura at every unit-vs-city and
 city-strike roll (23 sites), S3 B-8 +1 MP via a frozen per-turn
@@ -2217,7 +2217,7 @@ untagged halves of tagged items stay Fable/main-session work.
   turn-exact; remaining GPU channels proven unreachable under greedy
   adoption (exporter ships all), tilePurchaseMult gate-inert pending
   the A-5 tile-purchase verb.
-- A-9 (90% — 2026-07-19, ROUND B9 R1-R3, gpu/ROUND_B9.md). RESOLVED
+- A-9 (90% — 2026-07-19, ROUND B9 R1-R3, gpu/docs/rounds/ROUND_B9.md). RESOLVED
   minus the NEIGHBORHOOD stretch. `SCAFFOLD_DISTRICTS` is 9-wide
   (+INDUSTRIAL_ZONE, +THEATER_SQUARE/+ENTERTAINMENT_COMPLEX on CIVIC
   unlocks via `unlockKind`, +ENCAMPMENT with GPU placement code 3 =
@@ -2382,7 +2382,7 @@ untagged halves of tagged items stay Fable/main-session work.
   scripted player policy, so gates can't drift; the APPLY-path wiring
   and the P8 re-baseline decisions stay Fable/main.]
 - A-19. **RESOLVED (2026-07-20, task #55 S1/S2 — brief
-  gpu/GEOPOLITICS_DESIGN.md)**: per-pair war state on unified civ ids
+  gpu/docs/design/GEOPOLITICS_DESIGN.md)**: per-pair war state on unified civ ids
   (`RivalCiv.atWarRivals` + `civsAtWar`/`setRivalWar` in rivals.ts;
   GPU `rr_war` [B,R,R] symmetric bool, `_MUTABLE`). The (0, r+1)
   player pair still rides the untouched `atWar` boolean. S2 made it
@@ -2521,7 +2521,7 @@ untagged halves of tagged items stay Fable/main-session work.
   surfaced two pre-existing latents: the G-5 class (fixed by slice H
   this round) and a founding tie-break sighting recorded as G-6.
 - A-25. **RESOLVED-AS-VERIFIED-CORRECT (2026-07-20, #69 S1 — brief
-  gpu/A25_G8.md)**. The B8-K sighting (seed 9196: scripted player
+  gpu/docs/rounds/A25_G8.md)**. The B8-K sighting (seed 9196: scripted player
   conquest ~t240, GPU `amen_have` 0 vs TS −2, growth 0.70 vs 0.90)
   does NOT reproduce: 9196 RESTORED at `SEED_OVERRIDES[15]` runs
   0.0-milli green at 250t — under the #55 geopolitics reshuffle its
@@ -2605,7 +2605,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   the defender at every roll site both engines; symmetric, snapshot-
   and `_reclaim_pool`-safe.
 - B-6. RESOLVED (2026-07-18, task #45, serial N1→N2→N3 off
-  gpu/NAVAL_DESIGN.md): embarkation + naval units both engines.
+  gpu/docs/design/NAVAL_DESIGN.md): embarkation + naval units both engines.
   `unitPassable` is unit-aware (naval on water; embarked land units on
   water — SAILING civilians / SHIPBUILDING all, CARTOGRAPHY oceans;
   embark/disembark cost all MP, `EMBARK_MOVES` 2); GALLEY + QUADRIREME
@@ -2890,7 +2890,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   enhancers), great people 9 classes incl. Writer/Musician, projects
   incl. the space-race chain; buildings were already real-complete per
   MODELED district (unmodeled districts' buildings arrive with A-9).
-  Degradation ledger: gpu/ROUND_B2_LOG.md (each row that needed an
+  Degradation ledger: gpu/docs/rounds/ROUND_B2_LOG.md (each row that needed an
   absent system). Improvements 9 stays (rest need naval/appeal).
 
 **Economy/districts/religion:**
@@ -2961,7 +2961,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   pipelines — the player walk gained a follower application it never
   had; landed inert-first (owner-keyed, byte-identical) then flipped;
   16/24 scripted seeds reshuffled turn-exact
-  (gpu/ROUND_B3_LOG.md §U). Pantheon/founder/enhancer stay per-civ.
+  (gpu/docs/rounds/ROUND_B3_LOG.md §U). Pantheon/founder/enhancer stay per-civ.
   **ROUND B6 (2026-07-19, #62)**: all 7 enhancer EFFECTS live
   (per-religion pressure range, `tradeReligionYields` route term, the
   three combat CS adders via `religionAttackCS`/`religionDefenseCS` /
@@ -3185,7 +3185,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   Poke lanes: tests/grievances.test.ts (4 favor cases) + the `geopolitics`
   battery lane (suzerain contest, tie rule, tier+suzerainty accrual, _MUTABLE).
   B-22 -> 70%. NEXT: S2 sessions + a resolution, S3 Diplomatic Victory Points
-  and the win at 20 — see gpu/WORLD_CONGRESS_DESIGN.md.
+  and the win at 20 — see gpu/docs/design/WORLD_CONGRESS_DESIGN.md.
   **WORLD CONGRESS S2+S3 LANDED (2026-07-28, #76).** The Congress convenes at
   every CONGRESS_INTERVAL (30) turn once ANY civ has reached CONGRESS_MIN_ERA
   (2 = Medieval), at the same post-increment position `eraBoundary` uses on
@@ -3222,7 +3222,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   battery lane (the same on tensors).
   B-22 -> 85%. STILL OPEN: multiple/varied resolutions, Emergencies and Scored
   Competitions as real DVP sources, and peace deals with terms.
-- B-24 (70% — 2026-07-20, task #68, brief gpu/GOVERNORS_DESIGN.md;
+- B-24 (70% — 2026-07-20, task #68, brief gpu/docs/design/GOVERNORS_DESIGN.md;
   serial S1-S3 main-session + S4 coverage agent, ALL FOUR stages
   hunt-free). **LANDED**: (1) ERA SCORE — per-civ zero-draw
   accumulators (`state.eraScore`/`era_score`, unified civ ids) fed by
@@ -3387,7 +3387,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   landed byte-identical and PROVEN GATE-UNREACHABLE even at 250t
   (rival greedy resolves a Campus to RESEARCH_GRANTS first; the
   player has no GPU project subsystem), so parity rests on
-  `gpu/space_race_test.py` (gpu/ROUND_B3_LOG.md §W). **RELIGIOUS
+  `gpu/space_race_test.py` (gpu/docs/rounds/ROUND_B3_LOG.md §W). **RELIGIOUS
   victory LANDED (2026-07-19, ROUND B6 S3)**: `religiousVictor` /
   `_religious_victor` — predominance (>half of each civ's cities)
   in EVERY alive civ, checked at endTurn on the just-flipped follow

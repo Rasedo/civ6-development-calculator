@@ -1,13 +1,13 @@
 # Aggressive Rival-Phase Optimization — Both Engines
 
 (Owner-approved ultraplan, 2026-07-18. This document is the round's source of
-truth; gpu/PERF_EXPLORATION.md holds the measurements it builds on. Line
+truth; gpu/docs/rounds/PERF_EXPLORATION.md holds the measurements it builds on. Line
 numbers below are from the planning pass — anchor by SYMBOL when editing.)
 
 ## Context
 
 The rival phase is the single hottest code path in the project. Profiling
-(gpu/PERF_EXPLORATION.md, dated today) shows `_rival_phase` at **68.9% of
+(gpu/docs/rounds/PERF_EXPLORATION.md, dated today) shows `_rival_phase` at **68.9% of
 `step()`** on the parity path and 53.4% on rollout, and all three heavy
 battery lanes (gpu-gate 287.5s, parity 265.3s, mcts-search 244.9s) are
 `step()`-bound — so every % cut here shrinks the whole test wall. The TS
@@ -196,7 +196,7 @@ proportionally, plus an independent TS-replay speedup on the gpu-gate wall.
 - `src/core/rivals.ts` — `rivalPhase` 1353, call sites
   479/548/1034/1131/1708/1781, write sites 597-645/1712-1715/1872/1901
 - `src/core/empirePlanner.ts` — `rivalEmpireScore` ~73-83
-- `gpu/PERF_EXPLORATION.md` — baselines; update per stage
+- `gpu/docs/rounds/PERF_EXPLORATION.md` — baselines; update per stage
 
 ## Verification (every stage)
 1. `git diff --stat` before any battery; edit via patch files.

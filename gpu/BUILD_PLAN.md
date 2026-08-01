@@ -203,7 +203,7 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       value head is too noisy to search against. Needs a STRONG net (Q-normalized PUCT /
       chance nodes deferred until then). See the M2b-2 + Phase-B(local) status entries.
 - [ ] **M3** Search-distilled training — the AlphaZero loop, research-informed
-      (`gpu/ARCHIVE.md`; our value-leaf failure and raw-score PUCT pathology
+      (`gpu/docs/rounds/ARCHIVE.md`; our value-leaf failure and raw-score PUCT pathology
       are both predicted by published work). Sub-stages, each green on its own:
       - [x] **M3a** min-max Q normalization (`minmax_normalize`, degenerate-
             range guard) — shipped with the Gumbel package. Original spec: —
@@ -239,7 +239,7 @@ Blocker: player is a full citizen, rivals are a reduced heuristic NPC model.
 
 **DECIDED 2026-07-06 (user): Road A — full-fidelity C1.** Promote rivals to
 full symmetric civs in BOTH engines, keeping the two-gate parity contract.
-See `gpu/ARCHIVE.md`. Plan principles: (1) never a big-bang rewrite —
+See `gpu/docs/rounds/ARCHIVE.md`. Plan principles: (1) never a big-bang rewrite —
 every stage lands with both gates green; (2) TS stays the oracle at every
 step; (3) behavior-preserving refactors FIRST (fixtures unchanged), then
 one rival subsystem at a time swaps heuristic → real machinery (fixtures
@@ -247,7 +247,7 @@ and baselines legitimately regenerate at each activation); (4) the old
 scripted-rival heuristic is re-expressed as a scripted POLICY driving a
 full civ — it remains the parity anchor and becomes self-play's baseline
 opponent; (5) the verbs arm (war/capture) folds in where symmetric state
-makes it natural. Research-informed additions (`gpu/ARCHIVE.md`):
+makes it natural. Research-informed additions (`gpu/docs/rounds/ARCHIVE.md`):
 (6) the owner dimension **O is a parameter** — self-play starts at
 **O=2 (duel)**, the theoretically safe regime (2-player-zero-sum-adjacent
 guarantees; half the tensor width; faster league iteration), and scales

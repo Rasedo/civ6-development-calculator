@@ -50,9 +50,15 @@ PER_CS = 3    # met, envoys/6, hasQuest
 PER_RIVAL = 3  # atWar, warTurns/14, cities/6
 PER_CITY = 9  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
               # ownedTiles/20, hp/200, loyalty/100, hasQueue
+# #51/S8.4 (#66): the trailing BOOST blocks — one flag per tech, then per civic,
+# in `Object.values(TECHS)` / `Object.values(CIVICS)` order (what the exporter
+# ships and both engines' planes use). The research pick is lowest EFFECTIVE
+# cost and a boost is -50%, so WITHOUT these a policy cannot reproduce the
+# engine's own choice — see task #66.
 
 
-def split(obs: torch.Tensor, n_cs: int, n_rivals: int, n_cities: int) -> dict[str, torch.Tensor]:
+def split(obs: torch.Tensor, n_cs: int, n_rivals: int, n_cities: int,
+          n_techs: int, n_civics: int) -> dict[str, torch.Tensor]:
     """Slice a [B, F] observation into its four blocks.
 
     The layout is positional and shared with TS; anything reading an
@@ -69,8 +75,14 @@ def split(obs: torch.Tensor, n_cs: int, n_rivals: int, n_cities: int) -> dict[st
     i += PER_RIVAL * n_rivals
     city = obs[:, i:i + PER_CITY * n_cities].reshape(b, n_cities, PER_CITY)
     i += PER_CITY * n_cities
+    n_t, n_c = n_techs, n_civics
+    boost_t = obs[:, i:i + n_t]
+    i += n_t
+    boost_c = obs[:, i:i + n_c]
+    i += n_c
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
-    return {"empire": emp, "cs": cs, "rival": riv, "city": city}
+    return {"empire": emp, "cs": cs, "rival": riv, "city": city,
+            "boostTech": boost_t, "boostCivic": boost_c}
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:
@@ -94,7 +106,8 @@ def decide(obs: torch.Tensor, masks: dict[str, torch.Tensor], layout: dict[str, 
     that a policy READS AN OBSERVATION and RETURNS ACTIONS, so the AI and a net
     are interchangeable at one seam.
     """
-    _ = split(obs, layout["cs"], layout["rivals"], layout["cities"])  # schema check
+    _ = split(obs, layout["cs"], layout["rivals"], layout["cities"],
+              layout["techs"], layout["civics"])  # schema check
     out: dict[str, torch.Tensor] = {}
     for key in ("production", "tech", "civic", "units", "envoy"):
         m = masks.get(key)

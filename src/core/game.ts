@@ -1225,7 +1225,7 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
  *
  * INERT this round: followedReligion/religionPressure are computed and
  * serialized but NOT yet read by the yield pipeline (the per-city follower-
- * belief coupling is the deferred follow-up — see gpu/ROUND_B2_LOG.md §T).
+ * belief coupling is the deferred follow-up — see gpu/docs/rounds/ROUND_B2_LOG.md §T).
  * The GPU mirror is BatchSim._spread_religious_pressure. Integer pressure
  * keeps the argmax exact (no float association across the batch). Fresh City
  * objects (founded/flipped cities) carry no pressure — the reset-on-birth KILL

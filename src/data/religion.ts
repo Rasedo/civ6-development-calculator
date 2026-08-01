@@ -121,7 +121,7 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     // Two land on the improvementOnResource channel; the rest need absent
     // systems (Holy-Site adjacency, tile appeal, combat, production-toward-X)
     // and land INERT (empty effects) — every degradation recorded in
-    // gpu/ROUND_B2_LOG.md.
+    // gpu/docs/rounds/ROUND_B2_LOG.md.
     B('GODDESS_OF_FESTIVALS', 'Goddess of Festivals', '+1 culture from improved luxury resources.', {
       // GS: +1 culture from Plantation/Vineyard luxuries. Degrade: any
       // improvement on a luxury resource (channel is improvement-agnostic).
@@ -169,7 +169,7 @@ export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
     }),
     // B-18/B-27: real GS follower beliefs whose effects need absent systems
     // (faith-purchase of non-worship buildings, relics/tourism, unique units)
-    // — land INERT, recorded in gpu/ROUND_B2_LOG.md.
+    // — land INERT, recorded in gpu/docs/rounds/ROUND_B2_LOG.md.
     B('JESUIT_EDUCATION', 'Jesuit Education', 'May purchase Campus and Theater Square buildings with faith.', {}),
     B('RELIQUARIES', 'Reliquaries', 'Triple faith and tourism from relics.', {}),
     B('WARRIOR_MONKS', 'Warrior Monks', 'May train Warrior Monks (a religious melee unit).', {}),
@@ -219,7 +219,7 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
  * territorial religious combat, faith-generating trade routes), so they land
  * INERT (empty effects). The slot, catalog and player choose-path exist; the
  * effects and rival enhancer claiming are deferred follow-ups (see
- * gpu/ROUND_B2_LOG.md).
+ * gpu/docs/rounds/ROUND_B2_LOG.md).
  */
 export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [

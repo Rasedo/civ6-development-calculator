@@ -18,6 +18,8 @@ import type { City, GameState, QueueItem } from './types';
 import { PLAYER_CIV, seatOf, isPlayerSeat, isBarbSeat, civsAtWar, rivalCount, civOfRival, citiesOf, rivalsOf, tileSeat, tileCity } from './seats';
 import { isSuzerain, envoysOf } from './cityStates';
 import { seatTourism } from './city';
+import { effectiveResearchCostIn } from './boosts';
+import { goldenBoostBonus } from './eras';
 import { itemCost } from './game';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
 import { TECHS } from '../data/techs';
@@ -221,7 +223,24 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
       head ? 1 : 0,
     );
   }
-  return [...emp, ...cs, ...riv, ...per];
+  // #51/S8.4 (#66): EFFECTIVE research cost per option — the quantity the
+  // decision uses, not the boost flag it derives from. Emitting flags would
+  // force the policy to apply `boosted ? base*(1-frac) : base` itself, and that
+  // formula is a RULE: it belongs in the engine, or a rule leaks into the
+  // policy and the two drift.
+  //
+  // FULL WIDTH, unmasked, on purpose. Legality lives in the MASK — one source
+  // of truth each. What the full vector buys is PLANNING: a boosted tech
+  // several prereqs away should steer a policy toward that branch now, and a
+  // mask-to-frontier vector would be EMPTY whenever a research slot is busy.
+  const rs = s?.research;
+  const gT = goldenBoostBonus(state, seat, false);
+  const gC = goldenBoostBonus(state, seat, true);
+  const costT = Object.values(TECHS).map((t) =>
+    (rs ? effectiveResearchCostIn(rs, t.id, t.cost, gT) : t.cost) / 1000);
+  const costC = Object.values(CIVICS).map((c) =>
+    (rs ? effectiveResearchCostIn(rs, c.id, c.cost, gC) : c.cost) / 1000);
+  return [...emp, ...cs, ...riv, ...per, ...costT, ...costC];
 }
 
 /**

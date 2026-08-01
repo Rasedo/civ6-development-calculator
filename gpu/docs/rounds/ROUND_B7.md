@@ -2,7 +2,7 @@
 
 2026-07-19. Three slices → 3 parallel Opus worktree agents off this
 committed brief (the B10 pattern). Agents verify HEAD == the commit
-that added this file (`git log -1 -- gpu/ROUND_B7.md`) and
+that added this file (`git log -1 -- gpu/docs/rounds/ROUND_B7.md`) and
 `git reset --hard` to it if stale. ONE battery at round END, main
 session only — agents run the gate ladder, never the battery.
 

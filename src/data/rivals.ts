@@ -190,7 +190,7 @@ export const WAR_WEARINESS_PER_AMENITY = 400;
  * them is sourced to the wiki table and its CivFanatics thread, with the
  * provenance caveat stated above. It is recorded because the rule in this repo
  * is that a claim about Civ 6 names its source, and a comment is not one. */
-/** B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages. The game is
+/** B-24 (task #68, gpu/docs/design/GOVERNORS_DESIGN.md): era score / Ages. The game is
  *  divided into fixed ERA_LENGTH-turn eras (no per-civ tech-era drift —
  *  recorded residual). Each civ accrues an INTEGER era score from zero-draw
  *  "historic moment" events; the accumulator resets at every era boundary
