@@ -223,6 +223,54 @@ def main() -> None:
           "lowest-index within class, B-10 army lanes, counters threaded, "
           "engineer/galley tiers)")
 
+    # ---- g) the UNIT-ORDERS verb (#69/#70) --------------------------------
+    # Three lines in rivals.ts: attack a hostile in reach (lowest TARGET TILE
+    # index), else drift home past the stop radius, else hold. Legality is the
+    # mask's; the distances are the observation's — this verb is the reason the
+    # observation needed a per-unit block at all.
+    UW, UN = 26, 2
+    def umask(rows):
+        m = torch.zeros(1, UN, UW, dtype=torch.bool)
+        for j, cols in enumerate(rows):
+            for c in cols:
+                m[0, j, c] = True
+        return m
+    def uobs(rows):
+        o = torch.zeros(1, UN, 16, dtype=torch.float64)
+        for j, (dh, dnb, nbt) in enumerate(rows):
+            o[0, j, ladder.U_DHOME] = dh
+            for i in range(6):
+                o[0, j, ladder.U_DNB + i] = dnb[i]
+                o[0, j, ladder.U_NBTILE + i] = nbt[i]
+        return o
+
+    far = [9.0] * 6
+    # attack outranks the drift, and picks the LOWEST TARGET TILE, not the
+    # lowest direction — dir 4 holds tile 10, dir 2 holds tile 50.
+    m = umask([[2, 8, 10], [12]])
+    o = uobs([(9.0, far, [99, 99, 50, 99, 10, 99]), (0.0, far, [0] * 6)])
+    got = ladder.pick_unit_orders(m, o)
+    assert int(got[0, 0]) == 10, f"attack must take the lowest TARGET TILE, got {int(got[0,0])}"
+
+    # no hostile: drift to a strictly CLOSER neighbour, ties by PATROL_DIR_PERM
+    # (3 before 4 before 2 ...), not by direction index
+    m = umask([[0, 1, 2, 3, 4, 5], [12]])
+    o = uobs([(9.0, [8.0, 8.0, 8.0, 8.0, 8.0, 9.0], [0] * 6), (0.0, far, [0] * 6)])
+    assert int(ladder.pick_unit_orders(m, o)[0, 0]) == 3, "patrol tie-break must follow PATROL_DIR_PERM"
+
+    # a neighbour that is NOT closer is never taken as a drift
+    o = uobs([(9.0, [9.0, 9.0, 9.0, 9.0, 9.0, 9.0], [0] * 6), (0.0, far, [0] * 6)])
+    assert int(ladder.pick_unit_orders(m, o)[0, 0]) == 12, "no closer neighbour -> HOLD"
+
+    # inside the stop radius the unit holds even with a closer step available
+    o = uobs([(2.0, [1.0] * 6, [0] * 6), (0.0, far, [0] * 6)])
+    assert int(ladder.pick_unit_orders(m, o)[0, 0]) == 12, "within the radius the drift stops"
+
+    # nothing legal at all -> no instruction, which is not the same as HOLD
+    assert int(ladder.pick_unit_orders(umask([[], []]), uobs([(9.0, far, [0]*6)]*2))[0, 0]) == -1
+    print("  g unit-orders verb OK (attack by lowest target tile, PATROL_DIR_PERM "
+          "drift, stop radius, hold vs no-instruction)")
+
     print("LADDER CONTRACT OK")
 
 

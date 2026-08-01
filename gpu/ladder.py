@@ -405,3 +405,74 @@ def pick_production(
             ranged = ranged + (mil & roster["is_ranged"][ui]).long()
             melee = melee + (mil & ~roster["is_ranged"][ui]).long()
     return out
+
+
+#: the scripted patrol's direction tie-break (engine `PATROL_DIR_PERM`). POLICY,
+#: not a rule — it decides WHICH of several equally-legal steps is taken, so it
+#: belongs here rather than in either engine.
+PATROL_DIR_PERM = (3, 4, 2, 5, 1, 0)
+
+#: per-unit observation offsets — mirrors BatchSim.UNIT_OBS.
+U_DHOME, U_DNB, U_NBTILE, U_MP, U_CHARGES, U_CIVILIAN = 0, 1, 7, 13, 14, 15
+
+#: how close to home the patrol stops drifting (engine's `d_home > 3`).
+PATROL_HOME_RADIUS = 3
+
+
+def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = PATROL_HOME_RADIUS) -> torch.Tensor:
+    """[B, N] long — ONE order per unit, ported from `_rival_unit_peace_act`.
+
+    The scripted peace rule is three lines:
+        1. attack a hostile in reach, target = LOWEST TILE INDEX
+        2. else drift home when further than `home_radius`
+        3. else hold
+
+    Legality comes from `mask` [B, N, 26]; the distances and neighbour tile ids
+    come from `obs` [B, N, 16] (#69) — the masks say which orders are LEGAL and
+    never which one the verb wants, which is why the observation had to grow a
+    per-unit block before this verb could be ported at all.
+
+    ONE STEP PER CALL, deliberately. The scripted patrol walks REAL MP (2.78
+    tiles per moving unit-turn, measured), and #90 gave the action space a
+    direction SEQUENCE so that is expressible. But choosing step 2 needs to know
+    where step 1 lands, and the observation is 1-HOP: it carries each
+    neighbour's distance to home and nothing beyond. So the DRIVER re-observes
+    and calls again while units still have MP, rather than this guessing a path
+    it cannot see. A net, which may commit several steps at once, can fill the
+    sequence directly — the action space supports both.
+
+    Returns 12 (HOLD) where nothing better is legal, never -1: holding is a real
+    order and the engine treats -1 as "no instruction".
+    """
+    B, N, W = mask.shape
+    dev = mask.device
+    atk = mask[:, :, 6:12]
+    nb_tile = obs[:, :, U_NBTILE:U_NBTILE + 6]
+    BIG = float(10 ** 9)
+
+    # 1. ATTACK — lowest target TILE INDEX among legal directions, which is the
+    #    engine's `tkey.min` tie-break (it scans tiles in index order).
+    a_key = torch.where(atk, nb_tile, torch.full_like(nb_tile, BIG))
+    has_atk = atk.any(dim=2)
+    atk_dir = a_key.argmin(dim=2)
+
+    # 2. PATROL — only while further than the stop radius, and only to a
+    #    neighbour that is strictly CLOSER to home. Ties break in
+    #    PATROL_DIR_PERM order, so score by that rank, not by direction index.
+    d_home = obs[:, :, U_DHOME]
+    d_nb = obs[:, :, U_DNB:U_DNB + 6]
+    rank = torch.empty(6, dtype=torch.long, device=dev)
+    for pos, d in enumerate(PATROL_DIR_PERM):
+        rank[d] = pos
+    legal_mv = mask[:, :, 0:6]
+    closer = legal_mv & (d_nb < d_home.unsqueeze(2))
+    p_key = torch.where(closer, rank.view(1, 1, 6).expand(B, N, 6), torch.full((B, N, 6), 10 ** 9, device=dev))
+    has_mv = closer.any(dim=2)
+    mv_dir = p_key.argmin(dim=2)
+    roam = (d_home > float(home_radius)) & has_mv
+
+    out = torch.full((B, N), 12, dtype=torch.long, device=dev)
+    out = torch.where(roam, mv_dir, out)
+    out = torch.where(has_atk, atk_dir + 6, out)   # attack outranks the drift
+    # a unit with no legal order at all gets no instruction
+    return torch.where(mask.any(dim=2), out, torch.full_like(out, -1))

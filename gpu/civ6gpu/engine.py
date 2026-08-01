@@ -6589,6 +6589,77 @@ class BatchSim:
             )
         return out
 
+    #: per-unit observation layout (#69). Keep in step with `_unit_obs`.
+    UNIT_OBS = (
+        "d_home",           # 0    distance to this seat's nearest live city
+        *(f"d_home_n{i}" for i in range(6)),   # 1-6  same, per neighbour
+        *(f"nb_tile{i}" for i in range(6)),    # 7-12 neighbour tile index, -1 = none
+        "mp", "charges", "is_civilian",        # 13-15
+    )
+
+    def _unit_obs(self, tile, present, centers, calive, mp, charges, utype):
+        """[B, N, 16] the per-unit half of the observation, seat-generic.
+
+        #69: the masks say WHICH ORDERS ARE LEGAL, never which one the verb
+        wants. The scripted patrol drifts toward the nearest own city and stops
+        within 3, so "how far is home, and which neighbour is closer" is exactly
+        what a policy needs and nothing in the empire/city/rival scalars carries
+        it. Distances are what the OBSERVATION owes the verb; the direction
+        tie-break and the stop radius stay POLICY and live in gpu/ladder.py.
+
+        One body for both seats — the whole point of #51. The player passes
+        `site`/`p_tile`, a rival passes `rc_center[:, r]`/its slot-mapped tiles.
+        """
+        B, N = tile.shape
+        dev, dt = self.device, self.dtype
+        BIG = float(self.T)
+        tc = tile.clamp(min=0)
+        nb = self.neigh[tc]                                   # [B, N, 6]
+        nbc = nb.clamp(min=0).reshape(B, N * 6)
+
+        d_home = torch.full((B, N), BIG, dtype=dt, device=dev)
+        d_nb = torch.full((B, N * 6), BIG, dtype=dt, device=dev)
+        for c in range(centers.shape[1]):
+            ok = (calive[:, c] & (centers[:, c] >= 0)).unsqueeze(1)
+            ctr = centers[:, c].clamp(min=0).unsqueeze(1)
+            d_home = torch.where(ok, torch.minimum(d_home, self.pair_dist[tc, ctr].to(dt)), d_home)
+            d_nb = torch.where(ok, torch.minimum(d_nb, self.pair_dist[nbc, ctr].to(dt)), d_nb)
+        # a missing neighbour is unreachable, not adjacent to home
+        d_nb = torch.where(nb.reshape(B, N * 6) >= 0, d_nb, torch.full_like(d_nb, BIG)).reshape(B, N, 6)
+
+        civ = (self._p_combat[utype.clamp(min=0, max=self.NU - 1)] <= 0)
+        out = torch.cat(
+            [
+                d_home.unsqueeze(2),
+                d_nb,
+                nb.to(dt),
+                mp.to(dt).unsqueeze(2),
+                charges.to(dt).unsqueeze(2),
+                civ.to(dt).unsqueeze(2),
+            ],
+            dim=2,
+        )
+        return torch.where(present.unsqueeze(2), out, torch.zeros_like(out))
+
+    def unit_obs(self) -> torch.Tensor:
+        """[B, P_MAX, 16] the PLAYER's per-unit observation (#69)."""
+        return self._unit_obs(
+            self.p_tile, self.p_alive, self.site, self.site >= 0,
+            self.p_mp, self.p_charges, self.p_type,
+        )
+
+    def rival_unit_obs(self, r: int) -> torch.Tensor:
+        """[B, P_MAX, 16] a rival's per-unit observation, same layout as the
+        player's so one policy reads either seat."""
+        smap = self.rival_slot_map(r)
+        sc = smap.clamp(min=0)
+        return self._unit_obs(
+            self.v_tile.gather(1, sc), smap >= 0,
+            self.rc_center[:, r], self.rc_alive[:, r],
+            self.v_mp.gather(1, sc), self.v_charges.gather(1, sc),
+            self.v_type.gather(1, sc),
+        )
+
     def apply_rival_unit_sequence(self, r: int, seq: torch.Tensor) -> None:
         """#90: a unit's order is a SHORT DIRECTION SEQUENCE [B, P_MAX, K].
 
