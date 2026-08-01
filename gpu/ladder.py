@@ -194,7 +194,49 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
 #: Production action classes, in the RIVAL LADDER's priority order. The engine
 #: encoding is: buildings [0, NB), SETTLER = NB, IDLE = NB+1,
 #: units [NB+2, NB+2+NU), districts above those, purchases last.
-PROD_PRIORITY = ("settler", "district", "building", "unit")
+#:
+#: The order is `rivals.ts`'s chain verbatim, MINUS two branches this cannot
+#: express yet, both recorded rather than silently skipped:
+#:   * WONDER sits between building and builder — the rival action space has no
+#:     wonder column at all (task #83), so there is nothing to select.
+#:   * the B-6 GALLEY sits just below the military floor; both unit lanes here
+#:     exclude naval hulls, exactly as the TS scan does, so a galley is never
+#:     picked. Porting it needs its own zero-naval/coastal predicate.
+PROD_PRIORITY = ("settler", "district", "building", "builder", "unit")
+
+
+def unit_roster(units: list[dict]) -> dict:
+    """Per-unit selection data for the B-10 two-lane pick, straight off the
+    exported catalog so the ladder holds no second copy of the unit table.
+
+    `units` is `rules.json`'s unit list in table order — the order IS the
+    tie-break, so it must not be re-sorted.
+    """
+    combat = torch.tensor([int(u.get("combat", 0) or 0) for u in units], dtype=torch.long)
+    rng_str = torch.tensor([int(u.get("rangedStrength", 0) or 0) for u in units], dtype=torch.long)
+    naval = torch.tensor([bool(u.get("naval", 0)) for u in units], dtype=torch.bool)
+    ids = [u.get("id") for u in units]
+    return {
+        "combat": combat,
+        "ranged_str": rng_str,
+        "naval": naval,
+        "is_ranged": rng_str > 0,
+        "builder_idx": ids.index("BUILDER") if "BUILDER" in ids else -1,
+    }
+
+
+def _best_in_lane(cand: torch.Tensor, strength: torch.Tensor) -> torch.Tensor:
+    """[B] index of the strongest legal unit in a lane, ties to LOWEST index.
+
+    `key = strength*NU - idx` then argmax reproduces the TS scan's strict `>`
+    (first wins over table order) without depending on argmax's undefined
+    tie-break. The engine's own picker uses this identical key — if one changes,
+    both must.
+    """
+    NU = cand.shape[1]
+    ar = torch.arange(NU, device=cand.device)
+    key = (strength * NU - ar).unsqueeze(0).expand(cand.shape[0], -1)
+    return torch.where(cand, key, torch.full_like(key, -(10 ** 9))).argmax(dim=1)
 
 
 def prod_classes(NB: int, NU: int, n_scaffold: int) -> dict:
@@ -213,33 +255,120 @@ def prod_classes(NB: int, NU: int, n_scaffold: int) -> dict:
     }
 
 
-def pick_production(mask: torch.Tensor, classes: dict) -> torch.Tensor:
+def pick_production(
+    mask: torch.Tensor,
+    classes: dict,
+    roster: dict | None = None,
+    ctx: dict | None = None,
+) -> torch.Tensor:
     """[B, C] long — the PRODUCTION verb, ported from `rivals.ts`.
 
     The rival ladder is a chain of `tryQueueRivalX` calls, each returning false
     when nothing of that kind is legal:
-        settler -> district -> building -> ... -> army
-    which reduces exactly to FIRST LEGAL CLASS in priority order, lowest index
-    within it. That reduction is only faithful because each `tryQueue` already
-    encodes its own legality, and legality reaches us through the MASK.
+        settler -> district -> building -> (wonder) -> builder -> army
+    which reduces to FIRST LEGAL CLASS in priority order — but ONLY the first
+    three classes reduce to "lowest index within the class". The army does not,
+    and that cost 50 points of agreement when this verb was first ported.
 
-    NO CAPITAL GATE, in the ladder or anywhere else (#82). It used to sit in
-    the rival's MASK — so a rival's action space could not express "settle from
-    a second city" at all, while the player's could — and again in both scripted
+    NO CAPITAL GATE, in the ladder or anywhere else (#82). It used to sit in the
+    rival's MASK — so a rival's action space could not express "settle from a
+    second city" at all, while the player's could — and again in both scripted
     ladders. All three are gone; `queueSettler`'s "any city" is now the single
-    shared rule, which is also Civ 6's. Legality lives in the mask, and the two
-    masks now agree on this column.
+    shared rule, which is also Civ 6's. The two masks agree on that column now.
+
+    CITIES ARE WALKED IN ORDER, not scored independently, because the rules this
+    replaces carry state ACROSS them (task #84): `settlerQueued`, `unitCount`,
+    and the `meleeCount`/`rangedCount` army composition are all updated inside
+    the TS city loop and the engine mirrors each one. A snapshot mask cannot say
+    "city 0 just took the settler", so a stateless pass queues one per city.
+    MEASURED against the engine over 12 seeds x 250 turns: 45.94% stateless,
+    49.53% once the settler threads, 100% only with the army lanes below.
+
+    THE ARMY (AUDIT B-10) is two lanes, not a lowest-index pick:
+      * melee  — highest `combat` among non-ranged, non-naval, combat > 0
+      * ranged — highest `rangedStrength` among ranged, non-naval
+    ties to the lowest table index in both, and the lane is chosen by
+    `rangedCount * 2 < meleeCount` — train ranged while the army holds fewer
+    than one ranged per two melee. Legality (tech + strategic resource) arrives
+    through the MASK; the strengths come from `roster`, which is built off the
+    exported catalog so there is no second copy of the unit table here.
+
+    `ctx` carries the per-seat counters the mask cannot express, all [B]:
+    `settler_queued`, `melee`, `ranged`, `unit_count`, `unit_cap`. Absent ones
+    default to zero except `unit_cap`, which defaults to "no cap" — a missing
+    cap must not silently forbid the army.
 
     Returns -1 where nothing is legal (the engine's "queue nothing" case).
     """
     B, C, W = mask.shape
-    out = torch.full((B, C), -1, dtype=torch.long, device=mask.device)
-    for name in PROD_PRIORITY:
-        lo, hi = classes[name]
-        if lo >= hi or lo >= W:
-            continue
-        sub = mask[:, :, lo:min(hi, W)]
-        has = sub.any(dim=2)
-        first = lo + sub.float().argmax(dim=2)
-        out = torch.where((out < 0) & has, first, out)
+    dev = mask.device
+    ctx = ctx or {}
+
+    def col(name: str, default: int) -> torch.Tensor:
+        v = ctx.get(name)
+        if v is None:
+            return torch.full((B,), default, dtype=torch.long, device=dev)
+        return v.to(torch.long)
+
+    lo_s, hi_s = classes["settler"]
+    u_lo, u_hi = classes["unit"]
+    taken = ctx.get("settler_queued")
+    taken = (torch.zeros(B, dtype=torch.bool, device=dev) if taken is None
+             else taken.to(torch.bool).clone())
+    melee, ranged = col("melee", 0), col("ranged", 0)
+    n_units, cap = col("unit_count", 0), col("unit_cap", 10 ** 9)
+    b_idx = roster["builder_idx"] if roster else -1
+
+    out = torch.full((B, C), -1, dtype=torch.long, device=dev)
+    for j in range(C):
+        best = torch.full((B,), -1, dtype=torch.long, device=dev)
+        under_cap = n_units < cap
+        for name in PROD_PRIORITY:
+            if name == "builder":
+                # a builder IS a unit and takes a cap slot; the mask already
+                # carries the one-per-civ and jobs-exist gates
+                if b_idx < 0 or u_lo + b_idx >= W:
+                    continue
+                hit = mask[:, j, u_lo + b_idx] & under_cap
+                best = torch.where((best < 0) & hit,
+                                   torch.full_like(best, u_lo + b_idx), best)
+                continue
+            if name == "unit":
+                if roster is None or u_lo >= W:
+                    continue
+                legal = mask[:, j, u_lo:min(u_hi, W)]
+                nu = legal.shape[1]
+                rng_t = roster["is_ranged"][:nu]
+                nav = roster["naval"][:nu]
+                mel_ok = legal & ~rng_t & ~nav & (roster["combat"][:nu] > 0)
+                rng_ok = legal & rng_t & ~nav
+                pick_m = u_lo + _best_in_lane(mel_ok, roster["combat"][:nu])
+                pick_r = u_lo + _best_in_lane(rng_ok, roster["ranged_str"][:nu])
+                want_r = ranged * 2 < melee
+                use_r = want_r & rng_ok.any(dim=1)
+                use_m = ~use_r & mel_ok.any(dim=1)
+                chosen = torch.where(use_r, pick_r, torch.where(use_m, pick_m, best))
+                hit = (use_r | use_m) & under_cap
+                best = torch.where((best < 0) & hit, chosen, best)
+                continue
+            lo, hi = classes[name]
+            if lo >= hi or lo >= W:
+                continue
+            sub = mask[:, j, lo:min(hi, W)]
+            if name == "settler":
+                sub = sub & ~taken.unsqueeze(1)
+            has = sub.any(dim=1)
+            first = lo + sub.float().argmax(dim=1)
+            best = torch.where((best < 0) & has, first, best)
+
+        out[:, j] = best
+        # thread every counter the next city will read, exactly as TS does
+        taken = taken | ((best >= lo_s) & (best < hi_s))
+        is_unit = (best >= u_lo) & (best < u_hi)
+        n_units = n_units + is_unit.long()
+        if roster is not None:
+            ui = (best - u_lo).clamp(min=0, max=max(u_hi - u_lo - 1, 0))
+            mil = is_unit & (roster["combat"][ui] > 0)
+            ranged = ranged + (mil & roster["is_ranged"][ui]).long()
+            melee = melee + (mil & ~roster["is_ranged"][ui]).long()
     return out

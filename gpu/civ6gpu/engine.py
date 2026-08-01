@@ -13542,11 +13542,10 @@ class BatchSim:
             # levy suzerain test later this phase.
             self._rival_quest_phase(r, active)
             # C1-B2: queue PICKS for the PRE-TURN city set, in slot order —
-            # the capital (rc_is_cap, the rivals.ts:1077 rc.isCapital gate;
-            # P7-FULL: compaction can move it off slot 0) prefers the
-            # settler with one in flight per civ, everyone else trains
-            # units up to the cap. Counts update sequentially, exactly
-            # like the TS pick loop.
+            # the FIRST idle city takes the settler (#82 deleted the capital
+            # gate; one in flight per civ still), everyone else trains units up
+            # to the cap. Counts update sequentially, exactly like the TS pick
+            # loop — and that sequencing is load-bearing, see task #84.
             alive0 = self.rc_alive[:, r].clone()  # newborns must not act this turn
             n_units = (self.v_alive & (self.v_civ == r)).sum(dim=1)
             unit_count = n_units + ((self.rc_current[:, r] >= 1) & (self.rc_current[:, r] <= self.NU)).sum(dim=1)  # units only — district codes sit above NU

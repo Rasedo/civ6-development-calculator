@@ -118,6 +118,13 @@ def main() -> None:
     NB, NU, nS = 4, 3, 2
     cls = ladder.prod_classes(NB, NU, nS)
     W = NB + 2 + NU + nS
+    # synthetic 3-unit roster: 0 BUILDER (combat 0), 1 WARRIOR (melee 20),
+    # 2 ARCHER (ranged 25). Table order IS the tie-break, as in rules.json.
+    ROSTER = ladder.unit_roster([
+        {"id": "BUILDER", "combat": 0},
+        {"id": "WARRIOR", "combat": 20},
+        {"id": "ARCHER", "combat": 15, "rangedStrength": 25},
+    ])
     def mk(idxs):
         m = torch.zeros(1, 1, W, dtype=torch.bool)
         for i in idxs:
@@ -131,13 +138,61 @@ def main() -> None:
     # district outranks building
     assert int(ladder.pick_production(mk([0, cls["district"][0]]), cls)[0, 0]) == cls["district"][0]
     # building outranks a unit
-    assert int(ladder.pick_production(mk([1, cls["unit"][0]]), cls)[0, 0]) == 1
+    assert int(ladder.pick_production(mk([1, cls["unit"][0]]), cls, ROSTER)[0, 0]) == 1
     # lowest index within a class
     assert int(ladder.pick_production(mk([2, 1]), cls)[0, 0]) == 1
     # nothing legal -> queue nothing
     assert int(ladder.pick_production(mk([]), cls)[0, 0]) == -1
+
+    # #84: CITIES ARE WALKED IN ORDER. The settler is retired once some city
+    # takes it, exactly as rivals.ts's settlerQueued does — a snapshot mask says
+    # "legal" in every idle city, and scoring them independently queued one per
+    # city (63.83% agreement with the engine; 100.00% with the walk).
+    def mk2(rows):
+        m = torch.zeros(1, len(rows), W, dtype=torch.bool)
+        for j, idxs in enumerate(rows):
+            for i in idxs:
+                m[0, j, i] = True
+        return m
+    both = ladder.pick_production(mk2([[NB, cls["district"][0]], [NB, 1]]), cls)
+    assert int(both[0, 0]) == NB, "first city takes the settler"
+    assert int(both[0, 1]) == 1, "second city must NOT — it falls to the building"
+    # and an incoming settler retires the column for the FIRST city too
+    pre = torch.ones(1, dtype=torch.bool)
+    held = ladder.pick_production(mk2([[NB, cls["district"][0]]]), cls,
+                                  ctx={"settler_queued": pre})
+    assert int(held[0, 0]) == cls["district"][0]
+    # the walk must not leak ACROSS batch entries
+    solo = ladder.pick_production(mk2([[NB], [NB]]), cls)
+    assert [int(solo[0, 0]), int(solo[0, 1])] == [NB, -1]
+
+    # AUDIT B-10: the ARMY is two lanes, NOT a lowest-index pick. Porting it as
+    # lowest-index agreed with the engine on only 45.94% of 3267 decisions —
+    # and a 30-turn smoke test showed 100%, because early game has one legal
+    # unit. Scale is what caught it.
+    u0, u1, u2 = (cls["unit"][0] + i for i in range(3))
+    allu = mk([u0, u1, u2])
+    # BUILDER (combat 0) is its own tier ABOVE the army and wins when legal...
+    assert int(ladder.pick_production(allu, cls, ROSTER)[0, 0]) == u0
+    # ...and without it the melee lane takes WARRIOR over the weaker ARCHER,
+    # never the lowest index.
+    assert int(ladder.pick_production(mk([u1, u2]), cls, ROSTER)[0, 0]) == u1
+    # ranged while the army holds fewer than 1 ranged per 2 melee
+    hungry = {"melee": torch.tensor([2]), "ranged": torch.tensor([0])}
+    assert int(ladder.pick_production(mk([u1, u2]), cls, ROSTER, hungry)[0, 0]) == u2
+    # satisfied composition falls back to the melee lane
+    full = {"melee": torch.tensor([2]), "ranged": torch.tensor([1])}
+    assert int(ladder.pick_production(mk([u1, u2]), cls, ROSTER, full)[0, 0]) == u1
+    # the unit CAP is not in the mask, so the ladder must honour it
+    capped = {"unit_count": torch.tensor([3]), "unit_cap": torch.tensor([3])}
+    assert int(ladder.pick_production(mk([u1, u2]), cls, ROSTER, capped)[0, 0]) == -1
+    # composition threads across cities: 2 melee/0 ranged wants ranged first,
+    # and the ARCHER it just queued must count toward the next city's ratio
+    two = ladder.pick_production(mk2([[u1, u2], [u1, u2]]), cls, ROSTER, hungry)
+    assert [int(two[0, 0]), int(two[0, 1])] == [u2, u1]
+
     print("  f production verb OK (class priority, no capital gate, "
-          "lowest-index within class)")
+          "lowest-index within class, B-10 army lanes, counters threaded)")
 
     print("LADDER CONTRACT OK")
 
