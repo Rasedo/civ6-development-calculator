@@ -125,7 +125,14 @@ describe('rival tile economies', () => {
       rivalPhase(rich);
       rivalPhase(poor);
     }
-    expect(a.cities[0].population).toBeGreaterThan(b.cities[0].population);
+    // #82: with the capital gate gone, a productive rival converts POPULATION
+    // into CITIES — the rich site here settles twice and its first city pays a
+    // pop per settler, so city 0's own count is no longer a growth proxy (it
+    // reads 1 vs the poor site's 2 while the rich empire is 3 cities to 1).
+    // Sum the empire, which is what "grows faster" was always trying to say.
+    const totalPop = (r: RivalCiv) => r.cities.reduce((n, rc) => n + rc.population, 0);
+    expect(a.cities.length).toBeGreaterThan(b.cities.length);
+    expect(totalPop(a)).toBeGreaterThan(totalPop(b));
     // C1-B2: production output is queue COMPLETIONS — richer land fields
     // more (units + cities + in-flight progress), not a bigger stock.
     // C1-B4: districts/buildings are completions too (rough catalog costs).

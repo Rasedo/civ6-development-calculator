@@ -189,3 +189,57 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
     any_legal = mask.any(dim=-1)
     idx = score.argmin(dim=-1)
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
+
+
+#: Production action classes, in the RIVAL LADDER's priority order. The engine
+#: encoding is: buildings [0, NB), SETTLER = NB, IDLE = NB+1,
+#: units [NB+2, NB+2+NU), districts above those, purchases last.
+PROD_PRIORITY = ("settler", "district", "building", "unit")
+
+
+def prod_classes(NB: int, NU: int, n_scaffold: int) -> dict:
+    """Index ranges per production class, from the engine's own constants.
+
+    Passed IN rather than hardcoded: the ladder must not carry a second copy of
+    the action encoding, or it drifts from the engine the way every other
+    duplicated definition in this codebase has.
+    """
+    ub = NB + 2
+    return {
+        "building": (0, NB),
+        "settler": (NB, NB + 1),
+        "unit": (ub, ub + NU),
+        "district": (ub + NU, ub + NU + n_scaffold),
+    }
+
+
+def pick_production(mask: torch.Tensor, classes: dict) -> torch.Tensor:
+    """[B, C] long — the PRODUCTION verb, ported from `rivals.ts`.
+
+    The rival ladder is a chain of `tryQueueRivalX` calls, each returning false
+    when nothing of that kind is legal:
+        settler -> district -> building -> ... -> army
+    which reduces exactly to FIRST LEGAL CLASS in priority order, lowest index
+    within it. That reduction is only faithful because each `tryQueue` already
+    encodes its own legality, and legality reaches us through the MASK.
+
+    NO CAPITAL GATE, in the ladder or anywhere else (#82). It used to sit in
+    the rival's MASK — so a rival's action space could not express "settle from
+    a second city" at all, while the player's could — and again in both scripted
+    ladders. All three are gone; `queueSettler`'s "any city" is now the single
+    shared rule, which is also Civ 6's. Legality lives in the mask, and the two
+    masks now agree on this column.
+
+    Returns -1 where nothing is legal (the engine's "queue nothing" case).
+    """
+    B, C, W = mask.shape
+    out = torch.full((B, C), -1, dtype=torch.long, device=mask.device)
+    for name in PROD_PRIORITY:
+        lo, hi = classes[name]
+        if lo >= hi or lo >= W:
+            continue
+        sub = mask[:, :, lo:min(hi, W)]
+        has = sub.any(dim=2)
+        first = lo + sub.float().argmax(dim=2)
+        out = torch.where((out < 0) & has, first, out)
+    return out

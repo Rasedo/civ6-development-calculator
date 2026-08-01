@@ -111,6 +111,34 @@ def main() -> None:
     assert int(ladder.pick_research(tie, none, "tech")[0]) == -1, "nothing legal -> no action"
     print("  e research verb OK (effective cost, boosted beats cheap, ties low, mask-gated)")
 
+    # --- the PRODUCTION verb, ported from rivals.ts -------------------------
+    # The ladder is a chain of tryQueueRivalX calls, each false when nothing of
+    # that kind is legal: settler -> district -> building -> ... -> army. That
+    # reduces to FIRST LEGAL CLASS in priority order, lowest index within.
+    NB, NU, nS = 4, 3, 2
+    cls = ladder.prod_classes(NB, NU, nS)
+    W = NB + 2 + NU + nS
+    def mk(idxs):
+        m = torch.zeros(1, 1, W, dtype=torch.bool)
+        for i in idxs:
+            m[0, 0, i] = True
+        return m
+    # settler outranks a district, which outranks a building
+    assert int(ladder.pick_production(mk([0, NB, cls["district"][0]]), cls)[0, 0]) == NB
+    # the capital gate lives in the MASK, not here: an ungated settler column
+    # simply is not legal, and the ladder falls through to the district.
+    assert int(ladder.pick_production(mk([0, cls["district"][0]]), cls)[0, 0]) == cls["district"][0]
+    # district outranks building
+    assert int(ladder.pick_production(mk([0, cls["district"][0]]), cls)[0, 0]) == cls["district"][0]
+    # building outranks a unit
+    assert int(ladder.pick_production(mk([1, cls["unit"][0]]), cls)[0, 0]) == 1
+    # lowest index within a class
+    assert int(ladder.pick_production(mk([2, 1]), cls)[0, 0]) == 1
+    # nothing legal -> queue nothing
+    assert int(ladder.pick_production(mk([]), cls)[0, 0]) == -1
+    print("  f production verb OK (class priority, no capital gate, "
+          "lowest-index within class)")
+
     print("LADDER CONTRACT OK")
 
 

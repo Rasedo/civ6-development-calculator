@@ -2460,7 +2460,14 @@ export function rivalPhase(state: GameState): void {
     const rivalUnlocks = computeUnlocksIn(rival.research);
     for (const rc of rival.cities) {
       if (rc.queue.length > 0) continue;
-      if (!settlerQueued && rc.isCapital && rival.cities.length < RIVAL_MAX_CITIES) {
+      // #82: NO CAPITAL GATE. `queueSettler` never had one for the player and
+      // Civ 6 has none either — any city may build a Settler. This was an AI
+      // heuristic, and while it lived here it also shaped the rival ACTION
+      // SPACE in engine.py's rival_masks, so the two seats could not even
+      // express the same move. The first idle city in city order takes it;
+      // settlerQueued keeps it to one at a time (still a heuristic, and it
+      // leaves with the rest of the ladder).
+      if (!settlerQueued && rival.cities.length < RIVAL_MAX_CITIES) {
         commitProduction(state, rc.seat, rc, { kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
         settlerQueued = true;
       } else if (tryQueueRivalDistrict(state, rival, rc, rivalUnlocks)) {

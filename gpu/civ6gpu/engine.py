@@ -5267,8 +5267,8 @@ class BatchSim:
 
     def production_mask(self) -> torch.Tensor:
         """[B, C, NB+2+NU+nScaffold(+NB+1+NU)] valid production actions for idle
-        cities: columns 0..NB-1 = City Center buildings, NB = settler (always
-        trainable, as queueSettler is), NB+1 = idle, NB+2..NB+1+NU = train that
+        cities: columns 0..NB-1 = City Center buildings, NB = settler (any city,
+        as queueSettler is — and as rival_masks now also is, #82), NB+1 = idle, NB+2..NB+1+NU = train that
         roster unit (tech-gated like trainableUnits), NB+2+NU.. = place that
         scaffold district (capital-only, off-script; all-False unless
         _rl_district_active). With _rl_purchase_active the mask WIDENS by
@@ -8683,8 +8683,9 @@ class BatchSim:
         """C2b: a controlled rival's decision space, in the PLAYER head
         layouts so one net serves every seat. production [B, RC,
         NB+2+NU+nScaffold(+purchase width, all-False)]: col 0..NB-1 queue
-        that building (the B4b-2 gates), NB = settler (capital only, under
-        the picker's own gate), NB+1 = idle, NB+2.. = train that unit
+        that building (the B4b-2 gates), NB = settler (ANY city since #82 —
+        same as the player's, under the picker's own one-at-a-time gate),
+        NB+1 = idle, NB+2.. = train that unit
         (research-gated types + the builder's one-per-civ/jobs gate),
         then scaffold districts (placeable now, B4a gates). tech [B, NT] /
         civic [B, NC] = available picks where cur == -1. Purchases and
@@ -8726,14 +8727,19 @@ class BatchSim:
             for bi2, excl in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
                 if excl:
                     ok_b[:, bi2] &= ~have_b[:, torch.tensor(excl, device=dev, dtype=torch.long)].any(dim=1)
-            # settler: the CAPITAL only (rc_is_cap — the rivals.ts:1077
-            # rc.isCapital gate; P7-FULL: no longer necessarily slot 0
-            # once compaction runs), under the picker's own gate
+            # settler: ANY city, exactly as the player's queueSettler allows
+            # and as Civ 6 does. The rc_is_cap gate that used to live here was
+            # an AI heuristic that had leaked into the ACTION SPACE, so a net
+            # driving a rival was structurally unable to settle from anywhere
+            # but its capital while a net driving the player could settle from
+            # any city (#82). #51 deletes seat asymmetries, and an asymmetry in
+            # what a seat may legally DO is the worst kind. The one-at-a-time
+            # settler_q term stays: it is the scripted ladder's own gate and
+            # moves out to gpu/ladder.py with the rest of the policy.
             n_cities = self.rc_alive[:, r].sum(dim=1)
             settler_q = (self.rc_current[:, r] == 0).any(dim=1)
             ok_s = (
-                self.rc_is_cap[:, r, j]
-                & ~settler_q
+                ~settler_q
                 & (n_cities < rr.get("maxCities", 6))
             ).unsqueeze(1)
             # units: research-gated types (the picker's ladder exposes all
@@ -8786,7 +8792,12 @@ class BatchSim:
                 (n_cities < rr.get("maxCities", 6))
                 & self._afford(self.r_treasury[:, r], s_cost_r * mult)
                 & self.controlled[:, r]
-            ).unsqueeze(1) & self.rc_is_cap[:, r, j].unsqueeze(1)  # capital column only (rc.isCapital)
+            ).unsqueeze(1) & self.rc_is_cap[:, r, j].unsqueeze(1)
+            # ^ NOT the #82 heuristic — do not "fix" this to match ok_s above.
+            # The TS twin buys a settler at CIV level (tryFoundCity, no city is
+            # involved at all), so this per-city mask needs ONE canonical column
+            # to carry a civ-level verb; the capital is it. Ungating would let a
+            # net buy one settler PER CITY for a single civ-level action.
             u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
             if self._builder_idx >= 0:
                 # P4/D-10: the builder column prices off THIS rival's escalator
@@ -13640,7 +13651,10 @@ class BatchSim:
                 if not idle_any_l[j]:
                     continue
                 idle = idle_all[:, j]
-                want_s = idle & ~settler_q & (n_cities < rr.get("maxCities", 6)) & self.rc_is_cap[:, r, j]
+                # #82: no capital gate — the FIRST idle city takes the settler,
+                # and settler_q below keeps it to one at a time. Threaded over j
+                # in city order, mirroring rivals.ts's settlerQueued exactly.
+                want_s = idle & ~settler_q & (n_cities < rr.get("maxCities", 6))
                 if bool(want_s.any()):
                     self.rc_current[:, r, j] = torch.where(want_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
                     self.rc_cost[:, r, j] = torch.where(want_s, settle_cost, self.rc_cost[:, r, j])

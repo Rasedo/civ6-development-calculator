@@ -27,7 +27,6 @@ function addRival(
   row: number,
   opts: Partial<RivalCiv> = {},
 ): RivalCiv {
-  const tile = tileAtCoords(state.map, col, row);
   const rival: RivalCiv = {
     ...emptySeat(civOfRival(rivalCount(state))), // #51/S6.12
     id: rivalCount(state),
@@ -63,6 +62,17 @@ function addRival(
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, // opt out of belief races unless a test opts in
     ...opts,
   };
+  addRivalCity(state, rival, col, row);
+  state.seats.push(rival);
+  return rival;
+}
+
+/** The city half of addRival, on its own so a test can give a rival a SECOND
+ * city. #82 made that necessary: with no capital gate, the first idle city
+ * always takes the settler, so exercising any later branch of the pick loop
+ * needs a settler parked elsewhere. */
+function addRivalCity(state: GameState, rival: RivalCiv, col: number, row: number): RivalCity {
+  const tile = tileAtCoords(state.map, col, row);
   const city: RivalCity = {
     id: rival.nextCityId++,
     name: 'Roma',
@@ -92,8 +102,7 @@ function addRival(
     }
   }
   rival.cities.push(city);
-  state.seats.push(rival);
-  return rival;
+  return city;
 }
 
 describe('rival placement and expansion', () => {
@@ -412,9 +421,17 @@ describe('B-10 best-of-roster scripted rival production ladder', () => {
     const rival = addRival(state, 6, 6);
     rival.research.techs.push(...techs);
     const rc = rival.cities[0];
+    // #82: the settler branch is no longer capital-gated, so the FIRST idle
+    // city takes it unconditionally. Park one in a distant second city — the
+    // pre-scan's settlerQueued reads EVERY city's queue — so rc falls through
+    // to the unit lane this block is about. Added before the improvement sweep
+    // below so its tiles get farmed too: an unimproved tile is a builder JOB,
+    // and the builder branch outranks the unit branch.
+    const busy = addRivalCity(state, rival, 2, 9);
+    busy.queue.push({ kind: 'settler', progress: 0, cost: 999 });
     // improve all owned non-center tiles
     for (const t of state.map.tiles) {
-      if ((isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) === rival.id && t.index !== rc.centerIndex && !t.improvement) t.improvement = 'FARM';
+      if ((isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) === rival.id && t.index !== rc.centerIndex && t.index !== busy.centerIndex && !t.improvement) t.improvement = 'FARM';
     }
     // strategic access via improved resource tiles inside the borders
     const owned = state.map.tiles.filter((t) => (isRivalSeat(tileSeat(t)) ? rivalOfCiv(tileSeat(t)) : -1) === rival.id && t.index !== rc.centerIndex);
