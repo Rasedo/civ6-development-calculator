@@ -10,7 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, Improvemen
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { seatAccumulators, seatGrowth } from './seatTurn';
+import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -1026,7 +1026,7 @@ function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity,
     // refused luxury/strategic).
     if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
     rc.districts.push({ type: id, tileIndex: best });
-    rc.queue.push({ kind: 'district', district: id, tileIndex: best, progress: 0, cost });
+    commitProduction(state, rc.seat, rc, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
     return true;
   }
   return false;
@@ -1095,7 +1095,7 @@ function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks
     if (!best || def.cost < best.cost || (def.cost === best.cost && def.id < best.id)) best = def;
   }
   if (!best) return false;
-  rc.queue.push({ kind: 'building', building: best.id, progress: 0 });
+  commitProduction(state, rc.seat, rc, { kind: 'building', building: best.id, progress: 0 });
   return true;
 }
 
@@ -1149,7 +1149,7 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
     tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
     if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
     rc.wonders.push({ id: def.id, tileIndex: tile.index });
-    rc.queue.push({ kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
+    commitProduction(state, rc.seat, rc, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
     return true;
   }
   return false;
@@ -2504,7 +2504,7 @@ export function rivalPhase(state: GameState): void {
     for (const rc of rival.cities) {
       if (rc.queue.length > 0) continue;
       if (!settlerQueued && rc.isCapital && rival.cities.length < RIVAL_MAX_CITIES) {
-        rc.queue.push({ kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
+        commitProduction(state, rc.seat, rc, { kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
         settlerQueued = true;
       } else if (tryQueueRivalDistrict(state, rival, rc, rivalUnlocks)) {
         // C1-B4: districts outrank units — the economy compounds.
@@ -2517,7 +2517,7 @@ export function rivalPhase(state: GameState): void {
         // A builder is a unit — it takes a cap slot like any other.
         // P4/D-10: price escalates on the RIVAL's own counter (one at a
         // time, so no queued term), locked at queue time like the player's.
-        rc.queue.push({
+        commitProduction(state, rc.seat, rc, {
           kind: 'unit',
           unit: 'BUILDER',
           progress: 0,
@@ -2534,7 +2534,7 @@ export function rivalPhase(state: GameState): void {
         // rivalHasFortJob). Sits after the builder arm so economy work always
         // outranks it. Flat roster cost, no escalation: the engineer has no
         // trained-counter twin (that curve is the BUILDER's P4/D-10 rule).
-        rc.queue.push({
+        commitProduction(state, rc.seat, rc, {
           kind: 'unit',
           unit: 'MILITARY_ENGINEER',
           progress: 0,
@@ -2583,7 +2583,7 @@ export function rivalPhase(state: GameState): void {
         }
         const wantRanged = rangedCount * 2 < meleeCount;
         const type = wantRanged ? rangedType : meleeType;
-        rc.queue.push({ kind: 'unit', unit: type, progress: 0 });
+        commitProduction(state, rc.seat, rc, { kind: 'unit', unit: type, progress: 0 });
         unitCount += 1;
         if (wantRanged) rangedCount += 1;
         else meleeCount += 1;
@@ -2598,7 +2598,7 @@ export function rivalPhase(state: GameState): void {
         rival.research.techs.includes('SAILING') &&
         cityNavalCapable(state, rc)
       ) {
-        rc.queue.push({ kind: 'unit', unit: 'GALLEY', progress: 0 });
+        commitProduction(state, rc.seat, rc, { kind: 'unit', unit: 'GALLEY', progress: 0 });
         unitCount += 1;
         hasNaval = true;
       } else {
@@ -2612,7 +2612,7 @@ export function rivalPhase(state: GameState): void {
         );
         if (proj) {
           const cost = Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCostIn(rival.research) * 0.5));
-          rc.queue.push({ kind: 'project', project: proj.id, progress: 0, cost });
+          commitProduction(state, rc.seat, rc, { kind: 'project', project: proj.id, progress: 0, cost });
         }
       }
     }

@@ -14,7 +14,7 @@
  * work itself is shared.
  */
 
-import type { City, GameState } from './types';
+import type { City, GameState, QueueItem } from './types';
 import { PLAYER_CIV, seatOf, isPlayerSeat, civsAtWar, rivalCount, civOfRival } from './seats';
 import { isSuzerain } from './cityStates';
 import { seatTourism } from './city';
@@ -113,5 +113,36 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number): v
   } else if (city.foodBox < 0) {
     city.population = Math.max(1, city.population - 1);
     city.foodBox = 0;
+  }
+}
+
+/**
+ * #51/S8.1a — THE ONE PLACE A SEAT'S PRODUCTION CHOICE IS COMMITTED.
+ *
+ * The rival ladder pushed straight onto `rc.queue` at nine separate sites while
+ * an externally-driven seat's choice arrived as an ACTION and went through a
+ * different applier. Two appliers for one decision is why a net cannot be
+ * handed the AI's moves: the AI never produces a move, it produces a mutation.
+ *
+ * Every commit now goes through here, which makes the choice observable at a
+ * single seam — that is what the seat-tagged action log needs, and it is the
+ * completeness check for the conversion: a queue that changed without a
+ * `commitProduction` call is state moving behind the applier's back.
+ *
+ * Deliberately NOT a decision function. The ladder still decides; this only
+ * commits. Logging the walk instead of the pick would make two engines that
+ * choose identically produce different streams.
+ */
+export function commitProduction(state: GameState, seat: number, city: City, item: QueueItem): void {
+  city.queue.push(item);
+  if (process.env.CIV6_ALOG) {
+    const what =
+      item.kind === 'unit' ? item.unit
+      : item.kind === 'building' ? item.building
+      : item.kind === 'district' ? item.district
+      : item.kind === 'wonder' ? item.wonder
+      : item.kind === 'project' ? item.project
+      : item.kind;
+    console.error(`ALOG t${state.turn} s${seat} prod city=${city.id} ${item.kind}:${what}`);
   }
 }

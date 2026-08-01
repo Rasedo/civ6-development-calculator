@@ -17,7 +17,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress, nextCityName } from './rivals';
-import { seatAccumulators, seatGrowth } from './seatTurn';
+import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { expirePlayerRoutes } from './trade';
 import { ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
@@ -156,7 +156,7 @@ export function settlerCost(state: GameState): number {
 export function queueSettler(state: GameState, cityId: number): RuleResult {
   const city = state.cities.find((c) => c.id === cityId);
   if (!city) return { ok: false, reason: 'No such city.' };
-  city.queue.push({ kind: 'settler', progress: 0, cost: settlerCost(state) });
+  commitProduction(state, city.seat, city, { kind: 'settler', progress: 0, cost: settlerCost(state) });
   return { ok: true };
 }
 
@@ -333,7 +333,7 @@ export function queueDistrict(
   const cost = districtCost(state, type);
   city.districts.push({ type, tileIndex });
   if (!state.sandbox) {
-    city.queue.push({ kind: 'district', district: type, tileIndex, progress: 0, cost });
+    commitProduction(state, city.seat, city, { kind: 'district', district: type, tileIndex, progress: 0, cost });
   }
   return { ok: true };
 }
@@ -353,7 +353,7 @@ export function queueBuilding(state: GameState, cityId: number, buildingId: stri
     city.buildings.push(buildingId);
     if (buildingId === 'ANCIENT_WALLS') city.outerHp = WALLS_HP; // AUDIT B-1
   } else {
-    city.queue.push({ kind: 'building', building: buildingId, progress: 0 });
+    commitProduction(state, city.seat, city, { kind: 'building', building: buildingId, progress: 0 });
   }
   return { ok: true };
 }
@@ -379,7 +379,7 @@ export function queueWonder(
 
   city.wonders.push({ id: wonderId, tileIndex });
   if (!state.sandbox) {
-    city.queue.push({ kind: 'wonder', wonder: wonderId, tileIndex, progress: 0 });
+    commitProduction(state, city.seat, city, { kind: 'wonder', wonder: wonderId, tileIndex, progress: 0 });
   }
   return { ok: true };
 }
@@ -418,7 +418,7 @@ export function queueProject(state: GameState, cityId: number, projectId: string
   if (!availableProjects(state, city).some((p) => p.id === projectId)) {
     return { ok: false, reason: 'Project needs its completed district in this city.' };
   }
-  city.queue.push({ kind: 'project', project: projectId, progress: 0, cost: projectCost(state) });
+  commitProduction(state, city.seat, city, { kind: 'project', project: projectId, progress: 0, cost: projectCost(state) });
   return { ok: true };
 }
 
