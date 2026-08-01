@@ -4,10 +4,10 @@
  * Lives outside game.ts so units.ts can use it without an import cycle.
  */
 
-import { playerSeat, isPlayerSeat, tileSeat, cityAtTile } from './seats';
+import { PLAYER_CIV, seatOf, tileSeat, cityAtTile } from './seats';
 
 import type { City, GameState, Tile, YieldKey } from './types';
-import { computeUnlocks } from './effects';
+import { computeUnlocksIn } from './effects';
 import { FEATURES } from '../data/features';
 import { RESOURCES } from '../data/resources';
 
@@ -15,8 +15,9 @@ import { RESOURCES } from '../data/resources';
  * Era-scaled value of a chop/harvest (Civ 6 scales with game progress;
  * we scale with completed research: ~20 ancient, ~150 late).
  */
-export function chopValue(state: GameState): number {
-  const done = playerSeat(state).research.techs.length + playerSeat(state).research.civics.length;
+export function chopValue(state: GameState, seat: number = PLAYER_CIV): number {
+  const r = seatOf(state, seat)?.research;
+  const done = (r?.techs.length ?? 0) + (r?.civics.length ?? 0);
   return Math.round(20 + 2.5 * done);
 }
 
@@ -26,23 +27,30 @@ export interface LumpGrant {
 }
 
 /** What chopping this tile's feature would grant (null = nothing). */
-export function chopGrant(state: GameState, tile: Tile): LumpGrant | null {
+export function chopGrant(state: GameState, tile: Tile, seat: number = PLAYER_CIV): LumpGrant | null {
   if (!tile.feature) return null;
   const key = FEATURES[tile.feature]?.chopYield;
   if (!key) return null;
-  if (!isPlayerSeat(tileSeat(tile))) return null; // outside any city's borders
-  return { key, amount: chopValue(state) };
+  // #51/S7.9: was `!isPlayerSeat(tileSeat(tile))` — identical when `seat` is
+  // the player, and the whole point of the parameter otherwise. A chop only
+  // pays the seat whose borders the tile is in.
+  if (tileSeat(tile) !== seat) return null;
+  return { key, amount: chopValue(state, seat) };
 }
 
 /** What harvesting this tile's bonus resource would grant (null = not harvestable). */
-export function harvestGrant(state: GameState, tile: Tile): LumpGrant | null {
+export function harvestGrant(state: GameState, tile: Tile, seat: number = PLAYER_CIV): LumpGrant | null {
   if (!tile.resource) return null;
   const res = RESOURCES[tile.resource];
   if (!res?.harvestYield) return null;
-  if (!isPlayerSeat(tileSeat(tile))) return null;
-  // Harvesting needs the tech that works the resource (eyeballed Civ 6 gating).
-  if (!state.sandbox && !computeUnlocks(state).improvements.has(res.improvement)) return null;
-  return { key: res.harvestYield, amount: chopValue(state) };
+  if (tileSeat(tile) !== seat) return null;  // #51/S7.9
+  // Harvesting needs the tech that works the resource (eyeballed Civ 6 gating)
+  // — THIS seat's tech, not the player's. `computeUnlocks(state)` was the
+  // player-only wrapper over `computeUnlocksIn(research)`.
+  const rs = seatOf(state, seat)?.research;
+  if (!rs) return null;
+  if (!state.sandbox && !computeUnlocksIn(rs).improvements.has(res.improvement)) return null;
+  return { key: res.harvestYield, amount: chopValue(state, seat) };
 }
 
 /**
@@ -50,24 +58,33 @@ export function harvestGrant(state: GameState, tile: Tile): LumpGrant | null {
  * owning city (production banks if the queue is empty), the rest go to
  * empire pools. `tileIndex` locates the owning city.
  */
-export function applyLumpYield(state: GameState, tileIndex: number, grant: LumpGrant): void {
+export function applyLumpYield(
+  state: GameState,
+  tileIndex: number,
+  grant: LumpGrant,
+  seat: number = PLAYER_CIV,
+): void {
   const { key, amount } = grant;
+  // #51/S7.9: the four EMPIRE sinks are the seat's own. `RivalCity = City`, so
+  // the city sinks below already take either without a branch.
+  const s = seatOf(state, seat);
+  if (!s) return;
   if (key === 'gold') {
-    playerSeat(state).treasury += amount;
+    s.treasury += amount;
     return;
   }
   if (key === 'faith') {
-    playerSeat(state).faith += amount;
+    s.faith += amount;
     return;
   }
   if (key === 'science') {
-    playerSeat(state).research.techProgress += amount;
-    playerSeat(state).scienceTotal += amount;
+    s.research.techProgress += amount;
+    s.scienceTotal += amount;
     return;
   }
   if (key === 'culture') {
-    playerSeat(state).research.civicProgress += amount;
-    playerSeat(state).cultureTotal += amount;
+    s.research.civicProgress += amount;
+    s.cultureTotal += amount;
     return;
   }
   const city = cityAtTile(state, state.map.tiles[tileIndex]) as City | undefined;

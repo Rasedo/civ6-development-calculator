@@ -6469,13 +6469,15 @@ class BatchSim:
                         # #51/S7.6: this add is DELIBERATELY left to vanish when
                         # there is no current item, and must NOT be banked.
                         #
-                        # TS rivals do not chop AT ALL — `chopGrant`
-                        # (core/economy.ts) returns null for any tile whose seat
-                        # is not the player's. The GPU has a rival-chop path
-                        # anyway; it stays parity-clean only because
-                        # `rc_progress` is zeroed on the next queue push, so the
-                        # production is destroyed and TS's "no rival chop" is
-                        # matched by accident.
+                        # No TS rival chops. #51/S7.9 made `chopGrant` /
+                        # `harvestGrant` / `applyLumpYield` / `chopValue`
+                        # (core/economy.ts) seat-generic, so the PLUMBING now
+                        # exists for any seat — but nothing on the TS side CALLS
+                        # them for a rival, so the behaviour is unchanged. This
+                        # GPU path stays parity-clean only because `rc_progress`
+                        # is zeroed on the next queue push, so the production is
+                        # destroyed and TS's "no rival chop" is matched by
+                        # accident.
                         #
                         # Banking it hands the GPU production TS never gets. It
                         # crossed rival 1 city 1 over an AMENITY-TIER boundary a
@@ -6484,9 +6486,13 @@ class BatchSim:
                         # there the whole trajectory. The trace showed it first
                         # as `r1.rGScore` +2000 with every other column equal.
                         #
-                        # The real fix is to decide whether rivals chop at all
-                        # and make BOTH engines agree — that is its own slice,
-                        # not S7.6's.
+                        # The remaining decision is whether rivals chop at
+                        # all. Real Civ 6 says yes, so the target is a TS rival
+                        # chop verb matching this one. It is BLOCKED ON S8.2:
+                        # this GPU path is on the CONTROLLED-rival action
+                        # surface, which no gate drives, and TS cannot drive a
+                        # rival's units until the oracle gains a seat axis.
+                        # Neither engine can reach it today.
                         self.rc_progress[b2, r, j] += amt
                 self.v_charges[rows_c, sc[rows_c]] -= 1
                 self.v_mp[rows_c, sc[rows_c]] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
