@@ -3429,14 +3429,17 @@ class BatchSim:
             self._eff_version += 1
         return place, best
 
-    def _place_district_rival(self, r: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
-        """C1-B4: the rival twin of _place_district — same rank (best
-        floor(static + 0.5·adjacent-completed), ties lowest tile index), rival
-        eligibility (civ-owned via rival_at, district-usable, empty,
-        unimproved, within radius 3 of THIS city's center, not the center) —
-        and it QUEUES rather than completes: tile paved (district set,
-        complete stays False), rc_qtile remembers the completion target, the
-        per-city registry gains the type. Returns the placed mask."""
+    def _district_elig_rival(self, r: int, j: int, di: int, placement: int = 0):
+        """[B, T] eligible tiles (and the adjacency floor) for placing district
+        `di` in rival r's city slot j.
+
+        Split out of `_place_district_rival` for #86: `rival_masks` has to be
+        able to ask "can this district be placed AT ALL" without placing it. The
+        two MUST share this predicate — while the mask stopped at gate-level
+        validity and skipped the scan, it reported a district legal in cases the
+        scripted picker rejected, which was 90% of all ladder-vs-engine
+        disagreement (1400 of 1556 decisions).
+        """
         B, T, dev = self.B, self.T, self.device
         center = self.rc_center[:, r, j].clamp(min=0)
         surface = self.coastal_water if placement == 2 else self.d_usable
@@ -3451,6 +3454,7 @@ class BatchSim:
             & (self.improvement < 0)
             & (d_center <= 3)
         )
+        elig = elig.clone()
         elig[torch.arange(B, device=dev), center] = False
         if placement in (1, 3):
             cc = self._adj_center_count()
@@ -3458,6 +3462,18 @@ class BatchSim:
             adjf = torch.zeros(B, T, dtype=self.dtype, device=dev)
         else:
             adjf = self._district_adj_floor(di)  # (G5 memo)
+        return elig, adjf
+
+    def _place_district_rival(self, r: int, j: int, di: int, want: torch.Tensor, placement: int = 0) -> torch.Tensor:
+        """C1-B4: the rival twin of _place_district — same rank (best
+        floor(static + 0.5·adjacent-completed), ties lowest tile index), rival
+        eligibility (civ-owned via rival_at, district-usable, empty,
+        unimproved, within radius 3 of THIS city's center, not the center) —
+        and it QUEUES rather than completes: tile paved (district set,
+        complete stays False), rc_qtile remembers the completion target, the
+        per-city registry gains the type. Returns the placed mask."""
+        elig, adjf = self._district_elig_rival(r, j, di, placement)
+        B, T, dev = self.B, self.T, self.device
         key = torch.where(elig, adjf * T - self._arangeT_f, self._neg_f)  # D-7
         best = key.argmax(dim=1)
         place = want & elig.any(dim=1)
@@ -8742,23 +8758,23 @@ class BatchSim:
                 ~settler_q
                 & (n_cities < rr.get("maxCities", 6))
             ).unsqueeze(1)
-            # units: research-gated types (the picker's ladder exposes all
-            # gated types to the NET — it may train spears where the script
-            # trained horses); builder under one-per-civ + jobs-exist
-            rres = rr.get("research", {})
-            sp_t, ho_t = int(rres.get("spearTech", -1)), int(rres.get("horseTech", -1))
-            ok_u = torch.zeros(B, self.NU, dtype=torch.bool, device=dev)
-            ok_u[:, self._warrior_idx] = True
-            if sp_t >= 0 and self._r_spearman >= 0:
-                ok_u[:, self._r_spearman] = self.r_techs[:, r, sp_t]
-            if ho_t >= 0 and self._r_horseman >= 0:
-                ok_u[:, self._r_horseman] = self.r_techs[:, r, ho_t]
-            # A-6: the ranged rung — SLINGER ungated, ARCHER on archerTech
-            ar_t0 = int(rres.get("archerTech", -1))
-            if self._r_slinger >= 0:
-                ok_u[:, self._r_slinger] = True
-            if ar_t0 >= 0 and self._r_archer >= 0:
-                ok_u[:, self._r_archer] = self.r_techs[:, r, ar_t0]
+            # units: #85 — DERIVED FROM THE PICKER'S OWN PREDICATE, not from a
+            # second hardcoded ladder. This used to name five units by hand
+            # (WARRIOR, SPEARMAN on spearTech, HORSEMAN on horseTech, SLINGER,
+            # ARCHER on archerTech) while the scripted picker had long since
+            # moved to AUDIT B-10's data-driven best-of-roster over the FULL
+            # roster. The two disagreed: the script fielded MUSKETMEN a net
+            # could not even express. Trainable = tech satisfied over this
+            # rival's real techs (-1 = ungated) AND strategic access — the exact
+            # `tr_u_r` the picker builds — narrowed to MILITARY LAND units,
+            # because that is what the production lanes select from. Naval hulls
+            # stay out: the B-6 galley is its own unported branch, and civilians
+            # (combat 0) are not produced by any seat's ladder.
+            tr_u_r = (
+                (self._p_tech.unsqueeze(0) < 0)
+                | self.r_techs[:, r].gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+            )
+            ok_u = tr_u_r & (self._p_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
             if self.improvements_on and self._builder_idx >= 0:
                 has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
                 has_q = ((self.rc_current[:, r] == self._builder_idx + 1) & self.rc_alive[:, r]).any(dim=1)  # P5/S5: alive-masked
@@ -8773,10 +8789,17 @@ class BatchSim:
                     has_tech = self.r_techs[:, r, utech] if utech >= 0 else (self.r_civics[:, r, uciv] if uciv >= 0 else torch.ones(B, dtype=torch.bool, device=dev))  # B9-R1: kind-aware
                     not_owned = self.rc_dist_tile[:, r, j, di] < 0
                     under_cap = (spec_cnt < cap_max) if bool(self._is_specialty[di]) else torch.ones(B, dtype=torch.bool, device=dev)
-                    # tile existence probed lazily at apply time (the scan
-                    # is placement-order-dependent); the mask exposes the
-                    # gate-level validity
-                    ok_d[:, si] = has_tech & not_owned & under_cap
+                    # #86: the PLACEMENT SCAN belongs here. It used to be
+                    # "probed lazily at apply time", which made this mask
+                    # optimistic: it reported a district legal whenever the
+                    # gate-level tests passed, while the scripted picker also
+                    # requires a tile that can actually take it and otherwise
+                    # falls through to a BUILDING. That single omission was 90%
+                    # of all ladder-vs-engine disagreement (1400 of 1556). The
+                    # predicate is shared with _place_district_rival so the two
+                    # cannot drift again.
+                    can_place = self._district_elig_rival(r, j, di, plc)[0].any(dim=1)
+                    ok_d[:, si] = has_tech & not_owned & under_cap & can_place
             row = torch.cat([ok_b, ok_s, torch.ones(B, 1, dtype=torch.bool, device=dev), ok_u, ok_d], dim=1)
             # VP-G2: the purchase block (buy building / settler / unit at
             # goldPurchaseMult x cost from the CIV's shared treasury) — NOT
