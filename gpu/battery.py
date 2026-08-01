@@ -259,6 +259,7 @@ def main() -> int:
                 ("state_discipline", [py, "gpu/state_discipline_test.py"], 4),  # #51/S0.4: alias-rebind + _MUTABLE drift net
                 ("inplace", [py, "gpu/inplace_discipline_test.py"], 1),  # #51/S3.1: static — no self-rebinds, no stale captures
                 ("fort", [py, "gpu/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
+                ("ladder", [py, "gpu/ladder_test.py"], 4),  # #51/S8.3: the ladder leaves the parity gate — this is its only guard
             ],
             [
                 # P3→P5: sharded rollout (4 procs × OMP 4 — measured best on
