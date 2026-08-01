@@ -30,7 +30,7 @@
 
 import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
 
-import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join as pathJoin } from 'node:path';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
@@ -266,6 +266,16 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 // identical column layout when it replays an action file. While this derivation
 // lived only here, nothing else could see it — and a second copy elsewhere would
 // have rotted the file format silently, the #85 disease one level up.
+/** #70: the action file from pass 2, if pass 2 has run. Read ONCE — this is the
+ * interface between the policy module and both engines. */
+const DRIVEN_ACTIONS: { schema: number; turns: number; seeds: Record<string, Record<string, Record<string, unknown>>> } | null = (() => {
+  const f = pathJoin(OUT, 'rival_actions.json');
+  if (!existsSync(f)) return null;
+  const parsed = JSON.parse(readFileSync(f, 'utf-8'));
+  console.log(`replaying ladder actions from rival_actions.json (schema v${parsed.schema}, ${parsed.turns} turns)`);
+  return parsed;
+})();
+
 const centerBuildings = centerBuildingIds().map((id) => BUILDINGS[id]);
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
 const buildingUnlockTech = new Map<string, number>();
@@ -1325,6 +1335,26 @@ for (let s = 0; s < N_SEEDS; s++) {
     rivals: R_MAX,
   });
   state.disasters = true; // phase 4d: weather rolls join the RNG stream
+  // #70 PASS 3 OF THE TWO-PASS EXPORT. When `gpu/fixtures/rival_actions.json`
+  // exists, the rivals in this reference run do NOT decide — they replay the
+  // decisions `gpu/ladder.py` already made (pass 2, `gpu/drive_gate.py`). That
+  // is what lets the TS rival ladder be DELETED instead of merely duplicated:
+  // the policy lives once, outside both engines, and both replay the same file.
+  //
+  // Absent the file this is a no-op and the scripted ladder runs, so the two
+  // gates can coexist while the file-driven one is proven.
+  if (DRIVEN_ACTIONS) {
+    const forSeed = DRIVEN_ACTIONS.seeds[String(seed)];
+    if (forSeed) {
+      const log: Record<number, Record<number, unknown>> = {};
+      for (const [turn, seats] of Object.entries(forSeed)) {
+        const byRival: Record<number, unknown> = {};
+        for (const [rid, rec] of Object.entries(seats as Record<string, unknown>)) byRival[Number(rid)] = rec;
+        log[Number(turn)] = byRival;
+      }
+      state.rivalActions = log as GameState['rivalActions'];
+    }
+  }
   // A-12b: snapshot the t0 city-state roster BEFORE the reference run — a
   // rival can now CONQUER a CS mid-run (captureCityStateForRival removes it
   // from state.cityStates), and the fixture must carry the t0 world; the
