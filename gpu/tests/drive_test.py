@@ -88,6 +88,23 @@ def main() -> None:
         "— check the settler column and #87's preference apply"
     )
     print(f"  {TURNS} turns driven by gpu/ladder.py, seat competitive with the script OK")
+
+    # 5. THE FILE IS THE INTERFACE. Replaying the recorded actions — with no
+    #    ladder and no picker — must reproduce the run EXACTLY. This is the
+    #    contract the TS engine has to satisfy before any transcription can be
+    #    deleted: if a replay had to ask the ladder anything, the file would not
+    #    be a complete record of the decisions and TS could never reproduce the
+    #    trajectory from it.
+    c = BatchEnv([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+    for _ in range(WARMUP):
+        c.sim.step()
+    drive.replay(c, log, seats=[0])
+    rep = seat_state(c.sim)
+    assert rep == got, f"replay diverged from the driven run: {rep} vs {got}"
+    assert bool((b.sim.v_tile == c.sim.v_tile).all()), "replay put units on different tiles"
+    assert bool((b.sim.rc_current == c.sim.rc_current).all()), "replay left different city queues"
+    assert bool((b.sim.r_treasury == c.sim.r_treasury).all()), "replay diverged on treasury"
+    print("  action file replays to IDENTICAL state (no ladder, no picker) OK")
     print("DRIVE OK")
 
 

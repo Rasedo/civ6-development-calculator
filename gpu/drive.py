@@ -84,10 +84,28 @@ def _blocks(env, sim, r: int) -> dict:
     return ladder.split(obs, sim.S, sim.R, sim.C, sim.r_techs.shape[2], sim.r_civics.shape[2])
 
 
+#: ACTION FILE SCHEMA v1 (#70, "THE FILE IS THE INTERFACE").
+#:
+#: Both engines will parse this forever, so it records DECISIONS, never derived
+#: state: a replay must be able to reproduce the run without re-deriving
+#: anything the policy knew. Per turn, per driven seat:
+#:     {"turn": t, "seats": {"<r>": {
+#:         "production": [C]        per-city column, -1 = nothing
+#:         "tech": [B] | None       column, -1 = no pick
+#:         "civic": [B] | None
+#:         "units": [[N], ...]      one entry per unit STEP this turn, because
+#:                                  #90 lets a unit act several times and the
+#:                                  driver re-observes between steps
+#:     }}}
+#: Codes are the MASK layouts (`rival_masks`, `rival_unit_mask`), which are the
+#: player head layouts — so the same file can drive either seat, which is the
+#: whole point of #51.
+SCHEMA_VERSION = 1
+
+
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
-    """One turn's decisions for one driven seat. Returns a small action record —
-    the beginnings of the action FILE that will let TS replay the same choices.
-    """
+    """One turn's decisions for one driven seat, returned in the action-file
+    schema so a replay can reproduce them exactly."""
     m = sim.rival_masks(r)
     blocks = _blocks(env, sim, r)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(sim, r))
@@ -96,6 +114,7 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
     sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
 
     # units: re-observe per step, because the observation is 1-hop
+    steps = []
     for _ in range(max_steps):
         um = sim.rival_unit_mask(r)
         if not bool(um.any()):
@@ -105,9 +124,47 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
         if not bool((orders >= 0).any()):
             break
         sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))
+        steps.append(orders.tolist())
         if not bool((sim.rival_unit_mask(r)[:, :, :6]).any()):
             break
-    return {"production": prod.tolist()}
+    return {
+        "production": prod.tolist(),
+        "tech": None if tech is None else tech.tolist(),
+        "civic": None if civic is None else civic.tolist(),
+        "units": steps,
+    }
+
+
+def replay_seat(sim, r: int, rec: dict) -> None:
+    """Apply ONE recorded turn for seat `r` without consulting the ladder.
+
+    This is the half of the interface the TS engine has to implement. It must
+    touch no policy at all — if a replay needs to ask the ladder anything, the
+    file is not a complete record of the decisions and TS could never reproduce
+    the run from it.
+    """
+    dev = sim.device
+    prod = torch.tensor(rec["production"], dtype=torch.long, device=dev)
+    tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
+    civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
+    for step in rec["units"]:
+        orders = torch.tensor(step, dtype=torch.long, device=dev)
+        sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))
+
+
+def replay(env, log: list, seats=None) -> None:
+    """Re-run a recorded game from the action file alone. No ladder, no picker."""
+    sim = env.sim
+    seats = list(range(sim.R)) if seats is None else list(seats)
+    for r in seats:
+        take_seat(sim, r)
+    for turn_rec in log:
+        for r in seats:
+            key = f"r{r}"
+            if key in turn_rec:
+                replay_seat(sim, r, turn_rec[key])
+        sim.step()
 
 
 def drive(env, turns: int, seats=None, record: Path | None = None) -> list:
