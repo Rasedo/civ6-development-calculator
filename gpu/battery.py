@@ -63,7 +63,7 @@ POKE_COST = {
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
     "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
-    "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0,
+    "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "rival_verbs": 10.0,
     "rr_strike": 12.0,
     "spawn_reclaim": 6.0,
     "city_first": 14.0,
@@ -234,6 +234,7 @@ def main() -> int:
                 ("government", [py, "gpu/tests/government_test.py"], 4),
                 ("controlled", [py, "gpu/tests/controlled_test.py"], 4),
                 ("pref_apply", [py, "gpu/tests/pref_apply_test.py"], 4),  # #87: preference-order apply — the ONLY lane that reaches it
+                ("rival_verbs", [py, "gpu/tests/rival_verbs_test.py"], 4),  # #89: the 9 rival unit verbs — asserts EXECUTION, not legality
                 ("duel", [py, "gpu/tests/duel_test.py"], 4),
                 ("religion_gp", [py, "gpu/tests/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "gpu/tests/war_weariness_test.py"], 4),

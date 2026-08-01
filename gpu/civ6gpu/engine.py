@@ -6494,8 +6494,9 @@ class BatchSim:
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war
         attack = on_map & (barb | p_target) & can_fight & alive
         hold = present.unsqueeze(2)
+        tc = tile.clamp(min=0)  # `chop` below reads this outside the branch
+        _res_cols_r: list[torch.Tensor] = []
         if self.improvements_on and self._builder_idx >= 0:
-            tc = tile.clamp(min=0)
             hf = self.r_civics[:, r, self._hillfarms_civic].unsqueeze(1) if self._hillfarms_civic >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
             mining = self.r_techs[:, r, self._mine_unlock_tech].unsqueeze(1) if self._mine_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
             constr = self.r_techs[:, r, self._lumber_unlock_tech].unsqueeze(1) if self._lumber_unlock_tech >= 0 else torch.zeros(B, 1, dtype=torch.bool, device=dev)
@@ -6516,6 +6517,23 @@ class BatchSim:
         else:
             zc = torch.zeros(B, P_MAX, 1, dtype=torch.bool, device=dev)
             build_f = build_m = build_l = zc
+        if self.improvements_on and self._builder_idx >= 0:
+            # #89: the RESOURCE improvements, mirroring the player's `_res_cols`
+            # but gated on THIS RIVAL's techs. `here_ok` is already the rival
+            # twin of the player's `_base` (builder, charges, own tile, nothing
+            # already on it), so only the unlock source differs.
+            _rq_r = self.res_imp.gather(1, tc)  # required improvement idx, -1 = none
+            for _k in range(3, self._imp_unlock.numel()):
+                _ut = int(self._imp_unlock[_k])
+                _unl = (
+                    self.r_techs[:, r, _ut].unsqueeze(1) if _ut >= 0
+                    else torch.ones(B, 1, dtype=torch.bool, device=dev)
+                )
+                if self.SEASIDE >= 0 and _k == self.SEASIDE:
+                    _okk = here_ok & self._seaside_ok().gather(1, tc) & _unl
+                else:
+                    _okk = here_ok & (_rq_r == _k) & _unl
+                _res_cols_r.append(_okk.unsqueeze(2))
         # C3-sym V-H1: controlled rival builders chop like the player —
         # removable feature present, THAT RIVAL's removal tech in, unstripped.
         ftr_t = self.tile_ftr.gather(1, tc)
@@ -6526,7 +6544,50 @@ class BatchSim:
         has_mp = (self.v_mp.gather(1, sc) > 0).unsqueeze(2)
         move = move & has_mp
         attack = attack & has_mp
-        return torch.cat([move, attack, hold, build_f, build_m, build_l, chop], dim=2)
+        # #89 REPAIR — the A-13 repair job the scripted rival already runs
+        # (`_rival_job_mask`'s PILLAGED branch). Ownership is the RIVAL plane:
+        # `self.owner` is the PLAYER's per-city map and means nothing here.
+        _bidx_ok = (
+            (self.v_type.gather(1, sc) == self._builder_idx) if self._builder_idx >= 0
+            else torch.zeros_like(present)
+        )
+        repair_r = (
+            present
+            & _bidx_ok
+            & (self.rival_at.gather(1, tc) == r)
+            & (self.pillaged.gather(1, tc) | self.district_pillaged.gather(1, tc))
+        ).unsqueeze(2)
+        # #89 PILLAGE — the A-21 twin of the player's column. A military unit on
+        # an ENEMY tile with a live improvement, or a complete non-centre
+        # unpillaged district. Enemy for a rival = the PLAYER's land while at war
+        # with it, or any city-state's.
+        _enemy_r = (
+            ((self.owner.gather(1, tc) >= 0) & self.r_atwar[:, r].unsqueeze(1))
+            | (self.cs_at.gather(1, tc) >= 0)
+        )
+        _has_imp_r = (self.improvement.gather(1, tc) >= 0) & ~self.pillaged.gather(1, tc)
+        _has_dis_r = (
+            (self.district.gather(1, tc) >= 0)
+            & self.district_complete.gather(1, tc)
+            & ~self.district_pillaged.gather(1, tc)
+            & (self.center_at.gather(1, tc) < 0)
+            & (self.rvcity_at.gather(1, tc) < 0)
+        )
+        _mil_r = self._p_combat[self.v_type.gather(1, sc).clamp(min=0)] > 0
+        pillage_r = (present & _mil_r & _enemy_r & (_has_imp_r | _has_dis_r)).unsqueeze(2)
+        out = torch.cat(
+            [move, attack, hold, build_f, build_m, build_l, chop, repair_r] + _res_cols_r + [pillage_r],
+            dim=2,
+        )
+        # #89: the SAME width assert the player's mask carries. It lived on ONE
+        # SEAT ONLY, which is exactly how this mask sat 9 columns short of the
+        # enum (no REPAIR, no resource improvements, no FORT, no PILLAGE) while
+        # the scripted rival did all of them. A guard on one seat is not a guard.
+        if self._act_names and self.improvements_on and self._builder_idx >= 0:
+            assert out.shape[-1] == len(self._act_names), (
+                f"rival_unit_mask is {out.shape[-1]} wide but the enum has {len(self._act_names)} entries"
+            )
+        return out
 
     def _apply_rival_unit_actions(self, r: int, actions: torch.Tensor) -> None:
         """C3-prep: execute a CONTROLLED rival's unit orders in slot order
@@ -6711,6 +6772,101 @@ class BatchSim:
                         dr = spent.nonzero(as_tuple=True)[0]
                         self.v_alive[dr, sc[dr]] = False
                         self.occ_civ[(dr, here[dr])] = -1  # #51/S3.4b
+            # #89: the DISPATCH for the nine columns the mask just gained. A
+            # legal column that nothing executes is the A-21 trap — PILLAGE was
+            # once dispatched on the wrong column and no-op'd on BOTH engines,
+            # so the rollout stayed green while the verb did nothing at all.
+            _tcd = here.clamp(min=0)
+            # -- RESOURCE IMPROVEMENTS (18..): the player's `_res_cols` twin,
+            #    unlocked on THIS rival's techs. Column 18+i is improvement 3+i,
+            #    the same offset the mask uses.
+            if self.improvements_on and self._builder_idx >= 0 and self._act_names:
+                _res_lo = self._A_REPAIR + 1
+                _rbase = (
+                    act & is_civ
+                    & (a >= _res_lo) & (a < self._A_PILLAGE)
+                    & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
+                    & (self.rival_at.gather(1, _tcd.unsqueeze(1)).squeeze(1) == r)
+                    & (self.rvcity_at.gather(1, _tcd.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.improvement.gather(1, _tcd.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.district.gather(1, _tcd.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.built_wonder.gather(1, _tcd.unsqueeze(1)).squeeze(1) < 0)
+                )
+                if bool(_rbase.any()):
+                    _rqd = self.res_imp.gather(1, _tcd.unsqueeze(1)).squeeze(1)
+                    _didr = torch.zeros(B, dtype=torch.bool, device=dev)
+                    for _k in range(3, self._imp_unlock.numel()):
+                        _col = _res_lo + (_k - 3)
+                        _ut = int(self._imp_unlock[_k])
+                        _unl = self.r_techs[:, r, _ut] if _ut >= 0 else torch.ones(B, dtype=torch.bool, device=dev)
+                        if self.SEASIDE >= 0 and _k == self.SEASIDE:
+                            _okk = _rbase & (a == _col) & self._seaside_ok().gather(1, _tcd.unsqueeze(1)).squeeze(1) & _unl
+                        else:
+                            _okk = _rbase & (a == _col) & (_rqd == _k) & _unl
+                        if bool(_okk.any()):
+                            _rw = _okk.nonzero(as_tuple=True)[0]
+                            self.improvement[_rw, _tcd[_rw]] = _k
+                            self.pillaged[_rw, _tcd[_rw]] = False
+                            _didr[_rw] = True
+                    if bool(_didr.any()):
+                        _rw = _didr.nonzero(as_tuple=True)[0]
+                        self.v_charges[_rw, sc[_rw]] -= 1
+                        self.v_mp[_rw, sc[_rw]] = 0  # #51/S5.2: the turn is spent
+                        self._eff_version += 1
+                        _sp = _didr & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
+                        if bool(_sp.any()):
+                            _dr = _sp.nonzero(as_tuple=True)[0]
+                            self.v_alive[_dr, sc[_dr]] = False
+                            self.occ_civ[(_dr, here[_dr])] = -1
+                # -- REPAIR (A-18 twin): improvement first, else district, turn
+                #    spent, NO charge. Ownership is the RIVAL plane.
+                _okrp = (
+                    act & is_civ & (a == self._A_REPAIR)
+                    & (self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1) == self._builder_idx)
+                    & (self.rival_at.gather(1, _tcd.unsqueeze(1)).squeeze(1) == r)
+                    & (
+                        self.pillaged.gather(1, _tcd.unsqueeze(1)).squeeze(1)
+                        | self.district_pillaged.gather(1, _tcd.unsqueeze(1)).squeeze(1)
+                    )
+                )
+                if bool(_okrp.any()):
+                    _rw = _okrp.nonzero(as_tuple=True)[0]
+                    _tt = _tcd[_rw]
+                    _imp = self.pillaged[_rw, _tt]
+                    self.pillaged[_rw[_imp], _tt[_imp]] = False
+                    _dis = ~_imp & self.district_pillaged[_rw, _tt]
+                    self.district_pillaged[_rw[_dis], _tt[_dis]] = False
+                    self.v_mp[_rw, sc[_rw]] = 0
+                    self._eff_version += 1
+            # -- PILLAGE (A-21 twin): a MILITARY unit on enemy land wrecks the
+            #    improvement, else a complete non-centre district.
+            if self._act_names and self._A_PILLAGE > 0:
+                _enp = (
+                    ((self.owner.gather(1, _tcd.unsqueeze(1)).squeeze(1) >= 0) & self.r_atwar[:, r])
+                    | (self.cs_at.gather(1, _tcd.unsqueeze(1)).squeeze(1) >= 0)
+                )
+                _hip = (self.improvement.gather(1, _tcd.unsqueeze(1)).squeeze(1) >= 0) & ~self.pillaged.gather(1, _tcd.unsqueeze(1)).squeeze(1)
+                _hdp = (
+                    (self.district.gather(1, _tcd.unsqueeze(1)).squeeze(1) >= 0)
+                    & self.district_complete.gather(1, _tcd.unsqueeze(1)).squeeze(1)
+                    & ~self.district_pillaged.gather(1, _tcd.unsqueeze(1)).squeeze(1)
+                    & (self.center_at.gather(1, _tcd.unsqueeze(1)).squeeze(1) < 0)
+                    & (self.rvcity_at.gather(1, _tcd.unsqueeze(1)).squeeze(1) < 0)
+                )
+                _okpl = (
+                    act & (a == self._A_PILLAGE)
+                    & (self._p_combat[self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0)] > 0)
+                    & _enp & (_hip | _hdp)
+                )
+                if bool(_okpl.any()):
+                    _rw = _okpl.nonzero(as_tuple=True)[0]
+                    _tt = _tcd[_rw]
+                    _pi = _hip[_rw]
+                    self.pillaged[_rw[_pi], _tt[_pi]] = True
+                    _pd = ~_pi & _hdp[_rw]
+                    self.district_pillaged[_rw[_pd], _tt[_pd]] = True
+                    self.v_mp[_rw, sc[_rw]] = 0
+                    self._eff_version += 1
 
     def _scripted_builder(self) -> None:
         """Scripted-policy builder (phase 6a): each player BUILDER with

@@ -33,6 +33,23 @@ def main() -> None:
     assert paths, "no fixtures — run `npm run gpu:export` first"
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
 
+    # --- 0) #89: BOTH SEATS' masks are the enum's width --------------------
+    # This lane already existed because a 9-column gap sat in a green tree. It
+    # happened AGAIN, the same size, on the other seat: `unit_action_mask`
+    # asserted its own width against the enum and `rival_unit_mask` did not, so
+    # the rival surface sat at 17 while the player's grew to 26 — no REPAIR, no
+    # resource improvements, no FORT, no PILLAGE for a driven rival, all of
+    # which the SCRIPTED rival does. A guard on one seat is not a guard.
+    for _ in range(25):
+        sim.step()
+    _pm = sim.unit_action_mask()
+    _rm = sim.rival_unit_mask(0)
+    assert _pm.shape[2] == _rm.shape[2] == len(rj["actions"]["unit"]), (
+        f"unit action width disagrees: player {_pm.shape[2]}, rival {_rm.shape[2]}, "
+        f"enum {len(rj['actions']['unit'])}"
+    )
+    print(f"  0 both seats' unit masks are {_pm.shape[2]} wide (= the enum) OK")
+
     # --- 1) the enum is shipped and matches the improvement roster ----------
     acts = rj["actions"]["unit"]
     imp_ids = rj["improvements"]["ids"]
