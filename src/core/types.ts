@@ -286,6 +286,20 @@ export interface GovernmentState {
   policies: (string | null)[];
 }
 
+/** One driven seat's decisions for one turn, in the mask layouts. #70 schema v1. */
+export interface RivalActionRecord {
+  /** per city, the production mask column; -1 = queue nothing. */
+  production: number[];
+  /** tech / civic mask column; null or -1 = no pick. */
+  tech: number | null;
+  civic: number | null;
+  /** one entry per unit STEP this turn (#90 lets a unit act more than once). */
+  units: number[][];
+}
+
+/** turn -> rival id -> that seat's record. */
+export type RivalActionLog = Record<number, Record<number, RivalActionRecord>>;
+
 export interface GameState {
   /** #51/S1.2: every actor's own state, seat 0 = the player, r+1 = rival r.
    *  `rivals` still holds the SAME OBJECTS as seats[1..] while the migration
@@ -331,6 +345,15 @@ export interface GameState {
   cities: City[];
   nextCityId: number;
   turn: number;
+  /** #70 THE FILE IS THE INTERFACE. When present, a seat listed here does NOT
+   * decide — `rivalPhase` applies the recorded action codes instead of running
+   * the ladder. Codes are the shared MASK layouts (the player head layouts), so
+   * the same file drives either engine; `gpu/drive.py` writes it and
+   * `gpu/drive.replay` proves a replay reproduces a run exactly.
+   *
+   * This is what lets the TS rival ladder be DELETED rather than merely
+   * duplicated: policy lives once, outside both engines, and both replay it. */
+  rivalActions?: RivalActionLog;
   /** Sandbox: districts/buildings complete instantly, cost nothing, and ignore tech gating. */
   sandbox: boolean;
   /** Great-person ids already recruited BY ANYONE, in claim order. Real Civ 6

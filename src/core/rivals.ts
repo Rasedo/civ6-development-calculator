@@ -6,7 +6,7 @@
  * units raid like barbarians, and cities can be conquered.
  */
 
-import type { City, CityState, CityStateQuest, DistrictId, GameState, ImprovementId, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
+import type { City, CityState, CityStateQuest, DistrictId, GameState, ImprovementId, RivalActionRecord, RivalCity, RivalCiv, Tile, Unit, Yields } from './types';
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
@@ -28,6 +28,7 @@ import type { RuleResult } from './rules';
 import { TERRAINS } from '../data/terrains';
 import { TECHS } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
+import { prodLayout } from './prodLayout';   // #70: ONE column layout, shared with the exporter
 import { IMPROVEMENTS } from '../data/improvements';
 import { CIVICS } from '../data/civics';
 import { FEATURES } from '../data/features';
@@ -999,37 +1000,52 @@ function tryQueueRivalDistrict(state: GameState, rival: RivalCiv, rc: RivalCity,
   // a sibling's registered tile is NOT a valid site, keeping .districts and the
   // registry mutually consistent (was civ-level, so overlapping frontiers could
   // pave a sibling's tile — seed 9118).
-  const owns = (t: Tile) => tileBelongsTo(t, rc);
   for (const { id } of SCAFFOLD_DISTRICTS) {
-    let best = -1;
-    let bestAdj = -1;
-    for (const t of state.map.tiles) {
-      if (!owns(t) || t.improvement) continue;
-      if (!canPlaceDistrictIn(state, rc, id, t.index, { unlocks, ownsTile: owns }).ok) continue;
-      const adj = Math.floor(districtAdjacency(state.map, t, id));
-      if (adj > bestAdj) {
-        bestAdj = adj;
-        best = t.index;
-      }
-    }
-    if (best < 0) continue;
-    const tile = state.map.tiles[best];
-    // P4/D-8: the rival's own discount, priced BEFORE registering the
-    // placement (symmetric with the player's queueDistrict).
-    const base = districtCostIn(rival.research);
-    const cost = rivalDistrictDiscounted(state, rival, id, unlocks) ? Math.floor(base * 0.6) : base;
-    tile.district = id;
-    tile.districtComplete = false;
-    tile.improvement = null;
-    // AUDIT C-6: placement removes a bonus resource, exactly like the
-    // player's queueDistrict (real Civ 6 rule; canPlaceDistrictIn already
-    // refused luxury/strategic).
-    if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-    rc.districts.push({ type: id, tileIndex: best });
-    commitProduction(state, rc.seat, rc, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
-    return true;
+    if (placeRivalDistrict(state, rival, rc, id, unlocks)) return true;
   }
   return false;
+}
+
+/** #70: place ONE named district — the body `tryQueueRivalDistrict` used to
+ * inline, split out so the ACTION FILE can queue the district it recorded rather
+ * than "the first placeable one". Both callers share this, so the ladder and a
+ * replay cannot place differently: that split is precisely how the GPU mask and
+ * picker drifted apart in #86. Returns false when no owned tile can take it. */
+export function placeRivalDistrict(
+  state: GameState,
+  rival: RivalCiv,
+  rc: RivalCity,
+  id: DistrictId,
+  unlocks: Unlocks,
+): boolean {
+  const owns = (t: Tile) => tileBelongsTo(t, rc);
+  let best = -1;
+  let bestAdj = -1;
+  for (const t of state.map.tiles) {
+    if (!owns(t) || t.improvement) continue;
+    if (!canPlaceDistrictIn(state, rc, id, t.index, { unlocks, ownsTile: owns }).ok) continue;
+    const adj = Math.floor(districtAdjacency(state.map, t, id));
+    if (adj > bestAdj) {
+      bestAdj = adj;
+      best = t.index;
+    }
+  }
+  if (best < 0) return false;
+  const tile = state.map.tiles[best];
+  // P4/D-8: the rival's own discount, priced BEFORE registering the
+  // placement (symmetric with the player's queueDistrict).
+  const base = districtCostIn(rival.research);
+  const cost = rivalDistrictDiscounted(state, rival, id, unlocks) ? Math.floor(base * 0.6) : base;
+  tile.district = id;
+  tile.districtComplete = false;
+  tile.improvement = null;
+  // AUDIT C-6: placement removes a bonus resource, exactly like the
+  // player's queueDistrict (real Civ 6 rule; canPlaceDistrictIn already
+  // refused luxury/strategic).
+  if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
+  rc.districts.push({ type: id, tileIndex: best });
+  commitProduction(state, rc.seat, rc, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
+  return true;
 }
 
 /** P5/S1 (C-12): a rival city's gold upkeep — the player's cityMaintenance
@@ -2284,6 +2300,45 @@ function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity,
   );
 }
 
+
+/** #70: apply ONE recorded turn for a driven seat. Touches no policy — if this
+ * ever needed to consult the ladder, the file would not be a complete record of
+ * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
+ * `apply_rival_actions`: the idle gate, then the same cost/progress semantics. */
+export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: RivalActionRecord): void {
+  const { NB, NU, buildings, units } = prodLayout();
+  if (rec.tech !== null && rec.tech >= 0 && !rival.research.tech) {
+    const t = Object.keys(TECHS)[rec.tech];
+    if (t) rival.research.tech = t;
+  }
+  if (rec.civic !== null && rec.civic >= 0 && !rival.research.civic) {
+    const c = Object.keys(CIVICS)[rec.civic];
+    if (c) rival.research.civic = c;
+  }
+  rival.cities.forEach((rc, j) => {
+    const a = rec.production[j] ?? -1;
+    if (a < 0 || rc.queue.length > 0) return;   // the idle gate, as the GPU applies it
+    if (a < NB) {
+      const id = buildings[a];
+      const def = id ? BUILDINGS[id] : undefined;
+      if (def) commitProduction(state, rc.seat, rc, { kind: 'building', building: id, progress: 0 });
+    } else if (a === NB) {
+      commitProduction(state, rc.seat, rc, { kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
+    } else if (a >= NB + 2 && a < NB + 2 + NU) {
+      const id = units[a - NB - 2];
+      if (id && UNITS[id]) commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0 });
+    }
+    else if (a >= NB + 2 + NU) {
+      // DISTRICT: the file names the TYPE, the engine still runs the placement
+      // scan — a tile index in the record would be derived state, and the whole
+      // point of the schema is that it carries DECISIONS only.
+      const si = a - (NB + 2 + NU);
+      const d = SCAFFOLD_DISTRICTS[si];
+      if (d) placeRivalDistrict(state, rival, rc, d.id, computeUnlocksIn(rival.research));
+    }
+  });
+}
+
 export function rivalPhase(state: GameState): void {
   if (rivalCount(state) === 0) return;
 
@@ -2458,6 +2513,16 @@ export function rivalPhase(state: GameState): void {
       if (q?.kind === 'settler') settlerQueued = true;
     }
     const rivalUnlocks = computeUnlocksIn(rival.research);
+    // #70 THE FILE IS THE INTERFACE. A seat with a recorded action for this turn
+    // does NOT decide — it applies what the ladder already chose. This is the
+    // branch that makes the transcription below deletable: while both exist the
+    // file path is verified against it, and once verified the ladder path is the
+    // only one left.
+    const rec = state.rivalActions?.[state.turn]?.[rival.id];
+    if (rec) {
+      applyRivalActionRecord(state, rival, rec);
+      continue;
+    }
     for (const rc of rival.cities) {
       if (rc.queue.length > 0) continue;
       // #82: NO CAPITAL GATE. `queueSettler` never had one for the player and

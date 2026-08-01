@@ -144,7 +144,8 @@ import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, ENCAMPMENT_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
-import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
+import { BUILDINGS } from '../src/data/buildings';
+import { centerBuildingIds } from '../src/core/prodLayout';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { FEATURES } from '../src/data/features';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../src/data/techs'; // B-20 (#71): era scale
@@ -261,13 +262,11 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 // scaffold places HARBOR by ~t270, so its buildings — Lighthouse/Shipyard/Seaport —
 // must be buildable; Aqueduct has no buildings, harmless). Worship buildings still
 // excluded below. (Harbor stage: pairs with the _city_totals player-yield mirror.)
-const BUILDING_DISTRICTS = new Set<string>(['CITY_CENTER', ...SCAFFOLD_DISTRICTS.map((d) => d.id)]);
-const centerBuildings = Object.values(BUILDINGS)
-  // B9-R3: worship buildings JOIN the table (rivals faith-buy them; every
-  // production/gold picker masks them via the `worship` flag). PALACE stays
-  // out (both engines model it as a capital term, not a table row).
-  .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !SCRIPTED_HELD_BUILDINGS.has(b.id))
-  .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
+// #70: the ordering moved to src/core/prodLayout.ts so the ENGINE can derive the
+// identical column layout when it replays an action file. While this derivation
+// lived only here, nothing else could see it — and a second copy elsewhere would
+// have rotted the file format silently, the #85 disease one level up.
+const centerBuildings = centerBuildingIds().map((id) => BUILDINGS[id]);
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
 const buildingUnlockTech = new Map<string, number>();
 techList.forEach((t, i) => {
