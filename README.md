@@ -393,9 +393,9 @@ Hub, Aqueduct and Harbor placeable by the policy in any city, with real
 adjacency, building chains and great people) and gold purchases of
 buildings/settlers/units, all with the in-state mulberry32 RNG
 mirrored draw for draw. Phase 5 trains on it
-natively: `python gpu/train_ppo.py` runs a masked multi-head PPO whose
+natively: `python gpu/eval/train_ppo.py` runs a masked multi-head PPO whose
 inference, env stepping and updates never leave the device, with worlds
-re-seeded every episode; `gpu/eval.py` is the matching benchmark
+re-seeded every episode; `gpu/eval/eval.py` is the matching benchmark
 protocol (historical horizon-100-era numbers, superseded — district
 engine: random 115.1, scripted autopilot 162.2, and the tune1 reference
 net 216.9 after ~80 min on an RTX 4070 SUPER; the horizon is now the
