@@ -15,9 +15,13 @@
  */
 
 import type { City, GameState, QueueItem } from './types';
-import { PLAYER_CIV, seatOf, isPlayerSeat, civsAtWar, rivalCount, civOfRival } from './seats';
-import { isSuzerain } from './cityStates';
+import { PLAYER_CIV, seatOf, isPlayerSeat, isBarbSeat, civsAtWar, rivalCount, civOfRival, citiesOf, rivalsOf, tileSeat, tileCity } from './seats';
+import { isSuzerain, envoysOf } from './cityStates';
 import { seatTourism } from './city';
+import { itemCost } from './game';
+import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import { DIPLO_FAVOR_PER_SUZERAIN } from '../data/rivals';
@@ -145,4 +149,77 @@ export function commitProduction(state: GameState, seat: number, city: City, ite
       : item.kind;
     console.error(`ALOG t${state.turn} s${seat} prod city=${city.id} ${item.kind}:${what}`);
   }
+}
+
+/**
+ * #51/S8.1b — WHAT A SEAT SEES.
+ *
+ * The GPU has had a seat-invariant `observe(seat)` since C2; TS had none at
+ * all, so the thing a decision actually READS was never comparable between the
+ * engines. Parity compares ~412 trace columns chosen after the fact; an
+ * observation is what the policy consumes BEFORE it acts, which is the tighter
+ * artifact: matching observations plus identical actions make divergence
+ * impossible by construction rather than sampled.
+ *
+ * This is the TS twin of `gpu/civ6gpu/env.py:BatchEnv.observe`, field for field
+ * and scale for scale:
+ *   [ 14 empire | 3 per city-state | 3 per rival | 9 per city slot ]
+ *
+ * It reads ONLY through the seat-generic accessors (`seatOf`, `citiesOf`), so
+ * it is one renderer for every seat — unlike the GPU, which still routes
+ * seat > 0 into a second `_observe_rival` body. Collapsing that is what this
+ * function is the reference for.
+ */
+export function observeSeat(state: GameState, seat: number, cMax: number, horizon: number): number[] {
+  const s = seatOf(state, seat);
+  const cities = citiesOf(state, seat);
+  const nTech = Math.max(Object.keys(TECHS).length, 1);
+  const nCivic = Math.max(Object.keys(CIVICS).length, 1);
+  const emp: number[] = [
+    state.turn / horizon,
+    (s?.research.techs.length ?? 0) / nTech,
+    (s?.research.civics.length ?? 0) / nCivic,
+    (s?.research.techProgress ?? 0) / 50.0,
+    (s?.research.civicProgress ?? 0) / 50.0,
+    s?.settlers ?? 0,
+    cities.reduce((n: number, c: City) => n + c.queue.filter((q) => q.kind === 'settler').length, 0),
+    cities.length / cMax,
+    Math.min((s?.treasury ?? 0) / 200.0, 5.0),
+    (s?.envoysAvailable ?? 0) / 5.0,
+    (s?.influencePoints ?? 0) / 100.0,
+    state.barbSeat.camps.length / 5.0,
+    state.units.filter((u) => isBarbSeat(u.seat)).length / 10.0,
+    state.units.filter((u) => u.seat === seat).length / 10.0,
+  ];
+  const cs: number[] = [];
+  for (const c of state.cityStates ?? []) {
+    cs.push(c.met ? 1 : 0, envoysOf(c, seat) / 6.0, c.quest ? 1 : 0);
+  }
+  const riv: number[] = [];
+  for (const r of rivalsOf(state)) {
+    const other = civOfRival(r.id);
+    riv.push(
+      other !== seat && civsAtWar(state, seat, other) ? 1 : 0,
+      (r.warTurns ?? 0) / 14.0,
+      r.cities.length / 6.0,
+    );
+  }
+  const per: number[] = [];
+  for (let i = 0; i < cMax; i++) {
+    const c = cities[i];
+    if (!c) { per.push(0, 0, 0, 0, 0, 0, 0, 0, 0); continue; }
+    const head = c.queue[0];
+    per.push(
+      1,
+      c.population / 10.0,
+      c.foodBox / Math.max(growthFoodNeeded(c.population), 1),
+      head ? head.progress / Math.max(itemCost(head), 1) : 0,
+      c.cultureBox / Math.max(borderGrowthCost(c.tilesAcquired), 1),
+      state.map.tiles.filter((t) => tileSeat(t) === seat && tileCity(t) === c.id).length / 20.0,
+      c.hp / 200.0,
+      (c.loyalty ?? 100) / 100.0,
+      head ? 1 : 0,
+    );
+  }
+  return [...emp, ...cs, ...riv, ...per];
 }
