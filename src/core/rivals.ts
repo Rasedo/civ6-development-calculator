@@ -10,7 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, Improvemen
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
+import { seatAccumulators, seatGrowth, commitProduction, commitResearch } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -3316,13 +3316,13 @@ export function rivalPhase(state: GameState): void {
     const gCivic = goldenBoostBonus(state, civOfRival(rival.id), true);
     const pickNext = () => {
       if (rsr.tech === null)
-        rsr.tech = availableTechsIn(rsr).sort(
+        commitResearch(state, civOfRival(rival.id), 'tech', availableTechsIn(rsr).sort(
           (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost, gTech) - effectiveResearchCostIn(rsr, b.id, b.cost, gTech),
-        )[0]?.id ?? null;
+        )[0]?.id ?? null);
       if (rsr.civic === null)
-        rsr.civic = availableCivicsIn(rsr).sort(
+        commitResearch(state, civOfRival(rival.id), 'civic', availableCivicsIn(rsr).sort(
           (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost, gCivic) - effectiveResearchCostIn(rsr, b.id, b.cost, gCivic),
-        )[0]?.id ?? null;
+        )[0]?.id ?? null);
     };
     pickNext();
     rsr.techProgress += sciSum;

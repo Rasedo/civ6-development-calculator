@@ -223,3 +223,31 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   }
   return [...emp, ...cs, ...riv, ...per];
 }
+
+/**
+ * #51/S8.1d — the remaining COMMIT seams, same contract as `commitProduction`.
+ *
+ * Each is the one place a seat's choice of that kind lands, so the seat-tagged
+ * stream is complete rather than production-only. Completeness is the point:
+ * the invariant the log exists to prove is that a seat's state changes are all
+ * explained by its logged actions, and a verb with no seam is a hole in that.
+ *
+ * As with production these COMMIT, they do not decide, and they log the pick
+ * rather than the walk.
+ */
+export function commitResearch(state: GameState, seat: number, kind: 'tech' | 'civic', id: string | null): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
+  if (kind === 'tech') s.research.tech = id;
+  else s.research.civic = id;
+  if (process.env.CIV6_ALOG && id !== null) {
+    console.error(`ALOG t${state.turn} s${seat} ${kind} ${id}`);
+  }
+}
+
+/** A unit order committed by a seat — the verb plus where it landed. */
+export function logUnitOrder(state: GameState, seat: number, unitId: number, verb: string, tileIndex: number): void {
+  if (process.env.CIV6_ALOG) {
+    console.error(`ALOG t${state.turn} s${seat} ${verb} unit=${unitId} tile=${tileIndex}`);
+  }
+}

@@ -17,7 +17,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress, nextCityName } from './rivals';
-import { seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
+import { seatAccumulators, seatGrowth, commitProduction, commitResearch } from './seatTurn';
 import { expirePlayerRoutes } from './trade';
 import { ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
@@ -668,7 +668,7 @@ export function setTechResearch(state: GameState, techId: string): RuleResult {
   if (!availableTechs(state).some((t) => t.id === techId)) {
     return { ok: false, reason: 'Tech not available (missing prerequisites or already researched).' };
   }
-  playerSeat(state).research.tech = techId;
+  commitResearch(state, PLAYER_CIV, 'tech', techId);
   return { ok: true };
 }
 
@@ -676,7 +676,7 @@ export function setCivicResearch(state: GameState, civicId: string): RuleResult 
   if (!availableCivics(state).some((c) => c.id === civicId)) {
     return { ok: false, reason: 'Civic not available (missing prerequisites or already researched).' };
   }
-  playerSeat(state).research.civic = civicId;
+  commitResearch(state, PLAYER_CIV, 'civic', civicId);
   return { ok: true };
 }
 
@@ -739,11 +739,11 @@ function autoPickResearch(state: GameState): void {
   const eff = (id: string, cost: number) => effectiveResearchCost(state, id, cost);
   if (playerSeat(state).research.tech === null) {
     const next = availableTechs(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
-    if (next) playerSeat(state).research.tech = next.id;
+    if (next) commitResearch(state, PLAYER_CIV, 'tech', next.id);
   }
   if (playerSeat(state).research.civic === null) {
     const next = availableCivics(state).sort((a, b) => eff(a.id, a.cost) - eff(b.id, b.cost))[0];
-    if (next) playerSeat(state).research.civic = next.id;
+    if (next) commitResearch(state, PLAYER_CIV, 'civic', next.id);
   }
 }
 
