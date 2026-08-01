@@ -4960,8 +4960,9 @@ class BatchSim:
         # to every alive city, capitalYields to the capital — pre-tier, the
         # rivalCityYields `bonuses` position (rivals.ts). Same channels as the
         # player path (getRivalModifiers layers gov+policy into these mods).
+        _gym = None  # #51/S7.4b: bound only inside the branch below
         if self._gov_has_effects:
-            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # #51/S7.4a: housing IS consumed now (rival housing); ymult/slots still are not
+            gcity, gcap, _gh, _gym, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # #51/S7.4a housing, S7.4b ymult; slots still unconsumed
             acell = alive.double()  # [B, RC]
             gisc = (self.rc_is_cap[:, r] & alive).double()  # [B, RC]
             food = food + gcity[:, 0].unsqueeze(1) * acell + gcap[:, 0].unsqueeze(1) * gisc
@@ -5066,6 +5067,17 @@ class BatchSim:
         cul = cul * yf
         gold = gold * yf
         faith = faith * yf
+        # #51/S7.4b: the rival's GOVERNMENT/POLICY yieldMult, in the player's
+        # own position — the tier factor first, then ymult, then the wonder
+        # multipliers (city.ts / engine.py:_city_stats both do exactly this).
+        # A rival under MERCHANT_REPUBLIC kept 100% of its gold.
+        if _gym is not None:
+            prod = prod * _gym[:, 1].unsqueeze(1)
+            gold = gold * _gym[:, 2].unsqueeze(1)
+            sci = sci * _gym[:, 3].unsqueeze(1)
+            cul = cul * _gym[:, 4].unsqueeze(1)
+            faith = faith * _gym[:, 5].unsqueeze(1)
+            food = food * _gym[:, 0].unsqueeze(1)
         # A-4: wonder yield multipliers AFTER the tier scaling — an EXPLICIT
         # wonder-id-order product (the TS registry order the per-j
         # .prod(dim=1) realizes on all gated data): shape-independent.
@@ -10475,8 +10487,9 @@ class BatchSim:
             faith = faith + capY[:, 5] * isc
         # A-7r: government + slotted-policy flat yields (cityYields all cities,
         # capitalYields the capital) — pre-tier, the batched twin's addition.
+        _gym = None  # #51/S7.4b: bound only inside the branch below
         if self._gov_has_effects:
-            gcity, gcap, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # #51/S7.4a: housing IS consumed now (rival housing); ymult/slots still are not
+            gcity, gcap, _gh, _gym, *_ = self._gov_policy_mods_cached(r, self.r_civics[:, r])  # #51/S7.4a housing, S7.4b ymult; slots still unconsumed
             mcell = mask.double()  # [B]
             gisc = (self.rc_is_cap[:, r, j] & mask).double()  # [B]
             food = food + gcity[:, 0] * mcell + gcap[:, 0] * gisc
@@ -10571,6 +10584,16 @@ class BatchSim:
         cul = cul * yf
         gold = gold * yf
         faith = faith * yf
+        # #51/S7.4b: the per-city twin of the civ-level ymult above — same
+        # position (tier factor, ymult, then wonder multipliers). Both paths
+        # must carry it or they disagree with each other.
+        if _gym is not None:
+            food = food * _gym[:, 0]
+            prod = prod * _gym[:, 1]
+            gold = gold * _gym[:, 2]
+            sci = sci * _gym[:, 3]
+            cul = cul * _gym[:, 4]
+            faith = faith * _gym[:, 5]
         # A-4: the owning city's wonder yield multipliers (Oxford/Big Ben)
         # AFTER the tier scaling — the computeCityStats order; the product
         # runs in wonder-id order = the TS registry push order (the picker

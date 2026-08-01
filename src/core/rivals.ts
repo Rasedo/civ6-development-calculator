@@ -2079,6 +2079,13 @@ export function rivalCityYields(
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as (keyof Yields)[]) {
     total[k] *= t.yieldFactor;
   }
+  // #51/S7.4b: the seat's GOVERNMENT/POLICY yield multipliers, in the
+  // player's own position — `city.ts` runs `tier.yieldFactor`, THEN the
+  // `m.yieldMult` loop, THEN the wonder `cityYieldMult`. A rival adopting
+  // MERCHANT_REPUBLIC kept 100% of its gold while the player's was x1.1.
+  for (const k of Object.keys(ctx.mods.yieldMult) as (keyof Yields)[]) {
+    total[k] *= ctx.mods.yieldMult[k] ?? 1;
+  }
   // A-4: the owning city's wonder yield multipliers (Oxford/Big Ben) —
   // AFTER the tier scaling, the computeCityStats order (city.ts:483-489).
   for (const wd of rcWonders) {
