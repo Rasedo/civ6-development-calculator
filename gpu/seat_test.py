@@ -59,6 +59,47 @@ def main() -> None:
                 ca[b] = o[torch.randint(len(o), (1,), generator=g)]
         obs1, rew1, done1 = a.step(production=pa, tech=ta, civic=ca, seat=1)
         assert obs1.shape == oa.shape and not torch.isnan(obs1).any() and not torch.isnan(rew1).any()
+    # --- #51/S8.1c: a rival's observation must READ its state, not zero it ----
+    # `_observe_rival` used to render treasury/envoys/influence as hard 0 and
+    # loyalty as a constant 1.0, with comments claiming rivals had no such
+    # state. The planes landed later and the second renderer was never
+    # revisited, so a policy driving a rival saw a civ with no money, no
+    # influence and perfect loyalty everywhere. NOTHING COMPARES OBSERVATIONS —
+    # parity compares trace columns and an observation is not one — so this
+    # lane is the only thing standing between that renderer and silent drift.
+    # `src/core/seatTurn.ts:observeSeat` is the reference layout (83 wide at
+    # S=3,R=2,C=6; verified field-for-field against observe(0)).
+    import pathlib as _pl
+    from civ6gpu.env import BatchEnv as _BE
+    _p = sorted(_pl.Path("gpu/fixtures").glob("seed*.json"))[0]
+    e2 = _BE([load_fixture(_p)], rules, device="cpu", dtype=torch.float64)
+    s2 = e2.sim
+    for _ in range(60):
+        s2.step()
+    _base = 14 + 3 * s2.S + 3 * s2.R
+    for name, plane, col, scale in (
+        ("treasury", s2.r_treasury, 8, 200.0),
+        ("influence", s2.r_influence, 10, 100.0),
+        ("envoysAvail", s2.r_envoys_avail, 9, 5.0),
+    ):
+        plane[0, 0] = 0.0
+        lo = float(e2.observe(1)[0, col])
+        plane[0, 0] = scale                      # exactly one unit of its scale
+        hi = float(e2.observe(1)[0, col])
+        assert abs(lo) < 1e-9 and abs(hi - 1.0) < 1e-9, (
+            f"rival obs field {col} ({name}) must READ its plane: {lo} -> {hi}"
+        )
+    s2.rc_loyalty[0, 0, 0] = 42.0
+    assert abs(float(e2.observe(1)[0, _base + 7]) - 0.42) < 1e-9, (
+        "rival per-city loyalty must READ rc_loyalty, not render a constant"
+    )
+    s2.r_settlers[0, 0] = 3
+    assert abs(float(e2.observe(1)[0, 5]) - 3.0) < 1e-9, (
+        "obs field 5 is the seat's BANKED settlers for every seat (r_settlers)"
+    )
+    print("  #51/S8.1c rival observation reads live state (treasury/influence/"
+          "envoys/loyalty/settlers) OK")
+
     print("C2 SEAT SURFACE OK")
 
 

@@ -257,8 +257,18 @@ class BatchEnv:
         my empire = the rc_*/r_* family (slots beyond C invisible — RC>C by
         flips only), the CS block zeros (no rival courtship), the rival
         block's slot 0 = THE PLAYER viewed as an opponent, then the other
-        rivals. Fields without a rival analog (treasury, envoys, influence)
-        render zero; loyalty renders full."""
+        rivals.
+
+        #51/S8.1c: this used to zero treasury/envoys/influence and render
+        loyalty as a constant 1.0, with comments saying rivals had no such
+        state. Those comments were TRUE WHEN WRITTEN and the planes landed
+        later — `r_treasury`, `r_influence`, `r_envoys_avail` and `rc_loyalty`
+        all exist and are live. A policy driving a rival was therefore shown a
+        civ with no money, no influence, no envoys and perfect loyalty
+        everywhere. Nothing caught it because NOTHING COMPARES OBSERVATIONS:
+        parity compares trace columns and an observation is not one. Same
+        invisibility as #62 (city-state war state) and #63 (antiquity sites).
+        `seatTurn.ts:observeSeat` is now the reference for this layout."""
         s = self.sim
         d = s.dtype
         B, C = s.B, s.C
@@ -276,7 +286,7 @@ class BatchEnv:
                 torch.zeros(B, C, dtype=d, device=dev),  # no per-city border box
                 s.rc_acquired[:, r, :C].to(d) / 20.0 if hasattr(s, "rc_acquired") else torch.zeros(B, C, dtype=d, device=dev),
                 torch.where(alive, s.rc_hp[:, r, :C].to(d), torch.zeros_like(pop)) / 200.0,
-                torch.ones(B, C, dtype=d, device=dev),  # rivals hold full loyalty
+                s.rc_loyalty[:, r, :C].to(d) / 100.0,  # #51/S8.1c: rc_loyalty EXISTS
                 (s.rc_current[:, r, :C] >= 0).to(d),
             ],
             dim=2,
@@ -289,12 +299,18 @@ class BatchEnv:
                 s.r_civics[:, r].sum(dim=1).to(d) / max(s.r_civics.shape[2], 1),
                 s.r_tech_prog[:, r].to(d) / 50.0,
                 s.r_civic_prog[:, r].to(d) / 50.0,
-                (s.rc_current[:, r] == 0).sum(dim=1).to(d),  # settlers in production
-                (s.rc_current[:, r] == 0).any(dim=1).to(d),
+                # #51/S8.1c: field 5 is the seat's BANKED settlers and field 6 is
+                # how many are QUEUED — the player renders exactly that. This
+                # rendered the queued COUNT in field 5 and a mere BOOLEAN in
+                # field 6, so the two fields meant different things depending on
+                # which seat you asked. `r_settlers` is the rival's bank and has
+                # existed since S4.1r ("one plane, one rule").
+                s.r_settlers[:, r].to(d),
+                (s.rc_current[:, r] == 0).sum(dim=1).to(d),
                 s.rc_alive[:, r].sum(dim=1).to(d) / C,
-                torch.zeros(B, dtype=d, device=dev),  # no rival treasury
-                torch.zeros(B, dtype=d, device=dev),  # no envoys
-                torch.zeros(B, dtype=d, device=dev),  # no influence
+                (s.r_treasury[:, r] / 200.0).clamp(max=5.0),  # #51/S8.1c: r_treasury EXISTS
+                s.r_envoys_avail[:, r].to(d) / 5.0,  # #51/S8.1c: r_envoys_avail EXISTS
+                s.r_influence[:, r].to(d) / 100.0,  # #51/S8.1c: r_influence EXISTS
                 s.n_camps.to(d) / 5.0,
                 s.u_alive.sum(dim=1).to(d) / 10.0,
                 n_own_units / 10.0,
