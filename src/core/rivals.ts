@@ -10,7 +10,7 @@ import type { City, CityState, CityStateQuest, DistrictId, GameState, Improvemen
 import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
-import { seatAccumulators } from './seatTurn';
+import { seatAccumulators, seatGrowth } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves } from './units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
@@ -60,7 +60,7 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, civEraIndex, empireGrowthMult, pickBorderTile } from './city';
+import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, civEraIndex, empireGrowthMult, pickBorderTile, acquireTile } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
@@ -3035,17 +3035,13 @@ export function rivalPhase(state: GameState): void {
       // A-7/A-4: the belief growth multiplier AND the civ's wonder growth
       // multiplier (Hanging Gardens — the empireGrowthMult twin) ride the
       // chain exactly like computeCityStats (city.ts:495-501).
-      rc.foodBox += surplus > 0
+      // #51/S2.4b: ONE growth rule for every seat (`seatTurn.ts:seatGrowth`).
+      // The surplus CHAIN stays here — the player's arrives pre-folded as
+      // `stats.effectiveFoodSurplus` — but the bank/grow/starve rule is shared.
+      const _surplus = surplus > 0
         ? surplus * hFactor * tier.growthFactor * getModifiers(state, civOfRival(rival.id)).growthMult * empireGrowthMult(state, civOfRival(rival.id))
         : surplus;
-      const need = growthFoodNeeded(rc.population);
-      if (rc.foodBox >= need) {
-        rc.population += 1;
-        rc.foodBox -= need;
-      } else if (rc.foodBox < 0) {
-        rc.population = Math.max(1, rc.population - 1);
-        rc.foodBox = 0;
-      }
+      seatGrowth(rc, _surplus, growthFoodNeeded(rc.population));
       // Queue progress + completion (settler founds via the site scan; a
       // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = rc.queue[0];
@@ -3182,8 +3178,9 @@ export function rivalPhase(state: GameState): void {
           break;
         }
         rc.cultureBox -= rcBorderCost();
-        setTileOwner(state.map.tiles[next], civOfRival(rival.id), rc.id); // A-17
-        rc.tilesAcquired += 1;
+        // #51/S2.4c: the same claim the player uses. `acquireTile` now gates its
+        // fog reveal on the seat, so this stopped needing a hand-copy.
+        acquireTile(state, rc, next);
       }
       // AUDIT B-2: the rival mirror of the player city strike (combat.ts) —
       // a rival city WITH ANCIENT_WALLS fires once per turn at the nearest

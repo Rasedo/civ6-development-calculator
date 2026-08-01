@@ -14,7 +14,7 @@
  * work itself is shared.
  */
 
-import type { GameState } from './types';
+import type { City, GameState } from './types';
 import { PLAYER_CIV, seatOf, isPlayerSeat, civsAtWar, rivalCount, civOfRival } from './seats';
 import { isSuzerain } from './cityStates';
 import { seatTourism } from './city';
@@ -90,3 +90,28 @@ export function seatAccumulators(state: GameState, seat: number): void {
 /** The seat id for rival `rivalId` — re-exported so turn-body callers need
  *  only this module. */
 export { civOfRival };
+
+/**
+ * #51/S2.4b — CITY GROWTH, for any seat's city.
+ *
+ * `RivalCity = City`, so the two transcriptions of this rule were byte-for-byte
+ * the same arithmetic on the same field names: bank the surplus, grow at the
+ * threshold, starve at a negative box with a floor of 1 pop. `game.ts:endTurn`
+ * held one copy and the per-rival loop in `rivals.ts` held the other.
+ *
+ * The CALLER still computes the surplus, because the two seats reach it
+ * differently — the player's `computeCityStats` returns
+ * `effectiveFoodSurplus` with the housing/amenity/growth-mult chain already
+ * folded in, while the rival path folds that chain at the call site. That
+ * difference is real and is its own slice; the growth RULE is not.
+ */
+export function seatGrowth(city: City, surplus: number, growthNeeded: number): void {
+  city.foodBox += surplus;
+  if (city.foodBox >= growthNeeded) {
+    city.population += 1;
+    city.foodBox -= growthNeeded;
+  } else if (city.foodBox < 0) {
+    city.population = Math.max(1, city.population - 1);
+    city.foodBox = 0;
+  }
+}

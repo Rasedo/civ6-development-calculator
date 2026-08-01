@@ -17,7 +17,7 @@ import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeRivals, rivalPhase, applyLoyalty, flipCityToRival, worldCongress, nextCityName } from './rivals';
-import { seatAccumulators } from './seatTurn';
+import { seatAccumulators, seatGrowth } from './seatTurn';
 import { expirePlayerRoutes } from './trade';
 import { ERA_SCORE_FOUND, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_MONUMENTALITY, DED_EXODUS } from '../data/rivals';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints } from './eras';
@@ -900,14 +900,7 @@ export function endTurn(state: GameState): void {
     }
 
     // --- growth -------------------------------------------------------------
-    city.foodBox += stats.effectiveFoodSurplus;
-    if (city.foodBox >= stats.growthNeeded) {
-      city.population += 1;
-      city.foodBox -= stats.growthNeeded;
-    } else if (city.foodBox < 0) {
-      city.population = Math.max(1, city.population - 1);
-      city.foodBox = 0;
-    }
+    seatGrowth(city, stats.effectiveFoodSurplus, stats.growthNeeded);  // #51/S2.4b
 
     // --- cultural border expansion -------------------------------------------
     const borderCost = () => Math.round(borderGrowthCost(city.tilesAcquired) * mods.borderCostMult);

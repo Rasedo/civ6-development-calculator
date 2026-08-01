@@ -372,7 +372,11 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
 export function acquireTile(state: GameState, city: City, tileIndex: number): void {
   setTileOwner(state.map.tiles[tileIndex], city.seat, city.id);
   city.tilesAcquired += 1;
-  revealAround(state, tileIndex, 1);
+  // #51/S2.4c: the fog is the PLAYER's — rivals have none — so the reveal is
+  // the one seat-dependent step here. Gating it lets a rival claim a tile
+  // through this same function instead of hand-copying setTileOwner +
+  // tilesAcquired at its own call site, which is how the two drifted.
+  if (isPlayerSeat(city.seat)) revealAround(state, tileIndex, 1);
 }
 
 // ---------------------------------------------------------------------------
