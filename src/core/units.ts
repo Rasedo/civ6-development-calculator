@@ -1061,3 +1061,41 @@ export function builderHarvest(state: GameState, unitId: number): RuleResult {
 export function unitNeighbor(state: GameState, unit: Unit, d: number): Tile | null {
   return neighborTile(state.map, state.map.tiles[unit.tileIndex], d);
 }
+
+/**
+ * #51/S8.2a — GREEDY WALK TOWARD A TILE, for any seat.
+ *
+ * `walkPath` follows a QUEUED path; this is the other walker — step to the free
+ * neighbour strictly closer, first-found wins ties (direction order), stop when
+ * within `stopWithin`. It was transcribed by hand three times inside
+ * `rivals.ts`, each copy annotated with what it was copying ("pays walkPath's
+ * charge", "walkPath's charge (tile cost + 3 per river)", "the missionary
+ * chassis verbatim: ... walkPath's EXACT CHARGE, ZOC halt, camp clear").
+ *
+ * `stepUnit` already held the charge, the ZOC halt and the camp clear, so those
+ * were genuinely shared; what was triplicated is the PATHING around it — which
+ * is where task #46 came from (a rule inside the player's walker that the hand
+ * copies did not carry).
+ *
+ * Takes a UNIT, not a rival index: nothing here is seat-specific, and the
+ * Python ladder will call it for whichever seat it is driving.
+ */
+export function walkToward(state: GameState, unit: Unit, target: Tile, stopWithin = 0): void {
+  for (;;) {
+    const at = state.map.tiles[unit.tileIndex];
+    const dHere = hexDistance(at.col, at.row, target.col, target.row);
+    if (dHere <= stopWithin) break;
+    let dest = -1;
+    let destD = dHere;
+    for (const n of neighbors(state.map, at)) {
+      if (!tileFreeForUnit(state, n.index, unit)) continue;
+      const d = hexDistance(n.col, n.row, target.col, target.row);
+      if (d < destD) {
+        destD = d;
+        dest = n.index;
+      }
+    }
+    if (dest < 0) break;
+    if (stepUnit(state, unit, state.map.tiles[dest]) !== 'moved') break;
+  }
+}

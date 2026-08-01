@@ -30,7 +30,9 @@
 
 import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
 
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { join as pathJoin } from 'node:path';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../src/data/improvements'; // B-27 (#71)
@@ -1242,6 +1244,35 @@ const rules = {
     newDeal: p.effects.newDeal ? [p.effects.newDeal.min, p.effects.newDeal.housing, p.effects.newDeal.amenities] : [-1, 0, 0],
   })),
 };
+// #51/S8.2b: STALENESS STAMP. Fixtures on disk carry no record of the source
+// that produced them, so a stale set reads exactly like an engine divergence —
+// which has cost real time (probe-hygiene rule 5, task #58, and a baseline I
+// took mid-repair this session). Hash every input that determines the export
+// and let the gate refuse to compare against a mismatched stamp.
+//
+// The set must be EXACT: under-cover and it misses a change, over-cover (tests,
+// unrelated scripts) and it cries wolf until people stop believing it. The
+// exporter imports the engine and nothing else feeds the fixtures.
+function srcStamp(): string {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = pathJoin(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith('.ts')) files.push(full);
+    }
+  };
+  walk('src');
+  files.push('scripts/export-gpu.ts');
+  files.sort();
+  const h = createHash('sha256');
+  for (const f of files) {
+    h.update(f.split(String.fromCharCode(92)).join('/'));
+    h.update(readFileSync(f));
+  }
+  return h.digest('hex');
+}
+(rules as Record<string, unknown>).srcStamp = srcStamp();
 writeFileSync(`${OUT}/rules.json`, JSON.stringify(rules));
 console.log(
   `rules.json: ${rules.buildings.length} buildings, ${rules.techs.length} techs, ${rules.civics.length} civics, ${boostRows.length} detectable boosts`,

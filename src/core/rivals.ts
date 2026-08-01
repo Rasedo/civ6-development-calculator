@@ -65,7 +65,7 @@ import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builderCost } from './units';
+import { disbandUnit, cityNavalCapable, waterEnterable, builderCost, walkToward } from './units';
 import { killUnit } from './combat';  // #51/S7.12
 import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
@@ -1342,25 +1342,10 @@ function rivalBuilderActions(state: GameState, rival: RivalCiv, unlocks: Unlocks
     // full-MP unit always affords its first step). Any step still blocks
     // the D-2 heal (movesLeft < full, the same expression on both engines).
     const jt = state.map.tiles[best];
-    for (;;) {
-      const at = state.map.tiles[u.tileIndex];
-      const dHere = hexDistance(at.col, at.row, jt.col, jt.row);
-      if (dHere === 0) break;
-      let dest = -1;
-      let destD = dHere;
-      for (const n of neighbors(state.map, at)) {
-        if (!tileFreeForUnit(state, n.index, u)) continue;
-        const d = hexDistance(n.col, n.row, jt.col, jt.row);
-        if (d < destD) {
-          destD = d;
-          dest = n.index;
-        }
-      }
-      if (dest < 0) break;
-      // The shared MP contract. B-3 ZOC: a civilian mover halts adjacent to a
-      // hostile MILITARY unit too — only the EXERTER must be military.
-      if (stepUnit(state, u, state.map.tiles[dest]) !== 'moved') break;
-    }
+    // #51/S8.2a: the shared greedy walker. `stepUnit` already held the
+    // charge/ZOC/camp contract; the PATHING around it was transcribed by
+    // hand here, annotated with what it was copying.
+    walkToward(state, u, jt, 0);
   }
 }
 
@@ -1548,24 +1533,10 @@ function rivalMissionaryActions(state: GameState, rival: RivalCiv): void {
     }
     // walk toward the (fixed) target center on REAL MP — the rivalBuilderActions
     // step loop verbatim, with the ≤1 stop instead of the on-tile stop.
-    for (;;) {
-      const at = state.map.tiles[u.tileIndex];
-      const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
-      if (dHere <= 1) break;
-      let dest = -1;
-      let destD = dHere;
-      for (const n of neighbors(state.map, at)) {
-        if (!tileFreeForUnit(state, n.index, u)) continue;
-        const d = hexDistance(n.col, n.row, tt.col, tt.row);
-        if (d < destD) {
-          destD = d;
-          dest = n.index;
-        }
-      }
-      if (dest < 0) break;
-      // The shared MP contract (camp clear + B-3 ZOC halt included).
-      if (stepUnit(state, u, state.map.tiles[dest]) !== 'moved') break;
-    }
+    // #51/S8.2a: the shared greedy walker. `stepUnit` already held the
+    // charge/ZOC/camp contract; the PATHING around it was transcribed by
+    // hand here, annotated with what it was copying.
+    walkToward(state, u, tt, 1);
   }
 }
 
@@ -1614,24 +1585,10 @@ function rivalGeneralActions(state: GameState, rival: RivalCiv): void {
     if (!target) continue;
     const tt = state.map.tiles[target.centerIndex];
     // the rivalMissionaryActions step loop verbatim, with the ≤2 stop.
-    for (;;) {
-      const at = state.map.tiles[u.tileIndex];
-      const dHere = hexDistance(at.col, at.row, tt.col, tt.row);
-      if (dHere <= GENERAL_AURA_RANGE) break;
-      let dest = -1;
-      let destD = dHere;
-      for (const n of neighbors(state.map, at)) {
-        if (!tileFreeForUnit(state, n.index, u)) continue;
-        const d = hexDistance(n.col, n.row, tt.col, tt.row);
-        if (d < destD) {
-          destD = d;
-          dest = n.index;
-        }
-      }
-      if (dest < 0) break;
-      // The shared MP contract (camp clear + B-3 ZOC halt included).
-      if (stepUnit(state, u, state.map.tiles[dest]) !== 'moved') break;
-    }
+    // #51/S8.2a: the shared greedy walker. `stepUnit` already held the
+    // charge/ZOC/camp contract; the PATHING around it was transcribed by
+    // hand here, annotated with what it was copying.
+    walkToward(state, u, tt, GENERAL_AURA_RANGE);
   }
 }
 

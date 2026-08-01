@@ -21,6 +21,8 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
+import stamp
+
 def columns(sim, rj: dict) -> tuple[list[str], torch.Tensor]:
     """Column names and per-column tolerances, from ONE source per engine.
 
@@ -75,6 +77,10 @@ def columns(sim, rj: dict) -> tuple[list[str], torch.Tensor]:
 
 def main() -> int:
     rules = load_rules()
+    # #51/S8.2b: refuse to compare against fixtures this source did not build.
+    # A stale set reads exactly like an engine divergence — that is how task
+    # #58 and probe-hygiene rule 5 both came about.
+    stamp.check(FIXTURES)
     paths = sorted(FIXTURES.glob("seed*.json"))
     if not paths:
         print("no fixtures — run `npm run gpu:export` first")
