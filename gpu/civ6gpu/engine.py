@@ -6921,52 +6921,12 @@ class BatchSim:
         self.coastal[b, c_new] = bool(self.coastal_water[b, nb_c.clamp(min=0)][nb_c >= 0].any())
 
     def _player_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:
-        """V-W2: a PLAYER melee unit besieging a rival city — mirrors
-        attackRivalCity for attacker.owner === 'player': defender-first
-        rolls with the real defense formula, attacker consumed, CAPTURE at
-        0 HP (never the barb sack)."""
-        if not bool(att.any()):
+        """The PLAYER's melee assault on a rival city — the shared battle in
+        `_assault_rival_city`, then the player's own CAPTURE aftermath."""
+        _r = self._assault_rival_city(att, tgt, "player", p)
+        if _r is None:
             return
-        ttc = tgt.clamp(min=0)
-        civ = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-        slot = torch.zeros_like(civ)
-        for j in range(self.RC):
-            hit = self.rc_center[torch.arange(self.B, device=self.device), civ, j] == ttc
-            hit = hit & self.rc_alive[torch.arange(self.B, device=self.device), civ, j]
-            slot = torch.where(att & hit, torch.full_like(slot, j), slot)
-        bidx = torch.arange(self.B, device=self.device)
-        # P4/D-22 (rivalCityDefense): max(15, THAT civ's strongest melee
-        # ever) + 5 for its own military garrisoning the center.
-        best_r = self.r_best_melee[bidx, civ]
-        # #51/S3.4b: the city owner's OWN military on the centre tile.
-        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
-        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
-        atk_cs = self._p_combat[self.p_type[:, p]]
-        atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(self.p_tile[:, p], tgt) + self._xp_lvl_bonus(self.p_xp[:, p])  # B-29 wound + river (city not a unit) + B-4 veterancy
-        # #70/S2 (B-8): the General/Admiral aura covers city assaults too
-        # (attackRivalCity's atkCS). Added ONCE, before both paired rolls, so
-        # the counterattack sees the same atk_e — exactly like TS.
-        atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
-        atk_e = atk_e + self._gen_aura_cs(torch.zeros(self.B, dtype=torch.long, device=self.device), self.p_tile[:, p], atk_naval).to(atk_e.dtype)
-        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
-        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
-        rows = att.nonzero(as_tuple=True)[0]
-        # AUDIT B-1: the outer wall pool soaks the hit first, spillover to HP.
-        outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
-        absorbed = torch.minimum(outer, d_city[rows])
-        self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
-        self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
-
-        self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
-        died = att & (self.p_hp[:, p] <= 0)
-        # #51/S7.8f: a CITY is receiving the attack, so both sides score at
-        # the abroad column. MISSED on the first pass because these three
-        # appliers carry the k="rcty" tag, not the k="pcty" I enumerated by -
-        # [[measure-every-path]], and the parity gate named it at seed 9119
-        # t41 (rival 1 assaulting rival 2's city, TS 32 / GPU 0).
-        self._ww_battle(att, self._row_of(self.p_seat[:, p]), self._row_of(civ + 1), tgt,
-                        a_died=died, city=True)
+        rows, civ, slot, died, ttc = _r
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             here_d = self.p_tile[dr, p]
@@ -11354,51 +11314,12 @@ class BatchSim:
                     self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])  # P5/S7 (C-3)
 
     def _attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
-        """A barbarian battering a rival city (mirrors attackRivalCity):
-        P4/D-22 defense (best-melee-ever + garrison); sacked at 0 HP,
-        never captured."""
-        if not bool(att.any()):
+        """A BARBARIAN's melee assault on a rival city — the shared battle in
+        `_assault_rival_city`, then the barbarian SACK (barbs never hold)."""
+        _r = self._assault_rival_city(att, tgt, "barb", u)
+        if _r is None:
             return
-        ttc = tgt.clamp(min=0)
-        civ = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)
-        # locate the city slot at that center
-        slot = torch.zeros_like(civ)
-        for j in range(self.RC):
-            hit = self.rc_center[torch.arange(self.B, device=self.device), civ, j] == ttc
-            hit = hit & self.rc_alive[torch.arange(self.B, device=self.device), civ, j]
-            slot = torch.where(att & hit, torch.full_like(slot, j), slot)
-        bidx = torch.arange(self.B, device=self.device)
-        # P4/D-22 (rivalCityDefense): max(15, civ's strongest melee ever)
-        # + 5 for its own military garrisoning the center.
-        best_r = self.r_best_melee[bidx, civ]
-        # #51/S3.4b: the city owner's OWN military on the centre tile.
-        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
-        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
-        atk_cs = self._p_combat[self.u_type[:, u]]
-        atk_e = atk_cs - self._wound(self.u_hp[:, u]) - 5.0 * self._river_cross(self.u_tile[:, u], tgt)  # B-29 wound + river (city not a unit)
-        # #70/S2 (B-8): attackRivalCity's atkCS now carries the general/admiral
-        # aura — but this caller's attacker is a BARBARIAN (unified civ -1: barbs
-        # own no GENERAL/ADMIRAL), so _gen_aura_cs is structurally 0 here and no
-        # term is emitted (the same convention as the barb branch of B6-S1).
-        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
-        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
-        rows = att.nonzero(as_tuple=True)[0]
-        # AUDIT B-1: the outer wall pool soaks the hit first, spillover to HP.
-        outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
-        absorbed = torch.minimum(outer, d_city[rows])
-        self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
-        self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
-
-        self.u_hp[:, u] = torch.where(att, self.u_hp[:, u] - d_atk, self.u_hp[:, u])
-        died = att & (self.u_hp[:, u] <= 0)
-        # #51/S7.8f: a CITY is receiving the attack, so both sides score at
-        # the abroad column. MISSED on the first pass because these three
-        # appliers carry the k="rcty" tag, not the k="pcty" I enumerated by -
-        # [[measure-every-path]], and the parity gate named it at seed 9119
-        # t41 (rival 1 assaulting rival 2's city, TS 32 / GPU 0).
-        self._ww_battle(att, self._row_of(torch.full_like(tgt, BARB_SEAT)), self._row_of(civ + 1), tgt,
-                        a_died=died, city=True)
+        rows, civ, slot, died, ttc = _r
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self.occ_mil[(dr, self.u_tile[dr, u])] = -1  # #51/S3.4b
@@ -11427,57 +11348,12 @@ class BatchSim:
             self.rc_hp[sacked, sc, sj] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
 
     def _rival_attack_rival_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
-        """A-19/B-33 (S2): a rival battering an enemy AT-WAR rival's city
-        (mirrors attackRivalCity for a rival attacker): P4/D-22 defense, B-1
-        outer-pool absorb, rcty/rctyc rolls, +5 XP; at 0 HP the CONQUEROR TAKES
-        the city via _transfer_rc_to_rc (no +40 for the rival-vs-rival path)."""
-        if not bool(att.any()):
+        """A RIVAL's melee assault on another rival's city — the shared battle
+        in `_assault_rival_city`, then the CONQUEST transfer."""
+        _r = self._assault_rival_city(att, tgt, "rival", u)
+        if _r is None:
             return
-        B, dev = self.B, self.device
-        bidx = torch.arange(B, device=dev)
-        ttc = tgt.clamp(min=0)
-        civ = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)  # defender civ
-        slot = torch.zeros_like(civ)
-        for j in range(self.RC):
-            hit = (self.rc_center[bidx, civ, j] == ttc) & self.rc_alive[bidx, civ, j]
-            slot = torch.where(att & hit, torch.full_like(slot, j), slot)
-        # P4/D-22 rivalCityDefense: max(15, defender civ's strongest melee ever)
-        # + 5 for its own military garrisoning the center (ungarrisoned here by
-        # construction — rc_att required ~has_u — but keep the term for parity).
-        best_r = self.r_best_melee[bidx, civ]
-        # #51/S3.4b: the city owner's OWN military on the centre tile.
-        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
-        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
-        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
-        atk_cs = self._p_combat[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
-        atk_e = atk_cs - self._wound(self.v_hp[:, u]) - 5.0 * self._river_cross(self.v_tile[:, u], tgt) + self._xp_lvl_bonus(self.v_xp[:, u])  # B-29 wound + river + B-4 veterancy
-        # #70/S2 (B-8): the RIVAL attacker's own general/admiral aura joins
-        # attackRivalCity's atkCS — once, before both paired rolls.
-        atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
-        # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
-        # Crusade/Just War key on where the UNIT stands, not on what it hits.
-        # Inserted BEFORE the aura add so term order matches the TS assembly.
-        atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype) if self._city_rel_live else 0)
-        atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, self.v_tile[:, u], atk_naval).to(atk_e.dtype)
-        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
-        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
-        self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])  # B-4: +5 for the attack
-        rows = att.nonzero(as_tuple=True)[0]
-        # AUDIT B-1: the outer wall pool soaks the hit first, spillover to HP.
-        outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
-        absorbed = torch.minimum(outer, d_city[rows])
-        self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
-        self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
-
-        self.v_hp[:, u] = torch.where(att, self.v_hp[:, u] - d_atk, self.v_hp[:, u])
-        died = att & (self.v_hp[:, u] <= 0)
-        # #51/S7.8f: a CITY is receiving the attack, so both sides score at
-        # the abroad column. MISSED on the first pass because these three
-        # appliers carry the k="rcty" tag, not the k="pcty" I enumerated by -
-        # [[measure-every-path]], and the parity gate named it at seed 9119
-        # t41 (rival 1 assaulting rival 2's city, TS 32 / GPU 0).
-        self._ww_battle(att, self._row_of(self.v_seat[:, u]), self._row_of(civ + 1), tgt,
-                        a_died=died, city=True)
+        rows, civ, slot, died, ttc = _r
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             self.occ_mil[(dr, self.v_tile[dr, u])] = -1  # #51/S3.4b
@@ -12273,6 +12149,97 @@ class BatchSim:
             dr = died.nonzero(as_tuple=True)[0]
             a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
+
+    def _pool_of(self, atk_kind: str):
+        """#51/S7.8f (task #60): the unit-pool views for an attacker CLASS.
+
+        `p` the player pool, `v` a rival's, `u` the barbarians'. Spelled once so
+        a shared resolver can be written against "the attacker" instead of
+        against three near-identical copies keyed on which array it lives in.
+        """
+        pre = {"player": "p", "rival": "v", "barb": "u"}[atk_kind]
+        return tuple(getattr(self, f"{pre}_{f}")
+                     for f in ("hp", "tile", "type", "xp", "emb", "alive", "seat"))
+
+    def _assault_rival_city(self, att: torch.Tensor, tgt: torch.Tensor,
+                            atk_kind: str, u: int):
+        """ONE melee assault on a RIVAL city, for ANY attacking seat — the
+        `attackRivalCity` -> `cityAssault` twin.
+
+        #51/S7.8f (task #60): this WAS three functions —
+        `_player_attack_rival_city`, `_attack_rival_city` (barbarian) and
+        `_rival_attack_rival_city` — carrying the same P4/D-22 defense formula,
+        the same B-1 outer-pool absorb, the same rcty/rctyc pair and the same
+        death cleanup, differing only in which pool the attacker lives in. One
+        TS function against three GPU appliers is the asymmetry #51 exists to
+        destroy, and S7.8f measured what it costs: the war-weariness hook had to
+        be written three times and I missed all three on the first pass.
+
+        The per-CLASS terms that survive are the ones TS's own `assaultAtkCS`
+        keys on, not pool accidents:
+          * the veterancy bonus rides `SEAT_CAPS[...]["xp"]` — barbarians never
+            accrue XP, so TS's unconditional `xpLevelBonus` is 0 for them and
+            omitting it is byte-identical;
+          * the religion adder is `CITY_RELIGION_ADDER_LIVE && isRivalSeat(...)`
+            in TS too (#71: the GPU never sets the player's holy city);
+          * the general/admiral aura keys on the attacker's own civ, and a
+            barbarian has none (civ -1).
+
+        Returns `(rows, civ, slot, died, ttc)` so each caller can apply its OWN
+        aftermath — the player CAPTURES, a rival CONQUERS, a barbarian SACKS.
+        That branch is real and TS branches there too; what is shared is the
+        battle.
+        """
+        if not bool(att.any()):
+            return None
+        B, dev = self.B, self.device
+        bidx = torch.arange(B, device=dev)
+        a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
+        ttc = tgt.clamp(min=0)
+        civ = self.rvcity_at.gather(1, ttc.unsqueeze(1)).squeeze(1).clamp(min=0)  # defender civ
+        slot = torch.zeros_like(civ)
+        for j in range(self.RC):
+            hit = (self.rc_center[bidx, civ, j] == ttc) & self.rc_alive[bidx, civ, j]
+            slot = torch.where(att & hit, torch.full_like(slot, j), slot)
+        # P4/D-22: the city fights at its owner's best-melee-ever, floored at
+        # 15, +5 for a garrison of its OWN civ standing on the centre.
+        gslot = self.occ_mil.gather(1, ttc.unsqueeze(1)).squeeze(1)
+        gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == civ + 1)).long()
+        best_r = self.r_best_melee[bidx, civ]
+        def_cs = torch.maximum(best_r, torch.full_like(best_r, 15)) + gar * 5
+        # B-29 wound + river (a city is not a unit), then B-4 veterancy.
+        atk_e = (self._p_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
+                 - self._wound(a_hp[:, u])
+                 - 5.0 * self._river_cross(a_tile[:, u], tgt))
+        if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]:
+            atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
+        if atk_kind == "rival" and self._city_rel_live:
+            atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+        aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
+                               torch.full_like(civ, -1), a_seat[:, u])
+        atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
+        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        # DRAW ORDER is the parity contract: the city's damage first, the
+        # counter second, exactly as TS's cityAssault draws them.
+        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
+        if atk_kind == "rival":
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])  # B-4
+        rows = att.nonzero(as_tuple=True)[0]
+        # B-1: the ANCIENT_WALLS outer pool soaks the hit first.
+        outer = self.rc_outer_hp[rows, civ[rows], slot[rows]]
+        absorbed = torch.minimum(outer, d_city[rows])
+        self.rc_outer_hp[rows, civ[rows], slot[rows]] = outer - absorbed
+        self.rc_hp[rows, civ[rows], slot[rows]] -= d_city[rows] - absorbed
+        a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
+        died = att & (a_hp[:, u] <= 0)
+        self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(civ + 1), tgt,
+                        a_died=died, city=True)
+        if bool(died.any()):
+            dr = died.nonzero(as_tuple=True)[0]
+            self.occ_mil[(dr, a_tile[dr, u])] = -1  # #51/S3.4b
+            a_alive[:, u] = a_alive[:, u] & ~died
+        return rows, civ, slot, died, ttc
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
