@@ -66,6 +66,7 @@ import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builderCost } from './units';
+import { killUnit } from './combat';  // #51/S7.12
 import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
@@ -3195,7 +3196,7 @@ export function rivalPhase(state: GameState): void {
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
           warWearinessBattle(state, rc.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pcstk twin
-          if (defender.hp <= 0) disbandUnit(state, defender.id);
+          if (defender.hp <= 0) killUnit(state, defender);  // #51/S7.12: a dig, like the player's strike
         }
       }
       // B-17 (ROUND B7): the rival mirror of the ADDITIONAL Encampment strike
@@ -3236,7 +3237,7 @@ export function rivalPhase(state: GameState): void {
           awardDefenseXp(defender);
           warWearinessBattle(state, rc.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pestk twin
-          if (defender.hp <= 0) disbandUnit(state, defender.id);
+          if (defender.hp <= 0) killUnit(state, defender);  // #51/S7.12: a dig, like the player's strike
         }
       }
       // AUDIT A-10: a siege pins the HP, exactly like the player's heal —

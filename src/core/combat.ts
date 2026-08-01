@@ -395,7 +395,11 @@ export function cityDefenseStrength(state: GameState, city: City): number {
   return Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0) + (garrison ? 5 : 0);
 }
 
-function killUnit(state: GameState, unit: Unit): void {
+/** #51/S7.12: the ONE combat death path — a unit dying in battle leaves a dig
+ *  (B-20). Exported so the rival-phase city strikes in `rivals.ts` use the same
+ *  site as the player's; before this they called raw `disbandUnit`, so only the
+ *  PLAYER's strikes ever created antiquity sites. */
+export function killUnit(state: GameState, unit: Unit): void {
   markAntiquitySite(state, unit.tileIndex); // B-20 (#79): a death leaves a dig
   disbandUnit(state, unit.id);
 }

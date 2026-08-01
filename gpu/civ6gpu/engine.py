@@ -5932,6 +5932,20 @@ class BatchSim:
         self.best_melee.copy_(torch.maximum(self.best_melee, melee_cs))
 
 
+    def _dig_at(self, gd: torch.Tensor, td: torch.Tensor) -> None:
+        """#51/S7.12 (B-20): mark a DIG for the games in `gd` on the tiles in
+        `td` — the row-index form of `_mark_antiquity`, which takes a [B] mask.
+        Every COMBAT death goes through here, exactly as every TS combat death
+        goes through `combat.ts:killUnit`. Maintenance disbands and builder
+        charge-exhaustion are NOT deaths and must not call it."""
+        if len(gd) == 0:
+            return
+        m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        m[gd] = True
+        t = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        t[gd] = td
+        self._mark_antiquity(m, t)
+
     def _mark_antiquity(self, mask: torch.Tensor, tile: torch.Tensor) -> None:
         """B-20 (#79): the markAntiquitySite twin — stamp an ANTIQUITY SITE on
         `tile` for the rows in `mask`. Real Civ 6 creates these from PRE-MODERN
@@ -5942,6 +5956,18 @@ class BatchSim:
             return
         t = tile.clamp(min=0)
         era = self._civ_era(self.techs, self.civics)  # [B] the player's era
+        if self.S > 0:
+            _cs_s = self.cs_at.gather(1, t.unsqueeze(1)).squeeze(1)
+            _cs_ctr = (_cs_s >= 0) & (
+                self.cs_center.gather(1, _cs_s.clamp(min=0).unsqueeze(1)).squeeze(1) == t)
+        else:
+            _cs_ctr = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        # #51/S7.12: TS keeps ONE tile map, so `t.district` is set for EVERY
+        # seat's district and `markAntiquitySite` refuses them all. The GPU
+        # splits them: `self.district` is the PLAYER's, while a rival's live
+        # in the `rc_dist_tile` registry. Without this term the GPU dug on
+        # rival HOLY_SITEs TS refuses — seed 9119 t43/t47/t61/t84.
+        _rv_dist = (self.rc_dist_tile == t.view(self.B, 1, 1, 1)).any(3).any(2).any(1)
         okr = (
             mask
             & (tile >= 0)
@@ -5949,6 +5975,21 @@ class BatchSim:
             & ~self.water.gather(1, t.unsqueeze(1)).squeeze(1)
             & (self.district.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
+            # #51/S7.12: TS refuses a dig on ANY tile carrying a district, and
+            # `foundCity` sets `tile.district = 'CITY_CENTER'` (so do both
+            # capture paths). The GPU's `district` plane does NOT encode
+            # centres — they live in `center_at` (cf. the adjacency scan, which
+            # spells out `center_at >= 0 | district >= 0 | rvcity_at >= 0`), so
+            # without this term the GPU dug on a city centre TS refuses.
+            # Named by the `nAntiquity` column at seed 9002 t43 tile 830.
+            & (self.center_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # player centre
+            & (self.rvcity_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # rival centre
+            # NOTE: a CITY-STATE centre is deliberately NOT excluded. TS sets
+            # `tile.district = 'CITY_CENTER'` on player founding, on both
+            # capture paths and on RIVAL founding, but NOT for a city-state,
+            # so `markAntiquitySite` accepts a death on a minor's centre.
+            # Excluding it here over-refused at rng 2026006099 t41 tile 379.
+            & ~_rv_dist  # a RIVAL's district tile
         )
         if not bool(okr.any()):
             return
@@ -7011,6 +7052,7 @@ class BatchSim:
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
             here_d = self.p_tile[dr, p]
+            self._dig_at(dr, here_d)  # #51/S7.12 (B-20): killUnit's dig
             self.occ_mil[(dr, here_d)] = -1  # #51/S3.4b
             self.p_alive[dr, p] = False
         # P5/S2 gate-catch (seed 9001 t44): TS captureRivalCity fires even
@@ -7292,6 +7334,7 @@ class BatchSim:
                                 a_died=atk_dead, d_died=(_wwp & ~self._ww_occ(tgt)) != 0)
                 if bool(atk_dead.any()):
                     ar = atk_dead.nonzero(as_tuple=True)[0]
+                    self._dig_at(ar, here[ar])  # #51/S7.12 (B-20): killUnit's dig
                     self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
                     self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
                 # Advance into the freed tile (and clear any camp there).
@@ -7360,6 +7403,7 @@ class BatchSim:
                     _dead = self.unit_hp[rows, _ds] <= 0
                     r_def_dead[rows[_dead]] = True
                     _gd, _td = rows[_dead], tc[rows[_dead]]
+                    self._dig_at(_gd, _td)  # #51/S7.12 (B-20): killUnit's dig
                     self.unit_alive[_gd, _ds[_dead]] = False
                     self.occ_mil[_gd, _td] = -1
                 # B-4: a surviving rival MILITARY defender earns +2 (rv_at map).
@@ -7414,6 +7458,7 @@ class BatchSim:
                 ks = rvc_slot_t[rows]
                 self.v_hp[rows, ks] -= d_def[rows]
                 dead = self.v_hp[rows, ks] <= 0
+                self._dig_at(rows[dead], tc[rows[dead]])  # #51/S7.12 (B-20): killUnit's dig
                 self.v_alive[rows[dead], ks[dead]] = False
                 self.occ_civ[(rows[dead], tc[rows[dead]])] = -1  # #51/S3.4b
                 self._ww_battle(r_civ, self._row_of(self.p_seat[:, p]),  # #51/S7.8f
@@ -9296,6 +9341,14 @@ class BatchSim:
                     self._grant_relic(_ar, torch.full_like(_ar, r + 1))
             if bool(def_dead.any()):
                 dd = rows[def_dead]
+                # #51/S7.12: NO dig here. This is THEOLOGICAL combat, and its
+                # TS twin (`rivals.ts`, the apostle/missionary exchange) calls
+                # raw `disbandUnit`, NOT `killUnit` — so TS creates no
+                # antiquity site for a religious-unit death. Whether real Civ 6
+                # leaves a dig for theological combat is UNSOURCED; converting
+                # those TS disbands to `killUnit` is a deliberate behaviour
+                # change needing its own verification, not a side effect of
+                # this sweep. Adding it here over-dug at seed 9119 t78 tile 466.
                 self.v_alive[dd, j[dd]] = False
                 _vacate(dd, j[dd])
             if bool(atk_dead.any()):
@@ -11181,6 +11234,7 @@ class BatchSim:
                             a_died=atk_dead, d_died=(_wwh & ~self._ww_occ(tgt)) != 0)
             if bool(atk_dead.any()):
                 ar = atk_dead.nonzero(as_tuple=True)[0]
+                self._dig_at(ar, here[ar])  # #51/S7.12 (B-20): killUnit's dig
                 a_occ[ar, here[ar]] = -1  # #51/S3.4b
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
             # B5-M1 hunt fix: mirror TS tileFreeForUnit's TERRAIN check that
@@ -11248,6 +11302,7 @@ class BatchSim:
                 self.occ_civ[(rows, ct)] = nslot + self.POOL_LO["v"]  # #51/S3.4b
                 self.v_next[rows] += 1
             else:
+                self._dig_at(rows, ttc[rows])  # #51/S7.12 (B-20): a barb KILL leaves a dig (combat.ts B-31 branch)
                 self.occ_civ[(rows, ttc[rows])] = -1  # #51/S3.4b
                 self.p_alive[rows, ds] = False
             self._gen_ver += 1  # B7-G (B-8): a captured/killed civilian may be a general → invalidate the aura plane
@@ -11271,6 +11326,7 @@ class BatchSim:
                 self.v_next[rows] += 1
             else:
                 # C1-B5b: a barbarian kills a lone rival civilian roll-free.
+                self._dig_at(rows, ttc[rows])  # #51/S7.12 (B-20): a barb KILL leaves a dig (combat.ts B-31 branch)
                 self.occ_civ[(rows, ttc[rows])] = -1  # #51/S3.4b
                 self.v_alive[rows, ds] = False
             self._gen_ver += 1  # B7-G (B-8): the killed/captured civilian may be a general → invalidate the aura plane
@@ -11311,6 +11367,7 @@ class BatchSim:
         rows, civ, slot, died, ttc = _r
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
+            self._dig_at(dr, self.u_tile[dr, u])  # #51/S7.12 (B-20): killUnit's dig
             self.occ_mil[(dr, self.u_tile[dr, u])] = -1  # #51/S3.4b
             self.u_alive[:, u] = self.u_alive[:, u] & ~died
         sacked = rows[self.rc_hp[rows, civ[rows], slot[rows]] <= 0]
@@ -11345,6 +11402,7 @@ class BatchSim:
         rows, civ, slot, died, ttc = _r
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
+            self._dig_at(dr, self.v_tile[dr, u])  # #51/S7.12 (B-20): killUnit's dig
             self.occ_mil[(dr, self.v_tile[dr, u])] = -1  # #51/S3.4b
             self.v_alive[:, u] = self.v_alive[:, u] & ~died
         captured = rows[self.rc_hp[rows, civ[rows], slot[rows]] <= 0]
@@ -12110,6 +12168,7 @@ class BatchSim:
                         tc, a_died=_ww_ad, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
+            self._dig_at(dr, a_tile[dr, u])  # #51/S7.12 (B-20): killUnit's dig
             a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
 
@@ -12200,6 +12259,7 @@ class BatchSim:
                         a_died=died, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
+            self._dig_at(dr, a_tile[dr, u])  # #51/S7.12 (B-20): killUnit's dig
             self.occ_mil[(dr, a_tile[dr, u])] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
         return rows, civ, slot, died, ttc
@@ -12261,6 +12321,7 @@ class BatchSim:
         atk_dead = att & (a_hp[:, u] <= 0)
         if bool(atk_dead.any()):
             ar = atk_dead.nonzero(as_tuple=True)[0]
+            self._dig_at(ar, here[ar])  # #51/S7.12 (B-20): killUnit's dig
             self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~atk_dead
         # #51/S7.8f: warring a city-state wearies you exactly as warring a major
@@ -12317,6 +12378,13 @@ class BatchSim:
             gd, td = g[dead], tt[g[dead]]
             occ_map[gd, td] = -1
             self.unit_alive[gd, ds[dead]] = False
+            # #51/S7.12 (B-20): a combat death leaves a DIG, on the tile the
+            # dead unit stood on — `combat.ts:killUnit`. The GPU marked
+            # antiquity ONLY at a razed outpost, so every unit death on this
+            # engine created nothing while TS created a site. Invisible until
+            # the `nAntiquity` trace column existed: it went red at seed 9106
+            # t26, TS 1 / GPU 0.
+            self._dig_at(gd, td)
             if bool(dead.any()):
                 # G1: a death changes `_rival_route_income`'s raided mask, and
                 # that cache is keyed on `_rp_kill_version`. Only the RIVAL
@@ -12377,6 +12445,7 @@ class BatchSim:
             gd, td = rows[dead], tile_c[rows[dead]]
             self.unit_alive[gd, ds[dead]] = False
             self.occ_mil[gd, td] = -1  # #51/S3.4b
+            self._dig_at(gd, td)  # #51/S7.12 (B-20): killUnit's dig
         # B-4: +2 to a surviving MILITARY defender that can earn it.
         surv = (att & def_can_xp & ~def_dead).nonzero(as_tuple=True)[0]
         if len(surv) > 0:
@@ -12449,6 +12518,7 @@ class BatchSim:
                         a_died=_ww_ad, city=True)
         if bool(died.any()):
             dr = died.nonzero(as_tuple=True)[0]
+            self._dig_at(dr, a_tile[dr, u])  # #51/S7.12 (B-20): killUnit's dig
             a_occ[dr, a_tile[dr, u]] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
         sacked_rows = rows[self.city_hp[rows, cs] <= 0]
@@ -12627,6 +12697,7 @@ class BatchSim:
             dead = self.unit_hp[g, ds] <= 0
             gd, td = g[dead], ttc[g[dead]]
             self.unit_alive[gd, ds[dead]] = False
+            self._dig_at(gd, td)  # #51/S7.12 (B-20): killUnit's dig
             # Clearing EVERY map of the dead defender's domain is branch-free
             # and exact: only one of them is set on that tile. The legacy maps
             # go when the last reader does.
@@ -16613,7 +16684,7 @@ class BatchSim:
     # and not the other cannot ship.
     _TRACE_HEAD = [
         "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
-        "score", "rng", "csAtWar", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
+        "score", "rng", "nAntiquity", "csAtWar", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
         "fertility", "droughtTiles", "improvements", "leader", "gameOver", "winner",
         "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions",
         "diploPoints",
@@ -16673,6 +16744,7 @@ class BatchSim:
             js_round(self.culture_total * 1000),
             js_round(e_score * 1000),
             self.rng_state.to(self.dtype),
+            self.antiquity.sum(dim=1).to(self.dtype),  # #51/S7.12 probe
             (self.cs_atwar & self.cs_alive).sum(dim=1).to(self.dtype) if self.S > 0
             else torch.zeros(self.B, dtype=self.dtype, device=self.device),  # #51/S7.10b
             self.n_camps.to(self.dtype),
