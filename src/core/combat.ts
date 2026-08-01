@@ -12,6 +12,7 @@ import type { City, CityState, DistrictId, GameState, ImprovementId, RivalCity, 
 import { neighbors, hexDistance, tilesWithin } from './hex';
 import { isWater, isImpassable } from './query';
 import { civEraIndex } from './city';
+import { logUnitOrder } from './seatTurn';  // #51/S8.1e
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -590,7 +591,22 @@ export function encampmentDefense(
 }
 
 /** Melee attack an adjacent enemy unit or city tile. */
+
+/** #51/S8.1e: the COMMIT seam for meleeAttack. The resolver returns early on a
+ *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
+ *  not an action. Only a resolved order reaches the log, tagged with the
+ *  ACTING SEAT — which is what made the city-first divergences of this round
+ *  (a barbarian on a rival centre; the GPU sieging a peaceful city-state) a
+ *  state-column hunt instead of one diff. */
 export function meleeAttack(state: GameState, attackerId: number, targetIndex: number): RuleResult {
+  const r = meleeAttackInner(state, attackerId, targetIndex);
+  if (r.ok) {
+    const u = state.units.find((x) => x.id === attackerId);
+    if (u) logUnitOrder(state, u.seat, attackerId, 'melee', targetIndex);
+  }
+  return r;
+}
+function meleeAttackInner(state: GameState, attackerId: number, targetIndex: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
   if (!attacker) return no('No such unit.');
   const def = UNITS[attacker.type];
@@ -784,7 +800,22 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
 }
 
 /** Ranged attack within the unit's range (no retaliation taken). */
+
+/** #51/S8.1e: the COMMIT seam for rangedAttack. The resolver returns early on a
+ *  dozen refusals; logging inside it would record ATTEMPTS, and an attempt is
+ *  not an action. Only a resolved order reaches the log, tagged with the
+ *  ACTING SEAT — which is what made the city-first divergences of this round
+ *  (a barbarian on a rival centre; the GPU sieging a peaceful city-state) a
+ *  state-column hunt instead of one diff. */
 export function rangedAttack(state: GameState, attackerId: number, targetIndex: number): RuleResult {
+  const r = rangedAttackInner(state, attackerId, targetIndex);
+  if (r.ok) {
+    const u = state.units.find((x) => x.id === attackerId);
+    if (u) logUnitOrder(state, u.seat, attackerId, 'ranged', targetIndex);
+  }
+  return r;
+}
+function rangedAttackInner(state: GameState, attackerId: number, targetIndex: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
   if (!attacker) return no('No such unit.');
   const def = UNITS[attacker.type];

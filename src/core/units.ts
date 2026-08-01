@@ -5,6 +5,7 @@
  */
 
 import type { GameState, RivalCity, RivalCiv, Tile, Unit } from './types';
+import { logUnitOrder } from './seatTurn';  // #51/S8.1e
 import { neighbors, neighborTile, hexDistance, AXIAL_DIRS, offsetToAxial } from './hex';
 import { isWater, isImpassable } from './query';
 import { validImprovements, canRemoveFeature, type RuleResult } from './rules';
@@ -586,6 +587,12 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
+  // #51/S8.1e: THE move commit, for every seat. `walkPath` is the PLAYER's
+  // walker; rivals have their own chassis functions that transcribe its rules
+  // by hand ("walkPath's exact charge", three separate copies) — so seaming
+  // walkPath logged 642 player moves and ZERO rival ones. Every seat's step
+  // lands here instead: this is the ONLY tile write in core.
+  logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
   if (isPlayerSeat(unit.seat)) {
     revealAround(state, to.index);
@@ -598,6 +605,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   }
   return unit.movesLeft > 0 ? 'moved' : 'halted';
 }
+
 
 export function walkPath(state: GameState, unit: Unit): void {
   while (unit.path && unit.path.length > 0 && unit.movesLeft > 0) {
