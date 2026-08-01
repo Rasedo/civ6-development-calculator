@@ -92,6 +92,42 @@ def main() -> None:
     assert bool(m_war[d]), "after a declaration the city-state centre MUST be attackable"
     print("  a cs_atwar: peace default, a VIEW of war, snapshot round-trip OK")
     print("  b mask: peaceful hidden, declared war reveals the centre OK")
+
+    # --- c: #51/S7.10b the SUZERAIN RELEASE ---------------------------------
+    # `makePeace` in rivals.ts ends the wars a rival's city-states were dragged
+    # into and sheds WW_PEACE_TREATY from each. It was the one warWearinessPeace
+    # site with no GPU twin. NOTHING in the gate can reach it — no seat can
+    # declare on a city-state yet (task #62), so csAtWar is structurally 0 in
+    # all 3000 traced turns. This poke is the ONLY coverage it has.
+    suz_min = int(s2.rules.cs.get("suzerainEnvoys", 3))
+    r = 0
+    s2.cs_atwar[b, cs] = True
+    s2.cs_war_turns[b, cs] = 7
+    s2.cs_r_envoys[b, r, cs] = suz_min + 2   # this rival is the strict suzerain
+    s2.cs_envoys[b, cs] = 0
+    if s2.cs_r_envoys.shape[1] > 1:
+        s2.cs_r_envoys[b, 1:, cs] = 0
+    _cs_row = 1 + max(s2.R, 1) + cs
+    s2.ww[b, 0, _cs_row] = 900.0
+    s2.sync_war()
+    shed = int(s2.rules.war_weariness.get("peaceTreaty", 2000))
+
+    _peace = torch.zeros(s2.B, dtype=torch.bool)
+    _peace[b] = True
+    s2._cs_suzerain_release(r, _peace)
+    assert not bool(s2.cs_atwar[b, cs]), "the suzerain's peace must end the city-state's war"
+    assert int(s2.cs_war_turns[b, cs]) == 0, "the war clock must reset"
+    assert float(s2.ww[b, 0, _cs_row]) == max(0.0, 900.0 - shed), "the player must shed the treaty amount"
+    assert int(s2.war_turns[b, _cs_row]) == 0, "cs_war_turns is a VIEW — war_turns must see the reset"
+
+    # a rival that is NOT the suzerain releases nothing
+    s2.cs_atwar[b, cs] = True
+    s2.cs_r_envoys[b, r, cs] = 0
+    s2.sync_war()
+    s2._cs_suzerain_release(r, _peace)
+    assert bool(s2.cs_atwar[b, cs]), "a non-suzerain's peace must NOT free the city-state"
+    print("  c suzerain release: war ends, clock resets through the view, -%d ww OK" % shed)
+
     print("cs_war_test OK — A-18 player<->city-state war gates the attack mask")
 
 

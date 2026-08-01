@@ -811,7 +811,13 @@ export function rangedAttack(state: GameState, attackerId: number, targetIndex: 
         return ok;
       }
       const cs = cityStateAt(state, targetIndex);
-      if (cs && cs.centerIndex === targetIndex) {
+      // A-18/#45: bombardment needs a DECLARED war exactly as melee does. The
+      // rival arm one branch up reads `rc.rival.atWar` and `meleeAttack`'s
+      // csTarget reads `cs.atWar`, but this arm took ANY city-state — so the
+      // two TS paths disagreed with each other about one rule. Real Civ 6
+      // treats a city-state as a separate player you must declare on, so the
+      // RANGED arm is the wrong one. See [[target-legality-gates]].
+      if (cs && cs.centerIndex === targetIndex && cs.atWar) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
         cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
         warWearinessBattle(state, attacker.seat, seatOfCityState(cs.id), targetIndex, { city: true }); // #51/S7.8f

@@ -2647,6 +2647,37 @@ class BatchSim:
                 continue
             self.ww[:, i, j] = torch.where(mask, (self.ww[:, i, j] - shed).clamp(min=0), self.ww[:, i, j])
 
+    def _cs_suzerain_release(self, r: int, peace: torch.Tensor) -> None:
+        """#51/S7.10b: making peace with a rival ALSO ends the wars its
+        city-states were dragged into — the `makePeace` loop in `rivals.ts`
+        that walks `state.cityStates` and clears every `cs.atWar` whose
+        suzerain is that rival. It was the ONE `warWearinessPeace` site with no
+        GPU twin, so the player kept shedding 2000 on TS and not here.
+
+        The suzerain test is `rivalIsSuzerain`'s: at least `suzerainEnvoys`,
+        strictly above the player, strictly above every other rival."""
+        if self.S <= 0 or not bool(peace.any()):
+            return
+        suz_min = int(self.rules.cs.get("suzerainEnvoys", 3))
+        _oth = self.cs_r_envoys.clone()
+        _oth[:, r] = -1
+        r_suz = (
+            (self.cs_r_envoys[:, r] >= suz_min)
+            & (self.cs_r_envoys[:, r] > self.cs_envoys)
+            & (self.cs_r_envoys[:, r] > _oth.max(dim=1).values)
+            & self.cs_alive
+        )
+        rel = r_suz & self.cs_atwar & peace.unsqueeze(1)
+        if not bool(rel.any()):
+            return
+        self.cs_atwar &= ~rel
+        # `cs_war_turns` is a VIEW of `war_turns` — a rebind orphans it, so the
+        # clock must be written IN PLACE (the inplace_discipline lane caught it).
+        self.cs_war_turns.masked_fill_(rel, 0)
+        _cs0 = 1 + max(self.R, 1)
+        for _s in range(self.S):
+            self._ww_peace(rel[:, _s], 0, _cs0 + _s)
+
     def _ww_penalty_player(self) -> torch.Tensor:
         """B-15: player war-weariness amenity penalty [B] (integer floor, then
         dtype) - the `warWearinessPenalty(wwMax(playerSeat(state)))` twin."""
@@ -8662,6 +8693,7 @@ class BatchSim:
                 self.r_treasury[:, r] = torch.where(peace, self.r_treasury[:, r] - pcost_c, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~peace
                 self._ww_peace(peace, 0, r + 1)  # #51/S7.8f: -2000 on the treaty (the makePeace twin)
+                self._cs_suzerain_release(r, peace)  # #51/S7.10b
                 self.war[:, 1 + r, 0] &= ~peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
@@ -14959,6 +14991,7 @@ class BatchSim:
                 self.r_treasury[:, r] = torch.where(made_peace, self.r_treasury[:, r] - pcost, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~made_peace
                 self._ww_peace(made_peace, 0, r + 1)  # #51/S7.8f: -2000 on the treaty (the makePeace twin)
+                self._cs_suzerain_release(r, made_peace)  # #51/S7.10b
                 self.war[:, 1 + r, 0] &= ~made_peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
@@ -16574,7 +16607,7 @@ class BatchSim:
     # and not the other cannot ship.
     _TRACE_HEAD = [
         "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
-        "score", "rng", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
+        "score", "rng", "csAtWar", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
         "fertility", "droughtTiles", "improvements", "leader", "gameOver", "winner",
         "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions",
         "diploPoints",
@@ -16634,6 +16667,8 @@ class BatchSim:
             js_round(self.culture_total * 1000),
             js_round(e_score * 1000),
             self.rng_state.to(self.dtype),
+            (self.cs_atwar & self.cs_alive).sum(dim=1).to(self.dtype) if self.S > 0
+            else torch.zeros(self.B, dtype=self.dtype, device=self.device),  # #51/S7.10b
             self.n_camps.to(self.dtype),
             self.u_alive.sum(dim=1).to(self.dtype),
             self.p_alive.sum(dim=1).to(self.dtype),

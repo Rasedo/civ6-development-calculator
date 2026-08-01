@@ -71,6 +71,13 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   { name: 'culture', tol: 2, get: (s) => Math.round(playerSeat(s).cultureTotal * 1000) },
   { name: 'score', tol: 2, get: (s) => Math.round(empireScore(s, 'balanced') * 1000) },
   { name: 'rng', tol: 0, get: (s) => s.rngState >>> 0 },
+  // #51/S7.10b: the player's CITY-STATE war count. Nothing compared this
+  // before, which is why `cs_atwar` could be import-only on the GPU and
+  // why the melee/ranged CS gates could disagree, unseen. Structurally 0
+  // today on both engines (no seat can DECLARE on a city-state yet, task
+  // #62) — kept for the same reason S0.2 kept `envoysAvail`: it pins the
+  // invariant, and it is the tripwire the day a declare verb lands.
+  { name: 'csAtWar', tol: 0, get: (s) => (s.cityStates ?? []).filter((c) => c.atWar).length },
   { name: 'nCamps', tol: 0, get: (s) => s.barbSeat.camps.length },
   { name: 'nBarbs', tol: 0, get: (s) => s.units.filter((u) => isBarbSeat(u.seat)).length },
   { name: 'nPlayerUnits', tol: 0, get: (s) => s.units.filter((u) => isPlayerSeat(u.seat)).length },
