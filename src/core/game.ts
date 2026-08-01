@@ -871,7 +871,29 @@ export function endTurn(state: GameState): void {
           // AUDIT B-1: completing the walls fills the outer-defense pool.
           if (item.building === 'ANCIENT_WALLS') city.outerHp = WALLS_HP;
         }
-        if (city.queue.length > 0) city.queue[0].progress += overflow;
+        // #51/S7.6: production OVERFLOW carries. What is officially sourced is
+        // narrow and worth stating exactly, because a stronger claim was in
+        // this repo's notes and was wrong:
+        //   SOURCED  — Feb-2019 patch note, verbatim: "Correct production
+        //              overflow calculation so multipliers ... get backed out
+        //              of overflow." Overflow EXISTS and is carried.
+        //   NOT      — "overflow is HELD while nothing is selected" is
+        //   SETTLED    corroborated (the Steam overflow-fix mod behaves that
+        //              way, nothing contradicts it) but it is a FORUM POST,
+        //              and this repo's note attributed it to Ed Beach, which
+        //              is FALSE. The GlobalParameters table carries no overflow
+        //              row either, so the data cannot settle it.
+        // The carry into a QUEUED item is the sourced half and was already
+        // here. The empty-queue case now banks instead of discarding, which is
+        // the corroborated half — flagged, not asserted.
+        // IT ALWAYS BANKS, exactly as the rival's does — same rule, every seat.
+        // Carrying straight into `queue[0]` let TS spend the overflow the same
+        // turn while the GPU's SINGLE-SLOT city banked and paid the next one,
+        // so the player completed a unit a turn early: seed 9018 t173,
+        // `nPlayerUnits` GPU 9 / TS 8, with nothing else differing. I first
+        // judged this branch unreachable in the scripted gate and left it; it
+        // is reachable, and "latent" was a guess, not a measurement.
+        city.productionBank = (city.productionBank ?? 0) + overflow;
       }
     }
 
@@ -1174,8 +1196,12 @@ function applyGreatPersonEffect(state: GameState, cls: GreatPersonClass): void {
   if (fx.gold) playerSeat(state).treasury += fx.gold;
   if (fx.productionToCapital) {
     const capital = state.cities.find((c) => c.isCapital);
+    // #51/S7.6: route the LUMP the same way as completion overflow — it used
+    // to be dropped whenever the capital's queue happened to be empty.
     if (capital && capital.queue.length > 0) {
       capital.queue[0].progress += fx.productionToCapital;
+    } else if (capital) {
+      capital.productionBank = (capital.productionBank ?? 0) + fx.productionToCapital;
     }
   }
   // B7-G (B-8): a GENERAL/ADMIRAL claim ALSO spawns its support unit (civilian,

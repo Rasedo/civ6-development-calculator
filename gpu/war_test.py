@@ -240,6 +240,12 @@ def test_cs_siege(rules, path):
         print("  cs siege SKIPPED (no city-state on this seed)")
         return
     s = int(live[0])
+    # A-18/#45: a city-state is a separate player you must DECLARE on, and
+    # since #51/S7.10a the GPU enforces that (`cs_here` carries `cs_atwar`,
+    # mirroring TS's csTarget). This poke sieges, so it must first be at war —
+    # before the gate it was staging an attack the rules forbid. There is no
+    # declare VERB on the GPU yet (task #62), so poke the plane directly.
+    sim.cs_atwar[0, s] = True
     ctr = int(sim.cs_center[0, s])
     p_ = _melee_slot(sim)
     if p_ is None:

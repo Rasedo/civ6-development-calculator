@@ -606,8 +606,34 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
       ? state.cities.find((c) => c.centerIndex === targetIndex)
       : undefined;
   const rivalTarget =
+    // #51/S7.6: a rival city is a TARGET only if you are AT WAR with it — for
+    // EVERY seat. The rival branch below has always said so via `civsAtWar`;
+    // the player/barb branch did not, and instead let the city-first
+    // precedence divert the attack to the city and THEN refuse it with
+    // "declare war first", aborting the whole action.
+    //
+    // That mattered when a BARBARIAN stood on a rival city's centre while the
+    // player was at peace with that rival: TS diverted to the city and
+    // refused, while the GPU (whose `rc_ok` already gates on `r_atwar`) fell
+    // through and meleed the barbarian. Two extra draws on the GPU, which
+    // moved the RNG entering the disaster phase — seed 9056 rng 2026006092
+    // t69, the rollout's `rng` column.
+    //
+    // Falling through is the right half of that disagreement: being at peace
+    // with a city's owner is no reason to be unable to hit a BARBARIAN. The
+    // old guard was also `isPlayerSeat`-only, so a rival attacking a rival's
+    // city at peace was never checked at all — the seat asymmetry #51 exists
+    // to remove.
     isPlayerSeat(attacker.seat) || isBarbSeat(attacker.seat)
-      ? rivalCityAt(state, targetIndex)
+      ? (() => {
+          const rc = rivalCityAt(state, targetIndex);
+          // BARBARIANS need no war: `caps.alwaysHostile` is the whole point of
+          // the capability table, and gating them on `civsAtWar` stopped them
+          // sacking rival cities at all (tests/deeper.test.ts caught it).
+          const hostile = capsOf(attacker.seat).alwaysHostile
+            || (rc !== undefined && civsAtWar(state, unitSeat(attacker), civOfRival(rc.rival.id)));
+          return rc && hostile ? rc : undefined;
+        })()
       : isRivalSeat(attacker.seat)
       ? (() => {
           // A-19/B-33 (S2): an at-war rival attacker targets an ENEMY rival's
@@ -640,6 +666,13 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   // standing on the district is fought first (real Civ 6 hits the unit).
   const encamp = enemies.length === 0 ? encampmentDefense(state, attacker, target) : null;
   if (enemies.length === 0 && !enemyCity && !rivalTarget && !csTarget && !encamp) {
+    // #51/S7.6: a rival CITY may sit here and simply not be a legal target
+    // (at peace). `rivalTarget` is undefined in that case now, so name the
+    // REAL reason rather than claiming the tile is empty.
+    const rcHere = rivalCityAt(state, targetIndex);
+    if (rcHere && !civsAtWar(state, unitSeat(attacker), civOfRival(rcHere.rival.id))) {
+      return no(`You are at peace with ${rcHere.rival.name} — declare war first.`);
+    }
     return no('Nothing to attack there.');
   }
   if (encamp && !enemyCity && !rivalTarget && !csTarget) {

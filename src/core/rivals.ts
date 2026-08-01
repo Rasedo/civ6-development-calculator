@@ -830,7 +830,11 @@ function claimGreatPeople(state: GameState, rival: RivalCiv): void {
       if (fx.gold) rival.treasury = (rival.treasury ?? 0) + fx.gold;
       if (fx.productionToCapital) {
         const cap = rival.cities.find((c) => c.isCapital);
+        // #51/S7.6: route the LUMP the same way. It used to be dropped
+        // whenever the capital's queue happened to be empty — the same
+        // leak as completion overflow, in a different place.
         if (cap && cap.queue.length > 0) cap.queue[0].progress += fx.productionToCapital;
+        else if (cap) cap.productionBank = (cap.productionBank ?? 0) + fx.productionToCapital;
       }
       // B7-G (B-8): a GENERAL/ADMIRAL claim spawns its support unit (civilian,
       // 4 MP) at the rival's capital — same instant-effect-plus-spawn as the
@@ -3018,6 +3022,13 @@ export function rivalPhase(state: GameState): void {
       const q = rc.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
         q.progress += production;
+        // #51/S7.6: pay in the bank, exactly where the player's endTurn does
+        // (game.ts, right after the production add). Without this the field
+        // written below would be write-only.
+        if (rc.productionBank) {
+          q.progress += rc.productionBank;
+          rc.productionBank = 0;
+        }
         const cost =
           q.kind === 'unit'
             ? q.cost ?? UNITS[q.unit]?.cost ?? 54 // P4/D-10: builders lock at queue
@@ -3095,6 +3106,29 @@ export function rivalPhase(state: GameState): void {
             }
             if (q.unit === 'BUILDER') rival.buildersTrained = (rival.buildersTrained ?? 0) + 1; // P4/D-10
           }
+          // #51/S7.6: a rival's completion OVERFLOW carries, exactly as the
+          // player's does. It used to be DISCARDED — ~91% of rival-city
+          // completions in the 12-seed gate carry non-zero overflow (mean
+          // 5.27, ~14k production points thrown away across the set), so
+          // this is the largest single production leak in the model.
+          // `RivalCity = City` (#51/S1.3), so the bank field the player has
+          // used since V-H1 is already here — nothing new to store.
+          //
+          // IT ALWAYS BANKS — it does NOT carry into `rc.queue[0]` even when a
+          // next item is waiting. Real Civ 6 (and this file's own queue) would
+          // carry it immediately, and that is the more faithful shape, but the
+          // GPU's rival city is a SINGLE SLOT with no queue at all. Carrying
+          // here let TS complete a second item in the same turn while the GPU
+          // banked and paid next turn, which diverged parity at seed 9119 t105
+          // on `rng` itself — the completion spawns a unit, so the DRAW COUNT
+          // moved, in a slice whose whole premise is that production touches no
+          // draw site.
+          //
+          // Porting a queue to the GPU is explicitly out of this slice's scope
+          // (§7-4b). So the engines agree on the weaker rule and the LOSS is
+          // declared here rather than hidden: banked overflow is paid on the
+          // NEXT turn, one turn later than Civ 6 would pay it.
+          rc.productionBank = (rc.productionBank ?? 0) + (q.progress - cost);
         }
       }
       // P5/S4 (C-15): the player's cultural border growth — this city's

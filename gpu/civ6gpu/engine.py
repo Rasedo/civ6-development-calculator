@@ -473,7 +473,7 @@ _MUTABLE = [
     "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank",
+    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank", "rc_prod_bank",
     "rc_dist_tile",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -1894,6 +1894,12 @@ class BatchSim:
         self._worship_cost = float(rules.worship_faith_cost)
         self._shrine_bidx = int(rules.shrine_bidx)  # B6-S2: missionary buy gate
         self.prod_bank = z(B, C)  # V-H1: chop production banked while the queue is empty
+        # #51/S7.6: the RIVAL twin. Allocated beside the player's rather than
+        # folded into the `cty_*` merged-plane table above, because that table
+        # is fixture-loaded and this field has no fixture key — a rival city
+        # always starts with an empty bank. Folding it in is the tidier end
+        # state and belongs with the rest of the city-plane merge, not here.
+        self.rc_prod_bank = torch.zeros(B, max(self.R, 1), self.RC, dtype=dtype, device=device)
         self.settlers_queued = torch.zeros(B, dtype=torch.long, device=device)
         self.science_total = z(B)
 
@@ -3495,6 +3501,14 @@ class BatchSim:
                 if bool(has_build.any()):
                     _hb = has_build.nonzero(as_tuple=True)[0]
                     self.progress[_hb, _cap_col[_hb]] = self.progress[_hb, _cap_col[_hb]] + prod[_hb]
+                # #51/S7.6: with no build queued the lump used to VANISH. It
+                # banks now, matching game.ts. This is the twin that was
+                # missing when parity went red at seed 9119 t105-107: TS banked
+                # the lump, the GPU dropped it, so TS ran a turn AHEAD on
+                # production and completed items the GPU had not reached.
+                _nb = (_cap_live & ~has_build).nonzero(as_tuple=True)[0]
+                if len(_nb) > 0:
+                    self.prod_bank[_nb, _cap_col[_nb]] = self.prod_bank[_nb, _cap_col[_nb]] + prod[_nb]
             self.player_gp_points.sub_(cost * cf)
             self.gp_earned[:, :nCls] = earned + can.long()
             self.era_score[:, 0] += can.long().sum(dim=1) * self._era_pts["gp"]  # B-24: per GP earned
@@ -6421,6 +6435,27 @@ class BatchSim:
                     if int(ftr_c[rows_c[i2]]) == 1:
                         self.rc_growth[b2, r, j] += amt
                     else:
+                        # #51/S7.6: this add is DELIBERATELY left to vanish when
+                        # there is no current item, and must NOT be banked.
+                        #
+                        # TS rivals do not chop AT ALL — `chopGrant`
+                        # (core/economy.ts) returns null for any tile whose seat
+                        # is not the player's. The GPU has a rival-chop path
+                        # anyway; it stays parity-clean only because
+                        # `rc_progress` is zeroed on the next queue push, so the
+                        # production is destroyed and TS's "no rival chop" is
+                        # matched by accident.
+                        #
+                        # Banking it hands the GPU production TS never gets. It
+                        # crossed rival 1 city 1 over an AMENITY-TIER boundary a
+                        # turn early at seed 9119 t95 (Content vs Displeased),
+                        # which changed that city's yields, its score, and from
+                        # there the whole trajectory. The trace showed it first
+                        # as `r1.rGScore` +2000 with every other column equal.
+                        #
+                        # The real fix is to decide whether rivals chop at all
+                        # and make BOTH engines agree — that is its own slice,
+                        # not S7.6's.
                         self.rc_progress[b2, r, j] += amt
                 self.v_charges[rows_c, sc[rows_c]] -= 1
                 self.v_mp[rows_c, sc[rows_c]] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
@@ -6703,6 +6738,8 @@ class BatchSim:
             self.city_seq_next[b] += 1
             self.is_cap[b, c_new] = False  # P7: captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
+            # #51/S7.6: a CAPTURED city carries no banked production — TS pushes a fresh City literal. `prod_bank` is slot-indexed and survived the previous occupant's death, so a reused slot inherited it (seed 9018 slot 2: 8.000 from a city lost at t111, inherited at t169).
+            self.prod_bank[b, c_new] = 0
             self.center_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
             self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
@@ -6764,6 +6801,11 @@ class BatchSim:
                 self.treasury[b] += 40.0
             if not bool(self.rc_alive[b, r].any()):
                 self.r_atwar[b, r] = False
+                # #51/S7.8f: elimination ends the war, so it settles like any
+                # other peace — the `combat.ts` captureRivalCity twin.
+                _elim = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _elim[b] = True
+                self._ww_peace(_elim, 0, r + 1)
                 self.war[b, 0, 1 + r] = False  # #51/S4.3
                 self.war[b, 1 + r, 0] = False
         self._eff_version += 1
@@ -6815,6 +6857,8 @@ class BatchSim:
             self.city_seq_next[b] += 1
             self.is_cap[b, c_new] = False  # P7: captured cities are never capitals (TS isCapital: false)
             self.site[b, c_new] = c_t
+            # #51/S7.6: a CAPTURED city carries no banked production — TS pushes a fresh City literal. `prod_bank` is slot-indexed and survived the previous occupant's death, so a reused slot inherited it (seed 9018 slot 2: 8.000 from a city lost at t111, inherited at t169).
+            self.prod_bank[b, c_new] = 0
             self.center_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
             self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
@@ -7076,6 +7120,17 @@ class BatchSim:
                 (cs_s >= 0)
                 & (self.cs_center.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == tgt)
                 & self.cs_alive.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+                # A-18/#45: a city-state is a separate player you must DECLARE
+                # on — `meleeAttack`'s csTarget returns undefined for a PLAYER
+                # attacker unless `cs.atWar`. Without this term the GPU sieged a
+                # city-state it was at peace with, while TS fell through to the
+                # garrison; the war-weariness column named it at seed 9066
+                # rng 2026006094 t229 (TS 0 / GPU 215 against seat 101).
+                # It belongs on `cs_here`, not on `cs_hit`, because `cs_here`
+                # also feeds `city_here` — at peace the centre must stop being
+                # a city for CITY-FIRST too, so the melee branch takes the
+                # garrison exactly as TS does.
+                & self.cs_atwar.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
             )
             city_here = rc_ok | cs_here
             garrisoned = (bslot >= 0) | v_ok
@@ -8606,6 +8661,7 @@ class BatchSim:
             if bool(peace.any()):
                 self.r_treasury[:, r] = torch.where(peace, self.r_treasury[:, r] - pcost_c, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~peace
+                self._ww_peace(peace, 0, r + 1)  # #51/S7.8f: -2000 on the treaty (the makePeace twin)
                 self.war[:, 1 + r, 0] &= ~peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
@@ -10895,6 +10951,26 @@ class BatchSim:
         self.rc_pop[rows, r, slot] = 1
         self.rc_growth[rows, r, slot] = 0
         self.rc_cbox[rows, r, slot] = 0  # P5/S4
+        # A NEWLY FOUNDED city starts with NO religion. `rc_pressure` and
+        # `rc_followed` are indexed by SLOT, and the per-turn block only zeroes
+        # a slot that is NOT alive — so a slot handed straight from a dead city
+        # to a new one inherited the previous occupant's accumulated pressure.
+        # TS cannot have this: `foundRivalCity` builds a fresh City whose
+        # `religionPressure` is empty and whose `followedReligion` is null.
+        #
+        # Found via #51/S7.6: seed 9119 rival 1 slot 3 held tile 470 until t60
+        # and tile 777 from t62, carrying 4 turns of religion-1 pressure into
+        # the new city. That +4 broke a 21-21 pressure TIE at t79 the wrong way
+        # (GPU followed 1, TS followed 2) and every later divergence — the
+        # amenity tier, rGScore, the t98 production gap, the t105 rng move —
+        # flowed from it. PRE-EXISTING; S7.6 only moved a founding onto a reused
+        # slot where it mattered. [[trajectory-bisect-lies]]
+        #
+        # TRANSFERS deliberately do NOT reset: `transferCityToRival` moves the
+        # existing city and its pressure travels with it.
+        self.rc_pressure[rows, r, slot, :] = 0
+        self.rc_followed[rows, r, slot] = -1
+        self.rc_prod_bank[rows, r, slot] = 0  # #51/S7.6: same slot-inheritance
         self.rc_gw_writing[rows, r, slot] = 0  # B-20: fresh rival city holds no works
         self.rc_gw_music[rows, r, slot] = 0
         self.rc_loyalty[rows, r, slot] = 100.0  # P5/S6
@@ -14119,11 +14195,26 @@ class BatchSim:
                 cur = self.rc_current[:, r, j].clone()
                 has_q = cact & (cur >= 0)
                 if bool(has_q.any()):
-                    self.rc_progress[:, r, j] = torch.where(has_q, self.rc_progress[:, r, j] + prod, self.rc_progress[:, r, j])
+                    # #51/S7.6: pay in the bank right after the production add,
+                    # exactly where rivals.ts does it and where the player's own
+                    # `prod_bank` is consumed. Without this the field would be
+                    # write-only — the same shape as the write-only accumulators
+                    # #52 and #53 track.
+                    self.rc_progress[:, r, j] = torch.where(
+                        has_q, self.rc_progress[:, r, j] + prod + self.rc_prod_bank[:, r, j], self.rc_progress[:, r, j])
+                    self.rc_prod_bank[:, r, j] = torch.where(
+                        has_q, torch.zeros_like(self.rc_prod_bank[:, r, j]), self.rc_prod_bank[:, r, j])
                     done_q = has_q & (self.rc_progress[:, r, j] >= self.rc_cost[:, r, j])
                     if bool(done_q.any()):
                         cost_locked = self.rc_cost[:, r, j].clone()  # A-14: the project lump reads the LOCKED cost
                         self.rc_current[:, r, j] = torch.where(done_q, torch.full_like(cur, -1), self.rc_current[:, r, j])
+                        # #51/S7.6: BANK the overflow — the rivals.ts twin. This
+                        # is the largest single production leak in the model:
+                        # ~91% of rival-city completions in the 12-seed gate
+                        # carry non-zero overflow (mean 5.27, ~14k points).
+                        _rovf = (self.rc_progress[:, r, j] - self.rc_cost[:, r, j]).clamp(min=0)
+                        self.rc_prod_bank[:, r, j] = torch.where(
+                            done_q, self.rc_prod_bank[:, r, j] + _rovf, self.rc_prod_bank[:, r, j])
                         self.rc_progress[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
                         self.rc_cost[:, r, j] = torch.where(done_q, torch.zeros_like(self.rc_cost[:, r, j]), self.rc_cost[:, r, j])
                         found_s = done_q & (cur == 0)
@@ -14713,8 +14804,14 @@ class BatchSim:
                         # slot-0 invariant (compaction can move the capital);
                         # at most one flag per (b, r), so the masked add
                         # lands on exactly the capital's head or nowhere.
-                        capm = self.rc_is_cap[:, r] & self.rc_alive[:, r] & (self.rc_current[:, r] >= 0)
+                        _capa = self.rc_is_cap[:, r] & self.rc_alive[:, r]
+                        capm = _capa & (self.rc_current[:, r] >= 0)
                         self.rc_progress[:, r] = self.rc_progress[:, r] + torch.where(capm, prod_fx.unsqueeze(1), torch.zeros_like(self.rc_progress[:, r]))
+                        # #51/S7.6: the rivals.ts twin — bank it rather than
+                        # drop it when the capital has nothing queued.
+                        _capb = _capa & (self.rc_current[:, r] < 0)
+                        self.rc_prod_bank[:, r] = self.rc_prod_bank[:, r] + torch.where(
+                            _capb, prod_fx.unsqueeze(1), torch.zeros_like(self.rc_prod_bank[:, r]))
                     if self._gp_effects.shape[2] > 4:
                         self.r_faith[:, r] = self.r_faith[:, r] + eff[:, 4].double() * hf
                     if cls == self._prophet_cls:
@@ -14861,6 +14958,7 @@ class BatchSim:
             if bool(made_peace.any()):
                 self.r_treasury[:, r] = torch.where(made_peace, self.r_treasury[:, r] - pcost, self.r_treasury[:, r])
                 self.r_atwar[:, r] = self.r_atwar[:, r] & ~made_peace
+                self._ww_peace(made_peace, 0, r + 1)  # #51/S7.8f: -2000 on the treaty (the makePeace twin)
                 self.war[:, 1 + r, 0] &= ~made_peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(made_peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
@@ -15064,6 +15162,17 @@ class BatchSim:
         self.rc_current[b, w_, slot] = -1
         self.rc_progress[b, w_, slot] = 0.0
         self.rc_cost[b, w_, slot] = 0.0
+        # #51/S7.6: a CONQUERED city carries NO banked production. TS's
+        # `transferCityToRival` does not move the object — it pushes a FRESH
+        # RivalCity literal (combat.ts 1098), so `productionBank` is undefined.
+        # The GPU writes into a rival SLOT that may hold a recycled leftover, so
+        # it must be zeroed explicitly. (Carrying the player's bank across was
+        # tried and turned BOTH parity gates red — TS really does drop it.)
+        #
+        # MEASURED: seed 9018 t111, rival 0 takes the player's city at tile 849
+        # (player slot 3, lost that turn). The gate's persistent -1.75 on
+        # `r0c6.progress` under forced compaction is exactly that city's bank.
+        self.rc_prod_bank[b, w_, slot] = 0.0
         self.rc_qtile[b, w_, slot] = -1
         # AUDIT B-30: conquest keeps infrastructure. Adopt the transferring
         # city's districts (registry keyed by placeable-district type -> tile),
@@ -15268,6 +15377,9 @@ class BatchSim:
     _RC_SLOT_FIELDS = (
         "rc_alive", "rc_center", "rc_pop", "rc_growth", "rc_cbox", "rc_loyalty",
         "rc_acquired", "rc_hp", "rc_outer_hp", "rc_id", "rc_is_cap", "rc_current", "rc_progress",
+        "rc_prod_bank",  # #51/S7.6: banked overflow — a [[new-class-invariant-sweep]]
+                         # field. It rides the permutation with rc_progress or a
+                         # compaction hands one city's bank to its neighbour.
         "rc_cost", "rc_qtile", "rc_followed",  # B-18: pressure spread (3D per-slot)
         # B-20 (#79): ALL FOUR work counts must ride the compaction permutation.
         # ART and RELICS were added by #73 after this tuple was written and were
@@ -15939,7 +16051,15 @@ class BatchSim:
                 self.q_dtile[db_, col[db_]] = -1
                 self._eff_version += 1
             self.current[bidx, col] = torch.where(done, torch.full_like(cur_c, -1), cur_c)
-            self.progress[bidx, col] = torch.where(done, torch.zeros_like(self.progress[bidx, col]), self.progress[bidx, col])  # overflow drops (queue empty)
+            # #51/S7.6: the completion OVERFLOW is BANKED, not dropped. The
+            # comment this replaces said "overflow drops (queue empty)" and was
+            # accurate — a single-slot core always has an empty queue after a
+            # completion, so it dropped EVERY time. `game.ts` carries into a
+            # queued item where one exists and banks otherwise; the bank is the
+            # branch a single-slot core can reach.
+            _ovf = (self.progress[bidx, col] - self.cur_cost[bidx, col]).clamp(min=0)
+            self.prod_bank[bidx, col] = torch.where(done, self.prod_bank[bidx, col] + _ovf, self.prod_bank[bidx, col])
+            self.progress[bidx, col] = torch.where(done, torch.zeros_like(self.progress[bidx, col]), self.progress[bidx, col])
 
             # --- growth (the pop snapshot re-triggers totals for later cities) ---
             surplus = t_c[:, 0] - popf_c * r.food_per_citizen
@@ -16220,6 +16340,19 @@ class BatchSim:
             self.tiles_acquired[rows, c_new] = 0
             self.current[rows, c_new] = -1
             self.progress[rows, c_new] = 0
+            # #51/S7.6: a freshly settled city holds NO BANKED PRODUCTION.
+            # `prod_bank` is slot-indexed and nothing cleared it when a city was
+            # LOST, so a slot reused by a new founding inherited the dead city's
+            # bank. TS cannot: a lost city leaves `state.cities` and a new one is
+            # a fresh object whose `productionBank` is undefined.
+            #
+            # MEASURED, seed 9018 player slot 2: city 932 banked 8.000, the city
+            # was lost at t111 (slot -> -1) with the bank INTACT, and the city
+            # founded at tile 679 on t169 inherited all 8.000 — completing a
+            # WARRIOR at t173 that TS only reached at t175. Exactly the same
+            # slot-inheritance shape as the `rc_pressure` bug fixed in
+            # `_rival_try_found`, in the field S7.6 makes large.
+            self.prod_bank[rows, c_new] = 0
             self.loyalty[rows, c_new] = 100.0
             self.city_hp[rows, c_new] = self.rules.combat.get("cityMaxHp", 200)
             self.warrior_trained[rows, c_new] = False
