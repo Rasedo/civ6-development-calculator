@@ -77,6 +77,10 @@ const HEAD_COLS: TraceCol<HeadCtx>[] = [
   // today on both engines (no seat can DECLARE on a city-state yet, task
   // #62) — kept for the same reason S0.2 kept `envoysAvail`: it pins the
   // invariant, and it is the tripwire the day a declare verb lands.
+  // #51/S7.11a: S0.2 REJECTED this column because the GPU player had no
+  // faith economy at all; it now banks per-turn faith like every other
+  // seat, so the column can finally exist.
+  { name: 'faith', tol: 2, get: (s) => Math.round(playerSeat(s).faith * 1000) },
   { name: 'nAntiquity', tol: 0, get: (s) => s.map.tiles.reduce((n, t) => n + (t.antiquity ? 1 : 0), 0) },
   { name: 'csAtWar', tol: 0, get: (s) => (s.cityStates ?? []).filter((c) => c.atWar).length },
   { name: 'nCamps', tol: 0, get: (s) => s.barbSeat.camps.length },

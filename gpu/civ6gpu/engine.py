@@ -16108,6 +16108,7 @@ class BatchSim:
         gold_add = torch.zeros(B, dtype=self.dtype, device=dev)
         sci_add = torch.zeros(B, dtype=self.dtype, device=dev)
         cul_add = torch.zeros(B, dtype=self.dtype, device=dev)
+        fth_add = torch.zeros(B, dtype=self.dtype, device=dev)  # #51/S7.11a
         neigh_flat = self.neigh.clamp(min=0).reshape(1, -1).expand(B, -1)
         neigh_valid = (self.neigh >= 0).reshape(1, T, 6)
         # P7-FULL (C-2): TS iterates state.cities in ARRAY order (splice on
@@ -16301,10 +16302,18 @@ class BatchSim:
             gold_add = gold_add + t_c[:, 2]
             sci_add = sci_add + t_c[:, 3]
             cul_add = cul_add + t_c[:, 4]
+            fth_add = fth_add + t_c[:, 5]  # #51/S7.11a: faith rides the same walk
 
         self.treasury.add_(gold_add)
         self.science_total.add_(sci_add)
         self.culture_total.add_(cul_add)
+        # #51/S7.11a: the PLAYER's per-turn faith income — `game.ts:930` does
+        # `playerSeat(state).faith += stats.total.faith` in the same city walk
+        # that banks gold/science/culture, and the rival twin has always had
+        # it (`r_faith + faith_sum`). Without this the GPU player's faith was a
+        # write-only accumulator fed ONLY by Great People, so it drifted from
+        # TS from turn 1 — invisible only because nothing consumed or traced it.
+        self.player_faith.add_(fth_add)
         # B-20 (#71): TOURISM — accumulated ONCE per turn at the civ level,
         # right after the city loop and BEFORE the loyalty collapses, exactly
         # where TS puts it.
@@ -16727,7 +16736,7 @@ class BatchSim:
     # and not the other cannot ship.
     _TRACE_HEAD = [
         "turn", "techs", "civics", "settlers", "nCities", "treasury", "science", "culture",
-        "score", "rng", "nAntiquity", "csAtWar", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
+        "score", "rng", "faith", "nAntiquity", "csAtWar", "nCamps", "nBarbs", "nPlayerUnits", "envoysAvail", "influence",
         "fertility", "droughtTiles", "improvements", "leader", "gameOver", "winner",
         "victoryType", "playerAge", "tourism", "warmonger", "diploFavor", "congressSessions",
         "diploPoints",
@@ -16787,6 +16796,7 @@ class BatchSim:
             js_round(self.culture_total * 1000),
             js_round(e_score * 1000),
             self.rng_state.to(self.dtype),
+            js_round(self.player_faith * 1000),  # #51/S7.11a
             self.antiquity.sum(dim=1).to(self.dtype),  # #51/S7.12 probe
             (self.cs_atwar & self.cs_alive).sum(dim=1).to(self.dtype) if self.S > 0
             else torch.zeros(self.B, dtype=self.dtype, device=self.device),  # #51/S7.10b
