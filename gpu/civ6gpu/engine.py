@@ -6589,6 +6589,43 @@ class BatchSim:
             )
         return out
 
+    def apply_rival_unit_sequence(self, r: int, seq: torch.Tensor) -> None:
+        """#90: a unit's order is a SHORT DIRECTION SEQUENCE [B, P_MAX, K].
+
+        The scripted AI walks REAL MP — `_rival_unit_peace_act`'s patrol loops
+        `_step_verb` until movement runs out — and MEASURED it moves 2.78 tiles
+        per moving unit-turn. One order per unit-turn would cut rival mobility by
+        roughly two thirds: no crash, no parity red, driven rivals simply slower
+        and weaker than scripted ones. That mismatch is #51's premise in
+        miniature — the scripted AI doing something the ACTION SPACE cannot
+        express means the scripted AI cannot be replaced by a policy over it.
+
+        Column k is applied in order. Only MOVE columns (0-5) continue a
+        sequence: any other verb ends the unit's turn, exactly as it does today,
+        so k>0 entries are blanked for units that did something else.
+
+        NO NEW MP BOOKKEEPING. `_step_verb` already owns the contract ("movesLeft
+        < cost && movesLeft < full refuses, so a unit at FULL MP always gets its
+        first step"), so a unit out of movement simply has its next step refused
+        and later columns are no-ops. Leaning on that invariant instead of
+        re-deriving it is what keeps this faithful.
+
+        The ENGINE NEVER EXTENDS A MOVE. Every step it walks was named by the
+        policy — the alternative, "repeat the chosen direction until MP is
+        spent", would put a movement policy back inside the engine, which is the
+        #87 mistake and the thing #51 exists to delete.
+        """
+        if seq.dim() != 3:
+            raise AssertionError(f"unit sequence must be [B, P_MAX, K], got {tuple(seq.shape)}")
+        for k in range(int(seq.shape[2])):
+            a_k = seq[:, :, k].to(torch.long)
+            if k > 0:
+                # a non-move verb consumed the turn at an earlier rank
+                a_k = torch.where(a_k < 6, a_k, torch.full_like(a_k, -1))
+            if not bool((a_k >= 0).any()):
+                return
+            self._apply_rival_unit_actions(r, a_k)
+
     def _apply_rival_unit_actions(self, r: int, actions: torch.Tensor) -> None:
         """C3-prep: execute a CONTROLLED rival's unit orders in slot order
         (the rival_unit_mask layout; -1/12 = hold). Orders are re-validated

@@ -134,6 +134,98 @@ def main() -> None:
     assert not bool(sim.pillaged[0, tile]), "a rival pillaged its OWN improvement"
     print("  4 PILLAGE refused on own land OK")
 
+    # -- 5: #90 a MULTI-STEP order walks real MP ---------------------------
+    # The scripted patrol moves 2.78 tiles per moving unit-turn; one order per
+    # turn would cut rival mobility by ~two thirds. The action is a SEQUENCE and
+    # the engine walks it, validating each step — it never extends a move itself.
+    def setup():
+        s2 = fresh(rules, path)
+        s2.controlled[0, r] = True
+        sl = next(
+            v for v in range(s2.v_alive.shape[1])
+            if bool(s2.v_alive[0, v]) and int(s2.v_civ[0, v]) == r
+            and float(s2._p_combat[int(s2.v_type[0, v])]) > 0
+        )
+        s2.v_mp[0, sl] = 4.0
+        sm = s2.rival_slot_map(r)[0]
+        rw = int((sm == sl).nonzero(as_tuple=True)[0][0])
+        return s2, sl, rw, sm.shape[0]
+
+    def seq_of(cols, n_rows, rw):
+        q = torch.full((1, n_rows, len(cols)), -1, dtype=torch.long)
+        for i, c in enumerate(cols):
+            q[0, rw, i] = c
+        return q
+
+    # pick a legal first direction, then a legal SECOND one from where it lands
+    s5, sl5, rw5, nrows = setup()
+    m5 = s5.rival_unit_mask(r)[0, rw5]
+    d0 = next((d for d in range(6) if bool(m5[d])), None)
+    assert d0 is not None, "no legal first step for this unit"
+    s5.apply_rival_unit_sequence(r, seq_of([d0], nrows, rw5))
+    one_tile = int(s5.v_tile[0, sl5])
+    m5b = s5.rival_unit_mask(r)[0, rw5]
+    d1 = next((d for d in range(6) if bool(m5b[d])), None)
+    assert d1 is not None, "no legal second step — pick another fixture/turn"
+
+    s6, sl6b, rw6b, nrows2 = setup()
+    start_t = int(s6.v_tile[0, sl6b])
+    s6.apply_rival_unit_sequence(r, seq_of([d0, d1], nrows2, rw6b))
+    two_tile = int(s6.v_tile[0, sl6b])
+    assert two_tile != one_tile, (
+        f"#90 DEAD: the 2-step sequence ended where the 1-step did ({two_tile}) "
+        "— the second rank never executed"
+    )
+    assert int(s6.pair_dist[start_t, two_tile]) >= 1
+    print(f"  5 multi-step order walks real MP OK ({start_t} -> {one_tile} -> {two_tile})")
+
+    # -- 5b: an ILLEGAL later step is REFUSED, not skipped past --------------
+    # The engine validates every rank; it must not silently substitute another
+    # direction, and it must not carry the unit past a blocked tile.
+    # Find a direction that is legal NOW but illegal from where it lands, so the
+    # refusal happens mid-sequence rather than at rank 0 — that is the case the
+    # walk has to get right, and it is real here (d0 twice runs into water).
+    s7, sl7, rw7, nrows3 = setup()
+    dead = None
+    for d in range(6):
+        probe, slp, rwp, nrp = setup()
+        if not bool(probe.rival_unit_mask(r)[0, rwp][d]):
+            continue
+        probe.apply_rival_unit_sequence(r, seq_of([d], nrp, rwp))
+        if not bool(probe.rival_unit_mask(r)[0, rwp][d]):
+            dead = (d, int(probe.v_tile[0, slp]))
+            break
+    assert dead is not None, "no direction becomes illegal after one step — pick another fixture"
+    d_dead, stop_tile = dead
+    s7.apply_rival_unit_sequence(r, seq_of([d_dead, d_dead], nrows3, rw7))
+    assert int(s7.v_tile[0, sl7]) == stop_tile, (
+        f"#90: the walk did not stop at the illegal rank — ended {int(s7.v_tile[0, sl7])}, "
+        f"expected {stop_tile}"
+    )
+    print(f"  5b the walk STOPS at an illegal later step (dir {d_dead}, halted at {stop_tile}) OK")
+
+    # -- 6: a NON-MOVE verb at rank 0 consumes the turn ---------------------
+    # PILLAGE then a move: the move must NOT happen (mp spent), which is what
+    # keeps the sequence from smuggling a free action after a turn-ending verb.
+    sim6 = fresh(rules, path)
+    sim6.controlled[0, r] = True
+    sl6, t6 = a_rival_soldier(sim6, r)
+    sim6.r_atwar[0, r] = True
+    sim6.owner[0, t6] = 0
+    sim6.rival_at[0, t6] = -1
+    sim6.improvement[0, t6] = 0
+    sim6.pillaged[0, t6] = False
+    sim6.district[0, t6] = -1
+    sm6 = sim6.rival_slot_map(r)[0]
+    rw6 = int((sm6 == sl6).nonzero(as_tuple=True)[0][0])
+    sq6 = torch.full((1, sm6.shape[0], 2), -1, dtype=torch.long)
+    sq6[0, rw6, 0] = sim6._A_PILLAGE
+    sq6[0, rw6, 1] = 0
+    sim6.apply_rival_unit_sequence(r, sq6)
+    assert bool(sim6.pillaged[0, t6]), "the rank-0 PILLAGE did not fire"
+    assert int(sim6.v_tile[0, sl6]) == t6, "a turn-ending verb must not be followed by a move"
+    print("  6 a turn-ending verb at rank 0 blocks later steps OK")
+
     print("RIVAL VERBS OK")
 
 
