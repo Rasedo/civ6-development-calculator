@@ -7189,33 +7189,10 @@ class BatchSim:
                 # at seed 9002 rng 2026006079 t74 (TS 350 / GPU 300 = 2 x 25,
                 # one Classical surprise base abroad).
                 _wwp, _wwps = self._ww_occ(tgt), self._tile_mil_seat(tgt)
-                d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
-                d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
-                rows = att.nonzero(as_tuple=True)[0]
-                def_dead = torch.zeros_like(att)
-                # #51/S3.4b: one merged write. The two rows differed only in
-                # which pool the defender lived in — the merged slot answers
-                # that, and clearing every military map at the tile is
-                # branch-free and exact (only one is set there).
-                if len(rows) > 0:
-                    _lo = torch.where(is_b, torch.full_like(bslot, self.POOL_LO["u"]), torch.full_like(bslot, self.POOL_LO["v"]))
-                    _ds = (torch.where(is_b, bslot, vslot) + _lo)[rows]
-                    self.unit_hp[rows, _ds] -= d_def[rows]
-                    _dead = self.unit_hp[rows, _ds] <= 0
-                    def_dead[rows[_dead]] = True
-                    _gd, _td = rows[_dead], tc[rows[_dead]]
-                    self.unit_alive[_gd, _ds[_dead]] = False
-                    self.occ_mil[_gd, _td] = -1
-                # B-4: a surviving rival MILITARY defender earns +2 (barbs never
-                # accrue; rv_at is the rival-military map, so no civilian here).
-                surv_rv = (att & ~is_b & ~def_dead).nonzero(as_tuple=True)[0]
-                if len(surv_rv) > 0:
-                    self.unit_xp[surv_rv, vslot[surv_rv] + self.POOL_LO["v"]] += XP_DEFEND
-                self.p_hp[:, p] = torch.where(att, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
-                atk_dead = att & (self.p_hp[:, p] <= 0)
-                both = def_dead & atk_dead
-                self.p_hp[:, p] = torch.where(both, torch.ones_like(self.p_hp[:, p]), self.p_hp[:, p])  # victor survives
-                atk_dead = atk_dead & ~def_dead
+                # #51/S3.3: the defender's MERGED slot, whichever pool it lives in.
+                _dsl = torch.where(is_b, bslot + self.POOL_LO["u"], vslot + self.POOL_LO["v"])
+                rows, def_dead, atk_dead = self._melee_exchange(  # #51/S7.8f (#60)
+                    att, tgt, tc, _dsl, ~is_b, self.p_hp, p, atk_e, def_e)
                 # #51/S7.8f: ONE battle, scored for both sides - before the
                 # advance moves anybody and before the tile can change hands.
                 self._ww_battle(att, self._row_of(self.p_seat[:, p]),
@@ -11078,36 +11055,11 @@ class BatchSim:
             def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)  # #51/S7.8f
-            d_def = self._damage_roll(mil_att, atk_e - def_e, k="mel", tile=tgt)
-            d_atk = self._damage_roll(mil_att, def_e - atk_e, k="melc", tile=tgt)
-            rows = mil_att.nonzero(as_tuple=True)[0]
-            def_dead = torch.zeros_like(mil_att)
             _wwd = self._tile_mil_seat(tgt)  # #51/S7.8f: the defender, before it falls
-            # #51/S3.4b: ONE merged write. The three rows differed only in which
-            # pool the defender lived in, which the merged slot already answers.
-            if len(rows) > 0:
-                ds = d_slot[rows]
-                self.unit_hp[rows, ds] -= d_def[rows]
-                dead = self.unit_hp[rows, ds] <= 0
-                def_dead[rows[dead]] = True
-                gd, td = rows[dead], ttc[rows[dead]]
-                self.unit_alive[gd, ds[dead]] = False
-                # clearing every MILITARY map at the tile is branch-free and
-                # exact: only one of them is set there.
-                self.occ_mil[gd, td] = -1
-            # B-4: a rival attacker earns +5 for the attack executed (barbs none);
-            # a surviving MILITARY defender earns +2 via the merged xp plane
-            # (barb defenders never accrue).
             if atk_kind == "rival":
                 self.v_xp[:, u] = torch.where(mil_att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
-            surv = (mil_att & ~def_is_barb & ~def_dead).nonzero(as_tuple=True)[0]
-            if len(surv) > 0:
-                self.unit_xp[surv, d_slot[surv]] += XP_DEFEND
-            a_hp[:, u] = torch.where(mil_att, a_hp[:, u] - d_atk, a_hp[:, u])
-            atk_dead = mil_att & (a_hp[:, u] <= 0)
-            both = def_dead & atk_dead
-            a_hp[:, u] = torch.where(both, torch.ones_like(a_hp[:, u]), a_hp[:, u])  # victor survives
-            atk_dead = atk_dead & ~def_dead
+            rows, def_dead, atk_dead = self._melee_exchange(  # #51/S7.8f (#60)
+                mil_att, tgt, ttc, d_slot, ~def_is_barb, a_hp, u, atk_e, def_e)
             # #51/S7.8f: the same battle rule the player path scores, on the
             # seat that happens to be attacking here. Before the advance.
             self._ww_battle(mil_att, self._row_of(self._atk_seat(atk_kind, u)),
@@ -12274,6 +12226,53 @@ class BatchSim:
             sp = surv[alive_now]
             if len(sp) > 0:
                 self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+
+    def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
+                        d_slot: torch.Tensor, def_can_xp: torch.Tensor,
+                        a_hp: torch.Tensor, u: int,
+                        atk_e: torch.Tensor, def_e: torch.Tensor):
+        """ONE melee exchange between two units — the `meleeAttack` core.
+
+        #51/S7.8f (task #60): the last of the five applier groups. This was
+        written twice, in `_apply_unit_actions` for the player pool and in
+        `_hostile_vs_unit` for a rival's or a barbarian's, with the same paired
+        rolls, the same defender-death write, the same XP_DEFEND to a survivor
+        that can hold XP, and the same victor-survives rule.
+
+        Only the CORE is shared. Target selection, the roll-free civilian
+        capture, the city-first precedence and the advance rules stay with each
+        caller — those genuinely differ, and TS branches on them too.
+
+        `d_slot` is the defender's MERGED pool slot (#51/S3.3), so this function
+        never asks which pool the defender lives in. `def_can_xp` is the
+        defender-earns-veterancy mask — barbarians never accrue, which is
+        `SEAT_CAPS[...]["xp"]` expressed per row.
+
+        DRAW ORDER is the parity contract: the defender's damage first, the
+        counter second, exactly as TS's meleeAttack draws them.
+        """
+        d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
+        d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
+        rows = att.nonzero(as_tuple=True)[0]
+        def_dead = torch.zeros_like(att)
+        if len(rows) > 0:
+            ds = d_slot[rows]
+            self.unit_hp[rows, ds] -= d_def[rows]
+            dead = self.unit_hp[rows, ds] <= 0
+            def_dead[rows[dead]] = True
+            gd, td = rows[dead], tile_c[rows[dead]]
+            self.unit_alive[gd, ds[dead]] = False
+            self.occ_mil[gd, td] = -1  # #51/S3.4b
+        # B-4: +2 to a surviving MILITARY defender that can earn it.
+        surv = (att & def_can_xp & ~def_dead).nonzero(as_tuple=True)[0]
+        if len(surv) > 0:
+            self.unit_xp[surv, d_slot[surv]] += XP_DEFEND
+        a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
+        atk_dead = att & (a_hp[:, u] <= 0)
+        both = def_dead & atk_dead
+        a_hp[:, u] = torch.where(both, torch.ones_like(a_hp[:, u]), a_hp[:, u])  # victor survives
+        atk_dead = atk_dead & ~def_dead
+        return rows, def_dead, atk_dead
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
