@@ -115,7 +115,7 @@ def main() -> None:
     # The ladder is a chain of tryQueueRivalX calls, each false when nothing of
     # that kind is legal: settler -> district -> building -> ... -> army. That
     # reduces to FIRST LEGAL CLASS in priority order, lowest index within.
-    NB, NU, nS = 4, 3, 2
+    NB, NU, nS = 4, 5, 2
     cls = ladder.prod_classes(NB, NU, nS)
     W = NB + 2 + NU + nS
     # synthetic 3-unit roster: 0 BUILDER (combat 0), 1 WARRIOR (melee 20),
@@ -124,6 +124,8 @@ def main() -> None:
         {"id": "BUILDER", "combat": 0},
         {"id": "WARRIOR", "combat": 20},
         {"id": "ARCHER", "combat": 15, "rangedStrength": 25},
+        {"id": "MILITARY_ENGINEER", "combat": 0},
+        {"id": "GALLEY", "combat": 25, "naval": 1},
     ])
     def mk(idxs):
         m = torch.zeros(1, 1, W, dtype=torch.bool)
@@ -191,8 +193,35 @@ def main() -> None:
     two = ladder.pick_production(mk2([[u1, u2], [u1, u2]]), cls, ROSTER, hungry)
     assert [int(two[0, 0]), int(two[0, 1])] == [u2, u1]
 
+    # #83: MILITARY_ENGINEER and the B-6 GALLEY are single-column TIERS. Both
+    # are invisible to the army lanes (combat 0 / naval), so before they had
+    # tiers they were simply never picked — 57 and 29 missed engine decisions.
+    eng, gal = cls["unit"][0] + 3, cls["unit"][0] + 4
+    # engineer outranks the army, and the army outranks the galley
+    assert int(ladder.pick_production(mk([u1, eng]), cls, ROSTER)[0, 0]) == eng
+    assert int(ladder.pick_production(mk([u1, gal]), cls, ROSTER)[0, 0]) == u1
+    # ...but the builder still outranks the engineer
+    assert int(ladder.pick_production(mk([u0, eng]), cls, ROSTER)[0, 0]) == u0
+    # the engineer IS cap-gated; the galley deliberately is NOT — the picker
+    # reaches it only when the army branch missed BECAUSE the cap was full
+    atcap = {"unit_count": torch.tensor([3]), "unit_cap": torch.tensor([3])}
+    assert int(ladder.pick_production(mk([u1, eng]), cls, ROSTER, atcap)[0, 0]) == -1
+    assert int(ladder.pick_production(mk([u1, gal]), cls, ROSTER, atcap)[0, 0]) == gal
+
+    # #84: each solo tier is ONE PER CIV and the engine's gate reads rc_current
+    # live, so it retires mid-walk. Two idle cities both offered a builder must
+    # NOT both take one — the second falls through to the army.
+    solo = ladder.pick_production(mk2([[u0, u1], [u0, u1]]), cls, ROSTER)
+    assert [int(solo[0, 0]), int(solo[0, 1])] == [u0, u1]
+    # same for the engineer, and for the galley at cap
+    seng = ladder.pick_production(mk2([[eng], [eng]]), cls, ROSTER)
+    assert [int(seng[0, 0]), int(seng[0, 1])] == [eng, -1]
+    sgal = ladder.pick_production(mk2([[gal], [gal]]), cls, ROSTER, atcap)
+    assert [int(sgal[0, 0]), int(sgal[0, 1])] == [gal, -1]
+
     print("  f production verb OK (class priority, no capital gate, "
-          "lowest-index within class, B-10 army lanes, counters threaded)")
+          "lowest-index within class, B-10 army lanes, counters threaded, "
+          "engineer/galley tiers)")
 
     print("LADDER CONTRACT OK")
 

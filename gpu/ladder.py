@@ -199,10 +199,19 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
 #: express yet, both recorded rather than silently skipped:
 #:   * WONDER sits between building and builder — the rival action space has no
 #:     wonder column at all (task #83), so there is nothing to select.
-#:   * the B-6 GALLEY sits just below the military floor; both unit lanes here
-#:     exclude naval hulls, exactly as the TS scan does, so a galley is never
-#:     picked. Porting it needs its own zero-naval/coastal predicate.
-PROD_PRIORITY = ("settler", "district", "building", "builder", "unit")
+#:   * WONDER sits between building and builder and still has no mask column.
+#: MILITARY_ENGINEER and the B-6 GALLEY are single-column tiers like the
+#: builder: both have combat 0 or are naval, so neither can ever win an army
+#: lane, and without their own tier they were simply never picked (57 and 29
+#: missed engine decisions respectively). The GALLEY sits BELOW the army and is
+#: deliberately NOT cap-gated — the picker queues it only when the army branch
+#: missed because the cap was full, and counts it afterwards.
+PROD_PRIORITY = ("settler", "district", "building", "builder", "engineer", "unit", "galley")
+
+#: single-column tiers -> (roster key, is it gated by the unit cap)
+SOLO_TIERS = {"builder": ("builder_idx", True),
+              "engineer": ("engineer_idx", True),
+              "galley": ("galley_idx", False)}
 
 
 def unit_roster(units: list[dict]) -> dict:
@@ -222,6 +231,8 @@ def unit_roster(units: list[dict]) -> dict:
         "naval": naval,
         "is_ranged": rng_str > 0,
         "builder_idx": ids.index("BUILDER") if "BUILDER" in ids else -1,
+        "engineer_idx": ids.index("MILITARY_ENGINEER") if "MILITARY_ENGINEER" in ids else -1,
+        "galley_idx": ids.index("GALLEY") if "GALLEY" in ids else -1,
     }
 
 
@@ -319,19 +330,32 @@ def pick_production(
     n_units, cap = col("unit_count", 0), col("unit_cap", 10 ** 9)
     b_idx = roster["builder_idx"] if roster else -1
 
+    solo_taken = {nm: torch.zeros(B, dtype=torch.bool, device=dev) for nm in SOLO_TIERS}
     out = torch.full((B, C), -1, dtype=torch.long, device=dev)
     for j in range(C):
         best = torch.full((B,), -1, dtype=torch.long, device=dev)
         under_cap = n_units < cap
         for name in PROD_PRIORITY:
-            if name == "builder":
-                # a builder IS a unit and takes a cap slot; the mask already
-                # carries the one-per-civ and jobs-exist gates
-                if b_idx < 0 or u_lo + b_idx >= W:
+            if name in SOLO_TIERS:
+                # single-column tiers. The MASK carries each one's own gates
+                # (builder: one-per-civ + a job exists; engineer: one-per-civ +
+                # a fort job; galley: SAILING + naval-capable city + zero naval
+                # owned) — the ladder only supplies the cap, which no mask has.
+                key, capped = SOLO_TIERS[name]
+                idx = roster[key] if roster else -1
+                if idx < 0 or u_lo + idx >= W:
                     continue
-                hit = mask[:, j, u_lo + b_idx] & under_cap
+                # #84 again (4th, 5th and 6th instances): every one of these is
+                # ONE PER CIV and the engine's gate reads rc_current LIVE, so it
+                # retires the moment any city queues one. The mask is a snapshot
+                # taken before the walk and keeps saying "legal" for the rest of
+                # them, so without this the ladder queues a builder, an engineer
+                # or a galley in every idle city at once.
+                hit = mask[:, j, u_lo + idx] & ~solo_taken[name]
+                if capped:
+                    hit = hit & under_cap
                 best = torch.where((best < 0) & hit,
-                                   torch.full_like(best, u_lo + b_idx), best)
+                                   torch.full_like(best, u_lo + idx), best)
                 continue
             if name == "unit":
                 if roster is None or u_lo >= W:
@@ -363,6 +387,10 @@ def pick_production(
 
         out[:, j] = best
         # thread every counter the next city will read, exactly as TS does
+        for nm, (k, _c) in SOLO_TIERS.items():
+            i2 = roster[k] if roster else -1
+            if i2 >= 0:
+                solo_taken[nm] = solo_taken[nm] | (best == u_lo + i2)
         taken = taken | ((best >= lo_s) & (best < hi_s))
         is_unit = (best >= u_lo) & (best < u_hi)
         n_units = n_units + is_unit.long()

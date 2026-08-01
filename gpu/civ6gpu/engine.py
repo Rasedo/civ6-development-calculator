@@ -8779,6 +8779,36 @@ class BatchSim:
                 has_alive = (self.v_alive & (self.v_civ == r) & (self.v_type == self._builder_idx)).any(dim=1)
                 has_q = ((self.rc_current[:, r] == self._builder_idx + 1) & self.rc_alive[:, r]).any(dim=1)  # P5/S5: alive-masked
                 ok_u[:, self._builder_idx] = ~(has_alive | has_q) & self._rival_job_mask(r).any(dim=1)
+            # #83: the MILITARY ENGINEER tier — one per civ (live or queued),
+            # and only while a FORT job exists. Its own branch in the picker,
+            # between the builder and the army; combat 0 keeps it out of both
+            # lanes above, so without this column no net could ever build one.
+            if self._rival_eng_live and self._eng_idx >= 0:
+                has_alive_e = (self.v_alive & (self.v_civ == r) & (self.v_type == self._eng_idx)).any(dim=1)
+                has_q_e = ((self.rc_current[:, r] == self._eng_idx + 1) & self.rc_alive[:, r]).any(dim=1)
+                ok_u[:, self._eng_idx] = ~(has_alive_e | has_q_e) & self._rival_fort_job_mask(r).any(dim=1)
+            # #83/#45-B-6: the GALLEY — SAILING plus a naval-capable CITY (center
+            # adjacent to water OR a completed Harbor), and the civ owns zero
+            # naval units live or queued. Per-city, hence inside this j loop.
+            # ~unit_naval above excludes every hull, so this column is the only
+            # way a net can put a ship in the water at all.
+            if self._galley_idx >= 0 and self._sailing_tech >= 0:
+                has_sail_g = self.r_techs[:, r, self._sailing_tech]
+                ctr_jg = self.rc_center[:, r, j].clamp(min=0)
+                nb_jg = self.neigh[ctr_jg]
+                coastal_jg = ((nb_jg >= 0) & self.wpass.gather(1, nb_jg.clamp(min=0))).any(dim=1)
+                if self._harbor_idx >= 0:
+                    hb_jg = self.rc_dist_tile[:, r, j, self._harbor_idx]
+                    harbor_jg = (hb_jg >= 0) & self.district_complete.gather(1, hb_jg.clamp(min=0).unsqueeze(1)).squeeze(1)
+                else:
+                    harbor_jg = torch.zeros(B, dtype=torch.bool, device=dev)
+                vt_allm = self.v_type.clamp(min=0, max=self.NU - 1)
+                naval_live_g = (self.v_alive & (self.v_civ == r) & self.unit_naval[vt_allm]).any(dim=1)
+                qcur_g = self.rc_current[:, r]
+                q_nav_g = (qcur_g >= 1) & (qcur_g <= self.NU) & self.rc_alive[:, r] & self.unit_naval[(qcur_g - 1).clamp(min=0, max=self.NU - 1)]
+                ok_u[:, self._galley_idx] = (
+                    has_sail_g & (coastal_jg | harbor_jg) & ~(naval_live_g | q_nav_g.any(dim=1))
+                )
             ok_u = ok_u & self._res_avail_mask(self.rival_at == r)  # B-9: rival strategic-resource gate (builder ungated → all-True)
             # scaffold districts: placeable NOW under the B4 gates
             ok_d = torch.zeros(B, nS, dtype=torch.bool, device=dev)
