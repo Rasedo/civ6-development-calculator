@@ -8160,35 +8160,9 @@ class BatchSim:
                 _def_civ_u = torch.where(is_rmil, d_seat, torch.full_like(tt, -1))
                 _def_nav = torch.where(is_rmil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                 def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
-                d = self._damage_roll(strike, atk_cs - def_e, k="pcstk", tile=tt)
-                # #51/S7.8f: a city GIVING the attack is city combat too.
-                self._ww_battle(strike, 0, self._row_of(d_seat), tt,
-                                d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
-                rows = strike.nonzero(as_tuple=True)[0]
-                # #51/S3.4b: one merged write per DOMAIN. Clearing every legacy
-                # map of that domain is branch-free and exact — only one of
-                # them is set on the tile.
-                for grp, occ_map in (
-                    (_okm, self.occ_mil),
-                    (~_okm & _okc, self.occ_civ),
-                ):
-                    g = rows[grp[rows]]
-                    if len(g) == 0:
-                        continue
-                    ds = d_slot[g]
-                    self.unit_hp[g, ds] -= d[g]
-                    dead = self.unit_hp[g, ds] <= 0
-                    gd, td = g[dead], tt[g[dead]]
-                    occ_map[gd, td] = -1
-                    self.unit_alive[gd, ds[dead]] = False
-                # B-4: a surviving rival MILITARY defender earns +2 (attacker is
-                # the city — no attacker xp; barb / rival civilian never accrue).
-                surv_rm = (strike & is_rmil).nonzero(as_tuple=True)[0]
-                if len(surv_rm) > 0:
-                    alive_now = self.unit_hp[surv_rm, d_slot[surv_rm]] > 0
-                    sp = surv_rm[alive_now]
-                    if len(sp) > 0:
-                        self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+                self._city_strike_resolve(  # #51/S7.8f (#60): one rule, four callers
+                    strike, tt, d_slot, d_seat, _okm, _okc, is_rmil, atk_cs,
+                    def_e, def_hp, 0, "pcstk")
 
         # B-17 (ROUND B7): the ADDITIONAL Encampment strike (the pestk twin of
         # the pcstk walls strike above). A PLAYER city owning a COMPLETE LIVE
@@ -8257,33 +8231,9 @@ class BatchSim:
                 _def_civ_u = torch.where(is_rmil, d_seat, torch.full_like(tt, -1))
                 _def_nav = torch.where(is_rmil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                 def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
-                d = self._damage_roll(strike, atk_cs - def_e, k="pestk", tile=tt)
-                # #51/S7.8f: a city GIVING the attack is city combat too.
-                self._ww_battle(strike, 0, self._row_of(d_seat), tt,
-                                d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
-                rows = strike.nonzero(as_tuple=True)[0]
-                # #51/S3.4b: one merged write per DOMAIN. Clearing every legacy
-                # map of that domain is branch-free and exact — only one of
-                # them is set on the tile.
-                for grp, occ_map in (
-                    (_okm, self.occ_mil),
-                    (~_okm & _okc, self.occ_civ),
-                ):
-                    g = rows[grp[rows]]
-                    if len(g) == 0:
-                        continue
-                    ds = d_slot[g]
-                    self.unit_hp[g, ds] -= d[g]
-                    dead = self.unit_hp[g, ds] <= 0
-                    gd, td = g[dead], tt[g[dead]]
-                    occ_map[gd, td] = -1
-                    self.unit_alive[gd, ds[dead]] = False
-                surv_rm = (strike & is_rmil).nonzero(as_tuple=True)[0]
-                if len(surv_rm) > 0:
-                    alive_now = self.unit_hp[surv_rm, d_slot[surv_rm]] > 0
-                    sp = surv_rm[alive_now]
-                    if len(sp) > 0:
-                        self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+                self._city_strike_resolve(  # #51/S7.8f (#60): one rule, four callers
+                    strike, tt, d_slot, d_seat, _okm, _okc, is_rmil, atk_cs,
+                    def_e, def_hp, 0, "pestk")
 
         # Cities heal +20 when no hostile stands adjacent (barbarians, or
         # rival units whose civ is at war — TS unitsHostile counts rival
@@ -12256,6 +12206,75 @@ class BatchSim:
         cap = att & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
         return rows, atk_dead, cap
 
+    def _city_strike_resolve(self, strike: torch.Tensor, tt: torch.Tensor,
+                             d_slot: torch.Tensor, d_seat: torch.Tensor,
+                             okm: torch.Tensor, okc: torch.Tensor,
+                             is_mil: torch.Tensor, atk_cs: torch.Tensor,
+                             def_e: torch.Tensor, def_hp: torch.Tensor,
+                             striker_row, key: str) -> None:
+        """A CITY firing on the best target in range — the resolution half,
+        shared by all four strikes.
+
+        #51/S7.8f (task #60): `pcstk`, `pestk`, `rcstk` and `restk` are the same
+        rule four times — one roll at the city's strength, no retaliation, never
+        captures, the damaged defender's occupancy cleared on death and
+        XP_DEFEND to a MILITARY survivor. They differed only in WHICH city fires
+        (`best_melee` vs `r_best_melee[:, r]`) and hence in the roll key.
+
+        TARGET SELECTION stays with each caller: a player city and a rival city
+        scan for hostiles differently, and an Encampment strike needs a live
+        garrison its walls counterpart does not. What is shared is the BATTLE.
+
+        `striker_row` is the firing seat's war-matrix row — 0 for the player,
+        r+1 for rival r — so the war-weariness hook is written once instead of
+        four times. Three of the seven S7.8f site errors were in these four
+        copies: the death term was read off tile occupancy BEFORE the damage
+        landed, so it was always false, in all four.
+        """
+        d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt)
+        # #51/S7.8f: a city GIVING the attack is city combat, so both sides
+        # score at the abroad column. The death term comes from the HP the
+        # defender is about to have, not from tile occupancy — occupancy is not
+        # cleared until the loop below, which is what made all four wrong.
+        self._ww_battle(strike, striker_row, self._row_of(d_seat), tt,
+                        d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
+        rows = strike.nonzero(as_tuple=True)[0]
+        # #51/S3.4b: ONE defender slot, military first. Clearing the map of the
+        # dead defender's domain is branch-free and exact — only one is set.
+        for grp, occ_map in ((okm, self.occ_mil), (~okm & okc, self.occ_civ)):
+            g = rows[grp[rows]]
+            if len(g) == 0:
+                continue
+            ds = d_slot[g]
+            self.unit_hp[g, ds] -= d[g]
+            dead = self.unit_hp[g, ds] <= 0
+            gd, td = g[dead], tt[g[dead]]
+            occ_map[gd, td] = -1
+            self.unit_alive[gd, ds[dead]] = False
+            if bool(dead.any()):
+                # G1: a death changes `_rival_route_income`'s raided mask, and
+                # that cache is keyed on `_rp_kill_version`. Only the RIVAL
+                # copies bumped it, because only they fire mid-rival-phase with
+                # another rival's income already computed this turn. Dropping
+                # the bump broke parity at seed 9119 t154 - a rival city's
+                # foodBox and production, with no combat column moving.
+                #
+                # It is bumped UNCONDITIONALLY here rather than behind a caller
+                # flag: where the cache is already cold (the player's strikes
+                # run before any rival income this turn) the bump costs nothing
+                # and changes nothing, and where it is warm it is REQUIRED. A
+                # correctness bump that is sometimes redundant beats a flag that
+                # re-creates the asymmetry this task exists to remove.
+                self._rp_kill_version += 1
+        # B-4: +2 to a surviving MILITARY defender (the attacker is a city, so
+        # there is no attacker xp; barbarians never accrue).
+        surv = (strike & is_mil).nonzero(as_tuple=True)[0]
+        if len(surv) > 0:
+            alive_now = self.unit_hp[surv, d_slot[surv]] > 0
+            sp = surv[alive_now]
+            if len(sp) > 0:
+                self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
         aware defense, city-first rolls, sack at 0 HP."""
@@ -14332,34 +14351,9 @@ class BatchSim:
                             _def_civ_u = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))
                             _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
-                            d = self._damage_roll(strike, atk_cs - def_e, k="rcstk", tile=tt)
-                            self._ww_battle(strike, r + 1, self._row_of(d_seat), tt,
-                                            d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
-                            rows = strike.nonzero(as_tuple=True)[0]
-                            for grp, occ_map in (
-                                (_okm, self.occ_mil),
-                                (~_okm & _okc, self.occ_civ),
-                            ):
-                                g = rows[grp[rows]]
-                                if len(g) == 0:
-                                    continue
-                                ds = d_slot[g]
-                                self.unit_hp[g, ds] -= d[g]
-                                dead = self.unit_hp[g, ds] <= 0
-                                gd, td = g[dead], tt[g[dead]]
-                                occ_map[gd, td] = -1
-                                self.unit_alive[gd, ds[dead]] = False
-                                if bool(dead.any()):
-                                    self._rp_kill_version += 1  # G1: u_alive/p_alive death -> _rival_route_income raided-mask changes for city j+1
-                            # B-4: a surviving MILITARY defender that can earn xp gets
-                            # +2 (attacker is the city; a barbarian or any civilian
-                            # never accrues).
-                            surv_pm = (strike & is_vet_mil).nonzero(as_tuple=True)[0]
-                            if len(surv_pm) > 0:
-                                alive_now = self.unit_hp[surv_pm, d_slot[surv_pm]] > 0
-                                sp = surv_pm[alive_now]
-                                if len(sp) > 0:
-                                    self.unit_xp[sp, d_slot[sp]] += XP_DEFEND
+                            self._city_strike_resolve(  # #51/S7.8f (#60): one rule, four callers
+                                strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil, atk_cs,
+                                def_e, def_hp, r + 1, "rcstk")
                 # B-17 (ROUND B7): the rival mirror of the ADDITIONAL Encampment
                 # strike (the restk twin of walls' rcstk). This rival city
                 # (r, j), if it owns a COMPLETE unpillaged ENCAMPMENT, fires the
@@ -14434,31 +14428,9 @@ class BatchSim:
                             _def_civ_u = torch.where(is_vet_mil, d_seat, torch.full_like(tt, -1))  # #51/S7.1 (#59): the DEFENDER's own civ
                             _def_nav = torch.where(is_vet_mil, self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)], torch.zeros_like(d_emb))
                             def_e = def_e + self._gen_aura_cs(_def_civ_u, tt, d_emb | _def_nav).to(def_e.dtype)
-                            d = self._damage_roll(strike, atk_cs - def_e, k="restk", tile=tt)
-                            self._ww_battle(strike, r + 1, self._row_of(d_seat), tt,
-                                            d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
-                            rows = strike.nonzero(as_tuple=True)[0]
-                            for grp, occ_map in (
-                                (_okm, self.occ_mil),
-                                (~_okm & _okc, self.occ_civ),
-                            ):
-                                g = rows[grp[rows]]
-                                if len(g) == 0:
-                                    continue
-                                ds = d_slot[g]
-                                self.unit_hp[g, ds] -= d[g]
-                                dead = self.unit_hp[g, ds] <= 0
-                                gd, td = g[dead], tt[g[dead]]
-                                occ_map[gd, td] = -1
-                                self.unit_alive[gd, ds[dead]] = False
-                                if bool(dead.any()):
-                                    self._rp_kill_version += 1  # G1: death -> raided-mask changes for city j+1
-                            surv_pm2 = (strike & is_vet_mil).nonzero(as_tuple=True)[0]
-                            if len(surv_pm2) > 0:
-                                alive_now2 = self.unit_hp[surv_pm2, d_slot[surv_pm2]] > 0
-                                sp2 = surv_pm2[alive_now2]
-                                if len(sp2) > 0:
-                                    self.unit_xp[sp2, d_slot[sp2]] += XP_DEFEND
+                            self._city_strike_resolve(  # #51/S7.8f (#60): one rule, four callers
+                                strike, tt, d_slot, d_seat, _okm, _okc, is_vet_mil, atk_cs,
+                                def_e, def_hp, r + 1, "restk")
                 # AUDIT A-10: a siege pins the HP, exactly like the player's
                 # heal — any adjacent unit hostile to THIS civ (the player's
                 # at-war units, CIVILIANS included per unitsHostile — the
