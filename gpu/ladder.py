@@ -326,6 +326,11 @@ def pick_production(
     taken = ctx.get("settler_queued")
     taken = (torch.zeros(B, dtype=torch.bool, device=dev) if taken is None
              else taken.to(torch.bool).clone())
+    # #84: the CITY CAP is policy and no longer sits in the mask. Civ 6 has no
+    # cap; it is the rival ladder's own "stop expanding" heuristic, so it lives
+    # here with the rest of the policy. Absent -> no cap, never a silent ban.
+    n_cities, city_cap = col("n_cities", 0), col("city_cap", 10 ** 9)
+    room = n_cities < city_cap
     melee, ranged = col("melee", 0), col("ranged", 0)
     n_units, cap = col("unit_count", 0), col("unit_cap", 10 ** 9)
     b_idx = roster["builder_idx"] if roster else -1
@@ -380,7 +385,7 @@ def pick_production(
                 continue
             sub = mask[:, j, lo:min(hi, W)]
             if name == "settler":
-                sub = sub & ~taken.unsqueeze(1)
+                sub = sub & ~taken.unsqueeze(1) & room.unsqueeze(1)
             has = sub.any(dim=1)
             first = lo + sub.float().argmax(dim=1)
             best = torch.where((best < 0) & has, first, best)

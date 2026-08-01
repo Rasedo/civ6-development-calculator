@@ -8752,12 +8752,18 @@ class BatchSim:
             # what a seat may legally DO is the worst kind. The one-at-a-time
             # settler_q term stays: it is the scripted ladder's own gate and
             # moves out to gpu/ladder.py with the rest of the policy.
+            # #84: BOTH policy terms are gone from this column. `~settler_q`
+            # (one settler in flight per civ) and `maxCities` are AI HEURISTICS
+            # — Civ 6 has neither a one-settler rule nor a city cap — and while
+            # they sat in the MASK they shaped a net's action space. That is
+            # #82's disease exactly one line above where it was cured. Legality
+            # here is now only "a city may build a settler", which is the rule.
+            # The scripted picker keeps both terms because they are ITS policy,
+            # and gpu/ladder.py carries them for a driven seat (`settler_queued`
+            # and `city_cap` in its ctx). Mask and picker DIVERGING on policy is
+            # correct; diverging on LEGALITY is the #85 bug.
             n_cities = self.rc_alive[:, r].sum(dim=1)
-            settler_q = (self.rc_current[:, r] == 0).any(dim=1)
-            ok_s = (
-                ~settler_q
-                & (n_cities < rr.get("maxCities", 6))
-            ).unsqueeze(1)
+            ok_s = torch.ones(B, 1, dtype=torch.bool, device=dev)
             # units: #85 — DERIVED FROM THE PICKER'S OWN PREDICATE, not from a
             # second hardcoded ladder. This used to name five units by hand
             # (WARRIOR, SPEARMAN on spearTech, HORSEMAN on horseTech, SLINGER,
@@ -8887,11 +8893,29 @@ class BatchSim:
         tech: torch.Tensor | None = None,
         civic: torch.Tensor | None = None,
         war: torch.Tensor | None = None,
+        production_pref: torch.Tensor | None = None,
     ) -> None:
         """C2b: write a controlled rival's choices BEFORE step(). Codes use
         the rival_masks layout; -1 = no action. Queue writes mirror the
         picker's exact cost/progress semantics (districts run the same
-        placement scan; illegal or unplaceable picks fall to idle)."""
+        placement scan).
+
+        `production` [B, RC] is a single code per city. `production_pref`
+        [B, RC, W] is #87's PREFERENCE ORDER: a score per column, illegal
+        columns at -inf. Apply walks it best-first and takes the first column
+        that actually lands.
+
+        WHY A PREFERENCE ORDER. A district can be legal when the mask is taken
+        and unplaceable by the time it is applied — two cities can be offered
+        the last eligible tile. With one code per city the loser simply IDLES,
+        while the scripted picker falls through and builds something, so a
+        driven rival would be silently poorer than a scripted one. The fix must
+        not be "the engine picks a replacement": reproducing the priority chain
+        here would re-transcribe the ladder INTO the engine, which is what #51
+        deletes, and it would credit the policy for a decision it never made.
+        With a preference order the CHOICE stays wholly in the policy and this
+        function only ever validates. Near-free for a net, whose logits over the
+        columns already ARE a preference order."""
         B, dev = self.B, self.device
         rdv = self.rules_dev
         NBn = rdv.b_cost.shape[0]
@@ -8929,8 +8953,71 @@ class BatchSim:
                 self.war[:, 1 + r, 0] &= ~peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
+        if production_pref is not None:
+            self._apply_rival_pref(r, production_pref)
+            return
         if production is None:
             return
+        self._apply_rival_production(r, production)
+
+    def _apply_rival_pref(self, r: int, pref: torch.Tensor, max_tries: int = 8) -> None:
+        """#87: apply a PREFERENCE ORDER [B, RC, W] — best legal column wins.
+
+        Walks the ranking best-first, re-running the ordinary apply for whatever
+        is still idle. The pass is idempotent (its `act` gate needs
+        `rc_current == -1`), so a city that landed on an earlier rank is simply
+        skipped by later ones — no bookkeeping, no partial rollback.
+
+        The ENGINE NEVER CHOOSES. Every column it tries came from the policy's
+        own ranking; all this does is discover which of them the live state
+        actually accepts. That is the whole difference between this and letting
+        apply fall through to "the next class", which would put the ladder's
+        priority chain back inside the engine.
+
+        `-inf` marks a column the policy rules out; the walk stops offering a
+        city anything once its ranks run dry. PURCHASES are attempted on the
+        first pass only — they deliberately bypass the idle gate, so re-offering
+        them each rank would buy once per rank. Blanking them to -1 disables the
+        branch, which keys on `>= base_w`.
+
+        `max_tries` bounds the walk. Districts are the only realistic failure,
+        so it terminates on rank 0 or 1 in practice; the cap exists so a
+        pathological ranking cannot spin. If it is ever hit with cities still
+        idle that is a genuine finding, not noise — see the log below.
+        """
+        if pref.dim() != 3:
+            raise AssertionError(f"production_pref must be [B, RC, W], got {tuple(pref.shape)}")
+        RCj = min(int(pref.shape[1]), self.RC)
+        base_w = self.rules_dev.b_cost.shape[0] + 2 + self.NU + len(self._scaffold)
+        order = pref.argsort(dim=2, descending=True)  # [B, RC, W]
+        scores = pref.gather(2, order)
+        live = torch.isfinite(scores)
+        for k in range(min(max_tries, int(pref.shape[2]))):
+            idle = (self.rc_current[:, r, :RCj] == -1) & self.rc_alive[:, r, :RCj]
+            if not bool(idle.any()):
+                return
+            code = order[:, :RCj, k].clone()
+            code = torch.where(live[:, :RCj, k], code, torch.full_like(code, -1))
+            if k > 0:
+                # purchases already had their one attempt on rank 0
+                code = torch.where(code >= base_w, torch.full_like(code, -1), code)
+                code = torch.where(idle, code, torch.full_like(code, -1))
+            if not bool((code >= 0).any()):
+                return
+            self._apply_rival_production(r, code)
+
+    def _apply_rival_production(self, r: int, production: torch.Tensor) -> None:
+        """One pass of the production apply: every still-IDLE city takes the
+        code it was given. Idempotent across passes by construction — the `act`
+        gate below requires `rc_current == -1`, so a city assigned by an earlier
+        pass is untouched by a later one. #87's preference walk relies on that.
+        Purchase columns do NOT share the idle gate, so the walk blanks them
+        after its first pass rather than buying once per rank."""
+        B, dev = self.B, self.device
+        rdv = self.rules_dev
+        NBn = rdv.b_cost.shape[0]
+        nS = len(self._scaffold)
+        rr = self.rules.rivals
         for j in range(min(int(production.shape[1]), self.RC)):
             a = production[:, j].to(torch.long)
             act = (a >= 0) & self.controlled[:, r] & self.rc_alive[:, r, j] & (self.rc_current[:, r, j] == -1)
