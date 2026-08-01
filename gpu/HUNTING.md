@@ -6,7 +6,7 @@ machinery, not an open gap. /parity-hunt is the procedure that uses it.
 **RAW CHECKPOINTS — one mechanism for diagnosis AND verification.**
 Shipped: rollout `--ckpt` (default 25; parent clears the transient dir
 per run) dumps snapshot()+rngs+paths per shard; the replay dumps
-wrapped serialize(state) per game via CIV6_CKPT; `gpu/ckptdiff.py
+wrapped serialize(state) per game via CIV6_CKPT; `gpu/tools/ckptdiff.py
 --rng` is the JIT bracket finder; `--resume-t`/CIV6_RESUME_T resume
 both engines from any checkpoint (validated bit-faithful);
 scripts/ckpt-lines.ts is the TS JIT reader. CB lines carry k
@@ -45,7 +45,7 @@ them to stress slot-layout invariants (four real catches to date).
   fixes: full fresh gate (or battery) only, never a resume-check.
 
 Phase-1 statelog: `rollout.py --shards 4 --log <rng>` +
-`CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/logdiff.py` → first
+`CIV6_LOG=<rng> npm run gpu:replay` + `python gpu/tools/logdiff.py` → first
 divergent line. Fields: PC loy; RC cb/til/hp; RU hp+a (acted); RT fai
 + tsum (territory checksum); TI carries rp (live resource priority);
 CB lines = every damage roll from the damageRoll/_damage_roll

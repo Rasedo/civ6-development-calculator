@@ -569,7 +569,7 @@ rivals). The gaps are:
    any subset of non-focal seats from the pool.
 4. **α-Rank**: the eval protocol over ≥3 checkpoints — round-robin
    duel_eval margins → a payoff matrix → the α-Rank stationary
-   distribution (a ~50-line power-method script, `gpu/alpharank.py`),
+   distribution (a ~50-line power-method script, `gpu/eval/alpharank.py`),
    ranking the pool instead of raw win rates once intransitivity appears.
 5. **piKL anchoring** (mixed-motive collapse guard): an auxiliary KL term
    toward an ANCHOR policy (the scripted-equivalent or the last stable

@@ -27,7 +27,7 @@ shard's first-game rng; your game is batch index rng − first_rng.)
 Only when no turn is known (an end-state drift) binary-search first:
 
 ```
-PYTHONUTF8=1 python gpu/ckptdiff.py --rng <rng>
+PYTHONUTF8=1 python gpu/tools/ckptdiff.py --rng <rng>
 ```
 It JIT-computes both statelog line-sets from the raw dumps (no
 re-simulation), prints per-checkpoint verdicts and the divergence
@@ -47,7 +47,7 @@ full gate/battery stays the bar).
 ```
 PYTHONUTF8=1 python gpu/rollout.py --shards 4 --log <rng>   # add --resume-t/--turns from ckptdiff
 CIV6_LOG=<rng> npm run gpu:replay
-python gpu/logdiff.py          # prints the FIRST divergent line
+python gpu/tools/logdiff.py          # prints the FIRST divergent line
 ```
 - Run at the SAME shard/batch shape as the failing gate — BLAS float
   association is batch-shape-dependent; B=1 probes follow different

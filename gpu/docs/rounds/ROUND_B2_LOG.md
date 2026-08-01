@@ -54,7 +54,7 @@ land changing nothing before behaviour flips on. What's implemented:
   `_gov_policy_mods`.
 - The city-state influence rate gains the adopted government's tier
   (`GOV_INFLUENCE_TIER` == government tier), mirrored in `_city_state_phase`.
-- Poke test `gpu/government_test.py` (wired into battery cputests) forces the
+- Poke test `gpu/tests/government_test.py` (wired into battery cputests) forces the
   switch on in-memory and asserts the adoption boundaries, greedy slot fill,
   influence tier, and inert-by-default.
 
@@ -182,7 +182,7 @@ second earned Prophet, claimed-pool exclusion mirroring follower/founder).
 Landed as INERT PLUMBING: no rollout path claims an enhancer, so the seed
 rollouts are byte-unchanged and engine.py is untouched.
 
-**Poke tests.** `gpu/religion_gp_test.py` (wired into `battery.py`
+**Poke tests.** `gpu/tests/religion_gp_test.py` (wired into `battery.py`
 cputests) exercises rollout-unreachable paths: the GP era-ladder + its
 clamp boundary through the player advance loop, `n_gp = 9` with the three
 culture classes sharing the Theater Square district index, belief catalog
@@ -380,7 +380,7 @@ helpers, penalty subtracted from the balance at the two `_amenity_factors` sites
   curve keeps the drag real without inducing collapse; off-script/RL agents that
   make peace shed it quickly. Recorded as a modeling choice.
 - Scripted + forced-compaction parity gates green at 0.0 milli after the
-  softening; `gpu/war_weariness_test.py` (accrual→penalty threshold, cap
+  softening; `gpu/tests/war_weariness_test.py` (accrual→penalty threshold, cap
   saturation, 4× decay, floor-at-0, snapshot round-trip) wired into battery.py's
   cputests lane.
 
@@ -496,7 +496,7 @@ purchase per civ per turn.
 - Scripted parity gate (24×250): **PARITY OK, 0.0 milli.**
 - Forced-compaction gate (`CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3`): **0.0
   milli.** (Mandatory — pooled v-slot churn from bought units.)
-- Poke test `gpu/rival_purchase_test.py` (wired into `gpu/battery.py` cputests):
+- Poke test `gpu/tests/rival_purchase_test.py` (wired into `gpu/battery.py` cputests):
   priority building>settler>unit + one-per-turn; settler buy founds at 264 gold
   and blocks the unit branch; settler threshold (no found one milli below price);
   strongest-affordable ranking (192→HORSEMAN, 156→SPEARMAN, 96→WARRIOR-over-

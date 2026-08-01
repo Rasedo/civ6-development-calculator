@@ -42,7 +42,7 @@ Roll sites touched (CB tags): mel/melc, rng, vrng, pcstk.
   a flanker adjacent to the defender raises the mel `diff` by exactly +20; a friendly
   supporter lowers the mel `diff` by 20; support also lowers the ranged `rng` diff by 20.
   Reads the CB-log `diff` (RNG-independent), the exact parity acceptance value. 12/12 combat tests pass.
-- gpu/combat_mod_test.py: extended `test_integrated`'s independent reference (`ref_q`) with a
+- gpu/tests/combat_mod_test.py: extended `test_integrated`'s independent reference (`ref_q`) with a
   standalone B-7 neighbour scan (flank_support_ref) so the wounded-assembly self-test stays exact
   now that combat CS includes flanking/support. Its river (±50) and ranged-immunity assertions are
   relative and unchanged. This is battery maintenance, not a design change.

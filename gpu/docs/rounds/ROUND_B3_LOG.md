@@ -82,7 +82,7 @@ engines turn-exact.
   milli — validates the `rc_followed`/`rc_pressure` reclaim permutation now
   that the yield paths READ `rc_followed` per slot.
 - `npx tsc --noEmit` clean; `npx vitest run` 249 green.
-- Poke `gpu/religion_gp_test.py` extended (SLICE-U FOLLOWER-COUPLING OK):
+- Poke `gpu/tests/religion_gp_test.py` extended (SLICE-U FOLLOWER-COUPLING OK):
   a city following a FOREIGN religion draws that religion's follower belief
   bit-exactly (`_follower_by_rel`/`_follower_id_for`/`_fol_tab`), the
   pan+founder / follower `bldgY` split reconstructs the full row, and the
@@ -260,7 +260,7 @@ asserted inert, and the inspiration is asserted to fire at ≥4 / not below.
 - `npx vitest run` — 249 tests, 30 files, all green.
 - Scripted gate `python gpu/parity_test.py` — 0.0 milli after batch 1, batch 2.
 - Forced-compaction gate `CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3` — 0.0 milli.
-- `gpu/government_test.py` (battery cputests lane) — extended with cases 6/7/8,
+- `gpu/tests/government_test.py` (battery cputests lane) — extended with cases 6/7/8,
   green.
 
 ### Degradations / deferrals
@@ -355,7 +355,7 @@ exported projects table ("gate-unreachable at 100t").
   space project under the scripted policy regardless of tech.
 
 Because the chain is gate-unreachable, the parity gates prove INERTNESS; the
-semantics are pinned by `gpu/space_race_test.py` (wired into `battery.py`
+semantics are pinned by `gpu/tests/space_race_test.py` (wired into `battery.py`
 cputests), a GPU-only poke asserting against the TS contract (the
 government_test / religion_gp_test pattern — the pokes here do NOT spawn a
 TS subprocess). It proves: the exported chain (6 rows, chain order via `rp`,
@@ -409,7 +409,7 @@ recompute change keeps that exact behaviour for the reachable trajectory.
 - Scripted parity gate (`PYTHONUTF8=1 python gpu/parity_test.py`): PARITY OK,
   0.0 milli.
 - Forced-compaction gate (`CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3`): 0.0 milli.
-- `gpu/space_race_test.py`: OK (wired into battery.py cputests).
+- `gpu/tests/space_race_test.py`: OK (wired into battery.py cputests).
 
 
 Each agent appends its section (§U/§V/§W/§X). AUDIT.md updates happen at
@@ -478,7 +478,7 @@ qualitative — kill/less-than-full-HP — and hold for fresh-HP units). No
 war_test / purchase_test / rlenv drift observed.
 
 ### New poke
-`gpu/combat_mod_test.py` (wired into `gpu/battery.py` cputests). Proves, vs an
+`gpu/tests/combat_mod_test.py` (wired into `gpu/battery.py` cputests). Proves, vs an
 independent Python reference of the TS spec: (A) `_wound` bit-exact for HP
 0..100; (B) `_river_cross` == the exported riverMask bit over 402 edges;
 (C) `_damage_roll` reproduces the 0.1-granular table + `js_round` for
@@ -491,7 +491,7 @@ full assembly, drops by exactly 50 (=5 CS) when the river edge is forced on
 - Scripted parity `python gpu/parity_test.py`: **0.0 milli** (after wounded;
   again after river).
 - Forced-compaction `CIV6_RECLAIM_AT=12 CIV6_RC_RECLAIM_AT=3`: **0.0 milli**.
-- `gpu/combat_mod_test.py`: **COMBAT MOD OK**.
+- `gpu/tests/combat_mod_test.py`: **COMBAT MOD OK**.
 - (Off-script gate + full battery run once at merge — orchestrator.)
 
 ### Latents noticed

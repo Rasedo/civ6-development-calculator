@@ -264,7 +264,7 @@ kills one in TS and not on the GPU.)
 the CB combat-log lines are gated (they populate only under the
 `--log`/`CIV6_LOG` statelog path, not on a bare `BatchSim.step()`). So
 either drive the seed through `gpu/rollout.py --log` + the TS
-`CIV6_LOG` replay + `gpu/logdiff.py` (the documented pairing, which is
+`CIV6_LOG` replay + `gpu/tools/logdiff.py` (the documented pairing, which is
 what this class of bug was built for), or patch `_damage_roll` locally to
 print `(k, attacker, defender, diff, roll, dmg)` for the target turn.
 The paired k-tags are what pin it: both engines label every roll.
@@ -772,7 +772,7 @@ attacks follow. Prime suspect: #71's religion adders on the six
 city-attack sites, or B-8's admiral march changing unit positions.
 HUNT RECIPE: `python gpu/rollout.py --turns 250 --log 2026006134` +
 `CIV6_LOG=2026006134 npx vite-node scripts/replay-gpu.ts` +
-`python gpu/logdiff.py` — the statelog names the first divergent FIELD,
+`python gpu/tools/logdiff.py` — the statelog names the first divergent FIELD,
 which is what to chase, not the rng column itself.
 
 NOT YET RUN: standalone poke-lane sweep, battery, AUDIT close-out.

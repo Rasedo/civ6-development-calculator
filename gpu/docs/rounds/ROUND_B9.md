@@ -111,7 +111,7 @@ Blocked plumbing discovered in scoping (must land with the breadth):
 - **R4 — NEIGHBORHOOD stretch**: per decision above, own gates;
   droppable.
 - **R5 — coverage + close**: one Opus agent (efficiency contract below)
-  authors vitest additions + poke suite `gpu/district_breadth_test.py`
+  authors vitest additions + poke suite `gpu/tests/district_breadth_test.py`
   (battery lane `districts`): IZ adjacency channels live, EN placement
   rule, regional 6/7-distance boundary, exclusiveWith, worship
   faith-buy, rival PALACE, ENGINEER/GENERAL/ARTIST accrual,

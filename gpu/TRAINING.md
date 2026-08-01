@@ -26,7 +26,7 @@ world, but map diversity fights overfitting to one terrain layout.
 ## 2. Pick the device — measure, don't assume
 
 ```bash
-python gpu/bench.py
+python gpu/tools/bench.py
 ```
 
 This prints env throughput for CPU and (if available) CUDA. The engine
@@ -39,10 +39,10 @@ device; pick whichever bench wins at the batch you'll use.
 
 ```bash
 # GPU box / large batch
-python gpu/train_ppo.py --batch 1024 --updates 2000 --anneal-lr --out gpu/runs/overnight
+python gpu/eval/train_ppo.py --batch 1024 --updates 2000 --anneal-lr --out gpu/runs/overnight
 
 # laptop-friendly
-python gpu/train_ppo.py --batch 256 --updates 4000 --anneal-lr --out gpu/runs/overnight
+python gpu/eval/train_ppo.py --batch 256 --updates 4000 --anneal-lr --out gpu/runs/overnight
 ```
 
 Notes for sizing an overnight run:
@@ -60,7 +60,7 @@ Notes for sizing an overnight run:
 - Resume after any interruption:
 
 ```bash
-python gpu/train_ppo.py --resume gpu/runs/overnight/latest.pt --out gpu/runs/overnight \
+python gpu/eval/train_ppo.py --resume gpu/runs/overnight/latest.pt --out gpu/runs/overnight \
     --batch 1024 --updates 4000 --anneal-lr    # same batch; updates may extend
 ```
 
@@ -101,9 +101,9 @@ against the baselines above.
 ## 5. Evaluate
 
 ```bash
-python gpu/eval.py --policy gpu/runs/overnight/best.pt --episodes 50   # greedy
-python gpu/eval.py --policy gpu/runs/overnight/best.pt --episodes 50 --sample
-python gpu/eval.py --policy random --episodes 50                      # re-baseline
+python gpu/eval/eval.py --policy gpu/runs/overnight/best.pt --episodes 50   # greedy
+python gpu/eval/eval.py --policy gpu/runs/overnight/best.pt --episodes 50 --sample
+python gpu/eval/eval.py --policy random --episodes 50                      # re-baseline
 ```
 
 Greedy (default) is usually a few points above sampled. Same `--seed`

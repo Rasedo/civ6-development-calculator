@@ -1,0 +1,138 @@
+"""Stage-0 perf driver: attributable cProfile baselines for `step()`.
+
+    python gpu/profile_step.py                    # both parts, 250 turns
+    python gpu/profile_step.py --part parity
+    python gpu/profile_step.py --part rollout
+    python gpu/profile_step.py --dump out.prof    # keep the raw stats
+
+Two mirrors of the battery's hot paths (PERF_PLAN Stage 0), run under
+cProfile with OMP/MKL pinned to 4 threads so numbers are comparable
+across sessions:
+
+  parity  — scripted/f64 parity-path mirror: first 6 seed fixtures,
+            B=6, step() + trace_row() per turn (what parity_test does,
+            minus the compare).
+  rollout — off-script core: first 3 seed fixtures × 3 replicas, B=9,
+            the exact masked-choice sampling + attack-preferring order
+            transform from rollout.py, step(...) + trace_row().tolist()
+            per turn (minus JSON/action logging and checkpoints).
+
+Output per part: wall seconds, turns/sec, top-40 by cumtime, top-15 by
+tottime, and the `Tensor.any` guard-storm counter (call count + tottime
+— the G3 slice-A metric). Numbers are only comparable when the box is
+QUIET (never read perf off a contended machine).
+"""
+
+from __future__ import annotations
+
+import argparse
+import cProfile
+import io
+import os
+import pstats
+import sys
+import time
+from pathlib import Path
+
+os.environ.setdefault("OMP_NUM_THREADS", "4")
+os.environ.setdefault("MKL_NUM_THREADS", "4")
+
+import torch
+
+torch.set_num_threads(4)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
+from civ6gpu.rng import masked_choice
+
+HEAD_PROD, HEAD_TECH, HEAD_CIVIC, HEAD_UNIT, HEAD_ENVOY = 101, 202, 303, 404, 505
+HOLD = 12
+
+
+def _parity_loop(sim: BatchSim, turns: int) -> None:
+    for _ in range(turns):
+        sim.step()
+        sim.trace_row()
+
+
+def _rollout_loop(sim: BatchSim, turns: int, seed: int) -> None:
+    from civ6gpu.engine import P_MAX
+
+    B, C = sim.B, sim.C
+    game_seed = torch.tensor([seed * 1_000_003 + i for i in range(B)], dtype=torch.int64)
+    slots = torch.arange(C, dtype=torch.int64).view(1, C)
+    pslots = torch.arange(P_MAX, dtype=torch.int64).view(1, P_MAX)
+    for _ in range(turns):
+        turn = sim.turn
+        pa = masked_choice(sim.production_mask(), game_seed.view(B, 1), slots, turn, HEAD_PROD)
+        ta = masked_choice(sim.tech_mask(), game_seed, turn, HEAD_TECH)
+        ca = masked_choice(sim.civic_mask(), game_seed, turn, HEAD_CIVIC)
+        um = sim.unit_action_mask()
+        na = um.shape[2]
+        has_attack = um[:, :, 6:12].any(dim=2, keepdim=True)
+        um = um & ~(has_attack & (torch.arange(na).view(1, 1, na) < 6))
+        um[:, :, 12:13] = um[:, :, 12:13] & ~has_attack
+        ua = masked_choice(um, game_seed.view(B, 1), pslots, turn, HEAD_UNIT)
+        ea = masked_choice(sim.envoy_mask(), game_seed, turn, HEAD_ENVOY)
+        sim.step(production=pa, tech=ta, civic=ca, units=ua, envoy=ea)
+        sim.trace_row().tolist()
+
+
+def _report(part: str, pr: cProfile.Profile, wall: float, turns: int, dump: str | None) -> None:
+    print(f"\n=== {part}: {wall:.1f}s wall, {turns / wall:.1f} turns/sec ===")
+    buf = io.StringIO()
+    stats = pstats.Stats(pr, stream=buf)
+    if dump:
+        stats.dump_stats(dump)
+        print(f"raw stats -> {dump}")
+    stats.sort_stats("cumulative").print_stats(40)
+    stats.sort_stats("tottime").print_stats(15)
+    print(buf.getvalue())
+    # Guard-storm metric: Tensor.any call count + tottime (G3 slice A).
+    for func, (cc, nc, tt, ct, callers) in stats.stats.items():  # type: ignore[attr-defined]
+        name = func[2]
+        if "'any'" in name and "Tensor" in name:
+            print(f"guard-storm: {name}  calls={nc}  tottime={tt:.2f}s")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--part", choices=["parity", "rollout", "both"], default="both")
+    ap.add_argument("--turns", type=int, default=250)
+    ap.add_argument("--seed", type=int, default=2026, help="rollout action-stream seed (matches rollout.py)")
+    ap.add_argument("--dump", default=None, help="dump raw .prof stats (suffix _parity/_rollout added)")
+    args = ap.parse_args()
+
+    rules = load_rules()
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    if not paths:
+        print("no fixtures — run `npm run gpu:export` first")
+        return 1
+
+    if args.part in ("parity", "both"):
+        fixtures = [load_fixture(p) for p in paths[:6]]
+        sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
+        pr = cProfile.Profile()
+        t0 = time.perf_counter()
+        pr.enable()
+        _parity_loop(sim, args.turns)
+        pr.disable()
+        _report("parity", pr, time.perf_counter() - t0, args.turns,
+                args.dump and args.dump + "_parity.prof")
+
+    if args.part in ("rollout", "both"):
+        fixtures = [load_fixture(p) for p in paths[:3] for _ in range(3)]
+        sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
+        pr = cProfile.Profile()
+        t0 = time.perf_counter()
+        pr.enable()
+        _rollout_loop(sim, args.turns, args.seed)
+        pr.disable()
+        _report("rollout", pr, time.perf_counter() - t0, args.turns,
+                args.dump and args.dump + "_rollout.prof")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

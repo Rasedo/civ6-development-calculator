@@ -172,7 +172,7 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       by snapshot/restore), so ONE rollout per action is its exact value — a PUCT
       bandit is pointless here and, unnormalized, actively wrong (its exploration term
       is dwarfed by raw ~60–180 empire scores, so it sticks on the first-scored action
-      and never visits the rest). `gpu/mcts_test.py`: snapshot/restore bit-exact over
+      and never visits the rest). `gpu/tests/mcts_test.py`: snapshot/restore bit-exact over
       104 tensors + deterministic; search deterministic, eval-only (state bit-identical
       after), >= greedy on all 12 seeds and strictly beats it on 9 (typically finding a
       SETTLER/second-city line that compounds past the myopic building). Both gates green.
@@ -183,13 +183,13 @@ priors + value head (train_ppo `self.v`), legal-action masks.
       EVERY decision of the real game — model-predictive control — adapting to the
       realized RNG futures). Both stay eval-only during search (snapshot/restore).
       Result: closed-loop depth-1 beats the scripted base policy on final empire_score
-      on 5/6 seeds (mean +28, never worse), ~14 s/game on CPU. `gpu/mcts_test.py`
+      on 5/6 seeds (mean +28, never worse), ~14 s/game on CPU. `gpu/tests/mcts_test.py`
       covers determinism, eval-only, and the win over scripted. Both gates green.
-      `gpu/search_eval.py` benchmarks scripted-vs-search on matched B=1 worlds
+      `gpu/eval/search_eval.py` benchmarks scripted-vs-search on matched B=1 worlds
       (the reproducible harness for this arm; net rows land in M2b).
 - [x] **M2b-1** DONE — a TRAINED net wired into the search + benchmark harness. Proven
       that train_ppo.py LEARNS on the district engine (a CPU run climbed empire_score
-      85→135, best 138.1) and plugged the net in two ways via `gpu/search_eval.py`:
+      85→135, best 138.1) and plugged the net in two ways via `gpu/eval/search_eval.py`:
       `net` (policy head drives the capital) and `netsearch` (the M2a search with the
       net's VALUE head as the 1-ply leaf, no rollout). On matched worlds all three
       challengers crush scripted (net +68, netsearch +58, search +48); netsearch beats
@@ -577,7 +577,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
       goldPurchaseMult× cost, mirroring purchaseBuilding/purchaseSettler/
       purchaseUnit) behind `_rl_purchase_active=False`. Sequential slot walk for
       the order-coupled parts (settler prices, shared treasury). Self-test
-      `gpu/purchase_test.py`; both gates green.
+      `gpu/tests/purchase_test.py`; both gates green.
 - [x] **V-P2** Purchases ACTIVE off-script: flag flipped (mask 26→46),
       replay-gpu.ts dispatches purchase codes as soft-fail no-ops (both
       engines re-validate at execution). Gate coverage: 158 purchases across
@@ -586,7 +586,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
 - [x] **V-W1** Player-initiated war/peace (declare on a rival; peace-for-gold
       mirroring the TS deal), plumbed + gated OFF: a NEW `war` head
       (`war_mask()` [B,2R], `step(war=…)`), not wired into BatchEnv until
-      activation. Self-test `gpu/war_test.py`; both gates green.
+      activation. Self-test `gpu/tests/war_test.py`; both gates green.
 - [x] **V-W2** City capture: player melee vs rival city centers
       (attackCity/captureRivalCity semantics), gated. DESIGN CONSTRAINT
       (recorded at C3-prep): capture INTO the player breaks the static
@@ -601,7 +601,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
       ranged units execute codes 6-11 as rangedAttack (one roll, no
       retaliation, no advance, no camp clear; range-1 targets — legal for
       rng-1 and rng-2 alike). Mask unchanged; replay dispatches by unit type
-      via rollout.json's `rangedActive`. Self-test `gpu/ranged_test.py`;
+      via rollout.json's `rangedActive`. Self-test `gpu/tests/ranged_test.py`;
       both gates + tsc green.
 
 ## Status log
@@ -801,7 +801,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   it dominates PUCT forever and the bandit never visits the rest (observed: 6 of 7
   candidates left at 0 visits, best mis-picked). Real PUCT (net priors + value +
   Q-normalization + RNG chance nodes) is deferred to M2 where leaves become expensive
-  and stochastic. `gpu/mcts_test.py` (new, follows the parity_test.py convention):
+  and stochastic. `gpu/tests/mcts_test.py` (new, follows the parity_test.py convention):
   snapshot/restore bit-exact across 104 tensors + step-after-restore deterministic;
   search deterministic, leaves state bit-identical, and its horizon-15 pick is >=
   the greedy (horizon-0) pick on all 12 seeds — strictly better on 9, where it
@@ -826,7 +826,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   covered by the D5/D6 off-script gate). Measured: closed-loop depth-1 vs the scripted
   base policy over 60-turn games (horizon 20) — final empire_score beats scripted on
   5/6 seeds (+61.5/+26.3/+35.8/+13.1/+30.5, one tie, never worse), ~14 s/game on CPU
-  (search fires only at the ~10 decision turns, not every turn). `gpu/mcts_test.py`
+  (search fires only at the ~10 decision turns, not every turn). `gpu/tests/mcts_test.py`
   extended: plan_production deterministic + eval-only (incl. one depth-2 node), and
   mpc-d1 >= scripted on all sampled seeds / strictly better on the majority. Both
   parity gates unaffected (mcts.py isn't imported by the gates) and re-verified green.
@@ -980,7 +980,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   SETTLER code, so splitting them out is provably behavior-preserving). While OFF the
   mask KEEPS its 26-column width (unlike D5a's all-False columns) so tune1-era
   checkpoints stay loadable for the pending benchmarks; ON widens 26→46.
-  `gpu/purchase_test.py`: gated-off inertness is bit-exact (a purchase code == IDLE
+  `gpu/tests/purchase_test.py`: gated-off inertness is bit-exact (a purchase code == IDLE
   across all _MUTABLE), width 26/46, building purchase instant + slot idle + exact
   gold delta (incl. the same-turn upkeep a TS purchase also pays), unit spawn + tech
   gate, and two same-turn settler buys pricing sequentially (440 then 560). Both gates
@@ -1000,7 +1000,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   gate (peaceturns > 20) applies automatically; the war-roll RNG stream shifts
   identically in both engines because it is state-driven (skipped when already at
   war), preserving draw-for-draw parity. Gated-off: mask all-False, step(war=…)
-  ignored — `gpu/war_test.py` proves a war code is a bit-exact no-op across all
+  ignored — `gpu/tests/war_test.py` proves a war code is a bit-exact no-op across all
   _MUTABLE, and proves the ACTIVE transitions equal hand-poked declareWar/
   sueForPeace + a plain step (bit-identical over every tensor — the strongest
   equivalence, immune to same-turn rival-phase confounds; peace cost 240 at
@@ -1052,7 +1052,7 @@ ladder's economy component; spawn asymmetry stays (world-gen, accepted).
   the SAME rule — unit type has `ranged` AND rollout.json's `rangedActive` flag —
   so pre-V-R action logs still replay as melee. RNG contract: ranged consumes ONE
   mulberry32 draw where melee consumes two; both engines branch on identical
-  state, preserving draw-for-draw parity. `gpu/ranged_test.py` isolates the
+  state, preserving draw-for-draw parity. `gpu/tests/ranged_test.py` isolates the
   unit-action phase (a full step lets the world hit back and confounds hp
   assertions): ranged attacker untouched + stationary while the defender drops
   (100→83 on the probe), the SAME attack under flag-off gets the slinger KILLED
@@ -1177,7 +1177,7 @@ nothing more, until the final campaign on the finished engine.
 
 Ordered by how much each system changes what "best champion" MEANS:
 
-- [x] **G-V (i) horizon-300 audit DONE** (gpu/horizon_audit.py, scripted
+- [x] **G-V (i) horizon-300 audit DONE** (gpu/eval/horizon_audit.py, scripted
       autopilot, 12 seeds → 300 turns). FINDINGS reorder everything below:
       * **Cliff #1 (G-S, HARD CRASH ~t150): unit pools cap at 96 slots,
         append-only (dead slots never reclaimed).** U_MAX/P_MAX in engine.py.
@@ -1186,7 +1186,7 @@ Ordered by how much each system changes what "best champion" MEANS:
         Score PEAKS ~t200 (207) then DECLINES to 195@t300; d/turn goes
         1.47→0.07→-0.20. Player cities CONTRACT 3.7→2.2 while RIVAL cities
         SCALE 8.5→13.5 — the scripted player is out-expanded and run over.
-        NOT barbs (steady ~6). MECHANISM (gpu/cityloss_probe.py): the loss
+        NOT barbs (steady ~6). MECHANISM (gpu/tools/cityloss_probe.py): the loss
         is LOYALTY, not conquest — 74% of city losses happen AT PEACE
         (26 peace vs 9 war), i.e. rivals' loyalty pressure scales with
         their empire and flips the player's border cities. A competent

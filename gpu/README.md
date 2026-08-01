@@ -185,14 +185,14 @@ TS engine draw for draw.
 
 ## Training natively (phase 5)
 
-`gpu/train_ppo.py` closes the loop: policy inference, env stepping and
+`gpu/eval/train_ppo.py` closes the loop: policy inference, env stepping and
 the PPO update all run on one device — no numpy, no subprocess bridge,
 no host round-trips (the only sync points are logging scalars).
 
 ```bash
-python gpu/train_ppo.py                            # CPU smoke settings
-python gpu/train_ppo.py --batch 1024 --updates 2000 --anneal-lr   # GPU box
-python gpu/eval.py --policy gpu/runs/ppo/best.pt   # 50-episode protocol
+python gpu/eval/train_ppo.py                            # CPU smoke settings
+python gpu/eval/train_ppo.py --batch 1024 --updates 2000 --anneal-lr   # GPU box
+python gpu/eval/eval.py --policy gpu/runs/ppo/best.pt   # 50-episode protocol
 ```
 
 `gpu/TRAINING.md` is the step-by-step guide (fixture export, device
@@ -220,7 +220,7 @@ keeps the fixture's recorded stream — the parity setting; the gates are
 untouched by training features. More map variety = export more
 fixtures (`npm run gpu:export -- 32`).
 
-`gpu/eval.py` is the benchmark protocol for this env (N independent
+`gpu/eval/eval.py` is the benchmark protocol for this env (N independent
 episodes, fresh worlds, `empireScore` at the horizon). Numbers are
 comparable only WITHIN this table — the GPU env has direct unit control
 and the full hostile world, unlike the TS benchmark scenario.
@@ -290,14 +290,14 @@ npm run gpu:export            # 1. record fixtures from the TS engine
 python gpu/parity_test.py     # 2. scripted parity
 python gpu/rollout.py         # 3. random-action games on this engine
 npm run gpu:replay            # 4. the TS oracle must reproduce them
-python gpu/bench.py           # 5. throughput (CUDA if available)
-python gpu/train_ppo.py       # 6. train natively (phase 5)
-python gpu/eval.py --policy gpu/runs/ppo/best.pt   # 7. evaluate
+python gpu/tools/bench.py           # 5. throughput (CUDA if available)
+python gpu/eval/train_ppo.py       # 6. train natively (phase 5)
+python gpu/eval/eval.py --policy gpu/runs/ppo/best.pt   # 7. evaluate
 
-python gpu/purchase_test.py   # deterministic self-tests: verbs…
-python gpu/war_test.py        #   (war/peace is gated off; test flips it)
-python gpu/ranged_test.py
-python gpu/mcts_test.py       # …and the search primitives
+python gpu/tests/purchase_test.py   # deterministic self-tests: verbs…
+python gpu/tests/war_test.py        #   (war/peace is gated off; test flips it)
+python gpu/tests/ranged_test.py
+python gpu/tests/mcts_test.py       # …and the search primitives
 ```
 
 Needs only `torch` (already in `python/requirements.txt`). Parity runs in
@@ -318,7 +318,7 @@ topk narrowed from the full map to the radius-3 window (same candidates,
 same keys, same order), and batched disaster area effects. The
 remaining per-slot python loops (raider/unit acts, rival city walks)
 carry real sequential draw/occupancy semantics; batch scaling and CUDA
-hide their launch overhead. Run `python gpu/bench.py` on an RTX-class
+hide their launch overhead. Run `python gpu/tools/bench.py` on an RTX-class
 card for the CUDA numbers.
 
 ## Phase roadmap
@@ -350,7 +350,7 @@ card for the CUDA numbers.
    - ✅ 5a. The training loop — masked multi-head PPO over `BatchEnv`
      (per-city production, tech, civic, envoy, and a per-unit head fed
      by unit features), per-episode world re-seeding, checkpoints +
-     CSV/TensorBoard, and the `gpu/eval.py` benchmark protocol with
+     CSV/TensorBoard, and the `gpu/eval/eval.py` benchmark protocol with
      random/scripted baselines.
    - ✅ 5b. Kernelize the hot loops — 3× step throughput (f64 3.1k →
      9.6k, f32 → 13k game-turns/sec at batch 1024 on the 4-core box),

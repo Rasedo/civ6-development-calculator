@@ -268,7 +268,7 @@ Per-item weights (done% in parens where partial):
   GATE REACHABILITY: zero by construction — the scripted policy picks only from
   `attackTargets` and never declares, so no city-state is ever at war in-gate
   and scripted parity is 0.0 milli before and after. Proven instead by
-  gpu/cs_war_test.py (plane + peace-default + round-trip; peaceful centre hidden
+  gpu/tests/cs_war_test.py (plane + peace-default + round-trip; peaceful centre hidden
   from the mask, declared centre revealed) and two TS assertions in
   tests/deeper.test.ts (the resolver refuses a peaceful target; the mask gains
   the centre after a declaration).
@@ -393,7 +393,7 @@ Per-item weights (done% in parens where partial):
   Military Engineer is produced and NO fort is placed, so scripted parity is
   vacuous for this mechanic. It is proven instead by two constructed lanes —
   tests/fort.test.ts (4 assertions: +4, stacks with hills to 7, no yields,
-  offered to MILITARY_ENGINEER and nobody else) and gpu/fort_test.py (+4 and
+  offered to MILITARY_ENGINEER and nobody else) and gpu/tests/fort_test.py (+4 and
   stacking, both index forms agreeing, and the bonus staying OUT of the static
   plane so removing the fort removes it). Nothing yet BUILDS an engineer — the
   production/AI wiring is the remaining B-27 tail, alongside the post-tech-tree
@@ -532,7 +532,7 @@ Per-item weights (done% in parens where partial):
   scripted-gate reachability at ZERO permanently, which must then be recorded
   as an accepted, permanent gap rather than a temporary one.
   UNTIL THEN B-27's fort MECHANIC remains proven by construction only —
-  tests/fort.test.ts and gpu/fort_test.py — with production unreachable, which
+  tests/fort.test.ts and gpu/tests/fort_test.py — with production unreachable, which
   is the status quo this note makes precise rather than changes.
 
 - #71 FLAG SWEEP (2026-07-27): five of the six inert `_LIVE` flags are now
@@ -822,7 +822,7 @@ Per-item weights (done% in parens where partial):
   **ZERO** Festivals. So scripted parity genuinely covers the YIELD-fraction
   change (58 completions, both engines moving together at 0.0 milli) but cannot
   reach the multi-class award at all. New poke lanes construct it directly:
-  `gpu/festival_test.py` (exported table + a planted rival completion paying
+  `gpu/tests/festival_test.py` (exported table + a planted rival completion paying
   11 to each of the three classes and nothing elsewhere, with a guard that the
   Festival rate never equals the single-class rate) and a TS twin in
   `tests/economy.test.ts` that measures against a CONTROL turn, because a
@@ -1144,9 +1144,9 @@ Per-item weights (done% in parens where partial):
   decay grievances.
 
   **BATTERY SCOPE CORRECTED (2026-07-29, owner directive).** The engine's ONLY
-  snapshot/restore coverage lived inside `gpu/mcts_test.py`, named for the RL
+  snapshot/restore coverage lived inside `gpu/tests/mcts_test.py`, named for the RL
   feature it was written for rather than what it tests. It now lives in
-  `gpu/snapshot_restore_test.py`, and the four RL lanes — mcts-snap, mcts-search,
+  `gpu/tests/snapshot_restore_test.py`, and the four RL lanes — mcts-snap, mcts-search,
   mcts-plan, gumbel — are OUT of the battery: they are search-QUALITY properties
   that move when mcts.py changes and never when the engine does.
   MEASURED: battery wall **498s -> 367s (-26%)**, and the freed cores sped the
@@ -1320,7 +1320,7 @@ Per-item weights (done% in parens where partial):
   THE UPSIDE: the reproduction is DETERMINISTIC AND EXACT, which is what a
   checkpointed bisect needs. Recipe: re-apply the per-type envoy patch (seven
   wiring sites, listed above), export, then run rng 2026006119 UNSHARDED with
-  `--ckpt` and bracket with `gpu/ckptdiff.py --rng`.
+  `--ckpt` and bracket with `gpu/tools/ckptdiff.py --rng`.
   RULED OUT so far for this case, each verified:
    * all THREE GPU sites and all THREE TS sites are wired to the per-type
      value - grep shows no flat `capitalBonus` literal remains in either engine;
@@ -1868,7 +1868,7 @@ Per-item weights (done% in parens where partial):
   not established — parity green here is weak evidence, not proof. A poke lane
   that constructs the configuration directly is the right guard; queued with
   the rival-side pair.
-  **POKE LANE ADDED (2026-07-28): gpu/watermill_test.py**, wired into the
+  **POKE LANE ADDED (2026-07-28): gpu/tests/watermill_test.py**, wired into the
   battery. It rewrites the tile planes directly — every tile a city owns becomes
   a FARM carrying a farm-improved BONUS resource — rather than waiting for a
   seed to wander into the configuration, and asserts the three things the
@@ -2209,7 +2209,7 @@ untagged halves of tagged items stay Fable/main-session work.
   VP-G2 semantics, milli-rounded affordability, refunds on failed
   spawn/found. Unit branch parity-validated (82 in-gate fires);
   settler branch never fires organically — poke-covered
-  (`gpu/rival_purchase_test.py`), a recorded coverage gap, not a bug.
+  (`gpu/tests/rival_purchase_test.py`), a recorded coverage gap, not a bug.
   Tile purchase stays open (no GPU verb on any seat — fold into the
   A-18/#50 verb work).
 - A-7 (remainder). RESOLVED (2026-07-17 #46r LIVE; 2026-07-18 ROUND B3
@@ -2235,7 +2235,7 @@ untagged halves of tagged items stay Fable/main-session work.
   districts exist. In-gate at t250: 21/24 seeds with rival worship
   buildings, 48 rival palaces, 66 rival regional buildings. Coverage:
   vitest tests/district-breadth.test.ts + poke lane `districts`
-  (gpu/district_breadth_test.py). RESIDUALS: (1) NEIGHBORHOOD
+  (gpu/tests/district_breadth_test.py). RESIDUALS: (1) NEIGHBORHOOD
   (URBANIZATION civic, appeal-tier housing, GPU appeal plane) — the
   R4 stretch, dropped by the brief's pre-authorized option; (2) no
   palace RELOCATION on capital loss (real Civ 6 moves it; both
@@ -2319,7 +2319,7 @@ untagged halves of tagged items stay Fable/main-session work.
     SPEARMAN, not the full era ladder); the PLAYER levy verb stays
     UI-only (`main.ts` levyUnits call), absent from the scripted
     reference so the GPU mirrors only the rival path. Pokes:
-    `gpu/cs_verbs_test.py` (battery lane `cs_verbs`) + `tests/cs-verbs.test.ts`.
+    `gpu/tests/cs_verbs_test.py` (battery lane `cs_verbs`) + `tests/cs-verbs.test.ts`.
 - A-17. RESOLVED (2026-07-18, task #41): rival territory gained a
   per-city tile registry (TS `Tile.rivalCityId` / GPU `rc_tile_id`,
   persistent-rc-id keyed), fixing per-city border adjacency and exact
@@ -2398,7 +2398,7 @@ untagged halves of tagged items stay Fable/main-session work.
   in both statelog harnesses. RESIDUAL: a rival's RANGED unit stays
   scoped OUT of rival-vs-rival strikes (melee captures; the
   documented no-op quirk — `hostileRangedStrike`). Poke coverage:
-  `gpu/geopolitics_test.py` (battery lane `geopolitics`) +
+  `gpu/tests/geopolitics_test.py` (battery lane `geopolitics`) +
   `tests/geopolitics.test.ts`.
 - A-20. RESOLVED (2026-07-13, task #54): rival cities heal the flat +20
   when unbesieged (the 15/5 war split was a local invention), one
@@ -2517,7 +2517,7 @@ untagged halves of tagged items stay Fable/main-session work.
   `assertRivalRegistryCoherent` (rivals.ts), env-gated
   `CIV6_RC_REGISTRY_CHECK` and auto-ON under `CIV6_RC_RECLAIM_AT` so
   the forced-compaction gate exercises it every turn; poke lane
-  `rc_registry` (gpu/rc_registry_test.py). The site reshuffle
+  `rc_registry` (gpu/tests/rc_registry_test.py). The site reshuffle
   surfaced two pre-existing latents: the G-5 class (fixed by slice H
   this round) and a founding tie-break sighting recorded as G-6.
 - A-25. **RESOLVED-AS-VERIFIED-CORRECT (2026-07-20, #69 S1 — brief
@@ -2615,7 +2615,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   flat `EMBARKED_DEFENSE_CS` 10 (no attack/fortify/flank/support),
   embarked civilians captured per B-31 pool-end. GPU: `wpass`/
   `p_emb`/`v_emb` planes, `_embark_live` mirrored switch. Poke suite
-  `gpu/naval_test.py` (battery `naval` lane) covers the
+  `gpu/tests/naval_test.py` (battery `naval` lane) covers the
   gate-unreachable: player naval, city/CS capture from sea,
   quadrireme, ocean gate, walls-vs-ships. N2's hunt fixed a TS
   embarked-MP-reset bug and a GPU `r_routes` capacity latent.
@@ -2648,7 +2648,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   missionary chassis, stop ≤2); player GENERALs + ADMIRALs hold at
   the capital. Capture rides the B-31 POOL-END paths. In-gate:
   ADMIRAL 18/24 seeds, 33 claims; GENERAL gate-unreachable (no
-  scripted Encampment GPP — poke `gpu/gp_aura_test.py` +
+  scripted Encampment GPP — poke `gpu/tests/gp_aura_test.py` +
   `tests/great-general.test.ts`). RESIDUALS: the +1 MP aura half
   (movement coupling), naval war-march targeting, aura at city/CS
   strike sites, controlled-rival RL mask predates the chassis
@@ -2677,7 +2677,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   on the rival↔rival axis since #55-S3, −4/turn decay at peace) →
   flat amenity penalty via `computeCityStats`, symmetric
   player+rival, both engines (`_MUTABLE`-registered tensors; poke
-  `gpu/war_weariness_test.py`). MAGNITUDE: `WAR_WEARINESS_CAP` 16→32
+  `gpu/tests/war_weariness_test.py`). MAGNITUDE: `WAR_WEARINESS_CAP` 16→32
   (#69 S2) — the −4 empire ceiling is live (−1 per 8 war-turns
   player/FORMAL, −1 per 4 for SURPRISE rival wars); both engines
   clamp the ACCUMULATOR at the cap (accrual `Math.min` / GPU inc
@@ -2920,7 +2920,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   is where this round's two bugs were caught.
   Earlier (ROUND B7 #63 slice E 2026-07-19): Encampment now carries
   its three residual roles, both engines, player + rival, poke-covered
-  (gpu/encampment_test.py + tests/encampment.test.ts, battery lane
+  (gpu/tests/encampment_test.py + tests/encampment.test.ts, battery lane
   `encampment`): (1) SPECIALIST SLOT — `SPECIALIST_YIELDS.ENCAMPMENT` =
   {production:1, gold:1} (real Civ 6 has NO citizen specialist for the
   Encampment; this is the stylized-model yield), `citySpecialistSlots`
@@ -3037,7 +3037,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   capital of all three yield paths). In-gate (250t): player 3-tier fires
   in most seeds (envoys reach 4-5), rival 6-tier + suzerain both fire
   (A-12a: rival envoys reach 9); the 6-tier + contest edges are pinned
-  by `gpu/cs_bonus_test.py` (`cs_bonus` battery lane) + the suzerain
+  by `gpu/tests/cs_bonus_test.py` (`cs_bonus` battery lane) + the suzerain
   vitest pokes. DESCOPED suzerain rows (14 shipped / 10 descoped, each
   documented in `CS_SUZERAIN_LIVE`): channel `none` (Kabul/Preslav/
   Yerevan — unit XP/cavalry/apostles), trade-route rows (Antioch/
@@ -3085,7 +3085,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   the dest player center is gone (center_at<0, the TS `state.cities.find`
   twin). PLAYER→rival routes are TS-API-complete (`canAddIntlTradeRoute`/
   `addIntlTradeRoute` + `cityTradeYields` toRival branch, vitest-covered).
-  Poke-pinned in gpu/trade2_test.py (battery lane `trade2`) +
+  Poke-pinned in gpu/tests/trade2_test.py (battery lane `trade2`) +
   tests/trade-fidelity.test.ts. OPEN/DESCOPED: (1) the international leg is
   gate-UNREACHABLE under the scripted policy (rivals never exhaust
   domestic+CS destinations while holding spare capacity and an in-range
@@ -3335,7 +3335,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   without reading rules.json.
   REACHABILITY (12 seeds x 250t): 862 Builder-turns carry MONUMENTALITY's +2 and
   1,345 Missionary/Apostle-turns carry EXODUS's, over 4,104 civ-turns spent in a
-  Golden age. Lanes: `gpu/golden_move_test.py` (6 cases) and
+  Golden age. Lanes: `gpu/tests/golden_move_test.py` (6 cases) and
   `tests/golden-movement.test.ts` (8), each with a negative twin per case so
   neither can pass by granting everyone +2.
   **AND THE OTHER THREE FACES BECAME PER-SEAT 2026-07-31 (#51/S5.5).** They
@@ -3361,7 +3361,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   9056 per the SEED_OVERRIDES mechanism, whose own comment covers exactly this
   case ("rivals grew strong enough to conquer the capital — the world working
   as designed"). Off-script rollout games still cover collapse trajectories.
-  Lanes: gpu/golden_move_test.py cases 7-8 (a rival's FREE_INQUIRY discounts
+  Lanes: gpu/tests/golden_move_test.py cases 7-8 (a rival's FREE_INQUIRY discounts
   its own research; the PLAYER's Golden age does not) and
   tests/golden-movement.test.ts's second block (EXODUS pays a RIVAL exactly
   +4 PROPHET a turn over 6 turns against a control run).
@@ -3387,7 +3387,7 @@ gap; likewise GS disasters are modeled minus sea-level rise
   landed byte-identical and PROVEN GATE-UNREACHABLE even at 250t
   (rival greedy resolves a Campus to RESEARCH_GRANTS first; the
   player has no GPU project subsystem), so parity rests on
-  `gpu/space_race_test.py` (gpu/docs/rounds/ROUND_B3_LOG.md §W). **RELIGIOUS
+  `gpu/tests/space_race_test.py` (gpu/docs/rounds/ROUND_B3_LOG.md §W). **RELIGIOUS
   victory LANDED (2026-07-19, ROUND B6 S3)**: `religiousVictor` /
   `_religious_victor` — predominance (>half of each civ's cities)
   in EVERY alive civ, checked at endTurn on the just-flipped follow
@@ -3562,13 +3562,13 @@ G-1..G-7 resolved (detail in git history / the cited logs):
   one-per-type sources.
 - G-1. RESOLVED: `_rival_builder_actions` gain terms read current
   `r_techs`/`r_civics` (validity keeps the snapshot); poke
-  `gpu/builder_gain_test.py`.
+  `gpu/tests/builder_gain_test.py`.
 - G-2. RESOLVED (2026-07-17, #47r): GPU player GP loop banks faith via
   a `player_faith` accumulator mirroring the rival loop.
 - G-3. RESOLVED-AS-REFUTED (2026-07-17, #46r): the iteration-order
   theory was wrong (`_reclaim_pool` is stable); the real flip blockers
   were housingAll, wildcard-slot overflow, and the builder camp-clear
-  mirror — all fixed (`gpu/government_test.py`).
+  mirror — all fixed (`gpu/tests/government_test.py`).
 - G-4. RESOLVED-ON-CATCH (2026-07-17, #56): scripted builder walker
   moved AFTER production (TS order), fixing a one-turn phantom job.
 

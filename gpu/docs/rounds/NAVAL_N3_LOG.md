@@ -3,12 +3,12 @@
 Stage base: b097400 (N2 merged, naval LIVE + gate-green). TEST-ONLY stage:
 no edits to src/core, src/data, scripts/export-gpu.ts, gpu/civ6gpu/engine.py.
 
-Scope = `gpu/naval_test.py` covering N2's gate-unreachable naval surfaces,
+Scope = `gpu/tests/naval_test.py` covering N2's gate-unreachable naval surfaces,
 TS twins in tests/naval-embark.test.ts where natural, and a `naval` battery
 lane. The engine already has the mechanics; N3 pins the semantics the 24×250
 scripted parity gate cannot reach.
 
-## Poke coverage (gpu/naval_test.py) — ALL GREEN
+## Poke coverage (gpu/tests/naval_test.py) — ALL GREEN
 - [x] 1  GALLEY naval melee + CAPTURE of a coastal rival city
         (siege → _player_attack_rival_city → _capture_rival_city)
 - [x] 2  GALLEY naval melee + CAPTURE of a coastal CS (cs_hit → _capture_city_state)
@@ -76,8 +76,8 @@ defender flat CS + embarked-civilian capture pool-end already TS-covered.)
   Poke 5 pins it; the player-naval MOVE end-to-end is TS-side (findPath naval).
 
 ## Gate results (all foreground)
-- PYTHONUTF8=1 python gpu/naval_test.py: NAVAL (B-6) POKES OK (10 pokes)
+- PYTHONUTF8=1 python gpu/tests/naval_test.py: NAVAL (B-6) POKES OK (10 pokes)
 - npx tsc --noEmit: clean
 - npx vitest run tests/naval-embark.test.ts: 16 passed (1 new player-naval move)
 - PYTHONUTF8=1 python gpu/parity_test.py: PARITY OK — 0.0 milli
-- battery.py: new `naval` lane wired into the cputests group (gpu/naval_test.py)
+- battery.py: new `naval` lane wired into the cputests group (gpu/tests/naval_test.py)

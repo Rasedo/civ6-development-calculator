@@ -162,7 +162,7 @@ def main() -> None:
         for f in ckpt_dir.glob("*"):
             f.unlink()
 
-    from statelog import gpu_state_lines
+    from tools.statelog import gpu_state_lines  # #51/S8.5: tools/ group
     _logl = []
     sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
     B, C = sim.B, sim.C

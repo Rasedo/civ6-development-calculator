@@ -232,7 +232,7 @@ they change batch shape / association.
 
 ## Stage-0 baselines (2026-07-18, quiet box — gpu/PERF_PLAN.md execution)
 
-Committed drivers: `gpu/profile_step.py` (both parts, OMP/MKL=4, cProfile) and
+Committed drivers: `gpu/tools/profile_step.py` (both parts, OMP/MKL=4, cProfile) and
 `scripts/perf-rivals.ts` (TS headless, 3 seeds × 250t). These reproduce the
 throwaway-driver numbers above almost exactly (70.1 vs 71.3s; 104.7 vs 104.5s),
 so per-stage before/after deltas are attributable.

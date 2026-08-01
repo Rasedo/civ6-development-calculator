@@ -147,7 +147,7 @@ slices; ONE battery at the end per the round rule)
 - N2 (agent, Opus, after N1 merges): naval units + production gating
   + embarked/naval combat overrides + the rival galley policy. The
   big reshuffle. Gates green.
-- N3 (main session): `gpu/naval_test.py` poke suite (player galley
+- N3 (main session): `gpu/tests/naval_test.py` poke suite (player galley
   spawn/attack/city-capture, embarked civilian capture pool-end,
   quadrireme bombard, ocean gate pre/post CARTOGRAPHY), AUDIT/docs,
   residuals recorded, ONE battery, close.

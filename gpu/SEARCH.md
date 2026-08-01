@@ -32,11 +32,11 @@ belongs later (M2b-2), where leaves get expensive and stochastic.
 
 ## Tools
 
-- **`gpu/mcts_test.py`** — self-test: snapshot/restore bit-exactness (104 tensors, incl.
+- **`gpu/tests/mcts_test.py`** — self-test: snapshot/restore bit-exactness (104 tensors, incl.
   the RNG stream) + step-after-restore determinism; `search_production` determinism,
   eval-only, and ≥ greedy; closed-loop `mpc_play` ≥ scripted; empire-search determinism.
-  Run: `python3 gpu/mcts_test.py`.
-- **`gpu/search_eval.py`** — benchmark a challenger vs the scripted base policy on
+  Run: `python3 gpu/tests/mcts_test.py`.
+- **`gpu/eval/search_eval.py`** — benchmark a challenger vs the scripted base policy on
   **matched** B=1 worlds (same fixture + scramble, played twice from the identical start).
   Policies: `search` (net-free rollout MPC), `net` (a trained policy head drives
   production), `netsearch` (the search with the net's value head as the leaf),
@@ -46,7 +46,7 @@ belongs later (M2b-2), where leaves get expensive and stochastic.
   `--loyalty-aware` shapes the leaf against loyalty flips; `--checkpoint` nets from
   older action-space vintages auto-narrow the env. One fixed `--dtype` per run
   (float32/float64 diverge over 100 turns). Run:
-  `python3 gpu/search_eval.py --policy search --loyalty-aware --episodes 5 --turns 100`.
+  `python3 gpu/eval/search_eval.py --policy search --loyalty-aware --episodes 5 --turns 100`.
 
 ## Results (5 games × 100 turns, matched float32 worlds, capital production unless noted)
 

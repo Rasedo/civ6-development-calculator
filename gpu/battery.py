@@ -214,52 +214,52 @@ def main() -> int:
                 ("parity", [py, "gpu/parity_test.py"], 6),
             ],
             [
-                ("purchase", [py, "gpu/purchase_test.py"], 4),
-                ("rival_purchase", [py, "gpu/rival_purchase_test.py"], 4),
-                ("war", [py, "gpu/war_test.py"], 4),
-                ("ranged", [py, "gpu/ranged_test.py"], 4),
-                ("combat_mod", [py, "gpu/combat_mod_test.py"], 4),  # B-29 wounded + river
-                ("occupancy", [py, "gpu/occupancy_test.py"], 4),
-                ("builder_gain", [py, "gpu/builder_gain_test.py"], 4),
-                ("domination", [py, "gpu/domination_test.py"], 4),
-                ("melee", [py, "gpu/melee_test.py"], 4),  # #51/S3.4: was UNGATED — an S3.2 regression hid here
-                ("peace_target", [py, "gpu/peace_target_test.py"], 2),  # #51: no attack without a war
-                ("rr_strike", [py, "gpu/rr_strike_test.py"], 2),  # #51/S7.1 (#59): a rival city fires on an enemy RIVAL
-                ("spawn_reclaim", [py, "gpu/spawn_reclaim_test.py"], 2),
-                ("city_first", [py, "gpu/city_first_test.py"], 2),  # #51/S7.10a: a garrison shields no city  # #51/S7.2: a reclaimed slot hands on no drowned unit's MP
-                ("stack_rules", [py, "gpu/stack_rules_test.py"], 2),  # #51: cross-domain stacking + Encampment spawn wall
-                ("golden_move", [py, "gpu/golden_move_test.py"], 2),  # B-24: MONUMENTALITY / EXODUS +2 MP, per seat
-                ("bankruptcy", [py, "gpu/bankruptcy_test.py"], 4),
-                ("seat", [py, "gpu/seat_test.py"], 4),
-                ("government", [py, "gpu/government_test.py"], 4),
-                ("controlled", [py, "gpu/controlled_test.py"], 4),
-                ("duel", [py, "gpu/duel_test.py"], 4),
-                ("religion_gp", [py, "gpu/religion_gp_test.py"], 4),
-                ("war_weariness", [py, "gpu/war_weariness_test.py"], 4),
-                ("space_race", [py, "gpu/space_race_test.py"], 4),
-                ("culture_victory", [py, "gpu/culture_victory_test.py"], 4),  # B-25 (#72): the gate-unreachable culture win
-                ("relics", [py, "gpu/relics_test.py"], 4),  # B-20 (#73): martyr relics — temple slots, faith + tourism
-                ("festival", [py, "gpu/festival_test.py"], 4),  # #79: Festival pays THREE GP classes at 0.11 (gate-unreachable)
-                ("cs_war", [py, "gpu/cs_war_test.py"], 4),  # A-18 (#79): player<->CS war gates the attack mask
-                ("snapshot", [py, "gpu/snapshot_restore_test.py"], 4),  # ENGINE: _MUTABLE round-trip + step determinism (the ONLY coverage; parity never restores)
-                ("naval", [py, "gpu/naval_test.py"], 4),  # #45/B-6 gate-unreachable naval surfaces
-                ("districts", [py, "gpu/district_breadth_test.py"], 4),  # B9/A-9 catalog-breadth surfaces
-                ("rc_registry", [py, "gpu/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency
-                ("religion2", [py, "gpu/religion2_test.py"], 4),  # B6 missionary/enhancer/religious-victory surfaces
-                ("encampment", [py, "gpu/encampment_test.py"], 4),  # B7/B-17 Encampment strike + training XP + specialist surfaces
-                ("great_works", [py, "gpu/great_works_test.py"], 4),  # B7/B-20 Writer/Musician Great-Work slots + yield
-                ("gp_aura", [py, "gpu/gp_aura_test.py"], 4),  # B7-G/B-8 Great General/Admiral spawn/walk/aura/capture (gate-unreachable GENERAL)
-                ("cs_bonus", [py, "gpu/cs_bonus_test.py"], 4),  # B8-K/B-21 CS envoy building re-key + suzerain perk (6-envoy tier gate-unreachable)
-                ("cs_verbs", [py, "gpu/cs_verbs_test.py"], 4),  # B8/A-12 rival levy + rival CS quests (zero-draw)
-                ("trade2", [py, "gpu/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
-                ("geopolitics", [py, "gpu/geopolitics_test.py"], 4),  # #55 A-19/B-33/B-22 per-pair wars + casus belli + rc->rc transfer
-                ("governors", [py, "gpu/governors_test.py"], 4),  # #68/B-24 era-score hooks + Ages loyalty modulation + governor anchors
-                ("watermill", [py, "gpu/watermill_test.py"], 4),
-                ("unit_head", [py, "gpu/unit_head_test.py"], 4),  # #51/S0.3: action enum == mask width == RL head width
-                ("state_discipline", [py, "gpu/state_discipline_test.py"], 4),  # #51/S0.4: alias-rebind + _MUTABLE drift net
-                ("inplace", [py, "gpu/inplace_discipline_test.py"], 1),  # #51/S3.1: static — no self-rebinds, no stale captures
-                ("fort", [py, "gpu/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
-                ("ladder", [py, "gpu/ladder_test.py"], 4),  # #51/S8.3: the ladder leaves the parity gate — this is its only guard
+                ("purchase", [py, "gpu/tests/purchase_test.py"], 4),
+                ("rival_purchase", [py, "gpu/tests/rival_purchase_test.py"], 4),
+                ("war", [py, "gpu/tests/war_test.py"], 4),
+                ("ranged", [py, "gpu/tests/ranged_test.py"], 4),
+                ("combat_mod", [py, "gpu/tests/combat_mod_test.py"], 4),  # B-29 wounded + river
+                ("occupancy", [py, "gpu/tests/occupancy_test.py"], 4),
+                ("builder_gain", [py, "gpu/tests/builder_gain_test.py"], 4),
+                ("domination", [py, "gpu/tests/domination_test.py"], 4),
+                ("melee", [py, "gpu/tests/melee_test.py"], 4),  # #51/S3.4: was UNGATED — an S3.2 regression hid here
+                ("peace_target", [py, "gpu/tests/peace_target_test.py"], 2),  # #51: no attack without a war
+                ("rr_strike", [py, "gpu/tests/rr_strike_test.py"], 2),  # #51/S7.1 (#59): a rival city fires on an enemy RIVAL
+                ("spawn_reclaim", [py, "gpu/tests/spawn_reclaim_test.py"], 2),
+                ("city_first", [py, "gpu/tests/city_first_test.py"], 2),  # #51/S7.10a: a garrison shields no city  # #51/S7.2: a reclaimed slot hands on no drowned unit's MP
+                ("stack_rules", [py, "gpu/tests/stack_rules_test.py"], 2),  # #51: cross-domain stacking + Encampment spawn wall
+                ("golden_move", [py, "gpu/tests/golden_move_test.py"], 2),  # B-24: MONUMENTALITY / EXODUS +2 MP, per seat
+                ("bankruptcy", [py, "gpu/tests/bankruptcy_test.py"], 4),
+                ("seat", [py, "gpu/tests/seat_test.py"], 4),
+                ("government", [py, "gpu/tests/government_test.py"], 4),
+                ("controlled", [py, "gpu/tests/controlled_test.py"], 4),
+                ("duel", [py, "gpu/tests/duel_test.py"], 4),
+                ("religion_gp", [py, "gpu/tests/religion_gp_test.py"], 4),
+                ("war_weariness", [py, "gpu/tests/war_weariness_test.py"], 4),
+                ("space_race", [py, "gpu/tests/space_race_test.py"], 4),
+                ("culture_victory", [py, "gpu/tests/culture_victory_test.py"], 4),  # B-25 (#72): the gate-unreachable culture win
+                ("relics", [py, "gpu/tests/relics_test.py"], 4),  # B-20 (#73): martyr relics — temple slots, faith + tourism
+                ("festival", [py, "gpu/tests/festival_test.py"], 4),  # #79: Festival pays THREE GP classes at 0.11 (gate-unreachable)
+                ("cs_war", [py, "gpu/tests/cs_war_test.py"], 4),  # A-18 (#79): player<->CS war gates the attack mask
+                ("snapshot", [py, "gpu/tests/snapshot_restore_test.py"], 4),  # ENGINE: _MUTABLE round-trip + step determinism (the ONLY coverage; parity never restores)
+                ("naval", [py, "gpu/tests/naval_test.py"], 4),  # #45/B-6 gate-unreachable naval surfaces
+                ("districts", [py, "gpu/tests/district_breadth_test.py"], 4),  # B9/A-9 catalog-breadth surfaces
+                ("rc_registry", [py, "gpu/tests/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency
+                ("religion2", [py, "gpu/tests/religion2_test.py"], 4),  # B6 missionary/enhancer/religious-victory surfaces
+                ("encampment", [py, "gpu/tests/encampment_test.py"], 4),  # B7/B-17 Encampment strike + training XP + specialist surfaces
+                ("great_works", [py, "gpu/tests/great_works_test.py"], 4),  # B7/B-20 Writer/Musician Great-Work slots + yield
+                ("gp_aura", [py, "gpu/tests/gp_aura_test.py"], 4),  # B7-G/B-8 Great General/Admiral spawn/walk/aura/capture (gate-unreachable GENERAL)
+                ("cs_bonus", [py, "gpu/tests/cs_bonus_test.py"], 4),  # B8-K/B-21 CS envoy building re-key + suzerain perk (6-envoy tier gate-unreachable)
+                ("cs_verbs", [py, "gpu/tests/cs_verbs_test.py"], 4),  # B8/A-12 rival levy + rival CS quests (zero-draw)
+                ("trade2", [py, "gpu/tests/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
+                ("geopolitics", [py, "gpu/tests/geopolitics_test.py"], 4),  # #55 A-19/B-33/B-22 per-pair wars + casus belli + rc->rc transfer
+                ("governors", [py, "gpu/tests/governors_test.py"], 4),  # #68/B-24 era-score hooks + Ages loyalty modulation + governor anchors
+                ("watermill", [py, "gpu/tests/watermill_test.py"], 4),
+                ("unit_head", [py, "gpu/tests/unit_head_test.py"], 4),  # #51/S0.3: action enum == mask width == RL head width
+                ("state_discipline", [py, "gpu/tests/state_discipline_test.py"], 4),  # #51/S0.4: alias-rebind + _MUTABLE drift net
+                ("inplace", [py, "gpu/tests/inplace_discipline_test.py"], 1),  # #51/S3.1: static — no self-rebinds, no stale captures
+                ("fort", [py, "gpu/tests/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
+                ("ladder", [py, "gpu/tests/ladder_test.py"], 4),  # #51/S8.3: the ladder leaves the parity gate — this is its only guard
             ],
             [
                 # P3→P5: sharded rollout (4 procs × OMP 4 — measured best on
@@ -270,8 +270,8 @@ def main() -> int:
             ]
             + (
                 [
-                    ("eval-random", [py, "gpu/eval.py", "--policy", "random", "--episodes", "50"], 8),
-                    ("eval-scripted", [py, "gpu/eval.py", "--policy", "scripted", "--episodes", "50"], 8),
+                    ("eval-random", [py, "gpu/eval/eval.py", "--policy", "random", "--episodes", "50"], 8),
+                    ("eval-scripted", [py, "gpu/eval/eval.py", "--policy", "scripted", "--episodes", "50"], 8),
                 ]
                 if EVAL
                 else []

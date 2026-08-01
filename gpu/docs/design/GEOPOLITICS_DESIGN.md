@@ -81,7 +81,7 @@ them, not a rewrite.
 
 ## S4 — coverage agent + close
 
-One Opus agent: poke file `gpu/geopolitics_test.py` (pair-matrix
+One Opus agent: poke file `gpu/tests/geopolitics_test.py` (pair-matrix
 symmetry, rival-rival DoW/peace flips, a scripted rival-rival
 capture via `_transfer_rc_to_rc`, casus-belli ww multiplier, the
 S2 tie-break) + battery lane `geopolitics` + TS vitest pokes;

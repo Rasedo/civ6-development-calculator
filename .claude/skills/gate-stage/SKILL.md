@@ -31,7 +31,7 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
    completions when a cost lands inside it — it happened).
 5. **Validate**: `export PYTHONUTF8=1 && python gpu/battery.py --no-eval`
    (~3 min; `--full` only when search code changed). Behavior-changing
-   stages then re-baseline: `python gpu/eval.py --policy random|scripted
+   stages then re-baseline: `python gpu/eval/eval.py --policy random|scripted
    --episodes 50`, recorded in `gpu/TRAINING.md` (all prior nets go
    stale — say so).
 6. **Commit per stage, push**, with a message that names what the gates

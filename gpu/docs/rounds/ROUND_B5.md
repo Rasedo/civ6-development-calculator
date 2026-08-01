@@ -117,7 +117,7 @@ abilities are the recorded residual — we model XP → levels → flat CS):
 - Ownership transfers (B-31 capture, embarked capture) carry xp with
   the unit (civilians have xp 0 — they never fight; verify nothing
   else needs it).
-- HEADS-UP: gpu/combat_mod_test.py hardcodes independent CS-assembly
+- HEADS-UP: gpu/tests/combat_mod_test.py hardcodes independent CS-assembly
   references — B-7 shifted it last round and XP will too; extend its
   reference with the XP term (battery maintenance, note in log).
 - vitest: accrual amounts per site, thresholds, +5/level at both

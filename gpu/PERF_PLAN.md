@@ -43,7 +43,7 @@ cities: count}` — the TS cache key must include both.
 ## Stages (each independently gateable; one commit + one battery each)
 
 ### Stage 0 — Measurement infrastructure (no engine sources touched)
-- Commit `gpu/profile_step.py`: cProfile driver with (a) scripted/f64
+- Commit `gpu/tools/profile_step.py`: cProfile driver with (a) scripted/f64
   parity-path mirror (6 seeds, B=6, 250t) and (b) rollout core (9 games,
   B=9, OMP=4); top-40 cumtime + a `Tensor.any` call-count/tottime counter
   (guard-storm metric).
