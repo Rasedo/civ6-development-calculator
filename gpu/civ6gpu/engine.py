@@ -14332,6 +14332,26 @@ class BatchSim:
                     # `prod_bank` is consumed. Without this the field would be
                     # write-only — the same shape as the write-only accumulators
                     # #52 and #53 track.
+                    # #51/S7.4c: the rival's OWN encampmentProdMult, on the
+                    # queue head only — `game.ts` applies it to the player's
+                    # head and neither engine ever applied it to a rival's.
+                    # The multiplier keys on the ITEM (an Encampment district
+                    # or one of its buildings), not on the seat.
+                    _rem = self._gov_policy_mods_cached(r, self.r_civics[:, r])[5] if self._gov_has_effects else None
+                    if _rem is not None:
+                        # The RIVAL production space is its own encoding, NOT
+                        # the player's: 0 settler, 1..NU units, 1+NU+si a
+                        # scaffold/district, 1+NU+nS+bi a building. Reusing the
+                        # player's `cur < NB` test here read building indices
+                        # off unit codes and over-applied the multiplier
+                        # (seed 9144 t45, r0 qProgSum 43500 TS / 48120 GPU).
+                        _nS = len(self._scaffold)
+                        _bi = cur - (1 + self.NU + _nS)
+                        _enc_i = (_bi >= 0) & (_bi < self.NB) & (
+                            self._b_req_district[_bi.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
+                        if self._encamp_si >= 0:
+                            _enc_i = _enc_i | (cur == 1 + self.NU + self._encamp_si)
+                        prod = torch.where(_enc_i, prod * _rem, prod)
                     self.rc_progress[:, r, j] = torch.where(
                         has_q, self.rc_progress[:, r, j] + prod + self.rc_prod_bank[:, r, j], self.rc_progress[:, r, j])
                     self.rc_prod_bank[:, r, j] = torch.where(

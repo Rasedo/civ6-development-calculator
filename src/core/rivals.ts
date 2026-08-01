@@ -67,7 +67,7 @@ import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query'
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, tileFreeForUnit, cityNavalCapable, waterEnterable, builderCost } from './units';
 import { killUnit } from './combat';  // #51/S7.12
-import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt } from './game';
+import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS,  ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
@@ -3029,7 +3029,12 @@ export function rivalPhase(state: GameState): void {
       // unit spawns at THIS city — no home-city RNG draw anymore).
       const q = rc.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
-        q.progress += production;
+        // #51/S7.4c: the seat's GOVERNMENT/POLICY encampmentProdMult, which
+        // `game.ts` has always applied to the player's queue head and the
+        // rival's add never did. A rival that adopts the government owns
+        // its effects; the multiplier keys on the ITEM, not on the seat.
+        const _em = isEncampmentItem(q) ? getModifiers(state, civOfRival(rival.id)).encampmentProdMult : 1;
+        q.progress += production * _em;
         // #51/S7.6: pay in the bank, exactly where the player's endTurn does
         // (game.ts, right after the production add). Without this the field
         // written below would be write-only.

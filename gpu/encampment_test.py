@@ -166,6 +166,55 @@ def test_strike(rules, path) -> None:
     print(f"  double-roll OK: walls-first order {ks}")
 
 
+def test_rival_encamp_prod_mult(rules, path) -> None:
+    """#51/S7.4c: a rival's GOVERNMENT encampmentProdMult scales its queue head
+    when that head is an Encampment item — `game.ts` has always done this for
+    the player and neither engine ever did it for a rival.
+
+    THIS POKE IS THE ONLY COVERAGE. Measured on the scripted export: ZERO rival
+    encampment items in 12 seeds x 250 turns, and no shipped government carries
+    a non-unit multiplier, so the gate cannot reach the channel at all
+    ([[gate-reachability]]). Both inputs are poked directly."""
+    def _prep():
+        s = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
+        for _ in range(80):          # rivals need civics before they adopt a government
+            s.step()
+        return s
+    sim = _prep()
+    if not sim._gov_has_effects or sim._encamp_si < 0 or sim.R < 1:
+        print("  rival encampmentProdMult SKIPPED (no gov effects / no Encampment scaffold)")
+        return
+    r = 0
+    live = (sim.rc_alive[0, r]).nonzero(as_tuple=True)[0]
+    if not len(live):
+        print("  rival encampmentProdMult SKIPPED (no live rival city)")
+        return
+    j = int(live[0])
+    _ad, _has = sim._adopted_gov(sim.r_civics[:, r])
+    if not bool(_has[0]):
+        print("  rival encampmentProdMult SKIPPED (rival has adopted no government)")
+        return
+    gi = int(_ad[0])
+    enc_code = 1 + sim.NU + sim._encamp_si
+
+    def _run(mult):
+        s = _prep()
+        s.rc_current[0, r, j] = enc_code
+        s.rc_cost[0, r, j] = 1e9      # never completes, so progress stays readable
+        s.rc_progress[0, r, j] = 0.0
+        s.rc_prod_bank[0, r, j] = 0.0
+        s._gov_encamp[:] = 1.0
+        s._gov_encamp[gi] = mult
+        s._eff_version += 1           # G1: the gov/policy mods cache keys on this
+        s.step()
+        return float(s.rc_progress[0, r, j])
+
+    plain, doubled = _run(1.0), _run(2.0)
+    assert plain > 0, "the rival city produced nothing — poke cannot measure the multiplier"
+    assert abs(doubled - 2.0 * plain) < 1e-6, f"x2 encampmentProdMult: got {doubled}, plain {plain}"
+    print(f"  rival encampmentProdMult OK (x2 on the Encampment head: {plain} -> {doubled})")
+
+
 def main() -> None:
     rules = load_rules()
     paths = sorted(FIXTURES.glob("seed*.json"))
@@ -175,6 +224,7 @@ def main() -> None:
     test_catalog(sim0)
     test_training_xp_wiring(rules, paths[0])
     test_strike(rules, paths[0])
+    test_rival_encamp_prod_mult(rules, paths[0])
     print("ENCAMPMENT OK")
 
 

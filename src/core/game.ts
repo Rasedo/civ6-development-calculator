@@ -610,7 +610,9 @@ export function setSpecialists(
   return { ok: true };
 }
 
-function isEncampmentItem(item: QueueItem): boolean {
+// #51/S7.4c: exported — the RIVAL production add needs the same test, and a
+// second copy of it in rivals.ts is exactly how the two drift apart.
+export function isEncampmentItem(item: QueueItem): boolean {
   if (item.kind === 'district') return item.district === 'ENCAMPMENT';
   if (item.kind !== 'building') return false;
   return BUILDINGS[item.building]?.district === 'ENCAMPMENT';
