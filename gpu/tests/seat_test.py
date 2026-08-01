@@ -76,7 +76,11 @@ def main() -> None:
     s2 = e2.sim
     for _ in range(60):
         s2.step()
-    _base = 14 + 3 * s2.S + 3 * s2.R
+    # #51/S8.4c: read the block widths from the ONE layout definition rather
+    # than hardcoding 14 — the empire block has grown twice this round and a
+    # literal here silently points at the wrong field.
+    import ladder as _lay
+    _base = _lay.EMP + _lay.PER_CS * s2.S + _lay.PER_RIVAL * s2.R
     for name, plane, col, scale in (
         ("treasury", s2.r_treasury, 8, 200.0),
         ("influence", s2.r_influence, 10, 100.0),

@@ -205,9 +205,13 @@ class BatchEnv:
                 torch.where(s.alive, s.city_hp, torch.zeros_like(s.city_hp)).to(d) / 200.0,
                 s.loyalty.to(d) / 100.0,
                 (s.current >= 0).to(d),
+                # #51/S8.4c (#66): the production LADDER branches on isCapital
+                # (only the capital queues a settler) — nine floats could not
+                # say which city they described.
+                s.is_cap.to(d),
             ],
             dim=2,
-        )  # [B, C, 9]
+        )  # [B, C, 10]
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
@@ -224,9 +228,12 @@ class BatchEnv:
                 s.n_camps.to(d) / 5.0,
                 s.u_alive.sum(dim=1).to(d) / 10.0,
                 s.p_alive.sum(dim=1).to(d) / 10.0,
+                # #51/S8.4c (#66): army COMPOSITION — the ladder trains ranged
+                # while the army holds melee, so a bare COUNT cannot express it.
+                (s.p_alive & (s._p_rng_str[s.p_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
-        )  # [B, 14]
+        )  # [B, 15]
         cs = torch.stack(
             [
                 s.cs_met.to(d),
@@ -322,9 +329,13 @@ class BatchEnv:
                 torch.where(alive, s.rc_hp[:, r, :C].to(d), torch.zeros_like(pop)) / 200.0,
                 s.rc_loyalty[:, r, :C].to(d) / 100.0,  # #51/S8.1c: rc_loyalty EXISTS
                 (s.rc_current[:, r, :C] >= 0).to(d),
+                # #51/S8.4c (#66): the production LADDER branches on isCapital
+                # (only the capital queues a settler) — nine floats could not
+                # say which city they described.
+                s.rc_is_cap[:, r, :C].to(d),
             ],
             dim=2,
-        )  # [B, C, 9]
+        )  # [B, C, 10]
         n_own_units = (s.v_alive & (s.v_civ == r)).sum(dim=1).to(d)
         emp = torch.stack(
             [
@@ -348,6 +359,11 @@ class BatchEnv:
                 s.n_camps.to(d) / 5.0,
                 s.u_alive.sum(dim=1).to(d) / 10.0,
                 n_own_units / 10.0,
+                # #51/S8.4c (#66): army COMPOSITION for this rival, the twin of
+                # the player's — the ladder trains ranged while the army holds
+                # melee, so a bare unit COUNT cannot express the decision.
+                (s.v_alive & (s.v_civ == r)
+                 & (s._p_rng_str[s.v_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
         )  # [B, 14]

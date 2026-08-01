@@ -40,17 +40,17 @@ import torch
 
 # Observation layout, shared by both engines. Keep in step with
 # `src/core/seatTurn.ts:observeSeat` and `civ6gpu/env.py:BatchEnv.observe`.
-EMP = 14  # empire block width
+EMP = 15  # empire block width
 EMP_FIELDS = (
     "turn", "techs", "civics", "techProg", "civicProg", "settlers",
     "settlersQueued", "cities", "treasury", "envoysAvail", "influence",
-    "camps", "barbs", "units",
+    "camps", "barbs", "units", "rangedUnits",
 )
 PER_CS = 3    # met, envoys/6, hasQuest
 PER_RIVAL = 3  # atWar, warTurns/14, cities/6
 ESCALATORS = 3  # district, settler, builder — the only NON-static prices
-PER_CITY = 9  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
-              # ownedTiles/20, hp/200, loyalty/100, hasQueue
+PER_CITY = 10  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
+              # ownedTiles/20, hp/200, loyalty/100, hasQueue, isCapital
 # #51/S8.4 (#66): the trailing BOOST blocks — one flag per tech, then per civic,
 # in `Object.values(TECHS)` / `Object.values(CIVICS)` order (what the exporter
 # ships and both engines' planes use). The research pick is lowest EFFECTIVE

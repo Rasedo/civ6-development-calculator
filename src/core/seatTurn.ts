@@ -24,6 +24,7 @@ import { itemCost, districtCostIn, settlerCost } from './game';
 import { builderCost } from './units';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
 import { TECHS } from '../data/techs';
+import { UNITS } from '../data/units';
 import { CIVICS } from '../data/civics';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS, GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
@@ -193,6 +194,9 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     state.barbSeat.camps.length / 5.0,
     state.units.filter((u) => isBarbSeat(u.seat)).length / 10.0,
     state.units.filter((u) => u.seat === seat).length / 10.0,
+    // #51/S8.4c (#66): army COMPOSITION. The ladder trains ranged while the
+    // army holds melee, so a bare unit COUNT cannot express the decision.
+    state.units.filter((u) => u.seat === seat && (UNITS[u.type]?.ranged?.strength ?? 0) > 0).length / 10.0,
   ];
   const cs: number[] = [];
   for (const c of state.cityStates ?? []) {
@@ -210,7 +214,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   const per: number[] = [];
   for (let i = 0; i < cMax; i++) {
     const c = cities[i];
-    if (!c) { per.push(0, 0, 0, 0, 0, 0, 0, 0, 0); continue; }
+    if (!c) { per.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0); continue; }  // #51/S8.4c: 10 per slot
     const head = c.queue[0];
     per.push(
       1,
@@ -222,6 +226,10 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
       c.hp / 200.0,
       (c.loyalty ?? 100) / 100.0,
       head ? 1 : 0,
+      // #51/S8.4c (#66): the production LADDER branches on isCapital (only
+      // the capital queues a settler) — nine floats could not say which
+      // city it was talking to.
+      c.isCapital ? 1 : 0,
     );
   }
   // #51/S8.4 (#66): EFFECTIVE research cost per option — the quantity the
