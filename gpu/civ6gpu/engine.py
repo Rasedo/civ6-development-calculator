@@ -473,7 +473,7 @@ _MUTABLE = [
     "cs_last_levy",  # A-12 (B8-L): rival levy cooldown + rival CS quests
     "influence",
     "rc_tile_id", "rvcity_at",  # A-17: rc_tile_id = per-rc tile registry (rc_id-keyed)
-    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "controlled", "prod_bank", "rc_prod_bank",
+    "rr_warkind", "rr_denounced", "rr_allied", "congress_sessions", "era_score", "civ_age", "prev_age", "dedications", "ded_picks", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "road", "seat_ext", "prod_bank", "rc_prod_bank",
     "rc_dist_tile",
     "r_tiles_purchased",  # A-5r (#71): the rival tile-purchase cost escalator
     "r_pantheon_done", "r_religion_done", "r_next_city_id", "r_prophets", "r_routes",  # A-11: rival domestic trade routes (rc-id pairs)
@@ -995,7 +995,19 @@ class BatchSim:
         # auto-pick and unit AI skip these rivals; externally written
         # choices (rc_current, r_cur_*) are honored by the existing
         # mechanics. Empty by default = bit-inert.
-        self.controlled = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
+        # #51/S8.0: WHO DRIVES EACH SEAT — one column per seat in the absolute
+        # seat space, False = the built-in AI, True = actions supplied from
+        # outside. `controlled` was [B, R]: rivals only, with NO column for seat
+        # 0, so the PLAYER could not be AI-driven and a self-play net had nowhere
+        # to attach for it. Same shape bug the war row had before S6.0, same fix.
+        #
+        # `controlled` survives as a VIEW of the rival columns so all 20 existing
+        # `controlled[:, r]` consumers keep working byte-identically. Only
+        # `seat_ext` is _MUTABLE-registered — registering a view as well would
+        # double-restore it (the cs_atwar contract, asserted in cs_war_test).
+        self.seat_ext = torch.zeros(B, 1 + r_pad + s_pad + 1, dtype=torch.bool, device=device)
+        self.controlled = self.seat_ext[:, 1:1 + r_pad]
+        self.register_alias("controlled", lambda sim: sim.seat_ext[:, 1:1 + max(sim.R, 1)])
         # C1-B4: rival districts — the in-flight queued tile per city (the
         # completion target) and the per-city registry [.., nD] of placed
         # district tiles (one per type; queued counts for cap/one-per-type,

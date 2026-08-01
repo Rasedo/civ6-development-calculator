@@ -103,6 +103,31 @@ def main() -> None:
     assert bool(sim2.rc_alive[0, 0].any()), "controlled rival must survive random play"
     assert float(sim2.empire_score()[0]) > 0, "world must keep scoring"
 
+    # --- #51/S8.0: the driver plane covers EVERY seat, seat 0 included -------
+    # `controlled` used to be [B, R]. A self-play net needs somewhere to attach
+    # for the PLAYER, and the built-in AI needs to be selectable for a rival, so
+    # "who drives this seat" is one column per seat now. `controlled` survives
+    # only as the rival slice of it.
+    assert sim2.seat_ext.shape == (sim2.B, sim2.NS), (
+        f"seat_ext must span the absolute seat space, got {tuple(sim2.seat_ext.shape)}"
+    )
+    assert sim2.controlled.data_ptr() == sim2.seat_ext[:, 1:].data_ptr(), (
+        "controlled must be the RIVAL SLICE of seat_ext, not a second tensor"
+    )
+    sim2.seat_ext.zero_()                          # this sim already drives a rival
+    sim2.seat_ext[0, 0] = True                     # the player is externally driven
+    assert not bool(sim2.controlled[0].any()), "seat 0 must not leak into the rival slice"
+    sim2.seat_ext[0, 1] = True
+    assert bool(sim2.controlled[0, 0]), "rival 0 IS seat_ext column 1"
+    _snap = sim2.snapshot()
+    sim2.seat_ext.zero_()
+    sim2.restore(_snap)
+    assert bool(sim2.seat_ext[0, 0]) and bool(sim2.seat_ext[0, 1]), (
+        "the driver plane must round-trip through snapshot/restore"
+    )
+    sim2.seat_ext.zero_()
+    print("  #51/S8.0 driver plane OK (seat 0 has a slot; controlled is its rival slice)")
+
     print("C2b CONTROLLED-RIVAL OK")
 
 
