@@ -70,6 +70,25 @@ def main() -> None:
     assert float(s.empire_score()[0]) > sc0, "a driven empire should grow"
     print(f"  c ladder drove 20 turns (score {sc0:.1f} -> {float(s.empire_score()[0]):.1f}) OK")
 
+    # --- the ENVOY verb, ported from rivals.ts ------------------------------
+    # "greedy assignment (neediest met CS by OWN envoys, ties lowest id)".
+    # Pinned here because a WRONG pick is still a LEGAL pick: it produces a
+    # different game rather than an error, and every recorded action file stops
+    # replaying. Nothing else compares the ladder against the rule it ported.
+    b = {"cs": torch.tensor([[[1.0, 0.5, 0.0],    # met, 3 envoys
+                              [1.0, 0.0, 0.0],    # met, 0 envoys  <- neediest
+                              [0.0, 0.0, 0.0]]])} # NOT met
+    m = torch.tensor([[True, True, True]])
+    assert int(ladder.pick_envoy(b, m)[0]) == 1, "neediest MET city-state wins"
+    b2 = {"cs": torch.tensor([[[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]]])}
+    assert int(ladder.pick_envoy(b2, m)[0]) == 0, "ties break to the LOWEST index"
+    b3 = {"cs": torch.tensor([[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]])}
+    assert int(ladder.pick_envoy(b3, m)[0]) == -1, "no MET city-state -> no action"
+    m4 = torch.tensor([[False, True, True]])
+    b4 = {"cs": torch.tensor([[[1.0, 0.0, 0.0], [1.0, 0.5, 0.0], [0.0, 0.0, 0.0]]])}
+    assert int(ladder.pick_envoy(b4, m4)[0]) == 1, "the MASK still gates legality"
+    print("  d envoy verb OK (neediest met, lowest-index ties, mask-gated)")
+
     print("LADDER CONTRACT OK")
 
 

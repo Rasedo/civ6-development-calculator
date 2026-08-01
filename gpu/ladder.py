@@ -113,11 +113,45 @@ def decide(obs: torch.Tensor, masks: dict[str, torch.Tensor], layout: dict[str, 
     that a policy READS AN OBSERVATION and RETURNS ACTIONS, so the AI and a net
     are interchangeable at one seam.
     """
-    _ = split(obs, layout["cs"], layout["rivals"], layout["cities"],
-              layout["techs"], layout["civics"])  # schema check
+    blocks = split(obs, layout["cs"], layout["rivals"], layout["cities"],
+                   layout["techs"], layout["civics"])
     out: dict[str, torch.Tensor] = {}
-    for key in ("production", "tech", "civic", "units", "envoy"):
+    for key in ("production", "tech", "civic", "units"):
         m = masks.get(key)
         if m is not None:
             out[key] = first_legal(m)
+    if masks.get("envoy") is not None:
+        out["envoy"] = pick_envoy(blocks, masks["envoy"])   # #51: first ported verb
     return out
+
+
+def pick_envoy(blocks: dict, mask: torch.Tensor) -> torch.Tensor:
+    """[B] long — the ENVOY verb, ported from `rivals.ts`.
+
+    The rule there is one line: "greedy assignment (neediest met CS by OWN
+    envoys, ties lowest id)". Neediest = fewest envoys this seat has already
+    placed; ties break to the lowest city-state index, which is the same
+    lowest-index-wins convention every scripted picker uses and which the
+    recorded action file depends on.
+
+    PORTED WITHOUT WIDENING THE OBSERVATION, and that is the point of doing the
+    enumeration first: the rule reads only `met` and this seat's OWN envoy
+    count, and the city-state block already carries both (met, envoys/6,
+    hasQuest). Nothing new was needed, so nothing new was added.
+
+    NOT CARRIED, deliberately: how many envoys OTHER seats hold at each
+    city-state. The ported rule does not consult it, so adding it now would be
+    speculative — but a policy that wanted to CONTEST a suzerainty would need
+    it, and it is engine-computed and not derivable from the catalog. Record it
+    when a verb actually reads it; do not widen on a guess.
+    """
+    cs = blocks["cs"]                    # [B, S, 3] = met, envoys/6, hasQuest
+    met = cs[:, :, 0] > 0.5
+    mine = cs[:, :, 1]                   # own envoys, /6
+    legal = mask & met
+    # neediest first: lowest own-envoy count among legal, ties to lowest index
+    big = torch.full_like(mine, float("inf"))
+    score = torch.where(legal, mine, big)
+    any_legal = legal.any(dim=-1)
+    idx = score.argmin(dim=-1)
+    return torch.where(any_legal, idx, torch.full_like(idx, -1))
