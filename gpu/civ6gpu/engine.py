@@ -7366,36 +7366,9 @@ class BatchSim:
                 & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
                 & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
             )
-            if bool(cs_hit.any()):
-                atk_cs = self._p_combat[self.p_type[:, p]]
-                mil_idx = int(self.rules.cs.get("militaristicIdx", -1))
-                def_cs = (
-                    15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
-                    + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
-                )
-                atk_e = atk_cs - self._wound(self.p_hp[:, p]) - 5.0 * self._river_cross(here, tgt) + p_lvl5  # B-29 wound + river (CS center not a unit) + B-4 veterancy
-                # #70/S2 (B-8): aura on the CS assault (attackCityState's atkCS),
-                # added once so the cstyc counter-roll sees the same atk_e.
-                atk_naval = self.unit_naval[self.p_type[:, p].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, p]
-                atk_e = atk_e + self._gen_aura_cs(torch.zeros_like(here), self.p_tile[:, p], atk_naval).to(atk_e.dtype)
-                d_cs = self._damage_roll(cs_hit, atk_e - def_cs, k="csty", tile=tgt)
-                d_atk = self._damage_roll(cs_hit, def_cs - atk_e, k="cstyc", tile=tgt)
-                rows = cs_hit.nonzero(as_tuple=True)[0]
-                self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
-                self.p_hp[:, p] = torch.where(cs_hit, self.p_hp[:, p] - d_atk, self.p_hp[:, p])
-                atk_dead = cs_hit & (self.p_hp[:, p] <= 0)
-                if bool(atk_dead.any()):
-                    ar = atk_dead.nonzero(as_tuple=True)[0]
-                    self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
-                    self.p_alive[:, p] = self.p_alive[:, p] & ~atk_dead
-                # #51/S7.8f: warring a city-state wearies you exactly as
-                # warring a major does; the minor keeps no accumulator (no
-                # amenities, no research to date an era from). Scored BEFORE
-                # the capture branch, so the multiplier is the pre-capture one.
-                self._ww_battle(cs_hit, self._row_of(self.p_seat[:, p]),
-                                self._row_of(100 + cs_sc), tgt,
-                                a_died=atk_dead, city=True)
-                cap = cs_hit & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
+            _csr = self._assault_city_state(cs_hit, cs_sc, tgt, "player", p)  # #51/S7.8f (#60)
+            if _csr is not None:
+                rows, atk_dead, cap = _csr
                 if bool(cap.any()):
                     self._capture_city_state(cap.nonzero(as_tuple=True)[0], cs_sc)
                 self.p_mp[:, p] = torch.where(cs_hit, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
@@ -11858,35 +11831,9 @@ class BatchSim:
                 & (self._p_combat[vt0] > 0)
             )
             if bool(cs_att.any()):
-                mil_idx = int(self.rules.cs.get("militaristicIdx", -1))
-                def_cs = (
-                    15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
-                    + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
-                )
-                atk_e = self._p_combat[vt0] - self._wound(self.v_hp[:, v]) - 5.0 * self._river_cross(hc0, ttc) + self._xp_lvl_bonus(self.v_xp[:, v])  # B-29 wound + river (CS center not a unit) + B-4 veterancy
-                # #70/S2 (B-8): the rival attacker's aura on attackCityState's
-                # atkCS — once, so the cstyc counter sees the same atk_e.
-                atk_naval = self.unit_naval[vt0] | self.v_emb[:, v]
-                # #71 (DEBT-2): the enhancer ATTACKER adders apply to city assaults too —
-                # Crusade/Just War key on where the UNIT stands, not on what it hits.
-                # Inserted BEFORE the aura add so term order matches the TS assembly.
-                atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, v], ttc).to(atk_e.dtype) if self._city_rel_live else 0)
-                atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, v] + 1, here, atk_naval).to(atk_e.dtype)
-                d_cs = self._damage_roll(cs_att, atk_e - def_cs, k="csty", tile=ttc)
-                d_atk = self._damage_roll(cs_att, def_cs - atk_e, k="cstyc", tile=ttc)
-                self._ww_battle(cs_att, self._row_of(self.v_seat[:, v]),  # #51/S7.8f
-                                self._row_of(100 + cs_sc), ttc, city=True)
-                # B-4: +5 for the attack executed (CS center is not a unit — no defender xp).
-                self.v_xp[:, v] = torch.where(cs_att, self.v_xp[:, v] + XP_ATTACK, self.v_xp[:, v])
-                rows = cs_att.nonzero(as_tuple=True)[0]
-                self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
-                self.v_hp[:, v] = torch.where(cs_att, self.v_hp[:, v] - d_atk, self.v_hp[:, v])
-                atk_dead = cs_att & (self.v_hp[:, v] <= 0)
-                if bool(atk_dead.any()):
-                    ar = atk_dead.nonzero(as_tuple=True)[0]
-                    self.v_alive[ar, v] = False
-                    self.occ_mil[(ar, hc0[ar])] = -1  # #51/S3.4b
-                cap = cs_att & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
+                _csr = self._assault_city_state(cs_att, cs_sc, ttc, "rival", v)  # #51/S7.8f (#60)
+                assert _csr is not None
+                rows, atk_dead, cap = _csr
                 if bool(cap.any()):
                     self._capture_city_state_rival(cap.nonzero(as_tuple=True)[0], cs_sc, v)
                 acted_att = acted_att | cs_att
@@ -12240,6 +12187,74 @@ class BatchSim:
             self.occ_mil[(dr, a_tile[dr, u])] = -1  # #51/S3.4b
             a_alive[:, u] = a_alive[:, u] & ~died
         return rows, civ, slot, died, ttc
+
+    def _assault_city_state(self, att: torch.Tensor, cs_sc: torch.Tensor,
+                            tgt: torch.Tensor, atk_kind: str, u: int):
+        """ONE melee assault on a CITY-STATE centre, for any attacking seat —
+        the `attackCityState` twin.
+
+        #51/S7.8f (task #60): this was written TWICE — inline in
+        `_apply_unit_actions` for the player, again in `_rival_unit_war_act`
+        for a rival — carrying the same `15 + pop (+6 militaristic)` defense,
+        the same csty/cstyc draw pair and the same attacker-death cleanup.
+
+        MERGING THEM FOUND A REAL BUG. The rival copy's war-weariness hook
+        passed no `a_died`, so a rival that DIED assaulting a city-state scored
+        no death term while the player's did. That is the EIGHTH S7.8f site
+        error and the first found by READING rather than by a gate — the seven
+        before it each needed a rollout. Both sides score it now, because there
+        is one place to score it.
+
+        The per-CLASS terms are TS's own `assaultAtkCS` clauses, not pool
+        accidents — the same three `_assault_rival_city` documents.
+
+        Returns `(rows, atk_dead, cap)`; the CAPTURE aftermath stays with the
+        caller, since a player suzerain and a rival conqueror take a minor
+        differently.
+        """
+        if not bool(att.any()):
+            return None
+        a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
+        at0 = a_type[:, u].clamp(min=0, max=self.NU - 1)
+        here = a_tile[:, u].clamp(min=0)
+        mil_idx = int(self.rules.cs.get("militaristicIdx", -1))
+        def_cs = (
+            15 + self.cs_pop.gather(1, cs_sc.unsqueeze(1)).squeeze(1)
+            + (self.cs_type.gather(1, cs_sc.unsqueeze(1)).squeeze(1) == mil_idx).long() * 6
+        )
+        # B-29 wound + river (a CS centre is not a unit), then B-4 veterancy.
+        atk_e = self._p_combat[at0] - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt)
+        if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]:
+            atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
+        if atk_kind == "rival" and self._city_rel_live:
+            atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
+        # #70/S2 (B-8): the aura joins attackCityState's atkCS ONCE, so the
+        # cstyc counter-roll sees the same atk_e.
+        aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
+                               torch.full_like(a_seat[:, u], -1), a_seat[:, u])
+        atk_naval = self.unit_naval[at0] | a_emb[:, u]
+        atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        # DRAW ORDER is the parity contract: the minor's damage, then the counter.
+        d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
+        d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
+        if atk_kind == "rival":
+            a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])  # B-4
+        rows = att.nonzero(as_tuple=True)[0]
+        self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
+        a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
+        atk_dead = att & (a_hp[:, u] <= 0)
+        if bool(atk_dead.any()):
+            ar = atk_dead.nonzero(as_tuple=True)[0]
+            self.occ_mil[(ar, here[ar])] = -1  # #51/S3.4b
+            a_alive[:, u] = a_alive[:, u] & ~atk_dead
+        # #51/S7.8f: warring a city-state wearies you exactly as warring a major
+        # does; the minor keeps no accumulator (no amenities, no research to
+        # date an era from). Scored BEFORE the caller's capture branch, so the
+        # location multiplier is the pre-capture one.
+        self._ww_battle(att, self._row_of(a_seat[:, u]), self._row_of(100 + cs_sc), tgt,
+                        a_died=atk_dead, city=True)
+        cap = att & (self.cs_hp.gather(1, cs_sc.unsqueeze(1)).squeeze(1) <= 0)
+        return rows, atk_dead, cap
 
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a PLAYER city (attackCity): garrison-
