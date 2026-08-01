@@ -158,9 +158,19 @@ export const WAR_WEARINESS_PER_AMENITY = 400;
  * Under-modelling a sourced direction is an honest recorded residual;
  * over-modelling a magnitude by 33-100% with a borrowed constant is not.
  *
- * The twelve WAR_WEARINESS_* GlobalParameters rows ARE settled (byte-identical
- * Base = R&F = GS, unchanged Oct-2016 through Jul-2024) — the repo's perTurn /
- * decay / cap are not in question here, only the invented multiplier. */
+ * CLAIM RETRACTED (#51/S7.8f, 2026-08-01). This note used to assert that "the
+ * twelve WAR_WEARINESS_* GlobalParameters rows ARE settled — byte-identical
+ * Base = R&F = GS, unchanged Oct-2016 through Jul-2024". **That was never
+ * verified.** The three `Module_Data_Civ6_*_GlobalParameters` files sitting in
+ * the scratchpad, which are the only thing that could have backed it, are
+ * Cloudflare challenge pages — failed fetches saved to disk, containing no game
+ * data and not one occurrence of the word "weariness". A confident sentence
+ * about shipped game data was written from a block page.
+ *
+ * It changes no number: perTurn / decay / cap are DELETED, and what replaced
+ * them is sourced to the wiki table and its CivFanatics thread, with the
+ * provenance caveat stated above. It is recorded because the rule in this repo
+ * is that a claim about Civ 6 names its source, and a comment is not one. */
 /** B-24 (task #68, gpu/GOVERNORS_DESIGN.md): era score / Ages. The game is
  *  divided into fixed ERA_LENGTH-turn eras (no per-civ tech-era drift —
  *  recorded residual). Each civ accrues an INTEGER era score from zero-draw
