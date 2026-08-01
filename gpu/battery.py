@@ -176,6 +176,8 @@ def main() -> int:
     npx = "npx.cmd" if os.name == "nt" else "npx"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     py = sys.executable
+    # #51/S7.8f (task #55): ruff ships in the venv beside the interpreter.
+    ruff = Path(py).with_name("ruff.exe" if os.name == "nt" else "ruff")
     t0 = time.time()
 
     print("stage 0 (serial): tsc, export", flush=True)
@@ -190,6 +192,14 @@ def main() -> int:
         # catches the class that killed this gate with an empty error message.
         ("parse", ["node", "scripts/parse-check.mjs"]),
         ("lint", [npx, "oxlint", "src", "scripts", "tests"]),  # #51: no-constant-binary-expression et al
+        # #51/S7.8f (task #55): F821 = UNDEFINED NAME on the Python side. Costs
+        # ~0.3s and catches the class that cost this session hours: `cs_slot`
+        # was undefined in a new engine hook, so every shard that reached that
+        # branch CRASHED, rollout.py then waited forever on the dead worker, and
+        # the lane presented as a HANG rather than as an error. Python cannot
+        # catch it at import time and the branch was unreachable from scripted
+        # parity, so nothing before the rollout would have found it.
+        ("f821", [str(ruff), "check", "--select", "F821", "gpu", "scripts"]),
         ("export", [npm, "run", "gpu:export"]),
     ):
         run(name, cmd, threads=24)

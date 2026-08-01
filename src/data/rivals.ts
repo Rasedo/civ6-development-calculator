@@ -99,17 +99,36 @@ export const LOYALTY_AMENITY: Record<string, number> = {
 //     Death    = 3 * EraBase, to the side whose unit died
 //     any battle with a CITY on either side scores at the abroad column
 //
-// Source: https://civilization.fandom.com/wiki/War_weariness_(Civ6), whose
-// reference [1] is CivFanatics thread 623207 (re-fetched 2026-07-31; its
-// formula and its table agree everywhere except Ancient SURPRISE, where the
-// formula's `3 * min(max(era-1,1),4)` yields 19 and the table says 16 — the
-// TABLE is taken, being the measured column the formula was fitted to).
-// PROVENANCE: the wiki page is that thread's published form, not independent
-// corroboration, and its author flags multi-war behaviour as untested. It is
-// the best available source: the scaling lives in the C++ DLL —
-// `EFFECT_ADJUST_WAR_WEARINESS` takes only {Amount, Overall|Domestic|Enemy},
-// with no era and no casus-belli argument on any of its seven consumers — so
-// no datamining will ever improve on it.
+// PRIMARY SOURCE (2026-08-01). Every magnitude below is a GlobalParameters
+// row of the shipped game — not a wiki, not a forum:
+//
+//   WAR_WEARINESS_PER_COMBAT_IN_FOREIGN_LANDS  2     -> WW_ABROAD_MULT
+//   WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS   1     -> the at-home column
+//   WAR_WEARINESS_PER_UNIT_KILLED              3     -> WW_DEATH_MULT
+//   WAR_WEARINESS_DECAY_TURN_AT_WAR            50    -> WW_DECAY_AT_WAR
+//   WAR_WEARINESS_DECAY_TURN_AT_PEACE          200   -> WW_DECAY_AT_PEACE
+//   WAR_WEARINESS_DECAY_PEACE_DECLARED         2000  -> WW_PEACE_TREATY
+//   WAR_WEARINESS_POINTS_FOR_AMENITY_LOSS      400   -> WAR_WEARINESS_PER_AMENITY
+//   WAR_WEARINESS_WARMONGER_BASE               16    -> the era tables' row 0
+//
+// The ERA SCALING is the one part that is NOT in the data: GlobalParameters
+// carries a single base of 16 and no era table at all, which CONFIRMS what was
+// previously only asserted — the scaling lives in the C++ DLL, where
+// `EFFECT_ADJUST_WAR_WEARINESS` takes only {Amount, Overall|Domestic|Enemy}
+// with no era and no casus-belli argument. So the era rows come from
+// https://civilization.fandom.com/wiki/War_weariness_(Civ6) and its reference,
+// CivFanatics thread 623207 (re-fetched 2026-07-31): the two agree everywhere
+// except Ancient SURPRISE, where the formula's `3 * min(max(era-1,1),4)` yields
+// 19 and the table says 16 — the TABLE is taken, and the data's base of 16
+// independently backs it. `WAR_WEARINESS_PER_WMD_LAUNCHED = 10` likewise backs
+// the thread's "+10 * base" nuke reading (12x total with the abroad multiplier).
+//
+// NOT MODELLED, and now known to exist because the data names them:
+//   * WAR_WEARINESS_PER_WMD_LAUNCHED 10 — there are no nuclear weapons here.
+//   * WAR_WEARINESS_LOSS_OVER_REQ_AMENITIES_{AT_WAR_CITY 3, NONFOUNDED_CITY 1,
+//     FOUNDED_CITY 0} — a per-CITY component keyed on whether the city is at
+//     war and whether you founded it. This model applies one empire-wide
+//     penalty per seat; the per-city split is a recorded gap, not a decision.
 //
 // UNITS ARE NOW REAL WWP. The accumulator stays an INTEGER, so the derived
 // amenity penalty is integer too and there is no float-association risk.

@@ -40,8 +40,12 @@ import json
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
+
+if TYPE_CHECKING:  # #51/S7.8f (task #55): the annotation-only import, so the
+    from civ6gpu import MeleeEnv  # F821 lane sees the name without the cycle
 import torch.nn as nn
 from torch.distributions import Categorical
 

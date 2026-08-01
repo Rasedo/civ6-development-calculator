@@ -111,6 +111,25 @@ export function wwEraBase(state: GameState, seat: number, other: number): number
   return row[Math.min(Math.max(era, 0), row.length - 1)];
 }
 
+/**
+ * Is `tileOwner` land this seat fights on at the HOME rate?
+ *
+ * The shipped GlobalParameters carry two rows and only two:
+ * `WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS = 1` and
+ * `..._IN_FOREIGN_LANDS = 2`. So an ALLY's territory is home ground — not just
+ * your own — and everything else, unowned ground included, is foreign.
+ *
+ * Only the rival<->rival axis can answer yes to the alliance half, because
+ * `alliedRivals` is the only alliance either engine stores. Same shape as
+ * `isFormalWarSeats`: a missing VERB, not a seat-dependent rule.
+ */
+function friendlyLand(state: GameState, seat: number, tileOwner: number): boolean {
+  if (tileOwner < 0) return false; // nobody's land is foreign land
+  if (tileOwner === seat) return true;
+  if (!isRivalSeat(seat) || !isRivalSeat(tileOwner)) return false;
+  return rivalOfSeat(state, seat)?.alliedRivals?.includes(tileOwner - 1) ?? false;
+}
+
 function addWw(state: GameState, seat: number, other: number, amount: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -145,7 +164,7 @@ export function warWearinessBattle(
   const score = (self: number, foe: number, died: boolean): void => {
     if (!holdsWeariness(self)) return;
     const base = wwEraBase(state, self, foe);
-    const loc = opts.city || owner !== self ? WW_ABROAD_MULT : 1;
+    const loc = opts.city || !friendlyLand(state, self, owner) ? WW_ABROAD_MULT : 1;
     addWw(state, self, foe, base * loc + (died ? WW_DEATH_MULT * base : 0));
   };
   score(aSeat, dSeat, opts.aDied ?? false);

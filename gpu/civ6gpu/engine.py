@@ -258,6 +258,34 @@ U_MAX = 256
 P_MAX = 256  # player unit slots per game (append-only; runtime-asserted)
 
 # The absolute SEAT space, shared with TS core/seats.ts.
+# #51/S7.8f (task #60): every damage-roll key that OPENS a battle. The paired
+# counter-roll keys (melc, cstyc, pctyc, rctyc, pencc, rencc) are the SAME
+# battle from the other side and must not be counted twice.
+#
+# WHY THIS EXISTS. One TS function, `warWearinessBattle`, needs a hook at every
+# one of these on the GPU. I found them by grepping the keys I already knew and
+# got it wrong SEVEN times in one slice - `rcty` (x3) and `penc`/`renc` had no
+# hook at all, and scripted parity stayed green because it never has the player
+# attack anything. A grep is not an enumeration. This set is, and
+# `_ww_audit` makes the engine prove at runtime that the two agree.
+WW_BATTLE_KEYS = frozenset({
+    "mel",      # melee vs a unit - player pool AND hostile pool
+    "rng",      # player ranged vs a unit or a lone civilian
+    "vrng",     # hostile ranged vs a unit
+    "csty",     # melee vs a city-state centre - player AND rival
+    "pcty",     # hostile melee assault on a PLAYER city
+    "rcty",     # melee assault on a RIVAL city - player, barb AND rival
+    "penc",     # melee assault on an Encampment district (player-owned target)
+    "renc",     # ...and on a rival-owned one
+    "vrngc",    # hostile ranged vs a player city
+    "rngrc",    # player ranged vs a rival city
+    "rngcs",    # player ranged vs a city-state centre
+    "pcstk",    # a PLAYER city's walls strike
+    "pestk",    # a PLAYER city's Encampment strike
+    "rcstk",    # a RIVAL city's walls strike
+    "restk",    # a RIVAL city's Encampment strike
+})
+
 PLAYER_SEAT = 0  # #51/S3.4: the player, TS seats.ts PLAYER_CIV
 BARB_SEAT = 200  # #51/S3.3: the barbarians, TS seats.ts BARB_SEAT
 
@@ -2229,6 +2257,10 @@ class BatchSim:
         # a battle was fought there, which tells a war being fought from a
         # phoney one. The barbarian row exists and is never written.
         self.ww = torch.zeros(B, self.NS, self.NS, dtype=torch.long, device=device)
+        # #51/S7.8f (task #60): the per-step battle-site audit. Not game state -
+        # a tripwire, reset every step, asserted at the turn boundary.
+        self._ww_opened = torch.zeros(B, dtype=torch.long, device=device)
+        self._ww_hooked = torch.zeros(B, dtype=torch.long, device=device)
         self.ww_turn = torch.full((B, self.NS, self.NS), -1, dtype=torch.long, device=device)
 
     def sync_war(self) -> None:
@@ -2399,6 +2431,33 @@ class BatchSim:
     # them. No player function, no rival function.
     # ------------------------------------------------------------------
 
+    def _ww_audit(self) -> None:
+        """Every battle OPENED this step must have been SCORED for weariness.
+
+        `_damage_roll` counts the rolls whose key is in `WW_BATTLE_KEYS`;
+        `_ww_battle` counts the games it was actually invoked for. A new applier
+        - or one I missed - shows up here as a mismatch on the very first step
+        that reaches it, instead of as a silently-zero accumulator that only the
+        rollout notices 200 turns later.
+
+        It counts INVOCATIONS, not points: a battle involving a barbarian is
+        still hooked, and `_ww_battle` declines to score it internally. That is
+        deliberate - the audit asks "did the rule get a chance to run", which is
+        exactly the question the seven misses answered NO to.
+        """
+        bad = self._ww_opened != self._ww_hooked
+        if bool(bad.any()):
+            g = int(bad.nonzero()[0])
+            raise AssertionError(
+                f"WAR-WEARINESS SITE MISSING: game {g} turn {int(self.turn)} opened "
+                f"{int(self._ww_opened[g])} battle(s) but scored {int(self._ww_hooked[g])}. "
+                f"A damage roll keyed in WW_BATTLE_KEYS has no `_ww_battle` call "
+                f"beside it (or one fires under a different mask). See task #60: "
+                f"one TS rule, {len(WW_BATTLE_KEYS)} GPU appliers."
+            )
+        self._ww_opened.zero_()
+        self._ww_hooked.zero_()
+
     def _ww_max(self, row: int) -> torch.Tensor:
         """[B] long - the worst of this seat's wars, which is the one it feels.
         Simultaneous wars score separately and only the highest counts."""
@@ -2506,6 +2565,7 @@ class BatchSim:
         capture - the multiplier is the one that applied while the battle was
         fought, not the one that applies once the tile changes hands.
         """
+        self._ww_hooked += hit.long()  # #51/S7.8f (task #60): a battle was scored
         rww = self.rules.war_weariness
         abroad = int(rww.get("abroad", 2))
         death = int(rww.get("death", 3))
@@ -2532,7 +2592,16 @@ class BatchSim:
             if not bool(score.any()):
                 continue
             base = self._ww_era_base(self_row, foe_row)
-            at_home = (owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))) & (not city)
+            # #51/S7.8f: GlobalParameters carries exactly two location rows -
+            # WAR_WEARINESS_PER_COMBAT_IN_ALLIED_LANDS 1 and
+            # ..._IN_FOREIGN_LANDS 2 - so an ALLY's territory is home ground
+            # too, and unowned ground is foreign. `friendlyLand`'s twin.
+            _own = owner == self._ROW_SEAT.gather(0, self_row.clamp(min=0))
+            _rr = (self_row >= 1) & (self_row <= self.R) & (owner >= 1) & (owner <= self.R)
+            _n = self.rr_allied.shape[1]
+            _fl = (self_row.clamp(1, max(_n, 1)) - 1) * _n + (owner.clamp(1, max(_n, 1)) - 1)
+            _ally = self.rr_allied.reshape(self.B, -1).gather(1, _fl.unsqueeze(1)).squeeze(1) & _rr
+            at_home = (_own | _ally) & (not city)
             gain = base * torch.where(at_home, 1, abroad)
             if died is not None:
                 gain = gain + torch.where(died, base * death, zeros)
@@ -5348,6 +5417,8 @@ class BatchSim:
         return out
 
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None) -> torch.Tensor:
+        if k in WW_BATTLE_KEYS:  # #51/S7.8f (task #60): this roll OPENS a battle
+            self._ww_opened += mask.long()
         """Mirrors damageRoll: 30·e^(0.04·Δ)·rand(0.8–1.2) (P4/D-1: the real
         Civ 6 range — equal-strength hits land 24–36), JS-rounded, min 1.
         Δ is always an integer here, so the exponential comes from the
@@ -16311,6 +16382,7 @@ class BatchSim:
         # after the plannedSettles loop). INERT: not read by yields/trace yet.
         self._spread_religious_pressure()
 
+        self._ww_audit()
         self.turn += 1
         # B-24 (task #68): era boundary — the eraBoundary mirror (TS runs it
         # right after `state.turn += 1`). S2: every civ's Age for the NEW era
