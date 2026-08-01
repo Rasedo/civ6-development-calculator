@@ -161,6 +161,25 @@ class BatchEnv:
         self._last_score = score
         return self.observe(seat), reward, self.sim.turn > self.horizon
 
+    def _escalators(self, seat: int, techs, civics, builders, settler_cost) -> list:
+        """#51/S8.4b (#66): the three production costs that ESCALATE with a
+        seat's own state — district, settler, builder.
+
+        Every other production price is static rules data, which the ladder
+        already loads from `rules.json`. Static data is NOT state and does not
+        belong in an observation; carrying 122 cost floats to express three
+        moving numbers would be noise a policy has to learn to ignore. Computed
+        HERE, with the engine's own helpers, so the escalation rule stays in the
+        engine — the same reason research emits effective cost rather than a
+        boost flag."""
+        s = self.sim
+        d = s.dtype
+        dcp = s.rules.district_cost
+        t_pct = techs.sum(dim=1).to(d) / max(s.rules_dev.t_cost.shape[0], 1)
+        c_pct = civics.sum(dim=1).to(d) / max(s.rules_dev.c_cost.shape[0], 1)
+        d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct, c_pct)))
+        return [d_cost / 1000.0, settler_cost / 1000.0, s._builder_cost(builders).to(d) / 1000.0]
+
     def observe(self, seat: int = 0) -> torch.Tensor:
         """[B, obs_size] — empire globals, city-state courtship, rival
         posture, and per-city-slot economy/defense, all roughly unit-scaled.
@@ -235,6 +254,9 @@ class BatchEnv:
         # away should change which branch a policy walks toward now, and masking
         # to the legal frontier would delete exactly that signal.
         return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
+                          torch.stack(self._escalators(0, s.techs, s.civics, s.builders_trained,
+                                                      (s.rules.settler_base + s.rules.settler_per_city
+                                                       * (s.alive.sum(dim=1) - 1 + s.settlers).clamp(min=0).to(d))), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.tech_boosted, 0).to(d) / 1000.0,
                           s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0], dim=1)
 
@@ -366,6 +388,10 @@ class BatchEnv:
         # away should change which branch a policy walks toward now, and masking
         # to the legal frontier would delete exactly that signal.
         return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
+                          torch.stack(self._escalators(r + 1, s.r_techs[:, r], s.r_civics[:, r],
+                                                      s.r_builders_trained[:, r] if hasattr(s, "r_builders_trained")
+                                                      else torch.zeros(B, dtype=torch.long, device=dev),
+                                                      torch.zeros(B, dtype=d, device=dev)), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.r_tech_boosted[:, r], r + 1).to(d) / 1000.0,
                           s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.r_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0], dim=1)
 

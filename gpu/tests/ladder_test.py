@@ -38,7 +38,8 @@ def main() -> None:
     layout = {"cs": s.S, "rivals": s.R, "cities": s.C,
               "techs": s.techs.shape[1], "civics": s.civics.shape[1]}
     width = (ladder.EMP + ladder.PER_CS * s.S + ladder.PER_RIVAL * s.R
-             + ladder.PER_CITY * s.C + s.techs.shape[1] + s.civics.shape[1])
+             + ladder.PER_CITY * s.C + ladder.ESCALATORS
+             + s.techs.shape[1] + s.civics.shape[1])
 
     shapes = {}
     for seat in (0, 1):

@@ -48,6 +48,7 @@ EMP_FIELDS = (
 )
 PER_CS = 3    # met, envoys/6, hasQuest
 PER_RIVAL = 3  # atWar, warTurns/14, cities/6
+ESCALATORS = 3  # district, settler, builder — the only NON-static prices
 PER_CITY = 9  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
               # ownedTiles/20, hp/200, loyalty/100, hasQueue
 # #51/S8.4 (#66): the trailing BOOST blocks — one flag per tech, then per civic,
@@ -75,6 +76,12 @@ def split(obs: torch.Tensor, n_cs: int, n_rivals: int, n_cities: int,
     i += PER_RIVAL * n_rivals
     city = obs[:, i:i + PER_CITY * n_cities].reshape(b, n_cities, PER_CITY)
     i += PER_CITY * n_cities
+    # #51/S8.4b (#66): the three ESCALATING production costs — district,
+    # settler, builder. Every other production price is STATIC rules data the
+    # ladder loads from `rules.json`; static data is not state and carrying it
+    # in an observation is noise a policy must learn to ignore.
+    esc = obs[:, i:i + 3]
+    i += 3
     n_t, n_c = n_techs, n_civics
     boost_t = obs[:, i:i + n_t]
     i += n_t
@@ -82,7 +89,7 @@ def split(obs: torch.Tensor, n_cs: int, n_rivals: int, n_cities: int,
     i += n_c
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
     return {"empire": emp, "cs": cs, "rival": riv, "city": city,
-            "boostTech": boost_t, "boostCivic": boost_c}
+            "escalators": esc, "costTech": boost_t, "costCivic": boost_c}
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:

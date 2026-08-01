@@ -20,7 +20,8 @@ import { isSuzerain, envoysOf } from './cityStates';
 import { seatTourism } from './city';
 import { effectiveResearchCostIn } from './boosts';
 import { goldenBoostBonus } from './eras';
-import { itemCost } from './game';
+import { itemCost, districtCostIn, settlerCost } from './game';
+import { builderCost } from './units';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -233,6 +234,15 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   // of truth each. What the full vector buys is PLANNING: a boosted tech
   // several prereqs away should steer a policy toward that branch now, and a
   // mask-to-frontier vector would be EMPTY whenever a research slot is busy.
+  // #51/S8.4b (#66): the three ESCALATING production costs, in the SAME slot
+  // the GPU emits them — after the per-city block, before the research costs.
+  // Everything else a production pick needs is static rules data the ladder
+  // already loads; static data is not state.
+  const esc = [
+    districtCostIn(s?.research ?? { techs: [], civics: [] } as never) / 1000,
+    (isPlayerSeat(seat) ? settlerCost(state) : 0) / 1000,
+    builderCost(state, seat) / 1000,
+  ];
   const rs = s?.research;
   const gT = goldenBoostBonus(state, seat, false);
   const gC = goldenBoostBonus(state, seat, true);
@@ -240,7 +250,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     (rs ? effectiveResearchCostIn(rs, t.id, t.cost, gT) : t.cost) / 1000);
   const costC = Object.values(CIVICS).map((c) =>
     (rs ? effectiveResearchCostIn(rs, c.id, c.cost, gC) : c.cost) / 1000);
-  return [...emp, ...cs, ...riv, ...per, ...costT, ...costC];
+  return [...emp, ...cs, ...riv, ...per, ...esc, ...costT, ...costC];
 }
 
 /**
