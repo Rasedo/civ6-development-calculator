@@ -89,6 +89,28 @@ def main() -> None:
     assert int(ladder.pick_envoy(b4, m4)[0]) == 1, "the MASK still gates legality"
     print("  d envoy verb OK (neediest met, lowest-index ties, mask-gated)")
 
+    # --- the RESEARCH verb, ported from rivals.ts ---------------------------
+    # "sort available by effectiveResearchCostIn, take the first"; JS sort is
+    # STABLE, so equal costs keep catalog order = lowest index wins.
+    bb = {"costTech": torch.tensor([[0.080, 0.030, 0.100]]),
+          "costCivic": torch.tensor([[0.050, 0.050]])}
+    mm = torch.tensor([[True, True, True]])
+    assert int(ladder.pick_research(bb, mm, "tech")[0]) == 1, "cheapest EFFECTIVE cost wins"
+    # THE CASE THAT FORCED THE WIDENING: a BOOSTED 100 beats an unboosted 80.
+    # If the observation carried base cost (or a boost flag the policy had to
+    # apply itself) this picks the wrong item — index 0 rather than index 2.
+    boosted = {"costTech": torch.tensor([[0.080, 0.090, 0.050]])}   # idx2 = 100 boosted
+    assert int(ladder.pick_research(boosted, mm, "tech")[0]) == 2, (
+        "a boosted expensive tech must beat a cheap unboosted one"
+    )
+    tie = {"costTech": torch.tensor([[0.030, 0.030, 0.030]])}
+    assert int(ladder.pick_research(tie, mm, "tech")[0]) == 0, "ties break LOWEST index"
+    gated = torch.tensor([[False, False, True]])
+    assert int(ladder.pick_research(tie, gated, "tech")[0]) == 2, "the MASK gates legality"
+    none = torch.tensor([[False, False, False]])
+    assert int(ladder.pick_research(tie, none, "tech")[0]) == -1, "nothing legal -> no action"
+    print("  e research verb OK (effective cost, boosted beats cheap, ties low, mask-gated)")
+
     print("LADDER CONTRACT OK")
 
 

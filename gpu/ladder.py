@@ -116,10 +116,14 @@ def decide(obs: torch.Tensor, masks: dict[str, torch.Tensor], layout: dict[str, 
     blocks = split(obs, layout["cs"], layout["rivals"], layout["cities"],
                    layout["techs"], layout["civics"])
     out: dict[str, torch.Tensor] = {}
-    for key in ("production", "tech", "civic", "units"):
+    for key in ("production", "units"):
         m = masks.get(key)
         if m is not None:
             out[key] = first_legal(m)
+    for key, kind in (("tech", "tech"), ("civic", "civic")):
+        m = masks.get(key)
+        if m is not None:
+            out[key] = pick_research(blocks, m, kind)   # #51: ported verb
     if masks.get("envoy") is not None:
         out["envoy"] = pick_envoy(blocks, masks["envoy"])   # #51: first ported verb
     return out
@@ -153,5 +157,35 @@ def pick_envoy(blocks: dict, mask: torch.Tensor) -> torch.Tensor:
     big = torch.full_like(mine, float("inf"))
     score = torch.where(legal, mine, big)
     any_legal = legal.any(dim=-1)
+    idx = score.argmin(dim=-1)
+    return torch.where(any_legal, idx, torch.full_like(idx, -1))
+
+
+def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
+    """[B] long — the RESEARCH verb (tech or civic), ported from `rivals.ts`.
+
+    The rule there sorts the available items by `effectiveResearchCostIn` and
+    takes the first. `Array.prototype.sort` is stable, so equal costs keep
+    CATALOG order — i.e. ties break to the lowest index, the same convention as
+    every other scripted picker and the one the recorded action files depend on.
+
+    This is the verb that forced the observation to carry EFFECTIVE cost rather
+    than base cost plus a boost flag (#51/S8.4): a boost is -50%, so a boosted
+    100-cost item beats an unboosted 80, and base-cost order and effective-cost
+    order diverge whenever boosts are live. Emitting the flag instead would have
+    put `base*(1-frac)` — a RULE — inside the policy.
+
+    The policy therefore never learns that boosts exist. It reads a price.
+    """
+    cost = blocks["costTech"] if kind == "tech" else blocks["costCivic"]
+    if cost.shape[-1] != mask.shape[-1]:
+        raise ValueError(
+            f"{kind} cost vector is {cost.shape[-1]} wide but the mask is "
+            f"{mask.shape[-1]} — the observation layout and the action space "
+            "have drifted apart"
+        )
+    big = torch.full_like(cost, float("inf"))
+    score = torch.where(mask, cost, big)
+    any_legal = mask.any(dim=-1)
     idx = score.argmin(dim=-1)
     return torch.where(any_legal, idx, torch.full_like(idx, -1))
