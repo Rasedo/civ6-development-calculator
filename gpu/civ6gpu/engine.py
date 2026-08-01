@@ -1708,6 +1708,20 @@ class BatchSim:
             self._gov_ymult = torch.tensor([[float(x) for x in g.get("yieldMult", [1] * 6)] for g in _govs], dtype=dtype, device=device)  # [nGov,6]
             self._gov_encamp = torch.tensor([float(g.get("encampmentProdMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] B9-R1 (no gov carries it today; channel-complete)
             self._gov_tpmult = torch.tensor([float(g.get("tilePurchaseMult", 1)) for g in _govs], dtype=dtype, device=device)  # [nGov] #51/S7.7b
+            # #51/S7.4d: the amenity + district-conditional channels. TS applies
+            # all of these for EVERY seat now (computeHousing / computeCityStats
+            # for the player, rivalHousing / rivalAmenityTiers for a rival), so
+            # the old "PLAYER only / rivalHousing is mods-free" notes above are
+            # retired. newDeal carries housing AND amenities on one specialty
+            # threshold; housingIfDistricts counts ALL completed districts.
+            self._gov_amen = torch.tensor([float(g.get("amenitiesAll", 0)) for g in _govs], dtype=dtype, device=device)
+            _ghid = [g.get("housingIfDistricts", [-1, 0]) for g in _govs]
+            self._gov_hid_min = torch.tensor([int(x[0]) for x in _ghid], dtype=torch.long, device=device)
+            self._gov_hid_house = torch.tensor([float(x[1]) for x in _ghid], dtype=dtype, device=device)
+            _gnd = [g.get("newDeal", [-1, 0, 0]) for g in _govs]
+            self._gov_nd_min = torch.tensor([int(x[0]) for x in _gnd], dtype=torch.long, device=device)
+            self._gov_nd_house = torch.tensor([float(x[1]) for x in _gnd], dtype=dtype, device=device)
+            self._gov_nd_amen = torch.tensor([float(x[2]) for x in _gnd], dtype=dtype, device=device)
             self._gov_arange = torch.arange(self._ngov, dtype=torch.long, device=device)
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)  # [nPol]
@@ -1726,6 +1740,11 @@ class BatchSim:
             # isEncampmentItem); TS rival accrual is mods-free.
             self._pol_encamp = torch.tensor([float(p.get("encampmentProdMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol]
             self._pol_tpmult = torch.tensor([float(p.get("tilePurchaseMult", 1)) for p in _pols], dtype=dtype, device=device)  # [nPol] #51/S7.7b (LAND_SURVEYORS = 0.8)
+            self._pol_amen = torch.tensor([float(p.get("amenitiesAll", 0)) for p in _pols], dtype=dtype, device=device)  # #51/S7.4d
+            _pnd = [p.get("newDeal", [-1, 0, 0]) for p in _pols]
+            self._pol_nd_min = torch.tensor([int(x[0]) for x in _pnd], dtype=torch.long, device=device)
+            self._pol_nd_house = torch.tensor([float(x[1]) for x in _pnd], dtype=dtype, device=device)
+            self._pol_nd_amen = torch.tensor([float(x[2]) for x in _pnd], dtype=dtype, device=device)
         # A-7r master switch (rules.governmentsLive), mirrored from the TS
         # GOVERNMENTS_ADOPTION_LIVE. Landed inert; gates every gov/policy
         # application + the influence-tier addition so the two engines flip in
@@ -3193,6 +3212,11 @@ class BatchSim:
         city_y = torch.zeros(B, 6, dtype=dt, device=dev)
         cap_y = torch.zeros(B, 6, dtype=dt, device=dev)
         hous_all = torch.zeros(B, dtype=dt, device=dev)
+        # #51/S7.4d: flat amenities, and the two district-conditional rules as
+        # (threshold, housing, amenities) triples folded over gov + slotted cards.
+        amen_all = torch.zeros(B, dtype=dt, device=dev)
+        hid = []   # list of (min[B], housing[B])
+        nd = []    # list of (min[B], housing[B], amenities[B])
         ymult = torch.ones(B, 6, dtype=dt, device=dev)
         slotted = torch.zeros(B, self._npol, dtype=torch.bool, device=dev)
         emult = torch.ones(B, dtype=dt, device=dev)  # B9-R1: encampmentProdMult product (VETERANCY)
@@ -3202,11 +3226,19 @@ class BatchSim:
         # ignored LAND_SURVEYORS while the player's did not.
         tpmult = torch.ones(B, dtype=dt, device=dev)
         if not self._gov_has_effects or not self._ngov:
-            return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult
+            return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult, amen_all, hid, nd
         adopted, has_gov = self._adopted_gov(civics2)
         gmask = has_gov.to(dt).unsqueeze(1)
         city_y = city_y + self._gov_city_y[adopted] * gmask
         cap_y = cap_y + self._gov_cap_y[adopted] * gmask
+        amen_all = amen_all + self._gov_amen[adopted] * has_gov.to(dt)  # #51/S7.4d
+        _neg0 = torch.full((B,), -1, dtype=torch.long, device=dev)
+        _z0 = torch.zeros(B, dtype=dt, device=dev)
+        hid.append((torch.where(has_gov, self._gov_hid_min[adopted], _neg0),
+                    torch.where(has_gov, self._gov_hid_house[adopted], _z0)))
+        nd.append((torch.where(has_gov, self._gov_nd_min[adopted], _neg0),
+                   torch.where(has_gov, self._gov_nd_house[adopted], _z0),
+                   torch.where(has_gov, self._gov_nd_amen[adopted], _z0)))
         hous_all = hous_all + self._gov_housing[adopted] * has_gov.to(dt)
         ymult = torch.where(has_gov.unsqueeze(1), self._gov_ymult[adopted], ymult)
         emult = torch.where(has_gov, self._gov_encamp[adopted], emult)
@@ -3232,13 +3264,47 @@ class BatchSim:
             city_y = city_y + sd @ self._pol_city_y
             cap_y = cap_y + sd @ self._pol_cap_y
             hous_all = hous_all + sd @ self._pol_housing
+            amen_all = amen_all + sd @ self._pol_amen  # #51/S7.4d
+            for _pi in range(self._npol):
+                _on = slotted[:, _pi]
+                if not bool(_on.any()):
+                    continue
+                _neg = torch.full((B,), -1, dtype=torch.long, device=dev)
+                _z = torch.zeros(B, dtype=dt, device=dev)
+                hid.append((torch.where(_on, self._pol_hid_min[_pi].expand(B), _neg),
+                            torch.where(_on, self._pol_hid_house[_pi].expand(B), _z)))
+                nd.append((torch.where(_on, self._pol_nd_min[_pi].expand(B), _neg),
+                           torch.where(_on, self._pol_nd_house[_pi].expand(B), _z),
+                           torch.where(_on, self._pol_nd_amen[_pi].expand(B), _z)))
             # B9-R1: multiplicative product over slotted cards (TS applyPolicy
             # mods.encampmentProdMult *= fx — only VETERANCY carries it).
             emult = emult * torch.where(slotted, self._pol_encamp.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
             # #51/S7.7b: TS applyPolicy does `mods.tilePurchaseMult *= fx` — the
             # same multiplicative fold, over the same slotted mask.
             tpmult = tpmult * torch.where(slotted, self._pol_tpmult.unsqueeze(0).expand(B, -1), torch.ones(B, self._npol, dtype=dt, device=dev)).prod(dim=1)
-        return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult
+        return city_y, cap_y, hous_all, ymult, slotted, emult, tpmult, amen_all, hid, nd
+
+    def _cond_house_amen(self, hid, nd, all_d, spec_d):
+        """#51/S7.4d: the two district-conditional rules, for ANY seat.
+
+        `housingIfDistricts` keys on ALL completed non-centre districts;
+        `newDeal` keys on SPECIALTY ones and pays housing AND amenities. TS
+        applies both in `computeHousing`/`computeCityStats` for the player and
+        (since S7.4d) in `rivalHousing`/`rivalAmenityTiers` for a rival — one
+        rule, so one applier, rather than four copies that drift.
+
+        `all_d`/`spec_d` are [B, C] district counts; returns (housing, amenities)
+        of the same shape."""
+        house = torch.zeros_like(all_d, dtype=self.dtype)
+        amen = torch.zeros_like(all_d, dtype=self.dtype)
+        for mn, hs in hid:
+            ok = (mn.unsqueeze(1) >= 0) & (all_d >= mn.unsqueeze(1))
+            house = house + ok.to(self.dtype) * hs.unsqueeze(1)
+        for mn, hs, am in nd:
+            ok = (mn.unsqueeze(1) >= 0) & (spec_d >= mn.unsqueeze(1))
+            house = house + ok.to(self.dtype) * hs.unsqueeze(1)
+            amen = amen + ok.to(self.dtype) * am.unsqueeze(1)
+        return house, amen
 
     def _gov_policy_mods_cached(self, seat_tag, civics2: torch.Tensor):
         """G1: (seat_tag, _eff_version)-keyed wrapper over _gov_policy_mods. The
@@ -4469,7 +4535,12 @@ class BatchSim:
         # `bonuses`, city.ts:445-447), summed pre-amenity-factor. Food (col 0)
         # is left unscaled by the amenity factor below, matching TS.
         if self._gov_has_effects:
-            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult, _gpc_tp = self._gov_policy_mods_cached("p", self.civics)
+            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult, _gpc_tp, gpc_amen, gpc_hid, gpc_nd = self._gov_policy_mods_cached("p", self.civics)
+            # #51/S7.4d: both conditional rules once, here — the amenity half is
+            # needed BEFORE the tier balance and the housing half AFTER it.
+            _cond_house, _cond_amen = (
+                self._cond_house_amen(gpc_hid, gpc_nd, dcount_all, spec_count)
+                if self.districts_on and (gpc_hid or gpc_nd) else (None, None))
             total += gpc_city.unsqueeze(1)
             total += gpc_cap.unsqueeze(1) * self.is_cap.to(self.dtype).unsqueeze(2)
         else:
@@ -4493,6 +4564,10 @@ class BatchSim:
             amen_have = amen_have + torch.where(spec_count.to(self.dtype) >= _zen[:, :, 0], _zen[:, :, 1], torch.zeros_like(_zen[:, :, 1]))
         # B-15: flat empire-wide war-weariness drag, applied after the luxury
         # grant (mirrors city.ts `have -= warWearinessPenalty(...)`).
+        if gpc_amen is not None:
+            amen_have = amen_have + gpc_amen.unsqueeze(1)  # #51/S7.4d amenitiesAll
+        if _cond_amen is not None:
+            amen_have = amen_have + _cond_amen  # #51/S7.4d newDeal amenities
         balance = amen_have - amen_need - self._ww_penalty_player().unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
@@ -4567,11 +4642,12 @@ class BatchSim:
         # #46r: housingIfDistricts (INSULAE) — +housing where the city's
         # completed-district count meets the card's min (computeHousing's
         # rule loop; player-only like every housing mod).
-        if gpc_slotted is not None and self._npol and self.districts_on:
-            _hid_act = gpc_slotted & (self._pol_hid_min >= 0).unsqueeze(0)  # [B, nPol]
-            if bool(_hid_act.any()):
-                _hid_ok = _hid_act.unsqueeze(1) & (dcount_all.unsqueeze(2) >= self._pol_hid_min.clamp(min=0).reshape(1, 1, -1))
-                housing = housing + (_hid_ok.to(self.dtype) * self._pol_hid_house.reshape(1, 1, -1)).sum(dim=2)
+        # #51/S7.4d: BOTH district-conditional rules, from gov AND cards, via the
+        # one applier the rival path also calls. This replaced a policy-only,
+        # housingIfDistricts-only inline block — governments carrying the same
+        # channels were silently dropped, and `newDeal` was dropped entirely.
+        if _cond_house is not None:
+            housing = housing + _cond_house
 
         # D-10: refresh the store on every miss (lux=None callers always land
         # here, so a fresh walk always starts from a same-version store).
@@ -10711,6 +10787,17 @@ class BatchSim:
                 top_v, top_i = key.topk(k, dim=1)
                 grant = (top_v > -1e8) & act.unsqueeze(1)
                 out.scatter_add_(1, top_i, grant.to(torch.float64))
+        # #51/S7.4d: this rival's OWN government/policy flat amenities and the
+        # newDeal specialty rule — the same two arms the player has always had
+        # in computeCityStats. Shares `_cond_house_amen` with the player path.
+        _g_amen = _g_nd = None
+        if self._gov_has_effects:
+            _gm = self._gov_policy_mods_cached(r, self.r_civics[:, r])
+            _g_amen, _g_hid, _g_nd = _gm[7], _gm[8], _gm[9]
+            _rc_all = ((self.rc_dist_tile[:, r] >= 0) & self.district_complete.gather(
+                1, self.rc_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.rc_dist_tile[:, r])).sum(dim=2)
+            _, _r_cond_amen = self._cond_house_amen(_g_hid, _g_nd, _rc_all, self._rc_spec_count(r))
+            have = have + _g_amen.unsqueeze(1) + _r_cond_amen
         if self._r_has_beliefs(r):
             # A-7: River Goddess (river centers) + Zen Meditation (2+
             # completed specialty districts) join the TIER balance only —
@@ -12154,7 +12241,14 @@ class BatchSim:
         )
         def_cs = torch.where(r_at >= 0, r_def, p_def)
         # Attacker CS assembled exactly as _hostile_city_attack assembles it.
-        if atk_kind == "barb":
+        # #51/S7.13a: ASK THE TABLE, do not branch on the pool name. This site
+        # still spelled the barbarian rule as `if atk_kind == "barb"` while its
+        # two siblings already read `SEAT_CAPS[...]["xp"]` — one fact with two
+        # sources, which is the exact hazard the caps table exists to remove.
+        # S3.3's note blamed the missing barb xp PLANE; that plane exists now,
+        # so the hardcode has no reason left. Value-identical: `hostile` is the
+        # only class with xp False, so barbs still contribute 0.
+        if not SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]:
             atk_lvl5 = torch.zeros_like(a_hp[:, u])
         elif atk_kind == "player":
             atk_lvl5 = self._xp_lvl_bonus(self.p_xp[:, u])
@@ -14194,8 +14288,15 @@ class BatchSim:
                 # discarded it, so a rival running MONARCHY was denied its own
                 # government's housing. A government belongs to the civ that
                 # ADOPTED it, and rivals adopt on both engines.
-                _gp_hous = self._gov_policy_mods_cached(r, self.r_civics[:, r])[2].double()
+                _gpm = self._gov_policy_mods_cached(r, self.r_civics[:, r])
+                _gp_hous = _gpm[2].double()
                 housing = water + bh + self._palace_housing * (self.rc_is_cap[:, r] & self.rc_alive[:, r]).double() + farm + _gp_hous.unsqueeze(1)
+                # #51/S7.4d: this rival's housingIfDistricts + newDeal housing, through
+                # the same applier the player uses. `rivalHousing` gained both arms in TS.
+                _rc_all_d = ((self.rc_dist_tile[:, r] >= 0) & self.district_complete.gather(
+                    1, self.rc_dist_tile[:, r].clamp(min=0).reshape(B, -1)).reshape_as(self.rc_dist_tile[:, r])).sum(dim=2)
+                _rh, _ = self._cond_house_amen(_gpm[8], _gpm[9], _rc_all_d, self._rc_spec_count(r))
+                housing = housing + _rh
                 # A-9 (#71): appeal-based NEIGHBORHOOD housing, the player twin
                 # (computeHousing). rc tiles are keyed by the A-17 per-city
                 # registry (rc_tile_id), so sum per rc SLOT over its own tiles.

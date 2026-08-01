@@ -55,7 +55,7 @@ def main() -> None:
     c0 = torch.zeros(B, NC, dtype=torch.bool, device=sim.device)
     _, has_gov = sim._adopted_gov(c0)
     assert not bool(has_gov.any()), "no government should be adopted with zero civics"
-    city_y, cap_y, hous, ymult, _sl, _em, _tp = sim._gov_policy_mods(c0)
+    city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c0)
     assert float(city_y.abs().sum()) == 0.0 and float(cap_y.abs().sum()) == 0.0 and float(hous.abs().sum()) == 0.0, "no gov/policy mods with zero civics"
     assert int(sim._adopted_gov_tier(c0)[0]) == 0, "influence tier 0 with no government"
 
@@ -66,7 +66,7 @@ def main() -> None:
     adopted, has_gov = sim._adopted_gov(c1)
     assert bool(has_gov.all()), "CHIEFDOM should be adopted once CODE_OF_LAWS is in"
     assert int(adopted[0]) == gov_idx["CHIEFDOM"], "newest unlocked government is CHIEFDOM here"
-    city_y, cap_y, hous, ymult, _sl, _em, _tp = sim._gov_policy_mods(c1)
+    city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c1)
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING gives +1 production to every city"
     assert float(cap_y.abs().sum()) == 0.0, "CHIEFDOM has no capital yields and GOD_KING must NOT spill (no W slot)"
     assert int(sim._adopted_gov_tier(c1)[0]) == 0, "CHIEFDOM influence tier is 0"
@@ -86,7 +86,7 @@ def main() -> None:
     c2 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "POLITICAL_PHILOSOPHY"])
     adopted, has_gov = sim._adopted_gov(c2)
     assert int(adopted[0]) == gov_idx["AUTOCRACY"], "newest tier-1 government, table-order tie-break => AUTOCRACY"
-    city_y, cap_y, hous, ymult, _sl, _em, _tp = sim._gov_policy_mods(c2)
+    city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c2)
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING still slotted in AUTOCRACY's economic slot"
     for k in range(6):
         want = 2.0 if k in (2, 5) else 1.0  # gold, faith carry GOD_KING's wildcard spill
@@ -109,7 +109,7 @@ def main() -> None:
     c3 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"])
     adopted, has_gov = sim._adopted_gov(c3)
     assert int(adopted[0]) == gov_idx["MONARCHY"], "newest tier-2 government => MONARCHY"
-    city_y, cap_y, hous, ymult, _sl, _em, _tp = sim._gov_policy_mods(c3)
+    city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c3)
     assert float(hous[0]) == 1.0, "MONARCHY housingAll +1 (player-only channel; rival sites discard it)"
     GOLD, FAITH = 2, 5
     assert float(cap_y[0, GOLD]) == 1.0 and float(cap_y[0, FAITH]) == 1.0, "GOD_KING spills into MONARCHY's wildcard slot (+1 gold/+1 faith capital)"
@@ -122,7 +122,7 @@ def main() -> None:
     c4 = civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "FOREIGN_TRADE", "MILITARY_TRADITION", "STATE_WORKFORCE", "EARLY_EMPIRE", "POLITICAL_PHILOSOPHY", "CIVIL_SERVICE", "FEUDALISM", "GUILDS", "MEDIEVAL_FAIRES", "EXPLORATION"])
     adopted, has_gov = sim._adopted_gov(c4)
     assert int(adopted[0]) == gov_idx["MERCHANT_REPUBLIC"], "EXPLORATION without DIVINE_RIGHT => MERCHANT_REPUBLIC"
-    city_y, cap_y, hous, ymult, sl4, _em, _tp = sim._gov_policy_mods(c4)
+    city_y, cap_y, hous, ymult, sl4, _em, _tp, *_ = sim._gov_policy_mods(c4)
     GOLD2 = 2
     assert abs(float(ymult[0, GOLD2]) - 1.1) < 1e-12, "MERCHANT_REPUBLIC gold ×1.1 (the rng-2026006082 t249 catch)"
     pol_idx = {p["id"]: i for i, p in enumerate(rj["policies"])}
@@ -144,7 +144,7 @@ def main() -> None:
     sim2 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert sim2._gov_live is True, "A-7r ships LIVE (rules.governmentsLive True since #46r)"
     sim2._gov_has_effects = False  # force-off in memory
-    cy, cpy, ch, cym, _s2, _e2, _tp2 = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
+    cy, cpy, ch, cym, _s2, _e2, _tp2, *_ = sim2._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
     assert float(cy.abs().sum()) == 0.0 and float(cpy.abs().sum()) == 0.0 and float(ch.abs().sum()) == 0.0, "switch off => no mods"
 
     # 6) B-13 (Slice V) — a newly-wired card slots at its civic boundary.
@@ -152,7 +152,7 @@ def main() -> None:
     #    military slot; DISCIPLINE (earlier in POLICIES table order than SURVEY)
     #    takes it, SURVEY is dropped, URBAN_PLANNING keeps the economic slot.
     pol_i = {p["id"]: i for i, p in enumerate(rj["policies"])}
-    _, _, _, _, sl6, _, _ = sim._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
+    _, _, _, _, sl6, *_ = sim._gov_policy_mods(civics_with(["CODE_OF_LAWS"]))
     assert bool(sl6[0, pol_i["DISCIPLINE"]]), "DISCIPLINE fills CHIEFDOM's military slot once CODE_OF_LAWS grants it"
     assert not bool(sl6[0, pol_i["SURVEY"]]), "SURVEY is dropped — CHIEFDOM has only one military slot"
     assert bool(sl6[0, pol_i["URBAN_PLANNING"]]), "URBAN_PLANNING keeps the economic slot"
@@ -191,14 +191,14 @@ def main() -> None:
     mf_idx = civ_idx["MEDIEVAL_FAIRES"]
     simp = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     simp.civics.copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
-    _, _, _, _, slp, _, _ = simp._gov_policy_mods(simp.civics)
+    _, _, _, _, slp, *_ = simp._gov_policy_mods(simp.civics)
     assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
     simp.civic_boosted[:] = False
     simp._detect_boosts()
     assert bool(simp.civic_boosted[0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
     simn = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     simn.civics.copy_(civics_with(["CODE_OF_LAWS"]))
-    _, _, _, _, sln, _, _ = simn._gov_policy_mods(simn.civics)
+    _, _, _, _, sln, *_ = simn._gov_policy_mods(simn.civics)
     assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
     simn.civic_boosted[:] = False
     simn._detect_boosts()

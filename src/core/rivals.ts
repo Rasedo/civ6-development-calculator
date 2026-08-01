@@ -1687,6 +1687,21 @@ export function rivalHousing(state: GameState, rival: RivalCiv, rc: RivalCity): 
   // FLAT housingAll, which is a separate residual about the VALUE. This slice
   // is about the CHANNEL — that the rival seat reads it at all.
   total += m.housingAll;
+  // #51/S7.4d: the district-conditional housing rules, the player's two
+  // remaining arms in `computeHousing` (housingIfDistricts on ALL completed
+  // districts, newDeal on SPECIALTY ones). `RivalCity = City`, so the same
+  // counting helper serves both seats.
+  if (m.housingIfDistricts.length > 0 || m.newDeal.length > 0) {
+    const all = rc.districts.filter(
+      (d) => d.type !== 'CITY_CENTER' && map.tiles[d.tileIndex].districtComplete,
+    ).length;
+    const spec = rc.districts.filter(
+      (d) => d.type !== 'CITY_CENTER' && map.tiles[d.tileIndex].districtComplete
+        && DISTRICTS[d.type].countsTowardLimit,
+    ).length;
+    for (const rule of m.housingIfDistricts) if (all >= rule.min) total += rule.housing;
+    for (const rule of m.newDeal) if (spec >= rule.min) total += rule.housing;
+  }
   // #51/S7.3: the improvement's housing accrues to the city that OWNS the
   // tile, not to every city of the civ whose radius reaches it. This read
   // `tileOwnedByCiv(t, civ)`, so with two same-civ cities within six hexes —
@@ -1756,12 +1771,18 @@ export function rivalAmenityTiers(state: GameState, rival: RivalCiv): Map<number
   for (const rc of rival.cities) {
     const m = withFollowerBelief(state, base, followerReligionForCity(rc.followedReligion, ownerRel));
     let extra = 0;
+    // #51/S7.4d: the seat's GOVERNMENT/POLICY flat amenities and the newDeal
+    // specialty rule — `city.ts` has always added both for the player
+    // (`m.amenitiesAll`, then the `m.newDeal` loop beside amenitiesIfSpecialty)
+    // and the rival block had neither.
+    extra += m.amenitiesAll;
     if (m.riverCity && hasRiver(state.map.tiles[rc.centerIndex])) extra += m.riverCity.amenities;
-    if (m.amenitiesIfSpecialty.length > 0) {
+    if (m.amenitiesIfSpecialty.length > 0 || m.newDeal.length > 0) {
       const specialty = rc.districts.filter(
         (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
       ).length;
       for (const rule of m.amenitiesIfSpecialty) if (specialty >= rule.min) extra += rule.amenities;
+      for (const rule of m.newDeal) if (specialty >= rule.min) extra += rule.amenities;
     }
     tiers.set(rc.id, amenityTier(baseHave.get(rc.id)! + grants.get(rc.id)! + extra - wwPenalty - amenitiesNeeded(rc.population)));
   }
