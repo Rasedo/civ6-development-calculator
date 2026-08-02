@@ -15,7 +15,9 @@ import { makeMap, makeState, tileAtCoords } from './helpers';
 import { rivalPhase } from '../src/core/rivals';
 import { prodLayout } from '../src/core/prodLayout';
 import { civOfRival, rivalCount, isPlayerSeat, tileSeat, cityStateOfSeat, isCityStateSeat, setTileOwner, emptySeat } from '../src/core/seats';
-import { tilesWithin } from '../src/core/hex';
+import { tilesWithin, neighbors } from '../src/core/hex';
+import { spawnUnit } from '../src/core/units';
+import { isWater, isImpassable } from '../src/core/query';
 import { BUILDINGS } from '../src/data/buildings';
 import { SCAFFOLD_DISTRICTS } from '../src/data/districts';
 import type { GameState, RivalCity, RivalCiv } from '../src/core/types';
@@ -117,6 +119,28 @@ describe('#70 the action FILE drives the TS rival', () => {
     const q = rival.cities[0].queue[0];
     expect(q?.kind).toBe('district');
     expect(q?.kind === 'district' && q.district).toBe('CAMPUS');
+  });
+
+  it('replays recorded UNIT MOVE orders, one entry per step', () => {
+    // #90 made a unit's order a direction SEQUENCE, so the record holds one row
+    // per step and a faithful replay walks them in order. This asserts the unit
+    // actually MOVED — a replay that accepted the rows and moved nothing would
+    // leave driven rivals parked while the GPU's walked, and parity would blame
+    // something else entirely.
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    state.unitsMode = true;
+    const rival = addRival(state, 6, 6);
+    const spawned = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, civOfRival(rival.id));
+    expect(spawned).toBeTruthy();
+    const before = spawned!.tileIndex;
+    const nb = neighbors(state.map, state.map.tiles[before]);
+    const dir = nb.findIndex((t) => t && !isImpassable(t) && !isWater(t));
+    expect(dir).toBeGreaterThanOrEqual(0);
+    state.rivalActions = { [state.turn]: { [rival.id]: { production: [-1], tech: null, civic: null, units: [[dir]] } } };
+    rivalPhase(state);
+    const after = state.units.find((u) => u.id === spawned!.id);
+    expect(after).toBeTruthy();
+    expect(after!.tileIndex).not.toBe(before);
   });
 
   it('a seat with NO record still runs the ladder (the paths coexist)', () => {

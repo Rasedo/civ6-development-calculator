@@ -192,3 +192,70 @@ def drive(env, turns: int, seats=None, record: Path | None = None) -> list:
     if record is not None:
         record.write_text(json.dumps(log), encoding="utf-8")
     return log
+
+
+def replay_batched(env, seeds: list, actions: dict, turns: int) -> None:
+    """Replay a per-seed action file across a BATCHED sim.
+
+    `gpu/drive_gate.py` records each seed at B=1 because the driver observes one
+    game at a time, but the parity gate runs all seeds as one batch. So the
+    per-seed records are STACKED into the [B, ...] tensors the apply paths take.
+
+    Seeds keep their fixture order — `seeds[b]` is batch row b — because every
+    comparison downstream is positional. Getting that wrong would misattribute
+    one seed's decisions to another and show up as a diffuse parity failure with
+    no single cause, which is the worst kind to diagnose.
+
+    Turns a seed does not cover (a shorter recording) are left to -1, i.e. no
+    instruction, rather than silently repeating the last action.
+    """
+    sim = env.sim
+    B = sim.B
+    assert len(seeds) == B, f"{len(seeds)} seeds for a batch of {B}"
+    for r in range(sim.R):
+        take_seat(sim, r)
+    for t in range(turns):
+        apply_turn(sim, seeds, actions, t)
+        sim.step()
+
+
+def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
+    """Apply ONE recorded turn across the batch, WITHOUT stepping.
+
+    Split out so the parity gate can drive its own loop: parity must apply the
+    turn, step, and then read the trace row, and a helper that stepped for it
+    would put the comparison a turn out of phase.
+    """
+    B = sim.B
+    if True:
+        for r in range(sim.R):
+            recs = [actions.get(str(seeds[b]), {}).get(str(t), {}).get(str(r)) for b in range(B)]
+            if not any(recs):
+                continue
+            C = sim.RC
+            prod = torch.full((B, C), -1, dtype=torch.long, device=sim.device)
+            tech = torch.full((B,), -1, dtype=torch.long, device=sim.device)
+            civic = torch.full((B,), -1, dtype=torch.long, device=sim.device)
+            n_steps = 0
+            for b, rec in enumerate(recs):
+                if not rec:
+                    continue
+                pr = rec["production"]
+                prod[b, : min(len(pr), C)] = torch.tensor(pr[:C], dtype=torch.long, device=sim.device)
+                if rec.get("tech") is not None:
+                    tech[b] = int(rec["tech"][0] if isinstance(rec["tech"], list) else rec["tech"])
+                if rec.get("civic") is not None:
+                    civic[b] = int(rec["civic"][0] if isinstance(rec["civic"], list) else rec["civic"])
+                n_steps = max(n_steps, len(rec.get("units", [])))
+            sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
+            for k in range(n_steps):
+                N = sim.rival_slot_map(r).shape[1]
+                orders = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
+                for b, rec in enumerate(recs):
+                    if not rec:
+                        continue
+                    us = rec.get("units", [])
+                    if k < len(us):
+                        row = us[k][0] if (us[k] and isinstance(us[k][0], list)) else us[k]
+                        orders[b, : min(len(row), N)] = torch.tensor(row[:N], dtype=torch.long, device=sim.device)
+                sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))

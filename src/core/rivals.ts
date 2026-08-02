@@ -2337,6 +2337,48 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
       if (d) placeRivalDistrict(state, rival, rc, d.id, computeUnlocksIn(rival.research));
     }
   });
+  applyRivalUnitOrders(state, rival, rec.units);
+}
+
+/** #70: replay this seat's recorded UNIT orders.
+ *
+ * `rec.units` is one entry per STEP, because #90 made a unit's order a direction
+ * SEQUENCE — the GPU driver re-observes between steps (the observation is 1-hop)
+ * and records what it chose each time, so a faithful replay walks the same steps
+ * in the same order.
+ *
+ * Row j addresses the seat's j-th unit in SPAWN order, which is what
+ * `rival_slot_map` ranks by on the GPU side. `rivalUnits` filters `state.units`,
+ * which preserves spawn order, so the two agree — but this is an ASSUMPTION the
+ * gate has to hold, not a guarantee this function can enforce: if it ever breaks,
+ * every seat's orders land on the wrong units and the failure looks like chaos
+ * rather than an ordering bug.
+ *
+ * Columns are the shared unit-action enum: 0-5 step to that neighbour, 6-11
+ * attack there, 12 hold. The builder verbs (CHOP/REPAIR/improvements/PILLAGE)
+ * are NOT replayed here yet — the ladder's peace verb never emits them, so
+ * recording one would mean the policy changed and this needs extending with it.
+ */
+export function applyRivalUnitOrders(state: GameState, rival: RivalCiv, steps: number[][]): void {
+  if (!steps || steps.length === 0) return;
+  for (const step of steps) {
+    const row = Array.isArray(step[0]) ? (step[0] as unknown as number[]) : step;
+    const units = rivalUnits(state, rival.id);
+    units.forEach((unit, j) => {
+      const a = row[j] ?? -1;
+      if (a < 0 || a === 12) return;            // no instruction, or HOLD
+      if (!state.units.includes(unit) || unit.movesLeft <= 0) return;  // died or spent
+      if (a < 6) {
+        const nb = neighbors(state.map, state.map.tiles[unit.tileIndex]);
+        const to = nb[a];
+        if (to) stepUnit(state, unit, to);      // stepUnit re-validates; an illegal step is refused
+      }
+      // 6-11 ATTACK: the ladder's peace verb only fires it against barbarians,
+      // which `hostileUnitAct` already resolves in this phase. Wiring a replayed
+      // attack needs the combat call to be idempotent with that path — left out
+      // deliberately rather than double-resolving a strike.
+    });
+  }
 }
 
 export function rivalPhase(state: GameState): void {

@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from civ6gpu import BatchSim, load_rules, load_fixture, FIXTURES
 
 import stamp
+import drive  # #70: the file-driven gate
 
 def columns(sim, rj: dict) -> tuple[list[str], torch.Tensor]:
     """Column names and per-column tolerances, from ONE source per engine.
@@ -97,9 +98,26 @@ def main() -> int:
     # per fixture); torch.tensor raises on ragged input, the loud failure we
     # want if that ever stops holding.
     want_all = torch.tensor([f["trace"] for f in fixtures], dtype=torch.float64)
+    # #70: when the action file is present the rivals on BOTH sides replay it
+    # instead of deciding. That makes this gate compare the RULES with the policy
+    # removed from the comparison — today it compares two engines each running
+    # their own copy of the rival ladder, so it can only catch a divergence when
+    # the two TRANSCRIPTIONS disagree, never when they agree and are both wrong.
+    act_path = FIXTURES / "rival_actions.json"
+    driven = None
+    if act_path.exists():
+        blob = json.loads(act_path.read_text(encoding="utf-8"))
+        driven = blob["seeds"]
+        seed_order = [f["seed"] for f in fixtures]
+        for r in range(sim.R):
+            drive.take_seat(sim, r)
+        print(f"DRIVEN: replaying rival_actions.json (schema v{blob['schema']}) on both engines")
+
     failures = 0
     worst = torch.zeros(len(cols), dtype=torch.float64)
     for t in range(n_turns):
+        if driven is not None:
+            drive.apply_turn(sim, seed_order, driven, t)
         sim.step()
         got = sim.trace_row()
         diff_all = (got - want_all[:, t]).abs()

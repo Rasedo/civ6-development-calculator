@@ -3454,7 +3454,9 @@ class BatchSim:
             & (self.improvement < 0)
             & (d_center <= 3)
         )
-        elig = elig.clone()
+        # no clone: the `&` chain above already returns a fresh tensor nothing
+        # else references, and this runs per district type per city per rival
+        # per turn on the scripted hot path.
         elig[torch.arange(B, device=dev), center] = False
         if placement in (1, 3):
             cc = self._adj_center_count()
