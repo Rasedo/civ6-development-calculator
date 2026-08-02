@@ -301,10 +301,15 @@ def main() -> None:
               war=[(9.0, [8.0] * 6), (0.0, [9.0] * 6)])
     assert int(ladder.pick_unit_orders(ma, oa)[0, 0]) == 6, "attack outranks pillage and march"
 
-    # at war but NO reachable target (d_war BIG): fall back to the peace drift
+    # at war with NO reachable target: HOLD, never the peace drift. The engine's
+    # war act stands its ground (`moving = march & has_tgt`) — the earlier pin
+    # here encoded the ladder's own bug, and the tile-class re-bucket falsified
+    # it (203 of the 453 residual holds were exactly this drift).
     ow = uobs([(9.0, [8.0] * 6, [0] * 6), (0.0, far, [0] * 6)])
     ow[0, 0, ladder.U_ATWAR] = 1.0
-    assert int(ladder.pick_unit_orders(m, ow)[0, 0]) == 3, "no war target -> peace drift (PERM tie-break)"
+    assert int(ladder.pick_unit_orders(m, ow)[0, 0]) == 12, "at war with no target -> HOLD (no drift)"
+    # ...and the SAME unit at peace still drifts (the rule is war-gated).
+    assert int(ladder.pick_unit_orders(m, uobs([(9.0, [8.0] * 6, [0] * 6), (0.0, far, [0] * 6)]))[0, 0]) == 3
     # #92: adjacent and RING targets interleave by TILE INDEX — an adjacent
     # target on tile 50 loses to a ring target on tile 10, because the engine
     # scans all tiles in index order. Wide mask (38) + wide obs (36).
@@ -341,7 +346,7 @@ def main() -> None:
     print("  i snipe interleave OK (lowest TILE INDEX wins across d1 and d2)")
 
     print("  h war branch OK (march ties to direction order, pillage-first, "
-          "attack outranks, no-target falls back to patrol)")
+          "attack outranks, no-target HOLDS at war)")
     print("  g unit-orders verb OK (attack by lowest target tile, PATROL_DIR_PERM "
           "drift, stop radius, hold vs no-instruction)")
 

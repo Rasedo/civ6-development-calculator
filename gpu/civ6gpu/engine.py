@@ -6569,7 +6569,26 @@ class BatchSim:
             )
         else:
             _wgate = torch.zeros(B, P_MAX, 6, dtype=torch.bool, device=dev)
-        move = on_map & (passable | _wgate) & ~foreign & ~own_dom & alive
+        # #92 re-bucket: 203 of the residual holds were the ladder proposing a
+        # step ONTO a centre tile — the march refuses those ("enemy centers
+        # can't be entered — real Civ 6"; capture comes through ATTACK, and a
+        # CS tile is not enterable either). `foreign` is built from unit
+        # occupancy and never saw centre TILES. Own-civ centres stay enterable
+        # (garrisoning your own city is legal).
+        _rvc_mv = self.rvcity_at.gather(1, nbc).reshape(B, P_MAX, 6)
+        # cs term: the CENTRE TILE only, via the cs_center scatter — cs_at
+        # marks the whole TERRITORY, and blocking that stopped rivals marching
+        # THROUGH city-state land the engine crosses freely (the +99
+        # regression this line replaces). Same scatter the attack arm uses.
+        _Smv = self.S
+        _cs_ctr_mv = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        _cs_ctr_mv.scatter_(1, self.cs_center[:, :_Smv].clamp(min=0), self.cs_alive[:, :_Smv])
+        _centre_block = (
+            ((_rvc_mv >= 0) & (_rvc_mv != r))
+            | (self.center_at.gather(1, nbc).reshape(B, P_MAX, 6) >= 0)
+            | _cs_ctr_mv.gather(1, nbc).reshape(B, P_MAX, 6)
+        )
+        move = on_map & (passable | _wgate) & ~foreign & ~own_dom & ~_centre_block & alive
         can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
         at_war = self.r_atwar[:, r].reshape(B, 1, 1)
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war

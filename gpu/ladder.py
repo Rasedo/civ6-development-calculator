@@ -510,9 +510,14 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     roam = (d_home > float(home_radius)) & has_mv
 
     out = torch.full((B, N), 12, dtype=torch.long, device=dev)
-    out = torch.where(roam, mv_dir, out)                         # peace drift
+    # #92 re-bucket: NO PEACE DRIFT AT WAR. The engine's war act stands its
+    # ground when no target is reachable (`moving = march & has_tgt`) — it
+    # never walks home — while this fell through to the patrol and proposed
+    # exactly that, 203 times. A unit at war either marches on a target,
+    # fights, pillages, or HOLDS.
+    out = torch.where(roam & ~at_war, mv_dir, out)               # peace drift only at peace
     war_march = at_war & has_target & has_wmv
-    out = torch.where(war_march, w_dir, out)                     # war outranks it
+    out = torch.where(war_march, w_dir, out)                     # the war march
     out = torch.where(at_war & can_pillage, torch.full_like(out, pillage_col), out)
     out = torch.where(has_atk, atk_col, out)                     # attack outranks all
     # a unit with no legal order at all gets no instruction
