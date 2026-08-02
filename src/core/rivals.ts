@@ -2317,7 +2317,7 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
   // v2 (#70 signature A): production is [[centreTile, col], ...] — the city
   // axis keyed by CENTRE TILE, because slot order and founding order diverge
   // under compaction/capture. Each engine resolves the centre to ITS city.
-  const prodPairs = rec.production as unknown as [number, number][];
+  const prodPairs = rec.production;
   const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
   const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
   if (techCol !== null && techCol !== undefined && techCol >= 0 && !rival.research.tech) {

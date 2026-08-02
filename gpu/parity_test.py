@@ -105,7 +105,13 @@ def main() -> int:
     # the two TRANSCRIPTIONS disagree, never when they agree and are both wrong.
     act_path = FIXTURES / "rival_actions.json"
     driven = None
-    if act_path.exists():
+    # DRIVEN mode is an EXPLICIT opt-in (CIV6_DRIVEN=1), not presence-detection:
+    # the battery's parity lane must stay on the SCRIPTED gate while the driven
+    # hunt is mid-flight, or the whole tree's green couples to the hunt's
+    # residue — which is exactly what happened the first time the battery ran
+    # with the file sitting in gpu/fixtures.
+    import os as _os
+    if act_path.exists() and _os.environ.get("CIV6_DRIVEN"):
         blob = json.loads(act_path.read_text(encoding="utf-8"))
         driven = blob["seeds"]
         seed_order = [f["seed"] for f in fixtures]

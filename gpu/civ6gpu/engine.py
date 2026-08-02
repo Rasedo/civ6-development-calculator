@@ -6599,10 +6599,17 @@ class BatchSim:
             & (_rvc_mv != r)
             & self.rr_war[:, r].gather(1, _rvc_mv.clamp(min=0).reshape(B, -1)).reshape(B, P_MAX, 6)
         )
+        # the CS arm is GONE: the war verb's final singleton (9040 t42) showed
+        # the march stepping ONTO a city-state centre (step_ok has no centre
+        # term at all — "can't be entered" lives in the TARGET-stop logic, not
+        # the step scan), while this mask blocked it. Whether CS-centre entry
+        # is faithful to real Civ 6 is a SEPARATE question for both engines at
+        # once ([[source-of-truth]]); the mask's job is to agree with the rule
+        # the engines share. The player-centre arm stays (capture-by-walk is
+        # not modelled and no evidence has contradicted it).
         _centre_block = (
             _rvc_war_mv
             | (self.center_at.gather(1, nbc).reshape(B, P_MAX, 6) >= 0)
-            | _cs_ctr_mv.gather(1, nbc).reshape(B, P_MAX, 6)
         )
         # #92 the FINAL step-scan gate: the march's blocking is `_blocked_for`
         # — STACKING plus the ENCAMPMENT WALL (B-17: a live enemy Encampment
@@ -13237,6 +13244,13 @@ class BatchSim:
                                torch.full_like(civ, -1), a_seat[:, u])
         atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
         atk_e = atk_e + self._gen_aura_cs(aura_civ, a_tile[:, u], atk_naval).to(atk_e.dtype)
+        if getattr(self, "_battle_probe", False) and bool(att.any()):
+            for _b in att.nonzero(as_tuple=True)[0].tolist():
+                print(f"GPU-BATTLE b={_b} t={self.turn} tgt={int(tgt[_b])} "
+                      f"atk_e={float(atk_e[_b]):.1f} def_cs={float(def_cs[_b]):.1f} "
+                      f"combat={float(self._p_combat[int(a_type[_b, u])]):.0f} "
+                      f"wound={float(self._wound(a_hp[:, u])[_b]):.1f} "
+                      f"xp={int(a_xp[_b, u])} best_r={float(best_r[_b]):.0f} gar={int(gar[_b])}")
         # DRAW ORDER is the parity contract: the city's damage first, the
         # counter second, exactly as TS's cityAssault draws them.
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
@@ -16075,6 +16089,22 @@ class BatchSim:
             # D-4: this civ's live slots once (deaths only shrink mid-loop; no
             # spawns in either loop) — the war AND peace walks reuse it.
             v_mine = (self.v_alive[:, :v_high] & (self.v_civ[:, :v_high] == r)).any(dim=0).nonzero(as_tuple=True)[0].tolist() if v_high else []
+            # #70 driven rng-order: replayed unit acts must fire HERE — at the
+            # walkers' own position in the phase — not before step(). The t38
+            # first strikes were byte-identical on both engines while t39's
+            # wounds differed with the CUMULATIVE rng still matching: same
+            # stream, same totals, different values per battle, because the
+            # GPU's pre-step replay consumed its combat draws at a different
+            # position relative to the turn's other consumers than TS's
+            # in-phase replay. Draw-free actions (production/tech/civic) stay
+            # pre-step; battles draw, so they run where the scripted battles
+            # ran. War rows here, peace rows at the peace loop below.
+            _dsq = getattr(self, "_driven_useq", None)
+            if _dsq is not None and r in _dsq:
+                _rows_w = atw_any & self.controlled[:, r]
+                if bool(_rows_w.any()):
+                    _ord_w = torch.where(_rows_w.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
+                    self.apply_rival_unit_sequence(r, _ord_w)
             for v in v_mine:
                 # C1-B5b: civilians never act in the war loop (charges mark them)
                 # C3-prep: the units head drives controlled rivals now
@@ -16100,6 +16130,11 @@ class BatchSim:
 
             pea = active & ~atw_any  # A-19/B-33 (S2): a rival at ANY war does not patrol / roll the player-DoW
             self.r_peaceturns[:, r] = self.r_peaceturns[:, r] + pea.long()
+            if _dsq is not None and r in _dsq:
+                _rows_p = pea & self.controlled[:, r]
+                if bool(_rows_p.any()):
+                    _ord_p = torch.where(_rows_p.view(-1, 1, 1), _dsq[r], torch.full_like(_dsq[r], -1))
+                    self.apply_rival_unit_sequence(r, _ord_p)
             for v in v_mine:  # D-4: the same live-slot snapshot (superset)
                 # C1-B5b: builders neither snipe nor patrol
                 # C3-prep: the units head drives controlled rivals now

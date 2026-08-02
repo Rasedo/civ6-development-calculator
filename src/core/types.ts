@@ -288,8 +288,10 @@ export interface GovernmentState {
 
 /** One driven seat's decisions for one turn, in the mask layouts. #70 schema v1. */
 export interface RivalActionRecord {
-  /** per city, the production mask column; -1 = queue nothing. */
-  production: number[];
+  /** v2 (#70): [centreTile, maskColumn] pairs — the city axis keyed by
+   * CENTRE TILE, because slot order and founding order diverge under
+   * compaction/capture. A missing centre = that engine has no such city. */
+  production: [number, number][];
   /** tech / civic mask column; null or -1 = no pick. */
   tech: number | null;
   civic: number | null;

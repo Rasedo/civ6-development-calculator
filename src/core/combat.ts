@@ -495,6 +495,11 @@ function cityAssault(
 ): void {
   const atkCS = assaultAtkCS(state, attacker, city.centerIndex);
   const defCS = cityDefenseStrength(state, city);
+  if ((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CIV6_BATTLE_PROBE) {
+    console.log(`TS-BATTLE seed=${state.map.seed} t=${state.turn} tgt=${city.centerIndex} atkCS=${atkCS} defCS=${defCS} ` +
+      `combat=${UNITS[attacker.type]?.combat ?? 0} wound=${woundPenalty(attacker)} xp=${attacker.xp ?? 0} ` +
+      `best=${Math.max(15, seatOf(state, city.seat)?.bestMeleeCS ?? 0)}`);
+  }
   const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed

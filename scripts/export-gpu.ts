@@ -270,6 +270,11 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
  * interface between the policy module and both engines. */
 const DRIVEN_ACTIONS: { schema: number; turns: number; seeds: Record<string, Record<string, Record<string, unknown>>> } | null = (() => {
   const f = pathJoin(OUT, 'rival_actions.json');
+  // DRIVEN export is an EXPLICIT opt-in (CIV6_DRIVEN=1), matching parity_test:
+  // presence-detection coupled the battery's whole tree-green to the driven
+  // hunt's residue, and a half-gated pair (parity opt-in, exporter presence)
+  // produces MIXED gates — scripted GPU vs driven TS.
+  if (!process.env.CIV6_DRIVEN) return null;
   if (!existsSync(f)) return null;
   const parsed = JSON.parse(readFileSync(f, 'utf-8'));
   console.log(`replaying ladder actions from rival_actions.json (schema v${parsed.schema}, ${parsed.turns} turns)`);

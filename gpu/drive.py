@@ -121,20 +121,82 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
     sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
 
-    # units: re-observe per step, because the observation is 1-hop
-    steps = []
-    for _ in range(max_steps):
-        um = sim.rival_unit_mask(r)
-        if not bool(um.any()):
+    # units (#70 rng-order): the driver PLANS, the PHASE executes. Applying
+    # steps pre-step to re-observe consumed combat draws at a different stream
+    # position than TS's in-phase replay — same totals, different rolls per
+    # battle (proven by the t38/t39 six-number probe). Rank 0 comes from the
+    # real observation; later ranks are planned VIRTUALLY for MOVE rows only,
+    # chaining pair_dist toward the unit's own war target (or home) with the
+    # march's own key (d*8+dir) and NO state mutation. Non-move verbs end the
+    # turn at rank 0, exactly like the scripted walkers. The phase executes the
+    # stash at the walkers' position and RE-VALIDATES every rank (#90's
+    # contract: an illegal later step refuses, never substitutes).
+    um = sim.rival_unit_mask(r)
+    uo = sim.rival_unit_obs(r)
+    orders0 = ladder.pick_unit_orders(um, uo)
+    B2, N2 = orders0.shape
+    ranks = [orders0]
+    cur = uo[:, :, 0].long() * 0  # placeholder; real tiles below
+    smap = sim.rival_slot_map(r)
+    cur = sim.v_tile.gather(1, smap.clamp(min=0))
+    # per-row destination: the war target when at war, else the nearest own
+    # centre (the same two rules the ladder's own branches follow)
+    at_war_rows = uo[:, :, ladder.U_ATWAR] > 0
+    d_home0 = uo[:, :, ladder.U_DHOME]
+    for _k in range(1, max_steps):
+        prev = ranks[-1]
+        moving = (prev >= 0) & (prev < 6)
+        if not bool(moving.any()):
             break
-        uo = sim.rival_unit_obs(r)
-        orders = ladder.pick_unit_orders(um, uo)
-        if not bool((orders >= 0).any()):
+        nb_prev = sim.neigh[cur.clamp(min=0)]
+        cur = torch.where(moving, nb_prev.gather(2, prev.clamp(min=0, max=5).unsqueeze(2)).squeeze(2), cur)
+        nxt = torch.full_like(prev, -1)
+        nb_now = sim.neigh[cur.clamp(min=0)]          # [B, N, 6]
+        # war rows: toward the recorded war target; peace rows: toward home,
+        # respecting the stop radius. Distances are read-only pair_dist plans;
+        # terrain/occupancy legality is the PHASE's re-validation problem.
+        wt = getattr(sim, "_vplan_wt", None)
+        if wt is None or wt.get("r") != r:
+            hp_r = sim.r_atwar[:, r]
+            ac = torch.full((B2,), r, dtype=torch.long, device=sim.device)
+            tgts = torch.full((B2, N2), -1, dtype=torch.long, device=sim.device)
+            for n in range(N2):
+                if not bool((smap[:, n] >= 0).any()):
+                    break
+                tgt_n, hi, hpc, hrc = sim._war_march_target(sim.v_tile.gather(1, smap.clamp(min=0))[:, n].clamp(min=0), ac, hp_r)
+                has = (hi | hpc | hrc)
+                tgts[:, n] = torch.where(has, tgt_n, tgts[:, n])
+            sim._vplan_wt = {"r": r, "tgts": tgts}
+        tgts = sim._vplan_wt["tgts"]
+        # nearest own centre per row (peace drift target)
+        for n in range(N2):
+            rows_mv = moving[:, n]
+            if not bool(rows_mv.any()):
+                continue
+            dest = torch.where(at_war_rows[:, n] & (tgts[:, n] >= 0), tgts[:, n], torch.full_like(tgts[:, n], -1))
+            # peace: skip planning ranks beyond 0 (the drift re-plans next turn
+            # anyway; multi-rank marching is a WAR behaviour in the walkers)
+            ok_rows = rows_mv & (dest >= 0)
+            if not bool(ok_rows.any()):
+                continue
+            d_cur = sim.pair_dist[cur[:, n].clamp(min=0), dest.clamp(min=0)].to(torch.long)
+            d_nb = sim.pair_dist[nb_now[:, n].clamp(min=0), dest.clamp(min=0).unsqueeze(1)].to(torch.long)  # pair_dist is int16; the key sentinel overflows it
+            closer = (nb_now[:, n] >= 0) & (d_nb < d_cur.unsqueeze(1))
+            key = torch.where(closer, d_nb * 8 + torch.arange(6, device=sim.device), torch.full_like(d_nb, 10 ** 9))
+            best = key.argmin(dim=1)
+            has_step = closer.any(dim=1) & ok_rows
+            nxt[:, n] = torch.where(has_step, best, nxt[:, n])
+        ranks.append(nxt)
+        if not bool((nxt >= 0).any()):
+            ranks.pop()
             break
-        sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))
-        steps.append(orders.tolist())
-        if not bool((sim.rival_unit_mask(r)[:, :, :6]).any()):
-            break
+    sim._vplan_wt = None
+    K2 = len(ranks)
+    seq = torch.stack(ranks, dim=2) if K2 > 1 else ranks[0].unsqueeze(2)
+    if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
+        sim._driven_useq = {}
+    sim._driven_useq[r] = seq
+    steps = [rk.tolist() for rk in ranks]
     # v2: production as [centreTile, col] PAIRS (see SCHEMA_VERSION). Recorded
     # at B=1; the centre is the cross-engine city key.
     _pr = prod[0] if prod.shape[0] == 1 else prod[0]
@@ -170,11 +232,19 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
     sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
+    # #70 rng-order: replay stashes exactly as the driver does; the PHASE
+    # executes at the walkers' position, so recorder and replayer share one
+    # draw order by construction.
+    ranks = []
     for step in rec["units"]:
         orders = torch.tensor(step, dtype=torch.long, device=dev)
         if orders.dim() == 1:
-            orders = orders.unsqueeze(0)  # v2 writes flat [N] rows; v1 kept [1, N]
-        sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))
+            orders = orders.unsqueeze(0)
+        ranks.append(orders)
+    if ranks:
+        if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
+            sim._driven_useq = {}
+        sim._driven_useq[r] = torch.stack(ranks, dim=2)
 
 
 def replay(env, log: list, seats=None) -> None:
@@ -275,14 +345,21 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
                     civic[b] = int(rec["civic"][0] if isinstance(rec["civic"], list) else rec["civic"])
                 n_steps = max(n_steps, len(rec.get("units", [])))
             sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
-            for k in range(n_steps):
-                N = sim.rival_slot_map(r).shape[1]
-                orders = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
-                for b, rec in enumerate(recs):
-                    if not rec:
-                        continue
-                    us = rec.get("units", [])
-                    if k < len(us):
-                        row = us[k][0] if (us[k] and isinstance(us[k][0], list)) else us[k]
-                        orders[b, : min(len(row), N)] = torch.tensor(row[:N], dtype=torch.long, device=sim.device)
-                sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))
+            # #70 rng-order: unit acts DRAW, so they cannot run pre-step — the
+            # phase consumes them at the walkers' own position (the engine's
+            # _driven_useq hook). Production/tech/civic writes above are
+            # draw-free and stay here. Stack every recorded step into one
+            # [B, N, K] tensor; the phase walks ranks in order.
+            N = sim.rival_slot_map(r).shape[1]
+            K = max(1, n_steps)
+            seq = torch.full((B, N, K), -1, dtype=torch.long, device=sim.device)
+            for b, rec in enumerate(recs):
+                if not rec:
+                    continue
+                us = rec.get("units", [])
+                for k in range(min(len(us), K)):
+                    row = us[k][0] if (us[k] and isinstance(us[k][0], list)) else us[k]
+                    seq[b, : min(len(row), N), k] = torch.tensor(row[:N], dtype=torch.long, device=sim.device)
+            if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
+                sim._driven_useq = {}
+            sim._driven_useq[r] = seq
