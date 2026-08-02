@@ -12,6 +12,8 @@ import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction, commitResearch } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves } from './units';
+import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // #70: the replay's pillage arm mirrors hostileUnitAct's
+import { UNIT_HP } from '../data/units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
@@ -2346,7 +2348,10 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
       if (d) placeRivalDistrict(state, rival, rc, d.id, computeUnlocksIn(rival.research));
     }
   });
-  applyRivalUnitOrders(state, rival, rec.units);
+  // unit orders are NOT applied here. This function runs at the PICK position;
+  // the unit walkers run LATER in the phase, and a replay that acts units
+  // early reorders combat against production within the turn. The unit half
+  // executes in the war/peace section below, exactly where the walkers would.
 }
 
 /** #70: replay this seat's recorded UNIT orders.
@@ -2377,15 +2382,51 @@ export function applyRivalUnitOrders(state: GameState, rival: RivalCiv, steps: n
       const a = row[j] ?? -1;
       if (a < 0 || a === 12) return;            // no instruction, or HOLD
       if (!state.units.includes(unit) || unit.movesLeft <= 0) return;  // died or spent
+      const here = state.map.tiles[unit.tileIndex];
       if (a < 6) {
-        const nb = neighbors(state.map, state.map.tiles[unit.tileIndex]);
+        const nb = neighbors(state.map, here);
         const to = nb[a];
         if (to) stepUnit(state, unit, to);      // stepUnit re-validates; an illegal step is refused
+      } else if (a >= 6 && a < 12) {
+        // ATTACK — safe to replay now BECAUSE the walkers stand down for
+        // driven seats (no double-resolution). The SAME combat calls the
+        // walkers make; both re-validate their target.
+        const nb = neighbors(state.map, here);
+        const to = nb[a - 6];
+        if (to) {
+          if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, to.index);
+          else meleeAttack(state, unit.id, to.index);
+        }
+      } else if (a === 25) {
+        // PILLAGE underfoot — hostileUnitAct's own block, faithfully: an
+        // improvement first (food improvements heal +25, D-20), else the B-32
+        // complete non-centre district. Enemy-ownership re-validated.
+        const atWarWithPlayer = isRivalSeat(unit.seat) && civsAtWar(state, unitSeat(unit), 0);
+        const hereOwned = isPlayerSeat(tileSeat(here)) && atWarWithPlayer;
+        if (here.improvement && !here.pillaged && hereOwned) {
+          here.pillaged = true;
+          if (PILLAGE_HEAL_IMPROVEMENTS.has(here.improvement)) {
+            unit.hp = Math.min(UNIT_HP, unit.hp + 25);
+          }
+          unit.movesLeft = 0;
+        } else if (
+          hereOwned && here.district && here.district !== 'CITY_CENTER' &&
+          here.districtComplete && !here.districtPillaged
+        ) {
+          here.districtPillaged = true;
+          unit.movesLeft = 0;
+        }
+      } else if (a >= 26 && a < 38) {
+        // SNIPE — the ring-2 tile in TILE-INDEX order (the shared #92 layout:
+        // column order IS index order, so both engines enumerate identically).
+        const nb1 = neighbors(state.map, here).filter((t): t is Tile => !!t);
+        const d1 = new Set(nb1.map((t) => t.index));
+        const ring = [...new Set(nb1.flatMap((t) => neighbors(state.map, t)).filter((t): t is Tile => !!t).map((t) => t.index))]
+          .filter((i) => i !== here.index && !d1.has(i))
+          .sort((x, y) => x - y);
+        const rt = ring[a - 26];
+        if (rt !== undefined && UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, rt);
       }
-      // 6-11 ATTACK: the ladder's peace verb only fires it against barbarians,
-      // which `hostileUnitAct` already resolves in this phase. Wiring a replayed
-      // attack needs the combat call to be idempotent with that path — left out
-      // deliberately rather than double-resolving a strike.
     });
   }
 }
@@ -2423,6 +2464,11 @@ export function rivalPhase(state: GameState): void {
   rivalRivalDeclareWars(state);
 
   for (const rival of rivalsOf(state)) {
+    // #70: ONE record lookup for the whole rival turn. Declared at the TOP of
+    // the body because consumers sit both early (builder policy) and late (the
+    // war/peace walkers); a later `const` put the early gate in the temporal
+    // dead zone and ten cs-verbs cases named it instantly.
+    const recU = state.rivalActions?.[state.turn - 1]?.[rival.id];
     if (rival.cities.length === 0) continue; // eliminated
 
     // B-15 / #51/S7.8f: war weariness settles at this rival's block top, before
@@ -3462,7 +3508,13 @@ export function rivalPhase(state: GameState): void {
     if (!rsr.civic && availableCivicsIn(rsr).length === 0) rsr.civicProgress = Math.min(rsr.civicProgress, 0);
 
     // C1-B5b: builder actions (build best-Δ improvement or walk to a job).
-    rivalBuilderActions(state, rival, rivalUnlocks);
+    // #70 driven-parity layer 5: the GPU stands the BUILDER POLICY down for
+    // controlled seats ("controlled rivals' builders answer to the units
+    // head", `active & ~controlled`); this call was ungated, TS builders kept
+    // improving, and `improvements` diverged 5v4 at seed 9144 t30. Driven
+    // builders idle on BOTH engines until the builder-jobs verb is ported
+    // (the #93 policy family) — their BUILD columns already exist (#89).
+    if (!recU) rivalBuilderActions(state, rival, rivalUnlocks);
     // B6-S2: missionary actions (spread on the adjacent target, else walk).
     rivalMissionaryActions(state, rival);
 
@@ -3483,13 +3535,25 @@ export function rivalPhase(state: GameState): void {
     // already in ANY war — both engines gate on anyWar identically, so the
     // conditional draw is dropped in lockstep (RNG-stream parity preserved).
     const anyWar = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
+    // #70 UNIT-DRIVE SYMMETRY (driven-parity round 4): a seat with a record
+    // REPLAYS its unit orders here — at the walkers' own position in the turn
+    // — and the walkers stand down, mirroring what `controlled` does to the
+    // GPU's unit AI. Without this, TS walkers acted driven rivals' units on
+    // their own, positions drifted from the recorded trajectory immediately,
+    // and the compounding divergence eliminated the player on seed 9018.
+    // The peace-sue and DoW ROLLS also stand down for driven seats (policy;
+    // #93 ports them) — the GPU's controlled path makes neither draw, and the
+    // rng trace column polices the draw-count symmetry.
     if (anyWar) {
       if (rival.atWar) rival.warTurns += 1;
+      if (recU) {
+        applyRivalUnitOrders(state, rival, recU.units);
+      } else
       for (const unit of rivalUnits(state, rival.id)) {
         if (UNITS[unit.type]?.charges !== undefined) continue; // C1-B5b: civilians act in rivalBuilderActions, never march
         if (unit.movesLeft > 0) hostileUnitAct(state, unit);
       }
-      if (rival.atWar && rival.warTurns >= RIVAL_WAR_MIN_TURNS && nextRandom(state) < 0.25) {
+      if (!recU && rival.atWar && rival.warTurns >= RIVAL_WAR_MIN_TURNS && nextRandom(state) < 0.25) {
         // P5/S2 (C-13): suing costs the rival what it costs the player —
         // PEACE_GOLD_COST(warTurns) from ITS treasury; a broke rival fights
         // on. The roll stays UNCONDITIONAL (draw-count parity with the GPU);
@@ -3502,6 +3566,9 @@ export function rivalPhase(state: GameState): void {
       }
     } else {
       rival.peaceTurns += 1;
+      if (recU) {
+        applyRivalUnitOrders(state, rival, recU.units);
+      } else
       for (const unit of rivalUnits(state, rival.id)) {
         if (UNITS[unit.type]?.charges !== undefined) continue; // C1-B5b: builders don't patrol
         // Self-defense first: kill barbarians in reach, then drift home.
@@ -3516,6 +3583,7 @@ export function rivalPhase(state: GameState): void {
         patrol(state, rival, unit);
       }
       if (
+        !recU &&
         state.cities.length > 0 &&
         rival.peaceTurns > 20 &&
         rivalProximity(state, rival) <= 9 &&
