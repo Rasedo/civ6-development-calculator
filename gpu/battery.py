@@ -79,6 +79,15 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
     env.setdefault("PYTHONUTF8", "1")
     env["OMP_NUM_THREADS"] = str(threads)
     env["MKL_NUM_THREADS"] = str(threads)
+    # #93 THE GATE FLIP: parity runs DRIVEN — both engines replay
+    # gpu/fixtures/rival_actions.json, comparing the RULES with the policy
+    # removed (the round-8 design realized). The export is pass 3 of the
+    # two-pass scheme (the TS trace REPLAYING the recorded actions); the
+    # action file regenerates per round on engine change, exactly like the
+    # seed fixtures ([[verify-loop-cost]] 14). Rollout games carry no
+    # records, so their rivals keep the scripted path until deletion 2.
+    if name in ("export", "parity"):
+        env["CIV6_DRIVEN"] = "1"
     t0 = time.time()
     # BAIL-FAST (#78): the standing process is to fix and RE-RUN the whole
     # battery, so once any lane fails every other lane is wasted wall-clock —
