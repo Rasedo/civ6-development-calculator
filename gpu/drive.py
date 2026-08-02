@@ -100,7 +100,15 @@ def _blocks(env, sim, r: int) -> dict:
 #: Codes are the MASK layouts (`rival_masks`, `rival_unit_mask`), which are the
 #: player head layouts — so the same file can drive either seat, which is the
 #: whole point of #51.
-SCHEMA_VERSION = 1
+#: v2 (#70 signature A): the CITY AXIS is keyed by CENTRE TILE, not index.
+#: The recorder read cities by GPU slot; TS applies by founding-order array
+#: position; the two diverge exactly when compaction or capture reorders
+#: slots — the probe-hygiene rule ("match cities by centre, never slot")
+#: applied to the file format itself. `production` is now [[centreTile, col],
+#: ...] pairs, one per city that acts. The UNITS axis stays positional: the
+#: engines deliberately mirror unit order (TS splices captured units to the
+#: END because the GPU appends; deaths drop identically from both).
+SCHEMA_VERSION = 2
 
 
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
@@ -127,12 +135,18 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
         steps.append(orders.tolist())
         if not bool((sim.rival_unit_mask(r)[:, :, :6]).any()):
             break
-    # schema v1 says FLAT per-city/per-step lists; the driver records at B=1
-    # and tolist() keeps the batch dim, which cost one driven-parity red per
-    # engine before the consumers unwrapped. Flatten at the SOURCE too so a
-    # regenerated file is schema-true; consumers keep their defensive unwraps.
+    # v2: production as [centreTile, col] PAIRS (see SCHEMA_VERSION). Recorded
+    # at B=1; the centre is the cross-engine city key.
+    _pr = prod[0] if prod.shape[0] == 1 else prod[0]
+    _ctr = sim.rc_center[0, r]
+    _alive_c = sim.rc_alive[0, r]
+    prod_pairs = [
+        [int(_ctr[j]), int(_pr[j])]
+        for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0])))
+        if int(_pr[j]) >= 0 and bool(_alive_c[j])
+    ]
     return {
-        "production": prod[0].tolist() if prod.shape[0] == 1 else prod.tolist(),
+        "production": prod_pairs,
         "tech": None if tech is None else (int(tech[0]) if tech.shape[0] == 1 else tech.tolist()),
         "civic": None if civic is None else (int(civic[0]) if civic.shape[0] == 1 else civic.tolist()),
         "units": [st[0] if (st and isinstance(st[0], list) and len(st) == 1) else st for st in steps],
@@ -148,12 +162,18 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     the run from it.
     """
     dev = sim.device
-    prod = torch.tensor(rec["production"], dtype=torch.long, device=dev)
+    # v2: [centreTile, col] pairs -> per-slot columns via THIS sim's centres.
+    prod = torch.full((sim.B, sim.RC), -1, dtype=torch.long, device=dev)
+    for centre, col in rec["production"]:
+        hit = (sim.rc_center[:, r] == int(centre)) & sim.rc_alive[:, r]
+        prod = torch.where(hit, torch.full_like(prod, int(col)), prod)
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
     sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
     for step in rec["units"]:
         orders = torch.tensor(step, dtype=torch.long, device=dev)
+        if orders.dim() == 1:
+            orders = orders.unsqueeze(0)  # v2 writes flat [N] rows; v1 kept [1, N]
         sim.apply_rival_unit_sequence(r, orders.unsqueeze(2))
 
 
@@ -244,10 +264,11 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
             for b, rec in enumerate(recs):
                 if not rec:
                     continue
-                pr = rec["production"]
-                if pr and isinstance(pr[0], list):
-                    pr = pr[0]  # the recorder ran at B=1: tolist() kept the batch dim
-                prod[b, : min(len(pr), C)] = torch.tensor(pr[:C], dtype=torch.long, device=sim.device)
+                # v2: centre-keyed pairs resolve against THIS batch row's centres
+                for centre, col in rec["production"]:
+                    hits = (sim.rc_center[b, r] == int(centre)) & sim.rc_alive[b, r]
+                    if bool(hits.any()):
+                        prod[b, int(hits.nonzero(as_tuple=True)[0][0])] = int(col)
                 if rec.get("tech") is not None:
                     tech[b] = int(rec["tech"][0] if isinstance(rec["tech"], list) else rec["tech"])
                 if rec.get("civic") is not None:

@@ -2314,8 +2314,10 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
   // apply_turn needed on the GPU side, and the second driven-parity red: every
   // comparison against a LIST is false, so nothing ever queued and the TS
   // queues flatlined while the economies agreed.
-  const prodRaw = rec.production as unknown as (number | number[])[];
-  const production: number[] = Array.isArray(prodRaw[0]) ? (prodRaw[0] as number[]) : (prodRaw as number[]);
+  // v2 (#70 signature A): production is [[centreTile, col], ...] — the city
+  // axis keyed by CENTRE TILE, because slot order and founding order diverge
+  // under compaction/capture. Each engine resolves the centre to ITS city.
+  const prodPairs = rec.production as unknown as [number, number][];
   const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
   const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
   if (techCol !== null && techCol !== undefined && techCol >= 0 && !rival.research.tech) {
@@ -2326,9 +2328,11 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
     const c = Object.keys(CIVICS)[civicCol];
     if (c) rival.research.civic = c;
   }
-  rival.cities.forEach((rc, j) => {
-    const a = production[j] ?? -1;
-    if (a < 0 || rc.queue.length > 0) return;   // the idle gate, as the GPU applies it
+  for (const [centre, aCol] of prodPairs) {
+    const rc = rival.cities.find((c) => c.centerIndex === centre);
+    if (!rc) continue;                          // centre not this engine's city (drifted state)
+    const a = aCol;
+    if (a < 0 || rc.queue.length > 0) continue; // the idle gate, as the GPU applies it
     if (a < NB) {
       const id = buildings[a];
       const def = id ? BUILDINGS[id] : undefined;
@@ -2347,7 +2351,7 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
       const d = SCAFFOLD_DISTRICTS[si];
       if (d) placeRivalDistrict(state, rival, rc, d.id, computeUnlocksIn(rival.research));
     }
-  });
+  }
   // unit orders are NOT applied here. This function runs at the PICK position;
   // the unit walkers run LATER in the phase, and a replay that acts units
   // early reorders combat against production within the turn. The unit half
@@ -2518,11 +2522,18 @@ export function rivalPhase(state: GameState): void {
         const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(rival.research).government : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         rival.influencePoints = (rival.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier;
-        while (rival.influencePoints >= ENVOY_COST) {
+        // #70 driven-parity signature C: ACCRUAL is rules (every seat, above);
+        // CONVERSION + the greedy ASSIGNMENT are the envoy POLICY — the GPU's
+        // controlled path banks raw points (influence read 6 vs TS's 3 at seed
+        // 9066 t43 because TS kept converting). The ladder already owns the
+        // envoy verb (pick_envoy — the first verb ported); the rival envoy
+        // APPLY head is the #93-family port that re-enables this for driven
+        // seats on both engines at once.
+        while (!recU && rival.influencePoints >= ENVOY_COST) {
           rival.influencePoints -= ENVOY_COST;
           rival.envoysAvailable = (rival.envoysAvailable ?? 0) + 1;
         }
-        while ((rival.envoysAvailable ?? 0) > 0) {
+        while (!recU && (rival.envoysAvailable ?? 0) > 0) {
           let pick: (typeof state.cityStates)[number] | null = null;
           for (const cs of state.cityStates) {
             if (!cs.rivalMet?.[rival.id]) continue;
