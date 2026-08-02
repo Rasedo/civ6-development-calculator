@@ -2355,6 +2355,28 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
     const c = Object.keys(CIVICS)[civicCol];
     if (c) rival.research.civic = c;
   }
+  // #93 the WAR verb: the recorded declare/peace applies HERE — before the
+  // walkers, the exact position the GPU's pre-step war head uses, so a
+  // declare turns THIS turn's walkers hostile on both engines. The engine
+  // re-validates: peace pays the player's exact gold schedule or refuses
+  // (the scripted roll's own body, minus the roll — that lives in the
+  // ladder now, rolled from the DRIVER's policy stream, so neither engine's
+  // rule stream moves).
+  const warCol = rec.war;
+  if (warCol !== null && warCol !== undefined && warCol >= 0) {
+    const Rw = rivalCount(state);
+    if (warCol === 0 && !rival.atWar) {
+      rival.atWar = true;
+      rival.warTurns = 0;
+      state.eventLog.push(`${rival.name} declares war on you!`);
+    } else if (warCol === Rw && rival.atWar && rival.warTurns >= RIVAL_WAR_MIN_TURNS) {
+      const cost = PEACE_GOLD_COST(rival.warTurns);
+      if (goldAffordable(rival.treasury ?? 0, cost)) {
+        rival.treasury = (rival.treasury ?? 0) - cost;
+        makePeace(state, rival);
+      }
+    }
+  }
   for (const [centre, aCol] of prodPairs) {
     const rc = rival.cities.find((c) => c.centerIndex === centre);
     if (!rc) continue;                          // centre not this engine's city (drifted state)

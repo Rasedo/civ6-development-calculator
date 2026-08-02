@@ -53,7 +53,7 @@ def main() -> int:
     # dispatch is paid once per turn instead of once per turn PER SEED.
     fixtures = [load_fixture(p) for p in paths]
     env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
-    logs = drive.drive_batched(env, turns)
+    logs = drive.drive_batched(env, turns, seeds=[int(fx["seed"]) for fx in fixtures])
     out: dict[str, dict] = {}
     for b, fx in enumerate(fixtures):
         seed = str(fx["seed"])

@@ -7125,11 +7125,58 @@ class BatchSim:
                     # empty centre. TS's replay sieged (ww 32, city 200 -> 167,
                     # rng drawn) while the GPU did nothing: seed 9119 t39. The
                     # replay now routes through the act's own resolvers.
-                    rru_att = valid_t & _melee_d2 & _rr_u2      # enemy rival UNITS
-                    rrc_att = valid_t & _melee_d2 & _rr_c2 & ~_rr_u2   # enemy rival CENTRES
-                    cs_att2 = valid_t & _melee_d2 & _cs2 & ~_rr_u2 & ~_rr_c2
-                    unit_att = valid_t & (barb_t | (p_unit & at_war) | rru_att)
-                    city_att = valid_t & ~barb_t & ~p_unit & ~rru_att & ~rrc_att & ~cs_att2 & p_city & at_war
+                    # #93 (9144 t31, the first DRIVEN DoW): the precedence
+                    # must be meleeAttackInner's, in ITS order —
+                    #   1. a PLAYER centre takes the melee UNCONDITIONALLY
+                    #      (S7.10a: a garrison shields nothing; it adds to the
+                    #      city's strength instead),
+                    #   2. a RIVAL/CS centre takes it when the tile is EMPTY
+                    #      of enemy units OR holds a MILITARY garrison
+                    #      (city-first; a LONE CIVILIAN is captured instead),
+                    #   3. otherwise the unit resolver.
+                    # The old order sent a garrisoned player capital to
+                    # _hostile_vs_unit: the GPU killed the garrison while TS
+                    # sieged the city (hp 157 vs 200, ww 32 vs 0).
+                    # cityFirst counts HOSTILE occupants only — TS's
+                    # `enemies` is unitsAt filtered by unitsHostile, so the
+                    # attacker's OWN civilian parked on an enemy centre never
+                    # blocks the siege (9133 t46: r0's civilian stood on
+                    # r1's centre and a seat-blind _civ_only refused four
+                    # recorded city attacks in a row).
+                    # #93 (9144 t80/t82): a RANGED attacker never runs the
+                    # melee chain — TS's applier forks to hostileRangedStrike,
+                    # whose conventions differ on BOTH ends (a player city
+                    # takes the hit first and holds at 1 HP; a civilian TAKES
+                    # THE ROLL instead of being captured). Routing ranged
+                    # rows through the melee resolver captured a civilian a
+                    # shot should have wounded and shot a garrison a city
+                    # should have absorbed.
+                    _rngd_att = valid_t & ~_melee_d2
+                    if bool(_rngd_att.any()):
+                        for b_ in _rngd_att.nonzero(as_tuple=True)[0].tolist():
+                            v_ = int(sc[b_])
+                            one_ = torch.zeros(B, dtype=torch.bool, device=dev)
+                            one_[b_] = True
+                            self._hostile_ranged_strike(one_, tgt, "rival", v_)
+                            self.v_mp[b_, v_] = 0  # a strike spends the turn (TS movesLeft = 0)
+                    valid_t = valid_t & _melee_d2
+                    _host_mil = barb_t | ((_mts == PLAYER_SEAT) & at_war) | ((_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1))
+                    _host_civ = ((_cts == BARB_SEAT)
+                                 | ((_cts == PLAYER_SEAT) & at_war)
+                                 | ((_tcivC >= 0) & self.rr_war[:, r].gather(1, _tcivC.clamp(min=0).unsqueeze(1)).squeeze(1)))
+                    _civ_only = _host_civ & ~_host_mil          # LONE hostile civilian -> capture, not the city
+                    # the PLAYER-centre arm has NO civilian exception: TS's
+                    # `if (enemyCity)` returns before the capture block, so
+                    # even a lone civilian on the capital tile watches the
+                    # CITY take the hit (9144 t31 second pass: excluding it
+                    # made the GPU capture the civilian instead).
+                    pcity_att = valid_t & _melee_d2 & p_city & at_war
+                    _cf = ~_civ_only                            # city-first: empty or military-garrisoned
+                    rrc_att = valid_t & _melee_d2 & _rr_c2 & _cf & ~pcity_att
+                    cs_att2 = valid_t & _melee_d2 & _cs2 & _cf & ~pcity_att & ~rrc_att
+                    rru_att = valid_t & _melee_d2 & _rr_u2 & ~pcity_att & ~rrc_att & ~cs_att2
+                    unit_att = valid_t & ~pcity_att & ~rrc_att & ~cs_att2 & (barb_t | (p_unit & at_war) | rru_att)
+                    city_att = pcity_att
                     for b_ in range(B):
                         if not bool(valid_t[b_]):
                             continue
@@ -7394,6 +7441,19 @@ class BatchSim:
                     _tt = _tcd[_rw]
                     _pi = _hip[_rw]
                     self.pillaged[_rw[_pi], _tt[_pi]] = True
+                    # P4/D-20 (9106 t70): FOOD improvements heal their
+                    # pillager +25 — the scripted pillage and TS's replay arm
+                    # both carry it; this arm silently skipped the heal, and
+                    # the un-healed besieger's wound penalty rippled a 2-hp
+                    # city delta three turns later.
+                    _impv = self.improvement[_rw[_pi], _tt[_pi]]
+                    _hl = self._imp_heals[_impv.clamp(min=0)] & (_impv >= 0)
+                    _hr = _rw[_pi][_hl]
+                    if _hr.numel():
+                        self.v_hp[_hr, sc[_hr]] = torch.minimum(
+                            self.v_hp[_hr, sc[_hr]] + 25,
+                            torch.full_like(self.v_hp[_hr, sc[_hr]], 100),
+                        )
                     _pd = ~_pi & _hdp[_rw]
                     self.district_pillaged[_rw[_pd], _tt[_pd]] = True
                     self.v_mp[_rw, sc[_rw]] = 0

@@ -112,15 +112,63 @@ def _blocks(env, sim, r: int) -> dict:
 SCHEMA_VERSION = 2
 
 
+_M32 = 0xFFFFFFFF
+
+
+def _policy_rand(seed: int, turn: int, r: int, salt: int) -> float:
+    """#93: ONE mulberry32 draw from the DRIVER's policy stream, keyed on
+    (game seed, turn, rival, salt). Deterministic — the same engine always
+    re-records the same file — and fully separate from the engines' shared
+    rule stream, whose draw-count parity must not move when a policy is
+    ported out."""
+    a = (seed * 2654435761 ^ turn * 40503 ^ r * 97 ^ salt * 1013904223) & _M32
+    a = (a + 0x6D2B79F5) & _M32
+    t = ((a ^ (a >> 15)) * (1 | a)) & _M32
+    t = (((t + (((t ^ (t >> 7)) * (61 | t)) & _M32)) & _M32) ^ t) & _M32
+    return ((t ^ (t >> 14)) & _M32) / 4294967296.0
+
+
+def _policy_rng(sim, seeds: list, turn: int, r: int, salt: int) -> torch.Tensor:
+    return torch.tensor(
+        [_policy_rand(int(s_), turn, r, salt) for s_ in seeds],
+        dtype=torch.float64, device=sim.device,
+    )
+
+
+def _war_ctx(sim, r: int) -> dict:
+    """#93: the DoW policy's inputs, computed exactly as the scripted block
+    computes them (the engine's war-declaration site) — strengths, closest
+    player-city/rival-city pair, the B-22 gang term, aggression."""
+    B = sim.B
+    p_str = sim.alive.sum(dim=1) * 10 + (sim.p_alive.to(torch.long) * sim._p_combat[sim.p_type]).sum(dim=1)
+    own_cs = (sim.v_alive & (sim.v_civ == r)).to(torch.long) * sim._p_combat[sim.v_type]
+    n_cities = sim.rc_alive[:, r].sum(dim=1)
+    r_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
+    d_pr = sim.pair_dist[
+        sim.site.clamp(min=0).unsqueeze(2), sim.rc_center[:, r].clamp(min=0).unsqueeze(1)
+    ].to(torch.long)
+    pair_ok = sim.alive.unsqueeze(2) & sim.rc_alive[:, r].unsqueeze(1)
+    prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
+    return {
+        "has_cities": sim.alive.sum(dim=1) > 0,
+        "peace_turns": sim.r_peaceturns[:, r],
+        "prox": prox,
+        "r_str": r_str,
+        "p_str": p_str.double(),
+        "gang": sim.p_warmonger >= sim._wm_gang,
+        "aggression": sim.r_aggression[:, r],
+    }
+
+
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
     """One turn's decisions for one driven seat, returned in the action-file
     schema so a replay can reproduce them exactly. B=1 callers only — the
     batched recorder extracts every row via `_extract_record`."""
-    prod, tech, civic, seq = _decide_turn(env, sim, r, roster, classes, max_steps)
-    return _extract_record(sim, r, prod, tech, civic, seq, 0)
+    prod, tech, civic, war, seq = _decide_turn(env, sim, r, roster, classes, max_steps)
+    return _extract_record(sim, r, prod, tech, civic, war, seq, 0)
 
 
-def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4):
+def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
     """#94: the BATCHED decision core — masks, ladder picks, the virtual
     planner, the draw-free applies and the useq stash, exactly as
     decide_and_apply always ran them. Returns (prod, tech, civic, seq)
@@ -130,7 +178,20 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(sim, r))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
-    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
+    # #93 the WAR verb: the ladder decides from the driver's own policy
+    # stream; declare/peace apply PRE-STEP through the existing war head —
+    # the same position the replay uses, so recorder and replayer share one
+    # within-turn ordering (a declare turns THIS turn's walkers hostile on
+    # both engines). Without seeds/turn (a raw B=1 decide_and_apply caller)
+    # the verb stands down — the recording surfaces always pass them.
+    war = None
+    if seeds is not None and turn is not None:
+        rng_w = {
+            "dow": _policy_rng(sim, seeds, turn, r, 1),
+            "peace": _policy_rng(sim, seeds, turn, r, 2),
+        }
+        war = ladder.pick_war(m["war"], _war_ctx(sim, r), rng_w)
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war)
 
     # units (#70 rng-order): the driver PLANS, the PHASE executes. Applying
     # steps pre-step to re-observe consumed combat draws at a different stream
@@ -207,10 +268,10 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[r] = seq
-    return prod, tech, civic, seq
+    return prod, tech, civic, war, seq
 
 
-def _extract_record(sim, r: int, prod, tech, civic, seq, b: int) -> dict:
+def _extract_record(sim, r: int, prod, tech, civic, war, seq, b: int) -> dict:
     """One batch row's record, in the action-file schema.
 
     Per-row equivalences with the old B=1 writer:
@@ -237,7 +298,11 @@ def _extract_record(sim, r: int, prod, tech, civic, seq, b: int) -> dict:
     rows = [seq[b, :, k].tolist() for k in range(int(seq.shape[2]))]
     while len(rows) > 1 and all(x < 0 for x in rows[-1]):
         rows.pop()
-    return {"production": prod_pairs, "tech": _t, "civic": _c, "units": rows}
+    # #93: the war-head column (0 = declare on the player, R = sue for
+    # peace), or None. OPTIONAL field on schema v2 — readers that predate it
+    # treat a missing key as None, so old files stay replayable.
+    _w = None if war is None or int(war[b]) < 0 else int(war[b])
+    return {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "units": rows}
 
 
 def replay_seat(sim, r: int, rec: dict) -> None:
@@ -256,7 +321,9 @@ def replay_seat(sim, r: int, rec: dict) -> None:
         prod = torch.where(hit, torch.full_like(prod, int(col)), prod)
     tech = None if rec["tech"] is None else torch.tensor(rec["tech"], dtype=torch.long, device=dev)
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
-    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
+    _wv = rec.get("war")
+    war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war)
     # #70 rng-order: replay stashes exactly as the driver does; the PHASE
     # executes at the walkers' position, so recorder and replayer share one
     # draw order by construction.
@@ -300,7 +367,7 @@ def drive(env, turns: int, seats=None, record: Path | None = None) -> list:
     return log
 
 
-def drive_batched(env, turns: int, seats=None) -> list:
+def drive_batched(env, turns: int, seats=None, seeds=None) -> list:
     """#94: record EVERY batch row in one run — returns one log per row.
 
     The old gate ran 12 seeds as 12 serial B=1 runs; the engine's per-call
@@ -321,8 +388,12 @@ def drive_batched(env, turns: int, seats=None) -> list:
     for r in seats:
         take_seat(sim, r)
     logs = [[] for _ in range(B)]
+    # #93: the policy stream keys on the GAME seed — the caller passes them
+    # (BatchEnv keeps no fixture list). Absent -> per-row index fallback,
+    # deterministic but seed-blind; the recording surfaces always pass them.
+    game_seeds = list(seeds) if seeds is not None else list(range(B))
     for t in range(turns):
-        per_seat = {r: _decide_turn(env, sim, r, roster, classes) for r in seats}
+        per_seat = {r: _decide_turn(env, sim, r, roster, classes, seeds=game_seeds, turn=t) for r in seats}
         for b in range(B):
             turn_rec = {"turn": t}
             for r in seats:
@@ -374,6 +445,7 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
             prod = torch.full((B, C), -1, dtype=torch.long, device=sim.device)
             tech = torch.full((B,), -1, dtype=torch.long, device=sim.device)
             civic = torch.full((B,), -1, dtype=torch.long, device=sim.device)
+            war_b = torch.full((B,), -1, dtype=torch.long, device=sim.device)  # #93
             n_steps = 0
             for b, rec in enumerate(recs):
                 if not rec:
@@ -387,8 +459,10 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
                     tech[b] = int(rec["tech"][0] if isinstance(rec["tech"], list) else rec["tech"])
                 if rec.get("civic") is not None:
                     civic[b] = int(rec["civic"][0] if isinstance(rec["civic"], list) else rec["civic"])
+                if rec.get("war") is not None:
+                    war_b[b] = int(rec["war"])
                 n_steps = max(n_steps, len(rec.get("units", [])))
-            sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic)
+            sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war_b)
             # #70 rng-order: unit acts DRAW, so they cannot run pre-step — the
             # phase consumes them at the walkers' own position (the engine's
             # _driven_useq hook). Production/tech/civic writes above are

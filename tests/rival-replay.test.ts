@@ -225,6 +225,36 @@ describe('#70 the action FILE drives the TS rival', () => {
     expect(rc.queue[0]?.kind).toBe('project');
   });
 
+  it('#93: a recorded DECLARE flips the seat to war; a recorded PEACE pays or refuses', () => {
+    const declare = () => {
+      const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+      const rival = addRival(state, 6, 6);
+      state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [], tech: null, civic: null, war: 0, units: [] } } };
+      rivalPhase(state);
+      return rival;
+    };
+    expect(declare().atWar).toBe(true);
+    const peace = (treasury: number, warTurns: number) => {
+      const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+      const rival = addRival(state, 6, 6);
+      rival.atWar = true;
+      rival.warTurns = warTurns;
+      rival.treasury = treasury;
+      const R = 1; // one rival in this fixture — peace col = R
+      state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [], tech: null, civic: null, war: R, units: [] } } };
+      rivalPhase(state);
+      return rival;
+    };
+    // funded + warTurns past the minimum: peace lands (and pays)
+    const ok = peace(10000, 20);
+    expect(ok.atWar).toBe(false);
+    expect(ok.treasury).toBeLessThan(10000);
+    // broke: the engine re-validates and REFUSES — war continues
+    expect(peace(0, 20).atWar).toBe(true);
+    // too early: warTurns under the minimum refuses too
+    expect(peace(10000, 3).atWar).toBe(true);
+  });
+
   it('a seat with NO record still runs the ladder (the paths coexist)', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);

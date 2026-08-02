@@ -292,6 +292,9 @@ export interface RivalActionRecord {
    * CENTRE TILE, because slot order and founding order diverge under
    * compaction/capture. A missing centre = that engine has no such city. */
   production: [number, number][];
+  /** #93: war-head column — 0 = declare on the player, R = sue for peace;
+   * null/absent = no war action this turn. Optional on schema v2. */
+  war?: number | null;
   /** tech / civic mask column; null or -1 = no pick. */
   tech: number | null;
   civic: number | null;

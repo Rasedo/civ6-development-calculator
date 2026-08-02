@@ -377,6 +377,39 @@ def main() -> None:
     print("  g unit-orders verb OK (attack by lowest target tile, PATROL_DIR_PERM "
           "drift, stop radius, hold vs no-instruction)")
 
+    # --- #93 the WAR verb: pick_war -----------------------------------------
+    # mask [B, 2R] col0 = declare legal, colR = sue legal; ctx carries the
+    # scripted DoW conditions; rng from the driver's policy stream.
+    R2 = 2
+    wm = torch.zeros(1, 2 * R2, dtype=torch.bool)
+    base_ctx = {
+        "has_cities": torch.tensor([True]), "peace_turns": torch.tensor([25]),
+        "prox": torch.tensor([5]), "r_str": torch.tensor([100.0]),
+        "p_str": torch.tensor([50.0]), "gang": torch.tensor([False]),
+        "aggression": torch.tensor([0.5]),
+    }
+    lo_rng = {"dow": torch.tensor([0.01]), "peace": torch.tensor([0.01])}
+    hi_rng = {"dow": torch.tensor([0.99]), "peace": torch.tensor([0.99])}
+    # nothing legal -> -1 even with hot rng
+    assert int(ladder.pick_war(wm, base_ctx, lo_rng)[0]) == -1
+    # declare: legal + all conditions + rng under 0.08*(0.5+0.5)=0.08 -> col 0
+    wm[0, 0] = True
+    assert int(ladder.pick_war(wm, base_ctx, lo_rng)[0]) == 0
+    # rng above the DoW chance -> no declaration
+    assert int(ladder.pick_war(wm, base_ctx, hi_rng)[0]) == -1
+    # a failed condition kills it regardless of rng (proximity)
+    far = dict(base_ctx); far["prox"] = torch.tensor([10])
+    assert int(ladder.pick_war(wm, far, lo_rng)[0]) == -1
+    # the gang arm opens the DoW without the strength edge
+    weak = dict(base_ctx); weak["r_str"] = torch.tensor([10.0]); weak["gang"] = torch.tensor([True])
+    assert int(ladder.pick_war(wm, weak, lo_rng)[0]) == 0
+    # sue: legal + rng under 0.25 -> col R; over -> -1
+    wm2 = torch.zeros(1, 2 * R2, dtype=torch.bool)
+    wm2[0, R2] = True
+    assert int(ladder.pick_war(wm2, base_ctx, lo_rng)[0]) == R2
+    assert int(ladder.pick_war(wm2, base_ctx, hi_rng)[0]) == -1
+    print("  k #93 war verb OK (declare gates + rng arms, gang bypass, sue at 0.25, mask-gated)")
+
     print("LADDER CONTRACT OK")
 
 

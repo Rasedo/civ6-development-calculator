@@ -215,6 +215,44 @@ SOLO_TIERS = {"builder": ("builder_idx", True),
               "galley": ("galley_idx", False)}
 
 
+def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
+    """[B] long — the WAR verb (declare on the player / sue for peace),
+    ported from the scripted blocks both engines carry.
+
+    `mask` is rival_masks['war'] [B, 2R]: col 0 = DECLARE legal (alive, at
+    peace), col R = SUE legal (at war, warTurns >= min, peace gold
+    affordable) — LEGALITY, engine-owned. Everything else here is POLICY:
+    the sue chance (0.25), the DoW conditions (player has cities, peaceTurns
+    > 20, proximity <= 9, warmonger-gang OR a 1.3x strength edge) and the
+    DoW chance (0.08 · (0.5 + aggression)) — the scripted rolls verbatim.
+
+    `rng` carries {'dow': [B], 'peace': [B]} floats from the DRIVER's own
+    policy stream. THE ENGINES' SHARED STREAM IS NEVER TOUCHED: a driven
+    seat's war choice is a recorded FACT by the time either engine sees it,
+    and both engines' scripted rolls already stand down for driven seats, so
+    draw-count parity is untouched by construction.
+
+    Returns the war-head column (0 = declare, R = peace) or -1.
+    """
+    B, W2 = mask.shape
+    R = max(W2 // 2, 1)
+    out = torch.full((B,), -1, dtype=torch.long, device=mask.device)
+    # the scripted order: the war branch's sue roll runs before the peace
+    # branch's DoW roll, and a seat is only ever in one branch
+    sue = mask[:, R] & (rng["peace"] < 0.25)
+    out = torch.where(sue, torch.full_like(out, R), out)
+    dow = (
+        mask[:, 0]
+        & ctx["has_cities"]
+        & (ctx["peace_turns"] > 20)
+        & (ctx["prox"] <= 9)
+        & (ctx["gang"] | (ctx["r_str"] > ctx["p_str"] * 1.3))
+        & (rng["dow"] < 0.08 * (0.5 + ctx["aggression"]))
+    )
+    out = torch.where((out < 0) & dow, torch.zeros_like(out), out)
+    return out
+
+
 def unit_roster(units: list[dict]) -> dict:
     """Per-unit selection data for the B-10 two-lane pick, straight off the
     exported catalog so the ladder holds no second copy of the unit table.
