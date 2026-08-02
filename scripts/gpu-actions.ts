@@ -33,7 +33,13 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   names.push('CHOP'); // 16
   names.push('REPAIR'); // 17
   for (let i = DEDICATED_IMPROVEMENTS; i < improvementIds.length; i++) names.push(`BUILD_${improvementIds[i]}`); // 18+
-  names.push('PILLAGE'); // last
+  names.push('PILLAGE');
+  // #92: the distance-2 ring, ordered by TILE INDEX ascending. The engine's
+  // target rule is "lowest tile index in range", so scanning SNIPE columns in
+  // order IS scanning ring tiles in index order. Appended after PILLAGE —
+  // appending LAST protects every existing index, but note PILLAGE is no
+  // longer the final column; consumers must key on the NAME, never on W-1.
+  for (let k = 0; k < 12; k++) names.push(`SNIPE_${k}`);
   return names;
 }
 

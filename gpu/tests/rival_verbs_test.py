@@ -226,6 +226,43 @@ def main() -> None:
     assert int(sim6.v_tile[0, sl6]) == t6, "a turn-ending verb must not be followed by a move"
     print("  6 a turn-ending verb at rank 0 blocks later steps OK")
 
+    # -- 7: #92 SNIPE — a ranged unit strikes a ring-2 barbarian ------------
+    # Execution, not legality: the strike must DAMAGE the target. A legal
+    # column nothing executes is the A-21 no-op, and with #87's preference
+    # apply it would teach a net that sniping is worthless.
+    sim7 = fresh(rules, path)
+    sim7.controlled[0, r] = True
+    sl7b, t7 = a_rival_soldier(sim7, r)
+    assert sl7b is not None
+    archer = next(i for i, u in enumerate(rules.units) if u["id"] == "ARCHER") if hasattr(rules, "units") else None
+    # retype to ARCHER via the roster index in the sim's own tables
+    ai = next(i for i in range(sim7.NU) if float(sim7._p_rng_str[i]) > 0 and int(sim7._p_rng_rng[i]) >= 2)
+    sim7.v_type[0, sl7b] = ai
+    sim7.v_mp[0, sl7b] = 2.0
+    ring = sim7.ring2[t7]
+    rk = next(k for k in range(12) if int(ring[k]) >= 0 and bool(sim7.passable[0, int(ring[k])]))
+    rt = int(ring[rk])
+    # plant a barbarian on that ring tile (u-pool)
+    bslot = next(i for i in range(sim7.u_alive.shape[1]) if not bool(sim7.u_alive[0, i]))
+    sim7.u_alive[0, bslot] = True
+    sim7.u_tile[0, bslot] = rt
+    sim7.u_hp[0, bslot] = 100.0
+    sim7.u_type[0, bslot] = sim7._warrior_idx
+    sim7.occ_mil[0, rt] = bslot + sim7.POOL_LO["u"]
+    m7b = sim7.rival_unit_mask(r)
+    sm7 = sim7.rival_slot_map(r)[0]
+    rw7b = int((sm7 == sl7b).nonzero(as_tuple=True)[0][0])
+    A_SN = sim7._A_SNIPE
+    assert bool(m7b[0, rw7b, A_SN + rk]), "#92: the snipe column for a ring-2 barb must be LEGAL"
+    hp0 = float(sim7.u_hp[0, bslot])
+    acts7 = torch.full((1, sm7.shape[0]), -1, dtype=torch.long)
+    acts7[0, rw7b] = A_SN + rk
+    sim7._apply_rival_unit_actions(r, acts7)
+    hp1 = float(sim7.u_hp[0, bslot]) if bool(sim7.u_alive[0, bslot]) else 0.0
+    assert hp1 < hp0, f"#92 DISPATCH DEAD: snipe left the barb at {hp1} hp (was {hp0})"
+    assert float(sim7.v_mp[0, sl7b]) == 0.0, "a snipe must spend the turn"
+    print(f"  7 SNIPE strikes a ring-2 barbarian OK ({hp0:.0f} -> {hp1:.0f} hp)")
+
     print("RIVAL VERBS OK")
 
 

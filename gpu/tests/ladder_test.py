@@ -305,6 +305,41 @@ def main() -> None:
     ow = uobs([(9.0, [8.0] * 6, [0] * 6), (0.0, far, [0] * 6)])
     ow[0, 0, ladder.U_ATWAR] = 1.0
     assert int(ladder.pick_unit_orders(m, ow)[0, 0]) == 3, "no war target -> peace drift (PERM tie-break)"
+    # #92: adjacent and RING targets interleave by TILE INDEX — an adjacent
+    # target on tile 50 loses to a ring target on tile 10, because the engine
+    # scans all tiles in index order. Wide mask (38) + wide obs (36).
+    def umask38(rows):
+        m = torch.zeros(1, UN, 38, dtype=torch.bool)
+        for j, cols in enumerate(rows):
+            for c in cols:
+                m[0, j, c] = True
+        return m
+    def uobs36(rows, war=None, ring=None):
+        o = torch.zeros(1, UN, 36, dtype=torch.float64)
+        o[:, :, ladder.U_DWAR] = BIGW
+        o[:, :, ladder.U_DWARNB:ladder.U_DWARNB + 6] = BIGW
+        o[:, :, ladder.U_RINGTILE:ladder.U_RINGTILE + 12] = -1.0
+        for j, (dh, dnb, nbt) in enumerate(rows):
+            o[0, j, ladder.U_DHOME] = dh
+            for i in range(6):
+                o[0, j, ladder.U_DNB + i] = dnb[i]
+                o[0, j, ladder.U_NBTILE + i] = nbt[i]
+        if ring:
+            for j, tiles in enumerate(ring):
+                for i, t in enumerate(tiles):
+                    o[0, j, ladder.U_RINGTILE + i] = t
+        return o
+    mi = umask38([[6, ladder.A_SNIPE + 0], [12]])
+    oi = uobs36([(2.0, [1.0] * 6, [50, 0, 0, 0, 0, 0]), (0.0, [9.0] * 6, [0] * 6)],
+                ring=[[10] + [-1] * 11, [-1] * 12])
+    got_i = int(ladder.pick_unit_orders(mi, oi)[0, 0])
+    assert got_i == ladder.A_SNIPE + 0, f"ring tile 10 must beat adjacent tile 50, got {got_i}"
+    # and the reverse: adjacent tile 5 beats ring tile 10
+    oi2 = uobs36([(2.0, [1.0] * 6, [5, 0, 0, 0, 0, 0]), (0.0, [9.0] * 6, [0] * 6)],
+                 ring=[[10] + [-1] * 11, [-1] * 12])
+    assert int(ladder.pick_unit_orders(mi, oi2)[0, 0]) == 6, "adjacent tile 5 must beat ring tile 10"
+    print("  i snipe interleave OK (lowest TILE INDEX wins across d1 and d2)")
+
     print("  h war branch OK (march ties to direction order, pillage-first, "
           "attack outranks, no-target falls back to patrol)")
     print("  g unit-orders verb OK (attack by lowest target tile, PATROL_DIR_PERM "

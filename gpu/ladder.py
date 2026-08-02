@@ -415,6 +415,11 @@ PATROL_DIR_PERM = (3, 4, 2, 5, 1, 0)
 #: per-unit observation offsets — mirrors BatchSim.UNIT_OBS.
 U_DHOME, U_DNB, U_NBTILE, U_MP, U_CHARGES, U_CIVILIAN = 0, 1, 7, 13, 14, 15
 U_ATWAR, U_DWAR, U_DWARNB = 16, 17, 18   # #91 the war half
+U_RINGTILE = 24                          # #92: the 12 ring-2 tile ids
+#: unit-action enum geometry (#92). PILLAGE is NOT the last column any more —
+#: SNIPE_0..11 sit after it. Consumers key on these, never on W-1.
+A_PILLAGE = 25
+A_SNIPE = 26
 
 #: how close to home the patrol stops drifting (engine's `d_home > 3`).
 PATROL_HOME_RADIUS = 3
@@ -451,11 +456,25 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     nb_tile = obs[:, :, U_NBTILE:U_NBTILE + 6]
     BIG = float(10 ** 9)
 
-    # 1. ATTACK — lowest target TILE INDEX among legal directions, which is the
-    #    engine's `tkey.min` tie-break (it scans tiles in index order).
+    # 1. ATTACK — lowest target TILE INDEX across the unit's whole range: the
+    #    engine scans ALL tiles in index order, so adjacent (d=1) and ring
+    #    (d=2, #92 SNIPE) targets INTERLEAVE by index. Compare both against one
+    #    key and pick whichever holds the lower tile id.
     a_key = torch.where(atk, nb_tile, torch.full_like(nb_tile, BIG))
-    has_atk = atk.any(dim=2)
-    atk_dir = a_key.argmin(dim=2)
+    adj_min = a_key.min(dim=2).values
+    adj_dir = a_key.argmin(dim=2)
+    if W > A_SNIPE and obs.shape[2] > U_RINGTILE:
+        snipe = mask[:, :, A_SNIPE:A_SNIPE + 12]
+        ring_tile = obs[:, :, U_RINGTILE:U_RINGTILE + 12]
+        s_key = torch.where(snipe, ring_tile, torch.full_like(ring_tile, BIG))
+        sn_min = s_key.min(dim=2).values
+        sn_col = s_key.argmin(dim=2) + A_SNIPE
+    else:
+        sn_min = torch.full((B, N), BIG, dtype=obs.dtype, device=dev)
+        sn_col = torch.zeros(B, N, dtype=torch.long, device=dev)
+    has_atk = (adj_min < BIG) | (sn_min < BIG)
+    use_ring = sn_min < adj_min
+    atk_col = torch.where(use_ring, sn_col, adj_dir + 6)
 
     # 2a. WAR MARCH (#91) — while at war with a live target, step to the
     #     neighbour STRICTLY CLOSER to the war target; ties in DIRECTION ORDER
@@ -473,8 +492,8 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     has_wmv = w_closer.any(dim=2)
     w_dir = w_key.argmin(dim=2)
     has_target = d_war < 1e6
-    pillage_col = W - 1                       # PILLAGE is the enum's last column
-    can_pillage = mask[:, :, pillage_col]
+    pillage_col = A_PILLAGE                   # #92: NOT W-1 — SNIPE sits after it
+    can_pillage = mask[:, :, pillage_col] if W > A_PILLAGE else torch.zeros(B, N, dtype=torch.bool, device=dev)
 
     # 2b. PEACE PATROL — only while further than the stop radius, and only to a
     #     neighbour that is strictly CLOSER to home. Ties break in
@@ -495,6 +514,6 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     war_march = at_war & has_target & has_wmv
     out = torch.where(war_march, w_dir, out)                     # war outranks it
     out = torch.where(at_war & can_pillage, torch.full_like(out, pillage_col), out)
-    out = torch.where(has_atk, atk_dir + 6, out)                 # attack outranks all
+    out = torch.where(has_atk, atk_col, out)                     # attack outranks all
     # a unit with no legal order at all gets no instruction
     return torch.where(mask.any(dim=2), out, torch.full_like(out, -1))

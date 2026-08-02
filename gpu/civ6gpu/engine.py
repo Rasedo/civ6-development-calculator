@@ -643,6 +643,24 @@ class BatchSim:
         self._lux_k = int((rules.improvements or {}).get("luxAmenityCities", 4))
         self.camp_ok = torch.tensor([[t["camp"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.neigh = neighbor_table(self.W, self.H).to(device)  # [T, 6]
+        # #92: the distance-2 ring, [T, 12], each row SORTED ASCENDING and
+        # padded -1 at map edges. Column order IS tile-index order, which is the
+        # engine's own target tie-break — so scanning SNIPE columns in order is
+        # scanning ring tiles in index order, and no consumer needs a second
+        # ordering rule. Built once from neigh (neighbours-of-neighbours minus
+        # self and the d=1 set).
+        _n1 = self.neigh  # [T, 6]
+        _n2 = torch.where(_n1.unsqueeze(2) >= 0,
+                          _n1[_n1.clamp(min=0)], torch.full((self.T, 6, 6), -1, dtype=_n1.dtype, device=device))
+        _n2 = _n2.reshape(self.T, 36)
+        _ring = torch.full((self.T, 12), -1, dtype=torch.long, device=device)
+        _selfT = torch.arange(self.T, device=device)
+        for t in range(self.T):
+            d1 = set(int(x) for x in _n1[t].tolist() if int(x) >= 0)
+            cand = sorted(set(int(x) for x in _n2[t].tolist() if int(x) >= 0) - d1 - {t})
+            for k, x in enumerate(cand[:12]):
+                _ring[t, k] = x
+        self.ring2 = _ring  # [T, 12]
         self.pair_dist = pair_distances(self.W, self.H).to(device)  # [T, T] int16
 
         # --- the candidate-site table (static) and per-slot city data (dynamic:
@@ -1457,11 +1475,19 @@ class BatchSim:
         self._act_names = list((rules.actions or {}).get("unit", []))
         self._act = {n: i for i, n in enumerate(self._act_names)}
         if self._act_names:
-            _want = 13 + len(ids) + 3  # 6 move + 6 attack + hold + every improvement + chop + repair + pillage
+            # #92: the expectation VERSIONS ON THE ENUM'S OWN CONTENT. The
+            # melee lane runs against the frozen fixtures_o4 set whose enum is
+            # the legacy 26 columns; demanding 38 unconditionally broke it on
+            # first contact. If SNIPE_0 is present the enum must be complete
+            # (+12); absent, it must be exactly the legacy width — either way a
+            # PARTIAL enum still fails loudly.
+            self._snipe_on = "SNIPE_0" in self._act
+            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0)
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
             self._A_PILLAGE = self._act["PILLAGE"]
+            self._A_SNIPE = self._act.get("SNIPE_0", self._A_PILLAGE + 1)  # #92
             # column for BUILD_<improvement>, indexed by improvement roster index
             self._A_IMP = [self._act.get(f"BUILD_{n}", -1) for n in ids]
         else:
@@ -1470,6 +1496,8 @@ class BatchSim:
             # numbers collided — re-export.
             self._A_CHOP, self._A_REPAIR = 16, 17
             self._A_PILLAGE = 13 + len(ids) + 2
+            self._A_SNIPE = self._A_PILLAGE + 1  # #92
+            self._snipe_on = False
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
         self.MINE = ids.index("MINE") if "MINE" in ids else -1        # -1 = not in scope
@@ -6429,8 +6457,17 @@ class BatchSim:
         pillage = (
             self.p_alive & (self._p_combat[self.p_type] > 0) & _enemy & (_has_imp | _has_dis)
         ).unsqueeze(2)
+        # #92: the SNIPE ring columns. ALL-FALSE for the player, deliberately:
+        # the player's snipe DISPATCH is unwritten, and a legal column nothing
+        # executes is the A-21 no-op trap. All-False is the truth ("not legal"),
+        # keeps both seats' widths equal to the enum, and the real player snipe
+        # lands with #88's head widening. The RIVAL's columns are live.
+        _sn_p = (
+            [torch.zeros(B, P_MAX, 12, dtype=torch.bool, device=dev)]
+            if getattr(self, "_snipe_on", False) else []
+        )
         out = torch.cat(
-            [move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols + [pillage], dim=2
+            [move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols + [pillage] + _sn_p, dim=2
         )
         # #51/S0.3: the mask's width IS the enum's length, or a dispatch is
         # reading the wrong column. `_res_cols` is empty when improvements are
@@ -6577,8 +6614,36 @@ class BatchSim:
         )
         _mil_r = self._p_combat[self.v_type.gather(1, sc).clamp(min=0)] > 0
         pillage_r = (present & _mil_r & _enemy_r & (_has_imp_r | _has_dis_r)).unsqueeze(2)
+        # #92 SNIPE_0..11 — the distance-2 ring, LIVE for the rival. Legal iff
+        # this unit is ranged with range >= 2, not embarked, and the k-th ring
+        # tile holds a REAL target: a barbarian always; a player unit or a
+        # PLAYER city centre while at war with the player. Quirk targets (other
+        # civs' centres, which the resolver refuses into a HOLD) are NOT
+        # offered — a mask column whose execution is a guaranteed no-op teaches
+        # a net that the verb is worthless (#87's corrupted-signal argument).
+        vt_sn = self.v_type.gather(1, sc).clamp(min=0, max=self.NU - 1)
+        _rngd_sn = (self._p_rng_str[vt_sn] > 0) & (self._p_rng_rng[vt_sn] >= 2)
+        _emb_sn = self.v_emb.gather(1, sc)
+        ring = self.ring2[tc]                     # [B, P_MAX, 12]
+        ringc = ring.clamp(min=0).reshape(B, -1)  # [B, P_MAX*12]
+        _rm = self.occ_mil.gather(1, ringc)
+        _rc_ = self.occ_civ.gather(1, ringc)
+        _rms = torch.where(_rm >= 0, self.unit_seat.gather(1, _rm.clamp(min=0)), torch.full_like(_rm, -1))
+        _rcs = torch.where(_rc_ >= 0, self.unit_seat.gather(1, _rc_.clamp(min=0)), torch.full_like(_rc_, -1))
+        _barb_ring = (_rms == BARB_SEAT).reshape(B, P_MAX, 12)
+        _pu_ring = ((_rms == PLAYER_SEAT) | (_rcs == PLAYER_SEAT)).reshape(B, P_MAX, 12)
+        _pc_ring = (self.center_at.gather(1, ringc) >= 0).reshape(B, P_MAX, 12)
+        _hp_sn = self.r_atwar[:, r].view(B, 1, 1)
+        snipe_r = (
+            present.unsqueeze(2)
+            & _rngd_sn.unsqueeze(2)
+            & ~_emb_sn.unsqueeze(2)
+            & (ring >= 0)
+            & (_barb_ring | ((_pu_ring | _pc_ring) & _hp_sn))
+        )
+        _sn_r = [snipe_r] if getattr(self, "_snipe_on", False) else []
         out = torch.cat(
-            [move, attack, hold, build_f, build_m, build_l, chop, repair_r] + _res_cols_r + [pillage_r],
+            [move, attack, hold, build_f, build_m, build_l, chop, repair_r] + _res_cols_r + [pillage_r] + _sn_r,
             dim=2,
         )
         # #89: the SAME width assert the player's mask carries. It lived on ONE
@@ -6605,6 +6670,10 @@ class BatchSim:
         "at_war",                              # 16
         "d_war",            # 17   distance to the chosen war target (BIG if none)
         *(f"d_war_n{i}" for i in range(6)),    # 18-23 same, per neighbour
+        # #92: the ring-2 tile ids, so the attack pick can interleave adjacent
+        # and ring targets by TILE INDEX (the engine scans all tiles in index
+        # order — d1 and d2 targets compete on one key). -1 = no tile (edge).
+        *(f"ring_tile{i}" for i in range(12)),  # 24-35
     )
 
     def _unit_obs(self, tile, present, centers, calive, mp, charges, utype,
@@ -6670,6 +6739,7 @@ class BatchSim:
                 at_war.to(dt).unsqueeze(1).expand(B, N).unsqueeze(2),
                 d_war.unsqueeze(2),
                 d_war_nb,
+                self.ring2[tc].to(dt),   # #92: [B, N, 12] ring tile ids, -1 pad
             ],
             dim=2,
         )
@@ -6824,6 +6894,43 @@ class BatchSim:
                         elif bool(city_att[b_]):
                             self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "rival", v)
                             self.v_mp[b_, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
+            # --- #92 SNIPE (ranged ring-2 strike) ---
+            snp = (
+                act & (a >= self._A_SNIPE) & (a < self._A_SNIPE + 12) & ~is_civ
+                if getattr(self, "_snipe_on", False)
+                else torch.zeros_like(act)
+            )
+            if bool(snp.any()):
+                ringd = self.ring2[here.clamp(min=0)]  # [B, 12]
+                tgt_s = ringd.gather(1, (a - self._A_SNIPE).clamp(min=0, max=11).unsqueeze(1)).squeeze(1)
+                vt_d = self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                ok_s2 = (
+                    snp & (tgt_s >= 0)
+                    & (self._p_rng_str[vt_d] > 0) & (self._p_rng_rng[vt_d] >= 2)
+                    & ~self.v_emb.gather(1, sc.unsqueeze(1)).squeeze(1)
+                )
+                if bool(ok_s2.any()):
+                    tcs = tgt_s.clamp(min=0)
+                    _mt2 = self.occ_mil.gather(1, tcs.unsqueeze(1)).squeeze(1)
+                    _ct2 = self.occ_civ.gather(1, tcs.unsqueeze(1)).squeeze(1)
+                    _mts2 = torch.where(_mt2 >= 0, self.unit_seat.gather(1, _mt2.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_mt2, -1))
+                    _cts2 = torch.where(_ct2 >= 0, self.unit_seat.gather(1, _ct2.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ct2, -1))
+                    at_war2 = self.r_atwar[:, r]
+                    u_hit = ok_s2 & ((_mts2 == BARB_SEAT) | (((_mts2 == PLAYER_SEAT) | (_cts2 == PLAYER_SEAT)) & at_war2))
+                    c_hit = ok_s2 & ~u_hit & (self.center_at.gather(1, tcs.unsqueeze(1)).squeeze(1) >= 0) & at_war2
+                    for b_ in range(B):
+                        if not bool(ok_s2[b_]):
+                            continue
+                        v = int(sc[b_])
+                        one = torch.zeros(B, dtype=torch.bool, device=dev)
+                        one[b_] = True
+                        if bool(u_hit[b_]):
+                            # the war act's own ranged resolver — one roll, no retaliation
+                            self._hostile_ranged_strike(one, tgt_s, "rival", v)
+                            self.v_mp[b_, v] = 0
+                        elif bool(c_hit[b_]):
+                            self._hostile_city_attack(one, self.center_at.gather(1, tcs.unsqueeze(1)).squeeze(1), "rival", v)
+                            self.v_mp[b_, v] = 0
             # --- builds 13-15 (builders) ---
             # C3-sym V-H1: rival chop (16) — strip + grant into the owning
             # rival's NEAREST alive city (food -> rc_growth, production ->
