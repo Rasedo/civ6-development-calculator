@@ -6565,7 +6565,13 @@ class BatchSim:
                 & (~self.ocean_tile.gather(1, nbc).reshape(B, P_MAX, 6) | _cart_r)
                 & _ship_r
                 & ~_is_nav_mv
-                & self.r_atwar[:, r].view(B, 1, 1)  # bound later in this fn; read the tensor
+                # AT WAR WITH ANYONE — the war walker has no hp term at all
+                # (running it IS the war context), and 9133's units embark
+                # against an enemy RIVAL with hp=False. Gating on r_atwar
+                # (war-with-the-PLAYER only) refused every rr-war embark:
+                # the final 30-class, seventh attribution, named by the
+                # full-term dump (pass=False wpass=True at the engine's step).
+                & (self.r_atwar[:, r] | self.rr_war[:, r].any(dim=1)).view(B, 1, 1)
             )
         else:
             _wgate = torch.zeros(B, P_MAX, 6, dtype=torch.bool, device=dev)
@@ -6583,8 +6589,18 @@ class BatchSim:
         _Smv = self.S
         _cs_ctr_mv = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         _cs_ctr_mv.scatter_(1, self.cs_center[:, :_Smv].clamp(min=0), self.cs_alive[:, :_Smv])
+        # the march's own rule is "ENEMY centers can't be entered" — a NEUTRAL
+        # rival's centre is walkable (the mm-probe caught units funnelling past
+        # one at seed 9133: equal-distance tie, engine steps dir 3, mask had
+        # killed it). The rvc arm therefore gates on rr_war; player and CS
+        # centres stay blocked (no capture-by-walk).
+        _rvc_war_mv = (
+            (_rvc_mv >= 0)
+            & (_rvc_mv != r)
+            & self.rr_war[:, r].gather(1, _rvc_mv.clamp(min=0).reshape(B, -1)).reshape(B, P_MAX, 6)
+        )
         _centre_block = (
-            ((_rvc_mv >= 0) & (_rvc_mv != r))
+            _rvc_war_mv
             | (self.center_at.gather(1, nbc).reshape(B, P_MAX, 6) >= 0)
             | _cs_ctr_mv.gather(1, nbc).reshape(B, P_MAX, 6)
         )
@@ -7006,7 +7022,8 @@ class BatchSim:
                         & _ship_d
                         & ~self.unit_naval[_vt_mv2]
                     )
-                    _pass_d = _pass_d | (_wg2 & self.r_atwar[:, r])  # war-march only, no embark at peace
+                    _at_war_d = self.r_atwar[:, r] | self.rr_war[:, r].any(dim=1)  # war with ANYONE, matching the walker
+                    _pass_d = _pass_d | (_wg2 & _at_war_d)  # war-march only, no embark at peace
                 # #92: cliffs — TS stepUnit refuses them INTERNALLY, the GPU
                 # _step_verb does not, so without this term a replayed cliff
                 # step diverges between engines instead of being refused.
