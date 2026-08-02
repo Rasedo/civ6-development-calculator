@@ -7026,7 +7026,16 @@ class BatchSim:
                 # the transition itself (EMBARK_MOVES pool, cost, disembark).
                 _pass_d = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
                 if self._embark_live:
+                    # #70 t43: the MASK's three-way terrain body, at the apply
+                    # surface — one legality rule, both surfaces. The old term
+                    # here was `passable | (land embark gate)`: the LAND arm
+                    # only, so a driven NAVAL hull had every water step
+                    # refused at execution while the mask (and TS) moved it.
+                    # naval: wpass behind cartography-for-ocean, war-free;
+                    # land: passable, or the embark gate (SHIPBUILDING, ocean
+                    # behind cartography, at war with ANYONE).
                     _vt_mv2 = self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                    _is_nav_d = self.unit_naval[_vt_mv2]
                     _cart_r2 = (
                         self.r_techs[:, r, self._cartography_tech]
                         if self._cartography_tech >= 0
@@ -7037,14 +7046,12 @@ class BatchSim:
                         if self._shipbuilding_tech >= 0
                         else torch.zeros(B, dtype=torch.bool, device=dev)
                     )
-                    _wg2 = (
-                        self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1)
-                        & (~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | _cart_r2)
-                        & _ship_d
-                        & ~self.unit_naval[_vt_mv2]
+                    _wp_d = self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1) & (
+                        ~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | _cart_r2
                     )
                     _at_war_d = self.r_atwar[:, r] | self.rr_war[:, r].any(dim=1)  # war with ANYONE, matching the walker
-                    _pass_d = _pass_d | (_wg2 & _at_war_d)  # war-march only, no embark at peace
+                    _wg2 = _wp_d & _ship_d & ~_is_nav_d & _at_war_d  # war-march only, no embark at peace
+                    _pass_d = torch.where(_is_nav_d, _wp_d, _pass_d | _wg2)
                 # #92: cliffs — TS stepUnit refuses them INTERNALLY, the GPU
                 # _step_verb does not, so without this term a replayed cliff
                 # step diverges between engines instead of being refused.

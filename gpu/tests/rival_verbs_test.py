@@ -263,6 +263,53 @@ def main() -> None:
     assert float(sim7.v_mp[0, sl7b]) == 0.0, "a snipe must spend the turn"
     print(f"  7 SNIPE strikes a ring-2 barbarian OK ({hp0:.0f} -> {hp1:.0f} hp)")
 
+    # -- 8: a replayed NAVAL water move SAILS (#70 t43 sibling) -------------
+    # The apply's terrain term was `passable | (embark gate)` — the LAND arm
+    # only — so a driven galley had every water step refused at execution
+    # while the mask (and TS) moved it. The apply now carries the mask's own
+    # three-way body: naval water is cartography-gated, war-free.
+    sim8 = fresh(rules, path)
+    sim8.controlled[0, r] = True
+    sl8, t8 = a_rival_soldier(sim8, r)
+    assert sl8 is not None
+    ni = next(i for i in range(sim8.NU) if bool(sim8.unit_naval[i]))
+    sim8.v_type[0, sl8] = ni
+    sim8.v_mp[0, sl8] = 3.0
+    # park it on coastal water with a free water neighbour (occ bookkeeping
+    # by hand, the city_first_test idiom)
+    w8 = None
+    for cand in (sim8.wpass[0] & ~sim8.ocean_tile[0]).nonzero(as_tuple=True)[0].tolist():
+        if int(sim8.occ_mil[0, cand]) >= 0:
+            continue
+        for d8 in range(6):
+            nb8 = int(sim8.neigh[cand, d8])
+            if nb8 >= 0 and bool(sim8.wpass[0, nb8]) and not bool(sim8.ocean_tile[0, nb8]) and int(sim8.occ_mil[0, nb8]) < 0:
+                w8 = (int(cand), d8, nb8)
+                break
+        if w8:
+            break
+    assert w8 is not None, "fixture has no free coastal pair"
+    wt8, dir8, nb8 = w8
+    sim8.occ_mil[0, t8] = -1
+    sim8.v_tile[0, sl8] = wt8
+    sim8.occ_mil[0, wt8] = sl8 + sim8.POOL_LO["v"]
+    sm8 = sim8.rival_slot_map(r)[0]
+    rw8 = int((sm8 == sl8).nonzero(as_tuple=True)[0][0])
+    acts8 = torch.full((1, sm8.shape[0]), -1, dtype=torch.long)
+    acts8[0, rw8] = dir8
+    sim8._apply_rival_unit_actions(r, acts8)
+    assert int(sim8.v_tile[0, sl8]) == nb8, (
+        f"#70 t43 sibling: a replayed naval water step must SAIL (stuck at {int(sim8.v_tile[0, sl8])}, wanted {nb8})"
+    )
+    # and the same hull never walks onto land
+    sim8.v_mp[0, sl8] = 3.0
+    landd = next((d for d in range(6) if int(sim8.neigh[nb8, d]) >= 0 and bool(sim8.passable[0, int(sim8.neigh[nb8, d])]) and not bool(sim8.wpass[0, int(sim8.neigh[nb8, d])])), None)
+    if landd is not None:
+        acts8[0, rw8] = landd
+        sim8._apply_rival_unit_actions(r, acts8)
+        assert int(sim8.v_tile[0, sl8]) == nb8, "a naval hull must refuse a land step at the apply"
+    print(f"  8 replayed naval move sails OK ({wt8} -> {nb8}), land step refused")
+
     print("RIVAL VERBS OK")
 
 

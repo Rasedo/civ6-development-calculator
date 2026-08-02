@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, neighbors } from './hex';
 import { isWater, isImpassable } from './query';
 import { nextRandom } from './rand';
 import { seatAccumulators, seatGrowth, commitProduction, commitResearch } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves } from './units';
+import { spawnUnit, unitsAt, unitsHostile, unitDomain, encampmentIntact, encampmentBlocks, layTradeRoad, cliffBlocksStep, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit } from './units';
 import { PILLAGE_HEAL_IMPROVEMENTS } from './combat';  // #70: the replay's pillage arm mirrors hostileUnitAct's
 import { UNIT_HP } from '../data/units';
 import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captureRivalCity, damageRoll, terrainDefense, woundPenalty, supportCount, SUPPORT_CS, xpLevelBonus, awardDefenseXp, encampmentTrainXp, GENERAL_AURA_RANGE, generalAuraCS, cityDefenseStrength } from './combat';
@@ -2390,7 +2390,27 @@ export function applyRivalUnitOrders(state: GameState, rival: RivalCiv, steps: n
       if (a < 6) {
         const nb = neighbors(state.map, here);
         const to = nb[a];
-        if (to) stepUnit(state, unit, to);      // stepUnit re-validates; an illegal step is refused
+        // #70 t43: the WALKERS' OWN candidate gate, at the REPLAY surface —
+        // refusal parity with the GPU's _apply_rival_unit_actions. stepUnit
+        // re-validates cost/cliffs but neither STACKING nor the EMBARK tech
+        // (TS walkers never OFFER an illegal step, so stepUnit never needed
+        // to refuse one). Two live divergences came through that hole at
+        // seed 9119: t43 embarked a Shipbuilding-less warrior toward 556
+        // (into a trade-route raid ring, -1F -1P/turn), and t46 stacked two
+        // r0 warriors on 552 (the GPU's _blocked_for refused; the drifted
+        // attacker then missed r1c3 and the whole t48 war family split).
+        // `tileFreeForUnit` is the war-march's own body: stacking, the
+        // encampment wall, naval/land domain, canEmbark, ocean-behind-
+        // CARTOGRAPHY. allowEmbark carries the march's call-site arms: at
+        // war with ANYONE, and SHIPBUILDING for every land unit — the GPU
+        // gate's exact term (canEmbark alone would let a SAILING civilian
+        // embark that the GPU refuses; Shipbuilding requires Sailing, so
+        // the conjunction equals the GPU's single test).
+        if (to) {
+          const anyWarU = rival.atWar || (rival.atWarRivals?.length ?? 0) > 0;
+          const allowEmb = anyWarU && ownerHasTech(state, unit, 'SHIPBUILDING');
+          if (tileFreeForUnit(state, to.index, unit, allowEmb)) stepUnit(state, unit, to);
+        }
       } else if (a >= 6 && a < 12) {
         // ATTACK — safe to replay now BECAUSE the walkers stand down for
         // driven seats (no double-resolution). The SAME combat calls the

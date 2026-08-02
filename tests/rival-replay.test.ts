@@ -143,6 +143,49 @@ describe('#70 the action FILE drives the TS rival', () => {
     expect(after!.tileIndex).not.toBe(before);
   });
 
+  it('a replayed WATER step is refused without SHIPBUILDING — and embarks with it (#70 t43)', () => {
+    // stepUnit's embark transition has no tech gate of its own (walkers gate
+    // embark at CANDIDATE level), so the replay surface must refuse what the
+    // GPU's apply refuses: seed 9119 t43 embarked a Shipbuilding-less warrior
+    // toward tile 556, drifted it into a trade-route raid ring, and desynced
+    // the engines by 1 food + 1 production per turn.
+    const mk = (withTech: boolean) => {
+      const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+      state.unitsMode = true;
+      const rival = addRival(state, 6, 6);
+      rival.atWar = true; // the gate needs war with ANYONE; peace refusal is older
+      if (withTech) rival.research.techs.push('SAILING', 'SHIPBUILDING');
+      const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, civOfRival(rival.id))!;
+      const nb = neighbors(state.map, state.map.tiles[u.tileIndex]);
+      const dir = nb.findIndex((t) => t && !isImpassable(t));
+      nb[dir]!.terrain = 'COAST';
+      state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [], tech: null, civic: null, units: [[dir]] } } };
+      const before = u.tileIndex;
+      rivalPhase(state);
+      return { moved: state.units.find((x) => x.id === u.id)!.tileIndex !== before };
+    };
+    expect(mk(false).moved).toBe(false); // no Shipbuilding: REFUSED
+    expect(mk(true).moved).toBe(true);   // Shipbuilding at war: embarks
+  });
+
+  it('a replayed NAVAL land step is refused (a hull never walks ashore)', () => {
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    state.unitsMode = true;
+    const rival = addRival(state, 6, 6);
+    rival.treasury = 50; // GV-5 bankruptcy would disband the maintenance-1 galley
+    const home = tileAtCoords(state.map, 3, 3);
+    home.terrain = 'COAST';
+    const u = spawnUnit(state, 'GALLEY', home.index, civOfRival(rival.id))!;
+    expect(u).toBeTruthy();
+    expect(u.tileIndex).toBe(home.index);
+    const nb = neighbors(state.map, home);
+    const dir = nb.findIndex((t) => t && !isWater(t) && !isImpassable(t));
+    expect(dir).toBeGreaterThanOrEqual(0);
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [], tech: null, civic: null, units: [[dir]] } } };
+    rivalPhase(state);
+    expect(state.units.find((x) => x.id === u.id)!.tileIndex).toBe(home.index);
+  });
+
   it('a seat with NO record still runs the ladder (the paths coexist)', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);
