@@ -6588,7 +6588,47 @@ class BatchSim:
             | (self.center_at.gather(1, nbc).reshape(B, P_MAX, 6) >= 0)
             | _cs_ctr_mv.gather(1, nbc).reshape(B, P_MAX, 6)
         )
-        move = on_map & (passable | _wgate) & ~foreign & ~own_dom & ~_centre_block & alive
+        # #92 the FINAL step-scan gate: the march's blocking is `_blocked_for`
+        # — STACKING plus the ENCAMPMENT WALL (B-17: a live enemy Encampment
+        # bars entry; it is a DISTRICT, so occupancy probes read the tile as
+        # empty, and all 140 remaining hold-vs-move cases were exactly this).
+        # The mask's hand-rolled `foreign`/`own_dom` stacking is REPLACED by
+        # the same body the march calls: one legality rule, both surfaces —
+        # this file's whole lesson, applied to its last bug.
+        _nbf = nbc  # [B, P_MAX*6]
+        _blk_mil = self._blocked_for(_nbf, r + 1).reshape(B, P_MAX, 6)
+        _blk_civ = self._blocked_for(_nbf, r + 1, is_civilian=True).reshape(B, P_MAX, 6)
+        _blk_sel = torch.where(is_civ, _blk_civ, _blk_mil)
+        # #92 the ACTUAL 140-class: NAVAL movers. The march's terrain term is
+        # `where(is_naval, water_gate, land | embark)` — a galley NEVER walks
+        # on land — while this mask handed every unit `passable | wgate` and so
+        # offered LAND steps to ships: free tile, no occupant, no centre,
+        # step_ok=False, the exact bucket signature. Naval water is gated on
+        # cartography-for-ocean only (no shipbuilding — that is the LAND
+        # unit's embark tech) and is NOT war-gated (a galley sails at peace;
+        # the peace act patrols it on water).
+        if self._embark_live:
+            _nav_water = (
+                self.wpass.gather(1, nbc).reshape(B, P_MAX, 6)
+                & (~self.ocean_tile.gather(1, nbc).reshape(B, P_MAX, 6) | _cart_r)
+            )
+            _terr_mv = torch.where(_is_nav_mv, _nav_water, passable | _wgate)
+        else:
+            _terr_mv = passable
+        move = on_map & _terr_mv & ~_blk_sel & ~_centre_block & alive
+        # #92 final residual (95 of the last 140): CLIFF EDGES. The march
+        # applies _cliff_block_dirs at step level; this mask had no cliff term
+        # (recorded as a residual when SHIPBUILDING landed, measured now).
+        # Per-row loop bounded by live units — rows empty across the whole
+        # batch break out, the same pattern as the war-target loop in
+        # rival_unit_obs.
+        if self._embark_live:
+            _own_r = self.rival_at == r
+            for _n in range(P_MAX):
+                if not bool(present[:, _n].any()):
+                    break
+                _clf = self._cliff_block_dirs(tile[:, _n].clamp(min=0), nb[:, _n], _own_r)
+                move[:, _n] = move[:, _n] & ~_clf
         can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
         at_war = self.r_atwar[:, r].reshape(B, 1, 1)
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war
@@ -6967,7 +7007,12 @@ class BatchSim:
                         & ~self.unit_naval[_vt_mv2]
                     )
                     _pass_d = _pass_d | (_wg2 & self.r_atwar[:, r])  # war-march only, no embark at peace
-                ok = mv & (tgt >= 0) & _pass_d & ~blocked
+                # #92: cliffs — TS stepUnit refuses them INTERNALLY, the GPU
+                # _step_verb does not, so without this term a replayed cliff
+                # step diverges between engines instead of being refused.
+                _clf_d = self._cliff_block_dirs(here.clamp(min=0), self.neigh[here.clamp(min=0)], self.rival_at == r)
+                _clf_dir = _clf_d.gather(1, a.clamp(min=0, max=5).unsqueeze(1)).squeeze(1)
+                ok = mv & (tgt >= 0) & _pass_d & ~blocked & ~_clf_dir
                 if bool(ok.any()):
                     stepped = self._step_verb(  # #51/S5.2: the shared contract
                         ok, sc + P_MAX, here, tgt, a.clamp(min=0, max=5),
@@ -12882,6 +12927,10 @@ class BatchSim:
         if not bool(march.any()):
             return
         tgt, has_imp, has_pc, has_rc = self._war_march_target(hc, ac, hp)
+        if getattr(self, "_war_probe", False) and getattr(self, "_war_last", None) is not None:
+            # second stash write — tgt/has_tgt exist only on the march path
+            self._war_last["has_tgt"] = (has_imp | has_pc | has_rc).clone()
+            self._war_last["tgt"] = tgt.clone()
         has_tgt = has_imp | has_pc | has_rc
         d_here = self.pair_dist[hc, tgt].to(torch.long)
         # AUDIT A-8: the march walks REAL MP toward the (fixed) target — per
@@ -12932,6 +12981,13 @@ class BatchSim:
                 # B-26 (#79): a CLIFF closes the embark/disembark edge.
                 step_ok = step_ok & ~self._cliff_block_dirs(cur, nb2, self.rival_at == self.v_civ[:, v].unsqueeze(1))
             d_nb = self.pair_dist[tgt.unsqueeze(1), nb2c].to(torch.long)
+            if getattr(self, "_war_probe", False) and getattr(self, "_war_last", None) is not None and "step_ok" not in self._war_last:
+                # first-iteration step-scan stash: the definitive instrument for
+                # hold-vs-move diagnosis — the march's OWN inputs, not an
+                # external re-derivation of them.
+                self._war_last["step_ok"] = step_ok.clone()
+                self._war_last["d_nb"] = d_nb.clone()
+                self._war_last["d_cur"] = d_cur.clone()
             skey = torch.where(step_ok, d_nb * 8 + arange6, 10**9)
             best = skey.min(dim=1).values
             dir_i = (best % 8).clamp(max=5)
