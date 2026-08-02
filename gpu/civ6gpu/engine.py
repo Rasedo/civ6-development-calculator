@@ -7092,9 +7092,20 @@ class BatchSim:
                     _csc2 = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
                     _csc2.scatter_(1, self.cs_center[:, :S2_].clamp(min=0), _suz2)
                     _cs2 = _csc2.gather(1, tc.unsqueeze(1)).squeeze(1) & at_war
-                    rr_att = valid_t & _melee_d2 & (_rr_u2 | _rr_c2 | _cs2)
-                    unit_att = valid_t & (barb_t | (p_unit & at_war) | rr_att)
-                    city_att = valid_t & ~barb_t & ~p_unit & ~rr_att & p_city & at_war
+                    # #70 driven-parity round 6: the war act resolves its melee
+                    # attacks through a FIVE-WAY split — units via
+                    # _hostile_vs_unit, player centres via _hostile_city_attack,
+                    # rr centres via _rival_attack_rival_city, CS centres via
+                    # _assault_city_state (+capture) — and this dispatch lumped
+                    # rr/CS centres into the UNIT resolver, which NO-OPS on an
+                    # empty centre. TS's replay sieged (ww 32, city 200 -> 167,
+                    # rng drawn) while the GPU did nothing: seed 9119 t39. The
+                    # replay now routes through the act's own resolvers.
+                    rru_att = valid_t & _melee_d2 & _rr_u2      # enemy rival UNITS
+                    rrc_att = valid_t & _melee_d2 & _rr_c2 & ~_rr_u2   # enemy rival CENTRES
+                    cs_att2 = valid_t & _melee_d2 & _cs2 & ~_rr_u2 & ~_rr_c2
+                    unit_att = valid_t & (barb_t | (p_unit & at_war) | rru_att)
+                    city_att = valid_t & ~barb_t & ~p_unit & ~rru_att & ~rrc_att & ~cs_att2 & p_city & at_war
                     for b_ in range(B):
                         if not bool(valid_t[b_]):
                             continue
@@ -7104,6 +7115,17 @@ class BatchSim:
                         if bool(unit_att[b_]):
                             self._hostile_vs_unit(one, tgt, "rival", v)
                             self.v_mp[b_, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
+                        elif bool(rrc_att[b_]):
+                            self._rival_attack_rival_city(one, tgt.clamp(min=0), v)
+                            self.v_mp[b_, v] = 0
+                        elif bool(cs_att2[b_]):
+                            _css = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
+                            _csr2 = self._assault_city_state(one, _css, tgt.clamp(min=0), "rival", v)
+                            if _csr2 is not None:
+                                _rows2, _dead2, _cap2 = _csr2
+                                if bool(_cap2.any()):
+                                    self._capture_city_state_rival(_cap2.nonzero(as_tuple=True)[0], _css, v)
+                            self.v_mp[b_, v] = 0
                         elif bool(city_att[b_]):
                             self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "rival", v)
                             self.v_mp[b_, v] = 0  # #51/S5.2: the turn is spent (TS movesLeft = 0)
