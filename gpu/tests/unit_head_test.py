@@ -54,16 +54,18 @@ def main() -> None:
     acts = rj["actions"]["unit"]
     imp_ids = rj["improvements"]["ids"]
     assert acts, "rules.actions.unit missing — the exporter must ship the enum"
-    assert len(acts) == 13 + len(imp_ids) + 3 + 12, (  # #92: +12 SNIPE ring columns
+    assert len(acts) == 13 + len(imp_ids) + 3 + 12 + 7, (  # #92: +12 SNIPE; #93: +7 SPREAD
         f"enum is {len(acts)} wide for {len(imp_ids)} improvements"
     )
+    assert acts[-7] == "SPREAD_HERE" and acts[-1] == "SPREAD_5", "#93: SPREAD tail misplaced"
+
     # #92 RETIRED the pillage-last invariant: SNIPE_0..11 sit after it. What
     # still matters is that PILLAGE and the ring block hold their exact seats —
     # consumers key on names/indices, never on W-1 (that assumption broke the
     # ladder once already; see A_PILLAGE in gpu/ladder.py).
     assert acts[25] == "PILLAGE", f"PILLAGE must hold column 25, got {acts[25]}"
-    assert acts[26] == "SNIPE_0" and acts[-1] == "SNIPE_11", (
-        f"SNIPE ring must be 26..37, got {acts[26]}..{acts[-1]}"
+    assert acts[26] == "SNIPE_0" and acts[37] == "SNIPE_11", (  # #93: SPREAD sits past 37 now — key on the SEAT, not W-1
+        f"SNIPE ring must be 26..37, got {acts[26]}..{acts[37]}"
     )
     for i, name in enumerate(imp_ids[:3]):
         assert acts[13 + i] == f"BUILD_{name}", f"dedicated build col {13+i} is {acts[13+i]}"

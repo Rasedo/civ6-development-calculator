@@ -168,6 +168,52 @@ def _builder_jobs(sim, r: int) -> torch.Tensor:
     return out
 
 
+def _spread_targets(sim, r: int) -> torch.Tensor:
+    """#93 slice 8: [B, N] spread-target CENTRE per slot row (-1 = none) for
+    religious rows with charges — the NEAREST alive centre of ANY civ whose
+    followed religion != g, ties lowest tile (the walker's own
+    dist·(T+1)+centerIndex key)."""
+    smap = sim.rival_slot_map(r)
+    B, N = smap.shape
+    out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
+    if not bool(sim.r_religion_done[:, r].any()):
+        return out
+    g = r + 1
+    T = sim.T
+    acc = torch.zeros(B, T, dtype=torch.long, device=sim.device)
+    acc.scatter_add_(1, sim.site.clamp(min=0), (sim.alive & (sim.city_followed != g)).long())
+    if sim.R > 0:
+        acc.scatter_add_(
+            1, sim.rc_center.clamp(min=0).reshape(B, -1),
+            (sim.rc_alive & (sim.rc_followed != g)).long().reshape(B, -1),
+        )
+    tm = acc > 0
+    if not bool(tm.any()):
+        return out
+    arangeT = torch.arange(T, device=sim.device)
+    for n in range(N):
+        sl = smap[:, n]
+        pres = sl >= 0
+        if not bool(pres.any()):
+            break
+        vt = sim.v_type.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=sim.NU - 1)
+        relig = torch.zeros_like(pres)
+        if sim._missionary_idx >= 0:
+            relig = relig | (vt == sim._missionary_idx)
+        if getattr(sim, "_apostle_idx", -1) >= 0:
+            relig = relig | (vt == sim._apostle_idx)
+        rows = pres & relig & (sim.v_charges.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1) > 0) & sim.r_religion_done[:, r]
+        if not bool(rows.any()):
+            continue
+        here = sim.v_tile.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1)
+        d = sim.pair_dist[here.clamp(min=0)].to(torch.long)
+        key = torch.where(tm, d * (T + 1) + arangeT, torch.full_like(d, 2 ** 40))
+        best = key.argmin(dim=1)
+        has = rows & tm.gather(1, best.unsqueeze(1)).squeeze(1)
+        out[:, n] = torch.where(has, best, out[:, n])
+    return out
+
+
 def _war_ctx(sim, r: int) -> dict:
     """#93: the DoW policy's inputs, computed exactly as the scripted block
     computes them (the engine's war-declaration site) — strengths, closest
@@ -274,9 +320,28 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # (lowest column for now — the builder spy tightens it like production's
     # 45%->99.4% arc). Rows not on their job get walked there by the planner.
     job_t = _builder_jobs(sim, r)
+    spread_t = _spread_targets(sim, r)
     smap0 = sim.rival_slot_map(r)
     here0 = sim.v_tile.gather(1, smap0.clamp(min=0))
     on_job = (job_t >= 0) & (here0 == job_t) & (smap0 >= 0)
+    # #93 slice 8: religious rows within 1 of their target SPREAD (HERE when
+    # standing on it — own cities — else the direction of the centre).
+    A_SP = getattr(sim, "_A_SPREAD", -1)
+    if A_SP >= 0 and bool((spread_t >= 0).any()):
+        here_sp = sim.v_tile.gather(1, smap0.clamp(min=0))
+        d_sp = sim.pair_dist[here_sp.clamp(min=0), spread_t.clamp(min=0)].to(torch.long)
+        close = (spread_t >= 0) & (smap0 >= 0) & (d_sp <= 1)
+        if bool(close.any()):
+            nbr = sim.neigh[here_sp.clamp(min=0)]  # [B, N, 6]
+            dir_hit = (nbr == spread_t.unsqueeze(2)) & (nbr >= 0)
+            dcol = torch.where(
+                here_sp == spread_t,
+                torch.zeros_like(spread_t),
+                dir_hit.float().argmax(dim=2) + 1,
+            )
+            valid_dir = (here_sp == spread_t) | dir_hit.any(dim=2)
+            take_sp = close & valid_dir
+            orders0 = torch.where(take_sp, A_SP + dcol, orders0)
     if bool(on_job.any()):
         W_u = um.shape[2]
         rep_ok = um[:, :, 17] if W_u > 17 else torch.zeros_like(on_job)
@@ -334,6 +399,8 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             # #93 slice 7b: a civilian's JOB is a walk destination like a war
             # target — real-MP multi-rank, re-planned each turn.
             dest = torch.where((dest < 0) & (job_t[:, n] >= 0), job_t[:, n], dest)
+            # #93 slice 8: a religious unit's SPREAD target likewise.
+            dest = torch.where((dest < 0) & (spread_t[:, n] >= 0), spread_t[:, n], dest)
             # peace: skip planning ranks beyond 0 (the drift re-plans next turn
             # anyway; multi-rank marching is a WAR behaviour in the walkers)
             ok_rows = rows_mv & (dest >= 0)

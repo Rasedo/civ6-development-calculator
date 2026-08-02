@@ -1482,7 +1482,8 @@ class BatchSim:
             # (+12); absent, it must be exactly the legacy width — either way a
             # PARTIAL enum still fails loudly.
             self._snipe_on = "SNIPE_0" in self._act
-            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0)
+            self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # #93: religious spread head
+            _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) + (7 if self._A_SPREAD >= 0 else 0)
             assert len(self._act_names) == _want, f"unit action enum is {len(self._act_names)} wide, expected {_want} for {len(ids)} improvements"
             self._A_CHOP = self._act["CHOP"]
             self._A_REPAIR = self._act["REPAIR"]
@@ -1497,6 +1498,7 @@ class BatchSim:
             self._A_CHOP, self._A_REPAIR = 16, 17
             self._A_PILLAGE = 13 + len(ids) + 2
             self._A_SNIPE = self._A_PILLAGE + 1  # #92
+            self._A_SPREAD = -1  # #93: no names -> no spread columns
             self._snipe_on = False
             self._A_IMP = [13 + i if i < 3 else 18 + i - 3 for i in range(len(ids))]
         self.FARM = ids.index("FARM") if "FARM" in ids else 0
@@ -6466,8 +6468,13 @@ class BatchSim:
             [torch.zeros(B, P_MAX, 12, dtype=torch.bool, device=dev)]
             if getattr(self, "_snipe_on", False) else []
         )
+        # #93: SPREAD columns are all-False on the PLAYER mask — the scripted
+        # player has no religious units, and the driven pipeline's spread
+        # legality lives in the driver's target scan + the apply arm. The
+        # columns exist so the mask width tracks the enum.
+        _sp_p = [torch.zeros_like(hold).expand(-1, -1, 7)] if getattr(self, "_A_SPREAD", -1) >= 0 else []
         out = torch.cat(
-            [move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols + [pillage] + _sn_p, dim=2
+            [move, attack, hold, build_f, build_m, build_l, chop, repair] + _res_cols + [pillage] + _sn_p + _sp_p, dim=2
         )
         # #51/S0.3: the mask's width IS the enum's length, or a dispatch is
         # reading the wrong column. `_res_cols` is empty when improvements are
@@ -6811,7 +6818,8 @@ class BatchSim:
         )
         _sn_r = [snipe_r] if getattr(self, "_snipe_on", False) else []
         out = torch.cat(
-            [move, attack, hold, build_f, build_m, build_l, chop, repair_r] + _res_cols_r + [pillage_r] + _sn_r,
+            [move, attack, hold, build_f, build_m, build_l, chop, repair_r] + _res_cols_r + [pillage_r] + _sn_r
+            + ([torch.zeros_like(hold).expand(-1, -1, 7)] if getattr(self, "_A_SPREAD", -1) >= 0 else []),
             dim=2,
         )
         # #89: the SAME width assert the player's mask carries. It lived on ONE
@@ -7458,6 +7466,55 @@ class BatchSim:
                     self.district_pillaged[_rw[_pd], _tt[_pd]] = True
                     self.v_mp[_rw, sc[_rw]] = 0
                     self._eff_version += 1
+            # --- #93 SPREAD (religious pressure) -------------------------
+            # The walker's spread body, at the replay surface: the lump into
+            # the target city's accumulator for religion g = r+1, charge -1,
+            # disband at 0. Re-validated: a religious unit with charges, a
+            # founded religion, and an ALIVE centre on the named tile.
+            if getattr(self, "_A_SPREAD", -1) >= 0:
+                spx = act & (a >= self._A_SPREAD) & (a < self._A_SPREAD + 7)
+                if bool(spx.any()):
+                    vt_sp = self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                    _relig_sp = torch.zeros_like(spx)
+                    if self._missionary_idx >= 0:
+                        _relig_sp = _relig_sp | (vt_sp == self._missionary_idx)
+                    if getattr(self, "_apostle_idx", -1) >= 0:
+                        _relig_sp = _relig_sp | (vt_sp == self._apostle_idx)
+                    dsp = (a - self._A_SPREAD).clamp(min=0)
+                    tgt_sp = torch.where(
+                        dsp == 0, here,
+                        self.neigh[here.clamp(min=0)].gather(1, (dsp - 1).clamp(min=0, max=5).unsqueeze(1)).squeeze(1),
+                    )
+                    ok_sp = (
+                        spx & _relig_sp & (tgt_sp >= 0)
+                        & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) > 0)
+                        & self.r_religion_done[:, r]
+                    )
+                    if bool(ok_sp.any()):
+                        g_sp = r + 1
+                        tc_sp = tgt_sp.clamp(min=0)
+                        pj_sp = self.center_at.gather(1, tc_sp.unsqueeze(1)).squeeze(1)
+                        rvj_sp = self.rvcity_at.gather(1, tc_sp.unsqueeze(1)).squeeze(1)
+                        lump_sp = self._enh["mlump"][self.r_enhancer[:, r] + 1]
+                        hit_p = ok_sp & (pj_sp >= 0)
+                        if bool(hit_p.any()):
+                            pr_ = hit_p.nonzero(as_tuple=True)[0]
+                            self.city_pressure[pr_, pj_sp[pr_], g_sp] += lump_sp[pr_]
+                        hit_r = ok_sp & (rvj_sp >= 0) & ~hit_p
+                        if bool(hit_r.any()):
+                            rr_ = hit_r.nonzero(as_tuple=True)[0]
+                            _rciv = self.rival_at.gather(1, tc_sp.unsqueeze(1)).squeeze(1)
+                            self.rc_pressure[rr_, _rciv[rr_].clamp(min=0), rvj_sp[rr_], g_sp] += lump_sp[rr_]
+                        landed = hit_p | (ok_sp & (rvj_sp >= 0))
+                        if bool(landed.any()):
+                            lr = landed.nonzero(as_tuple=True)[0]
+                            self.v_charges[lr, sc[lr]] -= 1
+                            self.v_mp[lr, sc[lr]] = 0
+                            dead_sp = landed & (self.v_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)
+                            if bool(dead_sp.any()):
+                                dr_ = dead_sp.nonzero(as_tuple=True)[0]
+                                self.v_alive[dr_, sc[dr_]] = False
+                                self.occ_civ[(dr_, here[dr_])] = -1  # #51/S3.4b
 
     def _scripted_builder(self) -> None:
         """Scripted-policy builder (phase 6a): each player BUILDER with

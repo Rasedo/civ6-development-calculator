@@ -31,6 +31,10 @@ export function unitActionNames(improvementIds: readonly string[]): string[] {
   // #92: the distance-2 ring, ordered by TILE INDEX ascending. Appended after
   // PILLAGE; consumers must key on the NAME, never on W-1.
   for (let k = 0; k < 12; k++) names.push(`SNIPE_${k}`);
+  // #93: religious SPREAD — HERE (standing on the target centre, own cities)
+  // plus the six directions. Appended LAST, name-keyed like everything else.
+  names.push('SPREAD_HERE');
+  for (let d = 0; d < 6; d++) names.push(`SPREAD_${d}`);
   return names;
 }
 

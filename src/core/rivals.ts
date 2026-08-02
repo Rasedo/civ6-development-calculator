@@ -2552,6 +2552,31 @@ export function applyRivalUnitOrders(state: GameState, rival: RivalCiv, steps: n
             if (unit.charges <= 0) disbandUnit(state, unit.id);
           }
         }
+      } else if (a >= 38 && a < 45) {
+        // #93 SPREAD — the walker's own body at the replay surface: lump into
+        // the target city's pressure accumulator for g, charge -1, disband
+        // at 0. HERE = column 38; directions 39-44.
+        if ((unit.type === 'MISSIONARY' || unit.type === 'APOSTLE') && (unit.charges ?? 0) > 0 && rival.religion.founded) {
+          const g = rivalsOf(state).indexOf(rival) + 1;
+          const to38 = a === 38 ? here : neighbors(state.map, here)[a - 39];
+          if (to38) {
+            const tcity = allCities(state).find((c) => c.centerIndex === to38.index);
+            if (tcity) {
+              const nRel = rivalCount(state) + 1;
+              const eb = rival.religion.enhancer ? ENHANCER_BELIEFS[rival.religion.enhancer]?.effects : undefined;
+              const lump = Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1));
+              let pres = tcity.religionPressure;
+              if (!pres || pres.length !== nRel) {
+                pres = new Array(nRel).fill(0);
+                tcity.religionPressure = pres;
+              }
+              pres[g] += lump;
+              unit.movesLeft = 0;
+              unit.charges = (unit.charges ?? 1) - 1;
+              if (unit.charges <= 0) disbandUnit(state, unit.id);
+            }
+          }
+        }
       } else if (a >= 26 && a < 38) {
         // SNIPE — the ring-2 tile in TILE-INDEX order (the shared #92 layout:
         // column order IS index order, so both engines enumerate identically).
