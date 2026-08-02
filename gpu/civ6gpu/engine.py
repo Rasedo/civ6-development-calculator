@@ -7057,7 +7057,17 @@ class BatchSim:
                 # step diverges between engines instead of being refused.
                 _clf_d = self._cliff_block_dirs(here.clamp(min=0), self.neigh[here.clamp(min=0)], self.rival_at == r)
                 _clf_dir = _clf_d.gather(1, a.clamp(min=0, max=5).unsqueeze(1)).squeeze(1)
-                ok = mv & (tgt >= 0) & _pass_d & ~blocked & ~_clf_dir
+                # #93 t103: a unit with NO movement cannot step — the walkers'
+                # own act gates (`movesLeft > 0` on TS, the march's MP loop
+                # here) both enforce it, and TS's replay applier does too. The
+                # only reachable hole was the DISEMBARK arm: its cost is "all
+                # remaining movement", so at 0 MP the afford test (mp < cost
+                # && mp < full) reads 0 < 0 = False and _step_verb walked a
+                # spent embarked unit ashore (9119's missionary took a third
+                # step to 598 and parked in a city's strike ring TS's twin
+                # never entered).
+                _mp_d = self.v_mp.gather(1, sc.unsqueeze(1)).squeeze(1)
+                ok = mv & (tgt >= 0) & _pass_d & ~blocked & ~_clf_dir & (_mp_d > 0)
                 if bool(ok.any()):
                     stepped = self._step_verb(  # #51/S5.2: the shared contract
                         ok, sc + P_MAX, here, tgt, a.clamp(min=0, max=5),
