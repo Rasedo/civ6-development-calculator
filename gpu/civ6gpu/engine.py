@@ -6547,9 +6547,23 @@ class BatchSim:
             # stays land-only: no embarking at peace" (#45/B-6). The first cut
             # of this gate skipped that term and the rival_verbs refusal case
             # (water at peace) caught it immediately.
+            # the march's own terms, ALL of them: "military embarks on
+            # SHIPBUILDING" — cartography only opens OCEAN. The first cut
+            # carried cartography alone, so the mask offered water to civs
+            # that cannot embark yet; the engine correctly declined to march
+            # and 562 of the 607 hold-vs-move cases were exactly this.
+            # (The march's cliff-edge block is NOT here yet — recorded
+            # residual; _step_verb does not re-check cliffs, so rare cliff
+            # columns are legal-but-refused until the next probe round.)
+            _ship_r = (
+                self.r_techs[:, r, self._shipbuilding_tech]
+                if self._shipbuilding_tech >= 0
+                else torch.zeros(B, dtype=torch.bool, device=dev)
+            ).view(B, 1, 1)
             _wgate = (
                 self.wpass.gather(1, nbc).reshape(B, P_MAX, 6)
                 & (~self.ocean_tile.gather(1, nbc).reshape(B, P_MAX, 6) | _cart_r)
+                & _ship_r
                 & ~_is_nav_mv
                 & self.r_atwar[:, r].view(B, 1, 1)  # bound later in this fn; read the tensor
             )
@@ -6922,9 +6936,15 @@ class BatchSim:
                         if self._cartography_tech >= 0
                         else torch.zeros(B, dtype=torch.bool, device=dev)
                     )
+                    _ship_d = (
+                        self.r_techs[:, r, self._shipbuilding_tech]
+                        if self._shipbuilding_tech >= 0
+                        else torch.zeros(B, dtype=torch.bool, device=dev)
+                    )
                     _wg2 = (
                         self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1)
                         & (~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | _cart_r2)
+                        & _ship_d
                         & ~self.unit_naval[_vt_mv2]
                     )
                     _pass_d = _pass_d | (_wg2 & self.r_atwar[:, r])  # war-march only, no embark at peace
@@ -12830,6 +12850,16 @@ class BatchSim:
         # B-32 union) within dist < 13 (ties -> lowest tile index), else nearest
         # player city — hostileUnitAct's widened target scan.
         march = act & ~attack & ~pillage & ~dist_pillage
+        if getattr(self, "_war_probe", False):
+            # diagnosis stash, dormant unless a probe sets _war_probe — records
+            # THIS act's own intermediates so an external spy never re-derives
+            # (and mis-derives) them. BEFORE the early return, or the
+            # attack/hold cases a hold-diagnosis needs would never reach it.
+            self._war_last = {
+                "v": v, "attack": attack.clone(), "target_tile": target_tile.clone(),
+                "pillage": pillage.clone(), "dist_pillage": dist_pillage.clone(),
+                "march": march.clone(),
+            }
         if not bool(march.any()):
             return
         tgt, has_imp, has_pc, has_rc = self._war_march_target(hc, ac, hp)
