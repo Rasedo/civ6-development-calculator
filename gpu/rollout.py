@@ -164,7 +164,12 @@ def main() -> None:
 
     from tools.statelog import gpu_state_lines  # #51/S8.5: tools/ group
     _logl = []
-    sim = BatchSim(fixtures, rules, device="cpu", dtype=torch.float64)
+    # #93: the rollout drives its rival seats through the ladder, whose
+    # observation goes through BatchEnv.observe — build the env and use ITS
+    # sim (one sim, not two).
+    from civ6gpu.env import BatchEnv
+    _env_d = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
+    sim = _env_d.sim
     B, C = sim.B, sim.C
     game_seed = torch.tensor([args.seed * 1_000_003 + lo + i for i in range(B)], dtype=torch.int64)  # GLOBAL index: shard-invariant seeds
     slots = torch.arange(C, dtype=torch.int64).view(1, C)
@@ -173,9 +178,24 @@ def main() -> None:
     pslots = torch.arange(P_MAX, dtype=torch.int64).view(1, P_MAX)
 
     games = [
-        {"seed": f["seed"], "rng": int(game_seed[i]), "sites": [c["site"] for c in f["cities"]], "actions": [], "trace": []}
+        {"seed": f["seed"], "rng": int(game_seed[i]), "sites": [c["site"] for c in f["cities"]], "actions": [], "trace": [], "rivals": {}}
         for i, f in enumerate(fixtures)
     ]
+    # #93 DELETION-1 PREREQUISITE: the rollout's rival seats are DRIVEN — the
+    # generator makes the ladder+driver decisions per turn and RECORDS them
+    # into rollout.json, so the TS replay feeds them through
+    # applyRivalActionRecord and the recordless-scripted fallback dies. The
+    # policy rng keys on (fixture seed, turn, rival), so resume-from-ckpt
+    # re-derives identical decisions.
+    import drive as _drv
+    import ladder as _ldr
+    _rj_d = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
+    _roster_d = _ldr.unit_roster(_rj_d["units"])
+    _NB_d = sim.rules_dev.b_cost.shape[0]
+    _classes_d = _ldr.prod_classes(_NB_d, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
+    _gseeds_d = [int(f["seed"]) for f in fixtures]
+    for _r in range(sim.R):
+        _drv.take_seat(sim, _r)
 
     if args.resume_t is not None:
         # §F resume: restore the FULL batch at the checkpoint (batch-shape
@@ -278,6 +298,15 @@ def main() -> None:
                 entry["u"] = orders
             if len(entry) > 1:
                 games[b]["actions"].append(entry)
+        # #93: rival decisions BEFORE step, the drive_batched per-turn body —
+        # draw-free applies land pre-step, stashes consume in-phase.
+        for _r in range(sim.R):
+            _dec = _drv._decide_turn(_env_d, sim, _r, _roster_d, _classes_d, seeds=_gseeds_d, turn=int(turn))
+            for _b in range(B):
+                _rec = _drv._extract_record(sim, _r, *_dec, _b)
+                # the record key convention is 0-BASED (TS reads
+                # rivalActions[state.turn - 1]; sim.turn is 1-based)
+                games[_b]["rivals"].setdefault(str(int(turn) - 1), {})[str(_r)] = _rec
         sim.step(production=pa, tech=ta, civic=ca, units=ua, envoy=ea)
         rows_l = sim.trace_row().tolist()
         if args.log is not None:

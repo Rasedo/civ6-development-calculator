@@ -84,6 +84,7 @@ const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
     sites: number[];
     actions: { t: number; p?: [number, number][]; r?: number; c?: number; e?: number; u?: [number, number, number][] }[];
     trace: number[][];
+    rivals?: Record<string, Record<string, unknown>>; // #93: driven rival records per turn
   }[];
 };
 
@@ -112,6 +113,10 @@ for (const game of roll.games) {
   foundCity(state, game.sites[0]);
   state.plannedSettles = game.sites.slice(1);
   state.autoResearch = false; // picks come from the action log, as in CivEnv
+  // #93: the rollout's rival seats are DRIVEN — the generator recorded their
+  // decisions per turn; rivalPhase replays them through the same
+  // applyRivalActionRecord path the parity gate uses.
+  if (game.rivals) state.rivalActions = game.rivals as never;
   const C = game.sites.length;
   const csMax = roll.csMax ?? 0;
   const rMax = roll.rMax ?? 0;
