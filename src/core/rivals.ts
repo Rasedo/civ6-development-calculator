@@ -3636,7 +3636,12 @@ export function rivalPhase(state: GameState): void {
     // B7-G (B-8): the Great General marches with the war effort (spawned above
     // in claimGreatPeople — a fresh one walks this turn on its full MP). Runs
     // BEFORE the war loop so the aura reflects the general's advanced position.
-    rivalGeneralActions(state, rival);
+    // #93: driven seats STAND DOWN — the GPU has gated this march since
+    // C3-prep (`active & ~controlled`); ungated, TS's admiral marched its own
+    // path ON TOP of the replayed ranks and passed through a different tile
+    // than the GPU's (9018 t147: 578-side vs elsewhere), which a trade-route
+    // raid ring detected at t149. GP units move via recorded ranks only.
+    if (!recU) rivalGeneralActions(state, rival);
 
     // War and peace. A-19/B-33 (S2): a rival at war with ANYONE (player or a
     // rival) takes the WAR branch (its units run hostileUnitAct, which now
