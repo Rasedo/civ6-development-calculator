@@ -135,6 +135,39 @@ def _policy_rng(sim, seeds: list, turn: int, r: int, salt: int) -> torch.Tensor:
     )
 
 
+def _builder_jobs(sim, r: int) -> torch.Tensor:
+    """#93 slice 7b: [B, N] job tile per slot row (-1 = none) for CIVILIAN
+    rows with charges — the NEAREST _rival_job_mask tile, ties to the LOWEST
+    tile index (the scripted walk's own key). One legality body: the job
+    predicate is the engine's, never re-derived."""
+    smap = sim.rival_slot_map(r)
+    B, N = smap.shape
+    out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
+    if not sim.improvements_on:
+        return out
+    jobs = sim._rival_job_mask(r)  # [B, T]
+    if not bool(jobs.any()):
+        return out
+    arangeT = torch.arange(sim.T, device=sim.device)
+    for n in range(N):
+        sl = smap[:, n]
+        pres = sl >= 0
+        if not bool(pres.any()):
+            break
+        vt = sim.v_type.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=sim.NU - 1)
+        civ_row = (sim._p_charges[vt] > 0) & (sim.v_charges.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1) > 0)
+        rows = pres & civ_row
+        if not bool(rows.any()):
+            continue
+        here = sim.v_tile.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1)
+        d = sim.pair_dist[here.clamp(min=0)].to(torch.long)  # [B, T]
+        key = torch.where(jobs, d * sim.T + arangeT, torch.full_like(d, 2 ** 30))
+        best = key.argmin(dim=1)
+        has = rows & jobs.gather(1, best.unsqueeze(1)).squeeze(1)
+        out[:, n] = torch.where(has, best, out[:, n])
+    return out
+
+
 def _war_ctx(sim, r: int) -> dict:
     """#93: the DoW policy's inputs, computed exactly as the scripted block
     computes them (the engine's war-declaration site) — strengths, closest
@@ -234,6 +267,30 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     um = sim.rival_unit_mask(r)
     uo = sim.rival_unit_obs(r)
     orders0 = ladder.pick_unit_orders(um, uo)
+    # #93 slice 7b: the BUILDER verb. A civilian with charges standing ON its
+    # job takes the job column — REPAIR first (the scripted order), else the
+    # lowest legal BUILD column. The MASK is the legality body (#89); the
+    # best-GAIN ranking within multi-option bare tiles is a RECORDED RESIDUAL
+    # (lowest column for now — the builder spy tightens it like production's
+    # 45%->99.4% arc). Rows not on their job get walked there by the planner.
+    job_t = _builder_jobs(sim, r)
+    smap0 = sim.rival_slot_map(r)
+    here0 = sim.v_tile.gather(1, smap0.clamp(min=0))
+    on_job = (job_t >= 0) & (here0 == job_t) & (smap0 >= 0)
+    if bool(on_job.any()):
+        W_u = um.shape[2]
+        rep_ok = um[:, :, 17] if W_u > 17 else torch.zeros_like(on_job)
+        bcols = list(range(13, 16)) + list(range(18, min(getattr(sim, "_A_PILLAGE", 25), W_u)))
+        bmask = torch.stack([um[:, :, c] for c in bcols], dim=2) if bcols else None
+        pick_b = torch.full_like(orders0, -1)
+        if bmask is not None:
+            hasb = bmask.any(dim=2)
+            firstb = bmask.float().argmax(dim=2)
+            colt = torch.tensor(bcols, device=um.device)
+            pick_b = torch.where(hasb, colt[firstb], pick_b)
+        chosen = torch.where(rep_ok, torch.full_like(orders0, 17), pick_b)
+        take_b = on_job & (chosen >= 0)
+        orders0 = torch.where(take_b, chosen, orders0)
     B2, N2 = orders0.shape
     ranks = [orders0]
     cur = uo[:, :, 0].long() * 0  # placeholder; real tiles below
@@ -274,6 +331,9 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             if not bool(rows_mv.any()):
                 continue
             dest = torch.where(at_war_rows[:, n] & (tgts[:, n] >= 0), tgts[:, n], torch.full_like(tgts[:, n], -1))
+            # #93 slice 7b: a civilian's JOB is a walk destination like a war
+            # target — real-MP multi-rank, re-planned each turn.
+            dest = torch.where((dest < 0) & (job_t[:, n] >= 0), job_t[:, n], dest)
             # peace: skip planning ranks beyond 0 (the drift re-plans next turn
             # anyway; multi-rank marching is a WAR behaviour in the walkers)
             ok_rows = rows_mv & (dest >= 0)
