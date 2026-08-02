@@ -2307,16 +2307,25 @@ function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity,
  * `apply_rival_actions`: the idle gate, then the same cost/progress semantics. */
 export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: RivalActionRecord): void {
   const { NB, NU, buildings, units } = prodLayout();
-  if (rec.tech !== null && rec.tech >= 0 && !rival.research.tech) {
-    const t = Object.keys(TECHS)[rec.tech];
+  // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
+  // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
+  // apply_turn needed on the GPU side, and the second driven-parity red: every
+  // comparison against a LIST is false, so nothing ever queued and the TS
+  // queues flatlined while the economies agreed.
+  const prodRaw = rec.production as unknown as (number | number[])[];
+  const production: number[] = Array.isArray(prodRaw[0]) ? (prodRaw[0] as number[]) : (prodRaw as number[]);
+  const techCol = Array.isArray(rec.tech) ? (rec.tech as unknown as number[])[0] : rec.tech;
+  const civicCol = Array.isArray(rec.civic) ? (rec.civic as unknown as number[])[0] : rec.civic;
+  if (techCol !== null && techCol !== undefined && techCol >= 0 && !rival.research.tech) {
+    const t = Object.keys(TECHS)[techCol];
     if (t) rival.research.tech = t;
   }
-  if (rec.civic !== null && rec.civic >= 0 && !rival.research.civic) {
-    const c = Object.keys(CIVICS)[rec.civic];
+  if (civicCol !== null && civicCol !== undefined && civicCol >= 0 && !rival.research.civic) {
+    const c = Object.keys(CIVICS)[civicCol];
     if (c) rival.research.civic = c;
   }
   rival.cities.forEach((rc, j) => {
-    const a = rec.production[j] ?? -1;
+    const a = production[j] ?? -1;
     if (a < 0 || rc.queue.length > 0) return;   // the idle gate, as the GPU applies it
     if (a < NB) {
       const id = buildings[a];
@@ -2560,12 +2569,20 @@ export function rivalPhase(state: GameState): void {
     // branch that makes the transcription below deletable: while both exist the
     // file path is verified against it, and once verified the ladder path is the
     // only one left.
-    const rec = state.rivalActions?.[state.turn]?.[rival.id];
-    if (rec) {
-      applyRivalActionRecord(state, rival, rec);
-      continue;
-    }
-    for (const rc of rival.cities) {
+    // state.turn is 1-BASED at rivalPhase time (createGame starts at 1;
+    // endTurn increments after the phases), while the recorder keys 0-based
+    // drive-loop turns. Reading [state.turn] skipped record t0 — the only
+    // turn that queued anything, since picks are one-shot and every later
+    // turn records -1 while the queue is busy. Driven-parity layer 3.
+    const rec = state.rivalActions?.[state.turn - 1]?.[rival.id];
+    if (rec) applyRivalActionRecord(state, rival, rec);
+    // `continue` here was the first driven-parity red: it skipped not just the
+    // DECISIONS but the rival's entire remaining turn — yields, growth,
+    // research accrual, treasury — and every TS rival column flatlined at 0
+    // from t2 while the GPU's controlled seats kept their economies. The
+    // record replaces the PICK LOOP below and nothing else; bookkeeping is
+    // RULES and runs for every seat, driven or scripted.
+    for (const rc of rec ? [] : rival.cities) {
       if (rc.queue.length > 0) continue;
       // #82: NO CAPITAL GATE. `queueSettler` never had one for the player and
       // Civ 6 has none either — any city may build a Settler. This was an AI

@@ -62,7 +62,7 @@ describe('#70 the action FILE drives the TS rival', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);
     const L = prodLayout();
-    state.rivalActions = { [state.turn]: { [rival.id]: { production: [L.settlerCol], tech: null, civic: null, units: [] } } };
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [L.settlerCol], tech: null, civic: null, units: [] } } };
     rivalPhase(state);
     expect(rival.cities[0].queue[0]?.kind).toBe('settler');
   });
@@ -72,7 +72,7 @@ describe('#70 the action FILE drives the TS rival', () => {
     const rival = addRival(state, 6, 6);
     const L = prodLayout();
     const col = 0;
-    state.rivalActions = { [state.turn]: { [rival.id]: { production: [col], tech: null, civic: null, units: [] } } };
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [col], tech: null, civic: null, units: [] } } };
     rivalPhase(state);
     const q = rival.cities[0].queue[0];
     expect(q?.kind).toBe('building');
@@ -85,7 +85,7 @@ describe('#70 the action FILE drives the TS rival', () => {
     const rival = addRival(state, 6, 6);
     const L = prodLayout();
     const ui = L.units.indexOf('WARRIOR');
-    state.rivalActions = { [state.turn]: { [rival.id]: { production: [L.unitLo + ui], tech: null, civic: null, units: [] } } };
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [L.unitLo + ui], tech: null, civic: null, units: [] } } };
     rivalPhase(state);
     const q = rival.cities[0].queue[0];
     expect(q?.kind).toBe('unit');
@@ -99,7 +99,7 @@ describe('#70 the action FILE drives the TS rival', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);
     const L = prodLayout();
-    state.rivalActions = { [state.turn]: { [rival.id]: { production: [L.idleCol], tech: null, civic: null, units: [] } } };
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [L.idleCol], tech: null, civic: null, units: [] } } };
     rivalPhase(state);
     expect(rival.cities[0].queue.length).toBe(0);
   });
@@ -114,7 +114,7 @@ describe('#70 the action FILE drives the TS rival', () => {
     const L = prodLayout();
     const si = SCAFFOLD_DISTRICTS.findIndex((d) => d.id === 'CAMPUS');
     expect(si).toBeGreaterThanOrEqual(0);
-    state.rivalActions = { [state.turn]: { [rival.id]: { production: [L.districtLo + si], tech: null, civic: null, units: [] } } };
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [L.districtLo + si], tech: null, civic: null, units: [] } } };
     rivalPhase(state);
     const q = rival.cities[0].queue[0];
     expect(q?.kind).toBe('district');
@@ -136,7 +136,7 @@ describe('#70 the action FILE drives the TS rival', () => {
     const nb = neighbors(state.map, state.map.tiles[before]);
     const dir = nb.findIndex((t) => t && !isImpassable(t) && !isWater(t));
     expect(dir).toBeGreaterThanOrEqual(0);
-    state.rivalActions = { [state.turn]: { [rival.id]: { production: [-1], tech: null, civic: null, units: [[dir]] } } };
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [-1], tech: null, civic: null, units: [[dir]] } } };
     rivalPhase(state);
     const after = state.units.find((u) => u.id === spawned!.id);
     expect(after).toBeTruthy();
@@ -146,7 +146,7 @@ describe('#70 the action FILE drives the TS rival', () => {
   it('a seat with NO record still runs the ladder (the paths coexist)', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);
-    state.rivalActions = { [state.turn]: {} };   // record present, this seat absent
+    state.rivalActions = { [state.turn - 1]: {} };   // record present, this seat absent
     rivalPhase(state);
     expect(rival.cities[0].queue.length).toBeGreaterThan(0);
   });

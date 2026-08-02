@@ -127,11 +127,15 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
         steps.append(orders.tolist())
         if not bool((sim.rival_unit_mask(r)[:, :, :6]).any()):
             break
+    # schema v1 says FLAT per-city/per-step lists; the driver records at B=1
+    # and tolist() keeps the batch dim, which cost one driven-parity red per
+    # engine before the consumers unwrapped. Flatten at the SOURCE too so a
+    # regenerated file is schema-true; consumers keep their defensive unwraps.
     return {
-        "production": prod.tolist(),
-        "tech": None if tech is None else tech.tolist(),
-        "civic": None if civic is None else civic.tolist(),
-        "units": steps,
+        "production": prod[0].tolist() if prod.shape[0] == 1 else prod.tolist(),
+        "tech": None if tech is None else (int(tech[0]) if tech.shape[0] == 1 else tech.tolist()),
+        "civic": None if civic is None else (int(civic[0]) if civic.shape[0] == 1 else civic.tolist()),
+        "units": [st[0] if (st and isinstance(st[0], list) and len(st) == 1) else st for st in steps],
     }
 
 
@@ -241,6 +245,8 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
                 if not rec:
                     continue
                 pr = rec["production"]
+                if pr and isinstance(pr[0], list):
+                    pr = pr[0]  # the recorder ran at B=1: tolist() kept the batch dim
                 prod[b, : min(len(pr), C)] = torch.tensor(pr[:C], dtype=torch.long, device=sim.device)
                 if rec.get("tech") is not None:
                     tech[b] = int(rec["tech"][0] if isinstance(rec["tech"], list) else rec["tech"])
