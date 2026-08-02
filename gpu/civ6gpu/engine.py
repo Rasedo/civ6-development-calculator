@@ -6531,7 +6531,37 @@ class BatchSim:
         can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
         at_war = self.r_atwar[:, r].reshape(B, 1, 1)
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war
-        attack = on_map & (barb | p_target) & can_fight & alive
+        # #92 branch probe: ALL 201 of the ('move','acted_in_place') war
+        # disagreements were MELEE units striking targets these columns never
+        # offered — the war act's other three classes. Named by the probe, not
+        # guessed:
+        #   * enemy AT-WAR rival UNITS (melee attackers only — a rival's ranged
+        #     never attacks enemy rivals, the A-19/B-33 scope-out)
+        #   * enemy at-war rival CENTRES (melee, d==1 — rivalVsRivalCity)
+        #   * player-suzerain CS centres while hostile to the player (A-12b
+        #     join-the-suzerain's-war; melee, d==1)
+        _vt_att = self.v_type.gather(1, sc).clamp(min=0, max=self.NU - 1)
+        _melee_att = (self._p_rng_str[_vt_att] <= 0).unsqueeze(2)
+        _rvciv_nb = torch.where(rvn >= 0, self.v_civ.gather(1, rvn.clamp(min=0)), torch.full_like(rvn, -1))
+        _rr_u = (
+            (_rvciv_nb >= 0)
+            & self.rr_war[:, r].gather(1, _rvciv_nb.clamp(min=0))
+        ).reshape(B, P_MAX, 6)
+        _rvc_nb = self.rvcity_at.gather(1, nbc)
+        _rr_c = ((_rvc_nb >= 0) & self.rr_war[:, r].gather(1, _rvc_nb.clamp(min=0))).reshape(B, P_MAX, 6)
+        S_ = self.S
+        _suz_min = int(self.rules.cityStates.get("suzerainMin", 3)) if hasattr(self.rules, "cityStates") and isinstance(getattr(self.rules, "cityStates", None), dict) else 3
+        _suz_p = (
+            (self.cs_envoys[:, :S_] >= _suz_min)
+            & (self.cs_envoys[:, :S_] > self.cs_r_envoys[:, :, :S_].max(dim=1).values)
+            & self.cs_alive[:, :S_]
+        )
+        _cs_nb = self.cs_at.gather(1, nbc)
+        _cs_ctr = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        _cs_ctr.scatter_(1, self.cs_center[:, :S_].clamp(min=0), _suz_p)
+        _cs_tgt = (_cs_ctr.gather(1, nbc) & (_cs_nb >= 0)).reshape(B, P_MAX, 6) & at_war
+        rr_target = (_rr_u | _rr_c | _cs_tgt) & _melee_att
+        attack = on_map & (barb | p_target | rr_target) & can_fight & alive
         hold = present.unsqueeze(2)
         tc = tile.clamp(min=0)  # `chop` below reads this outside the branch
         _res_cols_r: list[torch.Tensor] = []
@@ -6880,8 +6910,28 @@ class BatchSim:
                     at_war = self.r_atwar[:, r]
                     p_unit = (_mts == PLAYER_SEAT) | (_cts == PLAYER_SEAT)
                     p_city = self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
-                    unit_att = valid_t & (barb_t | (p_unit & at_war))
-                    city_att = valid_t & ~barb_t & ~p_unit & p_city & at_war
+                    # #92 branch probe: the war act's other melee classes —
+                    # enemy at-war rival units/centres and player-suzerain CS
+                    # centres — resolved through _hostile_vs_unit, the SAME
+                    # pool-generic resolver the war act itself calls.
+                    _vt_d2 = self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                    _melee_d2 = self._p_rng_str[_vt_d2] <= 0
+                    _tciv = torch.where((_mts > 0) & (_mts != BARB_SEAT), _mts - 1, torch.full_like(_mts, -1))
+                    _rr_u2 = (_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    _rvc2 = self.rvcity_at.gather(1, tc.unsqueeze(1)).squeeze(1)
+                    _rr_c2 = (_rvc2 >= 0) & self.rr_war[:, r].gather(1, _rvc2.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    S2_ = self.S
+                    _suz2 = (
+                        (self.cs_envoys[:, :S2_] >= 3)
+                        & (self.cs_envoys[:, :S2_] > self.cs_r_envoys[:, :, :S2_].max(dim=1).values)
+                        & self.cs_alive[:, :S2_]
+                    )
+                    _csc2 = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+                    _csc2.scatter_(1, self.cs_center[:, :S2_].clamp(min=0), _suz2)
+                    _cs2 = _csc2.gather(1, tc.unsqueeze(1)).squeeze(1) & at_war
+                    rr_att = valid_t & _melee_d2 & (_rr_u2 | _rr_c2 | _cs2)
+                    unit_att = valid_t & (barb_t | (p_unit & at_war) | rr_att)
+                    city_att = valid_t & ~barb_t & ~p_unit & ~rr_att & p_city & at_war
                     for b_ in range(B):
                         if not bool(valid_t[b_]):
                             continue
