@@ -235,13 +235,23 @@ def main() -> None:
             for c in cols:
                 m[0, j, c] = True
         return m
-    def uobs(rows):
-        o = torch.zeros(1, UN, 16, dtype=torch.float64)
+    BIGW = 1e9
+    def uobs(rows, war=None):
+        # 24-wide since #91: the war half defaults to "at peace, no target".
+        o = torch.zeros(1, UN, 24, dtype=torch.float64)
+        o[:, :, ladder.U_DWAR] = BIGW
+        o[:, :, ladder.U_DWARNB:ladder.U_DWARNB + 6] = BIGW
         for j, (dh, dnb, nbt) in enumerate(rows):
             o[0, j, ladder.U_DHOME] = dh
             for i in range(6):
                 o[0, j, ladder.U_DNB + i] = dnb[i]
                 o[0, j, ladder.U_NBTILE + i] = nbt[i]
+        if war:
+            for j, (dw, dwnb) in enumerate(war):
+                o[0, j, ladder.U_ATWAR] = 1.0
+                o[0, j, ladder.U_DWAR] = dw
+                for i in range(6):
+                    o[0, j, ladder.U_DWARNB + i] = dwnb[i]
         return o
 
     far = [9.0] * 6
@@ -268,6 +278,35 @@ def main() -> None:
 
     # nothing legal at all -> no instruction, which is not the same as HOLD
     assert int(ladder.pick_unit_orders(umask([[], []]), uobs([(9.0, far, [0]*6)]*2))[0, 0]) == -1
+
+    # ---- #91 the WAR branch ------------------------------------------------
+    # at war with a target: march to the strictly-closer neighbour, ties in
+    # DIRECTION order (the war march scans arange6 — NOT PATROL_DIR_PERM; the
+    # two tie-breaks differ in the engine and the port must keep both).
+    m = umask([[0, 1, 2, 3, 4, 5], [12]])
+    o = uobs([(2.0, [1.0] * 6, [0] * 6), (0.0, far, [0] * 6)],
+             war=[(9.0, [8.0, 8.0, 9.0, 8.0, 9.0, 9.0]), (0.0, [9.0] * 6)])
+    assert int(ladder.pick_unit_orders(m, o)[0, 0]) == 0, "war march ties to DIRECTION order"
+    # ...and the war march runs even INSIDE the peace stop radius (d_home=2):
+    # a unit at war does not sit home because home is close.
+
+    # PILLAGE-underfoot outranks the march (the scripted rule pillages first);
+    # the mask's last column is A-21 PILLAGE (#89).
+    mp_ = umask([[0, 1, 2, 3, 4, 5, UW - 1], [12]])
+    assert int(ladder.pick_unit_orders(mp_, o)[0, 0]) == UW - 1, "pillage before marching"
+
+    # an adjacent ATTACK still outranks everything at war
+    ma = umask([[0, 6, UW - 1], [12]])
+    oa = uobs([(2.0, [1.0] * 6, [10, 0, 0, 0, 0, 0]), (0.0, far, [0] * 6)],
+              war=[(9.0, [8.0] * 6), (0.0, [9.0] * 6)])
+    assert int(ladder.pick_unit_orders(ma, oa)[0, 0]) == 6, "attack outranks pillage and march"
+
+    # at war but NO reachable target (d_war BIG): fall back to the peace drift
+    ow = uobs([(9.0, [8.0] * 6, [0] * 6), (0.0, far, [0] * 6)])
+    ow[0, 0, ladder.U_ATWAR] = 1.0
+    assert int(ladder.pick_unit_orders(m, ow)[0, 0]) == 3, "no war target -> peace drift (PERM tie-break)"
+    print("  h war branch OK (march ties to direction order, pillage-first, "
+          "attack outranks, no-target falls back to patrol)")
     print("  g unit-orders verb OK (attack by lowest target tile, PATROL_DIR_PERM "
           "drift, stop radius, hold vs no-instruction)")
 

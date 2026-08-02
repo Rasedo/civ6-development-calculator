@@ -6591,15 +6591,24 @@ class BatchSim:
             )
         return out
 
-    #: per-unit observation layout (#69). Keep in step with `_unit_obs`.
+    #: per-unit observation layout (#69/#91). Keep in step with `_unit_obs`.
     UNIT_OBS = (
         "d_home",           # 0    distance to this seat's nearest live city
         *(f"d_home_n{i}" for i in range(6)),   # 1-6  same, per neighbour
         *(f"nb_tile{i}" for i in range(6)),    # 7-12 neighbour tile index, -1 = none
         "mp", "charges", "is_civilian",        # 13-15
+        # #91 the WAR half: the march destination is a FIXED enemy target —
+        # nearest unpillaged enemy improvement/district within 13 (B-32 union),
+        # else the nearest enemy city (player wins ties). The rule that CHOOSES
+        # between them is policy and lives in the ladder; the observation
+        # carries the distances, 1-hop like d_home.
+        "at_war",                              # 16
+        "d_war",            # 17   distance to the chosen war target (BIG if none)
+        *(f"d_war_n{i}" for i in range(6)),    # 18-23 same, per neighbour
     )
 
-    def _unit_obs(self, tile, present, centers, calive, mp, charges, utype):
+    def _unit_obs(self, tile, present, centers, calive, mp, charges, utype,
+                  at_war=None, war_tgt=None):
         """[B, N, 16] the per-unit half of the observation, seat-generic.
 
         #69: the masks say WHICH ORDERS ARE LEGAL, never which one the verb
@@ -6630,6 +6639,26 @@ class BatchSim:
         d_nb = torch.where(nb.reshape(B, N * 6) >= 0, d_nb, torch.full_like(d_nb, BIG)).reshape(B, N, 6)
 
         civ = (self._p_combat[utype.clamp(min=0, max=self.NU - 1)] <= 0)
+        # #91 the WAR half. `war_tgt` [B, N] is PER UNIT — the march destination
+        # is the nearest enemy improvement within 13 OF THAT UNIT (else nearest
+        # enemy city), so a per-seat target would misdirect every unit but one.
+        # It comes from `_war_march_target`, the SAME implementation the
+        # scripted AI calls, so the observation cannot drift from the rule it
+        # feeds. -1 rows mean no target; their distances read BIG.
+        if at_war is None:
+            at_war = torch.zeros(B, dtype=torch.bool, device=dev)
+        if war_tgt is None:
+            war_tgt = torch.full((B, N), -1, dtype=torch.long, device=dev)
+        has_wt = at_war.unsqueeze(1) & (war_tgt >= 0)
+        wtc = war_tgt.clamp(min=0)
+        d_war = torch.where(has_wt, self.pair_dist[tc, wtc].to(dt),
+                            torch.full((B, N), BIG, dtype=dt, device=dev))
+        wt6 = wtc.unsqueeze(2).expand(B, N, 6).reshape(B, N * 6)
+        d_war_nb = torch.where(has_wt.unsqueeze(2).expand(B, N, 6).reshape(B, N * 6),
+                               self.pair_dist[nbc, wt6].to(dt),
+                               torch.full((B, N * 6), BIG, dtype=dt, device=dev))
+        d_war_nb = torch.where(nb.reshape(B, N * 6) >= 0, d_war_nb,
+                               torch.full_like(d_war_nb, BIG)).reshape(B, N, 6)
         out = torch.cat(
             [
                 d_home.unsqueeze(2),
@@ -6638,6 +6667,9 @@ class BatchSim:
                 mp.to(dt).unsqueeze(2),
                 charges.to(dt).unsqueeze(2),
                 civ.to(dt).unsqueeze(2),
+                at_war.to(dt).unsqueeze(1).expand(B, N).unsqueeze(2),
+                d_war.unsqueeze(2),
+                d_war_nb,
             ],
             dim=2,
         )
@@ -6655,11 +6687,34 @@ class BatchSim:
         player's so one policy reads either seat."""
         smap = self.rival_slot_map(r)
         sc = smap.clamp(min=0)
+        # #91 the WAR columns. at_war = hostile to the player OR any at-war
+        # enemy rival. The march target is PER UNIT (`_war_march_target` takes
+        # the unit's own tile — nearest enemy improvement within 13 OF IT), so
+        # the shared method runs once per occupied row; rivals field a handful
+        # of units, and rows empty across the whole batch are skipped.
+        B, dev = self.B, self.device
+        present = smap >= 0
+        tiles = self.v_tile.gather(1, sc)
+        hp_r = self.r_atwar[:, r]
+        # rr_war is [b, ownCiv, otherCiv] with 0-based rival indices (see the
+        # picker's `rr_war[arange, ac, r2]`), so row r, not 1+r.
+        rrw = self.rr_war[:, r].any(dim=1) if self.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+        at_war = hp_r | rrw
+        ac = torch.full((B,), r, dtype=torch.long, device=dev)
+        war_tgt = torch.full((B, smap.shape[1]), -1, dtype=torch.long, device=dev)
+        if bool(at_war.any()):
+            for n in range(int(present.any(dim=0).sum())):
+                if not bool(present[:, n].any()):
+                    break
+                tgt_n, hi, hpc, hrc = self._war_march_target(tiles[:, n].clamp(min=0), ac, hp_r)
+                has = (hi | hpc | hrc) & present[:, n] & at_war
+                war_tgt[:, n] = torch.where(has, tgt_n, war_tgt[:, n])
         return self._unit_obs(
-            self.v_tile.gather(1, sc), smap >= 0,
+            tiles, present,
             self.rc_center[:, r], self.rc_alive[:, r],
             self.v_mp.gather(1, sc), self.v_charges.gather(1, sc),
             self.v_type.gather(1, sc),
+            at_war=at_war, war_tgt=war_tgt,
         )
 
     def apply_rival_unit_sequence(self, r: int, seq: torch.Tensor) -> None:
@@ -12290,6 +12345,66 @@ class BatchSim:
         war_c = rival_c & self._seats_hostile(seat, c_seat)
         return war_m, war_c
 
+    def _war_march_target(self, hc: torch.Tensor, ac: torch.Tensor, hp: torch.Tensor):
+        """The war-march DESTINATION for units at `hc` of civs `ac` (hp = at war
+        with the player) — nearest unpillaged enemy improvement/district within
+        13 (the B-32 union), else the nearest enemy city (player wins ties;
+        B9-R1 founding-sequence tie-break).
+
+        #91: split out of `_rival_unit_war_act` so the per-unit OBSERVATION and
+        the scripted AI compute the target from ONE implementation — the
+        `_district_elig_rival` discipline. Separate copies would only ever
+        drift, which is #85's disease. Returns (tgt, has_imp, has_pc, has_rc).
+        """
+        B, T, dev = self.B, self.T, self.device
+        arangeT = torch.arange(T, device=dev)
+        # A-19/B-33 (S2): the improvement/district march targets PLAYER tiles
+        # only while at war with the player (hp) — a rival-only-war rival heads
+        # for the enemy rival's cities, not neutral player improvements.
+        hpT = hp.unsqueeze(1)
+        if self.improvements_on or self.districts_on:
+            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == PLAYER_SEAT) & hpT
+            if self.districts_on:  # B-32: pillageable player districts join the union
+                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.tile_seat == PLAYER_SEAT) & hpT)
+            d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
+            ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
+            imp_min, imp_tgt = ikey.min(dim=1)
+            has_imp = imp_min < 10**9
+        else:
+            has_imp = torch.zeros(B, dtype=torch.bool, device=dev)
+            imp_tgt = hc
+        dc = self.pair_dist[hc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
+        # B9-R1: distance ties break by the FOUNDING sequence (TS array order),
+        # not the slot index — see the barb twin (rng 2026006104 t78).
+        # A-19/B-33 (S2): player cities are march targets only at war with the
+        # player (hp); a rival ALSO marches to its at-war ENEMY rivals' cities
+        # (key d*16384 + rivalId*2048 + centerTile), the PLAYER winning ties.
+        ckey = torch.where(self.alive & hpT, dc * 4096 + self.city_seq, 10**9)
+        city_min = ckey.min(dim=1).values
+        pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # player-city distance (1e9//4096 stays huge)
+        city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
+        rc_key_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
+        rc_tgt = hc.clone()
+        for r2 in range(self.R):
+            war2 = self.rr_war[torch.arange(B, device=dev), ac, r2]  # [B]; diagonal false -> r2==ac safe
+            if not bool(war2.any()):
+                continue
+            for j in range(self.RC):
+                ct2 = self.rc_center[:, r2, j].clamp(min=0)
+                alive2 = self.rc_alive[:, r2, j] & war2
+                d2 = self.pair_dist[hc, ct2].to(torch.long)
+                key2 = torch.where(alive2, d2 * (2048 * 8) + r2 * 2048 + ct2, torch.full_like(d2, 10**18))
+                upd = key2 < rc_key_min
+                rc_key_min = torch.where(upd, key2, rc_key_min)
+                rc_tgt = torch.where(upd, ct2, rc_tgt)
+        has_pc = city_min < 10**9
+        has_rc = rc_key_min < 10**18
+        rc_dist = torch.div(rc_key_min, 2048 * 8, rounding_mode="floor")
+        # player wins ties (pc_dist <= rc_dist); else the nearest enemy rival city
+        city_target = torch.where(has_pc & (~has_rc | (pc_dist <= rc_dist)), city_tgt, rc_tgt)
+        tgt = torch.where(has_imp, imp_tgt, city_target)
+        return tgt, has_imp, has_pc, has_rc
+
     def _rival_unit_war_act(self, v: int, act: torch.Tensor) -> None:
         """hostileUnitAct for an at-war rival unit: attack the lowest-index
         adjacent target — player city, hostile unit (player or barbarian),
@@ -12516,52 +12631,7 @@ class BatchSim:
         march = act & ~attack & ~pillage & ~dist_pillage
         if not bool(march.any()):
             return
-        arangeT = torch.arange(T, device=dev)
-        # A-19/B-33 (S2): the improvement/district march targets PLAYER tiles
-        # only while at war with the player (hp) — a rival-only-war rival heads
-        # for the enemy rival's cities, not neutral player improvements.
-        hpT = hp.unsqueeze(1)
-        if self.improvements_on or self.districts_on:
-            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == PLAYER_SEAT) & hpT
-            if self.districts_on:  # B-32: pillageable player districts join the union
-                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.tile_seat == PLAYER_SEAT) & hpT)
-            d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
-            ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
-            imp_min, imp_tgt = ikey.min(dim=1)
-            has_imp = imp_min < 10**9
-        else:
-            has_imp = torch.zeros_like(act)
-            imp_tgt = hc
-        dc = self.pair_dist[hc.unsqueeze(1), self.site.clamp(min=0)].to(torch.long)
-        # B9-R1: distance ties break by the FOUNDING sequence (TS array order),
-        # not the slot index — see the barb twin (rng 2026006104 t78).
-        # A-19/B-33 (S2): player cities are march targets only at war with the
-        # player (hp); a rival ALSO marches to its at-war ENEMY rivals' cities
-        # (key d*16384 + rivalId*2048 + centerTile), the PLAYER winning ties.
-        ckey = torch.where(self.alive & hpT, dc * 4096 + self.city_seq, 10**9)
-        city_min = ckey.min(dim=1).values
-        pc_dist = torch.div(city_min, 4096, rounding_mode="floor")  # player-city distance (1e9//4096 stays huge)
-        city_tgt = self.site.gather(1, ckey.argmin(dim=1, keepdim=True)).squeeze(1).clamp(min=0)
-        rc_key_min = torch.full((B,), 10**18, dtype=torch.long, device=dev)
-        rc_tgt = hc.clone()
-        for r2 in range(self.R):
-            war2 = self.rr_war[torch.arange(B, device=dev), ac, r2]  # [B]; diagonal false -> r2==ac safe
-            if not bool(war2.any()):
-                continue
-            for j in range(self.RC):
-                ct2 = self.rc_center[:, r2, j].clamp(min=0)
-                alive2 = self.rc_alive[:, r2, j] & war2
-                d2 = self.pair_dist[hc, ct2].to(torch.long)
-                key2 = torch.where(alive2, d2 * (2048 * 8) + r2 * 2048 + ct2, torch.full_like(d2, 10**18))
-                upd = key2 < rc_key_min
-                rc_key_min = torch.where(upd, key2, rc_key_min)
-                rc_tgt = torch.where(upd, ct2, rc_tgt)
-        has_pc = city_min < 10**9
-        has_rc = rc_key_min < 10**18
-        rc_dist = torch.div(rc_key_min, 2048 * 8, rounding_mode="floor")
-        # player wins ties (pc_dist <= rc_dist); else the nearest enemy rival city
-        city_target = torch.where(has_pc & (~has_rc | (pc_dist <= rc_dist)), city_tgt, rc_tgt)
-        tgt = torch.where(has_imp, imp_tgt, city_target)
+        tgt, has_imp, has_pc, has_rc = self._war_march_target(hc, ac, hp)
         has_tgt = has_imp | has_pc | has_rc
         d_here = self.pair_dist[hc, tgt].to(torch.long)
         # AUDIT A-8: the march walks REAL MP toward the (fixed) target — per

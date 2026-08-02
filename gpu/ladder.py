@@ -414,6 +414,7 @@ PATROL_DIR_PERM = (3, 4, 2, 5, 1, 0)
 
 #: per-unit observation offsets — mirrors BatchSim.UNIT_OBS.
 U_DHOME, U_DNB, U_NBTILE, U_MP, U_CHARGES, U_CIVILIAN = 0, 1, 7, 13, 14, 15
+U_ATWAR, U_DWAR, U_DWARNB = 16, 17, 18   # #91 the war half
 
 #: how close to home the patrol stops drifting (engine's `d_home > 3`).
 PATROL_HOME_RADIUS = 3
@@ -456,15 +457,33 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     has_atk = atk.any(dim=2)
     atk_dir = a_key.argmin(dim=2)
 
-    # 2. PATROL — only while further than the stop radius, and only to a
-    #    neighbour that is strictly CLOSER to home. Ties break in
-    #    PATROL_DIR_PERM order, so score by that rank, not by direction index.
+    # 2a. WAR MARCH (#91) — while at war with a live target, step to the
+    #     neighbour STRICTLY CLOSER to the war target; ties in DIRECTION ORDER
+    #     (the engine's war march scans `arange6`, unlike the patrol's
+    #     PATROL_DIR_PERM — two different tie-breaks, deliberately preserved).
+    #     PILLAGE-underfoot outranks the march: the scripted rule pillages
+    #     before marching, and the mask's A-21 column (#89) carries legality.
+    at_war = obs[:, :, U_ATWAR] > 0
+    d_war = obs[:, :, U_DWAR]
+    d_war_nb = obs[:, :, U_DWARNB:U_DWARNB + 6]
+    legal_mv = mask[:, :, 0:6]
+    w_closer = legal_mv & (d_war_nb < d_war.unsqueeze(2))
+    w_key = torch.where(w_closer, torch.arange(6, device=dev).view(1, 1, 6).expand(B, N, 6),
+                        torch.full((B, N, 6), 10 ** 9, device=dev))
+    has_wmv = w_closer.any(dim=2)
+    w_dir = w_key.argmin(dim=2)
+    has_target = d_war < 1e6
+    pillage_col = W - 1                       # PILLAGE is the enum's last column
+    can_pillage = mask[:, :, pillage_col]
+
+    # 2b. PEACE PATROL — only while further than the stop radius, and only to a
+    #     neighbour that is strictly CLOSER to home. Ties break in
+    #     PATROL_DIR_PERM order, so score by that rank, not by direction index.
     d_home = obs[:, :, U_DHOME]
     d_nb = obs[:, :, U_DNB:U_DNB + 6]
     rank = torch.empty(6, dtype=torch.long, device=dev)
     for pos, d in enumerate(PATROL_DIR_PERM):
         rank[d] = pos
-    legal_mv = mask[:, :, 0:6]
     closer = legal_mv & (d_nb < d_home.unsqueeze(2))
     p_key = torch.where(closer, rank.view(1, 1, 6).expand(B, N, 6), torch.full((B, N, 6), 10 ** 9, device=dev))
     has_mv = closer.any(dim=2)
@@ -472,7 +491,10 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     roam = (d_home > float(home_radius)) & has_mv
 
     out = torch.full((B, N), 12, dtype=torch.long, device=dev)
-    out = torch.where(roam, mv_dir, out)
-    out = torch.where(has_atk, atk_dir + 6, out)   # attack outranks the drift
+    out = torch.where(roam, mv_dir, out)                         # peace drift
+    war_march = at_war & has_target & has_wmv
+    out = torch.where(war_march, w_dir, out)                     # war outranks it
+    out = torch.where(at_war & can_pillage, torch.full_like(out, pillage_col), out)
+    out = torch.where(has_atk, atk_dir + 6, out)                 # attack outranks all
     # a unit with no legal order at all gets no instruction
     return torch.where(mask.any(dim=2), out, torch.full_like(out, -1))
