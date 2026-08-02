@@ -3522,6 +3522,14 @@ export function rivalPhase(state: GameState): void {
     const gTech = goldenBoostBonus(state, civOfRival(rival.id), false);
     const gCivic = goldenBoostBonus(state, civOfRival(rival.id), true);
     const pickNext = () => {
+      // #93: the RESEARCH PICK is the ladder's verb — a driven seat takes its
+      // tech/civic from the FILE (applyRivalActionRecord) and never auto-
+      // picks, exactly like the GPU's `r_cur_tech == -1` wait. Ungated, this
+      // refilled the slot inside the completion loop below, so TS ran one
+      // tech AHEAD of the recording whenever a completion left overflow (the
+      // GP_HYPATIA +120 at 9002 t87 made it visible: TS completed-and-
+      //-continued while the GPU banked 126.9 with no current tech).
+      if (recU) return;
       if (rsr.tech === null)
         commitResearch(state, civOfRival(rival.id), 'tech', availableTechsIn(rsr).sort(
           (a, b) => effectiveResearchCostIn(rsr, a.id, a.cost, gTech) - effectiveResearchCostIn(rsr, b.id, b.cost, gTech),
