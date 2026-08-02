@@ -6527,7 +6527,35 @@ class BatchSim:
         own_dom = torch.where(is_civ, rc_own, rv_own)
         foreign = barb | pmil | pciv | (rv_any & ~rv_own) | (rc_any & ~rc_own)
         alive = present.unsqueeze(2)
-        move = on_map & passable & ~foreign & ~own_dom & alive
+        # #92 blocking probe: ALL 146 of the ('hold','move') war disagreements
+        # were the engine EMBARKING where this gate said impassable — the war
+        # march carries the #45/B-6 embark handling and this term was
+        # land-passable only, so a DRIVEN rival could never put a unit on
+        # water at all. The gate mirrors the march's own water term: wpass,
+        # ocean behind cartography, land units only while embark is live
+        # (naval hulls keep wpass through `passable`'s own semantics), and
+        # `_step_verb` still re-validates cost/afford at execution.
+        if self._embark_live:
+            _vt_mv = self.v_type.gather(1, sc).clamp(min=0, max=self.NU - 1)
+            _is_nav_mv = self.unit_naval[_vt_mv].unsqueeze(2)
+            _cart_r = (
+                self.r_techs[:, r, self._cartography_tech]
+                if self._cartography_tech >= 0
+                else torch.zeros(B, dtype=torch.bool, device=dev)
+            ).view(B, 1, 1)
+            # AT WAR ONLY: the peace rule is explicit — "a grounded land unit
+            # stays land-only: no embarking at peace" (#45/B-6). The first cut
+            # of this gate skipped that term and the rival_verbs refusal case
+            # (water at peace) caught it immediately.
+            _wgate = (
+                self.wpass.gather(1, nbc).reshape(B, P_MAX, 6)
+                & (~self.ocean_tile.gather(1, nbc).reshape(B, P_MAX, 6) | _cart_r)
+                & ~_is_nav_mv
+                & self.r_atwar[:, r].view(B, 1, 1)  # bound later in this fn; read the tensor
+            )
+        else:
+            _wgate = torch.zeros(B, P_MAX, 6, dtype=torch.bool, device=dev)
+        move = on_map & (passable | _wgate) & ~foreign & ~own_dom & alive
         can_fight = (self._p_combat[self.v_type.gather(1, sc)] > 0).unsqueeze(2)
         at_war = self.r_atwar[:, r].reshape(B, 1, 1)
         p_target = (pmil | pciv | (self.center_at.gather(1, nbc) >= 0).reshape(B, P_MAX, 6)) & at_war
@@ -6884,7 +6912,23 @@ class BatchSim:
                 blocked_mil = self._blocked_for(tgt.unsqueeze(1), r + 1).squeeze(1)
                 blocked_civ = self._blocked_for(tgt.unsqueeze(1), r + 1, is_civilian=True).squeeze(1)
                 blocked = torch.where(is_civ, blocked_civ, blocked_mil)
-                ok = mv & (tgt >= 0) & self.passable.gather(1, tc.unsqueeze(1)).squeeze(1) & ~blocked
+                # #92: the embark gate, mirroring the mask — _step_verb owns
+                # the transition itself (EMBARK_MOVES pool, cost, disembark).
+                _pass_d = self.passable.gather(1, tc.unsqueeze(1)).squeeze(1)
+                if self._embark_live:
+                    _vt_mv2 = self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
+                    _cart_r2 = (
+                        self.r_techs[:, r, self._cartography_tech]
+                        if self._cartography_tech >= 0
+                        else torch.zeros(B, dtype=torch.bool, device=dev)
+                    )
+                    _wg2 = (
+                        self.wpass.gather(1, tc.unsqueeze(1)).squeeze(1)
+                        & (~self.ocean_tile.gather(1, tc.unsqueeze(1)).squeeze(1) | _cart_r2)
+                        & ~self.unit_naval[_vt_mv2]
+                    )
+                    _pass_d = _pass_d | (_wg2 & self.r_atwar[:, r])  # war-march only, no embark at peace
+                ok = mv & (tgt >= 0) & _pass_d & ~blocked
                 if bool(ok.any()):
                     stepped = self._step_verb(  # #51/S5.2: the shared contract
                         ok, sc + P_MAX, here, tgt, a.clamp(min=0, max=5),
