@@ -7491,21 +7491,27 @@ class BatchSim:
                         & self.r_religion_done[:, r]
                     )
                     if bool(ok_sp.any()):
+                        # 9081 t62 catch: rvcity_at is NOT the per-civ slot j —
+                        # writing rc_pressure through it landed the lump on
+                        # the WRONG CITY (r0c0 for r0c2) and swapped the flip.
+                        # Resolve the slot the WALKER's own way: match
+                        # rc_center == target across (civ, slot).
                         g_sp = r + 1
                         tc_sp = tgt_sp.clamp(min=0)
-                        pj_sp = self.center_at.gather(1, tc_sp.unsqueeze(1)).squeeze(1)
-                        rvj_sp = self.rvcity_at.gather(1, tc_sp.unsqueeze(1)).squeeze(1)
                         lump_sp = self._enh["mlump"][self.r_enhancer[:, r] + 1]
-                        hit_p = ok_sp & (pj_sp >= 0)
-                        if bool(hit_p.any()):
-                            pr_ = hit_p.nonzero(as_tuple=True)[0]
-                            self.city_pressure[pr_, pj_sp[pr_], g_sp] += lump_sp[pr_]
-                        hit_r = ok_sp & (rvj_sp >= 0) & ~hit_p
-                        if bool(hit_r.any()):
-                            rr_ = hit_r.nonzero(as_tuple=True)[0]
-                            _rciv = self.rival_at.gather(1, tc_sp.unsqueeze(1)).squeeze(1)
-                            self.rc_pressure[rr_, _rciv[rr_].clamp(min=0), rvj_sp[rr_], g_sp] += lump_sp[rr_]
-                        landed = hit_p | (ok_sp & (rvj_sp >= 0))
+                        pm_sp = ok_sp.unsqueeze(1) & self.alive & (self.site == tc_sp.unsqueeze(1))
+                        pr_, pj_ = pm_sp.nonzero(as_tuple=True)
+                        if len(pr_):
+                            self.city_pressure[pr_, pj_, g_sp] += lump_sp[pr_]
+                        hit_p = pm_sp.any(dim=1)
+                        hit_r = torch.zeros_like(hit_p)
+                        if self.R > 0:
+                            rm_sp = (ok_sp & ~hit_p).reshape(B, 1, 1) & self.rc_alive & (self.rc_center == tc_sp.reshape(B, 1, 1))
+                            rr_, rc_, rj_ = rm_sp.nonzero(as_tuple=True)
+                            if len(rr_):
+                                self.rc_pressure[rr_, rc_, rj_, g_sp] += lump_sp[rr_]
+                            hit_r = rm_sp.reshape(B, -1).any(dim=1)
+                        landed = hit_p | hit_r
                         if bool(landed.any()):
                             lr = landed.nonzero(as_tuple=True)[0]
                             self.v_charges[lr, sc[lr]] -= 1
