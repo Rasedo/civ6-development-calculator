@@ -49,17 +49,19 @@ def main() -> int:
         return 1
     turns = int(sys.argv[1]) if len(sys.argv) > 1 else 250
 
+    # #94: ONE batched run records every seed — the engine's fixed per-call
+    # dispatch is paid once per turn instead of once per turn PER SEED.
+    fixtures = [load_fixture(p) for p in paths]
+    env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
+    logs = drive.drive_batched(env, turns)
     out: dict[str, dict] = {}
-    for p in paths:
-        fx = load_fixture(p)
+    for b, fx in enumerate(fixtures):
         seed = str(fx["seed"])
-        env = BatchEnv([fx], rules, device="cpu", dtype=torch.float64)
-        log = drive.drive(env, turns)
         # re-key turn -> rival -> record, which is GameState.rivalActions' shape.
         # The driver's own log is a list because it is a RECORDING; the file is a
         # LOOKUP because a replay needs random access by turn.
         per_turn: dict[str, dict] = {}
-        for t, rec in enumerate(log):
+        for t, rec in enumerate(logs[b]):
             seats = {}
             for k, v in rec.items():
                 if k == "turn":

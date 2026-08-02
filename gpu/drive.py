@@ -113,7 +113,17 @@ SCHEMA_VERSION = 2
 
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
     """One turn's decisions for one driven seat, returned in the action-file
-    schema so a replay can reproduce them exactly."""
+    schema so a replay can reproduce them exactly. B=1 callers only — the
+    batched recorder extracts every row via `_extract_record`."""
+    prod, tech, civic, seq = _decide_turn(env, sim, r, roster, classes, max_steps)
+    return _extract_record(sim, r, prod, tech, civic, seq, 0)
+
+
+def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4):
+    """#94: the BATCHED decision core — masks, ladder picks, the virtual
+    planner, the draw-free applies and the useq stash, exactly as
+    decide_and_apply always ran them. Returns (prod, tech, civic, seq)
+    tensors; extraction is the caller's per-row problem."""
     m = sim.rival_masks(r)
     blocks = _blocks(env, sim, r)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(sim, r))
@@ -196,23 +206,37 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[r] = seq
-    steps = [rk.tolist() for rk in ranks]
-    # v2: production as [centreTile, col] PAIRS (see SCHEMA_VERSION). Recorded
-    # at B=1; the centre is the cross-engine city key.
-    _pr = prod[0] if prod.shape[0] == 1 else prod[0]
-    _ctr = sim.rc_center[0, r]
-    _alive_c = sim.rc_alive[0, r]
+    return prod, tech, civic, seq
+
+
+def _extract_record(sim, r: int, prod, tech, civic, seq, b: int) -> dict:
+    """One batch row's record, in the action-file schema.
+
+    Per-row equivalences with the old B=1 writer:
+    - tech/civic: the old writer emitted None when the whole-batch mask was
+      empty; per-row, a -1 pick (this game had nothing legal) is the same
+      fact and records as None.
+    - units: ranks are trimmed of TRAILING all-hold rows (the B=1 planner
+      stopped exactly there — `if not (nxt >= 0).any(): pop; break` — so a
+      per-row trim reproduces what a solo recording of this game would have
+      written; a unit's own ranks are monotone, orders never follow a -1).
+    """
+    # v2: production as [centreTile, col] PAIRS (see SCHEMA_VERSION); the
+    # centre is the cross-engine city key.
+    _pr = prod[b]
+    _ctr = sim.rc_center[b, r]
+    _alive_c = sim.rc_alive[b, r]
     prod_pairs = [
         [int(_ctr[j]), int(_pr[j])]
         for j in range(min(int(_pr.shape[0]), int(_ctr.shape[0])))
         if int(_pr[j]) >= 0 and bool(_alive_c[j])
     ]
-    return {
-        "production": prod_pairs,
-        "tech": None if tech is None else (int(tech[0]) if tech.shape[0] == 1 else tech.tolist()),
-        "civic": None if civic is None else (int(civic[0]) if civic.shape[0] == 1 else civic.tolist()),
-        "units": [st[0] if (st and isinstance(st[0], list) and len(st) == 1) else st for st in steps],
-    }
+    _t = None if tech is None or int(tech[b]) < 0 else int(tech[b])
+    _c = None if civic is None or int(civic[b]) < 0 else int(civic[b])
+    rows = [seq[b, :, k].tolist() for k in range(int(seq.shape[2]))]
+    while len(rows) > 1 and all(x < 0 for x in rows[-1]):
+        rows.pop()
+    return {"production": prod_pairs, "tech": _t, "civic": _c, "units": rows}
 
 
 def replay_seat(sim, r: int, rec: dict) -> None:
@@ -268,7 +292,26 @@ def drive(env, turns: int, seats=None, record: Path | None = None) -> list:
     written out, which is what will let the TS engine replay the identical
     decisions instead of keeping its own copy of the policy.
     """
+    assert env.sim.B == 1, "drive() is the B=1 surface; batches record via drive_batched()"
+    log = drive_batched(env, turns, seats)[0]
+    if record is not None:
+        record.write_text(json.dumps(log), encoding="utf-8")
+    return log
+
+
+def drive_batched(env, turns: int, seats=None) -> list:
+    """#94: record EVERY batch row in one run — returns one log per row.
+
+    The old gate ran 12 seeds as 12 serial B=1 runs; the engine's per-call
+    python dispatch (83% of a step, #81) was paid twelve times for identical
+    tensor work. The decision path is batched end to end, so one B=12 run
+    produces the same twelve records for one run's dispatch cost. Row
+    independence is the parity gate's own premise (replay_batched stacks
+    per-seed records positionally), and the B=1-vs-B=12 identity of a
+    recording is asserted by the drive lane.
+    """
     sim = env.sim
+    B = sim.B
     seats = list(range(sim.R)) if seats is None else list(seats)
     NB = sim.rules_dev.b_cost.shape[0]
     classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold))
@@ -276,16 +319,16 @@ def drive(env, turns: int, seats=None, record: Path | None = None) -> list:
     roster = ladder.unit_roster(rj["units"])
     for r in seats:
         take_seat(sim, r)
-    log = []
+    logs = [[] for _ in range(B)]
     for t in range(turns):
-        turn_rec = {"turn": t}
-        for r in seats:
-            turn_rec[f"r{r}"] = decide_and_apply(env, sim, r, roster, classes)
+        per_seat = {r: _decide_turn(env, sim, r, roster, classes) for r in seats}
+        for b in range(B):
+            turn_rec = {"turn": t}
+            for r in seats:
+                turn_rec[f"r{r}"] = _extract_record(sim, r, *per_seat[r], b)
+            logs[b].append(turn_rec)
         sim.step()
-        log.append(turn_rec)
-    if record is not None:
-        record.write_text(json.dumps(log), encoding="utf-8")
-    return log
+    return logs
 
 
 def replay_batched(env, seeds: list, actions: dict, turns: int) -> None:
