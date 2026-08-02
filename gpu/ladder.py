@@ -487,8 +487,14 @@ def pick_unit_orders(mask: torch.Tensor, obs: torch.Tensor, home_radius: int = P
     d_war_nb = obs[:, :, U_DWARNB:U_DWARNB + 6]
     legal_mv = mask[:, :, 0:6]
     w_closer = legal_mv & (d_war_nb < d_war.unsqueeze(2))
-    w_key = torch.where(w_closer, torch.arange(6, device=dev).view(1, 1, 6).expand(B, N, 6),
-                        torch.full((B, N, 6), 10 ** 9, device=dev))
+    # the ENGINE's march key is `d_nb * 8 + dir` — MIN DISTANCE first, then
+    # direction order. Ranking all closer neighbours by direction alone picked
+    # a different (legal, closer, but not closest) step whenever two
+    # directions both approached the target: the 30-case ('move','move')
+    # residual class, gone with this key.
+    w_key = torch.where(w_closer,
+                        d_war_nb * 8 + torch.arange(6, device=dev).view(1, 1, 6).to(d_war_nb.dtype),
+                        torch.full((B, N, 6), 1e9, dtype=d_war_nb.dtype, device=dev))
     has_wmv = w_closer.any(dim=2)
     w_dir = w_key.argmin(dim=2)
     has_target = d_war < 1e6
