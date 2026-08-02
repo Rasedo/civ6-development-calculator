@@ -73,6 +73,7 @@ import { killUnit } from './combat';  // #51/S7.12
 import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
+import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS } from './unitActions';
 import { RIVAL_LEADERS, RIVAL_MAX_CITIES, RIVAL_SETTLER_COST, RIVAL_WAR_MIN_TURNS, PEACE_MIN_WAR_TURNS, PEACE_GOLD_COST, RIVAL_WORK_RADIUS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, warWearinessPenalty, RR_DOW_PROXIMITY, RR_DOW_STRENGTH_RATIO, RR_DOW_WW_MAX, RR_PEACE_WW, RR_FORMAL_MIN_TURNS,  ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, GOVERNOR_LOYALTY, RIVAL_TILE_BUY_LIVE, ADMIRAL_MARCH_LIVE, RR_ALLY_MIN_PEACE, RR_WARMONGER_DOW, RR_WARMONGER_CAPTURE, RR_WARMONGER_GANG, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_MONUMENTALITY, RIVAL_ENGINEER_LIVE } from '../data/rivals';
 import { addEraScore, agePressureFactor, dedicationEvent, governorPicks, governorTitles, goldenBoostBonus, goldenProphetPoints, goldenCulturePerDistrict } from './eras';
 import { tileClaimed, tileOwnedByCiv, civOfRival, rivalOfCiv, tileRivalCiv, civHasStrategic, unitSeat, allCities, civsAtWar, setRivalWar, playerSeat, prophetsOf, isPlayerSeat, isRivalSeat, PLAYER_CIV, tileSeat, tileCity, NO_SEAT, setTileOwner, tileBelongsTo, rivalOfSeat, rivalsOf, rivalCount , emptySeat, seatOfCityState } from './seats';
@@ -2516,6 +2517,40 @@ export function applyRivalUnitOrders(state: GameState, rival: RivalCiv, steps: n
         ) {
           here.districtPillaged = true;
           unit.movesLeft = 0;
+        }
+      } else if ((a >= 13 && a < 18) || (a >= 18 && a < 18 + IMPROVEMENT_IDS.length - DEDICATED_IMPROVEMENTS)) {
+        // #93 BUILDER verbs — the rival walker's OWN bodies (rivalBuilderActions),
+        // re-validated: REPAIR/CHOP-equivalents clear flags without a charge;
+        // a BUILD writes the improvement, spends a charge and disbands at 0.
+        // validImprovementsIn under the RIVAL's unlocks is the legality body
+        // (builderImprove's player-facing validImprovements would gate on the
+        // wrong civ's techs).
+        if ((unit.charges ?? 0) <= 0 && a !== 17) return;
+        if (a === 16) {
+          // CHOP: remove the feature underfoot (the walker's own remove body)
+          if (here.feature && here.feature !== 'FLOODPLAINS' && tileBelongsTo(here, rival.cities.find((c) => tileBelongsTo(here, c)) ?? rival.cities[0])) {
+            here.feature = null;
+            unit.movesLeft = 0;
+          }
+        } else if (a === 17) {
+          if (here.pillaged && tileOwnedByCiv(here, civOfRival(rival.id))) {
+            here.pillaged = false;
+            unit.movesLeft = 0;
+          } else if (here.districtPillaged && tileOwnedByCiv(here, civOfRival(rival.id))) {
+            here.districtPillaged = false;
+            unit.movesLeft = 0;
+          }
+        } else {
+          const ii = a < 18 ? a - 13 : DEDICATED_IMPROVEMENTS + (a - 18);
+          const imp = IMPROVEMENT_IDS[ii] as ImprovementId;
+          const un = computeUnlocksIn(rival.research);
+          if (!here.improvement && tileOwnedByCiv(here, civOfRival(rival.id))
+              && validImprovementsIn(here, { unlocks: un, builder: unit.type, ownsTile: (t: Tile) => tileOwnedByCiv(t, civOfRival(rival.id)) }).includes(imp)) {
+            here.improvement = imp;
+            unit.charges = (unit.charges ?? 0) - 1;
+            unit.movesLeft = 0;
+            if (unit.charges <= 0) disbandUnit(state, unit.id);
+          }
         }
       } else if (a >= 26 && a < 38) {
         // SNIPE — the ring-2 tile in TILE-INDEX order (the shared #92 layout:

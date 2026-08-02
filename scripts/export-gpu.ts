@@ -180,7 +180,7 @@ import {
 // on the tile (unreachable in both engines).
 // B-27 (#71): SEASIDE_RESORT appended LAST — this array's order IS the GPU's
 // improvement index, so anything but an append renumbers every other row.
-const IMPROVEMENT_IDS = ['FARM', 'MINE', 'LUMBER_MILL', 'QUARRY', 'PASTURE', 'CAMP', 'PLANTATION', 'OIL_WELL', 'SEASIDE_RESORT', 'FORT']; // B-27 (#78): FORT appended LAST — the GPU resolves by name, but order is the index
+import { IMPROVEMENT_IDS } from '../src/core/unitActions'; // #93: ONE roster, core-owned (order is the column index; FORT appended LAST)
 // Canonical luxury catalog order for the per-tile `lux` plane.
 const LUXURY_IDS = Object.values(RESOURCES)
   .filter((r) => r.category === 'luxury')
