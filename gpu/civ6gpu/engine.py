@@ -6660,9 +6660,16 @@ class BatchSim:
         _vt_att = self.v_type.gather(1, sc).clamp(min=0, max=self.NU - 1)
         _melee_att = (self._p_rng_str[_vt_att] <= 0).unsqueeze(2)
         _rvciv_nb = torch.where(rvn >= 0, self.v_civ.gather(1, rvn.clamp(min=0)), torch.full_like(rvn, -1))
+        # BOTH halves of rr_units: the war act's target set is `war_m | war_c`
+        # — enemy CIVILIANS are war targets too (killing enemy builders), and
+        # this arm was built from the MILITARY occupancy map alone; 70 of the
+        # final 96 disagreements were adjacent enemy-civilian strikes the mask
+        # never offered. rcn (the civilian map's rival slots) was computed
+        # above for the stacking terms and is reused here.
+        _rvcivC_nb = torch.where(rcn >= 0, self.v_civ.gather(1, rcn.clamp(min=0)), torch.full_like(rcn, -1))
         _rr_u = (
-            (_rvciv_nb >= 0)
-            & self.rr_war[:, r].gather(1, _rvciv_nb.clamp(min=0))
+            ((_rvciv_nb >= 0) & self.rr_war[:, r].gather(1, _rvciv_nb.clamp(min=0)))
+            | ((_rvcivC_nb >= 0) & self.rr_war[:, r].gather(1, _rvcivC_nb.clamp(min=0)))
         ).reshape(B, P_MAX, 6)
         _rvc_nb = self.rvcity_at.gather(1, nbc)
         _rr_c = ((_rvc_nb >= 0) & self.rr_war[:, r].gather(1, _rvc_nb.clamp(min=0))).reshape(B, P_MAX, 6)
@@ -6678,7 +6685,14 @@ class BatchSim:
         _cs_ctr.scatter_(1, self.cs_center[:, :S_].clamp(min=0), _suz_p)
         _cs_tgt = (_cs_ctr.gather(1, nbc) & (_cs_nb >= 0)).reshape(B, P_MAX, 6) & at_war
         rr_target = (_rr_u | _rr_c | _cs_tgt) & _melee_att
-        attack = on_map & (barb | p_target | rr_target) & can_fight & alive
+        # EMBARKED UNITS CANNOT ATTACK — the war act's own gate is
+        # `attack = act & ... & ~v_emb`, and this arm never had the term (the
+        # SNIPE columns did). 77 of the final 87 disagreements were units on
+        # water offered strikes they cannot execute: two coastal standoffs
+        # grinding the same civilian for dozens of turns, plus embarked units
+        # adjacent to coastal barbarians.
+        _emb_att = self.v_emb.gather(1, sc).unsqueeze(2)
+        attack = on_map & (barb | p_target | rr_target) & can_fight & ~_emb_att & alive
         hold = present.unsqueeze(2)
         tc = tile.clamp(min=0)  # `chop` below reads this outside the branch
         _res_cols_r: list[torch.Tensor] = []
@@ -7039,7 +7053,7 @@ class BatchSim:
                     srows = stepped.nonzero(as_tuple=True)[0]
             # --- attacks 6-11 (military only; the shared resolution handles
             # barb/player defenders, lone civilians and city targets) ---
-            atk = act & (a >= 6) & (a < 12) & ~is_civ
+            atk = act & (a >= 6) & (a < 12) & ~is_civ & ~self.v_emb.gather(1, sc.unsqueeze(1)).squeeze(1)  # embarked cannot attack (the war act's ~v_emb)
             if bool(atk.any()):
                 nb = self.neigh[here.clamp(min=0)]
                 tgt = nb.gather(1, (a - 6).clamp(min=0, max=5).unsqueeze(1)).squeeze(1)
@@ -7062,7 +7076,11 @@ class BatchSim:
                     _vt_d2 = self.v_type.gather(1, sc.unsqueeze(1)).squeeze(1).clamp(min=0, max=self.NU - 1)
                     _melee_d2 = self._p_rng_str[_vt_d2] <= 0
                     _tciv = torch.where((_mts > 0) & (_mts != BARB_SEAT), _mts - 1, torch.full_like(_mts, -1))
-                    _rr_u2 = (_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    _tcivC = torch.where((_cts > 0) & (_cts != BARB_SEAT), _cts - 1, torch.full_like(_cts, -1))
+                    _rr_u2 = (
+                        ((_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1))
+                        | ((_tcivC >= 0) & self.rr_war[:, r].gather(1, _tcivC.clamp(min=0).unsqueeze(1)).squeeze(1))
+                    )
                     _rvc2 = self.rvcity_at.gather(1, tc.unsqueeze(1)).squeeze(1)
                     _rr_c2 = (_rvc2 >= 0) & self.rr_war[:, r].gather(1, _rvc2.clamp(min=0).unsqueeze(1)).squeeze(1)
                     S2_ = self.S
