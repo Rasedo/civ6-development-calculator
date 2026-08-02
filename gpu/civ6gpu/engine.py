@@ -14057,15 +14057,22 @@ class BatchSim:
             # the computeAdoption twin the A-7r machinery already provides)
             pt = pt + self._adopted_gov_tier(self.r_civics[:, r]).double()
         self.r_influence[:, r] = self.r_influence[:, r] + torch.where(any_met, pt, torch.zeros_like(pt))
+        # #93 (#70 signature C, the OTHER half): ACCRUAL is rules — every seat,
+        # above — but CONVERSION + the greedy ASSIGNMENT are the envoy POLICY,
+        # and TS has stood them down for driven seats since round 8 while this
+        # loop kept converting for controlled ones: influence read (100, 0) at
+        # 9144 t68 — exactly one envoyCost. Driven seats bank raw points on
+        # BOTH engines until the envoy-apply head ports.
+        pol_met = any_met & ~self.controlled[:, r]
         cost = float(rr.get("envoyCost", 100))
         for _ in range(3):  # the player conversion loop's bound
-            earn = any_met & (self.r_influence[:, r] >= cost)
+            earn = pol_met & (self.r_influence[:, r] >= cost)
             if not bool(earn.any()):
                 break
             self.r_influence[:, r] = torch.where(earn, self.r_influence[:, r] - cost, self.r_influence[:, r])
             self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] + earn.long()
         for _ in range(4):  # assignment until spent (bank grows ≤1/turn)
-            can = any_met & (self.r_envoys_avail[:, r] > 0)
+            can = pol_met & (self.r_envoys_avail[:, r] > 0)
             if not bool(can.any()):
                 return
             key = torch.where(

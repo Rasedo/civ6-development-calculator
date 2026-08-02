@@ -2368,7 +2368,12 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
       commitProduction(state, rc.seat, rc, { kind: 'settler', progress: 0, cost: RIVAL_SETTLER_COST(rival.cities.length) });
     } else if (a >= NB + 2 && a < NB + 2 + NU) {
       const id = units[a - NB - 2];
-      if (id && UNITS[id]) commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0 });
+      // #93: the BUILDER prices off the ONE escalator (#51/S7.7a), exactly as
+      // the scripted branch and the GPU's queue arm both do — omitting the
+      // cost here fell back to the base price and locked r1c1's builder at 30
+      // where the GPU locked 32 (seed 9106 t61, the qCost family).
+      if (id === 'BUILDER') commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, civOfRival(rival.id)) });
+      else if (id && UNITS[id]) commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0 });
     }
     else if (a >= wonderLo && a < wonderLo + wonders.length) {
       // #88 WONDER: the file names WHICH wonder; the engine re-runs the whole
@@ -3584,7 +3589,15 @@ export function rivalPhase(state: GameState): void {
     // (the #93 policy family) — their BUILD columns already exist (#89).
     if (!recU) rivalBuilderActions(state, rival, rivalUnlocks);
     // B6-S2: missionary actions (spread on the adjacent target, else walk).
-    rivalMissionaryActions(state, rival);
+    // #93: driven seats STAND DOWN — the GPU has gated this since C3-prep
+    // (`active & ~controlled`, engine.py's _rival_missionary_actions call)
+    // while this call ran ungated: the half-gated pair. Both engines still
+    // BUY the missionary (a rules-side faith spend, ungated on both); it
+    // just holds position until the missionary verb is ported. The ungated
+    // TS walker was the WHOLE t61 wall: a wandering missionary met
+    // city-states (r1.influence accrual TS-only) and spread religion
+    // (followedSum/followed TS-only) that the GPU's parked twin never could.
+    if (!recU) rivalMissionaryActions(state, rival);
 
     // Races: great people, pantheons, beliefs.
     claimGreatPeople(state, rival);
