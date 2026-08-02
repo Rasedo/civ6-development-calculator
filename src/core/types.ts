@@ -295,6 +295,10 @@ export interface RivalActionRecord {
   /** #93: war-head column — 0 = declare on the player, R = sue for peace;
    * null/absent = no war action this turn. Optional on schema v2. */
   war?: number | null;
+  /** #93: this turn's envoy assignment sequence (city-state indices, in
+   * pick order). Each entry spends the bank first, else one ENVOY_COST of
+   * influence. Optional on schema v2. */
+  envoys?: number[];
   /** tech / civic mask column; null or -1 = no pick. */
   tech: number | null;
   civic: number | null;

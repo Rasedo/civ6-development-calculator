@@ -9756,6 +9756,7 @@ class BatchSim:
         civic: torch.Tensor | None = None,
         war: torch.Tensor | None = None,
         production_pref: torch.Tensor | None = None,
+        envoys: torch.Tensor | None = None,
     ) -> None:
         """C2b: write a controlled rival's choices BEFORE step(). Codes use
         the rival_masks layout; -1 = no action. Queue writes mirror the
@@ -9815,6 +9816,17 @@ class BatchSim:
                 self.war[:, 1 + r, 0] &= ~peace  # #51/S6.0: the store IS war[0, 1+r]; this writes the MIRROR cell
                 self.r_warturns[:, r] = torch.where(peace, torch.zeros_like(self.r_warturns[:, r]), self.r_warturns[:, r])
                 self.r_peaceturns[:, r] = torch.where(peace, torch.zeros_like(self.r_peaceturns[:, r]), self.r_peaceturns[:, r])
+        # #93 the ENVOY verb: STASHED here, consumed at _rival_cs_phase's own
+        # position (right after the accrual — where the scripted loops ran).
+        # The totals commute with the accrual, but SUZERAINTY is a THRESHOLD
+        # and the player's favor accrual reads it: applying pre-step flipped
+        # a suzerainty one turn earlier than TS's in-block apply (9056 t192,
+        # a constant +1 favor offset). Positions must match, like the unit
+        # stash.
+        if envoys is not None and self.S > 0:
+            if not hasattr(self, "_driven_envoys") or self._driven_envoys is None:
+                self._driven_envoys = {}
+            self._driven_envoys[r] = envoys
         if production_pref is not None:
             self._apply_rival_pref(r, production_pref)
             return
@@ -14141,6 +14153,30 @@ class BatchSim:
                 break
             self.r_influence[:, r] = torch.where(earn, self.r_influence[:, r] - cost, self.r_influence[:, r])
             self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] + earn.long()
+        # #93: the DRIVEN envoy picks consume HERE — the scripted loops'
+        # exact position (post-accrual), so every threshold reader
+        # (suzerainty -> player favor) sees the same within-turn sequence on
+        # both engines. Bank first, else one envoyCost; re-validated.
+        _dse = getattr(self, "_driven_envoys", None)
+        if _dse is not None and r in _dse:
+            _env_s = _dse.pop(r)
+            cost_e = float(rr.get("envoyCost", 100))
+            for _k in range(int(_env_s.shape[1])):
+                e_k = _env_s[:, _k]
+                cs_i = e_k.clamp(min=0, max=S - 1)
+                ok_e = (
+                    (e_k >= 0) & (e_k < S) & self.controlled[:, r] & self.r_alive[:, r]
+                    & self.cs_alive[:, :S].gather(1, cs_i.unsqueeze(1)).squeeze(1)
+                    & self.cs_r_met[:, r, :S].gather(1, cs_i.unsqueeze(1)).squeeze(1)
+                )
+                if not bool(ok_e.any()):
+                    continue
+                bank_e = ok_e & (self.r_envoys_avail[:, r] > 0)
+                pay_e = ok_e & ~bank_e & (self.r_influence[:, r] >= cost_e)
+                land_e = bank_e | pay_e
+                self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] - bank_e.long()
+                self.r_influence[:, r] = torch.where(pay_e, self.r_influence[:, r] - cost_e, self.r_influence[:, r])
+                self.cs_r_envoys[:, r, :S].scatter_add_(1, cs_i.unsqueeze(1), land_e.long().unsqueeze(1))
         for _ in range(4):  # assignment until spent (bank grows ≤1/turn)
             can = pol_met & (self.r_envoys_avail[:, r] > 0)
             if not bool(can.any()):

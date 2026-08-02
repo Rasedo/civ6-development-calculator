@@ -255,6 +255,23 @@ describe('#70 the action FILE drives the TS rival', () => {
     expect(peace(10000, 3).atWar).toBe(true);
   });
 
+  it('#93: recorded ENVOYS land at the named city-state — bank first, else influence', () => {
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    const rival = addRival(state, 6, 6);
+    const cs = state.cityStates[0];
+    if (!cs) return; // fixture map without CS — nothing to pin here
+    (cs.rivalMet ??= [])[rival.id] = true;
+    rival.envoysAvailable = 1;
+    rival.influencePoints = 100;
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [], tech: null, civic: null, envoys: [0, 0, 0], units: [] } } };
+    rivalPhase(state);
+    // pick 1 spends the bank, pick 2 spends 100 influence, pick 3 REFUSES (broke)
+    expect(cs.rivalEnvoys?.[rival.id] ?? 0).toBe(2);
+    expect(rival.envoysAvailable).toBe(0);
+    // the accrual may have added a few points this turn, but never 100
+    expect(rival.influencePoints).toBeLessThan(100);
+  });
+
   it('a seat with NO record still runs the ladder (the paths coexist)', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);

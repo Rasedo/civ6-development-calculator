@@ -164,8 +164,8 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
     """One turn's decisions for one driven seat, returned in the action-file
     schema so a replay can reproduce them exactly. B=1 callers only — the
     batched recorder extracts every row via `_extract_record`."""
-    prod, tech, civic, war, seq = _decide_turn(env, sim, r, roster, classes, max_steps)
-    return _extract_record(sim, r, prod, tech, civic, war, seq, 0)
+    prod, tech, civic, war, env_seq, seq = _decide_turn(env, sim, r, roster, classes, max_steps)
+    return _extract_record(sim, r, prod, tech, civic, war, env_seq, seq, 0)
 
 
 def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
@@ -191,7 +191,35 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             "peace": _policy_rng(sim, seeds, turn, r, 2),
         }
         war = ladder.pick_war(m["war"], _war_ctx(sim, r), rng_w)
-    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war)
+    # #93 the ENVOY verb: simulate the scripted greedy sequence — spend the
+    # BANK first (quest-granted envoys), then conversions while influence
+    # affords — re-ranking neediest after every pick exactly as the two
+    # while-loops did. Zero draws; pick_envoy is the round-8 ported policy.
+    env_seq = None
+    if seeds is not None and turn is not None and sim.S > 0:
+        cost_e = float(sim.rules.cs.get("envoyCost", 100))
+        infl_e = sim.r_influence[:, r].clone()
+        avail_e = sim.r_envoys_avail[:, r].clone()
+        met_live_e = sim.cs_r_met[:, r, : sim.S] & sim.cs_alive[:, : sim.S]
+        mine6_e = sim.cs_r_envoys[:, r, : sim.S].double() / 6.0
+        picks_e = []
+        for _ke in range(6):  # bank (<=2 quest grants) + the conversion run
+            can_e = met_live_e.any(dim=1) & ((avail_e > 0) | (infl_e >= cost_e))
+            if not bool(can_e.any()):
+                break
+            blk_e = {"cs": torch.stack([met_live_e.double(), mine6_e, torch.zeros_like(mine6_e)], dim=2)}
+            p_e = ladder.pick_envoy(blk_e, met_live_e)
+            p_e = torch.where(can_e, p_e, torch.full_like(p_e, -1))
+            if not bool((p_e >= 0).any()):
+                break
+            picks_e.append(p_e)
+            hit_e = p_e >= 0
+            bank_e = hit_e & (avail_e > 0)
+            avail_e = torch.where(bank_e, avail_e - 1, avail_e)
+            infl_e = torch.where(hit_e & ~bank_e, infl_e - cost_e, infl_e)
+            mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), sim.S).double() * hit_e.unsqueeze(1).double() / 6.0
+        env_seq = torch.stack(picks_e, dim=1) if picks_e else None  # [B, K]
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq)
 
     # units (#70 rng-order): the driver PLANS, the PHASE executes. Applying
     # steps pre-step to re-observe consumed combat draws at a different stream
@@ -268,10 +296,10 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[r] = seq
-    return prod, tech, civic, war, seq
+    return prod, tech, civic, war, env_seq, seq
 
 
-def _extract_record(sim, r: int, prod, tech, civic, war, seq, b: int) -> dict:
+def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, b: int) -> dict:
     """One batch row's record, in the action-file schema.
 
     Per-row equivalences with the old B=1 writer:
@@ -302,7 +330,9 @@ def _extract_record(sim, r: int, prod, tech, civic, war, seq, b: int) -> dict:
     # peace), or None. OPTIONAL field on schema v2 — readers that predate it
     # treat a missing key as None, so old files stay replayable.
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
-    return {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "units": rows}
+    # #93: this row's envoy assignment sequence (CS indices), possibly empty.
+    _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
+    return {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
 
 
 def replay_seat(sim, r: int, rec: dict) -> None:
@@ -323,7 +353,9 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     civic = None if rec["civic"] is None else torch.tensor(rec["civic"], dtype=torch.long, device=dev)
     _wv = rec.get("war")
     war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
-    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war)
+    _ev = rec.get("envoys") or []
+    env_seq = torch.tensor(_ev, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1) if _ev else None
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq)
     # #70 rng-order: replay stashes exactly as the driver does; the PHASE
     # executes at the walkers' position, so recorder and replayer share one
     # draw order by construction.
@@ -446,6 +478,7 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
             tech = torch.full((B,), -1, dtype=torch.long, device=sim.device)
             civic = torch.full((B,), -1, dtype=torch.long, device=sim.device)
             war_b = torch.full((B,), -1, dtype=torch.long, device=sim.device)  # #93
+            env_b = torch.full((B, 6), -1, dtype=torch.long, device=sim.device)  # #93 envoys
             n_steps = 0
             for b, rec in enumerate(recs):
                 if not rec:
@@ -461,8 +494,10 @@ def apply_turn(sim, seeds: list, actions: dict, t: int) -> None:
                     civic[b] = int(rec["civic"][0] if isinstance(rec["civic"], list) else rec["civic"])
                 if rec.get("war") is not None:
                     war_b[b] = int(rec["war"])
+                for _ki, _cs in enumerate((rec.get("envoys") or [])[:6]):
+                    env_b[b, _ki] = int(_cs)
                 n_steps = max(n_steps, len(rec.get("units", [])))
-            sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war_b)
+            sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war_b, envoys=env_b)
             # #70 rng-order: unit acts DRAW, so they cannot run pre-step — the
             # phase consumes them at the walkers' own position (the engine's
             # _driven_useq hook). Production/tech/civic writes above are

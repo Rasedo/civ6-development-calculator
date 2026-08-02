@@ -2362,6 +2362,19 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
   // (the scripted roll's own body, minus the roll — that lives in the
   // ladder now, rolled from the DRIVER's policy stream, so neither engine's
   // rule stream moves).
+  // #93 the ENVOY verb: the recorded picks land here — bank first (quest
+  // grants), else one ENVOY_COST of influence; met + affordable re-validated.
+  // The write set matches the scripted assignment loop (rivalEnvoys only);
+  // spend-vs-accrual order commutes (linear adds), so the apply positions'
+  // difference across the engines cannot split the traced totals.
+  for (const csIdx of rec.envoys ?? []) {
+    const cs = state.cityStates[csIdx];
+    if (!cs || !cs.rivalMet?.[rival.id]) continue;
+    if ((rival.envoysAvailable ?? 0) > 0) rival.envoysAvailable = (rival.envoysAvailable ?? 0) - 1;
+    else if ((rival.influencePoints ?? 0) >= ENVOY_COST) rival.influencePoints = (rival.influencePoints ?? 0) - ENVOY_COST;
+    else continue;
+    (cs.rivalEnvoys ??= [])[rival.id] = (cs.rivalEnvoys[rival.id] ?? 0) + 1;
+  }
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
     const Rw = rivalCount(state);
