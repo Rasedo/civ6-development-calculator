@@ -146,6 +146,33 @@ def main() -> None:
     # nothing legal -> queue nothing
     assert int(ladder.pick_production(mk([]), cls)[0, 0]) == -1
 
+    # --- #88 WONDER + PROJECT tiers ----------------------------------------
+    # wonder sits between building and builder (the tryQueueRivalWonder slot);
+    # project sits LAST (the A-14 army-capped fallback). The capital-only arm
+    # is POLICY carried via ctx["is_capital"]; absent ctx -> ungated.
+    cls8 = ladder.prod_classes(NB, NU, nS, 2, 2)
+    W8 = cls8["project"][1]
+    def mk8(idxs):
+        m = torch.zeros(1, 1, W8, dtype=torch.bool)
+        for i in idxs:
+            m[0, 0, i] = True
+        return m
+    wlo, plo = cls8["wonder"][0], cls8["project"][0]
+    # building outranks wonder; wonder outranks the army
+    assert int(ladder.pick_production(mk8([1, wlo]), cls8, ROSTER)[0, 0]) == 1
+    assert int(ladder.pick_production(mk8([wlo, cls8["unit"][0] + 1]), cls8, ROSTER)[0, 0]) == wlo
+    # lowest wonder column = data order first (the A-4 scan order)
+    assert int(ladder.pick_production(mk8([wlo + 1, wlo]), cls8, ROSTER)[0, 0]) == wlo
+    # the capital heuristic: a non-capital city never raises one; the capital does
+    capctx = {"is_capital": torch.tensor([[False]])}
+    assert int(ladder.pick_production(mk8([wlo]), cls8, ROSTER, capctx)[0, 0]) == -1
+    capctx = {"is_capital": torch.tensor([[True]])}
+    assert int(ladder.pick_production(mk8([wlo]), cls8, ROSTER, capctx)[0, 0]) == wlo
+    # project loses to EVERYTHING else and fires alone (the fallback tier)
+    assert int(ladder.pick_production(mk8([plo, cls8["unit"][0] + 1]), cls8, ROSTER)[0, 0]) == cls8["unit"][0] + 1
+    assert int(ladder.pick_production(mk8([plo + 1, plo]), cls8, ROSTER)[0, 0]) == plo
+    print("  j #88 wonder/project tiers OK (building > wonder > army > project; capital ctx; data-order ties)")
+
     # #84: CITIES ARE WALKED IN ORDER. The settler is retired once some city
     # takes it, exactly as rivals.ts's settlerQueued does — a snapshot mask says
     # "legal" in every idle city, and scoring them independently queued one per

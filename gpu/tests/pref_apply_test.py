@@ -141,6 +141,73 @@ def main() -> None:
     else:
         print("  4 purchase lane SKIPPED (purchase columns off)")
 
+    # --- #88: WONDER + PROJECT codes at the driven apply ---------------------
+    # The driven gate cannot reach these before its t61 wall (#93), so the
+    # dispatch is pinned HERE: the code lands via the scripted pick's own
+    # helper bodies, and one-per-world refuses CROSS-SEAT at apply time.
+    sim5 = fresh(rules, path)
+    r5, j5 = 0, 0
+    sim5.controlled[0, r5] = True
+    NB5 = sim5.rules_dev.b_cost.shape[0]
+    nS5 = len(sim5._scaffold)
+    w_lo5 = NB5 + 2 + sim5.NU + nS5 + NB5 + 1 + sim5.NU
+    # force a legal (wi, tile) pair deterministically: find a wonder whose wok
+    # bit is set on some r0-owned base_ok tile, then grant its unlock tech.
+    base5 = sim5._wonder_base_ok(r5, j5)[0]
+    wi5 = None
+    for _wi in range(sim5._wond_n):
+        _wrow = sim5._wond_rows[_wi]
+        if int(_wrow.get("ut", -1)) < 0 or int(_wrow.get("uc", -1)) >= 0:
+            continue  # want a tech-gated, civic-free row we can grant
+        if int(_wrow.get("adjD", -1)) != -1 or int(_wrow.get("adjR", -1)) >= 0:
+            continue  # no adjacency arm to satisfy
+        if bool((base5 & ((sim5.wok[0] >> _wi) & 1).bool()).any()):
+            wi5 = _wi
+            sim5.r_techs[0, r5, int(_wrow["ut"])] = True
+            break
+    assert wi5 is not None, "#88: fixture has no forceable wonder candidate near r0c0"
+    sim5.rc_current[0, r5, j5] = -1  # the columns are idle-gated like every base column
+    m5 = sim5.rival_masks(r5)["production"]
+    assert bool(m5[0, j5, w_lo5 + wi5]), "#88: the granted wonder column must read legal"
+    prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
+    prod5[0, j5] = w_lo5 + wi5
+    sim5.apply_rival_actions(r5, production=prod5)
+    code_w5 = 1 + sim5.NU + nS5 + NB5 + len(sim5._proj_rows) + wi5
+    assert int(sim5.rc_current[0, r5, j5]) == code_w5, "wonder code must queue via the shared helper"
+    assert int(sim5.rc_wonder[0, r5, j5, wi5]) >= 0, "the pave must register the tile"
+    assert bool((sim5.built_wonder[0] == wi5).any()), "built_wonder plane must carry the in-flight pave"
+    # cross-seat one-per-world: a fresh sim where ANOTHER civ already paved it
+    sim6 = fresh(rules, path)
+    sim6.controlled[0, r5] = True
+    sim6.r_techs[0, r5, int(sim6._wond_rows[wi5]["ut"])] = True  # same grant — the CLAIM must be the only blocker
+    sim6.rc_current[0, r5, j5] = -1
+    free6 = int((sim6.built_wonder[0] < 0).nonzero(as_tuple=True)[0][0])
+    sim6.built_wonder[0, free6] = wi5  # any tile, any owner — wonderExists is global
+    m6 = sim6.rival_masks(r5)["production"]
+    assert not bool(m6[0, j5, w_lo5 + wi5]), "mask must read the claim"
+    sim6.apply_rival_actions(r5, production=prod5)
+    assert int(sim6.rc_current[0, r5, j5]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
+    # PROJECT: plant a completed district matching base project 0, then apply
+    sim7 = fresh(rules, path)
+    sim7.controlled[0, r5] = True
+    prow7 = sim7._proj_rows[0]
+    d_i7 = int(prow7["d"])
+    ctr7 = int(sim7.rc_center[0, r5, j5])
+    dt7 = next(int(t) for t in range(sim7.T) if int(sim7.rival_at[0, t]) == r5 and int(sim7.district[0, t]) < 0 and t != ctr7 and int(sim7.built_wonder[0, t]) < 0)
+    sim7.district[0, dt7] = d_i7
+    sim7.district_complete[0, dt7] = True
+    sim7.rc_dist_tile[0, r5, j5, d_i7] = dt7
+    sim7.rc_current[0, r5, j5] = -1
+    m7 = sim7.rival_masks(r5)["production"]
+    p_lo7 = w_lo5 + sim7._wond_n
+    assert bool(m7[0, j5, p_lo7]), "#88: base project 0 must be legal on its completed district"
+    prod7 = torch.full((1, sim7.RC), -1, dtype=torch.long)
+    prod7[0, j5] = p_lo7
+    sim7.apply_rival_actions(r5, production=prod7)
+    assert int(sim7.rc_current[0, r5, j5]) == 1 + sim7.NU + nS5 + NB5 + 0, "project code must queue"
+    assert float(sim7.rc_cost[0, r5, j5]) > 0, "project cost must lock"
+    print("  5 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
+
     print("PREF APPLY OK")
 
 

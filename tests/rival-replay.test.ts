@@ -186,6 +186,45 @@ describe('#70 the action FILE drives the TS rival', () => {
     expect(state.units.find((x) => x.id === u.id)!.tileIndex).toBe(home.index);
   });
 
+  it('#88: a recorded WONDER column places and queues — and one-per-world refuses cross-seat', () => {
+    const L = prodLayout();
+    const oracleCol = L.wonderLo + L.wonders.indexOf('ORACLE');
+    const mk = (claimed: boolean) => {
+      const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+      const rival = addRival(state, 6, 6);
+      rival.research.civics.push('MYSTICISM'); // Oracle's unlock
+      const hill = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== rival.cities[0].centerIndex)!;
+      hill.elevation = 'HILLS';               // Oracle is hillsOnly
+      if (claimed) {
+        // ANOTHER civ finished it since recording — the cross-seat trap
+        tileAtCoords(state.map, 12, 12).builtWonder = 'ORACLE';
+      }
+      state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [[rival.cities[0].centerIndex, oracleCol]], tech: null, civic: null, units: [] } } };
+      rivalPhase(state);
+      return rival.cities[0];
+    };
+    const rc = mk(false);
+    expect(rc.queue[0]?.kind).toBe('wonder');
+    expect(rc.wonders.some((w) => w.id === 'ORACLE')).toBe(true);
+    const rc2 = mk(true);
+    expect(rc2.queue.find((q) => q.kind === 'wonder')).toBeUndefined(); // refused, never double-built
+  });
+
+  it('#88: a recorded PROJECT column queues on a completed district', () => {
+    const L = prodLayout();
+    const col = L.projectLo + L.projects.indexOf('RESEARCH_GRANTS');
+    const state = makeState(makeMap(14, 14, 'GRASSLAND'));
+    const rival = addRival(state, 6, 6);
+    const rc = rival.cities[0];
+    const dt = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== rc.centerIndex)!;
+    dt.district = 'CAMPUS';
+    dt.districtComplete = true;
+    rc.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
+    state.rivalActions = { [state.turn - 1]: { [rival.id]: { production: [[rc.centerIndex, col]], tech: null, civic: null, units: [] } } };
+    rivalPhase(state);
+    expect(rc.queue[0]?.kind).toBe('project');
+  });
+
   it('a seat with NO record still runs the ladder (the paths coexist)', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const rival = addRival(state, 6, 6);

@@ -195,18 +195,19 @@ def pick_research(blocks: dict, mask: torch.Tensor, kind: str) -> torch.Tensor:
 #: encoding is: buildings [0, NB), SETTLER = NB, IDLE = NB+1,
 #: units [NB+2, NB+2+NU), districts above those, purchases last.
 #:
-#: The order is `rivals.ts`'s chain verbatim, MINUS two branches this cannot
-#: express yet, both recorded rather than silently skipped:
-#:   * WONDER sits between building and builder — the rival action space has no
-#:     wonder column at all (task #83), so there is nothing to select.
-#:   * WONDER sits between building and builder and still has no mask column.
+#: The order is `rivals.ts`'s chain verbatim.
 #: MILITARY_ENGINEER and the B-6 GALLEY are single-column tiers like the
 #: builder: both have combat 0 or are naval, so neither can ever win an army
 #: lane, and without their own tier they were simply never picked (57 and 29
 #: missed engine decisions respectively). The GALLEY sits BELOW the army and is
 #: deliberately NOT cap-gated — the picker queues it only when the army branch
 #: missed because the cap was full, and counts it afterwards.
-PROD_PRIORITY = ("settler", "district", "building", "builder", "engineer", "unit", "galley")
+#: #88: WONDER joins between building and builder (the tryQueueRivalWonder
+#: slot in the chain) and PROJECT joins LAST (the A-14 army-capped fallback —
+#: the tier fires only when every other class missed, which is exactly the
+#: scripted condition). Both were "recorded rather than silently skipped"
+#: above; the recording is paid off.
+PROD_PRIORITY = ("settler", "district", "building", "wonder", "builder", "engineer", "unit", "galley", "project")
 
 #: single-column tiers -> (roster key, is it gated by the unit cap)
 SOLO_TIERS = {"builder": ("builder_idx", True),
@@ -250,19 +251,26 @@ def _best_in_lane(cand: torch.Tensor, strength: torch.Tensor) -> torch.Tensor:
     return torch.where(cand, key, torch.full_like(key, -(10 ** 9))).argmax(dim=1)
 
 
-def prod_classes(NB: int, NU: int, n_scaffold: int) -> dict:
+def prod_classes(NB: int, NU: int, n_scaffold: int, n_wonder: int = 0, n_project: int = 0) -> dict:
     """Index ranges per production class, from the engine's own constants.
 
     Passed IN rather than hardcoded: the ladder must not carry a second copy of
     the action encoding, or it drifts from the engine the way every other
     duplicated definition in this codebase has.
+
+    #88: WONDER and PROJECT columns sit past the purchase block (appended so
+    no purchase consumer renumbered). Zero widths (the defaults) make both
+    tiers vanish — old-layout masks keep working.
     """
     ub = NB + 2
+    w_lo = ub + NU + n_scaffold + NB + 1 + NU  # past the purchase block
     return {
         "building": (0, NB),
         "settler": (NB, NB + 1),
         "unit": (ub, ub + NU),
         "district": (ub + NU, ub + NU + n_scaffold),
+        "wonder": (w_lo, w_lo + n_wonder),
+        "project": (w_lo + n_wonder, w_lo + n_wonder + n_project),
     }
 
 
@@ -386,6 +394,15 @@ def pick_production(
             sub = mask[:, j, lo:min(hi, W)]
             if name == "settler":
                 sub = sub & ~taken.unsqueeze(1) & room.unsqueeze(1)
+            elif name == "wonder":
+                # #88 POLICY: the scripted chain raises wonders from the
+                # CAPITAL only (tryQueueRivalWonder's own first line). The
+                # MASK offers any city — Civ 6's rule — so the heuristic
+                # lives here with the rest of the policy. Absent ctx -> no
+                # gate (a net is free to build anywhere).
+                cap_rows = ctx.get("is_capital")
+                if cap_rows is not None:
+                    sub = sub & cap_rows[:, j].to(torch.bool).unsqueeze(1)
             has = sub.any(dim=1)
             first = lo + sub.float().argmax(dim=1)
             best = torch.where((best < 0) & has, first, best)

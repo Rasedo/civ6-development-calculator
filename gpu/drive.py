@@ -57,6 +57,7 @@ def _prod_ctx(sim, r: int) -> dict:
     n_mel = n_mel + (q_mil & ~rng_t[q_ty]).sum(dim=1)
     return {
         "settler_queued": (qcur == 0).any(dim=1),
+        "is_capital": sim.rc_is_cap[:, r],  # #88: the wonder tier's capital heuristic
         "melee": n_mel,
         "ranged": n_rng,
         "unit_count": n_units,
@@ -314,7 +315,7 @@ def drive_batched(env, turns: int, seats=None) -> list:
     B = sim.B
     seats = list(range(sim.R)) if seats is None else list(seats)
     NB = sim.rules_dev.b_cost.shape[0]
-    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold))
+    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
     rj = json.loads((Path(__file__).resolve().parent / "fixtures" / "rules.json").read_text(encoding="utf-8"))
     roster = ladder.unit_roster(rj["units"])
     for r in seats:

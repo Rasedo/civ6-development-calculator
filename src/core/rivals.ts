@@ -67,7 +67,7 @@ import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenanc
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
-import { BUILT_WONDERS } from '../data/builtWonders';
+import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, cityNavalCapable, waterEnterable, builderCost, walkToward } from './units';
 import { killUnit } from './combat';  // #51/S7.12
 import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem } from './game';
@@ -1125,13 +1125,27 @@ function tryQueueRivalBuilding(state: GameState, rc: RivalCity, unlocks: Unlocks
  * queueWonder's verbatim (improvement dies, feature dies except
  * floodplains, a bonus resource is stripped — the C-6 rule). */
 function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _unlocks: Unlocks): boolean {
-  if (!rc.isCapital) return false;
+  if (!rc.isCapital) return false;   // the SCRIPTED chain's own heuristic — POLICY, not legality (#88)
+  for (const def of Object.values(BUILT_WONDERS)) {
+    if (placeRivalWonder(state, rival, rc, def)) return true;
+  }
+  return false;
+}
+
+/** #88: queue ONE named wonder — the tryQueueRivalWonder body for a single
+ * def, shared by the scripted chain above and the driven replay. Re-validates
+ * EVERYTHING (unlock, one-per-world, placement): one-per-world is CROSS-SEAT,
+ * so a column legal at record time can have been claimed by any civ by apply
+ * time — the replay refuses rather than double-building. The capital gate
+ * stays OUT: it is the scripted picker's heuristic (the #82 settler lesson),
+ * and real Civ 6 lets any city raise any unlocked wonder. */
+export function placeRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, def: BuiltWonderDef): boolean {
   const civ = civOfRival(rival.id);
   const center = state.map.tiles[rc.centerIndex];
-  for (const def of Object.values(BUILT_WONDERS)) {
-    if (wonderExists(state, def.id)) continue;
-    if (def.requiresTech && !rival.research.techs.includes(def.requiresTech)) continue;
-    if (def.requiresCivic && !rival.research.civics.includes(def.requiresCivic)) continue;
+  {
+    if (wonderExists(state, def.id)) return false;
+    if (def.requiresTech && !rival.research.techs.includes(def.requiresTech)) return false;
+    if (def.requiresCivic && !rival.research.civics.includes(def.requiresCivic)) return false;
     const p = def.placement;
     const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
       .filter((t) => {
@@ -1160,7 +1174,7 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
       })
       .sort((a, b) => a.index - b.index);
     const tile = cands[0];
-    if (!tile) continue;
+    if (!tile) return false;
     tile.builtWonder = def.id;
     tile.builtWonderComplete = false;
     tile.improvement = null;
@@ -1170,7 +1184,20 @@ function tryQueueRivalWonder(state: GameState, rival: RivalCiv, rc: RivalCity, _
     commitProduction(state, rc.seat, rc, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
     return true;
   }
-  return false;
+}
+
+/** #88: run ONE named district project — the A-14 branch's queue for a single
+ * id, shared by the scripted chain and the driven replay. BASE projects only:
+ * the space-race rows ride their own chain (requiresTech/requiresProject and
+ * the one-shot spaceProjects ledger), which no mask offers yet. Re-validates
+ * the district on THIS city. */
+export function queueRivalProject(state: GameState, rival: RivalCiv, rc: RivalCity, projId: string): boolean {
+  const proj = PROJECTS[projId];
+  if (!proj || proj.space || proj.victory) return false;
+  if (!rc.districts.some((d) => d.type === proj.district && state.map.tiles[d.tileIndex].districtComplete)) return false;
+  const cost = Math.max(Math.round(15 * GAME_SPEED), Math.round(districtCostIn(rival.research) * 0.5));
+  commitProduction(state, rc.seat, rc, { kind: 'project', project: proj.id, progress: 0, cost });
+  return true;
 }
 
 /** A-4: the civ-wide wonder growth multiplier (Hanging Gardens) — the
@@ -2308,7 +2335,7 @@ function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity,
  * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
  * `apply_rival_actions`: the idle gate, then the same cost/progress semantics. */
 export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: RivalActionRecord): void {
-  const { NB, NU, buildings, units } = prodLayout();
+  const { NB, NU, buildings, units, wonders, projects, wonderLo, projectLo } = prodLayout();
   // the recorder ran at B=1 and `tolist()` keeps the batch dim: production
   // arrives as [[c0..]], tech/civic as [v]. Unwrap defensively — the same fix
   // apply_turn needed on the GPU side, and the second driven-parity red: every
@@ -2343,7 +2370,17 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
       const id = units[a - NB - 2];
       if (id && UNITS[id]) commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0 });
     }
-    else if (a >= NB + 2 + NU) {
+    else if (a >= wonderLo && a < wonderLo + wonders.length) {
+      // #88 WONDER: the file names WHICH wonder; the engine re-runs the whole
+      // placement scan and the one-per-world check (cross-seat — another civ
+      // may have claimed it since recording; the replay refuses, never
+      // double-builds).
+      const wd = BUILT_WONDERS[wonders[a - wonderLo]];
+      if (wd) placeRivalWonder(state, rival, rc, wd);
+    } else if (a >= projectLo && a < projectLo + projects.length) {
+      // #88 PROJECT: base rows only; queueRivalProject re-validates.
+      queueRivalProject(state, rival, rc, projects[a - projectLo]);
+    } else if (a >= NB + 2 + NU) {
       // DISTRICT: the file names the TYPE, the engine still runs the placement
       // scan — a tile index in the record would be derived state, and the whole
       // point of the schema is that it carries DECISIONS only.

@@ -9372,6 +9372,88 @@ class BatchSim:
         self.r_best_melee[:, civ] = torch.maximum(self.r_best_melee[:, civ], melee_cs)
         return can
 
+    def _wonder_base_ok(self, r: int, j: int) -> torch.Tensor:
+        """#88: the A-4 wonder-tile base predicate for city (r, j) — ONE body
+        shared by the scripted pick, rival_masks and the driven apply (the #86
+        lesson: placement legality that exists twice drifts twice)."""
+        d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
+        return (
+            (self.rival_at == r)
+            & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))  # A-24: THIS city's registry
+            & (d_ctr <= 3)
+            & (self.district < 0)
+            & (self.built_wonder < 0)
+            & (self.rvcity_at < 0)
+            & (self.center_at < 0)
+            & (self.res_priority <= 1)
+        )
+
+    def _wonder_unlock_ok(self, r: int, wi: int) -> torch.Tensor | None:
+        """#88: [B] unlock for wonder wi, or None when its unlock or adjacency
+        requirement sits outside the compact tree (-3: TS includes() never
+        matches, so the wonder is unbuildable for every seat)."""
+        wrow = self._wond_rows[wi]
+        if int(wrow.get("ut", -1)) == -3 or int(wrow.get("uc", -1)) == -3:
+            return None
+        if int(wrow.get("adjD", -1)) == -3:
+            return None
+        ok = torch.ones(self.B, dtype=torch.bool, device=self.device)
+        if int(wrow.get("ut", -1)) >= 0:
+            ok = ok & self.r_techs[:, r, int(wrow["ut"])]
+        if int(wrow.get("uc", -1)) >= 0:
+            ok = ok & self.r_civics[:, r, int(wrow["uc"])]
+        return ok
+
+    def _wonder_cand(self, r: int, j: int, wi: int, base_ok: torch.Tensor) -> torch.Tensor:
+        """#88: [B, T] candidate tiles for wonder wi at city (r, j) — the wok
+        bitplane plus the adjacency arms, exactly the scripted pick's terms."""
+        wrow = self._wond_rows[wi]
+        cand_w = base_ok & ((self.wok >> wi) & 1).bool()
+        adjD = int(wrow.get("adjD", -1))
+        if adjD == -2:
+            cand_w = cand_w & (self._adj_center_count() > 0)
+        elif adjD >= 0:
+            cand_w = cand_w & self._adj_dtype_complete(adjD)
+        if int(wrow.get("adjR", -1)) >= 0:
+            cand_w = cand_w & self._adj_res_live(int(wrow["adjR"]))
+        return cand_w
+
+    def _queue_rival_wonder_at(self, r: int, j: int, wi: int, has_w: torch.Tensor, cand_w: torch.Tensor) -> None:
+        """#88: queueWonder's writes for rows `has_w` (each has a candidate in
+        cand_w): pave the LOWEST-index tile, improvement dies, feature dies
+        except floodplains, a bonus resource is stripped (C-6), registry +
+        queue code + locked cost."""
+        wrow = self._wond_rows[wi]
+        keyw = torch.where(cand_w, self._arangeT_f, self._inf_f)
+        bw = keyw.argmin(dim=1)
+        rows_w = has_w.nonzero(as_tuple=True)[0]
+        bwt = bw[rows_w]
+        self.built_wonder[rows_w, bwt] = wi
+        self.built_wonder_complete[rows_w, bwt] = False
+        self.improvement[rows_w, bwt] = -1
+        nofp = self.feat_id[rows_w, bwt] != self._fp_fid
+        if bool(nofp.any()):
+            self._strip_feature_at(rows_w[nofp], bwt[nofp])
+        fresh_rs = (self.res_priority[rows_w, bwt] == 1) & ~self.res_stripped[rows_w, bwt]
+        self.res_stripped[rows_w, bwt] = self.res_stripped[rows_w, bwt] | (self.res_priority[rows_w, bwt] == 1)
+        self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
+        self.rc_wonder[rows_w, r, j, wi] = bwt
+        code_w = 1 + self.NU + len(self._scaffold) + self.rules_dev.b_cost.shape[0] + len(self._proj_rows) + wi
+        self.rc_current[:, r, j] = torch.where(has_w, torch.full_like(self.rc_current[:, r, j], code_w), self.rc_current[:, r, j])
+        self.rc_cost[:, r, j] = torch.where(has_w, torch.full_like(self.rc_cost[:, r, j], float(wrow["cost"])), self.rc_cost[:, r, j])
+        self.rc_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+        self._eff_version += 1  # a pave: features/improvements changed under the caches
+
+    def _rival_proj_cost(self, r: int) -> torch.Tensor:
+        """#88: the A-14 project cost — max(round(15·speed), round(dCost·0.5))
+        on THIS rival's research, the districtCostIn twin the phase hoists."""
+        dcp = self.rules.district_cost
+        t_pct_r = self.r_techs[:, r].to(torch.float64).mean(dim=1)
+        c_pct_r = self.r_civics[:, r].to(torch.float64).mean(dim=1)
+        d_cost = torch.floor(dcp.get("base", 32) * (1 + dcp.get("scale", 9) * torch.maximum(t_pct_r, c_pct_r)))
+        p_floor = float(round(15 * self.rules.game_speed))
+        return torch.maximum(torch.full_like(d_cost, p_floor), js_round(d_cost * 0.5))
+
     def rival_masks(self, r: int) -> dict[str, torch.Tensor]:
         """C2b: a controlled rival's decision space, in the PLAYER head
         layouts so one net serves every seat. production [B, RC,
@@ -9542,7 +9624,40 @@ class BatchSim:
                 u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
             afford_u = self._afford(self.r_treasury[:, r].unsqueeze(1), u_cost_r * mult)
             pu = ok_u & afford_u & self.controlled[:, r].unsqueeze(1)
-            prod_cols.append(torch.cat([row & idle[:, j].unsqueeze(1), pb, ps, pu], dim=1))
+            # #88 WONDER columns [nW]: unlock + one-per-world (in-flight tiles
+            # count, like wonderExists) + a live placement candidate — the
+            # scripted pick's own scan bodies. The CAPITAL-ONLY term stays out:
+            # it is the scripted chain's heuristic (the #82 settler lesson),
+            # and real Civ 6 lets any city raise an unlocked wonder.
+            nW_m = self._wond_n if self.districts_on else 0
+            ok_w = torch.zeros(B, max(nW_m, 0), dtype=torch.bool, device=dev)
+            if nW_m > 0:
+                base_okm = self._wonder_base_ok(r, j)
+                for wi in range(nW_m):
+                    unl_w = self._wonder_unlock_ok(r, wi)
+                    if unl_w is None or not bool(unl_w.any()):
+                        continue
+                    okc_m = unl_w & ~(self.built_wonder == wi).any(dim=1)
+                    if not bool(okc_m.any()):
+                        continue
+                    ok_w[:, wi] = okc_m & self._wonder_cand(r, j, wi, base_okm).any(dim=1)
+            # #88 PROJECT columns [nP]: BASE rows only (district complete on
+            # THIS city). Space/victory rows keep their column for layout
+            # stability but never read True — their chain (requiresTech,
+            # requiresProject, the one-shot spaceProjects ledger) is its own
+            # queue path that no mask offers yet.
+            nP_m = len(self._proj_rows) if self.districts_on else 0
+            ok_p = torch.zeros(B, max(nP_m, 0), dtype=torch.bool, device=dev)
+            for pi_m, prow_m in enumerate(self._proj_rows if self.districts_on else []):
+                if int(prow_m.get("sp", 0)) or int(prow_m.get("vic", 0)):
+                    continue
+                d_im = int(prow_m.get("d", -1))
+                if d_im < 0 or d_im >= self.rc_dist_tile.shape[3]:
+                    continue
+                regp_m = self.rc_dist_tile[:, r, j, d_im]
+                ok_p[:, pi_m] = (regp_m >= 0) & self.district_complete.gather(1, regp_m.clamp(min=0).unsqueeze(1)).squeeze(1)
+            idle_j = idle[:, j].unsqueeze(1)
+            prod_cols.append(torch.cat([row & idle_j, pb, ps, pu, ok_w & idle_j, ok_p & idle_j], dim=1))
         production = torch.stack(prod_cols, dim=1)  # [B, RC, base + NB+1+NU purchase]
         tech = self._available_mask(self.r_techs[:, r], self._prereq_t) & (self.r_cur_tech[:, r] == -1).unsqueeze(1)
         civic = self._available_mask(self.r_civics[:, r], self._prereq_c) & (self.r_cur_civic[:, r] == -1).unsqueeze(1)
@@ -9676,8 +9791,13 @@ class BatchSim:
             code = order[:, :RCj, k].clone()
             code = torch.where(live[:, :RCj, k], code, torch.full_like(code, -1))
             if k > 0:
-                # purchases already had their one attempt on rank 0
-                code = torch.where(code >= base_w, torch.full_like(code, -1), code)
+                # purchases already had their one attempt on rank 0. #88: the
+                # bound is the purchase RANGE — wonder/project columns sit
+                # above it, are idle-gated like base columns, and must stay
+                # offered on later ranks (a wonder whose tile was claimed
+                # falls through to the next preference).
+                _pw_hi = base_w + self.rules_dev.b_cost.shape[0] + 1 + self.NU
+                code = torch.where((code >= base_w) & (code < _pw_hi), torch.full_like(code, -1), code)
                 code = torch.where(idle, code, torch.full_like(code, -1))
             if not bool((code >= 0).any()):
                 return
@@ -9718,6 +9838,52 @@ class BatchSim:
                 self.rc_current[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_current[:, r, j]), self.rc_current[:, r, j])
                 self.rc_cost[:, r, j] = torch.where(is_s, settle_cost, self.rc_cost[:, r, j])
                 self.rc_progress[:, r, j] = torch.where(is_s, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
+            # #88 WONDER/PROJECT codes sit past the purchase block. The file
+            # names WHICH wonder/project; the engine re-runs the WHOLE
+            # legality — one-per-world is CROSS-SEAT (any civ can have claimed
+            # it since the mask was taken), so the apply refuses rather than
+            # double-building, exactly like the TS placeRivalWonder twin.
+            w_lo = NBn + 2 + self.NU + nS + NBn + 1 + self.NU
+            nW_a = self._wond_n if self.districts_on else 0
+            nP_a = len(self._proj_rows) if self.districts_on else 0
+            is_w = act & (a >= w_lo) & (a < w_lo + nW_a)
+            if bool(is_w.any()):
+                base_okA = self._wonder_base_ok(r, j)
+                for wcode in sorted(set(a[is_w].tolist())):
+                    wi_a = int(wcode) - w_lo
+                    rows_a = is_w & (a == wcode)
+                    unl_a = self._wonder_unlock_ok(r, wi_a)
+                    if unl_a is None:
+                        continue
+                    rows_a = rows_a & unl_a & ~(self.built_wonder == wi_a).any(dim=1)
+                    if not bool(rows_a.any()):
+                        continue
+                    cand_a = self._wonder_cand(r, j, wi_a, base_okA)
+                    rows_a = rows_a & cand_a.any(dim=1)
+                    if not bool(rows_a.any()):
+                        continue
+                    self._queue_rival_wonder_at(r, j, wi_a, rows_a, cand_a)
+            p_lo = w_lo + nW_a
+            is_p = act & (a >= p_lo) & (a < p_lo + nP_a)
+            if bool(is_p.any()):
+                pc_a = self._rival_proj_cost(r)
+                for pcode in sorted(set(a[is_p].tolist())):
+                    pi_a = int(pcode) - p_lo
+                    prow_a = self._proj_rows[pi_a]
+                    if int(prow_a.get("sp", 0)) or int(prow_a.get("vic", 0)):
+                        continue  # base rows only — the mask never offers these
+                    d_ia = int(prow_a.get("d", -1))
+                    if d_ia < 0 or d_ia >= self.rc_dist_tile.shape[3]:
+                        continue
+                    regp_a = self.rc_dist_tile[:, r, j, d_ia]
+                    has_pa = (regp_a >= 0) & self.district_complete.gather(1, regp_a.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    rows_p = is_p & (a == pcode) & has_pa
+                    if not bool(rows_p.any()):
+                        continue
+                    code_pr = 1 + self.NU + nS + NBn + pi_a
+                    self.rc_current[:, r, j] = torch.where(rows_p, torch.full_like(self.rc_current[:, r, j], code_pr), self.rc_current[:, r, j])
+                    self.rc_cost[:, r, j] = torch.where(rows_p, pc_a, self.rc_cost[:, r, j])
+                    self.rc_progress[:, r, j] = torch.where(rows_p, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
             # VP-G2: purchase codes live past the base width — buildings
             # base..base+NB-1, (settler col skipped), units follow. Purchases
             # bypass the idle gate and revalidate LIVE (treasury may have
@@ -9725,7 +9891,7 @@ class BatchSim:
             base_w = NBn + 2 + self.NU + nS
             pa = production[:, j].to(torch.long)
             mult = self.rules.gold_purchase_mult
-            can_p = (pa >= base_w) & self.controlled[:, r] & self.rc_alive[:, r, j]
+            can_p = (pa >= base_w) & (pa < w_lo) & self.controlled[:, r] & self.rc_alive[:, r, j]  # #88: wonder/project codes sit past the purchases
             if bool(can_p.any()):
                 pb_i = pa - base_w
                 is_pb = can_p & (pb_i >= 0) & (pb_i < NBn)
@@ -14571,68 +14737,27 @@ class BatchSim:
                 if self.districts_on and self._wond_n > 0 and rem_any and bool((rem & self.rc_is_cap[:, r, j]).any()):
                     remw = rem & self.rc_is_cap[:, r, j]
                     remw_any = True  # guarded non-empty above; live mirror below
-                    d_ctr = self.pair_dist[self.rc_center[:, r, j].clamp(min=0)]  # [B, T]
-                    base_ok = (
-                        (self.rival_at == r)
-                        & (self.rc_tile_id == self.rc_id[:, r, j].unsqueeze(1))  # A-24: THIS capital's registry (mirrors canPlaceWonder tile.cityId === city.id)
-                        & (d_ctr <= 3)
-                        & (self.district < 0)
-                        & (self.built_wonder < 0)
-                        & (self.rvcity_at < 0)
-                        & (self.center_at < 0)
-                        & (self.res_priority <= 1)
-                    )
+                    # #88: the scan lives in _wonder_base_ok/_wonder_cand/
+                    # _queue_rival_wonder_at now — the SAME bodies rival_masks
+                    # and the driven apply call, so the three cannot drift.
+                    base_ok = self._wonder_base_ok(r, j)
                     for wi in range(self._wond_n):
                         if not remw_any:
                             break
-                        wrow = self._wond_rows[wi]
-                        if int(wrow.get("ut", -1)) == -3 or int(wrow.get("uc", -1)) == -3:
-                            continue  # unlock absent from the compact tree — unreachable (TS includes() never matches)
-                        okc = remw
-                        if int(wrow.get("ut", -1)) >= 0:
-                            okc = okc & self.r_techs[:, r, int(wrow["ut"])]
-                        if int(wrow.get("uc", -1)) >= 0:
-                            okc = okc & self.r_civics[:, r, int(wrow["uc"])]
+                        unl_w = self._wonder_unlock_ok(r, wi)
+                        if unl_w is None:
+                            continue  # unlock/adjacency outside the compact tree
+                        okc = remw & unl_w
                         if not bool(okc.any()):
                             continue
                         okc = okc & ~(self.built_wonder == wi).any(dim=1)
                         if not bool(okc.any()):
                             continue
-                        adjD = int(wrow.get("adjD", -1))
-                        if adjD == -3:
-                            continue  # requires an out-of-catalog district — never placeable
-                        cand_w = base_ok & ((self.wok >> wi) & 1).bool()
-                        if adjD == -2:
-                            cand_w = cand_w & (self._adj_center_count() > 0)
-                        elif adjD >= 0:
-                            cand_w = cand_w & self._adj_dtype_complete(adjD)
-                        if int(wrow.get("adjR", -1)) >= 0:
-                            cand_w = cand_w & self._adj_res_live(int(wrow["adjR"]))
+                        cand_w = self._wonder_cand(r, j, wi, base_ok)
                         has_w = okc & cand_w.any(dim=1)
                         if not bool(has_w.any()):
                             continue
-                        keyw = torch.where(cand_w, self._arangeT_f, self._inf_f)
-                        bw = keyw.argmin(dim=1)
-                        rows_w = has_w.nonzero(as_tuple=True)[0]
-                        bwt = bw[rows_w]
-                        # queueWonder's tile writes: pave, improvement dies,
-                        # feature dies EXCEPT floodplains, bonus resource
-                        # stripped (the C-6 rule)
-                        self.built_wonder[rows_w, bwt] = wi
-                        self.built_wonder_complete[rows_w, bwt] = False
-                        self.improvement[rows_w, bwt] = -1
-                        nofp = self.feat_id[rows_w, bwt] != self._fp_fid
-                        if bool(nofp.any()):
-                            self._strip_feature_at(rows_w[nofp], bwt[nofp])
-                        fresh_rs = (self.res_priority[rows_w, bwt] == 1) & ~self.res_stripped[rows_w, bwt]
-                        self.res_stripped[rows_w, bwt] = self.res_stripped[rows_w, bwt] | (self.res_priority[rows_w, bwt] == 1)
-                        self._withdraw_sea_adj(rows_w[fresh_rs], bwt[fresh_rs])
-                        self.rc_wonder[rows_w, r, j, wi] = bwt
-                        code_w = 1 + self.NU + len(self._scaffold) + self.rules_dev.b_cost.shape[0] + len(self._proj_rows) + wi
-                        self.rc_current[:, r, j] = torch.where(has_w, torch.full_like(self.rc_current[:, r, j], code_w), self.rc_current[:, r, j])
-                        self.rc_cost[:, r, j] = torch.where(has_w, torch.full_like(self.rc_cost[:, r, j], float(wrow["cost"])), self.rc_cost[:, r, j])
-                        self.rc_progress[:, r, j] = torch.where(has_w, torch.zeros_like(self.rc_progress[:, r, j]), self.rc_progress[:, r, j])
-                        self._eff_version += 1  # a pave: features/improvements changed under the caches
+                        self._queue_rival_wonder_at(r, j, wi, has_w, cand_w)
                         remw = remw & ~has_w
                         remw_any = bool(remw.any())
                         rem = rem & ~has_w
