@@ -1351,7 +1351,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     // replay's own setting).
     state.autoResearch = false;
   }
-  type Seat0Rec = { production?: [number, number][]; tech?: number | null; civic?: number | null; units?: [number, number, number][] };
+  type Seat0Rec = { production?: [number, number][]; tech?: number | null; civic?: number | null; units?: [number, number, number][]; envoys?: number[] };
   let seat0rec: Seat0Rec | null = null;
   // A-12b: snapshot the t0 city-state roster BEFORE the reference run — a
   // rival can now CONQUER a CS mid-run (captureCityStateForRival removes it
@@ -1951,6 +1951,16 @@ for (let s = 0; s < N_SEEDS; s++) {
         seat0rec = (msg.recs as Record<string, Seat0Rec | undefined>)['0'] ?? null;
       }
     }
+    if (SERVE && seat0rec?.envoys) {
+      // #51 seat-0 ENVOYS driven: the wire's picks (CS slot indices, the
+      // rival records' own convention) through the same assignEnvoy — met
+      // and availability re-validated inside it, refusals soft on both
+      // engines. The scripted greedy below stands down on the KEY.
+      for (const csIdx of seat0rec.envoys) {
+        const cs0 = state.cityStates[csIdx];
+        if (cs0) assignEnvoy(state, cs0.id);
+      }
+    } else
     // Envoys: greedily back the neediest met city-state (fewest envoys,
     // ties to the lowest id) — the GPU scripted policy mirrors this.
     while (playerSeat(state).envoysAvailable > 0 && state.cityStates.some((cs) => cs.met)) {

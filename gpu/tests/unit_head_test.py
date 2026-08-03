@@ -88,28 +88,17 @@ def main() -> None:
     for k, col in enumerate(sim._A_IMP):
         assert col == acts.index(f"BUILD_{imp_ids[k]}"), f"improvement {imp_ids[k]} dispatch column"
 
-    # --- 4) the RL unit head is built to the LIVE mask width ---------------
-    # (the actual break: Policy's last layer was nn.Linear(uhidden, 17))
+    # --- 4) the env's head-width derivation reads the LIVE enum ------------
+    # (the actual break: a hardcoded 17 in the net's last layer. The net
+    # itself retired with the duel/melee RL family — a rebuilt policy must
+    # size its unit head from n_unit_acts, which this pins to the enum.)
     from civ6gpu.env import n_unit_acts
 
     assert n_unit_acts(rules) == len(acts), "env.n_unit_acts must read the shipped enum"
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from eval.train_ppo import Policy  # #51/S8.5: eval/ group
-    from civ6gpu.env import UNIT_FEATURES
-    from civ6gpu.engine import P_MAX
-
-    dims = {"C": 6, "AP": 4, "NT": 8, "NC": 8, "S": 3, "W": 0, "UA": m.shape[-1]}
-    pol = Policy(obs_size=32, dims=dims, hidden=16, uhidden=8)
-    out = pol(torch.zeros(2, 32), torch.zeros(2, P_MAX, UNIT_FEATURES))
-    assert out["units"].shape[-1] == m.shape[-1], (
-        f"unit head emits {out['units'].shape[-1]} logits for a {m.shape[-1]}-wide mask "
-        "— masking would broadcast-fail or silently misalign"
-    )
-
     print(
         f"unit_head OK — enum {len(acts)} wide, mask matches, PILLAGE at {sim._A_PILLAGE} "
-        f"(no BUILD collision), RL head {out['units'].shape[-1]} logits"
+        "(no BUILD collision), n_unit_acts reads the enum"
     )
 
 

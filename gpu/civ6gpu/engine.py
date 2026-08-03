@@ -1471,12 +1471,11 @@ class BatchSim:
         self._act_names = list((rules.actions or {}).get("unit", []))
         self._act = {n: i for i, n in enumerate(self._act_names)}
         if self._act_names:
-            # #92: the expectation VERSIONS ON THE ENUM'S OWN CONTENT. The
-            # melee lane runs against the frozen fixtures_o4 set whose enum is
-            # the legacy 26 columns; demanding 38 unconditionally broke it on
-            # first contact. If SNIPE_0 is present the enum must be complete
-            # (+12); absent, it must be exactly the legacy width — either way a
-            # PARTIAL enum still fails loudly.
+            # #92: the expectation VERSIONS ON THE ENUM'S OWN CONTENT — an
+            # older fixture set may carry the legacy 26-column enum. If
+            # SNIPE_0 is present the enum must be complete (+12); absent, it
+            # must be exactly the legacy width — either way a PARTIAL enum
+            # still fails loudly.
             self._snipe_on = "SNIPE_0" in self._act
             self._A_SPREAD = self._act.get("SPREAD_HERE", -1)  # #93: religious spread head
             _want = 13 + len(ids) + 3 + (12 if self._snipe_on else 0) + (7 if self._A_SPREAD >= 0 else 0)
@@ -2016,12 +2015,11 @@ class BatchSim:
             # #51/S3.2 replaced unitCombat/unitMoves/... with barbLadder. A
             # rules.json without it is a STALE EXPORT, and silently falling
             # back to a one-entry ladder just moves the failure somewhere
-            # confusing (melee_test died with "index 4 out of bounds" deep
-            # inside _spawn_barb). Say so here instead.
+            # confusing ("index 4 out of bounds" deep inside _spawn_barb).
+            # Say so here instead.
             raise ValueError(
                 "rules.json has no combat.barbLadder — this is a pre-#51/S3.2 export. "
-                "Re-run the exporter for this fixture set "
-                "(the O=4 pool: `npx vite-node scripts/export-gpu.ts -- 24 100 5 3 gpu/fixtures_o4`)."
+                "Re-run the exporter for this fixture set (`npm run gpu:export`)."
             )
         self._barb_ladder = torch.tensor(_bl, dtype=torch.long, device=device)
         _bn = rules.combat.get("barbNavalTypes", []) or []
@@ -17202,12 +17200,24 @@ class BatchSim:
                     self._eff_version += 1
                     self.envoys_avail.sub_(can.long())
             else:
-                e_act = envoy.to(torch.long)
-                ok = (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
-                if bool(ok.any()):
-                    rows = ok.nonzero(as_tuple=True)[0]
-                    self.cs_envoys[rows, e_act[rows]] += 1
-                    self.envoys_avail.sub_(ok.long())
+                # #51 seat-0 driven: a [B, K] SEQUENCE like the rival records
+                # (a [B] single pick still works — the RL head's old shape).
+                # Each pick re-validates against the LIVE mask, and every
+                # increment bumps _eff_version (the #78 lesson: an envoy
+                # crossing the 1/3/6 thresholds changes the capital's cached
+                # yields — the scripted branch always bumped, this one
+                # predates the hunt and silently did not).
+                e_seq = envoy.to(torch.long)
+                if e_seq.dim() == 1:
+                    e_seq = e_seq.unsqueeze(1)
+                for _ek in range(int(e_seq.shape[1])):
+                    e_act = e_seq[:, _ek]
+                    ok = (e_act >= 0) & self.envoy_mask().gather(1, e_act.clamp(min=0).unsqueeze(1)).squeeze(1)
+                    if bool(ok.any()):
+                        rows = ok.nonzero(as_tuple=True)[0]
+                        self.cs_envoys[rows, e_act[rows]] += 1
+                        self.envoys_avail.sub_(ok.long())
+                        self._eff_version += 1
 
         # --- production choice ------------------------------------------------
         if production is None:

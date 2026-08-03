@@ -58,7 +58,7 @@ POKE_COST = {
     "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
     "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "cs_verbs": 6.6,
     "cs_bonus": 7.9, "rival_purchase": 9.2, "rc_registry": 12.4, "controlled": 13.8,
-    "combat_mod": 17.1, "ranged": 18.5, "duel": 20.6, "occupancy": 21.0,
+    "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
     "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
@@ -229,7 +229,6 @@ def main() -> int:
                 ("occupancy", [py, "gpu/tests/occupancy_test.py"], 4),
                 ("builder_gain", [py, "gpu/tests/builder_gain_test.py"], 4),
                 ("domination", [py, "gpu/tests/domination_test.py"], 4),
-                ("melee", [py, "gpu/tests/melee_test.py"], 4),  # #51/S3.4: was UNGATED — an S3.2 regression hid here
                 ("peace_target", [py, "gpu/tests/peace_target_test.py"], 2),  # #51: no attack without a war
                 ("rr_strike", [py, "gpu/tests/rr_strike_test.py"], 2),  # #51/S7.1 (#59): a rival city fires on an enemy RIVAL
                 ("spawn_reclaim", [py, "gpu/tests/spawn_reclaim_test.py"], 2),
@@ -243,7 +242,6 @@ def main() -> int:
                 ("pref_apply", [py, "gpu/tests/pref_apply_test.py"], 4),  # #87: preference-order apply — the ONLY lane that reaches it
                 ("rival_verbs", [py, "gpu/tests/rival_verbs_test.py"], 4),  # #89: the 9 rival unit verbs — asserts EXECUTION, not legality
                 ("drive", [py, "gpu/tests/drive_test.py"], 4),  # #70: gpu/ladder.py DRIVES a seat for a whole game
-                ("duel", [py, "gpu/tests/duel_test.py"], 4),
                 ("religion_gp", [py, "gpu/tests/religion_gp_test.py"], 4),
                 ("war_weariness", [py, "gpu/tests/war_weariness_test.py"], 4),
                 ("space_race", [py, "gpu/tests/space_race_test.py"], 4),

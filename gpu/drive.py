@@ -298,6 +298,47 @@ def _seat_unit_orders(sim, seat: int):
     return orders0, job_t, spread_t, um, uo
 
 
+def _seat_envoys(sim, seat: int):
+    """#93/#51 the ENVOY verb, seat-generic: simulate the scripted greedy
+    sequence — spend the BANK first (quest/civic-granted envoys), then
+    influence conversions while affordable — re-ranking neediest after
+    every pick exactly as the two while-loops did. Seat 0 has NO
+    influence-conversion machinery (the player's envoys arrive as bank
+    grants only), so its influence plane is ZERO and the SAME text runs
+    bank-only. Zero draws; pick_envoy is the round-8 ported policy.
+    Returns [B, K] CS indices (-1 pad) or None."""
+    if sim.S <= 0:
+        return None
+    cost_e = float(sim.rules.cs.get("envoyCost", 100))
+    if seat == 0:
+        infl_e = torch.zeros(sim.B, dtype=torch.float64, device=sim.device)
+        avail_e = sim.envoys_avail.clone()
+        met_live_e = sim.cs_met[:, : sim.S] & sim.cs_alive[:, : sim.S]
+        mine6_e = sim.cs_envoys[:, : sim.S].double() / 6.0
+    else:
+        infl_e = sim.r_influence[:, seat - 1].clone()
+        avail_e = sim.r_envoys_avail[:, seat - 1].clone()
+        met_live_e = sim.cs_r_met[:, seat - 1, : sim.S] & sim.cs_alive[:, : sim.S]
+        mine6_e = sim.cs_r_envoys[:, seat - 1, : sim.S].double() / 6.0
+    picks_e = []
+    for _ke in range(6):  # bank (<=2 quest grants) + the conversion run
+        can_e = met_live_e.any(dim=1) & ((avail_e > 0) | (infl_e >= cost_e))
+        if not bool(can_e.any()):
+            break
+        blk_e = {"cs": torch.stack([met_live_e.double(), mine6_e, torch.zeros_like(mine6_e)], dim=2)}
+        p_e = ladder.pick_envoy(blk_e, met_live_e)
+        p_e = torch.where(can_e, p_e, torch.full_like(p_e, -1))
+        if not bool((p_e >= 0).any()):
+            break
+        picks_e.append(p_e)
+        hit_e = p_e >= 0
+        bank_e = hit_e & (avail_e > 0)
+        avail_e = torch.where(bank_e, avail_e - 1, avail_e)
+        infl_e = torch.where(hit_e & ~bank_e, infl_e - cost_e, infl_e)
+        mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), sim.S).double() * hit_e.unsqueeze(1).double() / 6.0
+    return torch.stack(picks_e, dim=1) if picks_e else None  # [B, K]
+
+
 def _war_ctx(blocks: dict) -> dict:
     """#93/#95 S1(a): the DoW policy's inputs, read from the OBSERVATION's
     ctx block — env._ctx_block renders the scripted war-declaration site's
@@ -369,34 +410,9 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             "peace": _policy_rng(sim, seeds, turn, r, 2),
         }
         war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w)
-    # #93 the ENVOY verb: simulate the scripted greedy sequence — spend the
-    # BANK first (quest-granted envoys), then conversions while influence
-    # affords — re-ranking neediest after every pick exactly as the two
-    # while-loops did. Zero draws; pick_envoy is the round-8 ported policy.
     env_seq = None
     if seeds is not None and turn is not None and sim.S > 0:
-        cost_e = float(sim.rules.cs.get("envoyCost", 100))
-        infl_e = sim.r_influence[:, r].clone()
-        avail_e = sim.r_envoys_avail[:, r].clone()
-        met_live_e = sim.cs_r_met[:, r, : sim.S] & sim.cs_alive[:, : sim.S]
-        mine6_e = sim.cs_r_envoys[:, r, : sim.S].double() / 6.0
-        picks_e = []
-        for _ke in range(6):  # bank (<=2 quest grants) + the conversion run
-            can_e = met_live_e.any(dim=1) & ((avail_e > 0) | (infl_e >= cost_e))
-            if not bool(can_e.any()):
-                break
-            blk_e = {"cs": torch.stack([met_live_e.double(), mine6_e, torch.zeros_like(mine6_e)], dim=2)}
-            p_e = ladder.pick_envoy(blk_e, met_live_e)
-            p_e = torch.where(can_e, p_e, torch.full_like(p_e, -1))
-            if not bool((p_e >= 0).any()):
-                break
-            picks_e.append(p_e)
-            hit_e = p_e >= 0
-            bank_e = hit_e & (avail_e > 0)
-            avail_e = torch.where(bank_e, avail_e - 1, avail_e)
-            infl_e = torch.where(hit_e & ~bank_e, infl_e - cost_e, infl_e)
-            mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), sim.S).double() * hit_e.unsqueeze(1).double() / 6.0
-        env_seq = torch.stack(picks_e, dim=1) if picks_e else None  # [B, K]
+        env_seq = _seat_envoys(sim, r + 1)
     # A-5r piece 3b: the PURCHASE verb — priority over the candidates from
     # the engines' one legality body; the engine stashes and consumes at
     # the gold block's own position, re-validating there.

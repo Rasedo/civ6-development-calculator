@@ -176,6 +176,13 @@ def run_batched(turns: int, eps: float) -> None:
             _pt_l = sim.p_tile.tolist()
             _pc_l = sim._p_civ[sim.p_type].tolist()
             _pa_l = sim.p_alive.tolist()
+            # #51 the ENVOY verb, seat 0: the same greedy sequence as every
+            # seat (bank-only — the player converts no influence). ALWAYS a
+            # tensor: the envoy= key stands the GPU's scripted greedy down,
+            # the rec-0 "envoys" key stands the TS while-loop down.
+            env0 = drive._seat_envoys(sim, 0)
+            env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
+            _e0_l = env0_t.tolist()
             per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=seeds, turn=t) for r in seats}
             for b, ch in enumerate(children):
                 recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], b) for r in seats}
@@ -187,10 +194,11 @@ def run_batched(turns: int, eps: float) -> None:
                     "units": [[_pt_l[b][p], v, int(_pc_l[b][p])]
                               for p, v in enumerate(_u0_l[b])
                               if _pa_l[b][p] and v >= 0 and v != 12],
+                    "envoys": [x for x in _e0_l[b] if x >= 0],
                 }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
-            sim.step(production=prod0, tech=tech0, civic=civic0, units=u0)
+            sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t)
             trs = [read_msg(ch) for ch in children]
             grows = sim.trace_row().tolist()
             for b, tr in enumerate(trs):
@@ -373,6 +381,8 @@ def main() -> None:
         _pt_l = sim.p_tile[0].tolist()
         _pc_l = sim._p_civ[sim.p_type][0].tolist()
         _pa_l = sim.p_alive[0].tolist()
+        env0 = drive._seat_envoys(sim, 0)
+        env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
         recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
         recs["0"] = {
@@ -383,12 +393,13 @@ def main() -> None:
             "units": [[_pt_l[p], v, int(_pc_l[p])]
                       for p, v in enumerate(_u0_l)
                       if _pa_l[p] and v >= 0 and v != 12],
+            "envoys": [x for x in env0_t[0].tolist() if x >= 0],
         }
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
-        sim.step(production=prod0, tech=tech0, civic=civic0, units=u0)
+        sim.step(production=prod0, tech=tech0, civic=civic0, units=u0, envoy=env0_t)
         if _slog is not None:
             from tools.statelog import gpu_state_lines  # noqa: E402
             _slog.write(chr(10).join(gpu_state_lines(sim, 0)) + chr(10))
