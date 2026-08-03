@@ -1882,7 +1882,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       // read by THIS turn's rivalPhase). The obs renders at the GPU's own
       // decide position: pre-turn, before any phase acts.
       const obs: Record<string, number[]> = {};
-      for (let r = 0; r < R_MAX; r++) obs[String(r)] = observeSeat(state, r + 1, C_MAX, SERVE_HORIZON);
+      for (let r = 0; r < R_MAX; r++) obs[String(r)] = observeSeat(state, r + 1, C_MAX, SERVE_HORIZON, CS_MAX);
       serveOut({ t: state.turn, obs });
       const nx = await serveIn.next();
       if (nx.done) throw new Error(`serve: stdin closed at turn ${state.turn}`);

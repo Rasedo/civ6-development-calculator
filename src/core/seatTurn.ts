@@ -15,7 +15,7 @@
  */
 
 import type { City, GameState, QueueItem } from './types';
-import { PLAYER_CIV, seatOf, isPlayerSeat, isBarbSeat, civsAtWar, rivalCount, civOfRival, citiesOf, rivalsOf, tileSeat, tileCity, playerSeat } from './seats';
+import { PLAYER_CIV, seatOf, isPlayerSeat, isBarbSeat, civsAtWar, rivalCount, civOfRival, rivalOfCiv, citiesOf, rivalsOf, tileSeat, tileCity, playerSeat } from './seats';
 // #95 S1(a): the ctx block reads the scripted DoW site's own helpers. rivals.ts
 // already imports from THIS module — the cycle is function-level and resolves
 // at call time (observeSeat runs long after module init).
@@ -179,7 +179,7 @@ export function commitProduction(state: GameState, seat: number, city: City, ite
  * seat > 0 into a second `_observe_rival` body. Collapsing that is what this
  * function is the reference for.
  */
-export function observeSeat(state: GameState, seat: number, cMax: number, horizon: number): number[] {
+export function observeSeat(state: GameState, seat: number, cMax: number, horizon: number, csMax?: number): number[] {
   const s = seatOf(state, seat);
   const cities = citiesOf(state, seat);
   const nTech = Math.max(Object.keys(TECHS).length, 1);
@@ -203,18 +203,39 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     // army holds melee, so a bare unit COUNT cannot express the decision.
     state.units.filter((u) => u.seat === seat && (UNITS[u.type]?.ranged?.strength ?? 0) > 0).length / 10.0,
   ];
+  // #95 S1(c): FIXED S slots by t0 id, ZEROS when captured (the trace
+  // tables' own convention — iterating the live array narrowed the vector
+  // after a CS capture). Each slot renders THE SEAT'S OWN view: rival met
+  // is cs.rivalMet (the envoy-verb plane), envoysOf is seat-keyed already,
+  // and quests are a player-only mechanic (zero for rivals, both engines).
   const cs: number[] = [];
-  for (const c of state.cityStates ?? []) {
-    cs.push(c.met ? 1 : 0, envoysOf(c, seat) / 6.0, c.quest ? 1 : 0);
-  }
-  const riv: number[] = [];
-  for (const r of rivalsOf(state)) {
-    const other = civOfRival(r.id);
-    riv.push(
-      other !== seat && civsAtWar(state, seat, other) ? 1 : 0,
-      (r.warTurns ?? 0) / 14.0,
-      r.cities.length / 6.0,
+  const nCs = csMax ?? (state.cityStates ?? []).length;
+  for (let i = 0; i < nCs; i++) {
+    const c = (state.cityStates ?? []).find((x) => x.id === i);
+    if (!c) { cs.push(0, 0, 0); continue; }
+    cs.push(
+      isPlayerSeat(seat) ? (c.met ? 1 : 0) : (c.rivalMet?.[rivalOfCiv(seat)] ? 1 : 0),
+      envoysOf(c, seat) / 6.0,
+      isPlayerSeat(seat) ? (c.quest ? 1 : 0) : 0,
     );
+  }
+  // #95 S1(c): the OPPONENT block mirrors env._observe_rival's convention —
+  // for a rival seat, slot 0 is THE PLAYER viewed as an opponent (war field
+  // = MY war with the player), then the other rivals in order. NOTE the
+  // GPU's other-rival slots render o's war WITH THE PLAYER (not o-vs-me);
+  // mirrored verbatim — a semantic revisit changes both engines together.
+  const riv: number[] = [];
+  if (isPlayerSeat(seat)) {
+    for (const r of rivalsOf(state)) {
+      riv.push(r.atWar ? 1 : 0, (r.warTurns ?? 0) / 14.0, r.cities.length / 6.0);
+    }
+  } else {
+    const me = rivalsOf(state)[rivalOfCiv(seat)];
+    riv.push(me?.atWar ? 1 : 0, (me?.warTurns ?? 0) / 14.0, state.cities.length / 6.0);
+    for (const o of rivalsOf(state)) {
+      if (o === me) continue;
+      riv.push(o.atWar ? 1 : 0, (o.warTurns ?? 0) / 14.0, o.cities.length / 6.0);
+    }
   }
   const per: number[] = [];
   for (let i = 0; i < cMax; i++) {

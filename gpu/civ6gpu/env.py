@@ -241,7 +241,7 @@ class BatchEnv:
                 (s.cs_quest > 0).to(d),
             ],
             dim=2,
-        )  # [B, S, 3]
+        ) * s.cs_alive.unsqueeze(2).to(d)  # [B, S, 3] — captured CS render ZEROS (#95 S1(c), the trace tables' convention)
         riv = torch.stack(
             [
                 (s.r_alive & s.r_atwar).to(d),
@@ -442,7 +442,18 @@ class BatchEnv:
             ],
             dim=1,
         )  # [B, 14]
-        cs = torch.zeros(B, s.S, _PER_CS_F, dtype=d, device=dev)
+        # #95 S1(c): THE SEAT'S OWN courtship view — this was zero-filled with
+        # a "no rival courtship" comment that has been stale since the envoy
+        # verb landed cs_r_met/cs_r_envoys. Quests stay zero: a player-only
+        # mechanic (TS renders 0 for rival seats too). Captured CS zero out.
+        cs = torch.stack(
+            [
+                s.cs_r_met[:, r, : s.S].to(d),
+                s.cs_r_envoys[:, r, : s.S].to(d) / 6.0,
+                torch.zeros(B, s.S, dtype=d, device=dev),
+            ],
+            dim=2,
+        ) * s.cs_alive.unsqueeze(2).to(d)
         # opponents: slot 0 = the player, then the other rivals in order
         opp_cols = [
             torch.stack(
