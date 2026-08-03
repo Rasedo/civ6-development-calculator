@@ -144,12 +144,33 @@ def run_batched(turns: int, eps: float) -> None:
                                 break
             if bad:
                 break
+            # SEAT 0: the same seat verbs — v1 base classes (see the
+            # single-seed path's twin block).
+            m0 = env.masks(0)
+            blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.C, NT, NC)
+            pm0 = m0["production"].clone()
+            _base_w0 = NB + 2 + sim.NU + len(sim._scaffold)
+            pm0[:, :, _base_w0:] = False
+            prod0 = ladder.pick_production(pm0, classes, roster, drive._prod_ctx(blocks0, sim, 0))
+            # ALWAYS tensors, -1 where no pick: None means "not driven" to the
+            # step and the GPU auto-research fires (the drift the s0 probe named
+            # at 9002 t7 — TS tech null + unbounded accrual while the GPU
+            # auto-picked). The rollout's ta contract, exactly.
+            _neg0 = torch.full((sim.B,), -1, dtype=torch.long)
+            tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
+            civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
             per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=seeds, turn=t) for r in seats}
             for b, ch in enumerate(children):
                 recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], b) for r in seats}
+                recs["0"] = {
+                    "production": [[int(sim.site[b, c]), int(prod0[b, c])] for c in range(sim.C)
+                                   if int(prod0[b, c]) >= 0 and bool(sim.alive[b, c])],
+                    "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
+                    "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
+                }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
-            sim.step()
+            sim.step(production=prod0, tech=tech0, civic=civic0)
             trs = [read_msg(ch) for ch in children]
             grows = sim.trace_row().tolist()
             for b, tr in enumerate(trs):
@@ -239,6 +260,10 @@ def main() -> None:
     obs_bails = 0
     trace_bad = 0
     first_report: str | None = None
+    _slog = None
+    if os.environ.get("CIV6_SERVE_STATELOG"):
+        from tools.statelog import gpu_state_lines  # noqa: E402
+        _slog = open(str(FIXTURES / "gpu_statelog.txt"), "w", encoding="utf-8")
     for t in range(args.turns):
         msg = read_msg()
         assert msg.get("t") == t + 1, f"turn frame skew: TS says {msg.get('t')}, orchestrator at {t + 1}"
@@ -284,13 +309,40 @@ def main() -> None:
                         break
         if obs_bails:
             break
+        # SEAT 0: THE SAME SEAT VERBS (owner: there are no rival verbs).
+        # v1 = base production classes (the scripted player's own
+        # expressiveness); wonder/project/purchase arms port with the TS
+        # replay dispatch. Units/envoys stay scripted BOTH SIDES.
+        m0 = env.masks(0)
+        blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.C, NT, NC)
+        pm0 = m0["production"].clone()
+        _base_w0 = NB + 2 + sim.NU + len(sim._scaffold)
+        pm0[:, :, _base_w0:] = False
+        prod0 = ladder.pick_production(pm0, classes, roster, drive._prod_ctx(blocks0, sim, 0))
+        # ALWAYS tensors, -1 where no pick: None means "not driven" to the
+        # step and the GPU auto-research fires (the drift the s0 probe named
+        # at 9002 t7 — TS tech null + unbounded accrual while the GPU
+        # auto-picked). The rollout's ta contract, exactly.
+        _neg0 = torch.full((sim.B,), -1, dtype=torch.long)
+        tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
+        civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
         recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
+        recs["0"] = {
+            "production": [[int(sim.site[0, c]), int(prod0[0, c])] for c in range(sim.C)
+                           if int(prod0[0, c]) >= 0 and bool(sim.alive[0, c])],
+            "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
+            "civic": None if int(civic0[0]) < 0 else int(civic0[0]),
+        }
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
-        sim.step()
+        sim.step(production=prod0, tech=tech0, civic=civic0)
+        if _slog is not None:
+            from tools.statelog import gpu_state_lines  # noqa: E402
+            _slog.write(chr(10).join(gpu_state_lines(sim, 0)) + chr(10))
+            _slog.flush()
         tr = read_msg()
         grow = sim.trace_row()[0].tolist()
         trow = tr["trace"]
@@ -302,7 +354,8 @@ def main() -> None:
                 if first_report is None:
                     first_report = rep
                 trace_bad += 1
-                break
+                if not os.environ.get("CIV6_SERVE_ALL_COLS"):
+                    break
         if obs_bails or trace_bad:
             break
 

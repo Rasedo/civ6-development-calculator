@@ -33,7 +33,7 @@ import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat
 import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join as pathJoin } from 'node:path';
-import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler , TURN_LIMIT } from '../src/core/game';
+import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler, setTechResearch, setCivicResearch, TURN_LIMIT } from '../src/core/game';
 import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../src/data/improvements'; // B-27 (#71)
 import type { ImprovementId } from '../src/core/types';
@@ -145,7 +145,7 @@ import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, ENCAMPMENT_HP } from '../src/data/units';
 import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
-import { centerBuildingIds } from '../src/core/prodLayout';
+import { centerBuildingIds, prodLayout } from '../src/core/prodLayout';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
 import { FEATURES } from '../src/data/features';
 import { TECHS, ERAS, MODERN_ERA_INDEX } from '../src/data/techs'; // B-20 (#71): era scale
@@ -182,6 +182,8 @@ import {
 // improvement index, so anything but an append renumbers every other row.
 import { IMPROVEMENT_IDS } from '../src/core/unitActions'; // #93: ONE roster, core-owned (order is the column index; FORT appended LAST)
 import { observeSeat } from '../src/core/seatTurn'; // #95 S1(b): the serve-mode obs render
+import { tsStateLines } from './statelog'; // serve statelog (hunt tooling)
+import { appendFileSync } from 'node:fs';
 import { tileOwnedByCiv, allCities } from '../src/core/seats';
 import { computeUnlocksIn } from '../src/core/effects';
 import { validImprovementsIn } from '../src/core/rules';
@@ -1382,7 +1384,15 @@ for (let s = 0; s < N_SEEDS; s++) {
   }
   // #95 S1(b): serve mode fills rivalActions TURN BY TURN from the wire —
   // same key convention, same rivalPhase consumption as the driven file.
-  if (SERVE) state.rivalActions = {} as GameState['rivalActions'];
+  if (SERVE) {
+    state.rivalActions = {} as GameState['rivalActions'];
+    // #51 seat 0 driven: research picks come over the wire like every
+    // other seat's — the engine's auto-pick stands down (the rollout
+    // replay's own setting).
+    state.autoResearch = false;
+  }
+  type Seat0Rec = { production?: [number, number][]; tech?: number | null; civic?: number | null };
+  let seat0rec: Seat0Rec | null = null;
   // A-12b: snapshot the t0 city-state roster BEFORE the reference run — a
   // rival can now CONQUER a CS mid-run (captureCityStateForRival removes it
   // from state.cityStates), and the fixture must carry the t0 world; the
@@ -1955,6 +1965,7 @@ for (let s = 0; s < N_SEEDS; s++) {
           if (Number(sid) >= 1) bySeat[Number(sid) - 1] = rec;
         }
         (state.rivalActions as unknown as Record<number, unknown>)[state.turn - 1] = bySeat;
+        seat0rec = (msg.recs as Record<string, Seat0Rec | undefined>)['0'] ?? null;
       }
     }
     // Envoys: greedily back the neediest met city-state (fewest envoys,
@@ -1965,6 +1976,48 @@ for (let s = 0; s < N_SEEDS; s++) {
         .sort((a, b) => a.envoys - b.envoys || a.id - b.id)[0];
       assignEnvoy(state, pick.id);
     }
+    if (SERVE && seat0rec) {
+      // #51 SEAT 0 DRIVEN: the wire's picks apply through the same queue
+      // functions; the scripted chain below stands down entirely. Base
+      // classes v1 (the scripted player's own expressiveness); the
+      // wonder/project/purchase arms port with the replay dispatch next.
+      const pl0 = prodLayout();
+      for (const [centre0, a0] of (seat0rec.production ?? [])) {
+        const city = state.cities.find((c) => c.centerIndex === centre0);
+        if (!city || city.queue.length > 0 || a0 < 0) continue;
+        if (a0 < pl0.NB) {
+          const bid0 = pl0.buildings[a0];
+          if (bid0) queueBuilding(state, city.id, bid0);
+        } else if (a0 === pl0.NB) {
+          queueSettler(state, city.id);
+        } else if (a0 >= pl0.NB + 2 && a0 < pl0.NB + 2 + pl0.NU) {
+          const uid0 = pl0.units[a0 - pl0.NB - 2];
+          if (uid0) queueUnit(state, city.id, uid0);
+        } else if (a0 >= pl0.NB + 2 + pl0.NU && a0 < pl0.NB + 2 + pl0.NU + SCAFFOLD_DISTRICTS.length) {
+          // the replay's own placement scan: best floor(adjacency), ties
+          // lowest tile, canPlaceDistrict re-validated live.
+          const did0 = SCAFFOLD_DISTRICTS[a0 - pl0.NB - 2 - pl0.NU].id;
+          // VERBATIM replay-gpu's proven arm (9018 t63: my floored scan with
+          // an explicit tiebreak picked 860 where the proven raw-adjacency
+          // first-wins scan and the GPU picked 817 — one placement rule,
+          // copied not paraphrased).
+          let best0 = -1;
+          let bestAdj0 = -1;
+          for (const tile of state.map.tiles) {
+            if (!tileBelongsTo(tile, city) || tile.improvement) continue;
+            if (!canPlaceDistrict(state, city, did0, tile.index).ok) continue;
+            const adj0 = districtAdjacency(state.map, tile, did0);
+            if (adj0 > bestAdj0) {
+              bestAdj0 = adj0;
+              best0 = tile.index;
+            }
+          }
+          if (best0 >= 0) queueDistrict(state, city.id, did0, best0);
+        }
+      }
+      if (seat0rec.tech != null && techList[seat0rec.tech]) setTechResearch(state, techList[seat0rec.tech].id);
+      if (seat0rec.civic != null && civicList[seat0rec.civic]) setCivicResearch(state, civicList[seat0rec.civic].id);
+    } else
     for (const city of state.cities) {
       if (city.queue.length > 0) continue;
       if (city.isCapital && city.population >= 2 && !anyPlayerBuilder() && builderJobExists()) {
@@ -2082,6 +2135,9 @@ for (let s = 0; s < N_SEEDS; s++) {
     }
     trace.push(traceRow(state, cityIds, C_MAX, CS_MAX, R_MAX));
     if (SERVE) serveOut({ row: trace.length - 1, trace: trace[trace.length - 1] });
+    if (SERVE && process.env.CIV6_SERVE_STATELOG) {
+      appendFileSync('gpu/fixtures/ts_statelog.txt', tsStateLines(state, Object.values(UNITS).map((u) => u.id)).join(String.fromCharCode(10)) + String.fromCharCode(10));
+    }
   }
   // A collapsed empire is a legitimate outcome for NON-capital cities —
   // loyalty flips ARE the hostile world working. But rival CONQUEST can

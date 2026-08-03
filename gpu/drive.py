@@ -38,7 +38,7 @@ import torch
 import ladder
 
 
-def _prod_ctx(blocks: dict, sim, r: int) -> dict:
+def _prod_ctx(blocks: dict, sim, seat: int) -> dict:
     """#95 S1(a): the per-seat counters no mask can express (#84), read from
     the OBSERVATION's ctx block (ladder.CTX_FIELDS) instead of peeking at
     sim tensors — the values are the scripted sites' own, rendered by
@@ -48,14 +48,17 @@ def _prod_ctx(blocks: dict, sim, r: int) -> dict:
     ctx = blocks["ctx"]
     emp = blocks["empire"]
     B = ctx.shape[0]
-    # is_capital must be MASK-ALIGNED (rival_masks' city axis is SLOT order),
+    # is_capital must be MASK-ALIGNED (the masks' city axis is SLOT order),
     # and the obs city block went LIVING-ORDER with catch 6 — the two axes
     # differ once a city dies. Until the serve obs dict carries a per-city
     # identity (centre tile) to re-map with, this one flag reads the
     # slot-ordered plane directly; the wire itself stays centre-keyed (the
-    # record schema), so nothing TS-facing leaks.
-    is_cap = sim.rc_is_cap[:, r]
+    # record schema), so nothing TS-facing leaks. `seat` semantics: 0 is
+    # the player — A SEAT LIKE ANY OTHER (owner 2026-08-03); its city cap
+    # is the world's physical slot count, not the rival heuristic.
+    is_cap = sim.is_cap if seat == 0 else sim.rc_is_cap[:, seat - 1]
     n_cities = ctx[:, 0].long()
+    cap = sim.C if seat == 0 else int(sim.rules.rivals.get("maxCities", 6))
     return {
         "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
         "is_capital": is_cap,  # #88: the wonder tier's capital heuristic (city col 9)
@@ -64,7 +67,7 @@ def _prod_ctx(blocks: dict, sim, r: int) -> dict:
         "unit_count": ctx[:, 1].long(),
         "unit_cap": ctx[:, 4].long(),
         "n_cities": n_cities,
-        "city_cap": torch.full_like(n_cities, int(sim.rules.rivals.get("maxCities", 6))),
+        "city_cap": torch.full_like(n_cities, cap),
     }
 
 
@@ -270,7 +273,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # columns, purchases zeroed; contract asserted in pref_apply_test.
     m = sim.rival_masks(r, lite=True)
     blocks = _blocks(env, sim, r)
-    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, r))
+    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, r + 1))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
     # #93 the WAR verb: the ladder decides from the driver's own policy
