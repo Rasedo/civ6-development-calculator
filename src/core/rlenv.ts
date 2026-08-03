@@ -8,7 +8,7 @@
  * reproducible from (seed, action indices).
  */
 
-import type { City, GameState, Unit, Yields } from './types';
+import type { City, GameState, Yields } from './types';
 import { playerSeat, isPlayerSeat, isBarbSeat, PLAYER_CIV, tileSeat, rivalsOf } from './seats';
 import { YIELD_KEYS, emptyYields, addYields } from './types';
 import {
@@ -46,12 +46,15 @@ import { computeCityStats } from './city';
 import { districtAdjacency } from './yields';
 import { availableBuildings, buildingCompletable } from './rules';
 import { computeUnlocks, availableTechs, availableCivics, governmentSlots } from './effects';
-import { trainableUnits, queueUnit, orderMove, builderImprove, builderRepair, setExploreMission, unitDomain } from './units';
-import { attackTargets, meleeAttack } from './combat';
+import { trainableUnits, queueUnit, unitDomain } from './units';
+// #51 deletion 4 (owner 2026-08-03): the player auto-policies moved to the
+// UI (src/ui/autopilot.ts) — UI product behavior, not engine rules; the
+// decision server drives every gated seat and never references them.
+import { playerAutoPhase } from '../ui/autopilot';
 import { initFog } from './fog';
 import { validImprovements } from './rules';
 import { hexDistance } from './hex';
-import { UNITS, CITY_MAX_HP } from '../data/units';
+import { CITY_MAX_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { DISTRICTS } from '../data/districts';
@@ -61,7 +64,7 @@ import { GOVERNMENTS, POLICIES, cardFitsSlot } from '../data/policies';
 import { PROJECT_YIELD_FRACTION } from '../data/projects';
 import { GP_CLASSES, gpCost } from '../data/greatPeople';
 import { neighbors } from './hex';
-import { tileFreeForUnit, unitsHostile } from './units';
+import { tileFreeForUnit } from './units';
 import { assignEnvoy, envoyBonusDelta, metCityStates, isSuzerain } from './cityStates';
 import { playerStrength, rivalStrength, rivalProximity } from './rivals';
 
@@ -141,100 +144,6 @@ export interface StepResult {
   reward: number;
   done: boolean;
   turn: number;
-}
-
-// ---------------------------------------------------------------------------
-// Auto-policies for everything that isn't a macro decision
-// ---------------------------------------------------------------------------
-
-function autoBuilder(state: GameState, unit: Unit): void {
-  const tile = state.map.tiles[unit.tileIndex];
-  if (tile.pillaged && isPlayerSeat(tileSeat(tile))) {
-    builderRepair(state, unit.id);
-    return;
-  }
-  const options = validImprovements(state, tile);
-  if (options.length > 0 && !tile.improvement && isPlayerSeat(tileSeat(tile))) {
-    builderImprove(state, unit.id, options[0]);
-    return;
-  }
-  if (unit.path) return;
-  // Head to the nearest ownable job: pillaged tile first, then unimproved.
-  let best: number | null = null;
-  let bestDist = 99;
-  for (const t of state.map.tiles) {
-    if (!isPlayerSeat(tileSeat(t))) continue;
-    const job = (t.pillaged || (!t.improvement && validImprovements(state, t).length > 0));
-    if (!job) continue;
-    const d = hexDistance(tile.col, tile.row, t.col, t.row);
-    if (d < bestDist) {
-      bestDist = d;
-      best = t.index;
-    }
-  }
-  if (best !== null && best !== unit.tileIndex) orderMove(state, unit.id, best);
-}
-
-function autoMilitary(state: GameState, unit: Unit): void {
-  // Fight anything in reach.
-  const targets = attackTargets(state, unit);
-  if (targets.length > 0) {
-    meleeAttack(state, unit.id, targets[0]);
-    return;
-  }
-  if (unit.path) return;
-  const here = state.map.tiles[unit.tileIndex];
-  // Chase hostiles (barbarians, at-war rivals) threatening the empire.
-  let prey: number | null = null;
-  let preyDist = 8;
-  for (const b of state.units) {
-    if (!unitsHostile(state, unit, b)) continue;
-    const bt = state.map.tiles[b.tileIndex];
-    const nearEmpire = state.cities.some((c) => {
-      const ct = state.map.tiles[c.centerIndex];
-      return hexDistance(bt.col, bt.row, ct.col, ct.row) <= 6;
-    });
-    if (!nearEmpire) continue;
-    const d = hexDistance(here.col, here.row, bt.col, bt.row);
-    if (d < preyDist) {
-      preyDist = d;
-      prey = b.tileIndex;
-    }
-  }
-  if (prey !== null) {
-    // Move adjacent to the prey (its tile itself is enemy-blocked).
-    const pt = state.map.tiles[prey];
-    const spot = state.map.tiles
-      .filter((t) => hexDistance(t.col, t.row, pt.col, pt.row) === 1)
-      .sort((a, b) => hexDistance(a.col, a.row, here.col, here.row) - hexDistance(b.col, b.row, here.col, here.row))[0];
-    if (spot) orderMove(state, unit.id, spot.index);
-    return;
-  }
-  // Otherwise garrison the nearest city.
-  const home = state.cities
-    .map((c) => c.centerIndex)
-    .sort((a, b) => {
-      const ta = state.map.tiles[a];
-      const tb = state.map.tiles[b];
-      return hexDistance(ta.col, ta.row, here.col, here.row) - hexDistance(tb.col, tb.row, here.col, here.row);
-    })[0];
-  if (home !== undefined && home !== unit.tileIndex) orderMove(state, unit.id, home);
-}
-
-export function playerAutoPhase(state: GameState): void {
-  if (!state.unitsMode) return;
-  for (const unit of [...state.units]) {
-    if (!isPlayerSeat(unit.seat) || unit.movesLeft <= 0) continue;
-    if (!state.units.includes(unit)) continue; // died mid-phase
-    const def = UNITS[unit.type];
-    if (def?.charges !== undefined) {
-      autoBuilder(state, unit);
-    } else if (unit.type === 'SCOUT' && state.fogOfWar) {
-      if (unit.mission !== 'explore') setExploreMission(state, unit.id, true);
-    } else if ((def?.combat ?? 0) > 0) {
-      autoMilitary(state, unit);
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------

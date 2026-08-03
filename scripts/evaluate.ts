@@ -16,12 +16,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
   CivEnv,
   runEpisode,
-  playerAutoPhase,
   CANDIDATE_FEATURES,
   FEATURE_VERSION,
   type Candidate,
   type EnvOptions,
 } from '../src/core/rlenv';
+import { playerAutoPhase } from '../src/ui/autopilot';
 import { makePolicy, type PolicySpec } from '../src/core/policy';
 import { Lcg } from '../src/core/es';
 import { endTurn, TURN_LIMIT } from '../src/core/game';
