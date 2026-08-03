@@ -283,6 +283,8 @@ def main() -> None:
             break
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
         recs = {str(r): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
+        if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
+            print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
         sim.step()

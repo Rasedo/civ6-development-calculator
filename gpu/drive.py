@@ -250,8 +250,8 @@ def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: i
     """One turn's decisions for one driven seat, returned in the action-file
     schema so a replay can reproduce them exactly. B=1 callers only — the
     batched recorder extracts every row via `_extract_record`."""
-    prod, tech, civic, war, env_seq, seq = _decide_turn(env, sim, r, roster, classes, max_steps)
-    return _extract_record(sim, r, prod, tech, civic, war, env_seq, seq, 0)
+    prod, tech, civic, war, env_seq, seq, buy = _decide_turn(env, sim, r, roster, classes, max_steps)
+    return _extract_record(sim, r, prod, tech, civic, war, env_seq, seq, buy, 0)
 
 
 def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4, seeds=None, turn=None):
@@ -309,7 +309,13 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             infl_e = torch.where(hit_e & ~bank_e, infl_e - cost_e, infl_e)
             mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), sim.S).double() * hit_e.unsqueeze(1).double() / 6.0
         env_seq = torch.stack(picks_e, dim=1) if picks_e else None  # [B, K]
-    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq)
+    # A-5r piece 3b: the PURCHASE verb — priority over the candidates from
+    # the engines' one legality body; the engine stashes and consumes at
+    # the gold block's own position, re-validating there.
+    bctx = _buy_ctx(sim, r)
+    buy_kind = ladder.pick_purchase(bctx["can_building"], bctx["settler_ok"], bctx["unit_ok"])
+    buy = (buy_kind, bctx["jj"], bctx["bb"])
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq, buy=buy)
 
     # units (#70 rng-order): the driver PLANS, the PHASE executes. Applying
     # steps pre-step to re-observe consumed combat draws at a different stream
@@ -434,10 +440,10 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     if not hasattr(sim, "_driven_useq") or sim._driven_useq is None:
         sim._driven_useq = {}
     sim._driven_useq[r] = seq
-    return prod, tech, civic, war, env_seq, seq
+    return prod, tech, civic, war, env_seq, seq, buy
 
 
-def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, b: int) -> dict:
+def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, b: int) -> dict:
     """One batch row's record, in the action-file schema.
 
     Per-row equivalences with the old B=1 writer:
@@ -470,7 +476,15 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, b: int) -
     _w = None if war is None or int(war[b]) < 0 else int(war[b])
     # #93: this row's envoy assignment sequence (CS indices), possibly empty.
     _e = [] if env_seq is None else [int(x) for x in env_seq[b].tolist() if int(x) >= 0]
-    return {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
+    rec = {"production": prod_pairs, "tech": _t, "civic": _c, "war": _w, "envoys": _e, "units": rows}
+    # A-5r: the BUY intent, CENTRE-KEYED like production (v2 lesson) —
+    # [0, centreTile, buildingIdx] for a building purchase; absent = none.
+    # OPTIONAL field: readers that predate it ignore the key.
+    if buy is not None and int(buy[0][b]) == 0:
+        _bj = int(buy[1][b])
+        if 0 <= _bj < int(sim.rc_center.shape[2]) and bool(sim.rc_alive[b, r, _bj]):
+            rec["buy"] = [0, int(sim.rc_center[b, r, _bj]), int(buy[2][b])]
+    return rec
 
 
 def replay_seat(sim, r: int, rec: dict) -> None:
@@ -493,7 +507,18 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     war = None if _wv is None else torch.full((sim.B,), int(_wv), dtype=torch.long, device=dev)
     _ev = rec.get("envoys") or []
     env_seq = torch.tensor(_ev, dtype=torch.long, device=dev).reshape(1, -1).expand(sim.B, -1) if _ev else None
-    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq)
+    # A-5r: parse the CENTRE-KEYED buy intent back to tensors (the v2 city
+    # resolution — match by centre + alive, never by slot).
+    _bv = rec.get("buy")
+    buy = None
+    if _bv is not None and int(_bv[0]) == 0:
+        hitj = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
+        for j in range(int(sim.rc_center.shape[2])):
+            m = (sim.rc_center[:, r, j] == int(_bv[1])) & sim.rc_alive[:, r, j]
+            hitj = torch.where(m, torch.full_like(hitj, j), hitj)
+        kind0 = torch.where(hitj >= 0, torch.zeros_like(hitj), torch.full_like(hitj, -1))
+        buy = (kind0, hitj, torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
+    sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq, buy=buy)
     # #70 rng-order: replay stashes exactly as the driver does; the PHASE
     # executes at the walkers' position, so recorder and replayer share one
     # draw order by construction.

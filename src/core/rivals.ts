@@ -2937,36 +2937,80 @@ export function rivalPhase(state: GameState): void {
     // head's apply_rival_actions purchase spec).
     {
       let bought = false;
-      let buyCity: RivalCity | null = null;
-      let buyDef: (typeof BUILDINGS)[string] | null = null;
-      for (const rc of rival.cities) {
-        const have = new Set(rc.buildings);
-        const done = new Set(
-          rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
-        );
-        const center = state.map.tiles[rc.centerIndex];
-        for (const def of Object.values(BUILDINGS)) {
-          if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue; // B9-R1: regional held until R2
-          if (!done.has(def.district)) continue;
-          if (!rivalUnlocks.buildings.has(def.id)) continue;
-          if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
-          if (def.exclusiveWith?.some((x) => have.has(x))) continue;
-          if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
-          if (rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id) continue;
-          if (!buyDef || def.cost < buyDef.cost || (def.cost === buyDef.cost && def.id < buyDef.id)) {
-            buyDef = def;
-            buyCity = rc;
+      if (rec) {
+        // A-5r 3c: the DRIVEN building buy — the wire's centre-keyed intent
+        // [0, centreTile, buildingIdx] (Object.values(BUILDINGS) order, the
+        // shared catalog), re-validated against THIS block's own predicates
+        // at THIS position — the GPU _consume_driven_buy twin. A stale
+        // intent refuses silently on both engines. The scripted scan below
+        // stands down for driven rivals (the BUILDING branch only —
+        // settler/unit stay scripted for every seat until their halves
+        // join the wire).
+        const bv = (rec as { buy?: [number, number, number] }).buy;
+        if (bv && bv[0] === 0) {
+          const rc = rival.cities.find((c) => c.centerIndex === bv[1]);
+          // the SHIPPED catalog order (prodLayout, the one derivation) — NOT
+          // Object.values(BUILDINGS): the exporter filters rows, so raw
+          // enumeration is offset (9040 t178: idx 5 resolved ANCIENT_WALLS
+          // where the wire meant LIBRARY; both buys refused silently).
+          const bid = prodLayout().buildings[bv[2]];
+          const def = bid ? BUILDINGS[bid] : undefined;
+          if (rc && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)) {
+            const have = new Set(rc.buildings);
+            const done = new Set(
+              rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
+            );
+            const center = state.map.tiles[rc.centerIndex];
+            const okBuy =
+              !have.has(def.id) && done.has(def.district) && rivalUnlocks.buildings.has(def.id) &&
+              (!def.requiresAny || def.requiresAny.some((x) => have.has(x))) &&
+              !def.exclusiveWith?.some((x) => have.has(x)) &&
+              !(def.special === 'WATER_MILL' && !hasRiver(center)) &&
+              !(rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id);
+            if (okBuy) {
+              const price = def.cost * GOLD_PURCHASE_MULT;
+              const reserve = PEACE_GOLD_COST(0);
+              if (Math.round((rival.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
+                rival.treasury = (rival.treasury ?? 0) - price;
+                rc.buildings.push(def.id);
+                if (def.id === 'ANCIENT_WALLS') rc.outerHp = WALLS_HP; // AUDIT B-1
+                bought = true;
+              }
+            }
           }
         }
-      }
-      if (buyDef && buyCity) {
-        const price = buyDef.cost * GOLD_PURCHASE_MULT;
-        const reserve = PEACE_GOLD_COST(0);
-        if (Math.round((rival.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
-          rival.treasury = (rival.treasury ?? 0) - price;
-          buyCity.buildings.push(buyDef.id);
-          if (buyDef.id === 'ANCIENT_WALLS') buyCity.outerHp = WALLS_HP; // AUDIT B-1
-          bought = true;
+      } else {
+        let buyCity: RivalCity | null = null;
+        let buyDef: (typeof BUILDINGS)[string] | null = null;
+        for (const rc of rival.cities) {
+          const have = new Set(rc.buildings);
+          const done = new Set(
+            rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
+          );
+          const center = state.map.tiles[rc.centerIndex];
+          for (const def of Object.values(BUILDINGS)) {
+            if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue; // B9-R1: regional held until R2
+            if (!done.has(def.district)) continue;
+            if (!rivalUnlocks.buildings.has(def.id)) continue;
+            if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
+            if (def.exclusiveWith?.some((x) => have.has(x))) continue;
+            if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+            if (rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id) continue;
+            if (!buyDef || def.cost < buyDef.cost || (def.cost === buyDef.cost && def.id < buyDef.id)) {
+              buyDef = def;
+              buyCity = rc;
+            }
+          }
+        }
+        if (buyDef && buyCity) {
+          const price = buyDef.cost * GOLD_PURCHASE_MULT;
+          const reserve = PEACE_GOLD_COST(0);
+          if (Math.round((rival.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
+            rival.treasury = (rival.treasury ?? 0) - price;
+            buyCity.buildings.push(buyDef.id);
+            if (buyDef.id === 'ANCIENT_WALLS') buyCity.outerHp = WALLS_HP; // AUDIT B-1
+            bought = true;
+          }
         }
       }
       // AUDIT A-5r: SETTLER — when no building was bought and the civ is
