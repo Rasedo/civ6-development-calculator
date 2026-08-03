@@ -10,6 +10,7 @@ import { tilesWithin, hexDistance } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
+import type { Modifiers } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost } from './units';
 import { barbarianPhase, encampmentTrainXp } from './combat';
@@ -627,21 +628,37 @@ export function isEncampmentItem(item: QueueItem): boolean {
  * × (1 + 4·research progress), +5 (scaled) per tile EVER purchased
  * empire-wide — fully decoupled from the culture-growth counter. Without a
  * target tile (UI headline price) the ring-2 base is shown. */
-export function tilePurchaseCost(state: GameState, city: City, tileIndex?: number): number {
-  const mods = getModifiers(state);
+/**
+ * #96: ONE tile-price text for every seat. The player's and the rival's were
+ * character-identical formulas over different planes — the seat's own
+ * research fraction, its own purchase count, its own tilePurchaseMult
+ * (LAND_SURVEYORS is a policy card, not the player's alone). `owner` supplies
+ * those three; callers that pass nothing get seat 0, which is what every
+ * existing player call site meant.
+ */
+export function tilePurchaseCost(
+  state: GameState,
+  city: City | RivalCity,
+  tileIndex?: number,
+  owner?: { research: ResearchState; tilesPurchased?: number; mods: Modifiers },
+): number {
+  const src = owner ?? {
+    research: playerSeat(state).research,
+    tilesPurchased: playerSeat(state).tilesPurchased,
+    mods: getModifiers(state),
+  };
   const center = state.map.tiles[city.centerIndex];
   let ring = 2;
   if (tileIndex !== undefined) {
     const t = state.map.tiles[tileIndex];
     ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
   }
-  const tPct = playerSeat(state).research.techs.length / Object.keys(TECHS).length;
-  const cPct = playerSeat(state).research.civics.length / Object.keys(CIVICS).length;
+  const tPct = src.research.techs.length / Object.keys(TECHS).length;
+  const cPct = src.research.civics.length / Object.keys(CIVICS).length;
   const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
   const step = Math.round(5 * GAME_SPEED);
   return Math.round(
-    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (playerSeat(state).tilesPurchased ?? 0)) *
-      mods.tilePurchaseMult,
+    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (src.tilesPurchased ?? 0)) * src.mods.tilePurchaseMult,
   );
 }
 

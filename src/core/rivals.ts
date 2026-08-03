@@ -18,7 +18,6 @@ import { hostileUnitAct, attackTargets, meleeAttack, hostileRangedStrike, captur
 import { modifiersFromResearch, availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getModifiers, withFollowerBelief, followerReligionForCity } from './effects';
-import type { Modifiers } from './effects';
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
 import { routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity, routeRaidedAt } from './trade';
@@ -63,14 +62,14 @@ import {
   type AmenityTier,
 } from '../data/constants';
 import { PROJECTS, PROJECT_YIELD_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
-import { tileScore, tileYieldsForCenter, buildingMaintenance, districtMaintenance, civEraIndex, empireGrowthMult, pickBorderTile, acquireTile } from './city';
+import { tileScore, tileYieldsForCenter, cityMaintenance, civEraIndex, empireGrowthMult, pickBorderTile, acquireTile } from './city';
 import { canPlaceDistrictIn, validImprovementsIn, wonderExists } from './rules';
 import { tileAppeal, appealTier } from './appeal'; // A-9 (#71)
 import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, cityNavalCapable, waterEnterable, builderCost, walkToward } from './units';
 import { killUnit } from './combat';  // #51/S7.12
-import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem } from './game';
+import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem, tilePurchaseCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS } from './unitActions';
@@ -1060,17 +1059,6 @@ export function placeRivalDistrict(
   rc.districts.push({ type: id, tileIndex: best });
   commitProduction(state, rc.seat, rc, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
   return true;
-}
-
-/** P5/S1 (C-12): a rival city's gold upkeep — the player's cityMaintenance
- * verbatim (completed districts + buildings, shared maintenance tables). */
-function rivalCityMaintenance(state: GameState, rc: RivalCity): number {
-  let total = 0;
-  for (const d of rc.districts) {
-    if (state.map.tiles[d.tileIndex].districtComplete) total += districtMaintenance(d.type);
-  }
-  for (const b of rc.buildings) total += buildingMaintenance(b);
-  return total;
 }
 
 /** P4/D-8 (symmetric with districtDiscounted): 40% off while this rival has
@@ -2315,33 +2303,6 @@ function issueRivalQuest(state: GameState, rival: RivalCiv, cs: CityState): City
   return null;
 }
 
-/**
- * AUDIT A-5r (#71): the `tilePurchaseCost` twin for a rival. Same curve — ring
- * base (50 + 25 per ring past 2, GAME_SPEED-scaled) x (1 + 4 x the civ's best
- * research fraction) + a flat step per tile this civ has already bought — but
- * keyed on THIS rival's techs/civics and its own borderCostMult-carrying
- * modifiers, exactly as the player's reads playerSeat(state).research and getModifiers.
- */
-function rivalTilePurchaseCost(state: GameState, rival: RivalCiv, rc: RivalCity, tileIndex: number, mods: Modifiers): number {
-  const center = state.map.tiles[rc.centerIndex];
-  const t = state.map.tiles[tileIndex];
-  const ring = Math.max(2, hexDistance(center.col, center.row, t.col, t.row));
-  const tPct = rival.research.techs.length / Object.keys(TECHS).length;
-  const cPct = rival.research.civics.length / Object.keys(CIVICS).length;
-  const base = Math.round((50 + 25 * (ring - 2)) * GAME_SPEED);
-  const step = Math.round(5 * GAME_SPEED);
-  // #51/S7.7b: this rival's OWN tilePurchaseMult — the player's formula, to
-  // the character. It used to be pinned at 1 with a note calling the flat rate
-  // an agreement between the two engines; it was an agreement to be WRONG
-  // TOGETHER. Civ 6's LAND_SURVEYORS reads "Reduces the cost of purchasing a
-  // tile by 20%" and is a POLICY CARD — nothing about it is the player's alone.
-  // The GPU grew the channel in the same commit (`_gov_policy_mods` -> tpmult).
-  return Math.round(
-    (base * (1 + 4 * Math.max(tPct, cPct)) + step * (rival.tilesPurchased ?? 0)) * mods.tilePurchaseMult,
-  );
-}
-
-
 /** #70: apply ONE recorded turn for a driven seat. Touches no policy — if this
  * ever needed to consult the ladder, the file would not be a complete record of
  * the decisions and TS could not reproduce a GPU trajectory from it. Mirrors
@@ -3103,7 +3064,7 @@ export function rivalPhase(state: GameState): void {
         for (const rc of rival.cities) {
           const next = pickBorderTile(state, rc, { map: state.map, mods: getModifiers(state, civOfRival(rival.id)) });
           if (next === null) continue;
-          const cost = rivalTilePurchaseCost(state, rival, rc, next, getModifiers(state, civOfRival(rival.id)));
+          const cost = tilePurchaseCost(state, rc, next, { research: rival.research, tilesPurchased: rival.tilesPurchased, mods: getModifiers(state, civOfRival(rival.id)) });  // #96: one price text, every seat
           if (!goldAffordable(rival.treasury ?? 0, cost)) break;
           rival.treasury = (rival.treasury ?? 0) - cost;
           setTileOwner(state.map.tiles[next], civOfRival(rival.id), rc.id); // A-17 registry
@@ -3379,7 +3340,7 @@ export function rivalPhase(state: GameState): void {
       const y = rivalCityYields(state, rival, rc, tier);
       // P5/S1 (C-12): rivals pay district+building upkeep like the player's
       // computeCityStats (completed districts only; same maintenance tables).
-      goldSum += y.gold - rivalCityMaintenance(state, rc);
+      goldSum += y.gold - cityMaintenance(state, rc);  // #96: one maintenance text, every seat
       faithSum += y.faith; // P5/S5 (C-17): the faith yield gains its consumer
       const food = y.food;
       const production = y.production;
