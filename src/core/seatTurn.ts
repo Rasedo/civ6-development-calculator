@@ -15,7 +15,12 @@
  */
 
 import type { City, GameState, QueueItem } from './types';
-import { PLAYER_CIV, seatOf, isPlayerSeat, isBarbSeat, civsAtWar, rivalCount, civOfRival, citiesOf, rivalsOf, tileSeat, tileCity } from './seats';
+import { PLAYER_CIV, seatOf, isPlayerSeat, isBarbSeat, civsAtWar, rivalCount, civOfRival, citiesOf, rivalsOf, tileSeat, tileCity, playerSeat } from './seats';
+// #95 S1(a): the ctx block reads the scripted DoW site's own helpers. rivals.ts
+// already imports from THIS module — the cycle is function-level and resolves
+// at call time (observeSeat runs long after module init).
+import { playerStrength, rivalStrength, rivalProximity } from './rivals';
+import { RR_WARMONGER_GANG } from '../data/rivals';
 import { isSuzerain, envoysOf } from './cityStates';
 import { seatTourism } from './city';
 import { effectiveResearchCostIn } from './boosts';
@@ -258,7 +263,38 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     (rs ? effectiveResearchCostIn(rs, t.id, t.cost, gT) : t.cost) / 1000);
   const costC = Object.values(CIVICS).map((c) =>
     (rs ? effectiveResearchCostIn(rs, c.id, c.cost, gC) : c.cost) / 1000);
-  return [...emp, ...cs, ...riv, ...per, ...esc, ...costT, ...costC];
+  // #95 S1(a): the CTX block — ladder.CTX_FIELDS, RAW and unscaled (the
+  // ladder compares these exactly; a /10 scale does not round-trip
+  // bit-stably in f64). Formulas are the SCRIPTED SITES' own — the GPU twin
+  // is env._ctx_block. Seat 0 zeroes the DoW-specific quintet exactly as
+  // the GPU does (the player has no scripted DoW policy).
+  const own = state.units.filter((u) => u.seat === seat);
+  const qHeads = cities.map((c) => c.queue[0]).filter((q): q is QueueItem => !!q && q.kind === 'unit');
+  const qMil = qHeads.filter((q) => ((UNITS[(q as { unit: string }).unit]?.combat ?? 0) > 0));
+  const isRngType = (t: string) => ((UNITS[t]?.ranged?.strength ?? 0) > 0);
+  const ownMil = own.filter((u) => (UNITS[u.type]?.combat ?? 0) > 0);
+  const nRangedWQ = ownMil.filter((u) => isRngType(u.type)).length
+    + qMil.filter((q) => isRngType((q as { unit: string }).unit)).length;
+  const nMeleeWQ = ownMil.filter((u) => !isRngType(u.type)).length
+    + qMil.filter((q) => !isRngType((q as { unit: string }).unit)).length;
+  const rv = isPlayerSeat(seat) ? undefined : rivalsOf(state)[seat - 1];
+  const atOpp = rv ? rv.atWar : rivalsOf(state).some((x) => x.atWar);
+  const ctx: number[] = [
+    cities.length,
+    own.length + qHeads.length,
+    nMeleeWQ,
+    nRangedWQ,
+    cities.length * 2 + (atOpp ? 3 : 1),
+    rv ? playerStrength(state) : 0,
+    rv ? rivalStrength(state, rv) : playerStrength(state),
+    rv ? Math.min(rivalProximity(state, rv), 999) : 0,
+    rv ? (((playerSeat(state).warmonger ?? 0) >= RR_WARMONGER_GANG) ? 1 : 0) : 0,
+    rv ? rv.aggression : 0,
+    rv ? rv.peaceTurns : 0,
+    (rv ? (rv.atWar || (rv.atWarRivals?.length ?? 0) > 0) : rivalsOf(state).some((x) => x.atWar)) ? 1 : 0,
+    rv ? (state.cities.length > 0 ? 1 : 0) : 0,
+  ];
+  return [...emp, ...cs, ...riv, ...per, ...esc, ...costT, ...costC, ...ctx];
 }
 
 /**

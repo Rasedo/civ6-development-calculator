@@ -49,6 +49,28 @@ EMP_FIELDS = (
 PER_CS = 3    # met, envoys/6, hasQuest
 PER_RIVAL = 3  # atWar, warTurns/14, cities/6
 ESCALATORS = 3  # district, settler, builder — the only NON-static prices
+# #95 S1(a): the CTX block — the decide-time scalars the drive.py ctx
+# builders used to PEEK at sim tensors for (#84's "counters no mask can
+# express", now IN the observation so a TS client can render them too).
+# RAW, UNSCALED values on purpose: the ladder compares them exactly
+# (melee < cities*2 …) and a /10-scale round-trip is not bit-stable in
+# f64. Trailing block so every existing offset is unchanged.
+CTX_SEAT = 13
+CTX_FIELDS = (
+    "nCities",        # alive city count, raw
+    "nUnitsWQ",       # live units + QUEUED units (current in the unit range)
+    "nMeleeWQ",       # live+queued military, rangedStrength == 0
+    "nRangedWQ",      # live+queued military, rangedStrength > 0
+    "unitCap",        # cities*2 + (atWarWithOpponent ? 3 : 1)
+    "oppStr",         # opponent strength: cities*10 + Σ combat (the DoW site)
+    "ownStr",         # floor(ownCities*8 + Σ own combat + 0.5)
+    "prox",           # min pairwise dist(own centres, opponent centres); 999 = none
+    "gang",           # 0/1: opponent warmonger >= the gang threshold
+    "aggression",     # this seat's aggression (0 for seat 0)
+    "peaceTurns",     # turns since last war with the opponent
+    "atWarAny",       # 0/1: at war with ANYONE (the embark/cap arm's term)
+    "oppHasCities",   # 0/1: the opponent holds any city (the DoW precondition)
+)
 PER_CITY = 10  # alive, pop/10, foodBox/need, progress/cost, cultureBox/cost,
               # ownedTiles/20, hp/200, loyalty/100, hasQueue, isCapital
 # #51/S8.4 (#66): the trailing BOOST blocks — one flag per tech, then per civic,
@@ -87,9 +109,12 @@ def split(obs: torch.Tensor, n_cs: int, n_rivals: int, n_cities: int,
     i += n_t
     boost_c = obs[:, i:i + n_c]
     i += n_c
+    ctx = obs[:, i:i + CTX_SEAT]  # #95 S1(a): raw decide-time scalars
+    i += CTX_SEAT
     assert i == obs.shape[1], f"observation width {obs.shape[1]} != layout {i}"
     return {"empire": emp, "cs": cs, "rival": riv, "city": city,
-            "escalators": esc, "costTech": boost_t, "costCivic": boost_c}
+            "escalators": esc, "costTech": boost_t, "costCivic": boost_c,
+            "ctx": ctx}
 
 
 def first_legal(mask: torch.Tensor) -> torch.Tensor:

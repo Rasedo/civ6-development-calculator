@@ -265,7 +265,71 @@ class BatchEnv:
                                                       (s.rules.settler_base + s.rules.settler_per_city
                                                        * (s.alive.sum(dim=1) - 1 + s.settlers).clamp(min=0).to(d))), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.tech_boosted, 0).to(d) / 1000.0,
-                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0], dim=1)
+                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0,
+                          self._ctx_block(None)], dim=1)
+
+    def _ctx_block(self, r: int | None) -> torch.Tensor:
+        """#95 S1(a): the CTX block (ladder.CTX_FIELDS) — the decide-time
+        scalars drive.py's _prod_ctx/_war_ctx used to peek at sim tensors
+        for, RAW and unscaled (the ladder compares them exactly; scaled
+        floats do not round-trip bit-stably). Formulas are the SCRIPTED
+        SITES' own, moved not re-derived. Seat 0 renders its own family's
+        twins; the DoW-specific quintet (oppStr/prox/gang/aggression/
+        peaceTurns) is zero for seat 0 — the player has no scripted DoW
+        policy — like the zeroed CS block on the rival side."""
+        s = self.sim
+        d = s.dtype
+        B = s.B
+        dev = s.device
+        rng_t = s._p_rng_str > 0
+        if r is None:
+            n_cities = s.alive.sum(dim=1)
+            qcur = s.current
+            q_ty = (qcur - 1).clamp(min=0, max=s.NU - 1)
+            q_u = (qcur >= 1) & (qcur <= s.NU)
+            q_mil = q_u & (s._p_combat[q_ty] > 0)
+            pt = s.p_type.clamp(min=0, max=s.NU - 1)
+            mil = s.p_alive & (s._p_combat[pt] > 0)
+            n_units = s.p_alive.sum(dim=1) + q_u.sum(dim=1)
+            n_rng = (mil & rng_t[pt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
+            n_mel = (mil & ~rng_t[pt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
+            at_opp = s.r_atwar.any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
+            own_str = n_cities * 10 + (s.p_alive.to(torch.long) * s._p_combat[pt]).sum(dim=1)
+            z = torch.zeros(B, dtype=d, device=dev)
+            return torch.stack([
+                n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
+                (n_cities * 2 + torch.where(at_opp, 3, 1)).to(d),
+                z, own_str.to(d), z, z, z, z,
+                at_opp.to(d), z,
+            ], dim=1)
+        n_cities = s.rc_alive[:, r].sum(dim=1)
+        qcur = s.rc_current[:, r]
+        q_ty = (qcur - 1).clamp(min=0, max=s.NU - 1)
+        q_u = (qcur >= 1) & (qcur <= s.NU)
+        q_mil = q_u & (s._p_combat[q_ty] > 0)
+        vt = s.v_type.clamp(min=0, max=s.NU - 1)
+        mine = s.v_alive & (s.v_civ == r)
+        mil = mine & (s._p_combat[vt] > 0)
+        n_units = mine.sum(dim=1) + q_u.sum(dim=1)
+        n_rng = (mil & rng_t[vt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
+        n_mel = (mil & ~rng_t[vt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
+        p_str = s.alive.sum(dim=1) * 10 + (s.p_alive.to(torch.long) * s._p_combat[s.p_type.clamp(min=0, max=s.NU - 1)]).sum(dim=1)
+        own_cs = mine.to(torch.long) * s._p_combat[vt]
+        r_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
+        d_pr = s.pair_dist[
+            s.site.clamp(min=0).unsqueeze(2), s.rc_center[:, r].clamp(min=0).unsqueeze(1)
+        ].to(torch.long)
+        pair_ok = s.alive.unsqueeze(2) & s.rc_alive[:, r].unsqueeze(1)
+        prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
+        gang = s.p_warmonger >= s._wm_gang
+        atwar_any = s.r_atwar[:, r] | (s.rr_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
+        return torch.stack([
+            n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
+            (n_cities * 2 + torch.where(s.r_atwar[:, r], 3, 1)).to(d),
+            p_str.to(d), r_str.to(d), prox.to(d),
+            gang.to(d), s.r_aggression[:, r].to(d), s.r_peaceturns[:, r].to(d),
+            atwar_any.to(d), (s.alive.sum(dim=1) > 0).to(d),
+        ], dim=1)
 
     def _rival_unit_features(self, r: int) -> torch.Tensor:
         """[B, P, 8] the player unit-feature layout over the rival's slot
@@ -409,7 +473,8 @@ class BatchEnv:
                                                       else torch.zeros(B, dtype=torch.long, device=dev),
                                                       torch.zeros(B, dtype=d, device=dev)), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.r_tech_boosted[:, r], r + 1).to(d) / 1000.0,
-                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.r_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0], dim=1)
+                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.r_civic_boosted[:, r], r + 1, is_civic=True).to(d) / 1000.0,
+                          self._ctx_block(r)], dim=1)
 
     def unit_features(self, seat: int = 0) -> torch.Tensor:
         """[B, P, 8] per player-unit-slot features for the units head:

@@ -39,7 +39,7 @@ def main() -> None:
               "techs": s.techs.shape[1], "civics": s.civics.shape[1]}
     width = (ladder.EMP + ladder.PER_CS * s.S + ladder.PER_RIVAL * s.R
              + ladder.PER_CITY * s.C + ladder.ESCALATORS
-             + s.techs.shape[1] + s.civics.shape[1])
+             + s.techs.shape[1] + s.civics.shape[1] + ladder.CTX_SEAT)
 
     shapes = {}
     for seat in (0, 1):

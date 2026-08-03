@@ -38,30 +38,27 @@ import torch
 import ladder
 
 
-def _prod_ctx(sim, r: int) -> dict:
-    """The per-seat counters no mask can express (#84), computed exactly as the
-    engine's own picker computes them so the ladder sees what it saw."""
-    n_cities = sim.rc_alive[:, r].sum(dim=1)
-    qcur = sim.rc_current[:, r]
-    n_live = (sim.v_alive & (sim.v_civ == r)).sum(dim=1)
-    n_units = n_live + ((qcur >= 1) & (qcur <= sim.NU)).sum(dim=1)
-    cap = n_cities * 2 + torch.where(sim.r_atwar[:, r], 3, 1)
-    vt = sim.v_type.clamp(min=0, max=sim.NU - 1)
-    rng_t = sim._p_rng_str > 0
-    mil = sim.v_alive & (sim.v_civ == r) & (sim._p_combat[vt] > 0)
-    n_rng = (mil & rng_t[vt]).sum(dim=1)
-    n_mel = (mil & ~rng_t[vt]).sum(dim=1)
-    q_ty = (qcur - 1).clamp(min=0, max=sim.NU - 1)
-    q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._p_combat[q_ty] > 0)
-    n_rng = n_rng + (q_mil & rng_t[q_ty]).sum(dim=1)
-    n_mel = n_mel + (q_mil & ~rng_t[q_ty]).sum(dim=1)
+def _prod_ctx(blocks: dict, sim) -> dict:
+    """#95 S1(a): the per-seat counters no mask can express (#84), read from
+    the OBSERVATION's ctx block (ladder.CTX_FIELDS) instead of peeking at
+    sim tensors — the values are the scripted sites' own, rendered by
+    env._ctx_block, so a TS client rendering the same observation feeds the
+    ladder identically. city_cap stays rules-side: static data is not
+    state."""
+    ctx = blocks["ctx"]
+    emp = blocks["empire"]
+    city = blocks["city"]
+    B = ctx.shape[0]
+    is_cap = torch.zeros(B, sim.RC, dtype=torch.bool, device=ctx.device)
+    is_cap[:, : city.shape[1]] = city[:, :, 9] > 0.5
+    n_cities = ctx[:, 0].long()
     return {
-        "settler_queued": (qcur == 0).any(dim=1),
-        "is_capital": sim.rc_is_cap[:, r],  # #88: the wonder tier's capital heuristic
-        "melee": n_mel,
-        "ranged": n_rng,
-        "unit_count": n_units,
-        "unit_cap": cap,
+        "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
+        "is_capital": is_cap,  # #88: the wonder tier's capital heuristic (city col 9)
+        "melee": ctx[:, 2].long(),
+        "ranged": ctx[:, 3].long(),
+        "unit_count": ctx[:, 1].long(),
+        "unit_cap": ctx[:, 4].long(),
         "n_cities": n_cities,
         "city_cap": torch.full_like(n_cities, int(sim.rules.rivals.get("maxCities", 6))),
     }
@@ -214,28 +211,21 @@ def _spread_targets(sim, r: int) -> torch.Tensor:
     return out
 
 
-def _war_ctx(sim, r: int) -> dict:
-    """#93: the DoW policy's inputs, computed exactly as the scripted block
-    computes them (the engine's war-declaration site) — strengths, closest
-    player-city/rival-city pair, the B-22 gang term, aggression."""
-    B = sim.B
-    p_str = sim.alive.sum(dim=1) * 10 + (sim.p_alive.to(torch.long) * sim._p_combat[sim.p_type]).sum(dim=1)
-    own_cs = (sim.v_alive & (sim.v_civ == r)).to(torch.long) * sim._p_combat[sim.v_type]
-    n_cities = sim.rc_alive[:, r].sum(dim=1)
-    r_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
-    d_pr = sim.pair_dist[
-        sim.site.clamp(min=0).unsqueeze(2), sim.rc_center[:, r].clamp(min=0).unsqueeze(1)
-    ].to(torch.long)
-    pair_ok = sim.alive.unsqueeze(2) & sim.rc_alive[:, r].unsqueeze(1)
-    prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
+def _war_ctx(blocks: dict) -> dict:
+    """#93/#95 S1(a): the DoW policy's inputs, read from the OBSERVATION's
+    ctx block — env._ctx_block renders the scripted war-declaration site's
+    own formulas (strengths, closest city pair, the B-22 gang term,
+    aggression), so the policy consumes only what a client observation
+    carries."""
+    ctx = blocks["ctx"]
     return {
-        "has_cities": sim.alive.sum(dim=1) > 0,
-        "peace_turns": sim.r_peaceturns[:, r],
-        "prox": prox,
-        "r_str": r_str,
-        "p_str": p_str.double(),
-        "gang": sim.p_warmonger >= sim._wm_gang,
-        "aggression": sim.r_aggression[:, r],
+        "has_cities": ctx[:, 12] > 0.5,
+        "peace_turns": ctx[:, 10].long(),
+        "prox": ctx[:, 7].long(),
+        "r_str": ctx[:, 6],
+        "p_str": ctx[:, 5],
+        "gang": ctx[:, 8] > 0.5,
+        "aggression": ctx[:, 9],
     }
 
 
@@ -258,7 +248,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # columns, purchases zeroed; contract asserted in pref_apply_test.
     m = sim.rival_masks(r, lite=True)
     blocks = _blocks(env, sim, r)
-    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(sim, r))
+    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
     # #93 the WAR verb: the ladder decides from the driver's own policy
@@ -273,7 +263,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             "dow": _policy_rng(sim, seeds, turn, r, 1),
             "peace": _policy_rng(sim, seeds, turn, r, 2),
         }
-        war = ladder.pick_war(m["war"], _war_ctx(sim, r), rng_w)
+        war = ladder.pick_war(m["war"], _war_ctx(blocks), rng_w)
     # #93 the ENVOY verb: simulate the scripted greedy sequence — spend the
     # BANK first (quest-granted envoys), then conversions while influence
     # affords — re-ranking neediest after every pick exactly as the two
