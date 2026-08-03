@@ -28,16 +28,16 @@
  *   npm run gpu:export -- 12 80 3  # 12 seeds, 80 turns, 3 extra cities
  */
 
-import { playerSeat, isPlayerSeat, isBarbSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
+import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, tileSeat, tileBelongsTo, rivalOfCiv, tileCity, isCityStateSeat, cityStateOfSeat, rivalsOf, rivalCount } from '../src/core/seats';
 
-import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join as pathJoin } from 'node:path';
 import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler, setTechResearch, setCivicResearch, TURN_LIMIT } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove, moveCostInto, trainableUnits } from '../src/core/units';
+import { queueUnit, moveCostInto } from '../src/core/units';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../src/data/improvements'; // B-27 (#71)
 import type { ImprovementId } from '../src/core/types';
-import { validImprovements, canPlaceDistrict } from '../src/core/rules';
+import { canPlaceDistrict } from '../src/core/rules';
 import { terrainDefense, GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../src/core/combat';
 import { GENERAL_AURA_MP } from '../src/core/aura'; // #70/S3 (B-8)
 import { assignEnvoy } from '../src/core/cityStates';
@@ -131,19 +131,18 @@ import {
   DED_EXODUS,
 } from '../src/data/rivals';
 import { scoreSettleSites } from '../src/core/advisor';
-import { availableBuildings } from '../src/core/rules';
 import { makeYieldCtx } from '../src/core/effects';
 import { tileYields, districtAdjacency } from '../src/core/yields';
 import { tileYieldsForCenter, cityMaintenance, WONDER_TOURISM_BASE } from '../src/core/city';
 import { BALANCED_WEIGHTS } from '../src/core/empirePlanner';
 import { traceRow, traceColumnTables } from './gpu-trace';
 import { unitActionNames } from './gpu-actions';
-import { hexDistance, neighbors, neighborTile } from '../src/core/hex';
+import { hexDistance, neighbors } from '../src/core/hex';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater } from '../src/core/query';
 import { unitPassable } from '../src/core/units';
 import { MAX_BARB_PER_CAMP } from '../src/core/combat';
 import { UNITS, UNIT_HP, CITY_MAX_HP, WALLS_HP, ENCAMPMENT_HP } from '../src/data/units';
-import { YIELD_KEYS, type City, type DistrictId, type GameState, type Tile } from '../src/core/types';
+import { YIELD_KEYS, type DistrictId, type GameState, type Tile } from '../src/core/types';
 import { BUILDINGS } from '../src/data/buildings';
 import { centerBuildingIds, prodLayout } from '../src/core/prodLayout';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, type AdjacencySource } from '../src/data/districts';
@@ -288,20 +287,6 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 // identical column layout when it replays an action file. While this derivation
 // lived only here, nothing else could see it — and a second copy elsewhere would
 // have rotted the file format silently, the #85 disease one level up.
-/** #70: the action file from pass 2, if pass 2 has run. Read ONCE — this is the
- * interface between the policy module and both engines. */
-const DRIVEN_ACTIONS: { schema: number; turns: number; seeds: Record<string, Record<string, Record<string, unknown>>> } | null = (() => {
-  const f = pathJoin(OUT, 'rival_actions.json');
-  // DRIVEN export is an EXPLICIT opt-in (CIV6_DRIVEN=1), matching parity_test:
-  // presence-detection coupled the battery's whole tree-green to the driven
-  // hunt's residue, and a half-gated pair (parity opt-in, exporter presence)
-  // produces MIXED gates — scripted GPU vs driven TS.
-  if (!process.env.CIV6_DRIVEN) return null;
-  if (!existsSync(f)) return null;
-  const parsed = JSON.parse(readFileSync(f, 'utf-8'));
-  console.log(`replaying ladder actions from rival_actions.json (schema v${parsed.schema}, ${parsed.turns} turns)`);
-  return parsed;
-})();
 
 const centerBuildings = centerBuildingIds().map((id) => BUILDINGS[id]);
 const buildingIdx = new Map(centerBuildings.map((b, i) => [b.id, i]));
@@ -574,7 +559,7 @@ const rules = {
   // rival r (array index == rival.id, asserted at export) is civ r+1.
   // City-states and barbarians stay outside the numbering.
   civs: { player: 0, rivalBase: 1 },
-  // #51/S0.1: the trace column NAMES + tolerances, per block. gpu/parity_test.py
+  // #51/S0.1: the trace column NAMES + tolerances, per block. gpu/serve_gate.py
   // expands these against the fixture's own cMax/csMax/rMax, asserts the result
   // matches BatchSim.trace_columns() exactly, and applies tolerance BY NAME —
   // so a new column can never silently shift a later column's tolerance.
@@ -1316,12 +1301,6 @@ console.log(
 
 // --- per-seed fixtures ----------------------------------------------------------
 
-function cheapestBuilding(state: GameState, city: City): string | null {
-  const avail = availableBuildings(state, city)
-    .filter((b) => buildingIdx.has(b.id)) // only the exported buildable set (availableBuildings gates district+prereq)
-    .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1));
-  return avail[0]?.id ?? null;
-}
 
 // A-13/A-15: seeds whose scripted game leaves the player with NO cities by
 // t100 (rivals grew strong enough to conquer the capital — the world working
@@ -1363,26 +1342,6 @@ for (let s = 0; s < N_SEEDS; s++) {
     rivals: R_MAX,
   });
   state.disasters = true; // phase 4d: weather rolls join the RNG stream
-  // #70 PASS 3 OF THE TWO-PASS EXPORT. When `gpu/fixtures/rival_actions.json`
-  // exists, the rivals in this reference run do NOT decide — they replay the
-  // decisions `gpu/ladder.py` already made (pass 2, `gpu/drive_gate.py`). That
-  // is what lets the TS rival ladder be DELETED instead of merely duplicated:
-  // the policy lives once, outside both engines, and both replay the same file.
-  //
-  // Absent the file this is a no-op and the scripted ladder runs, so the two
-  // gates can coexist while the file-driven one is proven.
-  if (DRIVEN_ACTIONS) {
-    const forSeed = DRIVEN_ACTIONS.seeds[String(seed)];
-    if (forSeed) {
-      const log: Record<number, Record<number, unknown>> = {};
-      for (const [turn, seats] of Object.entries(forSeed)) {
-        const byRival: Record<number, unknown> = {};
-        for (const [rid, rec] of Object.entries(seats as Record<string, unknown>)) byRival[Number(rid)] = rec;
-        log[Number(turn)] = byRival;
-      }
-      state.rivalActions = log as GameState['rivalActions'];
-    }
-  }
   // #95 S1(b): serve mode fills rivalActions TURN BY TURN from the wire —
   // same key convention, same rivalPhase consumption as the driven file.
   if (SERVE) {
@@ -1815,78 +1774,52 @@ for (let s = 0; s < N_SEEDS; s++) {
   const ownerInit = map.tiles.map((t) => (isPlayerSeat(tileSeat(t)) ? tileCity(t) : -1));
   const C_MAX = 1 + N_EXTRA;
 
-  const knownBoosts = new Set(playerSeat(state).research.boosted);
-  const boostSchedule: { turn: number; kind: string; idx: number }[] = [];
   const trace: number[][] = [];
-  let settlersQueued = 0;
 
-  const warriorTrained = new Set<number>();
-  // #56 H2: the once-ever builder flag is replaced by a dynamic gate — the
-  // capital re-trains a builder whenever none is alive or queued and a
-  // builder job (owned unimproved-farmable OR owned pillaged tile) exists.
-  const anyPlayerBuilder = (): boolean =>
-    state.units.some((u2) => isPlayerSeat(u2.seat) && u2.type === 'BUILDER' && (u2.charges ?? 0) > 0) ||
-    state.cities.some((c2) => c2.queue.some((q) => q.kind === 'unit' && q.unit === 'BUILDER'));
-  const builderJobExists = (): boolean =>
-    state.map.tiles.some(
-      (t2) => isPlayerSeat(tileSeat(t2)) && (t2.pillaged || (!t2.improvement && validImprovements(state, t2).includes('FARM'))),
+  // #51 DELETIONS 1-3: the fixture IS the t0 world — every key is pure
+  // world-gen output (the pre-loop consts above; the old post-loop literal
+  // was misleading placement, nothing in it was play-derived). EXPORT mode
+  // writes it and plays NOTHING — games run in the serve gate, where the
+  // decision server drives every seat. The trace/boostSchedule payloads
+  // died with the scripted game that produced them.
+  const fixture = {
+    seed,
+    width: map.width,
+    height: map.height,
+    unitsMode: 1,
+    disasters: 1,
+    volcanoes,
+    maxCamps,
+    rngInit,
+    csMax: CS_MAX,
+    rMax: R_MAX,
+    cityStates: csAtStart,
+    rivals: rivalsOf(state).map((r, i) => {
+      // C1-A3: the GPU maps rival ARRAY INDEX r to civ r+1 (src/core/civs.ts
+      // numbering), which is only sound while ids stay contiguous 0..R-1.
+      if (r.id !== i) throw new Error(`rival ids must be contiguous 0..R-1 (got id ${r.id} at index ${i})`);
+      return {
+        id: r.id,
+        aggression: r.aggression,
+        treasury: 0, // VP-G1: rivals start bankless at t0
+        cities: rivalCitiesInit.get(r.id) ?? [],
+        units: rivalUnitsInit.get(r.id) ?? [],
+      };
+    }),
+    cities,
+    tiles,
+    ownerInit,
+    eraScoreInit, // B-24: unified-civ era score at t0
+  };
+  if (!SERVE) {
+    writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));
+    console.log(
+      `seed${seed}.json: t0 world — capital + ${N_EXTRA} planned sites, ` +
+        `${rivalCount(state)} rivals, ${state.cityStates.length} CS, ${map.tiles.length} tiles`,
     );
-  // #56 H1: army scaling — alive player military + queued military across all
-  // city queues (the per-city else-if loop naturally sees earlier cities'
-  // queues this turn; the GPU mirrors with a city_seq prefix walk). Best =
-  // highest combat among trainable units; strict > keeps UNITS table order on
-  // ties (the GPU's argmax-first twin).
-  const militaryCount = (): number => {
-    let n = 0;
-    for (const u2 of state.units) if (isPlayerSeat(u2.seat) && (UNITS[u2.type]?.combat ?? 0) > 0) n += 1;
-    for (const c2 of state.cities)
-      for (const q of c2.queue) if (q.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) n += 1;
-    return n;
-  };
-  const bestMilitary = (): string => {
-    let bestId = 'WARRIOR';
-    let bestCombat = 0;
-    for (const d of trainableUnits(state)) {
-      if (d.combat > bestCombat) {
-        bestId = d.id;
-        bestCombat = d.combat;
-      }
-    }
-    return bestId;
-  };
-  const placedDistricts = new Set<number>();
-  // P2: districts cost production now — the capital QUEUES the next scaffold
-  // district when idle (first unplaced spec, scaffold order, whose tech is in
-  // AND a resource-free eligible tile exists; best floor(districtAdjacency),
-  // ties lowest index). Returns true when one was queued. The GPU scripted
-  // chain mirrors this branch exactly (same slot in the priority chain).
-  const queueNextDistrict = (cap: City): boolean => {
-    for (const spec of SCAFFOLD_DISTRICTS) {
-      const di = PLACEABLE_DISTRICTS.indexOf(spec.id);
-      // B9-R1: civic-unlocked scaffold entries gate on the civic tree.
-      const unlocked = (spec.unlockKind === 'civic' ? playerSeat(state).research.civics : playerSeat(state).research.techs).includes(spec.unlockId);
-      if (placedDistricts.has(di) || !unlocked) continue;
-      let best = -1;
-      let bestAdj = -1;
-      for (const tile of state.map.tiles) {
-        // AUDIT C-6: bonus-resource tiles are pickable (canPlaceDistrict
-        // refuses luxury/strategic; queueDistrict strips the bonus at pave —
-        // real Civ 6 placement rules).
-        if (!tileBelongsTo(tile, cap) || tile.improvement) continue;
-        if (!canPlaceDistrict(state, cap, spec.id, tile.index).ok) continue;
-        const adj = districtAdjacency(state.map, tile, spec.id);
-        if (adj > bestAdj) {
-          bestAdj = adj;
-          best = tile.index;
-        }
-      }
-      if (best < 0) continue;
-      queueDistrict(state, cap.id, spec.id, best);
-      placedDistricts.add(di);
-      return true;
-    }
-    return false;
-  };
+    continue;
+  }
+
   const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
     if (SERVE && serveIn) {
@@ -2031,7 +1964,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       // functions; the scripted chain below stands down entirely. Base
       // classes v1 (the scripted player's own expressiveness); the
       // wonder/project/purchase arms port with the replay dispatch next.
-      // UNITS FIRST — replay-gpu's proven order (the GPU steps units at the
+      // UNITS FIRST — the rollout replayer's proven order (the GPU steps units at the
       // top of step(), before the production section's district scan reads
       // tile.improvement; a same-turn build must precede the scan on BOTH
       // engines). rangedActive mirrors _rl_ranged_active (constant True).
@@ -2052,7 +1985,7 @@ for (let s = 0; s < N_SEEDS; s++) {
           // the replay's own placement scan: best floor(adjacency), ties
           // lowest tile, canPlaceDistrict re-validated live.
           const did0 = SCAFFOLD_DISTRICTS[a0 - pl0.NB - 2 - pl0.NU].id;
-          // VERBATIM replay-gpu's proven arm (9018 t63: my floored scan with
+          // VERBATIM the rollout replayer's proven arm (9018 t63: my floored scan with
           // an explicit tiebreak picked 860 where the proven raw-adjacency
           // first-wins scan and the GPU picked 817 — one placement rule,
           // copied not paraphrased).
@@ -2072,105 +2005,10 @@ for (let s = 0; s < N_SEEDS; s++) {
       }
       if (seat0rec.tech != null && techList[seat0rec.tech]) setTechResearch(state, techList[seat0rec.tech].id);
       if (seat0rec.civic != null && civicList[seat0rec.civic]) setCivicResearch(state, civicList[seat0rec.civic].id);
-    } else
-    for (const city of state.cities) {
-      if (city.queue.length > 0) continue;
-      if (city.isCapital && city.population >= 2 && !anyPlayerBuilder() && builderJobExists()) {
-        // One builder from the capital FIRST (phase 6a) — #56 H2: re-trained
-        // whenever the last one spent its charges and jobs remain (was
-        // once-ever). First-builder timing is unchanged; settlers still yield
-        // to the builder.
-        queueUnit(state, city.id, 'BUILDER');
-      } else if (city.isCapital && settlersQueued < chosen.length && city.population >= SETTLER_POP_GATE) {
-        queueSettler(state, city.id);
-        settlersQueued += 1;
-      } else if (!warriorTrained.has(city.id) && city.population >= 2) {
-        // One defender per city: exercises training, spawn placement and
-        // passive garrisons under the scripted gate (movement/attack are
-        // the rollout gate's job).
-        queueUnit(state, city.id, 'WARRIOR');
-        warriorTrained.add(city.id);
-      } else if (SCRIPTED_CAMPUS && city.isCapital && queueNextDistrict(city)) {
-        // P2: queued the next scaffold district (it costs production now).
-      } else if (city.population >= 2 && militaryCount() < 2 * state.cities.length) {
-        // #56 H1: keep a standing army of 2 military units per city, replacing
-        // losses with the best trainable unit — the passive one-warrior script
-        // lost whole games to rival conquest before the 250t horizon.
-        queueUnit(state, city.id, bestMilitary());
-      } else {
-        const next = cheapestBuilding(state, city);
-        if (next) queueBuilding(state, city.id, next);
-      }
     }
-    // Scripted builders (phase 6a): build a FARM on the current tile if it is
-    // a buildable, unimproved farm tile inside our borders; otherwise
-    // single-step toward the nearest farm job (nearest by distance, ties to
-    // lowest tile index; then the passable, civilian-free neighbour closest to
-    // it, ties to direction order, moving only if strictly closer). The GPU
-    // engine mirrors this exactly; none of it draws RNG.
-    const nTiles = state.map.tiles.length;
-    const blockedForBuilder = (ti: number): boolean =>
-      state.units.some(
-        (u2) =>
-          u2.tileIndex === ti &&
-          (isBarbSeat(u2.seat) ||
-            isRivalSeat(u2.seat) ||
-            (isPlayerSeat(u2.seat) && UNITS[u2.type]?.charges !== undefined)),
-      );
-    for (const u of state.units) {
-      // #51 seat 0 driven: a rec-0 with a "units" KEY (even empty — no
-      // actionable order this turn) stands the scripted walker down, the
-      // exact mirror of the GPU's `units is None` gate before
-      // _scripted_builder — the orchestrator always sends the key.
-      if (SERVE && seat0rec?.units) break;
-      if (!isPlayerSeat(u.seat) || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
-      const btile = state.map.tiles[u.tileIndex];
-      if (btile.pillaged && isPlayerSeat(tileSeat(btile))) {
-        // #56 H2: REPAIR first (the rival A-13 semantics — no charge spent,
-        // the turn is; barb raids on player farmland finally get answered).
-        btile.pillaged = false;
-        u.movesLeft = 0;
-        continue;
-      }
-      if (!btile.improvement && validImprovements(state, btile).includes('FARM')) {
-        builderImprove(state, u.id, 'FARM');
-        continue;
-      }
-      let best = -1;
-      let bestKey = Infinity;
-      for (const t of state.map.tiles) {
-        // #56 H2: a job is any owned tile that is unimproved-farmable OR
-        // pillaged (repair) — must match builderJobExists and the GPU walker.
-        if (!isPlayerSeat(tileSeat(t))) continue;
-        if (!(t.pillaged || (!t.improvement && validImprovements(state, t).includes('FARM')))) continue;
-        const key = hexDistance(btile.col, btile.row, t.col, t.row) * (nTiles + 1) + t.index;
-        if (key < bestKey) {
-          bestKey = key;
-          best = t.index;
-        }
-      }
-      if (best < 0) continue;
-      const target = state.map.tiles[best];
-      const dHere = hexDistance(btile.col, btile.row, target.col, target.row);
-      let stepDir = -1;
-      let stepKey = Infinity;
-      for (let dir = 0; dir < 6; dir++) {
-        const n = neighborTile(state.map, btile, dir);
-        if (!n || !unitPassable(n) || blockedForBuilder(n.index)) continue;
-        const key = hexDistance(n.col, n.row, target.col, target.row) * 8 + dir;
-        if (key < stepKey) {
-          stepKey = key;
-          stepDir = dir;
-        }
-      }
-      if (stepDir >= 0 && Math.floor(stepKey / 8) < dHere) {
-        const n = neighborTile(state.map, btile, stepDir)!;
-        u.path = [n.index];
-        walkPath(state, u);
-      }
-    }
-    // (P2: scripted districts moved into the per-city production chain above —
-    // the capital queues them at districtCost like every other build.)
+    // (#51 deletions: the scripted production chain and the scripted builder
+    // walker are GONE — every seat-0 verb arrives on the wire; a turn with no
+    // rec-0 queues nothing, and the trace compare names any drift.)
     // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's scripted game (the
     // SEED_OVERRIDES diagnosis knob — see the map above).
     const evBefore = state.eventLog.length;
@@ -2187,12 +2025,6 @@ for (let s = 0; s < N_SEEDS; s++) {
       const hole = cityIds.findIndex((id) => !state.cities.some((x) => x.id === id));
       if (hole >= 0) cityIds[hole] = c.id;
     }
-    for (const id of playerSeat(state).research.boosted) {
-      if (knownBoosts.has(id)) continue;
-      knownBoosts.add(id);
-      if (techIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'tech', idx: techIdx.get(id)! });
-      else if (civicIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'civic', idx: civicIdx.get(id)! });
-    }
     trace.push(traceRow(state, cityIds, C_MAX, CS_MAX, R_MAX));
     if (SERVE) serveOut({ row: trace.length - 1, trace: trace[trace.length - 1] });
     if (SERVE && process.env.CIV6_SERVE_STATELOG) {
@@ -2207,54 +2039,13 @@ for (let s = 0; s < N_SEEDS; s++) {
     throw new Error(`seed ${seed}: no cities left by turn ${N_TURNS} — add a SEED_OVERRIDES entry (diagnose with CIV6_EXPORT_DEBUG=${seed})`);
   }
 
-  const fixture = {
-    seed,
-    width: map.width,
-    height: map.height,
-    unitsMode: 1,
-    disasters: 1,
-    volcanoes,
-    maxCamps,
-    rngInit,
-    csMax: CS_MAX,
-    rMax: R_MAX,
-    cityStates: csAtStart,
-    rivals: rivalsOf(state).map((r, i) => {
-      // C1-A3: the GPU maps rival ARRAY INDEX r to civ r+1 (src/core/civs.ts
-      // numbering), which is only sound while ids stay contiguous 0..R-1.
-      if (r.id !== i) throw new Error(`rival ids must be contiguous 0..R-1 (got id ${r.id} at index ${i})`);
-      return {
-        id: r.id,
-        aggression: r.aggression,
-        treasury: 0, // VP-G1: the fixture is a t0 state — rivals start bankless (r.treasury here is the LIVE post-trace object, like the Init-map snapshots avoid)
-        cities: rivalCitiesInit.get(r.id) ?? [],
-        units: rivalUnitsInit.get(r.id) ?? [],
-      };
-    }),
-    cities,
-    tiles,
-    ownerInit,
-    eraScoreInit, // B-24: unified-civ era score at t0
-    boostSchedule,
-    trace,
-  };
-  if (!SERVE) writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));  // #95 S1(b): a serve run is a gate, not an export
-  const pops = state.cities.map((c) => c.population).join('/');
-  const envoys = state.cityStates.map((cs) => cs.envoys).join('/');
-  const wars = rivalsOf(state).filter((r) => r.atWar).length;
-  console.log(
-    `seed${seed}.json: ${N_TURNS} turns, ${state.cities.length}/${C_MAX} cities, pop ${pops}, ` +
-      `${state.cityStates.length} CS (envoys ${envoys}), ${rivalCount(state)} rivals (${wars} at war), ${boostSchedule.length} boosts`,
-  );
 }
 // ROUND B10 lesson: a SEED_OVERRIDES change leaves the PREVIOUS seed's
 // fixture on disk (fixtures are gitignored, so a worktree agent's rm never
-// reaches the main checkout). Stale orphans poison BOTH downstream gates:
-// parity_test sweeps every seed*.json (old-engine fixture vs new engine =
-// guaranteed mismatch), and the rollout derives its game set from the
-// fixture list, so 24+k fixtures shift the shard batch shapes and BLAS
-// float association past the milli tolerances. Sweep them here — the
-// emit set is the single source of truth.
+// reaches the main checkout). A stale orphan poisons the serve gate — it
+// derives its game set from the seed*.json glob, so an extra world shifts
+// the batch shape and plays a game no TS child mirrors. Sweep them here —
+// the emit set is the single source of truth.
 const emitted = new Set<string>();
 if (!SERVE) {  // #95 S1(b): serve mode wrote nothing — sweep nothing
   for (let s = 0; s < N_SEEDS; s++) emitted.add(`seed${seedFor(s)}.json`);
@@ -2265,4 +2056,4 @@ if (!SERVE) {  // #95 S1(b): serve mode wrote nothing — sweep nothing
     }
   }
 }
-console.log(`\nFixtures in ${OUT}/ — run gpu/parity_test.py against them.`);
+console.log(`\nSeeded t0 worlds in ${OUT}/ — the serve gate plays them.`);

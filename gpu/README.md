@@ -39,7 +39,7 @@ here is trusted without proof. Two gates, one oracle:
 
 1. **Scripted parity.** `npm run gpu:export` runs the **real TS engine**
    over reference seeds and records rule tables plus turn-by-turn traces
-   into `gpu/fixtures/`; `python gpu/parity_test.py` replays the same
+   into `gpu/fixtures/`; `python gpu/serve_gate.py --batched` plays the same
    games in the vectorized engine and compares every turn — empire state
    (techs, civics, settlers, city count, treasury, science, culture,
    empireScore) and per-city state (population, owned tiles, buildings,
@@ -287,7 +287,7 @@ the same fixtures/traces mechanism.
 
 ```bash
 npm run gpu:export            # 1. record fixtures from the TS engine
-python gpu/parity_test.py     # 2. scripted parity
+python gpu/serve_gate.py --batched --turns 250   # 2. the decision-server gate
 python gpu/rollout.py         # 3. random-action games on this engine
 npm run gpu:replay            # 4. the TS oracle must reproduce them
 python gpu/tools/bench.py           # 5. throughput (CUDA if available)

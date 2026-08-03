@@ -871,7 +871,7 @@ Per-item weights (done% in parens where partial):
       git diff 8eddd91~1 8eddd91 -- src/data/units.ts | git apply   # 5 strengths
       SEED_OVERRIDES 6: 9080          (9079 is wiped by the stronger world)
       npx vite-node scripts/export-gpu.ts
-      python gpu/rollout.py --shards 4 --pipeline-replay
+      python gpu/serve_gate.py --batched --turns 250   # (rollout replay gate DELETED at #51 deletions)
   gives, byte-exact:
       seed 9235 rng 2026006134: turn 249: column 72  TS=188400 GPU=191250
   i.e. the 2850-milli = 2.85 gap. Worktree preserved at `.claude/hunt-rg`.

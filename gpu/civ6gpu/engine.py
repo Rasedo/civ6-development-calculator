@@ -525,16 +525,12 @@ class BatchSim:
     """B games × C city slots stepping in lockstep. Build from fixtures
     (parity) or by replicating one fixture B times (benchmark/training).
 
-    `boosts` mode: 'detect' evaluates eureka conditions from state each
-    turn (required for off-script play); 'schedule' replays the turns the
-    exporter recorded (debug aid for isolating detection bugs).
     """
 
-    def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64, boosts: str = "detect"):
+    def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64):
         self.rules = rules
         self.device = device
         self.dtype = dtype
-        self.boost_mode = boosts
         B = len(fixtures)
         f0 = fixtures[0]
         self.B, self.W, self.H = B, f0["width"], f0["height"]
@@ -1889,9 +1885,6 @@ class BatchSim:
         self._palace_y = rules.palace_yields.to(device=device, dtype=dtype)  # [6]
         self._palace_housing = float(rules.palace_housing)
         self._palace_amenities = float(rules.palace_amenities)
-
-        # Boost schedules: [turn, kind(0 tech/1 civic), idx] per game.
-        self.boost_schedule = [f.get("boostSchedule", []) for f in fixtures]
 
         NB, NT, NC = len(rules.b_cost), len(rules.t_cost), len(rules.c_cost)
         self.NB = NB
@@ -17505,13 +17498,7 @@ class BatchSim:
             self.cur_civic.copy_(torch.where(ok, c_act, self.cur_civic))
 
         # --- eurekas (mirrors detectBoosts at the start of endTurn) ------------
-        if self.boost_mode == "detect":
-            self._detect_boosts()
-        else:
-            for b, sched in enumerate(self.boost_schedule):
-                for e in sched:
-                    if e["turn"] == self.turn:
-                        (self.tech_boosted if e["kind"] == "tech" else self.civic_boosted)[b, e["idx"]] = True
+        self._detect_boosts()
 
         # --- refreshUnits (P4/D-2, real Civ 6; unifies AUDIT C-7/C-8): heal
         # only units that spent NO MP since their last refresh — +20 in a

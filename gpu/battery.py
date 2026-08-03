@@ -8,12 +8,11 @@ Stage 0 (serial, everything depends on it): tsc type gate + fixture
 export (P5: the vite build artifact feeds no gate; vitest runs in a
 lane). Then the lanes run concurrently on the measured bottleneck split:
 
-    vitest+parity : the TS suite, then the 24-seed scripted gate
+    vitest        : the TS suite
     cputests      : purchase/war/ranged/snapshot/... self-tests (CPU f64)
-                    (same assertions/seeds — pure process split)
-    gpu           : rollout --shards 4 --pipeline-replay (P3 sharding;
-                    P5: each shard's TS replay runs as the shard lands,
-                    hiding the serial replay tail), then the evals
+    serve         : the decision-server gate (serve_gate --batched) — ONE
+                    B=12 GPU sim vs twelve TS children, every seat driven
+                    by one ladder over the wire, obs/jobs/trace equality
 
 Wall-clock is stage0 + the slowest lane, with the RL search/MPC
 benchmarks (search-quality, not engine-facing) behind --full.
@@ -46,8 +45,8 @@ EVAL = "--eval" in sys.argv
 NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
 
 # Poke pool (#78): 4 workers x OMP 2 = 8 threads, up from the old serial lane's
-# single OMP-4 process. Deliberately small — the box is 24 cores and parity (6)
-# + gpu-gate (4 shards x 4) already claim most of them.
+# single OMP-4 process. Deliberately small — the box is 24 cores and the serve
+# lane's twelve TS children already claim most of them.
 POKE_WORKERS = 4
 POKE_OMP = 2
 
@@ -79,19 +78,16 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
     env.setdefault("PYTHONUTF8", "1")
     env["OMP_NUM_THREADS"] = str(threads)
     env["MKL_NUM_THREADS"] = str(threads)
-    # #95 THE CUTOVER: the file interface is gone. The serve lane
-    # (serve_gate --batched) is the rival-behavior gate — both engines
-    # consume ONE ladder over the wire, per turn, with obs equality
-    # asserted; the pre-recorded rival_actions.json, its writer
-    # drive_gate.py, the battery's CIV6_DRIVEN flip and regen rule 14 all
-    # retired with it. The export runs SCRIPTED again (fixture t0 worlds
-    # only — nothing consumes fixture traces since the parity lane
-    # retired; parity_test.py stays on disk as a manual tool until
-    # deletion 2 removes the scripted rival twins it compares).
+    # #51 DELETIONS 1-3: the serve lane (serve_gate --batched) is THE
+    # cross-engine gate — every seat driven by one ladder over the wire,
+    # obs/jobs/trace equality asserted per turn. rollout.py + replay-gpu
+    # (the recorded-replay gate) and parity_test.py (the scripted-trace
+    # oracle) are DELETED; fixtures are pure t0 seeded worlds and the
+    # exporter plays nothing.
     t0 = time.time()
     # BAIL-FAST (#78): the standing process is to fix and RE-RUN the whole
     # battery, so once any lane fails every other lane is wasted wall-clock —
-    # and the expensive ones (eval ~1650s, parity ~650s, gpu-gate ~594s) would
+    # and the expensive ones (serve, gpu pokes) would
     # otherwise run to completion after the verdict is already known. Poll
     # instead of blocking so a failure elsewhere can kill this lane now.
     # `--no-bail` restores the old run-everything behaviour when the full
@@ -202,12 +198,9 @@ def main() -> int:
         ("parse", ["node", "scripts/parse-check.mjs"]),
         ("lint", [npx, "oxlint", "src", "scripts", "tests"]),  # #51: no-constant-binary-expression et al
         # #51/S7.8f (task #55): F821 = UNDEFINED NAME on the Python side. Costs
-        # ~0.3s and catches the class that cost this session hours: `cs_slot`
-        # was undefined in a new engine hook, so every shard that reached that
-        # branch CRASHED, rollout.py then waited forever on the dead worker, and
-        # the lane presented as a HANG rather than as an error. Python cannot
-        # catch it at import time and the branch was unreachable from scripted
-        # parity, so nothing before the rollout would have found it.
+        # ~0.3s and catches the class that cost this session hours: an
+        # undefined name in a rarely-reached engine branch presents as a
+        # crash or hang deep inside a lane instead of an import error.
         ("f821", [str(ruff), "check", "--select", "F821", "gpu", "scripts"]),
         ("export", [npm, "run", "gpu:export"]),
     ):
@@ -216,7 +209,7 @@ def main() -> int:
             break
 
     if not failed.is_set():
-        print("lanes (parallel): vitest+parity | cpu self-tests | gpu rollout(sharded, replay pipelined)/evals", flush=True)
+        print("lanes (parallel): vitest+serve | gpu pokes" + (" | evals" if EVAL else ""), flush=True)
         lanes = [
             [
                 ("vitest", [npm, "test"], 8),
@@ -278,26 +271,18 @@ def main() -> int:
                 ("fort", [py, "gpu/tests/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
                 ("ladder", [py, "gpu/tests/ladder_test.py"], 4),  # #51/S8.3: the ladder leaves the parity gate — this is its only guard
             ],
-            [
-                # P3→P5: sharded rollout (4 procs × OMP 4 — measured best on
-                # this 24-CPU box; 6 shards THRASH: gpu 282s, parity starved);
-                # replay runs AS THE SHARD LANDS (--pipeline-replay), hiding
-                # the ~35s serial replay tail. Merge + gate semantics identical.
-                ("gpu-gate", [py, "gpu/rollout.py", "--shards", "4", "--pipeline-replay"], 4),
-            ]
-            + (
-                [
-                    ("eval-random", [py, "gpu/eval/eval.py", "--policy", "random", "--episodes", "50"], 8),
-                    ("eval-scripted", [py, "gpu/eval/eval.py", "--policy", "scripted", "--episodes", "50"], 8),
-                ]
-                if EVAL
-                else []
-            ),
-        ]
-        # BAIL-FAST ORDERING (#78). The poke group is ONE lane on purpose: at
-        # ~348s serial it is nowhere near the critical path (parity ~650s,
-        # gpu-gate ~594s, eval ~1650s), so splitting it could not shorten the
-        # wall — it would only steal cores from the lanes that set it.
+        ] + (
+            [[
+                ("eval-random", [py, "gpu/eval/eval.py", "--policy", "random", "--episodes", "50"], 8),
+                ("eval-scripted", [py, "gpu/eval/eval.py", "--policy", "scripted", "--episodes", "50"], 8),
+            ]]
+            if EVAL
+            else []
+        )
+        # BAIL-FAST ORDERING (#78). The poke group is ONE lane on purpose:
+        # serial it is nowhere near the critical path (the serve lane sets
+        # it), so splitting it could not shorten the wall — it would only
+        # steal cores from the lanes that set it.
         # But bail-fast made TIME-TO-FIRST-FAILURE matter, and list order alone
         # decides that: the #78 red sat behind ~177s of slower pokes before
         # `government` (3.3s) reported. Running the cheap ones first surfaces

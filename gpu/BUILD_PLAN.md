@@ -9,7 +9,7 @@ container rollback never loses more than the in-flight stage. Every stage
 re-syncs first (`git stash -u; git fetch; git merge --ff-only origin/<branch>`),
 mirrors the TS oracle, and must pass BOTH parity gates + `tsc` before commit:
 
-    npm run gpu:export && python3 gpu/parity_test.py      # scripted gate
+    npm run gpu:export                                    # seeds t0 worlds; the serve lane is the gate
     npm run gpu:rollout && npm run gpu:replay             # off-script gate
 
 Legend: [ ] todo  [~] in progress  [x] done (commit hash)

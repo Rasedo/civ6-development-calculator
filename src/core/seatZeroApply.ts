@@ -1,11 +1,11 @@
 /**
  * SEAT-0 RECORD APPLICATION — the ONE text, two consumers (#51).
  *
- * This is replay-gpu.ts's proven player unit-order arm, extracted VERBATIM
- * so the serve fork cannot paraphrase it (the 9018 t63 lesson: a paraphrase
- * of a verified pair is a new unverified implementation). Consumers:
- * scripts/replay-gpu.ts (the rollout gate's replayer) and
- * scripts/export-gpu.ts's CIV6_SERVE fork (the decision-server client).
+ * The proven player unit-order arm (verified across the whole rollout-gate
+ * era, extracted VERBATIM so no consumer can paraphrase it — the 9018 t63
+ * lesson: a paraphrase of a verified pair is a new unverified
+ * implementation). Consumer: scripts/export-gpu.ts's CIV6_SERVE fork (the
+ * decision-server client applying seat-0 unit records from the wire).
  *
  * Orders are [tile, actionCol, isCivilian] triples in logged order; the
  * unit is identified by (start-of-turn) tile + domain — never a slot
