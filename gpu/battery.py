@@ -79,15 +79,15 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
     env.setdefault("PYTHONUTF8", "1")
     env["OMP_NUM_THREADS"] = str(threads)
     env["MKL_NUM_THREADS"] = str(threads)
-    # #93 THE GATE FLIP: parity runs DRIVEN — both engines replay
-    # gpu/fixtures/rival_actions.json, comparing the RULES with the policy
-    # removed (the round-8 design realized). The export is pass 3 of the
-    # two-pass scheme (the TS trace REPLAYING the recorded actions); the
-    # action file regenerates per round on engine change, exactly like the
-    # seed fixtures ([[verify-loop-cost]] 14). Rollout games carry no
-    # records, so their rivals keep the scripted path until deletion 2.
-    if name in ("export", "parity"):
-        env["CIV6_DRIVEN"] = "1"
+    # #95 THE CUTOVER: the file interface is gone. The serve lane
+    # (serve_gate --batched) is the rival-behavior gate — both engines
+    # consume ONE ladder over the wire, per turn, with obs equality
+    # asserted; the pre-recorded rival_actions.json, its writer
+    # drive_gate.py, the battery's CIV6_DRIVEN flip and regen rule 14 all
+    # retired with it. The export runs SCRIPTED again (fixture t0 worlds
+    # only — nothing consumes fixture traces since the parity lane
+    # retired; parity_test.py stays on disk as a manual tool until
+    # deletion 2 removes the scripted rival twins it compares).
     t0 = time.time()
     # BAIL-FAST (#78): the standing process is to fix and RE-RUN the whole
     # battery, so once any lane fails every other lane is wasted wall-clock —
@@ -220,11 +220,11 @@ def main() -> int:
         lanes = [
             [
                 ("vitest", [npm, "test"], 8),
-                ("parity", [py, "gpu/parity_test.py"], 6),
-                # #95 (iii): the DECISION-SERVER gate — one B=12 sim, twelve
-                # TS children, per-turn obs/unit-target equality + trace
-                # compare. The dual-consumer architecture's own lane; the
-                # file-driven parity above retires at the #95 cutover.
+                # #95 THE CUTOVER: the DECISION-SERVER gate — one B=12 sim,
+                # twelve TS children, per-turn obs/unit-target equality +
+                # trace compare — IS the parity lane now. The file-driven
+                # lane it replaces covered the same games (scripted player,
+                # driven rivals, same seeds) with strictly less checking.
                 ("serve", [py, "gpu/serve_gate.py", "--batched", "--turns", "250"], 6),
             ],
             [
