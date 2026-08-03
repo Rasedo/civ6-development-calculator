@@ -226,7 +226,11 @@ class BatchEnv:
                 s.tech_prog / 50.0,
                 s.civic_prog / 50.0,
                 s.settlers.to(d),
-                s.settlers_queued.to(d),
+                # LIVE queued-settler count (current == the settler column NB)
+                # — s.settlers_queued is a CUMULATIVE counter (add_-only, the
+                # scripted cap gate's semantics); TS renders the live queue.
+                # Seat-0 obs catch 3 (9002 t26: GPU 1 vs TS 0 post-completion).
+                (s.current == s.rules_dev.b_cost.shape[0]).sum(dim=1).to(d),
                 s.alive.sum(dim=1).to(d) / C,
                 (s.treasury / 200.0).clamp(max=5.0),
                 s.envoys_avail.to(d) / 5.0,
@@ -268,8 +272,12 @@ class BatchEnv:
         # to the legal frontier would delete exactly that signal.
         return torch.cat([emp, cs.reshape(B, -1), riv.reshape(B, -1), per_city.reshape(B, -1),
                           torch.stack(self._escalators(0, s.techs, s.civics, s.builders_trained,
+                                                      # TS settlerCost counts cities-1 + BANKED + LIVE-QUEUED settlers
+                                                      # (catch 2: queued term missing; catch 3: the counter is
+                                                      # cumulative — the LIVE count is (current == settler col))
                                                       (s.rules.settler_base + s.rules.settler_per_city
-                                                       * (s.alive.sum(dim=1) - 1 + s.settlers).clamp(min=0).to(d))), dim=1),
+                                                       * (s.alive.sum(dim=1) - 1 + s.settlers
+                                                          + (s.current == s.rules_dev.b_cost.shape[0]).sum(dim=1)).clamp(min=0).to(d))), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.tech_boosted, 0).to(d) / 1000.0,
                           s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0,
                           self._ctx_block(None)], dim=1)
@@ -291,8 +299,13 @@ class BatchEnv:
         if r is None:
             n_cities = s.alive.sum(dim=1)
             qcur = s.current
-            q_ty = (qcur - 1).clamp(min=0, max=s.NU - 1)
-            q_u = (qcur >= 1) & (qcur <= s.NU)
+            # seat 0's queue codes are MASK COLUMNS (units at NB+2..NB+1+NU),
+            # not the rc 1..NU coding — the serve gate's first seat-0 obs
+            # compare caught the rc-style assumption within 12 turns
+            # (ctx.nUnitsWQ GPU 0 vs TS 1, seed 9002 t12).
+            _nb0 = s.rules_dev.b_cost.shape[0]
+            q_ty = (qcur - (_nb0 + 2)).clamp(min=0, max=s.NU - 1)
+            q_u = (qcur >= _nb0 + 2) & (qcur < _nb0 + 2 + s.NU)
             q_mil = q_u & (s._p_combat[q_ty] > 0)
             pt = s.p_type.clamp(min=0, max=s.NU - 1)
             mil = s.p_alive & (s._p_combat[pt] > 0)

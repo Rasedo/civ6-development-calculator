@@ -117,12 +117,13 @@ def run_batched(turns: int, eps: float) -> None:
     try:
         for t in range(turns):
             msgs = [read_msg(ch) for ch in children]  # barrier
-            for r in seats:
-                gobs_all = env.observe(r + 1)
-                gj_all = drive._builder_jobs(sim, r).tolist()
-                gs_all = drive._spread_targets(sim, r).tolist()
+            for seat in [0] + [r + 1 for r in seats]:
+                r = seat - 1
+                gobs_all = env.observe(seat)
+                gj_all = drive._builder_jobs(sim, r).tolist() if seat >= 1 else None
+                gs_all = drive._spread_targets(sim, r).tolist() if seat >= 1 else None
                 for b, msg in enumerate(msgs):
-                    tobs = torch.tensor(msg["obs"][str(r)], dtype=torch.float64)
+                    tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
                     diff = (gobs - tobs).abs()
                     badm = torch.zeros_like(diff, dtype=torch.bool)
@@ -130,20 +131,22 @@ def run_batched(turns: int, eps: float) -> None:
                     badm[ctx_lo:] = diff[ctx_lo:] != 0
                     if bool(badm.any()):
                         i = int(badm.nonzero(as_tuple=True)[0][0])
-                        flag(f"seed {seeds[b]} turn {t + 1} r{r}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.C, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
-                    for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(r), [])),
-                                         ("spread", gs_all[b], msg.get("spreads", {}).get(str(r), []))):
+                        flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.C, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
+                    if seat == 0:
+                        continue
+                    for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(seat), [])),
+                                         ("spread", gs_all[b], msg.get("spreads", {}).get(str(seat), []))):
                         for i in range(max(len(ga), len(ta))):
                             gv = ga[i] if i < len(ga) else -1
                             tv = ta[i] if i < len(ta) else -1
                             if gv != tv:
-                                flag(f"seed {seeds[b]} turn {t + 1} r{r}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
+                                flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
                                 break
             if bad:
                 break
             per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=seeds, turn=t) for r in seats}
             for b, ch in enumerate(children):
-                recs = {str(r): drive._extract_record(sim, r, *per_seat[r], b) for r in seats}
+                recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], b) for r in seats}
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
             sim.step()
@@ -239,11 +242,11 @@ def main() -> None:
     for t in range(args.turns):
         msg = read_msg()
         assert msg.get("t") == t + 1, f"turn frame skew: TS says {msg.get('t')}, orchestrator at {t + 1}"
-        for r in seats:
-            gobs = env.observe(r + 1)[0]
-            tobs = torch.tensor(msg["obs"][str(r)], dtype=torch.float64)
+        for seat in [0] + [r + 1 for r in seats]:
+            gobs = env.observe(seat)[0]
+            tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
             if gobs.shape[0] != tobs.shape[0]:
-                print(f"turn {t + 1} seat r{r}: WIDTH {int(tobs.shape[0])} (TS) vs {int(gobs.shape[0])} (GPU)")
+                print(f"turn {t + 1} seat {seat}: WIDTH {int(tobs.shape[0])} (TS) vs {int(gobs.shape[0])} (GPU)")
                 child.kill()
                 sys.exit(1)
             diff = (gobs - tobs).abs()
@@ -254,7 +257,7 @@ def main() -> None:
             if bool(bad.any()):
                 i = int(bad.nonzero(as_tuple=True)[0][0])
                 name = _field_name(i, sim.S, sim.R, sim.C, NT, NC)
-                rep = (f"turn {t + 1} seat r{r}: OBS MISMATCH at [{i}] {name}: "
+                rep = (f"turn {t + 1} seat {seat}: OBS MISMATCH at [{i}] {name}: "
                        f"GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
                 print(rep)
                 if first_report is None:
@@ -266,8 +269,8 @@ def main() -> None:
         for r in seats:
             gj = drive._builder_jobs(sim, r)[0].tolist()
             gs = drive._spread_targets(sim, r)[0].tolist()
-            tj = msg.get("jobs", {}).get(str(r), [])
-            ts_ = msg.get("spreads", {}).get(str(r), [])
+            tj = msg.get("jobs", {}).get(str(r + 1), [])
+            ts_ = msg.get("spreads", {}).get(str(r + 1), [])
             for name, ga, ta in (("job", gj, tj), ("spread", gs, ts_)):
                 for i in range(max(len(ga), len(ta))):
                     gv = ga[i] if i < len(ga) else -1
@@ -282,7 +285,7 @@ def main() -> None:
         if obs_bails:
             break
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
-        recs = {str(r): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
+        recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")

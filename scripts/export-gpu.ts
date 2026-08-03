@@ -1884,8 +1884,12 @@ for (let s = 0; s < N_SEEDS; s++) {
       // dicts, stored at the driven-file key: rivalActions[state.turn - 1],
       // read by THIS turn's rivalPhase). The obs renders at the GPU's own
       // decide position: pre-turn, before any phase acts.
+      // #51 seat-keyed wire: keys are SEAT ids — "0" IS the player, a seat
+      // like any other (the rival indexing in the protocol was the
+      // asymmetry's last vocabulary). Seat 0's obs joins the equality
+      // contract; its decisions join when the routing lands.
       const obs: Record<string, number[]> = {};
-      for (let r = 0; r < R_MAX; r++) obs[String(r)] = observeSeat(state, r + 1, C_MAX, SERVE_HORIZON, CS_MAX);
+      for (let seat = 0; seat <= R_MAX; seat++) obs[String(seat)] = observeSeat(state, seat, C_MAX, SERVE_HORIZON, CS_MAX);
       // #95 per-unit obs twins — the drive.py extractors' TS mirrors, per
       // rival unit IN UNIT-ARRAY ORDER (the proven slot-map mirror):
       // job = nearest rivalHasJob tile (d*T + index key, ties lowest);
@@ -1934,17 +1938,23 @@ for (let s = 0; s < N_SEEDS; s++) {
             sr.push(st);
           }
         }
-        jobsMsg[String(r)] = jr;
-        spreadsMsg[String(r)] = sr;
+        jobsMsg[String(r + 1)] = jr;   // #51 seat-keyed wire
+        spreadsMsg[String(r + 1)] = sr;
       }
       serveOut({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg });
       const nx = await serveIn.next();
       if (nx.done) throw new Error(`serve: stdin closed at turn ${state.turn}`);
       const msg = JSON.parse(String(nx.value)) as { recs?: Record<string, unknown> };
       if (msg.recs && Object.keys(msg.recs).length) {
-        const byRival: Record<number, unknown> = {};
-        for (const [rid, rec] of Object.entries(msg.recs)) byRival[Number(rid)] = rec;
-        (state.rivalActions as unknown as Record<number, unknown>)[state.turn - 1] = byRival;
+        // #51 seat-keyed wire: rec keys are SEAT ids; rivalActions' storage
+        // is still indexed by the legacy rival id (seat - 1) until the great
+        // rename sweeps the planes. Seat-0 records queue here for the
+        // routing slice (ignored today, applied when seat 0 goes driven).
+        const bySeat: Record<number, unknown> = {};
+        for (const [sid, rec] of Object.entries(msg.recs)) {
+          if (Number(sid) >= 1) bySeat[Number(sid) - 1] = rec;
+        }
+        (state.rivalActions as unknown as Record<number, unknown>)[state.turn - 1] = bySeat;
       }
     }
     // Envoys: greedily back the neediest met city-state (fewest envoys,
