@@ -64,9 +64,25 @@ def _field_name(i: int, S: int, R: int, C: int, NT: int, NC: int) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=9002)
+    ap.add_argument("--seeds", default=None, help="'all' = every gpu/fixtures/seed*.json, or comma-separated; overrides --seed")
     ap.add_argument("--turns", type=int, default=60)
     ap.add_argument("--eps", type=float, default=1e-9, help="scaled-float obs tolerance; the raw ctx block is compared EXACTLY")
     args = ap.parse_args()
+
+    if args.seeds:
+        if args.seeds == "all":
+            seeds = sorted(int(p.stem[4:]) for p in FIXTURES.glob("seed*.json"))
+        else:
+            seeds = [int(x) for x in args.seeds.split(",")]
+        bad = 0
+        for sd in seeds:
+            rc = subprocess.call(
+                [sys.executable, __file__, "--seed", str(sd), "--turns", str(args.turns), "--eps", str(args.eps)],
+                cwd=ROOT,
+            )
+            bad += 1 if rc else 0
+        print(f"SERVE SWEEP {'OK' if bad == 0 else f'RED ({bad}/{len(seeds)} seeds)'} — {len(seeds)} seeds x {args.turns} turns")
+        sys.exit(1 if bad else 0)
 
     rules = load_rules()
     fx = load_fixture(FIXTURES / f"seed{args.seed}.json")
