@@ -700,6 +700,17 @@ export function transferCityToRival(state: GameState, city: City, winner: RivalC
     specialists: {},
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
+    // B-20 / #99 (owner ruling 2026-08-03): GREAT WORKS RIDE WITH THE CITY.
+    // Real Civ 6 hands the conqueror the works housed in a captured city,
+    // and relics/artifacts with them. The rival->rival twin
+    // (transferRivalCityToRival) always carried these; this player-city path
+    // silently dropped them, and the GPU dropped them identically — so no
+    // gate could see it (#97: paired agreement is not fidelity).
+    greatWorksWriting: city.greatWorksWriting,
+    greatWorksArt: city.greatWorksArt,
+    greatWorksMusic: city.greatWorksMusic,
+    relics: city.relics,
+    artifacts: city.artifacts,
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) defected.outerHp = 0; // B-30: walls kept, outer pool 0
   winner.cities.push(defected);

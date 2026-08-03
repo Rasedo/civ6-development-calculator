@@ -7798,8 +7798,14 @@ class BatchSim:
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
-            self.gw_writing[b, c_new] = 0  # B-20: works wiped on capture (buildings kept, works are not)
-            self.gw_music[b, c_new] = 0
+            # B-20 / #99 (owner ruling): the conqueror INHERITS the works.
+            # All five written so a reused slot cannot leak the dead city's
+            # art/relics/artifacts (they were never zeroed here).
+            self.gw_writing[b, c_new] = int(self.rc_gw_writing[b, r, j])
+            self.gw_art[b, c_new] = int(self.rc_gw_art[b, r, j])
+            self.gw_music[b, c_new] = int(self.rc_gw_music[b, r, j])
+            self.relics[b, c_new] = int(self.rc_relics[b, r, j])
+            self.artifacts[b, c_new] = int(self.rc_artifacts[b, r, j])
             self.tiles_acquired[b, c_new] = int(self.rc_acquired[b, r, j]) if hasattr(self, "rc_acquired") else 0
             self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
             self.current[b, c_new] = -1
@@ -7897,8 +7903,14 @@ class BatchSim:
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
             self.culture_box[b, c_new] = 0.0
-            self.gw_writing[b, c_new] = 0  # B-20: fresh captured CS holds no works
+            # B-20: a city-state holds no works, so there is nothing to
+            # inherit — but all five zero explicitly (slot hygiene: a reused
+            # slot must not serve the previous city's art/relics/artifacts).
+            self.gw_writing[b, c_new] = 0
+            self.gw_art[b, c_new] = 0
             self.gw_music[b, c_new] = 0
+            self.relics[b, c_new] = 0
+            self.artifacts[b, c_new] = 0
             self.tiles_acquired[b, c_new] = 0
             self.city_hp[b, c_new] = self.rules.combat.get("cityMaxHp", 200) // 2
             self.current[b, c_new] = -1
@@ -16805,8 +16817,19 @@ class BatchSim:
         self.rc_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)
         self.rc_growth[b, w_, slot] = 0
         self.rc_cbox[b, w_, slot] = 0  # P5/S4 (TS transfer: cultureBox 0)
-        self.rc_gw_writing[b, w_, slot] = 0  # B-20: works wiped on player→rival transfer
-        self.rc_gw_music[b, w_, slot] = 0
+        # B-20 / #99 (owner ruling 2026-08-03): GREAT WORKS RIDE WITH THE CITY.
+        # Real Civ 6 hands the conqueror the works housed in a captured city
+        # (relics and artifacts likewise) — the rival->rival path always did
+        # this; the two PLAYER-involved paths wiped, and because BOTH engines
+        # wiped identically no gate could see it (the #97 class: paired
+        # agreement is not fidelity). Writing all five also closes a slot-
+        # hygiene leak: art/relics/artifacts were never zeroed here, so a
+        # REUSED slot inherited the dead city's art.
+        self.rc_gw_writing[b, w_, slot] = int(self.gw_writing[b, c])
+        self.rc_gw_art[b, w_, slot] = int(self.gw_art[b, c])
+        self.rc_gw_music[b, w_, slot] = int(self.gw_music[b, c])
+        self.rc_relics[b, w_, slot] = int(self.relics[b, c])
+        self.rc_artifacts[b, w_, slot] = int(self.artifacts[b, c])
         self.rc_loyalty[b, w_, slot] = 100.0  # P5/S6
         self.rc_acquired[b, w_, slot] = int(self.tiles_acquired[b, c])
         self.rc_hp[b, w_, slot] = round(self.rules.rivals.get("cityMaxHp", 200) / 2)
