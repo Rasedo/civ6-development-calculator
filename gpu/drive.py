@@ -38,7 +38,7 @@ import torch
 import ladder
 
 
-def _prod_ctx(blocks: dict, sim) -> dict:
+def _prod_ctx(blocks: dict, sim, r: int) -> dict:
     """#95 S1(a): the per-seat counters no mask can express (#84), read from
     the OBSERVATION's ctx block (ladder.CTX_FIELDS) instead of peeking at
     sim tensors — the values are the scripted sites' own, rendered by
@@ -47,10 +47,14 @@ def _prod_ctx(blocks: dict, sim) -> dict:
     state."""
     ctx = blocks["ctx"]
     emp = blocks["empire"]
-    city = blocks["city"]
     B = ctx.shape[0]
-    is_cap = torch.zeros(B, sim.RC, dtype=torch.bool, device=ctx.device)
-    is_cap[:, : city.shape[1]] = city[:, :, 9] > 0.5
+    # is_capital must be MASK-ALIGNED (rival_masks' city axis is SLOT order),
+    # and the obs city block went LIVING-ORDER with catch 6 — the two axes
+    # differ once a city dies. Until the serve obs dict carries a per-city
+    # identity (centre tile) to re-map with, this one flag reads the
+    # slot-ordered plane directly; the wire itself stays centre-keyed (the
+    # record schema), so nothing TS-facing leaks.
+    is_cap = sim.rc_is_cap[:, r]
     n_cities = ctx[:, 0].long()
     return {
         "settler_queued": emp[:, 6] > 0.5,  # raw queued-settler count
@@ -248,7 +252,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # columns, purchases zeroed; contract asserted in pref_apply_test.
     m = sim.rival_masks(r, lite=True)
     blocks = _blocks(env, sim, r)
-    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim))
+    prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(blocks, sim, r))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None
     civic = ladder.pick_research(blocks, m["civic"], "civic") if bool(m["civic"].any()) else None
     # #93 the WAR verb: the ladder decides from the driver's own policy

@@ -212,6 +212,12 @@ class BatchEnv:
             ],
             dim=2,
         ) * s.alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin (#95 S1(c) catch 3)
+        # #95 S1(c) catch 6: the city AXIS is LIVING ORDER (TS's array shifts
+        # down when a city is lost; the trace's per-city join says the same),
+        # not slot order — compact alive slots to the front, stable in slot
+        # (= founding) order.
+        _ord = torch.argsort((~s.alive).long(), dim=1, stable=True)
+        per_city = per_city.gather(1, _ord.unsqueeze(2).expand(-1, -1, per_city.shape[2]))
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
@@ -378,39 +384,46 @@ class BatchEnv:
         d = s.dtype
         B, C = s.B, s.C
         dev = s.device
-        pop = s.rc_pop[:, r, :C].to(d)
-        alive = s.rc_alive[:, r, :C]
-        needs = s._growth_needed(s.rc_pop[:, r, :C]).clamp(min=1)
-        denom = s.rc_cost[:, r, :C].clamp(min=1)
+        # #95 S1(c) catches 6+7: the city AXIS is LIVING ORDER over the FULL
+        # RC width (TS's list shifts down when a city dies, and a live city
+        # can sit in a slot >= C after flips/captures — slicing [:C] BEFORE
+        # ordering dropped it: 9018 t61 city[4], 9066/9092 city[5]). Gather
+        # the first C living slots (stable = founding order), then render.
+        _ordR = torch.argsort((~s.rc_alive[:, r]).long(), dim=1, stable=True)[:, :C]  # [B, C] slot ids
+        pop = s.rc_pop[:, r].gather(1, _ordR).to(d)
+        alive = s.rc_alive[:, r].gather(1, _ordR)
+        needs = s._growth_needed(s.rc_pop[:, r].gather(1, _ordR)).clamp(min=1)
+        denom = s.rc_cost[:, r].gather(1, _ordR).clamp(min=1)
+        _cur = s.rc_current[:, r].gather(1, _ordR)
         per_city = torch.stack(
             [
                 alive.to(d),
                 pop / 10.0,
-                s.rc_growth[:, r, :C].to(d) / needs.to(d),
-                torch.where(s.rc_current[:, r, :C] >= 0, s.rc_progress[:, r, :C].to(d) / denom.to(d), torch.zeros_like(pop)),
+                s.rc_growth[:, r].gather(1, _ordR).to(d) / needs.to(d),
+                torch.where(_cur >= 0, s.rc_progress[:, r].gather(1, _ordR).to(d) / denom.to(d), torch.zeros_like(pop)),
                 # #95 S1(c) first light, minute one: the serve gate's obs
                 # compare named BOTH of these on its first run. Col 4 was
                 # zeroed ("no per-city border box") but rc_cbox is live; col 5
                 # rendered rc_acquired — the ACQUISITION COUNTER — where TS
                 # (and the player renderer) count OWNED TILES. S8.1c's exact
                 # leftover class: nothing compared observations until now.
-                s.rc_cbox[:, r, :C].to(d) / s._border_cost(s.rc_acquired[:, r, :C]).clamp(min=1).to(d),
+                s.rc_cbox[:, r].gather(1, _ordR).to(d) / s._border_cost(s.rc_acquired[:, r].gather(1, _ordR)).clamp(min=1).to(d),
                 torch.where(
                     alive,
-                    ((s.rc_tile_id.unsqueeze(1) == s.rc_id[:, r, :C].unsqueeze(2))
+                    ((s.rc_tile_id.unsqueeze(1) == s.rc_id[:, r].gather(1, _ordR).unsqueeze(2))
                      & (s.rival_at == r).unsqueeze(1)).sum(dim=2).to(d),  # rc_id is PER-CIV — gate by owner plane
                     torch.zeros(B, C, dtype=d, device=dev),
                 ) / 20.0,
-                torch.where(alive, s.rc_hp[:, r, :C].to(d), torch.zeros_like(pop)) / 200.0,
-                s.rc_loyalty[:, r, :C].to(d) / 100.0,  # #51/S8.1c: rc_loyalty EXISTS
-                (s.rc_current[:, r, :C] >= 0).to(d),
+                torch.where(alive, s.rc_hp[:, r].gather(1, _ordR).to(d), torch.zeros_like(pop)) / 200.0,
+                s.rc_loyalty[:, r].gather(1, _ordR).to(d) / 100.0,  # #51/S8.1c: rc_loyalty EXISTS
+                (_cur >= 0).to(d),
                 # #51/S8.4c (#66): the production LADDER branches on isCapital
                 # (only the capital queues a settler) — nine floats could not
                 # say which city they described.
-                s.rc_is_cap[:, r, :C].to(d),
+                s.rc_is_cap[:, r].gather(1, _ordR).to(d),
             ],
             dim=2,
-        ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin (#95 S1(c) catch 3)
+        ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead rows ZERO, the TS zero-fill twin (#95 S1(c) catch 3)
         n_own_units = (s.v_alive & (s.v_civ == r)).sum(dim=1).to(d)
         emp = torch.stack(
             [
