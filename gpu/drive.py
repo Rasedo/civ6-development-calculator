@@ -240,7 +240,7 @@ def _buy_ctx(sim, r: int) -> dict:
     the settler/unit branches stay scripted on BOTH sides (symmetric,
     gate-safe) until their candidate halves are extracted the same way."""
     active = sim.r_alive[:, r] & (sim.rc_alive[:, r].sum(dim=1) > 0)
-    jj, bb, can_b, price = sim._rival_buy_candidates(r, active)
+    jj, bb, can_b, price, _ = sim._rival_buy_candidates(r, active)
     z = torch.zeros_like(can_b)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
             "settler_ok": z, "unit_ok": z}

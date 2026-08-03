@@ -9853,6 +9853,7 @@ class BatchSim:
         war: torch.Tensor | None = None,
         production_pref: torch.Tensor | None = None,
         envoys: torch.Tensor | None = None,
+        buy: tuple | None = None,  # A-5r: (kind [B], j [B], b [B]) — the wire's purchase intent
     ) -> None:
         """C2b: write a controlled rival's choices BEFORE step(). Codes use
         the rival_masks layout; -1 = no action. Queue writes mirror the
@@ -9935,6 +9936,12 @@ class BatchSim:
             if not hasattr(self, "_driven_picks") or self._driven_picks is None:
                 self._driven_picks = {}
             self._driven_picks[r] = (production, production_pref)
+        # A-5r piece 3: the BUY intent stashes like production — consumed at
+        # the gold block's own position (_consume_driven_buy).
+        if buy is not None:
+            if not hasattr(self, "_driven_buy") or self._driven_buy is None:
+                self._driven_buy = {}
+            self._driven_buy[r] = buy
 
     def _rival_buy_candidates(self, r: int, active: torch.Tensor):
         """A-5r/#95: the gold-purchase BUILDING candidate — ONE legality
@@ -9992,7 +9999,35 @@ class BatchSim:
         price6 = rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult
         reserve6 = float(rr.get("peaceGold0", 150))
         can6 = has6 & (js_round(self.r_treasury[:, r] * 1000) >= js_round((price6 + reserve6) * 1000))
-        return jj6, bb6, can6, price6
+        return jj6, bb6, can6, price6, elig6
+
+    def _consume_driven_buy(self, r: int, active: torch.Tensor) -> torch.Tensor:
+        """A-5r piece 3: execute the wire's BUY intent at the gold block's
+        own phase position (the class-3 lesson — draw-free is not
+        order-free). Re-validates the RECORDED (j, b) against the LIVE
+        eligibility scan + affordability (TS's arm re-validates the same
+        way); a stale intent refuses silently on both engines. Returns the
+        rows that bought (they consume the one-purchase-per-turn slot)."""
+        dbuy = getattr(self, "_driven_buy", None)
+        B, dev = self.B, self.device
+        bought = torch.zeros(B, dtype=torch.bool, device=dev)
+        if not dbuy or r not in dbuy:
+            return bought
+        kind, jjw, bbw = dbuy.pop(r)
+        want = active & self.controlled[:, r] & (kind == 0) & (jjw >= 0) & (bbw >= 0)
+        if not bool(want.any()):
+            return bought
+        _, _, _, _, elig = self._rival_buy_candidates(r, active)
+        jc = jjw.clamp(min=0, max=self.RC - 1)
+        bc = bbw.clamp(min=0, max=self.rules_dev.b_cost.shape[0] - 1)
+        ok = want & elig[torch.arange(B, device=dev), jc, bc]
+        price = self.rules_dev.b_cost.gather(0, bc).double() * self.rules.gold_purchase_mult
+        reserve = float(self.rules.rivals.get("peaceGold0", 150))
+        ok = ok & (js_round(self.r_treasury[:, r] * 1000) >= js_round((price + reserve) * 1000))
+        if bool(ok.any()):
+            self._rival_buy_building(r, ok, jc, bc, price)
+            bought = ok
+        return bought
 
     def _rival_buy_building(self, r: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
         """A-5r: the building-purchase EXECUTOR — shared by the scripted
@@ -15189,7 +15224,13 @@ class BatchSim:
                 # A-5r/#95: the candidate scan is the SHARED legality body —
                 # _rival_buy_candidates serves this scripted block AND the
                 # wire driver's _buy_ctx (one rule, two consumers).
-                jj6, bb6, can6, price6 = self._rival_buy_candidates(r, active)
+                # A-5r piece 3: driven rows consume the wire's BUY intent at
+                # THIS position; the scripted scan below stands down for them
+                # (the BUILDING branch only — settler/unit stay scripted for
+                # every seat until their halves join the wire).
+                bought_r5 = bought_r5 | self._consume_driven_buy(r, active)
+                jj6, bb6, can6, price6, _ = self._rival_buy_candidates(r, active)
+                can6 = can6 & ~self.controlled[:, r]
                 if bool(can6.any()):
                     self._rival_buy_building(r, can6, jj6, bb6, price6)
                     bought_r5 = bought_r5 | can6
