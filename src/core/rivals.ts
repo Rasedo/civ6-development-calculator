@@ -91,7 +91,7 @@ const RIVAL_SPACING = 10;
  * precedes SWORDSMAN so the 36-combat tie keeps HORSEMAN). BUILDER/SCOUT are
  * excluded — never in the rival roster. requiresResource is gated in the buy
  * loop (data-driven off the catalog, verified there). */
-const RIVAL_BUY_UNITS: { id: string; tech?: string }[] = [
+export const RIVAL_BUY_UNITS: { id: string; tech?: string }[] = [
   { id: 'WARRIOR' },
   { id: 'SLINGER' },
   { id: 'ARCHER', tech: 'ARCHERY' },
@@ -2363,17 +2363,15 @@ export function applyRivalActionRecord(state: GameState, rival: RivalCiv, rec: R
   // (the scripted roll's own body, minus the roll — that lives in the
   // ladder now, rolled from the DRIVER's policy stream, so neither engine's
   // rule stream moves).
-  // #93 the ENVOY verb: the recorded picks land here — bank first (quest
-  // grants), else one ENVOY_COST of influence; met + affordable re-validated.
-  // The write set matches the scripted assignment loop (rivalEnvoys only);
-  // spend-vs-accrual order commutes (linear adds), so the apply positions'
-  // difference across the engines cannot split the traced totals.
+  // #93 the ENVOY verb: the recorded picks land here — met + availability
+  // re-validated. #98: BANK ONLY — conversion is an eager RULE at the CS
+  // phase now (every seat), so a decide-time pick can never exceed the
+  // bank and the old influence-spend fallback was dead text.
   for (const csIdx of rec.envoys ?? []) {
     const cs = state.cityStates[csIdx];
     if (!cs || !cs.rivalMet?.[rival.id]) continue;
-    if ((rival.envoysAvailable ?? 0) > 0) rival.envoysAvailable = (rival.envoysAvailable ?? 0) - 1;
-    else if ((rival.influencePoints ?? 0) >= ENVOY_COST) rival.influencePoints = (rival.influencePoints ?? 0) - ENVOY_COST;
-    else continue;
+    if ((rival.envoysAvailable ?? 0) <= 0) continue;
+    rival.envoysAvailable = (rival.envoysAvailable ?? 0) - 1;
     (cs.rivalEnvoys ??= [])[rival.id] = (cs.rivalEnvoys[rival.id] ?? 0) + 1;
   }
   const warCol = rec.war;
@@ -2686,14 +2684,13 @@ export function rivalPhase(state: GameState): void {
         const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(rival.research).government : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         rival.influencePoints = (rival.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier;
-        // #70 driven-parity signature C: ACCRUAL is rules (every seat, above);
-        // CONVERSION + the greedy ASSIGNMENT are the envoy POLICY — the GPU's
-        // controlled path banks raw points (influence read 6 vs TS's 3 at seed
-        // 9066 t43 because TS kept converting). The ladder already owns the
-        // envoy verb (pick_envoy — the first verb ported); the rival envoy
-        // APPLY head is the #93-family port that re-enables this for driven
-        // seats on both engines at once.
-        while (!recU && rival.influencePoints >= ENVOY_COST) {
+        // #98 (owner catch 2026-08-03): CONVERSION IS A RULE, for every seat.
+        // Real Civ 6 grants the envoy the moment the meter fills, assigned or
+        // not — only the greedy ASSIGNMENT below is policy. The old !recU
+        // gate (conversion classified as policy at the #93 port) left driven
+        // rivals banking raw influence between assignments, a state no real
+        // Civ 6 civ shows; the player's CS phase always converted eagerly.
+        while (rival.influencePoints >= ENVOY_COST) {
           rival.influencePoints -= ENVOY_COST;
           rival.envoysAvailable = (rival.envoysAvailable ?? 0) + 1;
         }
@@ -3048,7 +3045,10 @@ export function rivalPhase(state: GameState): void {
       // (highest combat, ties to table order) at cost × mult. It spawns via
       // the shared rival machinery at the capital (else the first city), and
       // pays only where it LANDED (no free spot = refund, the P5/S8 pattern).
-      if (!bought && meleeCount + rangedCount < rival.cities.length * 2) {
+      // A-5r kind 2: a DRIVEN rival takes this rung only on the wire's
+      // intent [2,-1,-1]; the quota + candidate scan below re-validate.
+      const wantUnit = rec ? (rec as { buy?: [number, number, number] }).buy?.[0] === 2 : true;
+      if (wantUnit && !bought && meleeCount + rangedCount < rival.cities.length * 2) {
         let pickId: string | null = null;
         let pickCombat = -Infinity;
         for (const cand of RIVAL_BUY_UNITS) {

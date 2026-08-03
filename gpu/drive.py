@@ -300,29 +300,26 @@ def _seat_unit_orders(sim, seat: int):
 
 def _seat_envoys(sim, seat: int):
     """#93/#51 the ENVOY verb, seat-generic: simulate the scripted greedy
-    sequence — spend the BANK first (quest/civic-granted envoys), then
-    influence conversions while affordable — re-ranking neediest after
-    every pick exactly as the two while-loops did. Seat 0 has NO
-    influence-conversion machinery (the player's envoys arrive as bank
-    grants only), so its influence plane is ZERO and the SAME text runs
-    bank-only. Zero draws; pick_envoy is the round-8 ported policy.
-    Returns [B, K] CS indices (-1 pad) or None."""
+    sequence — spend the BANK, neediest re-ranked after every pick.
+    #98 (owner catch): conversion influence->bank is an eager RULE at the
+    CS phase for EVERY seat (real Civ 6 grants the envoy the moment the
+    meter fills), so the verb is bank-only — ONE text, no influence fork;
+    the pool router below is the only seat-shaped line. Zero draws;
+    pick_envoy is the round-8 ported policy. Returns [B, K] CS indices
+    (-1 pad) or None."""
     if sim.S <= 0:
         return None
-    cost_e = float(sim.rules.cs.get("envoyCost", 100))
     if seat == 0:
-        infl_e = torch.zeros(sim.B, dtype=torch.float64, device=sim.device)
         avail_e = sim.envoys_avail.clone()
         met_live_e = sim.cs_met[:, : sim.S] & sim.cs_alive[:, : sim.S]
         mine6_e = sim.cs_envoys[:, : sim.S].double() / 6.0
     else:
-        infl_e = sim.r_influence[:, seat - 1].clone()
         avail_e = sim.r_envoys_avail[:, seat - 1].clone()
         met_live_e = sim.cs_r_met[:, seat - 1, : sim.S] & sim.cs_alive[:, : sim.S]
         mine6_e = sim.cs_r_envoys[:, seat - 1, : sim.S].double() / 6.0
     picks_e = []
-    for _ke in range(6):  # bank (<=2 quest grants) + the conversion run
-        can_e = met_live_e.any(dim=1) & ((avail_e > 0) | (infl_e >= cost_e))
+    for _ke in range(6):  # bank bound: accrual grants <=1/turn + quest grants
+        can_e = met_live_e.any(dim=1) & (avail_e > 0)
         if not bool(can_e.any()):
             break
         blk_e = {"cs": torch.stack([met_live_e.double(), mine6_e, torch.zeros_like(mine6_e)], dim=2)}
@@ -332,9 +329,7 @@ def _seat_envoys(sim, seat: int):
             break
         picks_e.append(p_e)
         hit_e = p_e >= 0
-        bank_e = hit_e & (avail_e > 0)
-        avail_e = torch.where(bank_e, avail_e - 1, avail_e)
-        infl_e = torch.where(hit_e & ~bank_e, infl_e - cost_e, infl_e)
+        avail_e = torch.where(hit_e, avail_e - 1, avail_e)
         mine6_e = mine6_e + torch.nn.functional.one_hot(p_e.clamp(min=0), sim.S).double() * hit_e.unsqueeze(1).double() / 6.0
     return torch.stack(picks_e, dim=1) if picks_e else None  # [B, K]
 
@@ -359,10 +354,12 @@ def _war_ctx(blocks: dict) -> dict:
 
 def _buy_ctx(sim, r: int) -> dict:
     """A-5r: the purchase candidates, read from the engines' ONE legality
-    body (sim._rival_buy_candidates — the scripted gold block's own scan,
-    extracted in 732eb6a). v1 stages the BUILDING branch onto the wire;
-    the settler/unit branches stay scripted on BOTH sides (symmetric,
-    gate-safe) until their candidate halves are extracted the same way."""
+    bodies (sim._rival_buy_candidates for the building, kind 0;
+    sim._rival_buy_unit_candidates for the unit, kind 2 — both the
+    scripted gold rungs' own scans). settler_ok mirrors the settler
+    rung's own gate (city cap + price, no reserve). The unit quota is
+    the #56 H1 comparison over decide-time planes: live + queued
+    military < 2x alive cities."""
     active = sim.r_alive[:, r] & (sim.rc_alive[:, r].sum(dim=1) > 0)
     jj, bb, can_b, price, _ = sim._rival_buy_candidates(r, active)
     rr = sim.rules.rivals
@@ -370,9 +367,16 @@ def _buy_ctx(sim, r: int) -> dict:
     sett_cost = (rr.get("settlerBase", 48) + rr.get("settlerPer", 18)
                  * (n_cities - 1).clamp(min=0).double()) * sim.rules.gold_purchase_mult
     settler_ok = active & (n_cities < rr.get("maxCities", 6)) & sim._afford(sim.r_treasury[:, r], sett_cost)
-    z = torch.zeros_like(can_b)
+    cand_u = sim._rival_buy_unit_candidates(r, sim._rival_trainable_units(r))
+    vt_all = sim.v_type.clamp(min=0, max=sim.NU - 1)
+    mil_live = sim.v_alive & (sim.v_civ == r) & (sim._p_combat[vt_all] > 0)
+    qcur = sim.rc_current[:, r]
+    q_ty = (qcur - 1).clamp(min=0, max=sim.NU - 1)
+    q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._p_combat[q_ty] > 0)
+    n_mil = mil_live.sum(dim=1) + q_mil.sum(dim=1)
+    unit_ok = active & (n_mil < 2 * n_cities) & cand_u.any(dim=1)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
-            "settler_ok": settler_ok, "unit_ok": z}
+            "settler_ok": settler_ok, "unit_ok": unit_ok}
 
 
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
@@ -544,6 +548,8 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, b: i
             rec["buy"] = [0, int(sim.rc_center[b, r, _bj]), int(buy[2][b])]
     elif buy is not None and int(buy[0][b]) == 1:
         rec["buy"] = [1, -1, -1]  # SETTLER: no city key, the site scan decides
+    elif buy is not None and int(buy[0][b]) == 2:
+        rec["buy"] = [2, -1, -1]  # UNIT: the strongest-affordable scan decides
     return rec
 
 
@@ -581,6 +587,9 @@ def replay_seat(sim, r: int, rec: dict) -> None:
     elif _bv is not None and int(_bv[0]) == 1:
         neg1 = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
         buy = (torch.ones((sim.B,), dtype=torch.long, device=dev), neg1, neg1)
+    elif _bv is not None and int(_bv[0]) == 2:
+        neg1 = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
+        buy = (torch.full((sim.B,), 2, dtype=torch.long, device=dev), neg1, neg1)
     sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq, buy=buy)
     # #70 rng-order: replay stashes exactly as the driver does; the PHASE
     # executes at the walkers' position, so recorder and replayer share one

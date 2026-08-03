@@ -130,6 +130,17 @@ def run_batched(turns: int, eps: float) -> None:
                     _pa0 = sim.p_alive.tolist()
                     gj_all = [[jv for jv, av in zip(row, arow) if av] for row, arow in zip(gj_all, _pa0)]
                     gs_all = [[sv for sv, av in zip(row, arow) if av] for row, arow in zip(gs_all, _pa0)]
+                gb_all = None
+                if seat >= 1:
+                    # A-5r piece 4: the BUY-candidate tripwire — _buy_ctx vs
+                    # the TS pre-turn twin, [centre, bIdx, settlerOk, unitOk].
+                    _bc = drive._buy_ctx(sim, seat - 1)
+                    gb_all = [
+                        [int(sim.rc_center[b2, seat - 1, int(_bc["jj"][b2])]) if bool(_bc["can_building"][b2]) else -1,
+                         int(_bc["bb"][b2]) if bool(_bc["can_building"][b2]) else -1,
+                         int(bool(_bc["settler_ok"][b2])), int(bool(_bc["unit_ok"][b2]))]
+                        for b2 in range(sim.B)
+                    ]
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -148,6 +159,10 @@ def run_batched(turns: int, eps: float) -> None:
                             if gv != tv:
                                 flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
                                 break
+                    if gb_all is not None:
+                        tb = msg.get("buys", {}).get(str(seat), [])
+                        if tb and gb_all[b] != tb:
+                            flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit]: GPU {gb_all[b]} vs TS {tb}")
             if bad:
                 break
             # SEAT 0: the same seat verbs — v1 base classes (see the
@@ -329,6 +344,18 @@ def main() -> None:
                 gs = [sv for sv, av in zip(gs, _pa0) if av]
             tj = msg.get("jobs", {}).get(str(seat), [])
             ts_ = msg.get("spreads", {}).get(str(seat), [])
+            if seat >= 1:
+                _bc = drive._buy_ctx(sim, seat - 1)
+                gb = [int(sim.rc_center[0, seat - 1, int(_bc["jj"][0])]) if bool(_bc["can_building"][0]) else -1,
+                      int(_bc["bb"][0]) if bool(_bc["can_building"][0]) else -1,
+                      int(bool(_bc["settler_ok"][0])), int(bool(_bc["unit_ok"][0]))]
+                tb = msg.get("buys", {}).get(str(seat), [])
+                if tb and gb != tb:
+                    rep = f"turn {t + 1} seat {seat}: BUY [centre,bIdx,settler,unit]: GPU {gb} vs TS {tb}"
+                    print(rep)
+                    if first_report is None:
+                        first_report = rep
+                    obs_bails += 1
             for name, ga, ta in (("job", gj, tj), ("spread", gs, ts_)):
                 for i in range(max(len(ga), len(ta))):
                     gv = ga[i] if i < len(ga) else -1

@@ -9992,6 +9992,32 @@ class BatchSim:
         can6 = has6 & (js_round(self.r_treasury[:, r] * 1000) >= js_round((price6 + reserve6) * 1000))
         return jj6, bb6, can6, price6, elig6
 
+    def _rival_trainable_units(self, r: int) -> torch.Tensor:
+        """[B, NU] the units rival r may train or gold-buy: tech-unlocked
+        (via _p_tech; -1 = ungated) AND strategic-resource access in ITS
+        territory — the ONE formula behind the phase's tr_u_r and the
+        wire driver's _buy_ctx."""
+        B = self.B
+        res_ok = self._res_avail_mask(self.rival_at == r)
+        return (
+            (self._p_tech.unsqueeze(0) < 0)
+            | self.r_techs[:, r].gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
+        ) & res_ok
+
+    def _rival_buy_unit_candidates(self, r: int, tr_u: torch.Tensor) -> torch.Tensor:
+        """A-5r kind 2 [B, NU]: the gold UNIT-purchase candidate set — ONE
+        legality body for the scripted gold rung and the wire's _buy_ctx.
+        Non-naval military among tr_u (SCOUT masked out: affordability can
+        otherwise leave it the only candidate; BUILDER is combat 0),
+        affordable at cost x mult, NO war-chest reserve (the A-5r spec).
+        The #56 H1 quota gate stays at the call sites — its military
+        COUNT is positional (the phase tracks mid-phase spawns/queues)."""
+        mil = tr_u & (self._p_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
+        if self._scout_idx >= 0:
+            mil[:, self._scout_idx] = False
+        afford = self._afford(self.r_treasury[:, r].unsqueeze(1), self._p_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult)
+        return mil & afford
+
     def _consume_driven_buy(self, r: int, active: torch.Tensor) -> torch.Tensor:
         """A-5r piece 3: execute the wire's BUY intent at the gold block's
         own phase position (the class-3 lesson — draw-free is not
@@ -10011,6 +10037,12 @@ class BatchSim:
             if not hasattr(self, "_driven_buy_settler") or self._driven_buy_settler is None:
                 self._driven_buy_settler = {}
             self._driven_buy_settler[r] = kind == 1
+        # kind 2 (UNIT) executes at the unit SUB-POSITION (after building and
+        # settler, the TS rung order) — forward it there.
+        if bool((kind == 2).any()):
+            if not hasattr(self, "_driven_buy_unit") or self._driven_buy_unit is None:
+                self._driven_buy_unit = {}
+            self._driven_buy_unit[r] = kind == 2
         want = active & self.controlled[:, r] & (kind == 0) & (jjw >= 0) & (bbw >= 0)
         if not bool(want.any()):
             return bought
@@ -14381,16 +14413,15 @@ class BatchSim:
             # the computeAdoption twin the A-7r machinery already provides)
             pt = pt + self._adopted_gov_tier(self.r_civics[:, r]).double()
         self.r_influence[:, r] = self.r_influence[:, r] + torch.where(any_met, pt, torch.zeros_like(pt))
-        # #93 (#70 signature C, the OTHER half): ACCRUAL is rules — every seat,
-        # above — but CONVERSION + the greedy ASSIGNMENT are the envoy POLICY,
-        # and TS has stood them down for driven seats since round 8 while this
-        # loop kept converting for controlled ones: influence read (100, 0) at
-        # 9144 t68 — exactly one envoyCost. Driven seats bank raw points on
-        # BOTH engines until the envoy-apply head ports.
+        # #98 (owner catch 2026-08-03): CONVERSION IS A RULE, for every seat —
+        # real Civ 6 grants the envoy the moment the meter fills, assigned or
+        # not; only the greedy ASSIGNMENT below is policy. The old
+        # ~controlled gate left driven rivals banking raw influence between
+        # assignments — a state no real Civ 6 civ shows.
         pol_met = any_met & ~self.controlled[:, r]
         cost = float(rr.get("envoyCost", 100))
         for _ in range(3):  # the player conversion loop's bound
-            earn = pol_met & (self.r_influence[:, r] >= cost)
+            earn = any_met & (self.r_influence[:, r] >= cost)
             if not bool(earn.any()):
                 break
             self.r_influence[:, r] = torch.where(earn, self.r_influence[:, r] - cost, self.r_influence[:, r])
@@ -14398,11 +14429,12 @@ class BatchSim:
         # #93: the DRIVEN envoy picks consume HERE — the scripted loops'
         # exact position (post-accrual), so every threshold reader
         # (suzerainty -> player favor) sees the same within-turn sequence on
-        # both engines. Bank first, else one envoyCost; re-validated.
+        # both engines. #98: BANK ONLY — conversion is an eager rule above,
+        # so a decide-time pick can never exceed the bank and the old
+        # influence-spend fallback was dead text.
         _dse = getattr(self, "_driven_envoys", None)
         if _dse is not None and r in _dse:
             _env_s = _dse.pop(r)
-            cost_e = float(rr.get("envoyCost", 100))
             for _k in range(int(_env_s.shape[1])):
                 e_k = _env_s[:, _k]
                 cs_i = e_k.clamp(min=0, max=S - 1)
@@ -14411,13 +14443,10 @@ class BatchSim:
                     & self.cs_alive[:, :S].gather(1, cs_i.unsqueeze(1)).squeeze(1)
                     & self.cs_r_met[:, r, :S].gather(1, cs_i.unsqueeze(1)).squeeze(1)
                 )
-                if not bool(ok_e.any()):
+                land_e = ok_e & (self.r_envoys_avail[:, r] > 0)
+                if not bool(land_e.any()):
                     continue
-                bank_e = ok_e & (self.r_envoys_avail[:, r] > 0)
-                pay_e = ok_e & ~bank_e & (self.r_influence[:, r] >= cost_e)
-                land_e = bank_e | pay_e
-                self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] - bank_e.long()
-                self.r_influence[:, r] = torch.where(pay_e, self.r_influence[:, r] - cost_e, self.r_influence[:, r])
+                self.r_envoys_avail[:, r] = self.r_envoys_avail[:, r] - land_e.long()
                 self.cs_r_envoys[:, r, :S].scatter_add_(1, cs_i.unsqueeze(1), land_e.long().unsqueeze(1))
         for _ in range(4):  # assignment until spent (bank grows ≤1/turn)
             can = pol_met & (self.r_envoys_avail[:, r] > 0)
@@ -14941,11 +14970,7 @@ class BatchSim:
             # rival's per-unit strategic access (res_ok_r, reused by the A-5r
             # buy block) and trainable mask (requiresTech satisfied over the
             # FULL tech tree r_techs, via _p_tech; -1 = ungated) gate both lanes.
-            res_ok_r = self._res_avail_mask(self.rival_at == r)  # [B, NU]
-            tr_u_r = (
-                (self._p_tech.unsqueeze(0) < 0)
-                | self.r_techs[:, r].gather(1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1))
-            ) & res_ok_r  # [B, NU]
+            tr_u_r = self._rival_trainable_units(r)  # [B, NU]
             rng_type = self._p_rng_str > 0  # [NU]
             arNU = torch.arange(self.NU, device=dev)
             fill = torch.full((B, self.NU), -(10**9), dtype=torch.long, device=dev)
@@ -15299,20 +15324,19 @@ class BatchSim:
             # capital (else the first alive city); pay only where it LANDED
             # (no free spot = refund, the P5/S8 pattern).
             mil_count5 = n_melee + n_ranged
-            want_u5 = active & ~bought_r5 & (mil_count5 < 2 * n_cities)
+            # A-5r kind 2: a DRIVEN rival takes this rung only on the wire's
+            # intent (the scripted rows keep the scan); re-validation below is
+            # the same candidate body + quota either way.
+            dbuy_u5 = getattr(self, "_driven_buy_unit", None)
+            drv_u5 = torch.zeros(B, dtype=torch.bool, device=dev)
+            if dbuy_u5 is not None and r in dbuy_u5:
+                drv_u5 = dbuy_u5.pop(r) & self.controlled[:, r]
+            want_u5 = active & ~bought_r5 & (mil_count5 < 2 * n_cities) & (drv_u5 | ~self.controlled[:, r])
             if bool(want_u5.any()):
                 # AUDIT B-10: candidate = every non-naval military unit the rival
-                # has the tech + strategic access for (the extended RIVAL_BUY_UNITS
-                # roster, data-driven off tr_u_r — WARRIOR/SLINGER ungated, the
-                # rest on requiresTech; res_ok_r folded into tr_u_r). BUILDER is
-                # combat 0; SCOUT (combat 10) is dominated by WARRIOR in the
-                # combat argmax — exactly the RIVAL_BUY_UNITS set (SCOUT masked
-                # out: affordability can otherwise leave it the only candidate).
-                mil5 = tr_u_r & (self._p_combat.unsqueeze(0) > 0) & ~self.unit_naval.unsqueeze(0)
-                if self._scout_idx >= 0:
-                    mil5[:, self._scout_idx] = False
-                afford_u5 = self._afford(self.r_treasury[:, r].unsqueeze(1), self._p_cost.double().unsqueeze(0) * mult_r5)
-                cand_u5 = mil5 & afford_u5
+                # has the tech + strategic access for (_rival_buy_unit_candidates
+                # — the ONE body this rung shares with the wire's _buy_ctx).
+                cand_u5 = self._rival_buy_unit_candidates(r, tr_u_r)
                 elig_u5 = want_u5 & cand_u5.any(dim=1)
                 if bool(elig_u5.any()):
                     # highest combat wins; combat·NU − index breaks ties to the

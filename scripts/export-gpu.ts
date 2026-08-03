@@ -33,7 +33,11 @@ import { playerSeat, isPlayerSeat, isRivalSeat, civOfRival, tileSeat, tileBelong
 import { mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join as pathJoin } from 'node:path';
-import { createGame, endTurn, foundCity, queueBuilding, queueDistrict, queueSettler, setTechResearch, setCivicResearch, TURN_LIMIT } from '../src/core/game';
+import { createGame, endTurn, foundCity, goldAffordable, queueBuilding, queueDistrict, queueSettler, setTechResearch, setCivicResearch, TURN_LIMIT } from '../src/core/game';
+import { RIVAL_BUY_UNITS } from '../src/core/rivals';
+import { civHasStrategic } from '../src/core/seats';
+import { SCRIPTED_HELD_BUILDINGS } from '../src/data/buildings';
+import { RIVAL_SETTLER_COST } from '../src/data/rivals';
 import { queueUnit, moveCostInto } from '../src/core/units';
 import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../src/data/improvements'; // B-27 (#71)
 import type { ImprovementId } from '../src/core/types';
@@ -1841,6 +1845,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       // (d*(T+1) + centreIndex key), religious charge-carriers only.
       const jobsMsg: Record<string, number[]> = {};
       const spreadsMsg: Record<string, number[]> = {};
+      const buysMsg: Record<string, number[]> = {};
       const nT = state.map.tiles.length;
       {
         // #51 seat 0 — the SAME job predicate over the player's own planes
@@ -1930,11 +1935,64 @@ for (let s = 0; s < N_SEEDS; s++) {
             }
             sr.push(st);
           }
+          // A-5r piece 4: the BUY-candidate tripwire — the TS pre-turn twin
+          // of drive._buy_ctx, per seat: [buildingCentre, buildingIdx,
+          // settlerOk, unitOk]. ATTRIBUTION when a purchase diverges (which
+          // half went wrong, at its causal turn); the trace stays the gate.
+          let buyC = -1;
+          let buyB = -1;
+          let bd: (typeof BUILDINGS)[string] | null = null;
+          let bc: (typeof rv.cities)[number] | null = null;
+          for (const rc of rv.cities) {
+            const have = new Set(rc.buildings);
+            const done = new Set(rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type));
+            const center = state.map.tiles[rc.centerIndex];
+            for (const def of Object.values(BUILDINGS)) {
+              if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue;
+              if (!done.has(def.district)) continue;
+              if (!unl.buildings.has(def.id)) continue;
+              if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
+              if (def.exclusiveWith?.some((x) => have.has(x))) continue;
+              if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
+              if (rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id) continue;
+              if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
+                bd = def;
+                bc = rc;
+              }
+            }
+          }
+          if (bd && bc && Math.round((rv.treasury ?? 0) * 1000) >= Math.round((bd.cost * GOLD_PURCHASE_MULT + PEACE_GOLD_COST(0)) * 1000)) {
+            buyC = bc.centerIndex;
+            buyB = prodLayout().buildings.indexOf(bd.id);
+          }
+          const settlerOk = rv.cities.length > 0 && rv.cities.length < RIVAL_MAX_CITIES
+            && goldAffordable(rv.treasury ?? 0, RIVAL_SETTLER_COST(rv.cities.length) * GOLD_PURCHASE_MULT);
+          let mil = 0;
+          for (const u of state.units) {
+            if (u.seat !== civOfRival(rv.id)) continue;
+            if ((UNITS[u.type]?.combat ?? 0) > 0) mil += 1;
+          }
+          for (const rc of rv.cities) {
+            const q = rc.queue[0];
+            if (q?.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) mil += 1;
+          }
+          let anyU = false;
+          for (const cand of RIVAL_BUY_UNITS) {
+            if (cand.tech && !rv.research.techs.includes(cand.tech)) continue;
+            const def = UNITS[cand.id];
+            if (!def) continue;
+            if (def.requiresResource && !civHasStrategic(state, civOfRival(rv.id), def.requiresResource)) continue;
+            if (!goldAffordable(rv.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
+            anyU = true;
+            break;
+          }
+          const unitOk = rv.cities.length > 0 && mil < rv.cities.length * 2 && anyU;
+          buysMsg[String(r + 1)] = [buyC, buyB, settlerOk ? 1 : 0, unitOk ? 1 : 0];
         }
         jobsMsg[String(r + 1)] = jr;   // #51 seat-keyed wire
         spreadsMsg[String(r + 1)] = sr;
       }
-      serveOut({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg });
+      serveOut({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg, buys: buysMsg });
       const nx = await serveIn.next();
       if (nx.done) throw new Error(`serve: stdin closed at turn ${state.turn}`);
       const msg = JSON.parse(String(nx.value)) as { recs?: Record<string, unknown> };
