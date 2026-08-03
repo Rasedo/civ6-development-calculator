@@ -10,7 +10,7 @@ import { tilesWithin, hexDistance } from './hex';
 import { computeCityStats, luxuryAmenities, borderCandidates, pickBorderTile, acquireTile, citySpecialistSlots } from './city';
 import { canFoundCity, canPlaceDistrict, canPlaceWonder, validImprovements, canRemoveFeature, availableBuildings, buildingCompletable, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, availableTechs, availableCivics, governmentSlots, computeAdoption } from './effects';
-import type { Modifiers } from './effects';
+import type { Modifiers, Unlocks } from './effects';
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { spawnUnit, refreshUnits, unitMaintenance, trainableUnits, disbandUnit, builderCost } from './units';
 import { barbarianPhase, encampmentTrainXp } from './combat';
@@ -66,14 +66,23 @@ export function districtCostIn(research: ResearchState): number {
 /** P4/D-8: the GS district discount — 40% off a specialty type while the civ
  * has PLACED fewer of it than its per-unlocked-type average of COMPLETED
  * specialty districts: n < ceil(D/U), gated on D ≥ U (civfanatics 27783). */
-export function districtDiscounted(state: GameState, type: DistrictId): boolean {
+/**
+ * #96: ONE discount rule for every seat — n < ceil(D/U) with D >= U, over the
+ * seat's OWN unlocked-district set and its OWN cities. `owner` supplies both;
+ * omitted means seat 0, which is what every player call site meant.
+ */
+export function districtDiscounted(
+  state: GameState,
+  type: DistrictId,
+  owner?: { unlocks: Unlocks; cities: (City | RivalCity)[] },
+): boolean {
   if (!DISTRICTS[type]?.countsTowardLimit) return false;
-  const unlocks = computeUnlocks(state);
+  const unlocks = owner?.unlocks ?? computeUnlocks(state);
   const U = [...unlocks.districts].filter((d) => DISTRICTS[d as DistrictId]?.countsTowardLimit).length;
   if (U === 0) return false;
   let D = 0;
   let n = 0;
-  for (const c of state.cities) {
+  for (const c of owner?.cities ?? state.cities) {
     for (const d of c.districts) {
       if (!DISTRICTS[d.type]?.countsTowardLimit) continue;
       if (state.map.tiles[d.tileIndex].districtComplete) D += 1;

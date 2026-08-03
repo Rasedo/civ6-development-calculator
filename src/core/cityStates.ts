@@ -6,7 +6,7 @@
  * rival-civ war framework.
  */
 
-import type { CityState, CityStateQuest, DistrictId, GameState, Tile, Yields } from './types';
+import type { City, CityState, CityStateQuest, DistrictId, GameState, RivalCity, Tile, Yields } from './types';
 import { playerSeat, tileSeat, NO_SEAT, setTileOwner, seatOfCityState, isCityStateSeat, cityStateOfSeat, rivalsOf, civOfRival, rivalOfCiv, isPlayerSeat, PLAYER_CIV, emptySeat } from './seats';
 import { emptyYields } from './types';
 import { tilesWithin, hexDistance } from './hex';
@@ -250,14 +250,26 @@ export function assignEnvoy(state: GameState, csId: number): RuleResult {
 // Per-turn phase
 // ---------------------------------------------------------------------------
 
-function questSatisfied(state: GameState, cs: CityState, quest: CityStateQuest): boolean {
+/**
+ * #96: ONE "is this quest done?" rule for every seat. Camps are global; the
+ * route and district tests read the SEAT's own lists, which `owner` supplies
+ * (omitted = seat 0, what every player call site meant). Note the quest
+ * ISSUERS are deliberately NOT merged: the player's draws RNG and the rival's
+ * is zero-draw by design (B8), and choosing a quest is policy, not a rule.
+ */
+export function questSatisfied(
+  state: GameState,
+  cs: CityState,
+  quest: CityStateQuest,
+  owner?: { tradeRoutes?: { toCs?: number }[]; cities: (City | RivalCity)[] },
+): boolean {
   switch (quest.kind) {
     case 'clearCamp':
       return quest.campIndex !== undefined && !state.barbSeat.camps.includes(quest.campIndex);
     case 'sendTradeRoute':
-      return state.tradeRoutes.some((r) => r.toCs === cs.id);
+      return (owner ? (owner.tradeRoutes ?? []) : state.tradeRoutes).some((r) => r.toCs === cs.id);
     case 'buildDistrict':
-      return state.cities.some((c) =>
+      return (owner?.cities ?? state.cities).some((c) =>
         c.districts.some(
           (d) => d.type === quest.district && state.map.tiles[d.tileIndex].districtComplete,
         ),

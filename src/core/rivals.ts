@@ -21,7 +21,7 @@ import { getModifiers, withFollowerBelief, followerReligionForCity } from './eff
 import { tileYields, regionalEffects } from './yields';
 import { emptyYields } from './types'; // A-22: rival specialist yields
 import { routeYields, csRouteYields, routeYieldsInternational, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity, routeRaidedAt } from './trade';
-import { isSuzerain, csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
+import { isSuzerain, csEnvoyBonuses, csSuzerainCapitalBonus, questSatisfied } from './cityStates';
 import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_DISTRICT } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
@@ -69,7 +69,7 @@ import { hasRiver, hasFreshWater, isCoastalLand, isCoastalWater } from './query'
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { disbandUnit, cityNavalCapable, waterEnterable, builderCost, walkToward } from './units';
 import { killUnit } from './combat';  // #51/S7.12
-import { districtCostIn, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem, tilePurchaseCost } from './game';
+import { districtCostIn, districtDiscounted, goldAffordable, buildingFaithCost, foundCityAt, isEncampmentItem, tilePurchaseCost } from './game';
 import { districtAdjacency, pillagedDistrictTypes } from './yields';
 import { DISTRICTS, SCAFFOLD_DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS } from './unitActions';
@@ -1048,7 +1048,7 @@ export function placeRivalDistrict(
   // P4/D-8: the rival's own discount, priced BEFORE registering the
   // placement (symmetric with the player's queueDistrict).
   const base = districtCostIn(rival.research);
-  const cost = rivalDistrictDiscounted(state, rival, id, unlocks) ? Math.floor(base * 0.6) : base;
+  const cost = districtDiscounted(state, id, { unlocks, cities: rival.cities }) ? Math.floor(base * 0.6) : base;  // #96: one discount rule, every seat
   tile.district = id;
   tile.districtComplete = false;
   tile.improvement = null;
@@ -1059,30 +1059,6 @@ export function placeRivalDistrict(
   rc.districts.push({ type: id, tileIndex: best });
   commitProduction(state, rc.seat, rc, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
   return true;
-}
-
-/** P4/D-8 (symmetric with districtDiscounted): 40% off while this rival has
- * PLACED fewer of the type than its per-unlocked-type average of COMPLETED
- * specialty districts — n < ceil(D/U), D ≥ U, from ITS OWN research. */
-function rivalDistrictDiscounted(
-  state: GameState,
-  rival: RivalCiv,
-  type: DistrictId,
-  unlocks: Unlocks,
-): boolean {
-  if (!DISTRICTS[type]?.countsTowardLimit) return false;
-  const U = [...unlocks.districts].filter((d) => DISTRICTS[d as DistrictId]?.countsTowardLimit).length;
-  if (U === 0) return false;
-  let D = 0;
-  let n = 0;
-  for (const rc of rival.cities) {
-    for (const d of rc.districts) {
-      if (!DISTRICTS[d.type]?.countsTowardLimit) continue;
-      if (state.map.tiles[d.tileIndex].districtComplete) D += 1;
-      if (d.type === type) n += 1;
-    }
-  }
-  return D >= U && n < Math.ceil(D / U);
 }
 
 /**
@@ -2247,27 +2223,7 @@ export function assertRivalRegistryCoherent(state: GameState): void {
 // ---------------------------------------------------------------------------
 
 /** Has this rival satisfied its `cs` quest? The rival-seat twin of
- *  questSatisfied (cityStates.ts) — reads THIS rival's cities/routes. */
-function rivalQuestSatisfied(
-  state: GameState,
-  rival: RivalCiv,
-  cs: CityState,
-  quest: CityStateQuest,
-): boolean {
-  switch (quest.kind) {
-    case 'clearCamp':
-      return quest.campIndex !== undefined && !state.barbSeat.camps.includes(quest.campIndex);
-    case 'sendTradeRoute':
-      // READ-ONLY on the rival's own route list (slice T owns trade.ts).
-      return (rival.tradeRoutes ?? []).some((r) => r.toCs === cs.id);
-    case 'buildDistrict':
-      return rival.cities.some((rc) =>
-        rc.districts.some(
-          (d) => d.type === quest.district && state.map.tiles[d.tileIndex].districtComplete,
-        ),
-      );
-  }
-}
+ *  questSatisfied (cityStates.ts), now the shared seat-generic rule. */
 
 /** Pick this rival's next `cs` quest with NO RNG: the FIRST SATISFIABLE
  *  option in the fixed order clearCamp → buildDistrict → sendTradeRoute
@@ -2697,7 +2653,7 @@ export function rivalPhase(state: GameState): void {
         const rqi = (cs.rivalQuestIssuedTurn ??= []);
         const cur = rq[rival.id] ?? null;
         if (cur) {
-          if (rivalQuestSatisfied(state, rival, cs, cur)) {
+          if (questSatisfied(state, cs, cur, { tradeRoutes: rival.tradeRoutes, cities: rival.cities })) {
             rq[rival.id] = null;
             rqi[rival.id] = state.turn;
             const env = (cs.rivalEnvoys ??= []);
