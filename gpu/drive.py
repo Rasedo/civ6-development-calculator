@@ -241,9 +241,14 @@ def _buy_ctx(sim, r: int) -> dict:
     gate-safe) until their candidate halves are extracted the same way."""
     active = sim.r_alive[:, r] & (sim.rc_alive[:, r].sum(dim=1) > 0)
     jj, bb, can_b, price, _ = sim._rival_buy_candidates(r, active)
+    rr = sim.rules.rivals
+    n_cities = sim.rc_alive[:, r].sum(dim=1)
+    sett_cost = (rr.get("settlerBase", 48) + rr.get("settlerPer", 18)
+                 * (n_cities - 1).clamp(min=0).double()) * sim.rules.gold_purchase_mult
+    settler_ok = active & (n_cities < rr.get("maxCities", 6)) & sim._afford(sim.r_treasury[:, r], sett_cost)
     z = torch.zeros_like(can_b)
     return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
-            "settler_ok": z, "unit_ok": z}
+            "settler_ok": settler_ok, "unit_ok": z}
 
 
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
@@ -484,6 +489,8 @@ def _extract_record(sim, r: int, prod, tech, civic, war, env_seq, seq, buy, b: i
         _bj = int(buy[1][b])
         if 0 <= _bj < int(sim.rc_center.shape[2]) and bool(sim.rc_alive[b, r, _bj]):
             rec["buy"] = [0, int(sim.rc_center[b, r, _bj]), int(buy[2][b])]
+    elif buy is not None and int(buy[0][b]) == 1:
+        rec["buy"] = [1, -1, -1]  # SETTLER: no city key, the site scan decides
     return rec
 
 
@@ -518,6 +525,9 @@ def replay_seat(sim, r: int, rec: dict) -> None:
             hitj = torch.where(m, torch.full_like(hitj, j), hitj)
         kind0 = torch.where(hitj >= 0, torch.zeros_like(hitj), torch.full_like(hitj, -1))
         buy = (kind0, hitj, torch.full((sim.B,), int(_bv[2]), dtype=torch.long, device=dev))
+    elif _bv is not None and int(_bv[0]) == 1:
+        neg1 = torch.full((sim.B,), -1, dtype=torch.long, device=dev)
+        buy = (torch.ones((sim.B,), dtype=torch.long, device=dev), neg1, neg1)
     sim.apply_rival_actions(r, production=prod, tech=tech, civic=civic, war=war, envoys=env_seq, buy=buy)
     # #70 rng-order: replay stashes exactly as the driver does; the PHASE
     # executes at the walkers' position, so recorder and replayer share one

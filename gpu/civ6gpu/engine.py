@@ -10014,6 +10014,12 @@ class BatchSim:
         if not dbuy or r not in dbuy:
             return bought
         kind, jjw, bbw = dbuy.pop(r)
+        # kind 1 (SETTLER) executes at the settler SUB-POSITION (after
+        # bank-first, the TS order) — forward it there.
+        if bool((kind == 1).any()):
+            if not hasattr(self, "_driven_buy_settler") or self._driven_buy_settler is None:
+                self._driven_buy_settler = {}
+            self._driven_buy_settler[r] = kind == 1
         want = active & self.controlled[:, r] & (kind == 0) & (jjw >= 0) & (bbw >= 0)
         if not bool(want.any()):
             return bought
@@ -15254,7 +15260,19 @@ class BatchSim:
                 _got_b = _bank_ok & (self.rc_alive[:, r].sum(dim=1) > _nb_b)
                 self.r_settlers[:, r] = torch.where(_got_b, self.r_settlers[:, r] - 1, self.r_settlers[:, r])
             n_cities = self.rc_alive[:, r].sum(dim=1)
-            want_s5 = active & ~bought_r5 & (n_cities < rr.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], sett_price5)
+            # A-5r kind 1: the driven SETTLER buy executes at THIS sub-position
+            # (after bank-first, the TS order); scripted rows keep the scan.
+            dbuy_s = getattr(self, "_driven_buy_settler", None)
+            if dbuy_s is not None and r in dbuy_s:
+                want_ds = dbuy_s.pop(r) & active & self.controlled[:, r] & ~bought_r5 \
+                    & (n_cities < rr.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], sett_price5)
+                if bool(want_ds.any()):
+                    n_before_d = self.rc_alive[:, r].sum(dim=1)
+                    self._rival_try_found(r, want_ds)
+                    founded_d = want_ds & (self.rc_alive[:, r].sum(dim=1) > n_before_d)
+                    self.r_treasury[:, r] = torch.where(founded_d, self.r_treasury[:, r] - sett_price5, self.r_treasury[:, r])
+                    bought_r5 = bought_r5 | founded_d
+            want_s5 = active & ~self.controlled[:, r] & ~bought_r5 & (n_cities < rr.get("maxCities", 6)) & self._afford(self.r_treasury[:, r], sett_price5)
             if bool(want_s5.any()):
                 n_before5 = self.rc_alive[:, r].sum(dim=1)
                 self._rival_try_found(r, want_s5)

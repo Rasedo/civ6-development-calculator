@@ -3026,7 +3026,12 @@ export function rivalPhase(state: GameState): void {
       if (rival.settlers > 0 && rival.cities.length < RIVAL_MAX_CITIES && tryFoundCity(state, rival)) {
         rival.settlers -= 1;
       }
-      if (!bought && rival.cities.length < RIVAL_MAX_CITIES) {
+      // A-5r kind 1: a DRIVEN rival buys a settler only on the wire's
+      // intent (re-validated by the same cap/afford/found gates below);
+      // scripted rivals keep the condition. Bank-first above stays
+      // unconditional for every seat — spending the bank is a rule.
+      const wantSettler = rec ? (rec as { buy?: [number, number, number] }).buy?.[0] === 1 : true;
+      if (wantSettler && !bought && rival.cities.length < RIVAL_MAX_CITIES) {
         const price = RIVAL_SETTLER_COST(rival.cities.length) * GOLD_PURCHASE_MULT;
         if (goldAffordable(rival.treasury ?? 0, price)) {
           const before = rival.cities.length;

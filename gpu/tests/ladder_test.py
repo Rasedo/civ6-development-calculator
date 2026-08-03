@@ -420,9 +420,9 @@ def main() -> None:
     # building branch only — settler/unit flags must be all-False stubs.
     import drive as _drv
     bctx = _drv._buy_ctx(s, 0)
-    assert not bool(bctx["settler_ok"].any()) and not bool(bctx["unit_ok"].any()), "v1: settler/unit stay scripted both sides"
-    assert bctx["can_building"].shape == (s.B,), "buy ctx must be per-row"
-    print("  l A-5r purchase priority OK (building > settler > unit, v1 stages building only)")
+    assert not bool(bctx["unit_ok"].any()), "v2: the UNIT branch stays scripted both sides"
+    assert bctx["can_building"].shape == (s.B,) == bctx["settler_ok"].shape, "buy ctx must be per-row"
+    print("  l A-5r purchase priority OK (building > settler > unit; unit branch still scripted)")
 
     print("LADDER CONTRACT OK")
 
