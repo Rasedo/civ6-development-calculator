@@ -211,7 +211,7 @@ class BatchEnv:
                 s.is_cap.to(d),
             ],
             dim=2,
-        )  # [B, C, 10]
+        ) * s.alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin (#95 S1(c) catch 3)
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
@@ -388,8 +388,19 @@ class BatchEnv:
                 pop / 10.0,
                 s.rc_growth[:, r, :C].to(d) / needs.to(d),
                 torch.where(s.rc_current[:, r, :C] >= 0, s.rc_progress[:, r, :C].to(d) / denom.to(d), torch.zeros_like(pop)),
-                torch.zeros(B, C, dtype=d, device=dev),  # no per-city border box
-                s.rc_acquired[:, r, :C].to(d) / 20.0 if hasattr(s, "rc_acquired") else torch.zeros(B, C, dtype=d, device=dev),
+                # #95 S1(c) first light, minute one: the serve gate's obs
+                # compare named BOTH of these on its first run. Col 4 was
+                # zeroed ("no per-city border box") but rc_cbox is live; col 5
+                # rendered rc_acquired — the ACQUISITION COUNTER — where TS
+                # (and the player renderer) count OWNED TILES. S8.1c's exact
+                # leftover class: nothing compared observations until now.
+                s.rc_cbox[:, r, :C].to(d) / s._border_cost(s.rc_acquired[:, r, :C]).clamp(min=1).to(d),
+                torch.where(
+                    alive,
+                    ((s.rc_tile_id.unsqueeze(1) == s.rc_id[:, r, :C].unsqueeze(2))
+                     & (s.rival_at == r).unsqueeze(1)).sum(dim=2).to(d),  # rc_id is PER-CIV — gate by owner plane
+                    torch.zeros(B, C, dtype=d, device=dev),
+                ) / 20.0,
                 torch.where(alive, s.rc_hp[:, r, :C].to(d), torch.zeros_like(pop)) / 200.0,
                 s.rc_loyalty[:, r, :C].to(d) / 100.0,  # #51/S8.1c: rc_loyalty EXISTS
                 (s.rc_current[:, r, :C] >= 0).to(d),
@@ -399,7 +410,7 @@ class BatchEnv:
                 s.rc_is_cap[:, r, :C].to(d),
             ],
             dim=2,
-        )  # [B, C, 10]
+        ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead slots ZERO, the TS zero-fill twin (#95 S1(c) catch 3)
         n_own_units = (s.v_alive & (s.v_civ == r)).sum(dim=1).to(d)
         emp = torch.stack(
             [

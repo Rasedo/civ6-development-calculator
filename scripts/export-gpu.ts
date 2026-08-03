@@ -181,6 +181,8 @@ import {
 // B-27 (#71): SEASIDE_RESORT appended LAST — this array's order IS the GPU's
 // improvement index, so anything but an append renumbers every other row.
 import { IMPROVEMENT_IDS } from '../src/core/unitActions'; // #93: ONE roster, core-owned (order is the column index; FORT appended LAST)
+import { observeSeat } from '../src/core/seatTurn'; // #95 S1(b): the serve-mode obs render
+import { createInterface } from 'node:readline';
 // Canonical luxury catalog order for the per-tile `lux` plane.
 const LUXURY_IDS = Object.values(RESOURCES)
   .filter((r) => r.category === 'luxury')
@@ -224,6 +226,20 @@ const R_MAX = Number(process.argv[5] ?? 2);  // C3c-i: parametric (the default 2
 // C3c-i: argv[5] = rival count (default 2 — THE PARITY CONTRACT POOL);
 // argv[6] = output dir. The O=4 pool: `-- 24 100 5 3 gpu/fixtures_o4`.
 const OUT = process.argv[6] ?? 'gpu/fixtures';
+
+// #95 S1(b): DECISION-SERVER CLIENT mode — the TS engine serves observations
+// and consumes decisions over stdio, per turn, for ONE seed; the wire
+// replaces gpu/fixtures/rival_actions.json. Protocol lines are prefixed
+// "@@" so ordinary exporter logging cannot corrupt the stream; the
+// orchestrator (gpu/serve_gate.py) filters on the sentinel. File outputs
+// are suppressed — a serve run is a gate, not an export.
+const SERVE = !!process.env.CIV6_SERVE;
+const SERVE_SEED = Number(process.env.CIV6_SERVE_SEED ?? -1);
+const SERVE_HORIZON = Number(process.env.CIV6_SERVE_HORIZON ?? N_TURNS);
+const serveIn = SERVE
+  ? createInterface({ input: process.stdin, crlfDelay: Infinity })[Symbol.asyncIterator]()
+  : null;
+const serveOut = (msg: unknown) => process.stdout.write('@@' + JSON.stringify(msg) + '\n');
 
 /**
  * #71 (DEBT-1): SEED_OVERRIDES is keyed by INDEX and tuned for the
@@ -1325,6 +1341,7 @@ const SEED_OVERRIDES: Record<number, number> = {
 };
 for (let s = 0; s < N_SEEDS; s++) {
   const seed = seedFor(s);
+  if (SERVE && seed !== SERVE_SEED) continue;  // #95 S1(b): one seed per serve child
   // withVillages: false — goody-hut claiming (a fog-era mechanic with its
   // own reward rolls) is outside the ported scope, so the reference maps
   // must not carry huts a moving unit could trip over.
@@ -1360,6 +1377,9 @@ for (let s = 0; s < N_SEEDS; s++) {
       state.rivalActions = log as GameState['rivalActions'];
     }
   }
+  // #95 S1(b): serve mode fills rivalActions TURN BY TURN from the wire —
+  // same key convention, same rivalPhase consumption as the driven file.
+  if (SERVE) state.rivalActions = {} as GameState['rivalActions'];
   // A-12b: snapshot the t0 city-state roster BEFORE the reference run — a
   // rival can now CONQUER a CS mid-run (captureCityStateForRival removes it
   // from state.cityStates), and the fixture must carry the t0 world; the
@@ -1855,6 +1875,24 @@ for (let s = 0; s < N_SEEDS; s++) {
   };
   const cityIds: number[] = state.cities.map((c) => c.id);
   for (let t = 0; t < N_TURNS; t++) {
+    if (SERVE && serveIn) {
+      // #95 S1(b): the handshake — obs out (per driven rival seat, the
+      // seat-invariant observeSeat vector), decisions in (record-schema
+      // dicts, stored at the driven-file key: rivalActions[state.turn - 1],
+      // read by THIS turn's rivalPhase). The obs renders at the GPU's own
+      // decide position: pre-turn, before any phase acts.
+      const obs: Record<string, number[]> = {};
+      for (let r = 0; r < R_MAX; r++) obs[String(r)] = observeSeat(state, r + 1, C_MAX, SERVE_HORIZON);
+      serveOut({ t: state.turn, obs });
+      const nx = await serveIn.next();
+      if (nx.done) throw new Error(`serve: stdin closed at turn ${state.turn}`);
+      const msg = JSON.parse(String(nx.value)) as { recs?: Record<string, unknown> };
+      if (msg.recs && Object.keys(msg.recs).length) {
+        const byRival: Record<number, unknown> = {};
+        for (const [rid, rec] of Object.entries(msg.recs)) byRival[Number(rid)] = rec;
+        (state.rivalActions as unknown as Record<number, unknown>)[state.turn - 1] = byRival;
+      }
+    }
     // Envoys: greedily back the neediest met city-state (fewest envoys,
     // ties to the lowest id) — the GPU scripted policy mirrors this.
     while (playerSeat(state).envoysAvailable > 0 && state.cityStates.some((cs) => cs.met)) {
@@ -1979,6 +2017,7 @@ for (let s = 0; s < N_SEEDS; s++) {
       else if (civicIdx.has(id)) boostSchedule.push({ turn: state.turn - 1, kind: 'civic', idx: civicIdx.get(id)! });
     }
     trace.push(traceRow(state, cityIds, C_MAX, CS_MAX, R_MAX));
+    if (SERVE) serveOut({ row: trace.length - 1, trace: trace[trace.length - 1] });
   }
   // A collapsed empire is a legitimate outcome for NON-capital cities —
   // loyalty flips ARE the hostile world working. But rival CONQUEST can
@@ -2019,7 +2058,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     boostSchedule,
     trace,
   };
-  writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));
+  if (!SERVE) writeFileSync(`${OUT}/seed${seed}.json`, JSON.stringify(fixture));  // #95 S1(b): a serve run is a gate, not an export
   const pops = state.cities.map((c) => c.population).join('/');
   const envoys = state.cityStates.map((cs) => cs.envoys).join('/');
   const wars = rivalsOf(state).filter((r) => r.atWar).length;
@@ -2037,11 +2076,13 @@ for (let s = 0; s < N_SEEDS; s++) {
 // float association past the milli tolerances. Sweep them here — the
 // emit set is the single source of truth.
 const emitted = new Set<string>();
-for (let s = 0; s < N_SEEDS; s++) emitted.add(`seed${seedFor(s)}.json`);
-for (const f of readdirSync(OUT)) {
-  if (/^seed\d+\.json$/.test(f) && !emitted.has(f)) {
-    rmSync(`${OUT}/${f}`);
-    console.log(`orphaned fixture removed: ${f} (not in the current SEED_OVERRIDES emit set)`);
+if (!SERVE) {  // #95 S1(b): serve mode wrote nothing — sweep nothing
+  for (let s = 0; s < N_SEEDS; s++) emitted.add(`seed${seedFor(s)}.json`);
+  for (const f of readdirSync(OUT)) {
+    if (/^seed\d+\.json$/.test(f) && !emitted.has(f)) {
+      rmSync(`${OUT}/${f}`);
+      console.log(`orphaned fixture removed: ${f} (not in the current SEED_OVERRIDES emit set)`);
+    }
   }
 }
 console.log(`\nFixtures in ${OUT}/ — run gpu/parity_test.py against them.`);
