@@ -18,7 +18,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { playerSeat, isPlayerSeat, tileBelongsTo } from '../src/core/seats';
+import { playerSeat, tileBelongsTo } from '../src/core/seats';
 import {
   createGame,
   endTurn,
@@ -34,15 +34,12 @@ import {
   serialize,
   deserialize,
 } from '../src/core/game';
-import { queueUnit, walkPath, builderImprove, builderRemoveFeature, builderRepair, playerPillage } from '../src/core/units';
-import { meleeAttack, rangedAttack } from '../src/core/combat';
+import { queueUnit } from '../src/core/units';
 import { assignEnvoy } from '../src/core/cityStates';
 import { canPlaceDistrict } from '../src/core/rules';
 import { districtAdjacency } from '../src/core/yields';
-import { neighborTile } from '../src/core/hex';
 import { traceRow, traceColumns } from './gpu-trace';
-import { unitActionIndex } from './gpu-actions';
-import { UNITS } from '../src/data/units';
+import { applySeatZeroUnits } from '../src/core/seatZeroApply';
 import type { DistrictId } from '../src/core/types';
 import { tsStateLines } from './statelog';
 
@@ -62,8 +59,6 @@ const PATH = process.argv[2] ?? 'gpu/fixtures/rollout.json';
 // hardcoded ladder had PILLAGE on 24 (the FORT column) and no handler at all
 // for the real pillage column or for FORT.
 const RULES_IMP: string[] = JSON.parse(readFileSync('gpu/fixtures/rules.json', 'utf8')).improvements.ids;
-const A = unitActionIndex(RULES_IMP);
-const RES_START = 18;
 
 const roll = JSON.parse(readFileSync(PATH, 'utf8')) as {
   width: number;
@@ -154,74 +149,12 @@ for (const game of roll.games) {
     // execution time (an earlier unit's move can invalidate a later one's),
     // so a rejected order here must match a no-op there — any real
     // divergence surfaces in the trace comparison instead.
-    for (const [tile, a, civ] of act?.u ?? []) {
-      // Identify the ordered unit by its (start-of-turn) tile and domain,
-      // NOT an append-only slot index: a unit that spawns and dies in the
-      // same turn would never enter a post-endTurn spawn log, desyncing the
-      // indices. A tile holds at most one player unit per domain (1 military
-      // + 1 civilian), so tile + civ is unambiguous, and orders execute in
-      // the logged order so no earlier move has vacated/entered this tile.
-      const unit = state.units.find(
-        (un) =>
-          isPlayerSeat(un.seat) &&
-          un.tileIndex === tile &&
-          (UNITS[un.type]?.charges !== undefined) === (civ === 1),
-      );
-      if (!unit) {
-        fail(`turn ${state.turn}: no player unit at tile ${tile} (civ ${civ})`);
+    // #51: the seat-0 unit-order application lives ONCE in
+    // src/core/seatZeroApply.ts (typechecked) — this replayer and the
+    // serve fork are its two consumers; paraphrases forbidden (9018 t63).
+    if (act?.u?.length) {
+      if (!applySeatZeroUnits(state, act.u as [number, number, number][], !!roll.rangedActive, RULES_IMP, (m) => fail(m))) {
         bad = true;
-        break;
-      }
-      if (a === A.PILLAGE) {
-        // A-21 (#50): PILLAGE the tile underfoot. Soft-fail like the builds.
-        playerPillage(state, unit.id);
-        continue;
-      }
-      if (a >= RES_START) {
-        // A-18 (#50): every non-dedicated improvement gets a column from 18 up,
-        // in roster order — INCLUDING the ones appended later (SEASIDE_RESORT,
-        // FORT). builderImprove validates through validImprovements, so an
-        // invalid pick soft-fails exactly as the GPU's re-validation does.
-        const rid = RULES_IMP[a - RES_START + 3];
-        if (rid) builderImprove(state, unit.id, rid as Parameters<typeof builderImprove>[2]);
-        continue;
-      }
-      if (a === A.REPAIR) {
-        // A-18 (#50): the PLAYER builder REPAIR verb — the rival seat has had
-        // it since A-13 (`_rival_builder_actions`) while the player's
-        // `builderRepair` existed with no way to call it. Soft-fail like the
-        // builds; the GPU re-validates identically.
-        builderRepair(state, unit.id);
-        continue;
-      }
-      if (a === A.CHOP) {
-        // V-H1: chop the feature under the builder (soft-fail like builds).
-        builderRemoveFeature(state, unit.id);
-        continue;
-      }
-      if (a >= 13) {
-        // Build an improvement on the builder's tile: 13 FARM, 14 MINE, 15
-        // LUMBER_MILL. Soft-fail (no-op) if invalid — the GPU re-validates
-        // identically, so a rejected build matches.
-        builderImprove(state, unit.id, a === 13 ? 'FARM' : a === 14 ? 'MINE' : 'LUMBER_MILL');
-        continue;
-      }
-      const dir = a % 6;
-      const n = neighborTile(state.map, state.map.tiles[unit.tileIndex], dir);
-      if (!n) continue;
-      if (a < 6) {
-        // The action is "step one tile", so apply it as a forced one-step
-        // path — NOT orderMove, whose A* may route an adjacent destination
-        // through cheaper intermediate tiles (different side effects).
-        unit.path = [n.index];
-        walkPath(state, unit);
-      } else if (a < 12) {
-        // V-R: ranged units strike (one roll, no retaliation) when the GPU
-        // engine ran with ranged active — same type-based dispatch rule.
-        // V-CS: meleeAttack's own fallback chain (units → rival city →
-        // city-state center) is the spec; the GPU mirrors it in-engine.
-        if (roll.rangedActive && UNITS[unit.type]?.ranged) rangedAttack(state, unit.id, n.index);
-        else meleeAttack(state, unit.id, n.index);
       }
     }
     if (bad) break;

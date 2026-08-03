@@ -182,6 +182,7 @@ import {
 // improvement index, so anything but an append renumbers every other row.
 import { IMPROVEMENT_IDS } from '../src/core/unitActions'; // #93: ONE roster, core-owned (order is the column index; FORT appended LAST)
 import { observeSeat } from '../src/core/seatTurn'; // #95 S1(b): the serve-mode obs render
+import { applySeatZeroUnits } from '../src/core/seatZeroApply';
 import { tsStateLines } from './statelog'; // serve statelog (hunt tooling)
 import { appendFileSync } from 'node:fs';
 import { tileOwnedByCiv, allCities } from '../src/core/seats';
@@ -1391,7 +1392,7 @@ for (let s = 0; s < N_SEEDS; s++) {
     // replay's own setting).
     state.autoResearch = false;
   }
-  type Seat0Rec = { production?: [number, number][]; tech?: number | null; civic?: number | null };
+  type Seat0Rec = { production?: [number, number][]; tech?: number | null; civic?: number | null; units?: [number, number, number][] };
   let seat0rec: Seat0Rec | null = null;
   // A-12b: snapshot the t0 city-state roster BEFORE the reference run — a
   // rival can now CONQUER a CS mid-run (captureCityStateForRival removes it
@@ -2015,6 +2016,10 @@ for (let s = 0; s < N_SEEDS; s++) {
           if (best0 >= 0) queueDistrict(state, city.id, did0, best0);
         }
       }
+      // seat-0 unit orders: the ONE application text (seatZeroApply) —
+      // INERT until the orchestrator sends units in rec 0. rangedActive
+      // mirrors the engine's _rl_ranged_active (constant True today).
+      if (seat0rec.units?.length) applySeatZeroUnits(state, seat0rec.units, true, IMPROVEMENT_IDS as unknown as string[]);
       if (seat0rec.tech != null && techList[seat0rec.tech]) setTechResearch(state, techList[seat0rec.tech].id);
       if (seat0rec.civic != null && civicList[seat0rec.civic]) setCivicResearch(state, civicList[seat0rec.civic].id);
     } else
