@@ -221,6 +221,11 @@ def main() -> int:
             [
                 ("vitest", [npm, "test"], 8),
                 ("parity", [py, "gpu/parity_test.py"], 6),
+                # #95 (iii): the DECISION-SERVER gate — one B=12 sim, twelve
+                # TS children, per-turn obs/unit-target equality + trace
+                # compare. The dual-consumer architecture's own lane; the
+                # file-driven parity above retires at the #95 cutover.
+                ("serve", [py, "gpu/serve_gate.py", "--batched", "--turns", "250"], 6),
             ],
             [
                 ("purchase", [py, "gpu/tests/purchase_test.py"], 4),
