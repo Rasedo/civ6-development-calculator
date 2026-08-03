@@ -240,6 +240,21 @@ SOLO_TIERS = {"builder": ("builder_idx", True),
               "galley": ("galley_idx", False)}
 
 
+def pick_purchase(can_building: torch.Tensor, settler_ok: torch.Tensor, unit_ok: torch.Tensor) -> torch.Tensor:
+    """A-5r: the GOLD-PURCHASE priority — ONE purchase per civ per turn,
+    BUILDING > SETTLER > UNIT, no rng (the scripted gold block's own
+    order). Inputs are the per-row candidate flags from the driver's
+    _buy_ctx (which reads the engines' shared legality bodies); the
+    return is the KIND [B] long: 0 building, 1 settler, 2 unit, -1
+    nothing. The engines' driven arms re-validate at their own phase
+    position — a kind is an INTENT, not a write."""
+    kind = torch.full(can_building.shape, -1, dtype=torch.long, device=can_building.device)
+    kind = torch.where(unit_ok, torch.full_like(kind, 2), kind)
+    kind = torch.where(settler_ok, torch.full_like(kind, 1), kind)
+    kind = torch.where(can_building, torch.full_like(kind, 0), kind)
+    return kind
+
+
 def pick_war(mask: torch.Tensor, ctx: dict, rng: dict) -> torch.Tensor:
     """[B] long — the WAR verb (declare on the player / sue for peace),
     ported from the scripted blocks both engines carry.

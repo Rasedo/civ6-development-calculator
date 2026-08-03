@@ -410,6 +410,20 @@ def main() -> None:
     assert int(ladder.pick_war(wm2, base_ctx, hi_rng)[0]) == -1
     print("  k #93 war verb OK (declare gates + rng arms, gang bypass, sue at 0.25, mask-gated)")
 
+    # -- l: A-5r purchase priority — BUILDING > SETTLER > UNIT, one kind ----
+    can_b = torch.tensor([True, False, False, False])
+    sett = torch.tensor([True, True, False, False])
+    unit = torch.tensor([True, True, True, False])
+    kinds = ladder.pick_purchase(can_b, sett, unit)
+    assert kinds.tolist() == [0, 1, 2, -1], f"purchase priority broken: {kinds.tolist()}"
+    # the driver ctx reads the engines' ONE legality body; v1 stages the
+    # building branch only — settler/unit flags must be all-False stubs.
+    import drive as _drv
+    bctx = _drv._buy_ctx(s, 0)
+    assert not bool(bctx["settler_ok"].any()) and not bool(bctx["unit_ok"].any()), "v1: settler/unit stay scripted both sides"
+    assert bctx["can_building"].shape == (s.B,), "buy ctx must be per-row"
+    print("  l A-5r purchase priority OK (building > settler > unit, v1 stages building only)")
+
     print("LADDER CONTRACT OK")
 
 

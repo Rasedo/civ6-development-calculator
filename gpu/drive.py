@@ -233,6 +233,19 @@ def _war_ctx(blocks: dict) -> dict:
     }
 
 
+def _buy_ctx(sim, r: int) -> dict:
+    """A-5r: the purchase candidates, read from the engines' ONE legality
+    body (sim._rival_buy_candidates — the scripted gold block's own scan,
+    extracted in 732eb6a). v1 stages the BUILDING branch onto the wire;
+    the settler/unit branches stay scripted on BOTH sides (symmetric,
+    gate-safe) until their candidate halves are extracted the same way."""
+    active = sim.r_alive[:, r] & (sim.rc_alive[:, r].sum(dim=1) > 0)
+    jj, bb, can_b, price = sim._rival_buy_candidates(r, active)
+    z = torch.zeros_like(can_b)
+    return {"jj": jj, "bb": bb, "can_building": can_b, "price": price,
+            "settler_ok": z, "unit_ok": z}
+
+
 def decide_and_apply(env, sim, r: int, roster: dict, classes: dict, max_steps: int = 4) -> dict:
     """One turn's decisions for one driven seat, returned in the action-file
     schema so a replay can reproduce them exactly. B=1 callers only — the
