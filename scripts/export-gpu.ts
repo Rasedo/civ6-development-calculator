@@ -182,6 +182,9 @@ import {
 // improvement index, so anything but an append renumbers every other row.
 import { IMPROVEMENT_IDS } from '../src/core/unitActions'; // #93: ONE roster, core-owned (order is the column index; FORT appended LAST)
 import { observeSeat } from '../src/core/seatTurn'; // #95 S1(b): the serve-mode obs render
+import { tileOwnedByCiv, allCities } from '../src/core/seats';
+import { computeUnlocksIn } from '../src/core/effects';
+import { validImprovementsIn } from '../src/core/rules';
 import { createInterface } from 'node:readline';
 // Canonical luxury catalog order for the per-tile `lux` plane.
 const LUXURY_IDS = Object.values(RESOURCES)
@@ -1883,7 +1886,58 @@ for (let s = 0; s < N_SEEDS; s++) {
       // decide position: pre-turn, before any phase acts.
       const obs: Record<string, number[]> = {};
       for (let r = 0; r < R_MAX; r++) obs[String(r)] = observeSeat(state, r + 1, C_MAX, SERVE_HORIZON, CS_MAX);
-      serveOut({ t: state.turn, obs });
+      // #95 per-unit obs twins — the drive.py extractors' TS mirrors, per
+      // rival unit IN UNIT-ARRAY ORDER (the proven slot-map mirror):
+      // job = nearest rivalHasJob tile (d*T + index key, ties lowest);
+      // spread = nearest allCities centre whose followedReligion != g
+      // (d*(T+1) + centreIndex key), religious charge-carriers only.
+      const jobsMsg: Record<string, number[]> = {};
+      const spreadsMsg: Record<string, number[]> = {};
+      const nT = state.map.tiles.length;
+      for (let r = 0; r < R_MAX; r++) {
+        const rv = rivalsOf(state)[r];
+        const jr: number[] = [];
+        const sr: number[] = [];
+        if (rv) {
+          const owns = (t: Tile) => tileOwnedByCiv(t, civOfRival(rv.id));
+          const unl = computeUnlocksIn(rv.research);
+          const jobTiles = state.map.tiles.filter((t) =>
+            owns(t) && !isWater(t)
+            && (t.pillaged || t.districtPillaged
+              || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map }).length > 0)));
+          const g = r + 1;
+          const spreadTargets = rv.religion.founded
+            ? allCities(state).filter((c) => c.followedReligion !== g)
+            : [];
+          for (const u of state.units) {
+            if (u.seat !== civOfRival(rv.id)) continue;
+            let jt = -1;
+            if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
+              const ut = state.map.tiles[u.tileIndex];
+              let bk = Infinity;
+              for (const t of jobTiles) {
+                const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
+                if (k < bk) { bk = k; jt = t.index; }
+              }
+            }
+            jr.push(jt);
+            let st = -1;
+            if ((u.type === 'MISSIONARY' || u.type === 'APOSTLE') && (u.charges ?? 0) > 0) {
+              const ut = state.map.tiles[u.tileIndex];
+              let bk = Infinity;
+              for (const c of spreadTargets) {
+                const ct = state.map.tiles[c.centerIndex];
+                const k = hexDistance(ut.col, ut.row, ct.col, ct.row) * (nT + 1) + c.centerIndex;
+                if (k < bk) { bk = k; st = c.centerIndex; }
+              }
+            }
+            sr.push(st);
+          }
+        }
+        jobsMsg[String(r)] = jr;
+        spreadsMsg[String(r)] = sr;
+      }
+      serveOut({ t: state.turn, obs, jobs: jobsMsg, spreads: spreadsMsg });
       const nx = await serveIn.next();
       if (nx.done) throw new Error(`serve: stdin closed at turn ${state.turn}`);
       const msg = JSON.parse(String(nx.value)) as { recs?: Record<string, unknown> };

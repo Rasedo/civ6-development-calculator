@@ -146,6 +146,27 @@ def main() -> None:
                 if first_report is None:
                     first_report = rep
                 obs_bails += 1
+        # #95 per-unit obs twins: the GPU extractors vs the TS arrays, per
+        # slot-map row (TS rows = live units in mirrored order; GPU rows
+        # beyond the live count must be -1).
+        for r in seats:
+            gj = drive._builder_jobs(sim, r)[0].tolist()
+            gs = drive._spread_targets(sim, r)[0].tolist()
+            tj = msg.get("jobs", {}).get(str(r), [])
+            ts_ = msg.get("spreads", {}).get(str(r), [])
+            for name, ga, ta in (("job", gj, tj), ("spread", gs, ts_)):
+                for i in range(max(len(ga), len(ta))):
+                    gv = ga[i] if i < len(ga) else -1
+                    tv = ta[i] if i < len(ta) else -1
+                    if gv != tv:
+                        rep = f"turn {t + 1} seat r{r}: {name.upper()} TARGET row {i}: GPU {gv} vs TS {tv}"
+                        print(rep)
+                        if first_report is None:
+                            first_report = rep
+                        obs_bails += 1
+                        break
+        if obs_bails:
+            break
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
         recs = {str(r): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
