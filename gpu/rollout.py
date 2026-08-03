@@ -237,7 +237,11 @@ def main() -> None:
                 finally:
                     _ckpt_q.task_done()
 
-        _ckpt_thread = _threadingmod.Thread(target=_ckpt_writer, name="ckpt-writer")
+        # daemon: a crashed main thread must not leave the process hanging on
+        # this writer (it did — a statelog exception stranded a shell for an
+        # hour). The SUCCESS path still flushes everything: the join below
+        # runs before exit, so no checkpoint is lost to the daemon flag.
+        _ckpt_thread = _threadingmod.Thread(target=_ckpt_writer, name="ckpt-writer", daemon=True)
         _ckpt_thread.start()
     for _ in range(args.turns):
         turn = sim.turn

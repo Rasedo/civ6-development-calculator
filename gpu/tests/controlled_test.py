@@ -99,6 +99,7 @@ def main() -> None:
             opts = m["civic"][0].nonzero(as_tuple=True)[0]
             ca[0] = opts[torch.randint(len(opts), (1,), generator=g)]
         sim2.apply_rival_actions(0, production=pa, tech=ta, civic=ca)
+        sim2._consume_driven_picks(0)
         sim2.step()
     assert bool(sim2.rc_alive[0, 0].any()), "controlled rival must survive random play"
     assert float(sim2.empire_score()[0]) > 0, "world must keep scoring"

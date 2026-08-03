@@ -61,7 +61,11 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
   }
   const barbActed = new Map<number, number>();
   for (const u of state.units) if (isBarbSeat(u.seat))
-    barbActed.set(u.tileIndex, (barbActed.get(u.tileIndex) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));
+    // acted = spent movement vs the RESET-TIME full (movesFull), matching the
+    // GPU dumper's `mp < mp_full` — the static table `moves` misreads any unit
+    // whose live full is boosted (aura/civic): it stays "a0" after acting
+    // until it spends below the static bar (the 2026006101 t81 false hit).
+    barbActed.set(u.tileIndex, (barbActed.get(u.tileIndex) ?? 0) + (u.movesLeft < (u.movesFull ?? UNITS[u.type]?.moves ?? 2) ? 1 : 0));
   for (const [tile, n] of [...barb.entries()].sort((a, b) => a[0] - b[0])) L.push(`${p}BU ${tile} = ${n} hp${barbHp.get(tile)} a${barbActed.get(tile)}`);
   // barb CAMPS (P5/S6 hunt: locations were invisible — the count-only trace)
   for (const c of state.barbSeat.camps) L.push(`${p}CA ${c} = 1`);
@@ -73,7 +77,7 @@ export function tsStateLines(state: GameState, unitIds: string[]): string[] {
     const k = `${rivalOfCiv(u.seat)}\t${u.tileIndex}\t${ti(u.type)}`;
     rv.set(k, (rv.get(k) ?? 0) + 1);
     rvHp.set(k, (rvHp.get(k) ?? 0) + u.hp);
-    rvActed.set(k, (rvActed.get(k) ?? 0) + (u.movesLeft < (UNITS[u.type]?.moves ?? 2) ? 1 : 0));
+    rvActed.set(k, (rvActed.get(k) ?? 0) + (u.movesLeft < (u.movesFull ?? UNITS[u.type]?.moves ?? 2) ? 1 : 0));
   }
   for (const [k, n] of [...rv.entries()].sort()) {
     const [civ, tile, typ] = k.split('\t');

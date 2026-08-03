@@ -252,7 +252,11 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     planner, the draw-free applies and the useq stash, exactly as
     decide_and_apply always ran them. Returns (prod, tech, civic, seq)
     tensors; extraction is the caller's per-row problem."""
-    m = sim.rival_masks(r)
+    # lite=True skips the purchase-column legality scan — the ladder has no
+    # purchase class (`prod_classes` never names those columns), so the
+    # driver never reads them. Same width, identical base + wonder/project
+    # columns, purchases zeroed; contract asserted in pref_apply_test.
+    m = sim.rival_masks(r, lite=True)
     blocks = _blocks(env, sim, r)
     prod = ladder.pick_production(m["production"], classes, roster, _prod_ctx(sim, r))
     tech = ladder.pick_research(blocks, m["tech"], "tech") if bool(m["tech"].any()) else None

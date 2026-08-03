@@ -2503,6 +2503,13 @@ export function applyRivalUnitOrders(state: GameState, rival: RivalCiv, steps: n
         // PILLAGE underfoot — hostileUnitAct's own block, faithfully: an
         // improvement first (food improvements heal +25, D-20), else the B-32
         // complete non-centre district. Enemy-ownership re-validated.
+        // MILITARY ONLY: the walker's pillage lives inside hostileUnitAct,
+        // which only military units ever run — the replay arm must carry
+        // that implicit gate explicitly (the GPU apply's _p_combat > 0
+        // twin). Without it a mid-turn death shifted a recorded PILLAGE
+        // row onto a MISSIONARY, which pillaged a mine here and silently
+        // no-opped on the GPU (9029 rng 2026006086 t239, esc +3600).
+        if (!((UNITS[unit.type]?.combat ?? 0) > 0)) return;
         const atWarWithPlayer = isRivalSeat(unit.seat) && civsAtWar(state, unitSeat(unit), 0);
         const hereOwned = isPlayerSeat(tileSeat(here)) && atWarWithPlayer;
         if (here.improvement && !here.pillaged && hereOwned) {

@@ -72,6 +72,7 @@ def main() -> None:
     b0 = legal_b[0]
     b1 = legal_b[1] if len(legal_b) > 1 else b0
     sim.apply_rival_actions(r, production_pref=pref([b0, b1]))
+    sim._consume_driven_picks(r)
     got = int(sim.rc_current[0, r, j])
     assert got == 1 + sim.NU + nS + b0, f"top-ranked legal column must win, got {got}"
     print("  1 top-ranked legal column wins OK")
@@ -96,6 +97,7 @@ def main() -> None:
     assert legal_b2, "no legal building for the fallback rank"
     d_col = D0                              # rank it FIRST even though it cannot land
     sim2.apply_rival_actions(r, production_pref=pref([d_col, legal_b2[0]]))
+    sim2._consume_driven_picks(r)
     got2 = int(sim2.rc_current[0, r, j])
     assert got2 != -1, "#87 REGRESSION: an unplaceable top pick left the city IDLE"
     assert got2 == 1 + sim2.NU + nS + legal_b2[0], f"fallback must be the policy's OWN next rank, got {got2}"
@@ -109,6 +111,7 @@ def main() -> None:
     sim3.rc_cost[0, r, j] = 0.0
     p_none = torch.full((1, sim3.RC, W), NEG, dtype=torch.float64)
     sim3.apply_rival_actions(r, production_pref=p_none)
+    sim3._consume_driven_picks(r)
     assert int(sim3.rc_current[0, r, j]) == -1, "an all -inf ranking must queue NOTHING"
     print("  3 exhausted ranking queues nothing (the engine never invents a pick) OK")
 
@@ -129,11 +132,13 @@ def main() -> None:
         buys = [c for c in range(base_w, W) if bool(m4[c])]
         if buys:
             sim4.apply_rival_actions(r, production_pref=pref([buys[0], 0]))
+            sim4._consume_driven_picks(r)
             spent = t0 - float(sim4.r_treasury[0, r])
             one = spent
             sim4.r_treasury[0, r] = t0
             sim4.rc_current[0, r, j] = -1
             sim4.apply_rival_actions(r, production=torch.full((1, sim4.RC), -1, dtype=torch.long))
+            sim4._consume_driven_picks(r)
             assert one >= 0.0, "purchase spent a negative amount"
             print(f"  4 purchase attempted once across the walk OK (spent {one:.0f})")
         else:
@@ -172,6 +177,7 @@ def main() -> None:
     prod5 = torch.full((1, sim5.RC), -1, dtype=torch.long)
     prod5[0, j5] = w_lo5 + wi5
     sim5.apply_rival_actions(r5, production=prod5)
+    sim5._consume_driven_picks(r5)
     code_w5 = 1 + sim5.NU + nS5 + NB5 + len(sim5._proj_rows) + wi5
     assert int(sim5.rc_current[0, r5, j5]) == code_w5, "wonder code must queue via the shared helper"
     assert int(sim5.rc_wonder[0, r5, j5, wi5]) >= 0, "the pave must register the tile"
@@ -186,6 +192,7 @@ def main() -> None:
     m6 = sim6.rival_masks(r5)["production"]
     assert not bool(m6[0, j5, w_lo5 + wi5]), "mask must read the claim"
     sim6.apply_rival_actions(r5, production=prod5)
+    sim6._consume_driven_picks(r5)
     assert int(sim6.rc_current[0, r5, j5]) != code_w5, "apply must REFUSE the claimed wonder (cross-seat)"
     # PROJECT: plant a completed district matching base project 0, then apply
     sim7 = fresh(rules, path)
@@ -204,9 +211,25 @@ def main() -> None:
     prod7 = torch.full((1, sim7.RC), -1, dtype=torch.long)
     prod7[0, j5] = p_lo7
     sim7.apply_rival_actions(r5, production=prod7)
+    sim7._consume_driven_picks(r5)
     assert int(sim7.rc_current[0, r5, j5]) == 1 + sim7.NU + nS5 + NB5 + 0, "project code must queue"
     assert float(sim7.rc_cost[0, r5, j5]) > 0, "project cost must lock"
     print("  5 #88 wonder queues via shared scan, one-per-world refuses cross-seat, project queues OK")
+
+    # -- 6: the lite=True contract (the driver's fast path) -----------------
+    # Same width, identical base + wonder/project columns, purchase columns
+    # all zeroed. drive.py:_decide_turn reads masks in lite mode; the ladder
+    # has no purchase class, so only these columns may differ.
+    m_full = sim7.rival_masks(r5)["production"]
+    m_lite = sim7.rival_masks(r5, lite=True)["production"]
+    NU7, nS7 = sim7.NU, nS5
+    pu_lo = NB5 + 2 + NU7 + nS7
+    pu_hi = pu_lo + NB5 + 1 + NU7
+    assert m_full.shape == m_lite.shape, "lite mask must keep the full width"
+    assert torch.equal(m_full[..., :pu_lo], m_lite[..., :pu_lo]), "lite must not touch base columns"
+    assert torch.equal(m_full[..., pu_hi:], m_lite[..., pu_hi:]), "lite must not touch wonder/project columns"
+    assert not bool(m_lite[..., pu_lo:pu_hi].any()), "lite purchase columns must be zeroed"
+    print("  6 lite=True: base+wonder/project identical, purchases zeroed, same width")
 
     print("PREF APPLY OK")
 

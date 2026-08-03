@@ -7165,8 +7165,16 @@ class BatchSim:
                             v_ = int(sc[b_])
                             one_ = torch.zeros(B, dtype=torch.bool, device=dev)
                             one_[b_] = True
-                            self._hostile_ranged_strike(one_, tgt, "rival", v_)
-                            self.v_mp[b_, v_] = 0  # a strike spends the turn (TS movesLeft = 0)
+                            _fired_ = self._hostile_ranged_strike(one_, tgt, "rival", v_)
+                            # spend ONLY when the strike actually resolved:
+                            # hostileRangedStrike's early returns (no city, no
+                            # eligible defender) leave TS movesLeft untouched,
+                            # and the refused-attempt burn here fed the D-2
+                            # heal/fortify gates a phantom act (9144
+                            # rng 2026006112 t61: refused ATTACK dir 1 by the
+                            # 622 archer — a0 vs a1, ww ±3600 at t93).
+                            if bool(_fired_[b_]):
+                                self.v_mp[b_, v_] = 0  # a strike spends the turn (TS movesLeft = 0)
                     valid_t = valid_t & _melee_d2
                     _host_mil = barb_t | ((_mts == PLAYER_SEAT) & at_war) | ((_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1))
                     _host_civ = ((_cts == BARB_SEAT)
@@ -7238,13 +7246,21 @@ class BatchSim:
                         v = int(sc[b_])
                         one = torch.zeros(B, dtype=torch.bool, device=dev)
                         one[b_] = True
-                        if bool(u_hit[b_]):
-                            # the war act's own ranged resolver — one roll, no retaliation
-                            self._hostile_ranged_strike(one, tgt_s, "rival", v)
-                            self.v_mp[b_, v] = 0
-                        elif bool(c_hit[b_]):
-                            self._hostile_city_attack(one, self.center_at.gather(1, tcs.unsqueeze(1)).squeeze(1), "rival", v)
-                            self.v_mp[b_, v] = 0
+                        if bool(u_hit[b_] | c_hit[b_]):
+                            # ONE resolver for both target classes — TS's
+                            # hostileRangedStrike does its own city-first
+                            # internally (vrngc: one roll, NO retaliation,
+                            # floor 1 HP). Routing c_hit through
+                            # _hostile_city_attack ran the MELEE assault body
+                            # instead: counter roll (an extra draw) and the
+                            # pcty diff orientation (9092 rng 2026006101 t98:
+                            # pcty dmg22 + pctyc dmg35 vs TS vrngc dmg32).
+                            # Spend only when it actually fired — the
+                            # resolver's internal refusals are TS's early
+                            # returns, which leave movesLeft untouched.
+                            _fired2 = self._hostile_ranged_strike(one, tgt_s, "rival", v)
+                            if bool(_fired2[b_]):
+                                self.v_mp[b_, v] = 0
             # --- builds 13-15 (builders) ---
             # C3-sym V-H1: rival chop (16) — strip + grant into the owning
             # rival's NEAREST alive city (food -> rc_growth, production ->
@@ -8187,7 +8203,14 @@ class BatchSim:
                 self.p_next[kr] += 1
                 self._gen_ver += 1  # B7-G (B-8): the captured civilian may be a general (owner flip) → invalidate the aura plane
                 self.p_mp[:, p] = torch.where(civk, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
-            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)  # #51/S7.10a
+            # TS cityFirst = enemies.length == 0 || enemies.some(military): a
+            # hostile CIVILIAN shields the city only when it is ALONE (civk
+            # captures it); a military garrison puts the CITY first, civilian
+            # or not. `~rvc_ok` alone dropped garrison+civilian centres into
+            # NO arm — a silent no-op where TS assaulted (seed 9144
+            # rng 2026006111 t40: warrior vs builder+archer on r0's centre).
+            city_first = ~rvc_ok | garrisoned
+            siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & city_first & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)  # #51/S7.10a
             if bool(siege.any()):
                 self._player_attack_rival_city(siege, tgt, p)  # V-W2
                 self.p_mp[:, p] = torch.where(siege, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
@@ -8420,7 +8443,7 @@ class BatchSim:
             # branches below (P4/D-23): one roll, floor 1 HP, no capture.
             cs_hit = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
+                & city_first & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first (garrison does not shield; lone civilian does)
                 & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
             )
             _csr = self._assault_city_state(cs_hit, cs_sc, tgt, "player", p)  # #51/S7.8f (#60)
@@ -8433,7 +8456,7 @@ class BatchSim:
             # --- P4/D-23: ranged BOMBARDMENT of cities (rangedAttack's city
             # fallback) — one roll against the D-22 defense, no retaliation,
             # HP floors at 1 (ranged never captures; melee finishes).
-            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & ~rvc_ok & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd  # #51/S7.10a
+            r_sieg = alive & (a >= 6) & (a < 12) & (tgt >= 0) & city_first & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & rngd  # #51/S7.10a (rangedAttackInner shares the exact cityFirst rule)
             if bool(r_sieg.any()):
                 bidx2 = torch.arange(self.B, device=self.device)
                 civ2 = rc_civ_t.clamp(min=0)
@@ -8465,7 +8488,7 @@ class BatchSim:
                 self.p_mp[:, p] = torch.where(r_sieg, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # #51/S5.2: the turn is spent (TS movesLeft = 0)
             r_cs = (
                 alive & (a >= 6) & (a < 12) & (tgt >= 0)
-                & ~rvc_ok & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first
+                & city_first & (rc_civ_t < 0) & cs_here  # #51/S7.10a: city-first (garrison does not shield; lone civilian does)
                 & (self._p_combat[self.p_type[:, p]] > 0) & rngd
             )
             if bool(r_cs.any()):
@@ -9587,7 +9610,7 @@ class BatchSim:
         p_floor = float(round(15 * self.rules.game_speed))
         return torch.maximum(torch.full_like(d_cost, p_floor), js_round(d_cost * 0.5))
 
-    def rival_masks(self, r: int) -> dict[str, torch.Tensor]:
+    def rival_masks(self, r: int, lite: bool = False) -> dict[str, torch.Tensor]:
         """C2b: a controlled rival's decision space, in the PLAYER head
         layouts so one net serves every seat. production [B, RC,
         NB+2+NU+nScaffold(+purchase width, all-False)]: col 0..NB-1 queue
@@ -9735,28 +9758,38 @@ class BatchSim:
             # the settler column is LIVE now — priced off the rival's own
             # curve; the apply founds immediately (their machinery has no
             # settler bank) and refunds when no valid site exists.
-            mult = self.rules.gold_purchase_mult
-            afford_b = self._afford(self.r_treasury[:, r].unsqueeze(1), (rdv.b_cost.double() * mult).unsqueeze(0))
-            pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
-            s_cost_r = rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities.double() - 1).clamp(min=0)
-            ps = (
-                (n_cities < rr.get("maxCities", 6))
-                & self._afford(self.r_treasury[:, r], s_cost_r * mult)
-                & self.controlled[:, r]
-            ).unsqueeze(1) & self.rc_is_cap[:, r, j].unsqueeze(1)
-            # ^ NOT the #82 heuristic — do not "fix" this to match ok_s above.
-            # The TS twin buys a settler at CIV level (tryFoundCity, no city is
-            # involved at all), so this per-city mask needs ONE canonical column
-            # to carry a civ-level verb; the capital is it. Ungating would let a
-            # net buy one settler PER CITY for a single civ-level action.
-            u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
-            if self._builder_idx >= 0:
-                # P4/D-10: the builder column prices off THIS rival's escalator
-                rb_n = self.r_builders_trained[:, r]  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
-                u_cost_r = u_cost_r.clone()
-                u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
-            afford_u = self._afford(self.r_treasury[:, r].unsqueeze(1), u_cost_r * mult)
-            pu = ok_u & afford_u & self.controlled[:, r].unsqueeze(1)
+            # #93 LEVER 1 (gpu-gate perf): the DRIVER's ladder has no purchase
+            # class at all (prod_classes names none of these columns), so the
+            # decide path pays the affordability + full re-validation columns
+            # every turn for nothing. `lite=True` (the driver) zeroes them;
+            # the net/pref surfaces keep the full mask.
+            if lite:
+                pb = torch.zeros(B, NBn, dtype=torch.bool, device=dev)
+                ps = torch.zeros(B, 1, dtype=torch.bool, device=dev)
+                pu = torch.zeros(B, self.NU, dtype=torch.bool, device=dev)
+            else:
+                mult = self.rules.gold_purchase_mult
+                afford_b = self._afford(self.r_treasury[:, r].unsqueeze(1), (rdv.b_cost.double() * mult).unsqueeze(0))
+                pb = ok_b & afford_b & self.controlled[:, r].unsqueeze(1)
+                s_cost_r = rr.get("settlerBase", 48) + rr.get("settlerPer", 18) * (n_cities.double() - 1).clamp(min=0)
+                ps = (
+                    (n_cities < rr.get("maxCities", 6))
+                    & self._afford(self.r_treasury[:, r], s_cost_r * mult)
+                    & self.controlled[:, r]
+                ).unsqueeze(1) & self.rc_is_cap[:, r, j].unsqueeze(1)
+                # ^ NOT the #82 heuristic — do not "fix" this to match ok_s above.
+                # The TS twin buys a settler at CIV level (tryFoundCity, no city is
+                # involved at all), so this per-city mask needs ONE canonical column
+                # to carry a civ-level verb; the capital is it. Ungating would let a
+                # net buy one settler PER CITY for a single civ-level action.
+                u_cost_r = self._p_cost.double().unsqueeze(0).expand(B, -1)
+                if self._builder_idx >= 0:
+                    # P4/D-10: the builder column prices off THIS rival's escalator
+                    rb_n = self.r_builders_trained[:, r]  # #51/S7.7a: ALREADY PRODUCED only — a queued item has produced nothing
+                    u_cost_r = u_cost_r.clone()
+                    u_cost_r[:, self._builder_idx] = self._builder_cost(rb_n).double()
+                afford_u = self._afford(self.r_treasury[:, r].unsqueeze(1), u_cost_r * mult)
+                pu = ok_u & afford_u & self.controlled[:, r].unsqueeze(1)
             # #88 WONDER columns [nW]: unlock + one-per-world (in-flight tiles
             # count, like wonderExists) + a live placement candidate — the
             # scripted pick's own scan bodies. The CAPITAL-ONLY term stays out:
@@ -9890,12 +9923,33 @@ class BatchSim:
             if not hasattr(self, "_driven_envoys") or self._driven_envoys is None:
                 self._driven_envoys = {}
             self._driven_envoys[r] = envoys
-        if production_pref is not None:
-            self._apply_rival_pref(r, production_pref)
+        # #93 (9144 rng 2026006112 t93): PRODUCTION stashes like the envoys —
+        # consumed at _rival_phase's own pick position via
+        # _consume_driven_picks. Draw-free is not ORDER-free: the pre-step
+        # apply queued (and district-PAVED) for a city the PLAYER captured
+        # later that same turn, while TS's rivalPhase apply — running after
+        # the player's units act — found no rival city at that centre and
+        # refused. rc_alive gates inside the appliers make the consume-time
+        # refusal exact.
+        if production_pref is not None or production is not None:
+            if not hasattr(self, "_driven_picks") or self._driven_picks is None:
+                self._driven_picks = {}
+            self._driven_picks[r] = (production, production_pref)
+
+    def _consume_driven_picks(self, r: int) -> None:
+        """#93: the production half of the stash-and-consume convention —
+        apply_rival_actions stores the driven pick, THIS position (the
+        scripted picker's slot at the top of _rival_phase's r-iteration)
+        executes it, so recorder, GPU replay and TS replay share one
+        within-turn ordering."""
+        dp = getattr(self, "_driven_picks", None)
+        if not dp or r not in dp:
             return
-        if production is None:
-            return
-        self._apply_rival_production(r, production)
+        production, pref = dp.pop(r)
+        if pref is not None:
+            self._apply_rival_pref(r, pref)
+        elif production is not None:
+            self._apply_rival_production(r, production)
 
     def _apply_rival_pref(self, r: int, pref: torch.Tensor, max_tries: int = 8) -> None:
         """#87: apply a PREFERENCE ORDER [B, RC, W] — best legal column wins.
@@ -14721,6 +14775,10 @@ class BatchSim:
         for r in range(self.R):
             n_cities = self.rc_alive[:, r].sum(dim=1)
             active = self.r_alive[:, r] & (n_cities > 0)
+            # #93: the driven production pick applies HERE — the position TS's
+            # applyRivalActionRecord runs (the pick loop's replacement), after
+            # the player's units already acted this turn.
+            self._consume_driven_picks(r)
             if not bool(active.any()):
                 continue
             # B-15: this rival's war weariness — accrue while at war, decay in
