@@ -61,13 +61,127 @@ def _field_name(i: int, S: int, R: int, C: int, NT: int, NC: int) -> str:
     return f"ctx.{ladder.CTX_FIELDS[i]}"
 
 
+def run_batched(turns: int, eps: float) -> None:
+    """#95 (iii): the battery-lane shape — ONE B=12 GPU sim, twelve TS
+    children in PARALLEL, a per-turn barrier. Children run concurrently
+    between barriers (independent processes); the GPU pays batched
+    dispatch once per step instead of twelve B=1 taxes (#94's lesson).
+    The sequential per-seed mode stays as the single-seed debug tool."""
+    rules = load_rules()
+    paths = sorted(FIXTURES.glob("seed*.json"))
+    fixtures = [load_fixture(p) for p in paths]
+    seeds = [int(fx["seed"]) for fx in fixtures]
+    env = BatchEnv(fixtures, rules, device="cpu", dtype=torch.float64)
+    sim = env.sim
+    seats = list(range(sim.R))
+    NB = sim.rules_dev.b_cost.shape[0]
+    classes = ladder.prod_classes(NB, sim.NU, len(sim._scaffold), sim._wond_n if sim.districts_on else 0, len(sim._proj_rows) if sim.districts_on else 0)
+    rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
+    roster = ladder.unit_roster(rj["units"])
+    for r in seats:
+        drive.take_seat(sim, r)
+    NT, NC = sim.r_techs.shape[2], sim.r_civics.shape[2]
+    ctx_lo = env.observe(1).shape[1] - ladder.CTX_SEAT
+
+    children = []
+    for sd in seeds:
+        child_env = dict(os.environ)
+        child_env.update({
+            "CIV6_SERVE": "1", "CIV6_SERVE_SEED": str(sd),
+            "CIV6_SERVE_HORIZON": str(env.horizon), "PYTHONIOENCODING": "utf-8",
+        })
+        children.append(subprocess.Popen(
+            ["npx", "vite-node", "scripts/export-gpu.ts", "--", "24", str(turns), "5", str(sim.R), "gpu/fixtures"],
+            cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True, encoding="utf-8", shell=True,
+        ))
+
+    def read_msg(ch) -> dict:
+        while True:
+            line = ch.stdout.readline()
+            if not line:
+                raise RuntimeError("a TS child closed its stdout (crashed?)")
+            if line.startswith("@@"):
+                return json.loads(line[2:])
+
+    bad = 0
+    first: str | None = None
+
+    def flag(rep: str) -> None:
+        nonlocal bad, first
+        print(rep)
+        if first is None:
+            first = rep
+        bad += 1
+
+    try:
+        for t in range(turns):
+            msgs = [read_msg(ch) for ch in children]  # barrier
+            for r in seats:
+                gobs_all = env.observe(r + 1)
+                gj_all = drive._builder_jobs(sim, r).tolist()
+                gs_all = drive._spread_targets(sim, r).tolist()
+                for b, msg in enumerate(msgs):
+                    tobs = torch.tensor(msg["obs"][str(r)], dtype=torch.float64)
+                    gobs = gobs_all[b]
+                    diff = (gobs - tobs).abs()
+                    badm = torch.zeros_like(diff, dtype=torch.bool)
+                    badm[:ctx_lo] = diff[:ctx_lo] > eps
+                    badm[ctx_lo:] = diff[ctx_lo:] != 0
+                    if bool(badm.any()):
+                        i = int(badm.nonzero(as_tuple=True)[0][0])
+                        flag(f"seed {seeds[b]} turn {t + 1} r{r}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.C, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
+                    for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(r), [])),
+                                         ("spread", gs_all[b], msg.get("spreads", {}).get(str(r), []))):
+                        for i in range(max(len(ga), len(ta))):
+                            gv = ga[i] if i < len(ga) else -1
+                            tv = ta[i] if i < len(ta) else -1
+                            if gv != tv:
+                                flag(f"seed {seeds[b]} turn {t + 1} r{r}: {name.upper()} row {i}: GPU {gv} vs TS {tv}")
+                                break
+            if bad:
+                break
+            per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=seeds, turn=t) for r in seats}
+            for b, ch in enumerate(children):
+                recs = {str(r): drive._extract_record(sim, r, *per_seat[r], b) for r in seats}
+                ch.stdin.write(json.dumps({"recs": recs}) + "\n")
+                ch.stdin.flush()
+            sim.step()
+            trs = [read_msg(ch) for ch in children]
+            grows = sim.trace_row().tolist()
+            for b, tr in enumerate(trs):
+                trow = tr["trace"]
+                for i in range(min(len(grows[b]), len(trow))):
+                    if abs(float(grows[b][i]) - float(trow[i])) > 1.0:
+                        flag(f"seed {seeds[b]} turn {t + 1}: TRACE col {i}: GPU {grows[b][i]} vs TS {trow[i]}")
+                        break
+            if bad:
+                break
+    finally:
+        for ch in children:
+            try:
+                ch.stdin.close()
+            except OSError:
+                pass
+            ch.kill()
+    if bad:
+        print(f"SERVE GATE (BATCHED) RED — first: {first}")
+        sys.exit(1)
+    print(f"SERVE GATE (BATCHED) OK — {len(seeds)} games x {turns} turns in one batch: obs + unit targets equal everywhere, traces within milli")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=9002)
     ap.add_argument("--seeds", default=None, help="'all' = every gpu/fixtures/seed*.json, or comma-separated; overrides --seed")
+    ap.add_argument("--batched", action="store_true", help="the battery-lane shape: ONE B=12 sim, all TS children in parallel")
     ap.add_argument("--turns", type=int, default=60)
     ap.add_argument("--eps", type=float, default=1e-9, help="scaled-float obs tolerance; the raw ctx block is compared EXACTLY")
     args = ap.parse_args()
+
+    if args.batched:
+        run_batched(args.turns, args.eps)
+        return
 
     if args.seeds:
         if args.seeds == "all":
