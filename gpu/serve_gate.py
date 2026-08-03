@@ -120,8 +120,16 @@ def run_batched(turns: int, eps: float) -> None:
             for seat in [0] + [r + 1 for r in seats]:
                 r = seat - 1
                 gobs_all = env.observe(seat)
-                gj_all = drive._builder_jobs(sim, r).tolist() if seat >= 1 else None
-                gs_all = drive._spread_targets(sim, r).tolist() if seat >= 1 else None
+                gj_all = drive._builder_jobs(sim, seat).tolist()
+                gs_all = drive._spread_targets(sim, seat).tolist()
+                if seat == 0:
+                    # seat-0 rows are RAW p-pool slots; TS emits per LIVE unit
+                    # in array order — compact by p_alive (append-only pool,
+                    # dead slots never reused, so alive-ascending IS array
+                    # order; the rivals get this via rival_slot_map instead).
+                    _pa0 = sim.p_alive.tolist()
+                    gj_all = [[jv for jv, av in zip(row, arow) if av] for row, arow in zip(gj_all, _pa0)]
+                    gs_all = [[sv for sv, av in zip(row, arow) if av] for row, arow in zip(gs_all, _pa0)]
                 for b, msg in enumerate(msgs):
                     tobs = torch.tensor(msg["obs"][str(seat)], dtype=torch.float64)
                     gobs = gobs_all[b]
@@ -132,8 +140,6 @@ def run_batched(turns: int, eps: float) -> None:
                     if bool(badm.any()):
                         i = int(badm.nonzero(as_tuple=True)[0][0])
                         flag(f"seed {seeds[b]} turn {t + 1} seat {seat}: OBS [{i}] {_field_name(i, sim.S, sim.R, sim.C, NT, NC)}: GPU {float(gobs[i])!r} vs TS {float(tobs[i])!r}")
-                    if seat == 0:
-                        continue
                     for name, ga, ta in (("job", gj_all[b], msg.get("jobs", {}).get(str(seat), [])),
                                          ("spread", gs_all[b], msg.get("spreads", {}).get(str(seat), []))):
                         for i in range(max(len(ga), len(ta))):
@@ -159,6 +165,17 @@ def run_batched(turns: int, eps: float) -> None:
             _neg0 = torch.full((sim.B,), -1, dtype=torch.long)
             tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
             civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
+            # #51 the UNIT verb, seat 0: the same rank-0 policy text as every
+            # seat (_seat_unit_orders), single-rank like the scripted walker's
+            # own gait; rows are RAW p-pool slots, exactly step()'s indexing.
+            # The rec carries the ROLLOUT's triple text ([tile, col, civ],
+            # pre-step tiles, HOLD dropped); "units" is ALWAYS present so the
+            # TS walker's stand-down keys on the KEY, mirroring units= below.
+            u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
+            _u0_l = u0.tolist()
+            _pt_l = sim.p_tile.tolist()
+            _pc_l = sim._p_civ[sim.p_type].tolist()
+            _pa_l = sim.p_alive.tolist()
             per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=seeds, turn=t) for r in seats}
             for b, ch in enumerate(children):
                 recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], b) for r in seats}
@@ -167,10 +184,13 @@ def run_batched(turns: int, eps: float) -> None:
                                    if int(prod0[b, c]) >= 0 and bool(sim.alive[b, c])],
                     "tech": None if int(tech0[b]) < 0 else int(tech0[b]),
                     "civic": None if int(civic0[b]) < 0 else int(civic0[b]),
+                    "units": [[_pt_l[b][p], v, int(_pc_l[b][p])]
+                              for p, v in enumerate(_u0_l[b])
+                              if _pa_l[b][p] and v >= 0 and v != 12],
                 }
                 ch.stdin.write(json.dumps({"recs": recs}) + "\n")
                 ch.stdin.flush()
-            sim.step(production=prod0, tech=tech0, civic=civic0)
+            sim.step(production=prod0, tech=tech0, civic=civic0, units=u0)
             trs = [read_msg(ch) for ch in children]
             grows = sim.trace_row().tolist()
             for b, tr in enumerate(trs):
@@ -290,18 +310,39 @@ def main() -> None:
                 obs_bails += 1
         # #95 per-unit obs twins: the GPU extractors vs the TS arrays, per
         # slot-map row (TS rows = live units in mirrored order; GPU rows
-        # beyond the live count must be -1).
-        for r in seats:
-            gj = drive._builder_jobs(sim, r)[0].tolist()
-            gs = drive._spread_targets(sim, r)[0].tolist()
-            tj = msg.get("jobs", {}).get(str(r + 1), [])
-            ts_ = msg.get("spreads", {}).get(str(r + 1), [])
+        # beyond the live count must be -1). Seat 0's raw p-pool rows are
+        # compacted by p_alive — the batched path's own convention.
+        for seat in [0] + [r + 1 for r in seats]:
+            gj = drive._builder_jobs(sim, seat)[0].tolist()
+            gs = drive._spread_targets(sim, seat)[0].tolist()
+            if seat == 0:
+                _pa0 = sim.p_alive[0].tolist()
+                gj = [jv for jv, av in zip(gj, _pa0) if av]
+                gs = [sv for sv, av in zip(gs, _pa0) if av]
+            tj = msg.get("jobs", {}).get(str(seat), [])
+            ts_ = msg.get("spreads", {}).get(str(seat), [])
             for name, ga, ta in (("job", gj, tj), ("spread", gs, ts_)):
                 for i in range(max(len(ga), len(ta))):
                     gv = ga[i] if i < len(ga) else -1
                     tv = ta[i] if i < len(ta) else -1
                     if gv != tv:
-                        rep = f"turn {t + 1} seat r{r}: {name.upper()} TARGET row {i}: GPU {gv} vs TS {tv}"
+                        rep = f"turn {t + 1} seat {seat}: {name.upper()} TARGET row {i}: GPU {gv} vs TS {tv}"
+                        if os.environ.get("CIV6_SERVE_DEBUG_JOB0") and name == "job":
+                            for _dt in (gv, tv):
+                                if _dt < 0:
+                                    continue
+                                print(f"  tile {_dt}: owner {int(sim.owner[0, _dt])} tile_seat {int(sim.tile_seat[0, _dt])}"
+                                      f" water {bool(sim.water[0, _dt])} imp {int(sim.improvement[0, _dt])}"
+                                      f" dist {int(sim.district[0, _dt])} wond {int(sim.built_wonder[0, _dt])}"
+                                      f" rvc {int(sim.rvcity_at[0, _dt])} pill {bool(sim.pillaged[0, _dt])}"
+                                      f" dpill {bool(sim.district_pillaged[0, _dt])} farm {bool(sim.farm_flat[0, _dt])}"
+                                      f" mine {bool(sim.mine_ok[0, _dt])} lumber {bool(sim.lumber_ok[0, _dt])}"
+                                      f" res {int(sim.res_imp[0, _dt])}")
+                            for _p in range(int(sim.p_next[0])):
+                                if not bool(sim.p_alive[0, _p]):
+                                    continue
+                                print(f"  p[{_p}] tile {int(sim.p_tile[0, _p])} type {int(sim.p_type[0, _p])}"
+                                      f" charges {int(sim.p_charges[0, _p])}")
                         print(rep)
                         if first_report is None:
                             first_report = rep
@@ -312,7 +353,7 @@ def main() -> None:
         # SEAT 0: THE SAME SEAT VERBS (owner: there are no rival verbs).
         # v1 = base production classes (the scripted player's own
         # expressiveness); wonder/project/purchase arms port with the TS
-        # replay dispatch. Units/envoys stay scripted BOTH SIDES.
+        # replay dispatch. Envoys stay scripted BOTH SIDES.
         m0 = env.masks(0)
         blocks0 = ladder.split(env.observe(0), sim.S, sim.R, sim.C, NT, NC)
         pm0 = m0["production"].clone()
@@ -326,6 +367,12 @@ def main() -> None:
         _neg0 = torch.full((sim.B,), -1, dtype=torch.long)
         tech0 = ladder.pick_research(blocks0, m0["tech"], "tech") if bool(m0["tech"].any()) else _neg0
         civic0 = ladder.pick_research(blocks0, m0["civic"], "civic") if bool(m0["civic"].any()) else _neg0
+        # #51 the UNIT verb, seat 0 — the batched path's twin block.
+        u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
+        _u0_l = u0[0].tolist()
+        _pt_l = sim.p_tile[0].tolist()
+        _pc_l = sim._p_civ[sim.p_type][0].tolist()
+        _pa_l = sim.p_alive[0].tolist()
         per_seat = {r: drive._decide_turn(env, sim, r, roster, classes, seeds=[args.seed], turn=t) for r in seats}
         recs = {str(r + 1): drive._extract_record(sim, r, *per_seat[r], 0) for r in seats}
         recs["0"] = {
@@ -333,12 +380,15 @@ def main() -> None:
                            if int(prod0[0, c]) >= 0 and bool(sim.alive[0, c])],
             "tech": None if int(tech0[0]) < 0 else int(tech0[0]),
             "civic": None if int(civic0[0]) < 0 else int(civic0[0]),
+            "units": [[_pt_l[p], v, int(_pc_l[p])]
+                      for p, v in enumerate(_u0_l)
+                      if _pa_l[p] and v >= 0 and v != 12],
         }
         if os.environ.get("CIV6_SERVE_DEBUG_BUY") and any("buy" in v for v in recs.values()):
             print(f"BUYREC turn {t + 1}: " + json.dumps({k: v["buy"] for k, v in recs.items() if "buy" in v}))
         child.stdin.write(json.dumps({"recs": recs}) + "\n")
         child.stdin.flush()
-        sim.step(production=prod0, tech=tech0, civic=civic0)
+        sim.step(production=prod0, tech=tech0, civic=civic0, units=u0)
         if _slog is not None:
             from tools.statelog import gpu_state_lines  # noqa: E402
             _slog.write(chr(10).join(gpu_state_lines(sim, 0)) + chr(10))

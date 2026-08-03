@@ -10333,6 +10333,22 @@ class BatchSim:
         # exact turn an unlock completes (seed 9274 t100).
         tk = techs if techs is not None else self.r_techs[:, r]
         cv = civics if civics is not None else self.r_civics[:, r]
+        return self._job_mask_core(tk, cv, self.rival_at == r)
+
+    def _seat_job_mask(self, seat: int, techs: torch.Tensor | None = None, civics: torch.Tensor | None = None) -> torch.Tensor:
+        """#51: the ONE builder-job predicate for ANY seat. Seat 0 routes the
+        player planes (owner >= 0 ownership, self.techs/self.civics); seats
+        k >= 1 route the legacy r-planes — the SAME _job_mask_core text, so
+        the predicate cannot fork by seat. (The old scripted player walker
+        was FARM-ONLY phase-6a policy — dead the moment units are driven,
+        not the job concept.)"""
+        if seat >= 1:
+            return self._rival_job_mask(seat - 1, techs=techs, civics=civics)
+        tk = techs if techs is not None else self.techs
+        cv = civics if civics is not None else self.civics
+        return self._job_mask_core(tk, cv, self.owner >= 0)
+
+    def _job_mask_core(self, tk: torch.Tensor, cv: torch.Tensor, owned: torch.Tensor) -> torch.Tensor:
         farm = self.farm_flat | (self.farm_hill & cv[:, self._hillfarms_civic].unsqueeze(1)) if self._hillfarms_civic >= 0 else self.farm_flat
         ok = farm
         if self.MINE >= 0 and self._mine_unlock_tech >= 0:
@@ -10348,13 +10364,19 @@ class BatchSim:
         if bool(new_res.any()):
             unlocked = tk.gather(1, self._imp_unlock[self.res_imp.clamp(min=0)].clamp(min=0))
             ok = ok | (new_res & unlocked)
-        owned = self.rival_at == r
         return (
             owned
             & (self.improvement < 0)
             & (self.district < 0)
             & (self.built_wonder < 0)  # A-8 gate-catch: an in-flight wonder pave refuses jobs (validImprovementsIn twin)
             & (self.rvcity_at < 0)
+            # #51 seat 0 (9002 t103): a PLAYER centre is a CITY_CENTER district
+            # TS-side, refused by validImprovementsIn like any pave — but the
+            # player plane is center_at, not district. A no-op for seats >= 1
+            # (a player centre never sits in rival territory; captured cities
+            # ride rvcity_at), REQUIRED for seat 0: a mid-game city founded on
+            # statically-farmable ground reads farm_flat=True forever.
+            & (self.center_at < 0)
             & ok
         ) | (owned & self.pillaged) | (owned & self.district_pillaged)  # B-32: pillaged district = repair job
 

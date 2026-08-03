@@ -1909,6 +1909,55 @@ for (let s = 0; s < N_SEEDS; s++) {
       const jobsMsg: Record<string, number[]> = {};
       const spreadsMsg: Record<string, number[]> = {};
       const nT = state.map.tiles.length;
+      {
+        // #51 seat 0 — the SAME job predicate over the player's own planes
+        // (_seat_job_mask's TS mirror), rows per LIVE player unit in array
+        // order (the GPU compacts its raw p-pool rows by p_alive to match).
+        // SPREAD stays EMPTY: player religion founding has no GPU twin yet
+        // (#73) — the gate compares the shared gate, not TS's richer plane.
+        const jr0: number[] = [];
+        const sr0: number[] = [];
+        const owns0 = (t: Tile) => isPlayerSeat(tileSeat(t));
+        const unl0 = computeUnlocksIn(playerSeat(state).research);
+        const jobTiles0 = state.map.tiles.filter((t) =>
+          owns0(t) && !isWater(t)
+          && (t.pillaged || t.districtPillaged
+            || (!t.improvement && validImprovementsIn(t, { unlocks: unl0, ownsTile: owns0, map: state.map }).length > 0)));
+        for (const u of state.units) {
+          if (!isPlayerSeat(u.seat)) continue;
+          let jt = -1;
+          if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
+            const ut = state.map.tiles[u.tileIndex];
+            let bk = Infinity;
+            for (const t of jobTiles0) {
+              const k = hexDistance(ut.col, ut.row, t.col, t.row) * nT + t.index;
+              if (k < bk) { bk = k; jt = t.index; }
+            }
+          }
+          jr0.push(jt);
+          sr0.push(-1);
+        }
+        jobsMsg['0'] = jr0;
+        spreadsMsg['0'] = sr0;
+        if (process.env.CIV6_SERVE_DEBUG_JOB0 && state.turn === Number(process.env.CIV6_SERVE_DEBUG_JOB0)) {
+          for (const u of state.units) {
+            if (!isPlayerSeat(u.seat)) continue;
+            appendFileSync('.claude/scratchpad/job0_ts.txt', JSON.stringify({
+              unit: u.type, tile: u.tileIndex, charges: u.charges ?? null, moves: u.movesLeft,
+            }) + String.fromCharCode(10));
+          }
+          for (const ti of (process.env.CIV6_SERVE_DEBUG_TILES ?? '').split(',').filter(Boolean).map(Number)) {
+            const t0d = state.map.tiles[ti];
+            appendFileSync('.claude/scratchpad/job0_ts.txt', JSON.stringify({
+              ti, terrain: t0d.terrain, elev: t0d.elevation, feature: t0d.feature,
+              res: t0d.resource, district: t0d.district, wonder: t0d.wonder,
+              builtWonder: t0d.builtWonder, imp: t0d.improvement, pill: t0d.pillaged,
+              owns: isPlayerSeat(tileSeat(t0d)),
+              valid: validImprovementsIn(t0d, { unlocks: unl0, ownsTile: owns0, map: state.map }),
+            }) + String.fromCharCode(10));
+          }
+        }
+      }
       for (let r = 0; r < R_MAX; r++) {
         const rv = rivalsOf(state)[r];
         const jr: number[] = [];
@@ -1982,6 +2031,11 @@ for (let s = 0; s < N_SEEDS; s++) {
       // functions; the scripted chain below stands down entirely. Base
       // classes v1 (the scripted player's own expressiveness); the
       // wonder/project/purchase arms port with the replay dispatch next.
+      // UNITS FIRST — replay-gpu's proven order (the GPU steps units at the
+      // top of step(), before the production section's district scan reads
+      // tile.improvement; a same-turn build must precede the scan on BOTH
+      // engines). rangedActive mirrors _rl_ranged_active (constant True).
+      if (seat0rec.units) applySeatZeroUnits(state, seat0rec.units, true, IMPROVEMENT_IDS as unknown as string[]);
       const pl0 = prodLayout();
       for (const [centre0, a0] of (seat0rec.production ?? [])) {
         const city = state.cities.find((c) => c.centerIndex === centre0);
@@ -2016,10 +2070,6 @@ for (let s = 0; s < N_SEEDS; s++) {
           if (best0 >= 0) queueDistrict(state, city.id, did0, best0);
         }
       }
-      // seat-0 unit orders: the ONE application text (seatZeroApply) —
-      // INERT until the orchestrator sends units in rec 0. rangedActive
-      // mirrors the engine's _rl_ranged_active (constant True today).
-      if (seat0rec.units?.length) applySeatZeroUnits(state, seat0rec.units, true, IMPROVEMENT_IDS as unknown as string[]);
       if (seat0rec.tech != null && techList[seat0rec.tech]) setTechResearch(state, techList[seat0rec.tech].id);
       if (seat0rec.civic != null && civicList[seat0rec.civic]) setCivicResearch(state, civicList[seat0rec.civic].id);
     } else
@@ -2068,6 +2118,11 @@ for (let s = 0; s < N_SEEDS; s++) {
             (isPlayerSeat(u2.seat) && UNITS[u2.type]?.charges !== undefined)),
       );
     for (const u of state.units) {
+      // #51 seat 0 driven: a rec-0 with a "units" KEY (even empty — no
+      // actionable order this turn) stands the scripted walker down, the
+      // exact mirror of the GPU's `units is None` gate before
+      // _scripted_builder — the orchestrator always sends the key.
+      if (SERVE && seat0rec?.units) break;
       if (!isPlayerSeat(u.seat) || u.type !== 'BUILDER' || (u.charges ?? 0) <= 0) continue;
       const btile = state.map.tiles[u.tileIndex];
       if (btile.pillaged && isPlayerSeat(tileSeat(btile))) {

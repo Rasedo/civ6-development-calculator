@@ -139,32 +139,48 @@ def _policy_rng(sim, seeds: list, turn: int, r: int, salt: int) -> torch.Tensor:
     )
 
 
-def _builder_jobs(sim, r: int) -> torch.Tensor:
-    """#93 slice 7b: [B, N] job tile per slot row (-1 = none) for CIVILIAN
-    rows with charges — the NEAREST _rival_job_mask tile, ties to the LOWEST
-    tile index (the scripted walk's own key). One legality body: the job
-    predicate is the engine's, never re-derived."""
-    smap = sim.rival_slot_map(r)
+
+def _seat_units(sim, seat: int):
+    """#51: (slot_map, present, tiles, types, charges) for ANY seat — seat 0
+    is the DIRECT player pool (identity rows over p_*); seats k >= 1 gather
+    through rival_slot_map exactly as before (byte-identical values)."""
+    if seat >= 1:
+        smap = sim.rival_slot_map(seat - 1)
+        sc = smap.clamp(min=0)
+        return (smap, smap >= 0,
+                sim.v_tile.gather(1, sc), sim.v_type.gather(1, sc), sim.v_charges.gather(1, sc))
+    B, N = sim.p_tile.shape
+    smap = torch.arange(N, device=sim.device).unsqueeze(0).expand(B, N)
+    return smap, sim.p_alive, sim.p_tile, sim.p_type, sim.p_charges
+
+
+def _builder_jobs(sim, seat: int) -> torch.Tensor:
+    """#93 slice 7b / #51 seat-generic: [B, N] job tile per slot row (-1 =
+    none) for CIVILIAN rows with charges — the NEAREST _seat_job_mask tile,
+    ties to the LOWEST tile index (the scripted walk's own key). One
+    legality body for every seat; the pool router supplies the planes."""
+    smap, present, tiles, types, charges = _seat_units(sim, seat)
     B, N = smap.shape
     out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
     if not sim.improvements_on:
         return out
-    jobs = sim._rival_job_mask(r)  # [B, T]
+    jobs = sim._seat_job_mask(seat)  # [B, T]
     if not bool(jobs.any()):
         return out
     arangeT = torch.arange(sim.T, device=sim.device)
     for n in range(N):
-        sl = smap[:, n]
-        pres = sl >= 0
+        pres = present[:, n]
         if not bool(pres.any()):
-            break
-        vt = sim.v_type.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=sim.NU - 1)
-        civ_row = (sim._p_charges[vt] > 0) & (sim.v_charges.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1) > 0)
+            if seat >= 1:
+                break  # compacted slot-map rows are contiguous
+            continue  # raw p-pool rows have HOLES (9002 t122: slot 3 dead, slot 4 live)
+        vt = types[:, n].clamp(min=0, max=sim.NU - 1)
+        civ_row = (sim._p_charges[vt] > 0) & (charges[:, n] > 0)
         rows = pres & civ_row
         if not bool(rows.any()):
             continue
-        here = sim.v_tile.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1)
-        d = sim.pair_dist[here.clamp(min=0)].to(torch.long)  # [B, T]
+        here = tiles[:, n]
+        d = sim.pair_dist[here.clamp(min=0)].to(torch.long)
         key = torch.where(jobs, d * sim.T + arangeT, torch.full_like(d, 2 ** 30))
         best = key.argmin(dim=1)
         has = rows & jobs.gather(1, best.unsqueeze(1)).squeeze(1)
@@ -172,17 +188,23 @@ def _builder_jobs(sim, r: int) -> torch.Tensor:
     return out
 
 
-def _spread_targets(sim, r: int) -> torch.Tensor:
-    """#93 slice 8: [B, N] spread-target CENTRE per slot row (-1 = none) for
-    religious rows with charges — the NEAREST alive centre of ANY civ whose
-    followed religion != g, ties lowest tile (the walker's own
-    dist·(T+1)+centerIndex key)."""
-    smap = sim.rival_slot_map(r)
+def _spread_targets(sim, seat: int) -> torch.Tensor:
+    """#93 slice 8 / #51 seat-generic: [B, N] spread-target CENTRE per slot
+    row (-1 = none) for religious rows with charges — the NEAREST alive
+    centre of ANY civ whose followed religion != g, ties lowest tile (the
+    walker's own dist·(T+1)+centerIndex key). g IS the seat id (the
+    religion plane's own convention: 0 the player, k the rivals)."""
+    smap, present, tiles, types, charges = _seat_units(sim, seat)
     B, N = smap.shape
     out = torch.full((B, N), -1, dtype=torch.long, device=sim.device)
-    if not bool(sim.r_religion_done[:, r].any()):
+    # seat 0: the player has NO religion-founding GPU twin yet (#73) — the
+    # spread verb is structurally empty for seat 0 until that plane lands.
+    if seat == 0:
         return out
-    g = r + 1
+    done = sim.r_religion_done[:, seat - 1]
+    if not bool(done.any()):
+        return out
+    g = seat
     T = sim.T
     acc = torch.zeros(B, T, dtype=torch.long, device=sim.device)
     acc.scatter_add_(1, sim.site.clamp(min=0), (sim.alive & (sim.city_followed != g)).long())
@@ -196,26 +218,84 @@ def _spread_targets(sim, r: int) -> torch.Tensor:
         return out
     arangeT = torch.arange(T, device=sim.device)
     for n in range(N):
-        sl = smap[:, n]
-        pres = sl >= 0
+        pres = present[:, n]
         if not bool(pres.any()):
-            break
-        vt = sim.v_type.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0, max=sim.NU - 1)
+            if seat >= 1:
+                break  # compacted slot-map rows are contiguous
+            continue  # raw p-pool rows have HOLES (the _builder_jobs twin)
+        vt = types[:, n].clamp(min=0, max=sim.NU - 1)
         relig = torch.zeros_like(pres)
         if sim._missionary_idx >= 0:
             relig = relig | (vt == sim._missionary_idx)
         if getattr(sim, "_apostle_idx", -1) >= 0:
             relig = relig | (vt == sim._apostle_idx)
-        rows = pres & relig & (sim.v_charges.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1) > 0) & sim.r_religion_done[:, r]
+        rows = pres & relig & (charges[:, n] > 0) & done
         if not bool(rows.any()):
             continue
-        here = sim.v_tile.gather(1, sl.clamp(min=0).unsqueeze(1)).squeeze(1)
+        here = tiles[:, n]
         d = sim.pair_dist[here.clamp(min=0)].to(torch.long)
         key = torch.where(tm, d * (T + 1) + arangeT, torch.full_like(d, 2 ** 40))
         best = key.argmin(dim=1)
         has = rows & tm.gather(1, best.unsqueeze(1)).squeeze(1)
         out[:, n] = torch.where(has, best, out[:, n])
     return out
+
+
+def _seat_unit_orders(sim, seat: int):
+    """#51 seat-generic RANK-0 unit policy — ONE text for every seat: the
+    ladder's pick over the seat's own mask/obs, then the builder-job and
+    spread overrides. Rows ride the seat's slot layout (_seat_units): raw
+    p-pool slots for seat 0 (step()'s _apply_unit_actions indexing), the
+    compacted slot map for seats >= 1 (the phase executor's indexing).
+
+    #93 slice 7b, the BUILDER verb: a civilian with charges standing ON its
+    job takes the job column — REPAIR first (the scripted order), else the
+    lowest legal BUILD column. The MASK is the legality body (#89); the
+    best-GAIN ranking within multi-option bare tiles is a RECORDED RESIDUAL
+    (lowest column for now — the builder spy tightens it like production's
+    45%->99.4% arc). Rows not on their job get walked there by the caller's
+    rank planner (seats >= 1) or re-planned next turn (seat 0, single-rank
+    like the scripted walker's own single-step gait).
+    """
+    um = sim.unit_action_mask() if seat == 0 else sim.rival_unit_mask(seat - 1)
+    uo = sim.unit_obs() if seat == 0 else sim.rival_unit_obs(seat - 1)
+    orders0 = ladder.pick_unit_orders(um, uo)
+    job_t = _builder_jobs(sim, seat)
+    spread_t = _spread_targets(sim, seat)
+    _smap, present, tiles, _types, _charges = _seat_units(sim, seat)
+    on_job = (job_t >= 0) & (tiles == job_t) & present
+    # #93 slice 8: religious rows within 1 of their target SPREAD (HERE when
+    # standing on it — own cities — else the direction of the centre).
+    A_SP = getattr(sim, "_A_SPREAD", -1)
+    if A_SP >= 0 and bool((spread_t >= 0).any()):
+        d_sp = sim.pair_dist[tiles.clamp(min=0), spread_t.clamp(min=0)].to(torch.long)
+        close = (spread_t >= 0) & present & (d_sp <= 1)
+        if bool(close.any()):
+            nbr = sim.neigh[tiles.clamp(min=0)]  # [B, N, 6]
+            dir_hit = (nbr == spread_t.unsqueeze(2)) & (nbr >= 0)
+            dcol = torch.where(
+                tiles == spread_t,
+                torch.zeros_like(spread_t),
+                dir_hit.float().argmax(dim=2) + 1,
+            )
+            valid_dir = (tiles == spread_t) | dir_hit.any(dim=2)
+            take_sp = close & valid_dir
+            orders0 = torch.where(take_sp, A_SP + dcol, orders0)
+    if bool(on_job.any()):
+        W_u = um.shape[2]
+        rep_ok = um[:, :, 17] if W_u > 17 else torch.zeros_like(on_job)
+        bcols = list(range(13, 16)) + list(range(18, min(getattr(sim, "_A_PILLAGE", 25), W_u)))
+        bmask = torch.stack([um[:, :, c] for c in bcols], dim=2) if bcols else None
+        pick_b = torch.full_like(orders0, -1)
+        if bmask is not None:
+            hasb = bmask.any(dim=2)
+            firstb = bmask.float().argmax(dim=2)
+            colt = torch.tensor(bcols, device=um.device)
+            pick_b = torch.where(hasb, colt[firstb], pick_b)
+        chosen = torch.where(rep_ok, torch.full_like(orders0, 17), pick_b)
+        take_b = on_job & (chosen >= 0)
+        orders0 = torch.where(take_b, chosen, orders0)
+    return orders0, job_t, spread_t, um, uo
 
 
 def _war_ctx(blocks: dict) -> dict:
@@ -335,55 +415,9 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     # turn at rank 0, exactly like the scripted walkers. The phase executes the
     # stash at the walkers' position and RE-VALIDATES every rank (#90's
     # contract: an illegal later step refuses, never substitutes).
-    um = sim.rival_unit_mask(r)
-    uo = sim.rival_unit_obs(r)
-    orders0 = ladder.pick_unit_orders(um, uo)
-    # #93 slice 7b: the BUILDER verb. A civilian with charges standing ON its
-    # job takes the job column — REPAIR first (the scripted order), else the
-    # lowest legal BUILD column. The MASK is the legality body (#89); the
-    # best-GAIN ranking within multi-option bare tiles is a RECORDED RESIDUAL
-    # (lowest column for now — the builder spy tightens it like production's
-    # 45%->99.4% arc). Rows not on their job get walked there by the planner.
-    job_t = _builder_jobs(sim, r)
-    spread_t = _spread_targets(sim, r)
-    smap0 = sim.rival_slot_map(r)
-    here0 = sim.v_tile.gather(1, smap0.clamp(min=0))
-    on_job = (job_t >= 0) & (here0 == job_t) & (smap0 >= 0)
-    # #93 slice 8: religious rows within 1 of their target SPREAD (HERE when
-    # standing on it — own cities — else the direction of the centre).
-    A_SP = getattr(sim, "_A_SPREAD", -1)
-    if A_SP >= 0 and bool((spread_t >= 0).any()):
-        here_sp = sim.v_tile.gather(1, smap0.clamp(min=0))
-        d_sp = sim.pair_dist[here_sp.clamp(min=0), spread_t.clamp(min=0)].to(torch.long)
-        close = (spread_t >= 0) & (smap0 >= 0) & (d_sp <= 1)
-        if bool(close.any()):
-            nbr = sim.neigh[here_sp.clamp(min=0)]  # [B, N, 6]
-            dir_hit = (nbr == spread_t.unsqueeze(2)) & (nbr >= 0)
-            dcol = torch.where(
-                here_sp == spread_t,
-                torch.zeros_like(spread_t),
-                dir_hit.float().argmax(dim=2) + 1,
-            )
-            valid_dir = (here_sp == spread_t) | dir_hit.any(dim=2)
-            take_sp = close & valid_dir
-            orders0 = torch.where(take_sp, A_SP + dcol, orders0)
-    if bool(on_job.any()):
-        W_u = um.shape[2]
-        rep_ok = um[:, :, 17] if W_u > 17 else torch.zeros_like(on_job)
-        bcols = list(range(13, 16)) + list(range(18, min(getattr(sim, "_A_PILLAGE", 25), W_u)))
-        bmask = torch.stack([um[:, :, c] for c in bcols], dim=2) if bcols else None
-        pick_b = torch.full_like(orders0, -1)
-        if bmask is not None:
-            hasb = bmask.any(dim=2)
-            firstb = bmask.float().argmax(dim=2)
-            colt = torch.tensor(bcols, device=um.device)
-            pick_b = torch.where(hasb, colt[firstb], pick_b)
-        chosen = torch.where(rep_ok, torch.full_like(orders0, 17), pick_b)
-        take_b = on_job & (chosen >= 0)
-        orders0 = torch.where(take_b, chosen, orders0)
+    orders0, job_t, spread_t, um, uo = _seat_unit_orders(sim, r + 1)
     B2, N2 = orders0.shape
     ranks = [orders0]
-    cur = uo[:, :, 0].long() * 0  # placeholder; real tiles below
     smap = sim.rival_slot_map(r)
     cur = sim.v_tile.gather(1, smap.clamp(min=0))
     # per-row destination: the war target when at war, else the nearest own
