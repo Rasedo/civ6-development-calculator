@@ -9936,6 +9936,77 @@ class BatchSim:
                 self._driven_picks = {}
             self._driven_picks[r] = (production, production_pref)
 
+    def _rival_buy_candidates(self, r: int, active: torch.Tensor):
+        """A-5r/#95: the gold-purchase BUILDING candidate — ONE legality
+        body for the scripted gold block and the wire driver's _buy_ctx.
+        Returns (jj, bb, can, price): the cheapest completable building
+        anywhere in the civ ((cost*1024 + bIdx)*32 + citySlot argmin — the
+        tryQueueRivalBuilding key) and whether the treasury clears
+        price + the peace-gold RESERVE (js_round milli, TS's exact test)."""
+        B, dev = self.B, self.device
+        rr = self.rules.rivals
+        rdv6 = self.rules_dev
+        NB6 = rdv6.b_cost.shape[0]
+        ones6 = torch.ones(B, NB6, dtype=torch.bool, device=dev)
+        unl6 = torch.where(
+            rdv6.b_unlock.unsqueeze(0) >= 0,
+            self.r_techs[:, r].gather(1, rdv6.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            ones6,
+        ) & torch.where(
+            rdv6.b_unlock_civic.unsqueeze(0) >= 0,
+            self.r_civics[:, r].gather(1, rdv6.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
+            ones6,
+        )
+        elig6 = torch.zeros(B, self.RC, NB6, dtype=torch.bool, device=dev)
+        for j6 in self.rc_alive[:, r].any(dim=0).nonzero(as_tuple=True)[0].tolist():  # D-4 style
+            al6 = active & self.rc_alive[:, r, j6]
+            if not bool(al6.any()):
+                continue
+            have6 = self.rc_bldg[:, r, j6]
+            ctile6 = self.rc_center[:, r, j6].clamp(min=0)
+            riv6 = self.tile_river.gather(1, ctile6.unsqueeze(1)).squeeze(1)
+            ok6 = unl6 & ~have6 & (~rdv6.b_river.reshape(1, -1) | riv6.unsqueeze(1)) & ~self._b_worship.reshape(1, -1)  # B9-R3: worship is faith-only
+            reg6 = self.rc_dist_tile[:, r, j6].gather(1, rdv6.b_req_district.clamp(min=0).unsqueeze(0).expand(B, -1))
+            dc6 = (reg6 >= 0) & self.district_complete.gather(1, reg6.clamp(min=0))
+            ok6 = ok6 & torch.where(rdv6.b_req_district.unsqueeze(0) >= 0, dc6, ones6)
+            for bi6, reqs6 in enumerate(self.rules.b_req_buildings):
+                if reqs6:
+                    ok6[:, bi6] &= have6[:, torch.tensor(reqs6, device=dev, dtype=torch.long)].any(dim=1)
+            for bi6, excl6 in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
+                if excl6:
+                    ok6[:, bi6] &= ~have6[:, torch.tensor(excl6, device=dev, dtype=torch.long)].any(dim=1)
+            qb6 = self.rc_current[:, r, j6] - (1 + self.NU + len(self._scaffold))
+            is_qb = (qb6 >= 0) & (qb6 < NB6)
+            if bool(is_qb.any()):
+                rows_q = is_qb.nonzero(as_tuple=True)[0]
+                ok6[rows_q, qb6[rows_q]] = False
+            elig6[:, j6] = ok6 & al6.unsqueeze(1)
+        key6 = (rdv6.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, 1, -1)) * 32 \
+            + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, -1, 1)
+        key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
+        flat6 = key6.reshape(B, -1)
+        best6 = flat6.argmin(dim=1)
+        has6 = active & torch.isfinite(flat6.gather(1, best6.unsqueeze(1)).squeeze(1))
+        jj6 = torch.div(best6, NB6, rounding_mode="floor")
+        bb6 = best6 % NB6
+        price6 = rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult
+        reserve6 = float(rr.get("peaceGold0", 150))
+        can6 = has6 & (js_round(self.r_treasury[:, r] * 1000) >= js_round((price6 + reserve6) * 1000))
+        return jj6, bb6, can6, price6
+
+    def _rival_buy_building(self, r: int, can6: torch.Tensor, jj6: torch.Tensor, bb6: torch.Tensor, price6: torch.Tensor) -> None:
+        """A-5r: the building-purchase EXECUTOR — shared by the scripted
+        gold block and the driven buy arm; the candidates (or the wire's
+        re-validation) decide WHO buys, this only writes."""
+        rows6 = can6.nonzero(as_tuple=True)[0]
+        self.rc_bldg[rows6, r, jj6[rows6], bb6[rows6]] = True
+        self._eff_version += 1  # B9-R2: a bought regional building reaches other cities this phase
+        if self._walls_bidx >= 0:  # AUDIT B-1
+            wm6 = rows6[bb6[rows6] == self._walls_bidx]
+            if len(wm6) > 0:
+                self.rc_outer_hp[wm6, r, jj6[wm6]] = self._walls_hp
+        self.r_treasury[:, r] = torch.where(can6, self.r_treasury[:, r] - price6, self.r_treasury[:, r])
+
     def _consume_driven_picks(self, r: int) -> None:
         """#93: the production half of the stash-and-consume convention —
         apply_rival_actions stores the driven pick, THIS position (the
@@ -15115,64 +15186,13 @@ class BatchSim:
             # reserve — the controlled-head apply_rival_actions purchase spec).
             bought_r5 = torch.zeros(B, dtype=torch.bool, device=dev)
             if self.districts_on:
-                rdv6 = self.rules_dev
-                NB6 = rdv6.b_cost.shape[0]
-                ones6 = torch.ones(B, NB6, dtype=torch.bool, device=dev)
-                unl6 = torch.where(
-                    rdv6.b_unlock.unsqueeze(0) >= 0,
-                    self.r_techs[:, r].gather(1, rdv6.b_unlock.clamp(min=0).unsqueeze(0).expand(B, -1)),
-                    ones6,
-                ) & torch.where(
-                    rdv6.b_unlock_civic.unsqueeze(0) >= 0,
-                    self.r_civics[:, r].gather(1, rdv6.b_unlock_civic.clamp(min=0).unsqueeze(0).expand(B, -1)),
-                    ones6,
-                )
-                elig6 = torch.zeros(B, self.RC, NB6, dtype=torch.bool, device=dev)
-                for j6 in self.rc_alive[:, r].any(dim=0).nonzero(as_tuple=True)[0].tolist():  # D-4 style
-                    al6 = active & self.rc_alive[:, r, j6]
-                    if not bool(al6.any()):
-                        continue
-                    have6 = self.rc_bldg[:, r, j6]
-                    ctile6 = self.rc_center[:, r, j6].clamp(min=0)
-                    riv6 = self.tile_river.gather(1, ctile6.unsqueeze(1)).squeeze(1)
-                    ok6 = unl6 & ~have6 & (~rdv6.b_river.reshape(1, -1) | riv6.unsqueeze(1)) & ~self._b_worship.reshape(1, -1)  # B9-R3: worship is faith-only
-                    reg6 = self.rc_dist_tile[:, r, j6].gather(1, rdv6.b_req_district.clamp(min=0).unsqueeze(0).expand(B, -1))
-                    dc6 = (reg6 >= 0) & self.district_complete.gather(1, reg6.clamp(min=0))
-                    ok6 = ok6 & torch.where(rdv6.b_req_district.unsqueeze(0) >= 0, dc6, ones6)
-                    for bi6, reqs6 in enumerate(self.rules.b_req_buildings):
-                        if reqs6:
-                            ok6[:, bi6] &= have6[:, torch.tensor(reqs6, device=dev, dtype=torch.long)].any(dim=1)
-                    for bi6, excl6 in enumerate(self.rules.b_excl_buildings):  # B9-R1: exclusiveWith
-                        if excl6:
-                            ok6[:, bi6] &= ~have6[:, torch.tensor(excl6, device=dev, dtype=torch.long)].any(dim=1)
-                    qb6 = self.rc_current[:, r, j6] - (1 + self.NU + len(self._scaffold))
-                    is_qb = (qb6 >= 0) & (qb6 < NB6)
-                    if bool(is_qb.any()):
-                        rows_q = is_qb.nonzero(as_tuple=True)[0]
-                        ok6[rows_q, qb6[rows_q]] = False
-                    elig6[:, j6] = ok6 & al6.unsqueeze(1)
-                key6 = (rdv6.b_cost.reshape(1, 1, -1) * 1024 + torch.arange(NB6, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, 1, -1)) * 32 \
-                    + torch.arange(self.RC, device=dev, dtype=rdv6.b_cost.dtype).reshape(1, -1, 1)
-                key6 = torch.where(elig6, key6.expand(B, -1, -1), torch.tensor(float("inf"), dtype=rdv6.b_cost.dtype, device=dev))
-                flat6 = key6.reshape(B, -1)
-                best6 = flat6.argmin(dim=1)
-                has6 = active & torch.isfinite(flat6.gather(1, best6.unsqueeze(1)).squeeze(1))
-                if bool(has6.any()):
-                    jj6 = torch.div(best6, NB6, rounding_mode="floor")
-                    bb6 = best6 % NB6
-                    price6 = rdv6.b_cost.gather(0, bb6).double() * self.rules.gold_purchase_mult
-                    reserve6 = float(rr.get("peaceGold0", 150))
-                    can6 = has6 & (js_round(self.r_treasury[:, r] * 1000) >= js_round((price6 + reserve6) * 1000))
-                    if bool(can6.any()):
-                        rows6 = can6.nonzero(as_tuple=True)[0]
-                        self.rc_bldg[rows6, r, jj6[rows6], bb6[rows6]] = True
-                        self._eff_version += 1  # B9-R2: a bought regional building reaches other cities this phase
-                        if self._walls_bidx >= 0:  # AUDIT B-1
-                            wm6 = rows6[bb6[rows6] == self._walls_bidx]
-                            if len(wm6) > 0:
-                                self.rc_outer_hp[wm6, r, jj6[wm6]] = self._walls_hp
-                        self.r_treasury[:, r] = torch.where(can6, self.r_treasury[:, r] - price6, self.r_treasury[:, r])
-                        bought_r5 = bought_r5 | can6
+                # A-5r/#95: the candidate scan is the SHARED legality body —
+                # _rival_buy_candidates serves this scripted block AND the
+                # wire driver's _buy_ctx (one rule, two consumers).
+                jj6, bb6, can6, price6 = self._rival_buy_candidates(r, active)
+                if bool(can6.any()):
+                    self._rival_buy_building(r, can6, jj6, bb6, price6)
+                    bought_r5 = bought_r5 | can6
 
             # AUDIT A-5r: SETTLER — no building bought, under the city cap,
             # settler price × mult affordable. The rival has no settler bank,
