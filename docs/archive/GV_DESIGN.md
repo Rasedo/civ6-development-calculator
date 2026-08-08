@@ -63,7 +63,7 @@ flag after capture. GV-3 MUST track the original capital TILES statically.
 Concrete plan (each step gated; TS is spec):
 - `state.capitalTiles: number[]` civ-indexed (0=player, r+1=rival r). Set at
   founding: game.ts foundCity when `isCapital` (first city) → capitalTiles[0];
-  rivals.ts first rc → capitalTiles[rid+1]. STATIC thereafter (survives capture).
+  phase.ts first rc → capitalTiles[rid+1]. STATIC thereafter (survives capture).
 - `dominationWinner(state)`: for each ct in capitalTiles, ownerOf(ct) = 0 if a
   player city is centered there, else r+1 if rival r's city is, else -1 (razed).
   If any -1 or count < 1+rivals → return -1. Else all-equal → that civ, else -1.

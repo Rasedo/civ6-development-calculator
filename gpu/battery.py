@@ -1,25 +1,22 @@
-"""The verification battery, parallelized.
+"""The verification battery: every gate an engine change must pass, in parallel.
 
-    python gpu/battery.py             # everything an ENGINE stage must pass
-    python gpu/battery.py --full      # + the slow MPC quality benchmarks
-    python gpu/battery.py --eval      # + the two 50-episode RL baselines (P8 only)
+    python gpu/battery.py              # all lanes
+    python gpu/battery.py --no-bail    # keep every lane running past a failure
 
-Stage 0 (serial, everything depends on it): tsc type gate + fixture
-export (P5: the vite build artifact feeds no gate; vitest runs in a
-lane). Then the lanes run concurrently on the measured bottleneck split:
+Stage 0 is serial because everything below depends on it: the TS and Python
+static gates, then the world seed, the fixture export and its staleness lock.
+Two lanes then run concurrently:
 
-    vitest        : the TS suite
-    cputests      : purchase/war/ranged/snapshot/... self-tests (CPU f64)
-    serve         : the decision-server gate (serve_gate --batched) — ONE
-                    B=12 GPU sim vs twelve TS children, every seat driven
-                    by one ladder over the wire, obs/jobs/trace equality
+    vitest + serve : the TS suite, then the decision-server gate
+                     (serve_gate --batched) — ONE B=12 GPU sim against twelve
+                     TS children, with per-turn obs/job/spread/buy equality
+                     and a state-digest compare
+    pokes          : the per-mechanic GPU self-tests, through a bounded pool
 
-Wall-clock is stage0 + the slowest lane, with the RL search/MPC
-benchmarks (search-quality, not engine-facing) behind --full.
-
-Each step's OMP thread count is capped so three torch processes don't
-oversubscribe the box. Exit code is nonzero if ANY step fails; the table
-at the end shows per-step wall time and status.
+Wall-clock is stage 0 plus the slowest lane. Each step's OMP thread count is
+capped so concurrent torch processes do not oversubscribe the box. Exit code
+is nonzero if ANY step fails; the table at the end gives per-step wall time
+and status.
 """
 
 from __future__ import annotations
@@ -33,36 +30,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FULL = "--full" in sys.argv
-# EVALS ARE OFF BY DEFAULT (#78). Owner directive 2026-07-10: no per-stage
-# eval re-baselining during engine development — "commit on battery green
-# WITHOUT running gpu/eval.py", with ONE baseline pass when the engine
-# settles, right before P8 training. Across the whole P1-P5 campaign the
-# parity gates caught every real problem first; the baseline never
-# independently caught one. They were also the largest cost in the battery,
-# so running them per-stage paid a lot for parked work. `--no-eval` is still
-# accepted and is now a no-op, since it describes the default.
-EVAL = "--eval" in sys.argv
-NO_BAIL = "--no-bail" in sys.argv  # #78: keep every lane running past a failure
+NO_BAIL = "--no-bail" in sys.argv  # keep every lane running past a failure
 
-# Poke pool (#78): 4 workers x OMP 2 = 8 threads, up from the old serial lane's
-# single OMP-4 process. Deliberately small — the box is 24 cores and the serve
-# lane's twelve TS children already claim most of them.
+# Poke pool: 4 workers x OMP 2 = 8 threads. Deliberately small — the box is 24
+# cores and the serve lane's twelve TS children already claim most of them.
 POKE_WORKERS = 4
 POKE_OMP = 2
 
-# Measured poke-lane wall times (seconds), used ONLY to order the poke
-# group cheapest-first so bail-fast surfaces a red sooner. Values from this
-# box's battery logs; a stale entry costs ordering quality, never correctness.
+# Measured poke-lane wall times (seconds), used ONLY to order the poke group
+# cheapest-first so bail-fast surfaces a red sooner. A stale entry costs
+# ordering quality, never correctness.
 POKE_COST = {
-    "great_works": 2.7, "religion_gp": 3.2, "government": 3.3, "builder_gain": 3.4,
+    "great_works": 2.7, "religion_gp": 3.2, "government": 3.3,
     "relics": 3.4, "trade2": 3.5, "bankruptcy": 3.7, "domination": 3.8,
     "culture_victory": 4.3, "space_race": 4.8, "encampment": 4.9, "cs_verbs": 6.6,
-    "cs_bonus": 7.9, "rival_purchase": 9.2, "rc_registry": 12.4, "controlled": 13.8,
+    "cs_bonus": 7.9, "seat_purchase": 9.2, "rc_registry": 12.4, "controlled": 13.8,
     "combat_mod": 17.1, "ranged": 18.5, "occupancy": 21.0,
     "governors": 22.2, "war_weariness": 23.2, "geopolitics": 23.8, "seat": 29.0,
     "gp_aura": 31.6, "war": 32.5, "purchase": 38.8, "religion2": 51.7,
     "naval": 53.7, "districts": 87.9, "watermill": 12.0, "fort": 6.0,
-    "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "rival_verbs": 10.0, "drive": 60.0,
+    "festival": 4.0, "cs_war": 6.0, "snapshot": 30.0, "golden_move": 3.0, "pref_apply": 8.0, "seat_verbs": 10.0, "drive": 60.0,
     "rr_strike": 12.0,
     "spawn_reclaim": 6.0,
     "city_first": 14.0,
@@ -78,20 +65,12 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
     env.setdefault("PYTHONUTF8", "1")
     env["OMP_NUM_THREADS"] = str(threads)
     env["MKL_NUM_THREADS"] = str(threads)
-    # #51 DELETIONS 1-3: the serve lane (serve_gate --batched) is THE
-    # cross-engine gate — every seat driven by one ladder over the wire,
-    # obs/jobs/trace equality asserted per turn. rollout.py + replay-gpu
-    # (the recorded-replay gate) and parity_test.py (the scripted-trace
-    # oracle) are DELETED; fixtures are pure t0 seeded worlds and the
-    # exporter plays nothing.
     t0 = time.time()
-    # BAIL-FAST (#78): the standing process is to fix and RE-RUN the whole
-    # battery, so once any lane fails every other lane is wasted wall-clock —
-    # and the expensive ones (serve, gpu pokes) would
-    # otherwise run to completion after the verdict is already known. Poll
-    # instead of blocking so a failure elsewhere can kill this lane now.
-    # `--no-bail` restores the old run-everything behaviour when the full
-    # picture is wanted (e.g. counting how many lanes a change breaks).
+    # BAIL-FAST: the standing process is to fix and RE-RUN the whole battery,
+    # so once any lane fails every other lane is wasted wall-clock — the
+    # expensive ones most of all. Poll instead of blocking so a failure
+    # elsewhere can kill this lane now. `--no-bail` runs everything anyway,
+    # for counting how many lanes a change breaks.
     p = subprocess.Popen(
         cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8", errors="replace",
@@ -128,19 +107,12 @@ def run(name: str, cmd: list[str], threads: int = 8, bail: bool = True) -> None:
 def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads: int) -> None:
     """Run one lane's steps CONCURRENTLY through a bounded pool.
 
-    #78: the poke group used to run strictly serial (~348s). That was never
-    about safety — rule (7)'s standalone sweep has always run these in
-    parallel, and the #55 round caught three reds in one such pass; no poke
-    test writes a file (checked), they are independent processes over
-    read-only fixtures. It was about not oversubscribing the box.
-
-    Bounded is the point: all 31 at OMP 4 would be 124 threads on 24 cores,
-    and this box has measured evidence that oversubscription starves the
-    critical lanes (6 rollout shards thrash: gpu 282s, parity starved). So a
-    small pool at a lower OMP instead — same total core-seconds, concentrated
-    into a shorter window. The critical path is the ~3720s GPU lane, so a
-    brief squeeze costs it almost nothing, while every poke red now surfaces
-    in one pass instead of one-per-battery-run.
+    Poke tests are independent processes over read-only fixtures — none writes
+    a file — so they parallelise freely. BOUNDED is the point: the whole group
+    at OMP 4 would be well over a hundred threads on 24 cores, and
+    oversubscription starves the lanes that set the critical path. A small pool
+    at a lower OMP spends the same core-seconds in a shorter window, and every
+    poke red surfaces in ONE pass.
     """
     pos = [0]
     lk = threading.Lock()
@@ -152,12 +124,10 @@ def lane_parallel(steps: list[tuple[str, list[str], int]], workers: int, threads
                     return
                 name, cmd, _ = steps[pos[0]]
                 pos[0] += 1
-            # DRAIN, don't bail (#78): a poke failure still sets `failed` and so
-            # still kills the expensive lanes immediately — but the pool itself
-            # runs to completion, because finishing it costs only ~90s and it is
-            # what makes ALL poke reds surface in ONE run. That is precisely
-            # what rule (7)'s standalone parallel sweep existed to provide, so
-            # the sweep is now redundant rather than merely cheaper to skip.
+            # DRAIN, don't bail: a poke failure still sets `failed` and so still
+            # kills the expensive lanes immediately, but the pool itself runs to
+            # completion — it costs ~90s and it is what makes ALL poke reds
+            # surface in one run.
             run(name, cmd, threads, bail=False)
 
     ws = [threading.Thread(target=worker) for _ in range(workers)]
@@ -181,119 +151,113 @@ def main() -> int:
     npx = "npx.cmd" if os.name == "nt" else "npx"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     py = sys.executable
-    # #51/S7.8f (task #55): ruff ships in the venv beside the interpreter.
+    # ruff ships in the venv beside the interpreter.
     ruff = Path(py).with_name("ruff.exe" if os.name == "nt" else "ruff")
     t0 = time.time()
 
     print("stage 0 (serial): tsc, export", flush=True)
     for name, cmd in (
-        # P5 battery trim: the vite build ARTIFACT feeds no gate (export,
-        # replay and vitest all run from source via vite/vite-node) — the
-        # type check IS the gate, so run tsc alone. vitest moved into the
-        # parity lane (it needs no fixtures).
+        # No lane consumes a vite build artifact — export and vitest both run
+        # from source — so the type check IS the gate here, and vitest runs in
+        # a lane below.
         ("tsc", [npx, "tsc", "--noEmit"]),
-        # #51/S1.3i: most of scripts/ cannot be typechecked (@types/node is not
-        # installed) and it IS the parity harness. A parse costs ~200ms and
-        # catches the class that killed this gate with an empty error message.
-        ("parse", ["node", "scripts/parse-check.mjs"]),
-        ("lint", [npx, "oxlint", "src", "scripts", "tests"]),  # #51: no-constant-binary-expression et al
-        # #51/S7.8f (task #55): F821 = UNDEFINED NAME on the Python side. Costs
-        # ~0.3s and catches the class that cost this session hours: an
-        # undefined name in a rarely-reached engine branch presents as a
-        # crash or hang deep inside a lane instead of an import error.
-        ("f821", [str(ruff), "check", "--select", "F821", "gpu", "scripts"]),
-        ("export", [npm, "run", "gpu:export"]),
+        # Parse-check + module boundary in one ~300ms pass: it catches a
+        # mangled file that tsc reports with an empty error message, and it
+        # enforces the world/seeder import boundary.
+        ("parse", ["node", "tools/parse-check.mjs"]),
+        ("lint", [npx, "oxlint", "cpu", "seeder", "world", "tools", "tests"]),  # no-constant-binary-expression et al
+        # F821 = UNDEFINED NAME on the Python side, ~0.3s. Without it an
+        # undefined name in a rarely-reached engine branch presents as a crash
+        # or hang deep inside a lane instead of an import error.
+        ("f821", [str(ruff), "check", "--select", "F821", "gpu", "policy", "tools"]),
+        # pyright, basic mode; suppressions are documented in pyrightconfig.json.
+        ("pyright", [npx, "pyright"]),
+        # Worlds (the engine-free seeder layer) then the compiled planes. The
+        # lock check is the staleness guard: every lane below COMPARES the two
+        # engines, and a stale world set reads exactly like an engine
+        # divergence. The fixtures' own srcStamp is additionally enforced
+        # inside gpu load_fixture.
+        ("seed", [npm, "run", "seed"]),
+        ("export", [npm, "run", "export"]),
+        ("lock", [npm, "run", "seed:check"]),
     ):
         run(name, cmd, threads=24)
         if failed.is_set():
             break
 
     if not failed.is_set():
-        print("lanes (parallel): vitest+serve | gpu pokes" + (" | evals" if EVAL else ""), flush=True)
+        print("lanes (parallel): vitest+serve | gpu pokes", flush=True)
         lanes = [
             [
                 ("vitest", [npm, "test"], 8),
-                # #95 THE CUTOVER: the DECISION-SERVER gate — one B=12 sim,
-                # twelve TS children, per-turn obs/unit-target equality +
-                # trace compare — IS the parity lane now. The file-driven
-                # lane it replaces covered the same games (scripted player,
-                # driven rivals, same seeds) with strictly less checking.
+                # The DECISION-SERVER gate: one B=12 sim, twelve TS children,
+                # per-turn obs/unit-target equality and a state-digest compare.
                 ("serve", [py, "gpu/serve_gate.py", "--batched", "--turns", "250"], 6),
             ],
             [
-                ("purchase", [py, "gpu/tests/purchase_test.py"], 4),
-                ("rival_purchase", [py, "gpu/tests/rival_purchase_test.py"], 4),
-                ("war", [py, "gpu/tests/war_test.py"], 4),
-                ("ranged", [py, "gpu/tests/ranged_test.py"], 4),
-                ("combat_mod", [py, "gpu/tests/combat_mod_test.py"], 4),  # B-29 wounded + river
-                ("occupancy", [py, "gpu/tests/occupancy_test.py"], 4),
-                ("builder_gain", [py, "gpu/tests/builder_gain_test.py"], 4),
-                ("domination", [py, "gpu/tests/domination_test.py"], 4),
-                ("peace_target", [py, "gpu/tests/peace_target_test.py"], 2),  # #51: no attack without a war
-                ("rr_strike", [py, "gpu/tests/rr_strike_test.py"], 2),  # #51/S7.1 (#59): a rival city fires on an enemy RIVAL
-                ("spawn_reclaim", [py, "gpu/tests/spawn_reclaim_test.py"], 2),
-                ("city_first", [py, "gpu/tests/city_first_test.py"], 2),  # #51/S7.10a: a garrison shields no city  # #51/S7.2: a reclaimed slot hands on no drowned unit's MP
-                ("stack_rules", [py, "gpu/tests/stack_rules_test.py"], 2),  # #51: cross-domain stacking + Encampment spawn wall
-                ("golden_move", [py, "gpu/tests/golden_move_test.py"], 2),  # B-24: MONUMENTALITY / EXODUS +2 MP, per seat
-                ("bankruptcy", [py, "gpu/tests/bankruptcy_test.py"], 4),
-                ("seat", [py, "gpu/tests/seat_test.py"], 4),
-                ("government", [py, "gpu/tests/government_test.py"], 4),
-                ("controlled", [py, "gpu/tests/controlled_test.py"], 4),
-                ("pref_apply", [py, "gpu/tests/pref_apply_test.py"], 4),  # #87: preference-order apply — the ONLY lane that reaches it
-                ("rival_verbs", [py, "gpu/tests/rival_verbs_test.py"], 4),  # #89: the 9 rival unit verbs — asserts EXECUTION, not legality
-                ("drive", [py, "gpu/tests/drive_test.py"], 4),  # #70: gpu/ladder.py DRIVES a seat for a whole game
-                ("religion_gp", [py, "gpu/tests/religion_gp_test.py"], 4),
-                ("war_weariness", [py, "gpu/tests/war_weariness_test.py"], 4),
-                ("space_race", [py, "gpu/tests/space_race_test.py"], 4),
-                ("culture_victory", [py, "gpu/tests/culture_victory_test.py"], 4),  # B-25 (#72): the gate-unreachable culture win
-                ("relics", [py, "gpu/tests/relics_test.py"], 4),  # B-20 (#73): martyr relics — temple slots, faith + tourism
-                ("festival", [py, "gpu/tests/festival_test.py"], 4),  # #79: Festival pays THREE GP classes at 0.11 (gate-unreachable)
-                ("cs_war", [py, "gpu/tests/cs_war_test.py"], 4),  # A-18 (#79): player<->CS war gates the attack mask
-                ("snapshot", [py, "gpu/tests/snapshot_restore_test.py"], 4),  # ENGINE: _MUTABLE round-trip + step determinism (the ONLY coverage; parity never restores)
-                ("naval", [py, "gpu/tests/naval_test.py"], 4),  # #45/B-6 gate-unreachable naval surfaces
-                ("districts", [py, "gpu/tests/district_breadth_test.py"], 4),  # B9/A-9 catalog-breadth surfaces
-                ("rc_registry", [py, "gpu/tests/rc_registry_test.py"], 4),  # B10/A-24 rival district/tile registry consistency
-                ("religion2", [py, "gpu/tests/religion2_test.py"], 4),  # B6 missionary/enhancer/religious-victory surfaces
-                ("encampment", [py, "gpu/tests/encampment_test.py"], 4),  # B7/B-17 Encampment strike + training XP + specialist surfaces
-                ("great_works", [py, "gpu/tests/great_works_test.py"], 4),  # B7/B-20 Writer/Musician Great-Work slots + yield
-                ("gp_aura", [py, "gpu/tests/gp_aura_test.py"], 4),  # B7-G/B-8 Great General/Admiral spawn/walk/aura/capture (gate-unreachable GENERAL)
-                ("cs_bonus", [py, "gpu/tests/cs_bonus_test.py"], 4),  # B8-K/B-21 CS envoy building re-key + suzerain perk (6-envoy tier gate-unreachable)
-                ("cs_verbs", [py, "gpu/tests/cs_verbs_test.py"], 4),  # B8/A-12 rival levy + rival CS quests (zero-draw)
-                ("trade2", [py, "gpu/tests/trade2_test.py"], 4),  # B8/B-23 international routes + route duration surfaces
-                ("geopolitics", [py, "gpu/tests/geopolitics_test.py"], 4),  # #55 A-19/B-33/B-22 per-pair wars + casus belli + rc->rc transfer
-                ("governors", [py, "gpu/tests/governors_test.py"], 4),  # #68/B-24 era-score hooks + Ages loyalty modulation + governor anchors
-                ("watermill", [py, "gpu/tests/watermill_test.py"], 4),
-                ("unit_head", [py, "gpu/tests/unit_head_test.py"], 4),  # #51/S0.3: action enum == mask width == RL head width
-                ("state_discipline", [py, "gpu/tests/state_discipline_test.py"], 4),  # #51/S0.4: alias-rebind + _MUTABLE drift net
-                ("inplace", [py, "gpu/tests/inplace_discipline_test.py"], 1),  # #51/S3.1: static — no self-rebinds, no stale captures
-                ("fort", [py, "gpu/tests/fort_test.py"], 4),  # #78/B-27 Fort +4 defence — gate reachability is ZERO, so this lane is the only proof  # #78 Water Mill: farm-improved bonus resources +1 food (gate coverage is thin)
-                ("ladder", [py, "gpu/tests/ladder_test.py"], 4),  # #51/S8.3: the ladder leaves the parity gate — this is its only guard
+                ("purchase", [py, "tests/gpu/purchase_test.py"], 4),
+                ("seat_purchase", [py, "tests/gpu/seat_purchase_test.py"], 4),
+                ("war", [py, "tests/gpu/war_test.py"], 4),
+                ("ranged", [py, "tests/gpu/ranged_test.py"], 4),
+                ("combat_mod", [py, "tests/gpu/combat_mod_test.py"], 4),  # wounded + river
+                ("occupancy", [py, "tests/gpu/occupancy_test.py"], 4),
+                ("domination", [py, "tests/gpu/domination_test.py"], 4),
+                ("peace_target", [py, "tests/gpu/peace_target_test.py"], 2),  # no attack without a war
+                ("rr_strike", [py, "tests/gpu/rr_strike_test.py"], 2),  # a civ city fires on an enemy civ
+                ("spawn_reclaim", [py, "tests/gpu/spawn_reclaim_test.py"], 2),  # a reclaimed slot hands on no drowned unit's MP
+                ("city_first", [py, "tests/gpu/city_first_test.py"], 2),  # a garrison shields no city
+                ("stack_rules", [py, "tests/gpu/stack_rules_test.py"], 2),  # cross-domain stacking + Encampment spawn wall
+                ("golden_move", [py, "tests/gpu/golden_move_test.py"], 2),  # MONUMENTALITY / EXODUS +2 MP, per seat
+                ("bankruptcy", [py, "tests/gpu/bankruptcy_test.py"], 4),
+                ("seat", [py, "tests/gpu/seat_test.py"], 4),
+                ("government", [py, "tests/gpu/government_test.py"], 4),
+                ("controlled", [py, "tests/gpu/controlled_test.py"], 4),
+                ("pref_apply", [py, "tests/gpu/pref_apply_test.py"], 4),  # preference-order apply — the ONLY lane that reaches it
+                ("seat_verbs", [py, "tests/gpu/seat_verbs_test.py"], 4),  # the 9 civ unit verbs — asserts EXECUTION, not legality
+                ("drive", [py, "tests/gpu/drive_test.py"], 4),  # the ladder DRIVES a seat for a whole game
+                ("religion_gp", [py, "tests/gpu/religion_gp_test.py"], 4),
+                ("war_weariness", [py, "tests/gpu/war_weariness_test.py"], 4),
+                ("space_race", [py, "tests/gpu/space_race_test.py"], 4),
+                ("culture_victory", [py, "tests/gpu/culture_victory_test.py"], 4),  # the culture win, which the serve gate never reaches
+                ("relics", [py, "tests/gpu/relics_test.py"], 4),  # martyr relics — temple slots, faith + tourism
+                ("festival", [py, "tests/gpu/festival_test.py"], 4),  # Festival pays THREE GP classes at 0.11 (serve gate never reaches it)
+                ("cs_war", [py, "tests/gpu/cs_war_test.py"], 4),  # seat-0 <-> city-state war gates the attack mask
+                ("snapshot", [py, "tests/gpu/snapshot_restore_test.py"], 4),  # _MUTABLE round-trip + step determinism (the ONLY lane that restores)
+                ("naval", [py, "tests/gpu/naval_test.py"], 4),  # naval surfaces the serve gate never reaches
+                ("districts", [py, "tests/gpu/district_breadth_test.py"], 4),  # district catalog breadth
+                ("rc_registry", [py, "tests/gpu/rc_registry_test.py"], 4),  # civ district/tile registry consistency
+                ("religion2", [py, "tests/gpu/religion2_test.py"], 4),  # missionary / enhancer / religious-victory surfaces
+                ("encampment", [py, "tests/gpu/encampment_test.py"], 4),  # Encampment strike + training XP + specialist surfaces
+                ("great_works", [py, "tests/gpu/great_works_test.py"], 4),  # Writer/Musician Great-Work slots + yield
+                ("gp_aura", [py, "tests/gpu/gp_aura_test.py"], 4),  # Great General/Admiral spawn/walk/aura/capture (GENERAL unreachable in the gate)
+                ("cs_bonus", [py, "tests/gpu/cs_bonus_test.py"], 4),  # CS envoy building re-key + suzerain perk (6-envoy tier unreachable in the gate)
+                ("cs_verbs", [py, "tests/gpu/cs_verbs_test.py"], 4),  # civ levy + civ city-state quests
+                ("trade2", [py, "tests/gpu/trade2_test.py"], 4),  # international routes + route duration surfaces
+                ("geopolitics", [py, "tests/gpu/geopolitics_test.py"], 4),  # per-pair wars + casus belli + civ-to-civ city transfer
+                ("governors", [py, "tests/gpu/governors_test.py"], 4),  # era-score hooks + Ages loyalty modulation + governor anchors
+                ("watermill", [py, "tests/gpu/watermill_test.py"], 4),  # Water Mill: farm-improved bonus resources +1 food
+                ("unit_head", [py, "tests/gpu/unit_head_test.py"], 4),  # action enum == mask width == RL head width
+                ("state_discipline", [py, "tests/gpu/state_discipline_test.py"], 4),  # alias-rebind + _MUTABLE drift net
+                ("inplace", [py, "tests/gpu/inplace_discipline_test.py"], 1),  # static — no self-rebinds, no stale captures
+                ("fort", [py, "tests/gpu/fort_test.py"], 4),  # Fort +4 defence — the serve gate never reaches it, so this lane is the only proof
+                ("ladder", [py, "tests/gpu/ladder_test.py"], 4),  # the shared decision ladder's own guard
             ],
-        ] + (
-            [[
-                ("eval-random", [py, "gpu/eval/eval.py", "--policy", "random", "--episodes", "50"], 8),
-                ("eval-scripted", [py, "gpu/eval/eval.py", "--policy", "scripted", "--episodes", "50"], 8),
-            ]]
-            if EVAL
-            else []
-        )
-        # BAIL-FAST ORDERING (#78). The poke group is ONE lane on purpose:
-        # serial it is nowhere near the critical path (the serve lane sets
-        # it), so splitting it could not shorten the wall — it would only
-        # steal cores from the lanes that set it.
-        # But bail-fast made TIME-TO-FIRST-FAILURE matter, and list order alone
-        # decides that: the #78 red sat behind ~177s of slower pokes before
-        # `government` (3.3s) reported. Running the cheap ones first surfaces
-        # most reds in seconds at zero CPU cost. Times are measured medians;
-        # unknown/new lanes default mid-pack so they are neither starved nor
-        # promoted. Pokes are independent processes over read-only fixtures,
-        # so order carries no semantics.
+        ]
+        # BAIL-FAST ORDERING. The poke group is ONE lane on purpose: it is
+        # nowhere near the critical path (the serve lane sets that), so
+        # splitting it could not shorten the wall — only steal cores from the
+        # lanes that do set it. What list order DOES decide is
+        # time-to-first-failure, so the cheap pokes run first and surface most
+        # reds in seconds at zero CPU cost. Times are measured medians;
+        # unknown lanes default mid-pack, neither starved nor promoted. Pokes
+        # are independent processes over read-only fixtures, so order carries
+        # no semantics.
         for L in lanes:
-            if len(L) > 5:  # only the cpu self-test group is this long
+            if len(L) > 5:  # only the poke group is this long
                 L.sort(key=lambda s: POKE_COST.get(s[0], 30.0))
 
         # The poke group runs through the bounded pool; every other lane is
-        # serial as before (they are 1-3 steps and sit on the critical path).
+        # serial (1-3 steps each, and on the critical path).
         threads = [
             threading.Thread(target=lane_parallel, args=(l, POKE_WORKERS, POKE_OMP))
             if len(l) > 5

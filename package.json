@@ -4,17 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "preview:map": "vite-node scripts/preview.ts",
-    "rl:build": "vite build -c vite.rl.config.ts",
-    "rl:train": "npm run rl:build && node dist-rl/train.js",
-    "rl:eval": "npm run rl:build && node dist-rl/evaluate.js",
-    "rl:train:dev": "vite-node scripts/train.ts",
     "test": "vitest run",
-    "gpu:export": "vite-node scripts/export-gpu.ts",
-    "lint": "oxlint src scripts tests"
+    "lint": "oxlint cpu seeder tools tests",
+    "seed": "vite-node seeder/seeder.ts",
+    "seed:check": "vite-node seeder/stamp.ts --check",
+    "export": "vite-node cpu/export/export.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

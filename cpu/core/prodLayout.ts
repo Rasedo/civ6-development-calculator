@@ -1,0 +1,110 @@
+/** THE production column layout, defined ONCE.
+ *
+ * The wire records mask COLUMNS, and both engines must agree on what column 7
+ * means, forever. One derivation, imported by everything that needs it — a
+ * second copy would rot the file format silently, which is the
+ * same disease as #85 (the seat mask five units behind the picker) one level
+ * up. So the derivation lives here and both sides import it.
+ *
+ * Layout, shared by `production_mask` and `rival_masks`:
+ *     [0, NB)            queue that City Center building
+ *     NB                 SETTLER
+ *     NB + 1             IDLE (queue nothing)
+ *     [NB+2, NB+2+NU)    train that roster unit
+ *     [NB+2+NU, +nS)     place that scaffold district
+ *     [purchaseLo, +NB+1+NU)  gold purchases (buy building / settler / unit)
+ *     [wonderLo, +nW)    queue that world wonder (#88; placement re-scanned)
+ *     [projectLo, +nP)   run that district project (#88; BASE rows only —
+ *                        space-race rows keep their column for layout
+ *                        stability but no mask ever offers them; the space
+ *                        chain is its own queue path with its own gate)
+ * note: wonders/projects APPEND after the purchase block deliberately —
+ * inserting before it would renumber every purchase consumer (pref-apply,
+ * rollout decode) for zero gain.
+ */
+import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
+import { SCAFFOLD_DISTRICTS } from '../data/districts';
+import { UNITS } from '../data/units';
+import { BUILT_WONDERS } from '../data/builtWonders';
+import { PROJECTS } from '../data/projects';
+
+/** Districts whose buildings sit in the production table. */
+export const BUILDING_DISTRICTS: Set<string> = new Set<string>([
+  'CITY_CENTER',
+  ...SCAFFOLD_DISTRICTS.map((d) => d.id),
+]);
+
+/** The building rows, in table order. PALACE stays out — both engines model it
+ * as a capital term, not a row. Worship buildings JOIN the table (the other seats
+ * faith-buy them; the pickers mask them via the `worship` flag). */
+export function centerBuildingIds(): string[] {
+  return Object.values(BUILDINGS)
+    .filter((b) => BUILDING_DISTRICTS.has(b.district) && b.id !== 'PALACE' && !SCRIPTED_HELD_BUILDINGS.has(b.id))
+    .sort((a, b) => a.cost - b.cost || (a.id < b.id ? -1 : 1))
+    .map((b) => b.id);
+}
+
+/** The unit rows, in table order — the order IS the tie-break in both engines'
+ * best-of-roster scans, so it must never be re-sorted. */
+export function rosterUnitIds(): string[] {
+  return Object.values(UNITS).map((u) => u.id);
+}
+
+/** wonder rows in EXPORT order — `Object.values(BUILT_WONDERS)`, the
+ * exact order `rules.json`'s wonders.rows ships in. Column index = data
+ * index, both engines. */
+export function wonderIds(): string[] {
+  return Object.values(BUILT_WONDERS).map((w) => w.id);
+}
+
+/** project rows in EXPORT order — `Object.values(PROJECTS)`, matching
+ * rules.json's projects.rows (base rows first, space rows last). */
+export function projectIds(): string[] {
+  return Object.values(PROJECTS).map((p) => p.id);
+}
+
+export interface ProdLayout {
+  NB: number;
+  NU: number;
+  buildings: string[];
+  units: string[];
+  wonders: string[];
+  projects: string[];
+  settlerCol: number;
+  idleCol: number;
+  unitLo: number;
+  districtLo: number;
+  purchaseLo: number;
+  wonderLo: number;
+  projectLo: number;
+  width: number;
+}
+
+export function prodLayout(): ProdLayout {
+  const buildings = centerBuildingIds();
+  const units = rosterUnitIds();
+  const wonders = wonderIds();
+  const projects = projectIds();
+  const NB = buildings.length;
+  const NU = units.length;
+  const nS = SCAFFOLD_DISTRICTS.length;
+  const purchaseLo = NB + 2 + NU + nS;
+  const wonderLo = purchaseLo + NB + 1 + NU;
+  const projectLo = wonderLo + wonders.length;
+  return {
+    NB,
+    NU,
+    buildings,
+    units,
+    wonders,
+    projects,
+    settlerCol: NB,
+    idleCol: NB + 1,
+    unitLo: NB + 2,
+    districtLo: NB + 2 + NU,
+    purchaseLo,
+    wonderLo,
+    projectLo,
+    width: projectLo + projects.length,
+  };
+}

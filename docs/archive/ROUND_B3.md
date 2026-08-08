@@ -59,7 +59,7 @@ featureYields, gpp — whatever channels the 9 follower beliefs
 actually carry) key on the CITY's `followedReligion`, not the owner's
 religion, in BOTH yield pipelines:
 - TS: `computeCityStats` (player cities) + `rivalCityYields`
-  (core/rivals.ts). Map religion id g → the founding civ's chosen
+  (core/phase.ts). Map religion id g → the founding civ's chosen
   follower belief (g=0 player — no in-gate founder; g=i+1 = rival i's
   `followerBelief`).
 - GPU: `_city_totals` (player walk) + `_rival_city_yields` AND the

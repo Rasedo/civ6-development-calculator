@@ -1,7 +1,8 @@
+// Vitest configuration. The browser app is gone; this file exists for the
+// test runner only.
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: './',
   test: {
     // A git WORKTREE lives under .claude/ during hunts (see gpu/AUDIT.md), and
     // vitest's default include glob does not respect .gitignore — so the
