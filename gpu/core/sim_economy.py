@@ -2755,6 +2755,22 @@ class SimEconomy:
         cols = [self.empire_score()] + [self.civ_empire_score(r) for r in range(self.R)]
         return first_argmax(torch.stack(cols, dim=1))
 
+    def protagonist(self) -> torch.Tensor:
+        """[B] the POST-HOC protagonist as a unified civ id (0 = seat 0,
+        r+1 = civ index r): the WINNER where the game produced one, else the
+        score-leader among actors that still hold a city, else leader()'s
+        plain pick. A finished game reads from whichever seat earned the
+        horizon, so no single seat's fate invalidates a seed. Read-side
+        only: nothing in the simulation consults it, and the wire records
+        every seat, so any pick has a complete trajectory to read."""
+        cols = [self.empire_score()] + [self.civ_empire_score(r) for r in range(self.R)]
+        scores = torch.stack(cols, dim=1)  # [B, 1+R]
+        has_city = torch.stack(
+            [self.alive.any(dim=1)] + [self.rc_alive[:, r].any(dim=1) for r in range(self.R)], dim=1)
+        fenced = torch.where(has_city, scores, torch.full_like(scores, float("-inf")))
+        pick = torch.where(has_city.any(dim=1), first_argmax(fenced), first_argmax(scores))
+        return torch.where(self.winner >= 0, self.winner, pick)
+
     def _domination(self) -> torch.Tensor:
         """[B] the unified civ id holding EVERY original capital (capitalTiles:
         cap_tile_player + cap_tile_civ), else -1. Owner of a capital tile: 0 if

@@ -388,8 +388,7 @@ for (let t = 0; t < N_TURNS; t++) {
   // (#51 deletions: the scripted production chain and the scripted builder
   // walker are GONE — every UNROUTED_SEAT-0 verb arrives on the wire; a turn with no
   // rec-0 queues nothing, and the trace compare names any drift.)
-  // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's scripted game (the
-  // SEED_OVERRIDES diagnosis knob — see the map above).
+  // CIV6_EXPORT_DEBUG=<seed>: narrate that seed's turn events for diagnosis.
   const evBefore = state.eventLog.length;
   endTurn(state, 0);
   if (process.env.CIV6_EXPORT_DEBUG === String(seed)) {
@@ -418,11 +417,9 @@ for (let t = 0; t < N_TURNS; t++) {
     o.send({ dumps });
   }
 }
-  // A collapsed empire is a legitimate outcome for NON-capital cities —
-// loyalty flips ARE the hostile world working. But seat CONQUEST can
-// kill the capital too, now that the other seats are strong enough; a fully
-// dead player makes the fixture unusable → add a SEED_OVERRIDES entry.
-if (seatOf(state, UNROUTED_SEAT)!.cities.length < 1) {
-  throw new Error(`seed ${seed}: no cities left by turn ${N_TURNS} — add a SEED_OVERRIDES entry (diagnose with CIV6_EXPORT_DEBUG=${seed})`);
-}
+  // A dead seat 0 is a LEGITIMATE outcome — conquest and loyalty flips are
+// the hostile world working. The gate compares every seat every turn
+// regardless of who survives, and a finished game reads post-hoc from
+// whichever seat earned the horizon (the `protagonist()` pick), so no
+// single seat's fate invalidates a seed.
 }

@@ -30,7 +30,7 @@ def dom(sim) -> int:
 def main() -> int:
     rules = load_rules()
     # resolve the fixture by POSITION: the lane only needs "some 2-civ
-    # fixture", so a SEED_OVERRIDES change cannot break it.
+    # fixture", so a seed-set change cannot break it.
     paths = sorted(FIXTURES.glob("seed*.json"))
     if not paths:
         print("no fixtures — run `npm run seed && npm run export` first")
