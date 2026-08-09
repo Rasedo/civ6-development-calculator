@@ -1422,7 +1422,7 @@ class SimPhase:
         self.current[b, c] = -1
         # relocatePalace runs right after the cities filter — BEFORE the
         # cityHp/route prune and BEFORE the conquest-raze early return below.
-        self._relocate_palace_seat0(torch.tensor([b], dtype=torch.long, device=self.device))
+        self._relocate_palace(torch.tensor([b], dtype=torch.long, device=self.device), torch.tensor([0], dtype=torch.long, device=self.device))
         owned = self.owner[b] == c
         # Snapshot the transferring city's COMPLETE placeable-district and
         # wonder tiles from the LIVE owner mask (CITY_CENTER is never in the

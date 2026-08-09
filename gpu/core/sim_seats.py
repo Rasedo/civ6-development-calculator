@@ -2298,9 +2298,9 @@ class SimSeats:
         # relocatePalace(from.cities) — the loser re-crowns immediately after its
         # city list loses the slot, before the route prune and territory re-tag,
         # matching the TS order.
-        self._relocate_palace_civ(
+        self._relocate_palace(
             torch.tensor([b], dtype=torch.long, device=self.device),
-            torch.tensor([civ_only_from], dtype=torch.long, device=self.device),
+            torch.tensor([civ_only_from + 1], dtype=torch.long, device=self.device),
         )
         # exactly the flipping city's tiles re-tag (registry scan). civ_city_id is read
         # before the hygiene writes; the slot's id field is never reset on death.

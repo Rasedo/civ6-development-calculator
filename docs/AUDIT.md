@@ -53,7 +53,7 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   blocker is gone — the appeal plane exists (the Seaside Resort pays
   gold = appeal) — so this is now ordinary district plumbing on both
   engines. (The other old A-9 residual, palace relocation on capital
-  loss, has since landed: `_relocate_palace_seat0` / `_relocate_palace_civ`.)
+  loss, has since landed: `_relocate_palace` (one body, every seat row).)
 - **A-11r. Trade-route tails.** (1) Seat 0's GPU route machinery:
   storage is seat-indexed (`seat_routes` / `seat_route_exp` /
   `seat_route_dest`, row 0 allocated) but the seat-0 rows' gated reach

@@ -511,60 +511,42 @@ class SimOrders:
                                 self.civ_unit_alive[dr_, sc[dr_]] = False
                                 self.civilian_at[(dr_, here[dr_])] = -1
 
-    def _relocate_palace_seat0(self, rows: torch.Tensor) -> None:
-        """Re-crown seat 0's capital — the phase.ts `relocatePalace` mirror.
+    def _relocate_palace(self, rows: torch.Tensor, seat_row: torch.Tensor) -> None:
+        """Re-crown a seat's capital — the `relocatePalace` mirror, ONE body
+        for every seat row. `rows`/`seat_row` are parallel [n] tensors: the
+        losing seat per game row.
 
-        Call it on the LOSER rows immediately after a seat-0 city leaves the
-        empire (capture, loyalty defection or raze). No-op when the empire is
-        gone (no live column) or still holds a capital; otherwise the
-        surviving city with the HIGHEST population is re-crowned, ties to the
-        EARLIEST acquisition (TS scans the array with a strict `>`, and array
-        order is city_seq rank, never the column index).
+        Call it immediately after a city leaves its seat's list (capture,
+        loyalty defection or raze) — TS calls relocatePalace right there.
+        No-op when the seat is gone (no live city) or still holds a capital;
+        otherwise the surviving city with the HIGHEST population is
+        re-crowned, ties to the EARLIEST acquisition (TS scans the array with
+        a strict `>`). The scan order is the seat's cities-ARRAY order: row
+        0's array order is the city_seq rank (its columns hole-reuse), while
+        a civ row's slot order IS acquisition rank (append-only, stable
+        reclaim) — that per-row key is the one branch below.
 
         The PALACE BUILDING needs no write: both engines model it as a
-        capital TERM (`is_cap` × `_palace_y` / `_palace_housing` /
-        `_palace_amenities`), never a b_cost row — the rules export drops
-        PALACE from the catalog — so moving `is_cap` moves the building.
-
-        `cap_tile` (TS `capitalTile`) deliberately does NOT move: it is
-        the STATIC domination anchor, as in real Civ 6 — the ORIGINAL capital
-        stays the domination target while the relocated Palace carries the
-        capital BONUSES."""
+        capital TERM (city_is_cap × the palace yield/housing/amenity terms),
+        never a b_cost row. `civ_cap_tile` deliberately does NOT move: the
+        ORIGINAL capital stays the domination anchor, as in real Civ 6, while
+        the relocated Palace carries the capital BONUSES."""
         if rows.numel() == 0:
             return
-        alive = self.alive[rows]  # [n, C]
-        need = alive.any(dim=1) & ~(self.is_cap[rows] & alive).any(dim=1)  # [n]
+        alive = self.city_alive[rows, seat_row]  # [n, RC]
+        need = alive.any(dim=1) & ~(self.city_is_cap[rows, seat_row] & alive).any(dim=1)  # [n]
         if not bool(need.any()):
             return
-        # ONE strictly-ordered key: population DESC, acquisition (city_seq)
-        # ASC. city_seq is unique across live columns, so the argmax is
-        # tie-free and reproduces TS's strict-`>` first-wins scan exactly.
-        seq = self.city_seq[rows]
-        key = torch.where(alive, self.pop[rows] * (1 << 20) - seq, torch.full_like(seq, -(1 << 60)))
+        seq = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive).clone()
+        r0 = seat_row == 0
+        if bool(r0.any()):
+            # dead columns beyond C never matter (alive is False there), so
+            # the pad value only has to keep the tensor rectangular.
+            seq[r0, : self.C] = self.city_seq[rows[r0]]
+        key = torch.where(alive, self.city_pop[rows, seat_row] * (1 << 20) - seq, torch.full_like(seq, -(1 << 60)))
         pick = key.max(dim=1).indices  # [n] (garbage where ~need, masked below)
-        self.is_cap[rows[need], pick[need]] = True
-        self._eff_version += 1  # yield-bearing: the palace term (yields/housing/amenities) just moved
-
-    def _relocate_palace_civ(self, rows: torch.Tensor, civ: torch.Tensor) -> None:
-        """Re-crown a civ seat's capital — the rc-side twin.
-
-        `relocatePalace(seat.cities)` for a civ seat. `rows` and `civ` are parallel [n] index tensors: the losing civ per
-        row. rc SLOT order IS the acquisition rank (founding, capture and both
-        transfers all append at last-alive+1 and _reclaim_civ_cities is stable, so rc
-        slot order matches TS array order), so the tie-break runs on the slot
-        index. civ_city_bldg is untouched (PALACE is not in the b_cost catalog) and
-        `civ_only_cap_tile` stays put for the same reason as the seat-0 side."""
-        if rows.numel() == 0:
-            return
-        alive = self.civ_city_alive[rows, civ]  # [n, RC]
-        need = alive.any(dim=1) & ~(self.civ_city_is_cap[rows, civ] & alive).any(dim=1)  # [n]
-        if not bool(need.any()):
-            return
-        idx = torch.arange(self.RC, device=self.device).reshape(1, -1).expand_as(alive)
-        key = torch.where(alive, self.civ_city_pop[rows, civ] * (1 << 20) - idx, torch.full_like(idx, -(1 << 60)))
-        pick = key.max(dim=1).indices  # [n]
-        self.civ_city_is_cap[rows[need], civ[need], pick[need]] = True
-        self._eff_version += 1  # yield-bearing: civ yields/housing/amenities all read civ_city_is_cap
+        self.city_is_cap[rows[need], seat_row[need], pick[need]] = True
+        self._eff_version += 1  # yield-bearing: the palace term just moved
 
     def _capture_civ_city(self, rows: torch.Tensor, civ: torch.Tensor, slot: torch.Tensor, ctr: torch.Tensor, plunder: bool = True) -> None:
         """Transfer a civ seat's city to seat 0 — the TS `transferCity` twin.
@@ -606,9 +588,9 @@ class SimOrders:
             # the city leaves its list — TS calls relocatePalace right after
             # `seat.cities = filter(...)`, BEFORE the route prune and the raze
             # early-outs below.
-            self._relocate_palace_civ(
+            self._relocate_palace(
                 torch.tensor([b], dtype=torch.long, device=self.device),
-                torch.tensor([r], dtype=torch.long, device=self.device),
+                torch.tensor([r + 1], dtype=torch.long, device=self.device),
             )
             # Exactly this city's tiles leave the civ, found by registry scan
             # (TS `tileBelongsTo`): a radius sweep would leak the outer ring
