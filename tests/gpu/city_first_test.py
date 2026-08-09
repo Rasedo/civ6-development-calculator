@@ -25,7 +25,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import PLAYER_SEAT, P_MAX
+from core.engine import P_MAX
 
 
 def build():
@@ -56,13 +56,13 @@ def civ_centre(sim) -> tuple[int, int]:
     raise AssertionError("no alive civ centre with a free neighbour")
 
 
-def put_player_melee(sim, tile: int) -> int:
+def put_p_melee(sim, tile: int) -> int:
     slot = int(sim.p_next[0])
     sim.p_alive[0, slot] = True
     sim.p_type[0, slot] = 2  # WARRIOR
     sim.p_tile[0, slot] = tile
     sim.p_hp[0, slot] = 100
-    sim.p_seat[0, slot] = PLAYER_SEAT
+    sim.p_seat[0, slot] = 0
     sim.p_mp[0, slot] = 2
     sim.p_mp_full[0, slot] = 2
     sim.occ_mil[0, tile] = slot + sim.POOL_LO["p"]
@@ -109,7 +109,7 @@ def run(civilian: bool, military: bool = False) -> tuple[int, int, bool]:
     if military and civilian:
         garrison(sim, ctr, civilian=False)
     g = garrison(sim, ctr, civilian)
-    p = put_player_melee(sim, from_tile)
+    p = put_p_melee(sim, from_tile)
 
     r, j = next((r, j) for r in range(sim.R) for j in range(sim.RC)
                 if bool(sim.rc_alive[0, r, j]) and int(sim.rc_center[0, r, j]) == ctr)

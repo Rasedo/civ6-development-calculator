@@ -246,10 +246,7 @@ def _ww_pairs(plane: str, live):
 
 
 def _capital_tile(sim, b, rows):
-    # Two planes for one fact: seat 0's capital tile is `cap_tile_player`, every
-    # other seat's is `cap_tile_civ`. The extractor is where that asymmetry is
-    # visible; the manifest note records it as a storage gap, not a rule.
-    return [int(sim.cap_tile_player[b]) if c == 0 else int(sim.cap_tile_civ[b, c - 1]) for c in rows]
+    return [int(sim.civ_cap_tile[b, c]) for c in rows]
 
 
 def _civ_only(plane: str, absent):

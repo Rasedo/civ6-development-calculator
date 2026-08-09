@@ -74,7 +74,7 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
 /**
  * Owner-qualified improvement rules: the same body over an
  * arbitrary unlock set and ownership test so seat builders place under
- * THEIR research. Player wrapper below keeps the exact old behavior.
+ * THEIR research. The seat-0 wrapper below keeps the exact old behavior.
  */
 export function validImprovementsIn(
   tile: Tile,
@@ -189,7 +189,7 @@ export function canRemoveFeature(state: GameState, tile: Tile, seat: number): Ru
 /**
  * Owner-qualified placement: the same rule body over an arbitrary
  * unlock set and tile-ownership test, so foreign cities place districts under
- * THEIR research. The player wrapper below keeps the exact old behavior.
+ * THEIR research. The seat-0 wrapper below keeps the exact old behavior.
  */
 export function canPlaceDistrictIn(
   state: GameState,

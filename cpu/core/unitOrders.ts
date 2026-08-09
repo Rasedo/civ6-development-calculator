@@ -35,7 +35,7 @@ export function applyUnitOrders(
         (UNITS[un.type]?.charges !== undefined) === (civ === 1),
     );
     if (!unit) {
-      onFail?.(`turn ${state.turn}: no player unit at tile ${tile} (civ ${civ})`);
+      onFail?.(`turn ${state.turn}: no unit at tile ${tile} (civ ${civ})`);
       return false;
     }
     if (a === A.FOUND_CITY) {

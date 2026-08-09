@@ -71,7 +71,7 @@ export const CS_ROUTE_SPEC = 1;
 export const INTL_ROUTE_GOLD = 3;
 
 /** Yields the origin receives from one INTERNATIONAL route to `dest` (a met
- * seat's city, or — from a seat's seat — a player city). Gold only. */
+ * seat's city, or — from a seat's seat — a seat-0 city). Gold only. */
 export function routeYieldsInternational(state: GameState, dest: City): Yields {
   const out = emptyYields();
   out.gold += INTL_ROUTE_GOLD + specialtyDistricts(state, dest);
@@ -91,7 +91,7 @@ export function csRouteYields(cs: CityState): Yields {
  * either endpoint.
  *
  * merged the both seats twins behind a flag, because neither
- * covered RIVAL-vs-RIVAL and turning it on is a behaviour change that Round 2
+ * covered CIV-SEAT-vs-CIV-SEAT and turning it on is a behaviour change that Round 2
  * was forbidden to make. #51/S7.1 is Round 7, and turns it on: the flag
  * ONE predicate — "is this unit hostile to the route's owner" — answers for
  * every seat pair. A seat at war with another interdicts its trade, which is
@@ -129,7 +129,7 @@ export function cityTradeYields(state: GameState, city: City): Yields {
       continue;
     }
     if (route.toSeat !== undefined) {
-      // international: a player route to a met seat's city — gold only.
+      // international: a seat-0 route to a met seat's city — gold only.
       // Suspended while at war with that seat (destination-civ interdiction)
       // or while hostiles prowl either endpoint.
       const rv = seatOf(state, seatOfIndex(route.toSeat));
@@ -143,7 +143,7 @@ export function cityTradeYields(state: GameState, city: City): Yields {
     if (dest && !routeRaided(state, city, dest, seat)) {
       addYields(out, routeYields(state, dest));
       // Extra yields when the destination city
-      // follows the player's religion (religion id 0) — the twin's rule.
+      // follows seat 0's religion (religion id 0) — the twin's rule.
       const relT = seatOf(state, seat)!.religion;
       if (relT?.founded && relT.enhancer && dest.followedReligion === 0) {
         const tr = ENHANCER_BELIEFS[relT.enhancer]?.effects.tradeReligionYields;
@@ -184,7 +184,7 @@ export function addTradeRoute(state: GameState, from: number, to: number, seat: 
 
 /** lay the route's road between two CENTER tiles (either endpoint
  *  missing = nothing to walk). Kept here so all four creation sites — the three
- *  player verbs and the seat pick — call ONE thing. */
+ *  seat-0 verbs and the seat pick — call ONE thing. */
 export function layRouteRoad(state: GameState, fromCityId: number, toCenterIndex: number, seat: number): void {
   const a = seatOf(state, seat)!.cities.find((c) => c.id === fromCityId);
   if (!a || toCenterIndex < 0) return;
@@ -218,7 +218,7 @@ export function addCsTradeRoute(state: GameState, from: number, csId: number, se
   return { ok: true };
 }
 
-/** International: can the player route from own city `from` to met seat
+/** International: can seat 0 route from own city `from` to met seat
  * civ `seatCiv`'s city `seatCity`? */
 export function canAddIntlTradeRoute(state: GameState, from: number, seatCiv: number, seatCity: number, seat: number): RuleResult {
   const a = seatOf(state, seat)!.cities.find((c) => c.id === from);
@@ -252,10 +252,10 @@ export function addIntlTradeRoute(state: GameState, from: number, seatCiv: numbe
   return { ok: true };
 }
 
-/** Duration: drop the player's routes whose expiresTurn has arrived; the
+/** Duration: drop seat 0's routes whose expiresTurn has arrived; the
  * owner re-picks next turn. Called from endTurn AFTER the turn's production so
  * a route freed this turn is re-pickable next turn (zero draws). */
-export function expirePlayerRoutes(state: GameState): void {
+export function expireTradeRoutes(state: GameState): void {
   state.tradeRoutes = state.tradeRoutes.filter(
     (r) => r.expiresTurn === undefined || r.expiresTurn > state.turn,
   );

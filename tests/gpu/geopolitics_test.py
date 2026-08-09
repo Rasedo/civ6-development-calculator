@@ -294,7 +294,7 @@ def poke_ww_differential(rules, path):
     sim.ww[0, 1, 0] = at_war + 11
     sim._seat_phase()
     assert int(sim.ww[0, 1, 0]) == 11, (
-        "the PLAYER-war axis decays at the same rate as a civ<->civ war — "
+        "the seat-0 war axis decays at the same rate as a civ<->civ war — "
         "weariness is not seat-dependent (#51/S7.8r, S7.8f)"
     )
 
@@ -410,7 +410,7 @@ def main() -> None:
     s3.p_warmonger[:] = 0
     s3.step()
     assert int(s3.p_warmonger[0]) == 0, "decay floors at zero"
-    print("player grievances OK — _MUTABLE, decay, floor")
+    print("seat-0 grievances OK — _MUTABLE, decay, floor")
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------
     for _f in ("diplo_favor", "r_diplo_favor"):
@@ -420,24 +420,24 @@ def main() -> None:
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
     suz_min = int(s4.rules.cs.get("suzerainEnvoys", 3))
     s4.cs_envoys.zero_(); s4.cs_r_envoys.zero_()
-    assert int(s4._player_suzerain_count()[0]) == 0, "no envoys -> no suzerainties"
+    assert int(s4._suzerain_count()[0]) == 0, "no envoys -> no suzerainties"
     s4.cs_envoys[:, 0] = suz_min - 1
-    assert int(s4._player_suzerain_count()[0]) == 0, "below the envoy minimum is not suzerainty"
+    assert int(s4._suzerain_count()[0]) == 0, "below the envoy minimum is not suzerainty"
     s4.cs_envoys[:, 0] = suz_min
-    assert int(s4._player_suzerain_count()[0]) == 1, "at the minimum with no civ contest -> suzerain"
+    assert int(s4._suzerain_count()[0]) == 1, "at the minimum with no civ contest -> suzerain"
     if s4.R > 0:
         s4.cs_r_envoys[:, 0, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
-        assert int(s4._player_suzerain_count()[0]) == 0, "a tie must leave NO suzerain"
+        assert int(s4._suzerain_count()[0]) == 0, "a tie must leave NO suzerain"
         s4.cs_r_envoys[:, 0, 0] = suz_min + 1
         assert int(s4._civ_suzerain_count(0)[0]) == 1, "the strictly-higher civ is suzerain"
-        assert int(s4._player_suzerain_count()[0]) == 0, "... and the player is not"
+        assert int(s4._suzerain_count()[0]) == 0, "... and seat 0 is not"
     # the accrual itself: tier + suzerainties, and it is CUMULATIVE
     s5 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     f0 = int(s5.diplo_favor[0])
     s5.step()
     f1 = int(s5.diplo_favor[0])
     assert f1 >= f0, "favor never decreases"
-    exp = int(s5._adopted_gov_tier(s5.civics)[0]) + s5._favor_per_suz * int(s5._player_suzerain_count()[0])
+    exp = int(s5._adopted_gov_tier(s5.civics)[0]) + s5._favor_per_suz * int(s5._suzerain_count()[0])
     s5.step()
     assert int(s5.diplo_favor[0]) - f1 == exp, (
         f"favor step must be tier+suzerainties ({exp}), got {int(s5.diplo_favor[0]) - f1}"
@@ -508,7 +508,7 @@ def main() -> None:
     s9.diplo_points[:] = s9._dvp_win - 1
     assert int(s9._diplomatic_victor()[0]) == -1, "one point short is not a win"
     s9.diplo_points[:] = s9._dvp_win
-    assert int(s9._diplomatic_victor()[0]) == 0, "the player wins at the threshold"
+    assert int(s9._diplomatic_victor()[0]) == 0, "seat 0 wins at the threshold"
     if s9.R > 0:
         s9.diplo_points.zero_()
         s9.r_diplo_points[:, 0] = s9._dvp_win

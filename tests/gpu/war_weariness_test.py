@@ -25,7 +25,6 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import PLAYER_SEAT
 
 
 def build():
@@ -73,7 +72,7 @@ def main() -> None:
     assert int(rww["eraFormal"][0]) == b, "Ancient formal and surprise are equal"
     assert int(rww["eraSurprise"][1]) > int(rww["eraFormal"][1]), "the premium opens at Classical"
 
-    away, home = neutral_tile(sim), owned_tile(sim, PLAYER_SEAT)
+    away, home = neutral_tile(sim), owned_tile(sim, 0)
 
     # --- both sides score, and the aggressor gets no discount --------------
     sim.ww[:] = 0
@@ -162,10 +161,10 @@ def main() -> None:
     # --- the amenity conversion, with no ceiling -------------------------
     sim.ww[:] = 0
     sim.ww[:, 0, 1] = per * 12 + (per - 1)
-    assert int(sim._ww_penalty_player()[0]) == 12, int(sim._ww_penalty_player()[0])
+    assert int(sim._ww_penalty()[0]) == 12, int(sim._ww_penalty()[0])
     assert int(sim._ww_penalty_civ(0)[0]) == 0, "civ 0 has fought nothing"
     sim.ww[:, 0, 1] = per - 1
-    assert int(sim._ww_penalty_player()[0]) == 0, "the remainder buys nothing"
+    assert int(sim._ww_penalty()[0]) == 0, "the remainder buys nothing"
     print(f"  {per} points buy one amenity, remainder lost, and 12 is reachable (no cap)")
 
     # --- the accumulator round-trips snapshot/restore ---------------------

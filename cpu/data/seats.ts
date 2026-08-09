@@ -3,7 +3,7 @@ import { GAME_SPEED } from './constants';
 /**
  * WHAT A SEAT MAY DO.
  *
- * Every actor in the game is a seat (`core/seats.ts`): the player, the opponents,
+ * Every actor in the game is a seat (`core/seats.ts`): seat 0, the opponents,
  * the city-states, the barbarians. They differ, and this is the ONE table that
  * says how. Code that reads a seat asks the table; it never branches on the
  * seat id, which is what let "is this a barbarian?" get spelled four different
@@ -48,7 +48,7 @@ import { GAME_SPEED } from './constants';
 /**
  * The three kinds of actor.
  *
- *   major    the player and the opponents — full civs
+ *   major    seat 0 and the opponents — full civs
  *   minor    city-states
  *   hostile  barbarians
  */
@@ -121,21 +121,20 @@ export const CIV_LEADERS: { name: string; color: string; cityNames: string[] }[]
 export const TECH_PROD_DIV = 12;
 export const CITY_DEF_PER_TECH = 3;
 export const MAX_CITIES_PER_SEAT = 6;
-/** the player's exact settler curve — 48 + 18·(cities−1) at
- * Online speed. Other seats never bank settlers and single-queue them, so the
- * player's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
+/** seat 0's exact settler curve — 48 + 18·(cities−1) at
+ * Online speed. Other seats never bank settlers and single-queue them, so
+ * seat 0's `cities − 1 + settlers + queued` term reduces to `cities − 1`. */
 export const SETTLER_COST = (cities: number) =>
   Math.round(80 * GAME_SPEED) + Math.round(30 * GAME_SPEED) * Math.max(0, cities - 1);
 /** Auto-peace becomes possible after this many war turns. */
 export const WAR_MIN_TURNS = 14;
-/** The player may sue for peace after this many war turns. */
+/** Seat 0 may sue for peace after this many war turns. */
 // SOURCED: real Civ 6 allows peace only once **10** turns have passed
 // since the war began (the leaders action panel unlocks the offer then). Was 8.
-// The same floor governs the player<->city-state peace added in #50, so both
+// The same floor governs the seat 0 <-> city-state peace added in #50, so both
 // pairings read this one constant.
 export const PEACE_GOLD_COST = (warTurns: number) => 150 + 10 * warTurns;
-// RIVAL_CITY_MAX_HP RETIRED: it held the same 200 as CITY_MAX_HP
-// in data/units.ts. One city HP cap, for every seat.
+// One city HP cap, for every seat: CITY_MAX_HP in data/units.ts.
 
 // --- deeper-opponent pacing ---------------------------------------------------
 
@@ -293,7 +292,7 @@ export const GOV_MAX_TITLES = 5;
  * favor per turn equal to its GOVERNMENT TIER (1-4; Chiefdom is tier 0 and
  * pays nothing), plus +1 per city-state it is SUZERAIN of.
  *
- * NOT MODELED, and deliberately not invented: favor from ALLIANCES (the player
+ * NOT MODELED, and deliberately not invented: favor from ALLIANCES (seat 0
  * has no alliance axis yet), and the favor PENALTIES for CO2 (no climate
  * system), global grievances and occupying original capitals. The wiki names
  * those terms but not their rates, and guessing a rate would be exactly the
@@ -312,7 +311,7 @@ export const DIPLO_FAVOR_PER_SUZERAIN = 1;
  *
  * TWO RECORDED STYLIZATIONS, both because the real thing needs subsystems that
  * do not exist here:
- *  1. VOTE SIZE. Real Civ 6 lets each player choose how much favor to commit.
+ *  1. VOTE SIZE. Real Civ 6 lets each civ choose how much favor to commit.
  *     There is no chooser on either seat (and a roll would break the zero-draw
  *     contract), so every civ commits ALL its favor. The tie-break by
  *     percentage-of-favor-spent is then always 100% and resolves to civ id —
@@ -440,16 +439,16 @@ export function warWearinessPenalty(weariness: number): number {
 }
 
 // --- civ↔civ war ----------------------------------------------------------
-// The pairwise auto-DoW re-derives the player auto-DoW's DETERMINISTIC gates
+// The pairwise auto-DoW re-derives the seat-0 auto-DoW's DETERMINISTIC gates
 // (proximity + strength ratio) and DROPS its RNG probability gate → ZERO-DRAW
-// (documented deviation; the player pair keeps its RNG). Anti-thrash is the
+// (documented deviation; the seat-0 pair keeps its RNG). Anti-thrash is the
 // aggressor's own war-weariness: a war-weary civ (ww ≥ DOW_WW_MAX) never
 // opens a NEW front, and a pair sues out once EITHER side's ww exceeds
 // PEACE_WW — so after a ww-triggered peace the aggressor's ww (> PEACE_WW
 // > DOW_WW_MAX) blocks an immediate re-declaration until it decays at peace.
-/** Max distance (closest city pair) for a pairwise DoW — the player gate. */
+/** Max distance (closest city pair) for a pairwise DoW — the seat-0 gate. */
 export const DOW_PROXIMITY = 9;
-/** Aggressor strength must exceed target × this — the player gate (1.3). */
+/** Aggressor strength must exceed target × this — the seat-0 gate (1.3). */
 export const DOW_STRENGTH_RATIO = 1.3;
 /** An aggressor at or above this war-weariness will not open a new war.
  *  6 -> 300. These two are ENGINE AI heuristics, not Civ 6 rules,

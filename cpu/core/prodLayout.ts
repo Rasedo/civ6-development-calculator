@@ -6,7 +6,7 @@
  * same disease as #85 (the seat mask five units behind the picker) one level
  * up. So the derivation lives here and both sides import it.
  *
- * Layout, shared by `production_mask` and `rival_masks`:
+ * Layout, shared by `production_mask` and `seat_masks`:
  *     [0, NB)            queue that City Center building
  *     NB                 SETTLER
  *     NB + 1             IDLE (queue nothing)

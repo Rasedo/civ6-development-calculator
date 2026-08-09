@@ -2549,8 +2549,26 @@ untagged halves of tagged items stay Fable/main-session work.
   outside the GPU roster — inert in BOTH engines today (no scripted
   builder builds it) but a LIVE asymmetry once #50's RL improvement
   verbs land (recorded on A-18; exporter comment updated).
-
-## B. Engine fidelity vs real Civ 6 (missing/simplified systems)
+- A-26 (open, surveyed 2026-08-09). **Seat-0 mask-policy exclusions have
+  NO TS twin — the last per-seat action-surface asymmetries, all
+  GPU-mask-side.** TS mechanics are seat-generic everywhere surveyed:
+  `trainableUnits`/`purchaseUnit` (units.ts/game.ts) offer naval hulls
+  to EVERY seat gated only on `cityNavalCapable`; the unit-sequence
+  walker's SPREAD and SNIPE arms (phase.ts) execute for whichever
+  seat's record carries them. The GPU side withholds the columns from
+  seat 0 instead: `city_mask` bans all naval training AND gold
+  purchase (`~unit_naval`, sim_masks.py), the civ production mask
+  hand-rolls a single one-hull galley column (`_galley_idx`,
+  sim_seats.py) that matches neither trainableUnits nor real Civ 6,
+  seat 0's SNIPE ring columns are all-False (no dispatch arm), and its
+  SPREAD columns are all-False (blocked on seat-0 religion founding,
+  #73). None of it is visible to the gate: the exclusions live in the
+  decider's masks, so identical records reach both engines. Burn-down
+  order: adopt the capability gate on BOTH mask families (kills the
+  galley column), give seat 0 the snipe dispatch, and let #73/#74
+  unlock spread/embark — each is a behaviour round with rollout
+  churn, so they need the serve gate live. Comment DEBT markers sit at
+  all four sim_masks.py sites.
 
 Re-verified correct vs real base Civ 6 (2026-07-12): eureka/inspiration
 40% (`BOOST_FRACTION`, data/boosts.ts), 1 specialty district per 3 pop

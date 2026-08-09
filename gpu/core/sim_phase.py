@@ -920,7 +920,7 @@ class SimPhase:
                 _ha_c = self.occ_civ.gather(1, nbhc)
                 _ha_cs = torch.where(_ha_c >= 0, self.unit_seat.gather(1, _ha_c.clamp(min=0)), torch.full_like(_ha_c, -1))
                 hostile_adj = (_ha_s == BARB_SEAT) | (
-                    ((_ha_s == PLAYER_SEAT) | (_ha_cs == PLAYER_SEAT))
+                    ((_ha_s == 0) | (_ha_cs == 0))
                     & self.r_atwar[:, r].unsqueeze(1)
                 )
                 # An adjacent AT-WAR civ seat's unit (military or civilian)
@@ -1132,7 +1132,7 @@ class SimPhase:
                 # Claim loop: overflow is KEPT (gpp −= cost, not zeroed) and
                 # the person's effect lands in this seat's own streams (tech/
                 # civic progress, treasury, faith, the capital's build head),
-                # mirroring _advance_player_great_people. PROPHETs gate the
+                # mirroring _advance_great_people. PROPHETs gate the
                 # religion.
                 maxN = self._gp_effects.shape[1]
                 for _ in range(maxN):
@@ -1148,10 +1148,10 @@ class SimPhase:
                     # WRITER/ARTIST/MUSICIAN culture is slotted as Great Works
                     # into this seat's cities (deferred per-kind culture);
                     # overflow charges fall back to the instant lump inside
-                    # _place_civ_works.
+                    # _place_rc_works.
                     _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
                     if _kind >= 0:
-                        self._place_civ_works(r, hit, eff[:, 1].double(), _kind)
+                        self._place_rc_works(r, hit, eff[:, 1].double(), _kind)
                     else:
                         self.r_civic_prog[:, r] = self.r_civic_prog[:, r] + eff[:, 1].double() * hf
                     self.r_treasury[:, r] = self.r_treasury[:, r] + eff[:, 2].double() * hf
@@ -1422,7 +1422,7 @@ class SimPhase:
         self.current[b, c] = -1
         # relocatePalace runs right after the cities filter — BEFORE the
         # cityHp/route prune and BEFORE the conquest-raze early return below.
-        self._relocate_palace_player(torch.tensor([b], dtype=torch.long, device=self.device))
+        self._relocate_palace_c(torch.tensor([b], dtype=torch.long, device=self.device))
         owned = self.owner[b] == c
         # Snapshot the transferring city's COMPLETE placeable-district and
         # wonder tiles from the LIVE owner mask (CITY_CENTER is never in the
@@ -1504,7 +1504,7 @@ class SimPhase:
         return True
 
 
-    def _found_player_at(self, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
+    def _found_c_at(self, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
         """FOUNDs a seat-0 city at `tile` [B] where `want` — the FOUND_CITY verb's mutation.
 
         canFoundCity legality is re-checked LIVE at the settler's own tile;
@@ -1604,11 +1604,11 @@ class SimPhase:
         self.city_seq[rows, c_new] = self.city_seq_next[rows]
         self.city_seq_next[rows] += 1
         self.is_cap[rows, c_new] = new_cap
-        self.cap_tile_player[rows] = torch.where(new_cap, s_idx, self.cap_tile_player[rows])
+        self.cap_tile[rows] = torch.where(new_cap, s_idx, self.cap_tile[rows])
         # Claim the center (unconditionally, as foundCity does) plus any
         # unowned first-ring tiles; the center becomes a district tile.
         self.tile_city[rows, s_idx] = c_new
-        self.tile_seat[rows, s_idx] = PLAYER_SEAT
+        self.tile_seat[rows, s_idx] = 0
         self._tile_owner_ver += 1
         self.workable[rows, s_idx] = False
         self.centre_slot_at[rows, s_idx] = c_new
@@ -1639,7 +1639,7 @@ class SimPhase:
                 & (self.civ_at[rows, ndc] < 0)
             )
             self.tile_city[rows[free_nb], n_d[free_nb]] = c_new[free_nb]
-            self.tile_seat[rows[free_nb], n_d[free_nb]] = PLAYER_SEAT
+            self.tile_seat[rows[free_nb], n_d[free_nb]] = 0
             self._tile_owner_ver += 1
         self._eff_version += 1  # d_static_adj changed
         return valid
@@ -1702,7 +1702,7 @@ class SimPhase:
                 _isw = self._b_worship.gather(0, idx)
                 _wcost = torch.full_like(cost, self._worship_cost)
                 can = is_pb & buildable[:, c].gather(1, idx.unsqueeze(1)).squeeze(1) & torch.where(
-                    _isw, self._afford(self.player_faith, _wcost), self._afford(self.treasury, cost))
+                    _isw, self._afford(self.faith, _wcost), self._afford(self.treasury, cost))
                 if bool(can.any()):
                     rows = can.nonzero(as_tuple=True)[0]
                     self.buildings[rows, c, idx[rows]] = True
@@ -1713,7 +1713,7 @@ class SimPhase:
                             self.outer_hp[wm, c] = self._walls_hp
                     self._eff_version += 1  # _buildable keys on it (a bought building must vanish from later masks)
                     # worship pays FAITH, everything else gold
-                    self.player_faith.copy_(torch.where(can & _isw, self.player_faith - _wcost, self.player_faith))
+                    self.faith.copy_(torch.where(can & _isw, self.faith - _wcost, self.faith))
                     self.treasury.copy_(torch.where(can & ~_isw, self.treasury - cost, self.treasury))
             # --- buy a settler (purchaseSettler: settlers += 1 immediately,
             # which raises every later slot's price)
@@ -1724,11 +1724,11 @@ class SimPhase:
                 ) * mult
                 # The settler SPAWNS at the buying city (pop >= 2, and no free
                 # spot = refund — the purchaseSettler rule).
-                found_ps, _ = self._first_free_spot(self.site[:, c], "player", torch.ones(self.B, dtype=torch.bool, device=self.device))
+                found_ps, _ = self._first_free_spot(self.site[:, c], "p", torch.ones(self.B, dtype=torch.bool, device=self.device))
                 can = is_ps & (self.pop[:, c] >= 2) & self._afford(self.treasury, s_cost) & found_ps
                 self.treasury.copy_(torch.where(can, self.treasury - s_cost, self.treasury))
                 if bool(can.any()):
-                    self._spawn_player(can, self.site[:, c], torch.full((self.B,), self._settler_idx, dtype=torch.long, device=self.device))
+                    self._spawn_p(can, self.site[:, c], torch.full((self.B,), self._settler_idx, dtype=torch.long, device=self.device))
                 self.pop[:, c] = torch.where(can, (self.pop[:, c] - 1).clamp(min=1), self.pop[:, c])  # purchased settlers cost the pop too
                 settlers_live = settlers_live + can.long()
             # --- buy a unit (purchaseUnit: trainable ∧ gold ∧ a free spawn
@@ -1741,7 +1741,7 @@ class SimPhase:
                 tech_ok = (p_tech < 0) | self.techs.gather(1, p_tech.clamp(min=0).unsqueeze(1)).squeeze(1)
                 # Strategic-resource access gates the purchase (purchaseUnit →
                 # trainableUnits), per this slot's chosen unit.
-                res_ok = self._res_avail_mask(self.tile_seat == PLAYER_SEAT).gather(1, utp.unsqueeze(1)).squeeze(1)
+                res_ok = self._res_avail_mask(self.tile_seat == 0).gather(1, utp.unsqueeze(1)).squeeze(1)
                 tech_ok = tech_ok & res_ok & ~self._p_faith_only[utp]  # faith-only units never gold-buy
                 cost = self._p_cost[utp] * mult
                 if self._builder_idx >= 0:
@@ -1749,13 +1749,13 @@ class SimPhase:
                     b_now = self._builder_cost(self.builders_trained)  # ALREADY PRODUCED only — a queued item has produced nothing
                     b_now = b_now * mult
                     cost = torch.where(utp == self._builder_idx, b_now, cost)
-                found, _ = self._first_free_spot(self.site[:, c], "player", self._p_civ[utp])
+                found, _ = self._first_free_spot(self.site[:, c], "p", self._p_civ[utp])
                 can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
                 if bool(can.any()):
                     self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
                     # a purchased military unit inherits city c's Encampment training XP (best tier)
                     xp_c = (self.buildings[:, c, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                    self._spawn_player(can, self.site[:, c], utp, init_xp=xp_c)
+                    self._spawn_p(can, self.site[:, c], utp, init_xp=xp_c)
                     if self._builder_idx >= 0:
                         # …and move it for every later slot (purchaseUnit)
                         self.builders_trained.add_((can & (utp == self._builder_idx)).long())

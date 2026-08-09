@@ -56,7 +56,7 @@ def main() -> None:
     assert paths, "no fixtures — run the exporter first"
     sim = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
     assert sim._gp_nc == 9, f"engine n_gp must be 9, got {sim._gp_nc}"
-    assert sim.gp_earned.shape[1] == 9 and sim.player_gp_points.shape[1] == 9
+    assert sim.gp_earned.shape[1] == 9 and sim.gp_points.shape[1] == 9
     assert sim.r_gpp.shape[2] == 9, "civ gpp tensor must be n_gp wide"
     assert list(sim._gp_costs.tolist()) == [float(x) for x in ladder]
 
@@ -143,8 +143,8 @@ def main() -> None:
         civic0 = sim.civic_prog.clone()
         earned0 = sim.gp_earned[:, 7].clone()
         gw0 = (sim.gw_writing + sim.gw_music).sum().item()
-        sim.player_gp_points[:, 7] = 100.0  # >= gpCost(0) = 60
-        sim._advance_player_great_people()
+        sim.gp_points[:, 7] = 100.0  # >= gpCost(0) = 60
+        sim._advance_great_people()
         assert bool((sim.gp_earned[:, 7] == earned0 + 1).all()), "Writer not earned"
         d_civic = (sim.civic_prog - civic0)
         assert bool((d_civic == 90.0).all()), f"Writer overflow lump wrong (want 2×45): {d_civic.tolist()}"
@@ -154,20 +154,20 @@ def main() -> None:
     # Confucius (PROPHET class 3, roster idx 0) carries fx.faith = 100; the TS
     # applyGreatPersonEffect banks it into the seat's faith total and the civ
     # GP loop applies its col-4 into r_faith. Drive a fresh seat-0 Prophet
-    # claim and assert player_faith rises by exactly the effect.
+    # claim and assert faith rises by exactly the effect.
     if sim.districts_on:
         assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
         pc = int(rr["prophetCls"])  # 3
         assert float(sim._gp_effects[pc, 0, 4]) == 100.0, "Confucius faith effect changed"
-        faith0 = sim.player_faith.clone()
+        faith0 = sim.faith.clone()
         pe0 = sim.gp_earned[:, pc].clone()
-        sim.player_gp_points[:, pc] = 100.0  # >= gpCost(0) = 60, earns one Prophet
-        sim._advance_player_great_people()
+        sim.gp_points[:, pc] = 100.0  # >= gpCost(0) = 60, earns one Prophet
+        sim._advance_great_people()
         assert bool((sim.gp_earned[:, pc] == pe0 + 1).all()), "Prophet not earned"
-        d_faith = sim.player_faith - faith0
-        assert bool((d_faith == 100.0).all()), f"player faith bank wrong: {d_faith.tolist()}"
+        d_faith = sim.faith - faith0
+        assert bool((d_faith == 100.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
 
-    # snapshot/restore round-trips the GP tensors + the player_faith bank
+    # snapshot/restore round-trips the GP tensors + the faith bank
     # and the enhancer race state (all registered in _MUTABLE).
     sim.enh_claimed[0, 2] = True  # give the enhancer state something to restore
     sim.r_enhancer[0, 0] = 2
@@ -178,7 +178,7 @@ def main() -> None:
     sim.cty_followed[0, 0, 0] = 0
     snap = sim.snapshot()
     sim.gp_earned[:, 7] = 0
-    sim.player_faith[:] = -1.0
+    sim.faith[:] = -1.0
     sim.enh_claimed[0, 2] = False
     sim.r_enhancer[0, 0] = -1
     sim.claimed_e_n[0] = 9
@@ -187,7 +187,7 @@ def main() -> None:
     sim.cty_followed[0, 0, 0] = -1
     sim.restore(snap)
     assert int(sim.gp_earned[0, 7]) >= 1, "gp_earned not preserved across snapshot"
-    assert float(sim.player_faith[0]) >= 100.0, "player_faith not preserved across snapshot"
+    assert float(sim.faith[0]) >= 100.0, "faith not preserved across snapshot"
     assert bool(sim.enh_claimed[0, 2]) and int(sim.r_enhancer[0, 0]) == 2 and int(sim.claimed_e_n[0]) == 1, \
         "enhancer race state not preserved across snapshot"
     assert int(sim.holy_tile[0, 0]) == 42 and int(sim.cty_pressure[0, 0, 0, 0]) == 5 and int(sim.cty_followed[0, 0, 0]) == 0, \
@@ -206,7 +206,7 @@ def main() -> None:
         sim.r_follower[:, 0] = 0  # civ 0 -> WORK_ETHIC
         sim.r_follower[:, 1] = 1  # civ 1 -> FEED_THE_WORLD
         fbr = sim._follower_by_rel()
-        assert bool((fbr[:, 0] == -1).all()), "player religion (col 0) never founds in-gate -> no follower"
+        assert bool((fbr[:, 0] == -1).all()), "seat-0 religion (col 0) never founds in-gate -> no follower"
         assert bool((fbr[:, 1] == 0).all()) and bool((fbr[:, 2] == 1).all()), "religion id -> founding civ's follower"
         # A city following religion 2 (civ 1) draws civ 1's follower (1); a
         # city following religion 1 (civ 0) draws civ 0's follower (0); a
@@ -233,10 +233,10 @@ def main() -> None:
         assert bool(((pf + folrow - full).abs().sum() == 0)), "pan+founder + follower must reconstruct the full bldgY"
         # flag routing: LIVE -> followedReligion; INERT -> owner religion.
         if sim._b18_couple:
-            assert bool((sim._city_rel_player() == sim.cty_followed[:, 0, :sim.C]).all()), "LIVE: player draws followedReligion"
+            assert bool((sim._city_rel_c() == sim.cty_followed[:, 0, :sim.C]).all()), "LIVE: seat 0 draws followedReligion"
             assert bool((sim._rc_rel(1) == sim.cty_followed[:, 1 + 1]).all()), "LIVE: civ draws rc_followed"
         else:
-            assert bool((sim._city_rel_player() == 0).all()), "INERT: player draws religion 0"
+            assert bool((sim._city_rel_c() == 0).all()), "INERT: seat 0 draws religion 0"
             assert bool((sim._rc_rel(1) == 2).all()), "INERT: civ 1 draws owner religion 2"
 
     print("SLICE-Q RELIGION+GP OK")

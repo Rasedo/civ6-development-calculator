@@ -39,7 +39,7 @@ function cultureFor(n: number) {
 }
 
 describe('B-25 culture victory', () => {
-  it('the player out-touring every civ wins (victoryType 7)', () => {
+  it('seat 0 out-touring every civ wins (victoryType 7)', () => {
     const state = newGame(1);
     const rv = (state.seats[(0) + 1] as Seat);
     seatOf(state, 0)!.tourism = tourismFor(5, 2);
@@ -56,7 +56,7 @@ describe('B-25 culture victory', () => {
     const rv = (state.seats[(0) + 1] as Seat);
     rv.tourism = tourismFor(9, 2);
     rv.cultureTotal = cultureFor(1);
-    seatOf(state, 0)!.cultureTotal = cultureFor(3); // civ 9 visiting > player 3 domestic
+    seatOf(state, 0)!.cultureTotal = cultureFor(3); // civ 9 visiting > seat-0 3 domestic
     seatOf(state, 0)!.tourism = 0;
     endTurn(state, 0);
     expect(state.victoryType).toBe(8);
@@ -133,7 +133,7 @@ describe('B-25 culture victory', () => {
       pres[1] = 500;
       c.religionPressure = pres;
     }
-    // … while the player would ALSO win on culture this very turn.
+    // … while seat 0 would ALSO win on culture this very turn.
     seatOf(state, 0)!.tourism = tourismFor(5, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     rv.cultureTotal = cultureFor(4);

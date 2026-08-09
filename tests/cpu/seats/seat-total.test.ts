@@ -34,7 +34,7 @@ describe('#51/S6.12 seatOf is total', () => {
     expect(new Set(got).size).toBe(ids.length); // six distinct objects, not one
   });
 
-  it('the player seat and the barbarian seat are not the same object', () => {
+  it('seat 0 and the barbarian seat are not the same object', () => {
     const state = newGame();
     expect(seatOf(state, 0)).toBe(seatOf(state, 0)!);
     expect(seatOf(state, BARB_SEAT)).toBe(state.barbSeat);

@@ -112,7 +112,7 @@ class SimOrders:
                     _cts = torch.where(_ct >= 0, self.unit_seat.gather(1, _ct.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ct, -1))
                     barb_t = _mts == BARB_SEAT
                     at_war = self.r_atwar[:, r]
-                    p_unit = (_mts == PLAYER_SEAT) | (_cts == PLAYER_SEAT)
+                    p_unit = (_mts == 0) | (_cts == 0)
                     p_city = self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1) >= 0
                     # The other melee target classes: at-war civ units and
                     # centres, plus city-state centres whose suzerain is
@@ -164,7 +164,7 @@ class SimOrders:
                             v_ = int(sc[b_])
                             one_ = torch.zeros(B, dtype=torch.bool, device=dev)
                             one_[b_] = True
-                            _fired_ = self._hostile_ranged_strike(one_, tgt, "civ", v_)
+                            _fired_ = self._hostile_ranged_strike(one_, tgt, "v", v_)
                             # Spend ONLY when the strike actually resolved:
                             # hostileRangedStrike's early returns (no city, no
                             # eligible defender) leave TS movesLeft untouched,
@@ -173,9 +173,9 @@ class SimOrders:
                             if bool(_fired_[b_]):
                                 self.v_mp[b_, v_] = 0  # a strike spends the turn (TS movesLeft = 0)
                     valid_t = valid_t & _melee_d2
-                    _host_mil = barb_t | ((_mts == PLAYER_SEAT) & at_war) | ((_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1))
+                    _host_mil = barb_t | ((_mts == 0) & at_war) | ((_tciv >= 0) & self.rr_war[:, r].gather(1, _tciv.clamp(min=0).unsqueeze(1)).squeeze(1))
                     _host_civ = ((_cts == BARB_SEAT)
-                                 | ((_cts == PLAYER_SEAT) & at_war)
+                                 | ((_cts == 0) & at_war)
                                  | ((_tcivC >= 0) & self.rr_war[:, r].gather(1, _tcivC.clamp(min=0).unsqueeze(1)).squeeze(1)))
                     _civ_only = _host_civ & ~_host_mil          # LONE hostile civilian -> capture, not the city
                     # the seat-0-centre arm has NO civilian exception: TS's
@@ -196,21 +196,21 @@ class SimOrders:
                         one = torch.zeros(B, dtype=torch.bool, device=dev)
                         one[b_] = True
                         if bool(unit_att[b_]):
-                            self._hostile_vs_unit(one, tgt, "civ", v)
+                            self._hostile_vs_unit(one, tgt, "v", v)
                             self.v_mp[b_, v] = 0  # the turn is spent (TS movesLeft = 0)
                         elif bool(rrc_att[b_]):
                             self._civ_attack_civ_city(one, tgt.clamp(min=0), v)
                             self.v_mp[b_, v] = 0
                         elif bool(cs_att2[b_]):
                             _css = self.cs_at.gather(1, tc.unsqueeze(1)).squeeze(1).clamp(min=0)
-                            _csr2 = self._assault_city_state(one, _css, tgt.clamp(min=0), "civ", v)
+                            _csr2 = self._assault_city_state(one, _css, tgt.clamp(min=0), "v", v)
                             if _csr2 is not None:
                                 _rows2, _dead2, _cap2 = _csr2
                                 if bool(_cap2.any()):
                                     self._capture_city_state_seat(_cap2.nonzero(as_tuple=True)[0], _css, v)
                             self.v_mp[b_, v] = 0
                         elif bool(city_att[b_]):
-                            self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "civ", v)
+                            self._hostile_city_attack(one, self.center_at.gather(1, tc.unsqueeze(1)).squeeze(1), "v", v)
                             self.v_mp[b_, v] = 0  # the turn is spent (TS movesLeft = 0)
             # --- SNIPE (ranged ring-2 strike) ---
             snp = (
@@ -234,7 +234,7 @@ class SimOrders:
                     _mts2 = torch.where(_mt2 >= 0, self.unit_seat.gather(1, _mt2.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_mt2, -1))
                     _cts2 = torch.where(_ct2 >= 0, self.unit_seat.gather(1, _ct2.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(_ct2, -1))
                     at_war2 = self.r_atwar[:, r]
-                    u_hit = ok_s2 & ((_mts2 == BARB_SEAT) | (((_mts2 == PLAYER_SEAT) | (_cts2 == PLAYER_SEAT)) & at_war2))
+                    u_hit = ok_s2 & ((_mts2 == BARB_SEAT) | (((_mts2 == 0) | (_cts2 == 0)) & at_war2))
                     c_hit = ok_s2 & ~u_hit & (self.center_at.gather(1, tcs.unsqueeze(1)).squeeze(1) >= 0) & at_war2
                     for b_ in range(B):
                         if not bool(ok_s2[b_]):
@@ -250,7 +250,7 @@ class SimOrders:
                             # Spend only when it actually fired: the
                             # resolver's internal refusals are TS's early
                             # returns, which leave movesLeft untouched.
-                            _fired2 = self._hostile_ranged_strike(one, tgt_s, "civ", v)
+                            _fired2 = self._hostile_ranged_strike(one, tgt_s, "v", v)
                             if bool(_fired2[b_]):
                                 self.v_mp[b_, v] = 0
             # --- builds 13-15 (builders) ---
@@ -511,7 +511,7 @@ class SimOrders:
                                 self.v_alive[dr_, sc[dr_]] = False
                                 self.occ_civ[(dr_, here[dr_])] = -1
 
-    def _relocate_palace_player(self, rows: torch.Tensor) -> None:
+    def _relocate_palace_c(self, rows: torch.Tensor) -> None:
         """Re-crown seat 0's capital — the phase.ts `relocatePalace` mirror.
 
         Call it on the LOSER rows immediately after a seat-0 city leaves the
@@ -526,7 +526,7 @@ class SimOrders:
         `_palace_amenities`), never a b_cost row — the rules export drops
         PALACE from the catalog — so moving `is_cap` moves the building.
 
-        `cap_tile_player` (TS `capitalTile`) deliberately does NOT move: it is
+        `cap_tile` (TS `capitalTile`) deliberately does NOT move: it is
         the STATIC domination anchor, as in real Civ 6 — the ORIGINAL capital
         stays the domination target while the relocated Palace carries the
         capital BONUSES."""
@@ -545,7 +545,7 @@ class SimOrders:
         self.is_cap[rows[need], pick[need]] = True
         self._eff_version += 1  # yield-bearing: the palace term (yields/housing/amenities) just moved
 
-    def _relocate_palace_seat(self, rows: torch.Tensor, civ: torch.Tensor) -> None:
+    def _relocate_palace_rc(self, rows: torch.Tensor, civ: torch.Tensor) -> None:
         """Re-crown a civ seat's capital — the rc-side twin.
 
         `relocatePalace(seat.cities)` for a civ seat. `rows` and `civ` are parallel [n] index tensors: the losing civ per
@@ -553,7 +553,7 @@ class SimOrders:
         transfers all append at last-alive+1 and _reclaim_rc is stable, so rc
         slot order matches TS array order), so the tie-break runs on the slot
         index. rc_bldg is untouched (PALACE is not in the b_cost catalog) and
-        `cap_tile_civ` stays put for the same reason as the seat-0 side."""
+        `r_cap_tile` stays put for the same reason as the seat-0 side."""
         if rows.numel() == 0:
             return
         alive = self.rc_alive[rows, civ]  # [n, RC]
@@ -590,7 +590,7 @@ class SimOrders:
             # The civ city dies either way, and its registries die with it —
             # TS removes the City object, so no stale rc_* row may survive.
             self.rc_alive[b, r, j] = False
-            self.rc_is_cap[b, r, j] = False  # capital identity dies with the city (cap_tile_civ keeps the tile)
+            self.rc_is_cap[b, r, j] = False  # capital identity dies with the city (r_cap_tile keeps the tile)
             self.centre_slot_at[b, c_t] = -1
             self.rc_dist_tile[b, r, j, :] = -1
             self.rc_wonder[b, r, j, :] = -1
@@ -606,7 +606,7 @@ class SimOrders:
             # the city leaves its list — TS calls relocatePalace right after
             # `seat.cities = filter(...)`, BEFORE the route prune and the raze
             # early-outs below.
-            self._relocate_palace_seat(
+            self._relocate_palace_rc(
                 torch.tensor([b], dtype=torch.long, device=self.device),
                 torch.tensor([r], dtype=torch.long, device=self.device),
             )
@@ -650,9 +650,9 @@ class SimOrders:
             self.centre_slot_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
             self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
-            self.tile_seat[b] = torch.where(_take, torch.full_like(self.tile_seat[b], PLAYER_SEAT), self.tile_seat[b])
+            self.tile_seat[b] = torch.where(_take, torch.zeros_like(self.tile_seat[b]), self.tile_seat[b])
             self.tile_city[b, c_t] = c_new
-            self.tile_seat[b, c_t] = PLAYER_SEAT  # seat + which city: TS's setTileOwner pair
+            self.tile_seat[b, c_t] = 0  # seat + which city: TS's setTileOwner pair
             self._tile_owner_ver += 1
             # Conquest KEEPS the captured city's COMPLETE districts: the tiles
             # re-own to c_new above and their district/complete planes are
@@ -764,9 +764,9 @@ class SimOrders:
             self.centre_slot_at[b, c_t] = c_new
             _take = ring & (self.tile_seat[b] == NO_SEAT)
             self.tile_city[b] = torch.where(_take, torch.full_like(self.tile_city[b], c_new), self.tile_city[b])
-            self.tile_seat[b] = torch.where(_take, torch.full_like(self.tile_seat[b], PLAYER_SEAT), self.tile_seat[b])
+            self.tile_seat[b] = torch.where(_take, torch.zeros_like(self.tile_seat[b]), self.tile_seat[b])
             self.tile_city[b, c_t] = c_new
-            self.tile_seat[b, c_t] = PLAYER_SEAT  # seat + which city: TS's setTileOwner pair
+            self.tile_seat[b, c_t] = 0  # seat + which city: TS's setTileOwner pair
             self._tile_owner_ver += 1
             self.pop[b, c_new] = pop
             self.food_box[b, c_new] = 0.0
@@ -873,12 +873,12 @@ class SimOrders:
         nb_c = self.neigh[c_t]
         self.coastal[b, c_new] = bool(self.coastal_water[b, nb_c.clamp(min=0)][nb_c >= 0].any())
 
-    def _player_attack_civ_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:
+    def _p_attack_civ_city(self, att: torch.Tensor, tgt: torch.Tensor, p: int) -> None:
         """Resolve seat 0's melee assault on a civ city.
 
         The shared battle in `_assault_civ_city`, then seat 0's own CAPTURE
         aftermath."""
-        _r = self._assault_civ_city(att, tgt, "player", p)
+        _r = self._assault_civ_city(att, tgt, "p", p)
         if _r is None:
             return
         rows, civ, slot, died, ttc = _r
@@ -1005,7 +1005,7 @@ class SimOrders:
             if getattr(self, "_A_FOUND", -1) >= 0 and self._settler_idx >= 0:
                 fnd = alive & (a == self._A_FOUND) & (self.p_type[:, p] == self._settler_idx)
                 if bool(fnd.any()):
-                    made_f = self._found_player_at(fnd, here)
+                    made_f = self._found_c_at(fnd, here)
                     if bool(made_f.any()):
                         rows_f = made_f.nonzero(as_tuple=True)[0]
                         self.occ_civ[rows_f, self.p_tile[rows_f, p]] = -1
@@ -1069,10 +1069,10 @@ class SimOrders:
                 ct = tc[kr]
                 self.v_alive[kr, ks] = False
                 nslot = self.p_next[kr]
-                assert int(nslot.max()) < simbase.P_MAX, "player slot pool exhausted — raise simbase.P_MAX"
+                assert int(nslot.max()) < simbase.P_MAX, "p slot pool exhausted — raise simbase.P_MAX"
                 self.p_alive[kr, nslot] = True
                 self.p_tile[kr, nslot] = ct
-                self.p_seat[kr, nslot] = PLAYER_SEAT
+                self.p_seat[kr, nslot] = 0
                 self._carry_capture(kr, ks + self.POOL_LO["v"], nslot + self.POOL_LO["p"])
                 self.occ_civ[(kr, ct)] = nslot + self.POOL_LO["p"]
                 self.p_next[kr] += 1
@@ -1086,13 +1086,13 @@ class SimOrders:
             city_first = ~rvc_ok | garrisoned
             siege = alive & (a >= 6) & (a < 12) & (tgt >= 0) & city_first & rc_ok & (self._p_combat[self.p_type[:, p]] > 0) & (self._p_rng_str[self.p_type[:, p]] == 0)
             if bool(siege.any()):
-                self._player_attack_civ_city(siege, tgt, p)
+                self._p_attack_civ_city(siege, tgt, p)
                 self.p_mp[:, p] = torch.where(siege, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # the turn is spent (TS movesLeft = 0)
             # A LIVE enemy Encampment on the target tile is assaulted
             # (meleeAttack's encamp arm). Requires the tile to hold no unit
             # and no civ city — the TS precedence — and a MELEE attacker.
             if self._encamp_didx >= 0:
-                enc_ok = self._encamp_block(tc.unsqueeze(1), PLAYER_SEAT).squeeze(1)
+                enc_ok = self._encamp_block(tc.unsqueeze(1), 0).squeeze(1)
                 enc_att = (
                     alive
                     & (a >= 6)
@@ -1107,7 +1107,7 @@ class SimOrders:
                     & (self._p_rng_str[self.p_type[:, p]] == 0)
                 )
                 if bool(enc_att.any()):
-                    self._attack_encampment(enc_att, tc, "player", p)
+                    self._attack_encampment(enc_att, tc, "p", p)
                     self.p_mp[:, p] = torch.where(enc_att, torch.zeros_like(self.p_mp[:, p]), self.p_mp[:, p])  # the turn is spent (TS movesLeft = 0)
             att = alive & (a >= 6) & (a < 12) & (tgt >= 0) & garrisoned & ~city_here & (self._p_combat[self.p_type[:, p]] > 0)
             # Ranged units strike instead of meleeing (rangedAttack — one
@@ -1182,7 +1182,7 @@ class SimOrders:
                 # passable plane is tested separately. Seat 0 builds no naval
                 # (production_mask excludes it), so the land plane is exact.
                 adv_terr = self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
-                adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), PLAYER_SEAT).squeeze(1) & adv_terr
+                adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), 0).squeeze(1) & adv_terr
                 if bool(adv.any()):
                     vr = adv.nonzero(as_tuple=True)[0]
                     self.occ_mil[(vr, here[vr])] = -1
@@ -1311,7 +1311,7 @@ class SimOrders:
                 & city_first & (rc_civ_t < 0) & cs_here  # city-first (garrison does not shield; lone civilian does)
                 & (self._p_combat[self.p_type[:, p]] > 0) & ~rngd
             )
-            _csr = self._assault_city_state(cs_hit, cs_sc, tgt, "player", p)
+            _csr = self._assault_city_state(cs_hit, cs_sc, tgt, "p", p)
             if _csr is not None:
                 rows, atk_dead, cap = _csr
                 if bool(cap.any()):
@@ -1578,11 +1578,11 @@ class SimOrders:
                 mv
                 & (tgt >= 0)
                 & self.passable.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1)
-                & ~self._blocked_for(tgt.clamp(min=0).unsqueeze(1), PLAYER_SEAT, is_civilian=civ).squeeze(1)
+                & ~self._blocked_for(tgt.clamp(min=0).unsqueeze(1), 0, is_civilian=civ).squeeze(1)
             )
             if bool(ok.any()):
                 self._step_verb(  # the shared step contract
-                    ok, torch.full_like(here, p), here, tgt, dirs, PLAYER_SEAT, civ,
+                    ok, torch.full_like(here, p), here, tgt, dirs, 0, civ,
                 )
 
     def _bankrupt_disband(self) -> None:
@@ -1863,13 +1863,13 @@ class SimOrders:
             )
 
             if bool(city_att.any()):
-                self._hostile_city_attack(city_att, tgt_city, "barb", u)
+                self._hostile_city_attack(city_att, tgt_city, "u", u)
             if bool(unit_att.any()):
-                self._hostile_vs_unit(unit_att, ttc, "barb", u)
+                self._hostile_vs_unit(unit_att, ttc, "u", u)
             if bool(rvc_att.any()):
                 self._attack_civ_city(rvc_att, ttc, u)
             if enc_att is not None and bool(enc_att.any()):
-                self._attack_encampment(enc_att, ttc, "barb", u)
+                self._attack_encampment(enc_att, ttc, "u", u)
             acted_att = city_att | unit_att | rvc_att
             if enc_att is not None:
                 acted_att = acted_att | enc_att
@@ -1883,7 +1883,7 @@ class SimOrders:
             # TS returns from hostileUnitAct before the pillage/march branches.
             r_att = attack & rngd
             if any_rngd and bool(r_att.any()):
-                acted_att = acted_att | self._hostile_ranged_strike(r_att, ttc, "barb", u)
+                acted_att = acted_att | self._hostile_ranged_strike(r_att, ttc, "u", u)
             self.u_mp[:, u] = torch.where(acted_att, torch.zeros_like(self.u_mp[:, u]), self.u_mp[:, u])  # the turn is spent (TS movesLeft = 0)
 
             # Pillage: a raider that did not attack, standing on an owned,
@@ -1938,7 +1938,7 @@ class SimOrders:
                 continue
             arangeT = torch.arange(T, device=dev)
             if self.improvements_on or self.districts_on:
-                _owned = (self.tile_seat == PLAYER_SEAT) | (self.civ_at >= 0)  # [B, T] — civ tiles tempt barbarians too
+                _owned = (self.tile_seat == 0) | (self.civ_at >= 0)  # [B, T] — civ tiles tempt barbarians too
                 imp_job = (self.improvement >= 0) & ~self.pillaged & _owned  # [B, T]
                 if self.districts_on:  # pillageable districts join the union
                     imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & _owned)
@@ -2038,8 +2038,8 @@ class SimOrders:
                 _mil, _civ = self.occ_mil, self.occ_civ
                 _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
                 _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
-                hm = self._seats_hostile(PLAYER_SEAT, _mseat)
-                hc = self._seats_hostile(PLAYER_SEAT, _cseat)
+                hm = self._seats_hostile(0, _mseat)
+                hc = self._seats_hostile(0, _cseat)
                 hostile = hm | hc  # [B, T]
                 valid = walled.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
                 key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
@@ -2066,7 +2066,7 @@ class SimOrders:
                 def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # a seat-0 military standing on the centre tile.
                 _g = self.occ_mil[bidx, ctr]
-                gar = ((_g >= 0) & (self.unit_seat[bidx, _g.clamp(min=0)] == PLAYER_SEAT)).long()
+                gar = ((_g >= 0) & (self.unit_seat[bidx, _g.clamp(min=0)] == 0)).long()
                 atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
                 # The defending unit is wounded (the attacker is the city).
                 def_hp = self.unit_hp[bidx, ds0]
@@ -2103,7 +2103,7 @@ class SimOrders:
             bidx = torch.arange(Bn, device=dev2)
             arangeT = torch.arange(Tn, device=dev2)
             walk_ord = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
-            owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.C).bool() & (self.tile_seat == PLAYER_SEAT).unsqueeze(2)  # [B,T,C]
+            owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), self.C).bool() & (self.tile_seat == 0).unsqueeze(2)  # [B,T,C]
             has_enc = (((self.district == self._encamp_didx) & self.district_complete & ~self.district_dead & ~self.district_pillaged & (self.encamp_hp > 0)).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] the city owns a completed LIVE unpillaged Encampment; one beaten to 0 HP is occupied and fires nothing
             for s_rank in range(self.C):
                 col = walk_ord[:, s_rank]  # [B] — this game's s_rank-th city (TS array order)
@@ -2117,8 +2117,8 @@ class SimOrders:
                 _mil, _civ = self.occ_mil, self.occ_civ
                 _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
                 _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
-                hm = self._seats_hostile(PLAYER_SEAT, _mseat)
-                hc = self._seats_hostile(PLAYER_SEAT, _cseat)
+                hm = self._seats_hostile(0, _mseat)
+                hc = self._seats_hostile(0, _cseat)
                 hostile = hm | hc  # [B, T]
                 valid = enc_city.unsqueeze(1) & hostile & (dist >= 1) & (dist <= 2)
                 key = torch.where(valid, dist * (Tn + 1) + arangeT.reshape(1, -1), torch.full((Bn, Tn), 10**9, device=dev2, dtype=torch.long))
@@ -2142,7 +2142,7 @@ class SimOrders:
                 def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                 # a seat-0 military standing on the centre tile.
                 _g = self.occ_mil[bidx, ctr]
-                gar = ((_g >= 0) & (self.unit_seat[bidx, _g.clamp(min=0)] == PLAYER_SEAT)).long()
+                gar = ((_g >= 0) & (self.unit_seat[bidx, _g.clamp(min=0)] == 0)).long()
                 atk_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
                 def_hp = self.unit_hp[bidx, ds0]
                 def_e = def_cs - self._wound(def_hp)
@@ -2189,7 +2189,7 @@ class SimOrders:
                 & self.district_complete
                 & ~self.district_pillaged
                 & ~self.district_dead  # captured: TS's fresh City has no districts
-                & (self.tile_seat == PLAYER_SEAT)
+                & (self.tile_seat == 0)
             )
             _unbes = self.alive & ~besieged  # [B, C]
             _heal_t = _enc_t & _unbes.gather(1, self.owner.clamp(min=0))

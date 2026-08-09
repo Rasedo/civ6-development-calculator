@@ -9,7 +9,7 @@ bar — these pokes are gate-unreachable-surface coverage):
 
   1. Training-XP catalog: _b_train_xp exports 5/5/10/15 for
      BARRACKS/STABLE/ARMORY/MILITARY_ACADEMY and 0 for every other building.
-  2. Training XP wiring: _spawn_player / _spawn_seat_unit honour init_xp — a
+  2. Training XP wiring: _spawn_p / _spawn_seat_unit honour init_xp — a
      MILITARY unit inherits the city's best Encampment tier, a civilian stays
      at 0.
   3. The ADDITIONAL Encampment strike: a seat-0 city owning a COMPLETE
@@ -64,13 +64,13 @@ def test_training_xp_wiring(rules, path) -> None:
 
     # MILITARY: inherits init_xp
     slot0 = int(sim.p_next[0])
-    sim._spawn_player(torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
+    sim._spawn_p(torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
     assert int(sim.p_next[0]) == slot0 + 1, "military unit did not spawn"
     assert int(sim.p_xp[0, slot0]) == 10, f"military trained XP = {int(sim.p_xp[0, slot0])}, want 10"
 
     # CIVILIAN: stays 0 even under init_xp
     slot1 = int(sim.p_next[0])
-    sim._spawn_player(torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
+    sim._spawn_p(torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
     assert int(sim.p_next[0]) == slot1 + 1, "builder did not spawn"
     assert int(sim.p_xp[0, slot1]) == 0, f"civilian trained XP = {int(sim.p_xp[0, slot1])}, want 0"
 
@@ -91,7 +91,7 @@ def build_strike_scene(rules, path):
     for _ in range(6):
         sim.step()
     ctr = int(sim.site[0, 0])
-    assert ctr >= 0, "no player capital"
+    assert ctr >= 0, "no seat-0 capital"
     # clear barbs so the civ unit is the unambiguous nearest hostile
     _pl = sim.occ_mil[0]  # clear only this pool's entries
     _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1

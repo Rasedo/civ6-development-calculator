@@ -60,7 +60,7 @@ describe('B-26: cliffs block embark and disembark', () => {
   it('a Harbor passes its OWNER only, never the enemy', () => {
     const { state, land, sea } = setup();
     land.district = 'HARBOR';
-    setTileOwner(land, 0, 1); // the player's territory
+    setTileOwner(land, 0, 1); // seat 0's territory
     expect(cliffBlocks(state, land, sea, { seat: 0 })).toBe(false);
     // an enemy using the same Harbor tile is still walled out
     expect(cliffBlocks(state, land, sea, { seat: seatOfIndex(0) })).toBe(true);

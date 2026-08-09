@@ -8,15 +8,15 @@ import { WARMONGER_DOW, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN } from '../../.
 import { diplomaticFavorPerTurn } from '../../../cpu/core/seatTurn';
 import { GOVERNMENTS } from '../../../cpu/data/policies';
 
-// The PLAYER's WARMONGER score (grievances) — the exact twin of
+// SEAT 0's WARMONGER score (grievances) — the exact twin of
 // Seat.warmonger, which #55/S3 landed for opponents only. Real Civ 6 prices
 // aggression in grievances: declaring war and taking cities make a civ shunned
 // and ganged up on. Grows on declaring (+4) and on taking a foreign city (+3),
 // decays 1/turn while at peace with EVERY civ, floor 0. Past
-// WARMONGER_GANG a civ may declare on the player WITHOUT the usual
+// WARMONGER_GANG a civ may declare on seat 0 WITHOUT the usual
 // strength advantage.
 //
-// MEASURED live in the gate: the player's score peaks at exactly the gang
+// MEASURED live in the gate: seat 0's score peaks at exactly the gang
 // threshold (6) with 192 civ-turns at or over it across the 24 scripted seeds,
 // so the changed DoW gate is genuinely exercised and `warmonger` is a compared
 // HEAD trace column. These pokes pin the accrual and decay rules themselves.
@@ -52,7 +52,7 @@ describe('B-22 diplomatic favor', () => {
     expect(diplomaticFavorPerTurn(null, 2)).toBe(2 * DIPLO_FAVOR_PER_SUZERAIN);
   });
 
-  it('accrues on the player each turn', () => {
+  it('accrues on seat 0 each turn', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticFavor = 0;
     seatOf(state, 0)!.government.current = 'MONARCHY';
@@ -62,7 +62,7 @@ describe('B-22 diplomatic favor', () => {
   });
 });
 
-describe('B-22 player grievances', () => {
+describe('B-22 seat-0 grievances', () => {
   it('declaring war earns grievances', () => {
     const state = newGame(1);
     expect(seatOf(state, 0)!.warmonger ?? 0).toBe(0);
@@ -97,7 +97,7 @@ describe('B-22 player grievances', () => {
   });
 
   it('the gang threshold is a real bar the score can reach', () => {
-    // Two declarations put the player at 8, past the gang threshold of 6 —
+    // Two declarations put seat 0 at 8, past the gang threshold of 6 —
     // the point at which opponents stop needing a strength advantage.
     const state = newGame(2);
     declareWar(state, indexOfSeat((state.seats[(0) + 1] as Seat).seat), 0);

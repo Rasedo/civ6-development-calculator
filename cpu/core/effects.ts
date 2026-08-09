@@ -43,7 +43,7 @@ function* completedEffectsIn(research: ResearchState): Generator<ResearchEffect>
 }
 
 /** Unlocks from an arbitrary research state (seat districts/
- * buildings gate on the RIVAL's own trees). Player wrapper below. */
+ * buildings gate on the SEAT's own trees). Seat-0 wrapper below. */
 export function computeUnlocksIn(research: ResearchState): Unlocks {
   const u: Unlocks = {
     improvements: new Set(BASELINE.improvements),
@@ -99,7 +99,7 @@ export function isCivicComplete(state: GameState, id: string, seat: number): boo
 
 /**
  * Techs researchable from an arbitrary research state (the other seats run the
- * SAME trees through their own ResearchState; the player wrappers below keep
+ * SAME trees through their own ResearchState; the seat-0 wrappers below keep
  * their exact signatures and behavior).
  */
 export function availableTechsIn(research: ResearchState): TechDef[] {
@@ -224,7 +224,7 @@ function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
 /**
  * The research-driven modifier head only (foreign cities apply THEIR
  * OWN tech boosts — mine yields, farm adjacency, hill farms; government/
- * religion/CS blocks are player machinery and stay out). The player's
+ * religion/CS blocks are seat-0 machinery and stay out). Seat 0's
  * getModifiers builds on top of this.
  */
 export function modifiersFromResearch(research: ResearchState): Modifiers {
@@ -260,7 +260,7 @@ export function modifiersFromResearch(research: ResearchState): Modifiers {
 // applyBeliefEffects never falls back to reading seatOf(state, seat)!.cities. WeakMap keys on
 // the seat object, stable within a state and fresh across deserialize/clone.
 //
-// The PLAYER is deliberately excluded: its mods also depend on stored policy
+// SEAT 0 is deliberately excluded: its mods also depend on stored policy
 // slots and the live city-state channel, neither of which is in this key.
 
 /**
@@ -409,7 +409,7 @@ export function computeAdoption(research: ResearchState): {
 }
 
 /** Layer a seat's adopted government + slotted policies onto `mods`, exactly
- * as getModifiers does for the player's seatOf(state, seat)!.government. */
+ * as getModifiers does for seat 0's seatOf(state, seat)!.government. */
 function applyGovernment(mods: Modifiers, research: ResearchState): void {
   const { government, policies } = computeAdoption(research);
   const gov = government ? GOVERNMENTS[government] : null;
@@ -427,8 +427,8 @@ function applyGovernment(mods: Modifiers, research: ResearchState): void {
 // ---------------------------------------------------------------------------
 
 /**
- * The FOLLOWER belief of religion `g` — the unified civ id (0 = the
- * player's religion, i+1 = seat i's). Returns undefined for an unfounded /
+ * The FOLLOWER belief of religion `g` — the unified civ id (0 = seat
+ * 0's religion, i+1 = seat i's). Returns undefined for an unfounded /
  * absent religion (g < 0, or the founding civ has not founded / claimed no
  * follower). Follower beliefs carry ONLY the per-city channels workEthic,
  * buildingYields, buildingHousing, amenitiesIfSpecialty and faithPerWonder

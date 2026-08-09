@@ -279,17 +279,17 @@ def test_worship_faith_purchase(rules, path):
         s.district[0, t] = s._hs_idx
         s.district_complete[0, t] = True
         s.buildings[0, 0, s._temple_bidx] = True
-        s.player_faith.fill_(10_000.0)
+        s.faith.fill_(10_000.0)
         s._eff_version += 1
         return t
     _endow(sim)
     assert bool(sim._buildable(include_worship=True)[0, 0, wj]), (
         "worship must be PURCHASE-eligible once its Temple stands"
     )
-    f0, g0 = float(sim.player_faith[0]), float(sim.treasury[0])
+    f0, g0 = float(sim.faith[0]), float(sim.treasury[0])
     sim.step(production=prod(sim, 0, pb + wj))
     assert bool(sim.buildings[0, 0, wj]), "worship purchase not granted"
-    buy_f, buy_g = f0 - float(sim.player_faith[0]), g0 - float(sim.treasury[0])
+    buy_f, buy_g = f0 - float(sim.faith[0]), g0 - float(sim.treasury[0])
 
     # CONTROL: the identical turn without the purchase. The city EARNS faith
     # during the step and the bought building pays its own faith yield the same
@@ -301,9 +301,9 @@ def test_worship_faith_purchase(rules, path):
     _endow(sim2)
     sim2.buildings[0, 0, wj] = True   # granted FREE: same yields, same upkeep
     sim2._eff_version += 1
-    f0b, g0b = float(sim2.player_faith[0]), float(sim2.treasury[0])
+    f0b, g0b = float(sim2.faith[0]), float(sim2.treasury[0])
     sim2.step(production=prod(sim2, 0, sim2.IDLE))
-    base_f, base_g = f0b - float(sim2.player_faith[0]), g0b - float(sim2.treasury[0])
+    base_f, base_g = f0b - float(sim2.faith[0]), g0b - float(sim2.treasury[0])
 
     assert abs((buy_f - base_f) - sim._worship_cost) < 1e-6, (
         f"worship must cost exactly {sim._worship_cost} faith, "

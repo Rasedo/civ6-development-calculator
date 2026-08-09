@@ -24,7 +24,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import BARB_SEAT, PLAYER_SEAT
+from core.engine import BARB_SEAT
 
 
 def build() -> BatchSim:
@@ -73,7 +73,7 @@ def main() -> None:
     assert bld >= 0 and mis >= 0 and apo >= 0, "roster indices missing"
 
     # ---- 1. no dedication -> no bonus, for every class ---------------------
-    p_bld = put(sim, "p", bld, PLAYER_SEAT)
+    p_bld = put(sim, "p", bld, 0)
     v_mis = put(sim, "v", mis, 1, civ=0)
     put(sim, "v", apo, 1, civ=0)
     assert full(sim, "p", p_bld) == base(sim, bld), "a Builder with no Golden age gained MP"
@@ -85,15 +85,15 @@ def main() -> None:
     v_war = put(sim, "v", 2, 1, civ=0)  # WARRIOR — never a dedication class
     golden(sim, 0, mono)  # seat 0's civ index is 0
     golden(sim, 1, mono)  # civ 0 is unified civ 1
-    assert full(sim, "p", p_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed the player's Builder"
+    assert full(sim, "p", p_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed seat 0's Builder"
     assert full(sim, "v", v_bld) == base(sim, bld) + bonus, "MONUMENTALITY missed the CIV's Builder"
     assert full(sim, "v", v_war) == base(sim, 2), "MONUMENTALITY reached a WARRIOR"
     assert full(sim, "v", v_mis) == base(sim, mis), "MONUMENTALITY reached a Missionary"
-    print(f"  2 MONUMENTALITY: builder {base(sim, bld)} -> {full(sim, 'p', p_bld)} for player AND civ; warrior/missionary untouched")
+    print(f"  2 MONUMENTALITY: builder {base(sim, bld)} -> {full(sim, 'p', p_bld)} for seat 0 AND civ; warrior/missionary untouched")
 
     # ---- 3. EXODUS lifts MISSIONARY + APOSTLE, and only those -------------
     sim2 = build()
-    p_bld2 = put(sim2, "p", bld, PLAYER_SEAT)
+    p_bld2 = put(sim2, "p", bld, 0)
     v_mis2 = put(sim2, "v", mis, 1, civ=0)
     v_apo2 = put(sim2, "v", apo, 1, civ=0)
     golden(sim2, 1, exo)
@@ -147,16 +147,16 @@ def main() -> None:
         sim6 = build()
         golden(sim6, 0, fi)
         assert float(sim6._eff_cost(cost, boosted, golden_civ=1)[0]) == float(plain[0]), (
-            "the PLAYER's dedication discounted a CIV's research"
+            "seat 0's dedication discounted a CIV's research"
         )
-        print(f"  7 FREE_INQUIRY: civ cost {float(plain[0]):.0f} -> {float(civ_g[0]):.0f}; the player's own age does not pay for it")
+        print(f"  7 FREE_INQUIRY: civ cost {float(plain[0]):.0f} -> {float(civ_g[0]):.0f}; seat 0's own age does not pay for it")
 
         # EXODUS's +4 prophet points and PEN_BRUSH's culture read the same table
         assert bool(sim5._golden_ded(1, fi)[0]) and not bool(sim5._golden_ded(0, fi)[0])
         sim7 = build()
         golden(sim7, 1, pb)
         assert bool(sim7._golden_ded(1, pb)[0]), "PEN_BRUSH unreachable for a civ"
-        assert not bool(sim7._golden_ded(0, pb)[0]), "PEN_BRUSH leaked to the player"
+        assert not bool(sim7._golden_ded(0, pb)[0]), "PEN_BRUSH leaked to seat 0"
         print("  8 per-seat table: a dedication answers for the civ that committed it, and only that civ")
 
     print("GOLDEN MOVE (B-24) OK — +2 MP for the seat that holds the dedication")

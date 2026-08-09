@@ -83,7 +83,7 @@ def test_catalog(rules, path) -> None:
     print(f"  catalog OK: scientific→LIBRARY/UNIVERSITY, religious→SHRINE/TEMPLE, suzAmt=3, {len(BUILDING_IDS)} bldgs")
 
 
-def test_player_building_bonus(rules, path) -> None:
+def test_building_bonus(rules, path) -> None:
     sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     for _ in range(6):
         sim.step()
@@ -107,7 +107,7 @@ def test_player_building_bonus(rules, path) -> None:
     assert s3 > s1 + 1e-9, f"3-envoy tier-1 building bonus did not fire ({s1}->{s3})"
     assert s6 > s3 + 1e-9, f"6-envoy tier-2 building bonus did not fire ({s3}->{s6})"
     assert abs(f3 - f1) < 1e-9 and abs(f6 - f1) < 1e-9, "food changed — bonus landed in the wrong channel"
-    print(f"  player building bonus OK: science {s1:.2f}(1e) -> {s3:.2f}(3e) -> {s6:.2f}(6e), food flat")
+    print(f"  seat-0 building bonus OK: science {s1:.2f}(1e) -> {s3:.2f}(3e) -> {s6:.2f}(6e), food flat")
 
     # control: no LIBRARY -> the 3-envoy tier-1 bonus vanishes
     sim.buildings[0, 0, li] = False
@@ -115,10 +115,10 @@ def test_player_building_bonus(rules, path) -> None:
     s1b, _ = sci0(1)
     s3b, _ = sci0(3)
     assert abs(s3b - s1b) < 1e-9, f"3-envoy bonus fired with NO tier-1 building ({s1b}->{s3b})"
-    print("  player building CONTROL OK: no tier-1 building -> no 3-envoy bonus")
+    print("  seat-0 building CONTROL OK: no tier-1 building -> no 3-envoy bonus")
 
 
-def test_player_building_pillage(rules, path) -> None:
+def test_building_pillage(rules, path) -> None:
     sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     for _ in range(6):
         sim.step()
@@ -168,7 +168,7 @@ def test_player_building_pillage(rules, path) -> None:
     print(f"  pillage-dark OK: live delta {live_delta:.2f} -> pillaged delta {dark_delta:.2f}")
 
 
-def test_player_suzerain(rules, path) -> None:
+def test_suzerain(rules, path) -> None:
     sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     for _ in range(6):
         sim.step()
@@ -190,7 +190,7 @@ def test_player_suzerain(rules, path) -> None:
     ship = cap_sci(SCIENCE)   # shipped science channel
     desc = cap_sci(-1)        # descoped
     assert ship > desc + 1e-9, f"suzerain perk did not add to the capital ({desc}->{ship})"
-    print(f"  player suzerain OK: capital science shipped {ship:.2f} vs descoped {desc:.2f} (+{suz_amt} pre-amenity)")
+    print(f"  seat-0 suzerain OK: capital science shipped {ship:.2f} vs descoped {desc:.2f} (+{suz_amt} pre-amenity)")
 
     # contest lost: a civ seat out-envoys seat 0 -> no perk
     if sim.R > 0:
@@ -200,7 +200,7 @@ def test_player_suzerain(rules, path) -> None:
         total, _, _, _ = sim._city_totals(lux=None)
         contested = float(total[0, 0, SCIENCE])
         assert abs(contested - desc) < 1e-9, f"suzerain perk paid while contest LOST ({contested} vs {desc})"
-        print("  player suzerain CONTEST OK: a civ out-envoys the player -> no perk")
+        print("  seat-0 suzerain CONTEST OK: a civ out-envoys seat 0 -> no perk")
 
 
 def test_civ_bonus(rules, path) -> None:
@@ -257,9 +257,9 @@ def main() -> None:
     p = paths[0]
     print(f"cs_bonus_test on {p.name}:")
     test_catalog(rules, p)
-    test_player_building_bonus(rules, p)
-    test_player_building_pillage(rules, p)
-    test_player_suzerain(rules, p)
+    test_building_bonus(rules, p)
+    test_building_pillage(rules, p)
+    test_suzerain(rules, p)
     test_civ_bonus(rules, p)
     print("CS_BONUS OK")
 

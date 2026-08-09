@@ -71,7 +71,7 @@ def main() -> None:
 
     # --- 1) seat 0 out-touring every civ WINS ------------------------------
     w, _ = victor([tourism_for(5)] + [0] * sim.R, [culture_for(1)] + [culture_for(4)] * sim.R)
-    assert w == 0, f"player should win the culture victory, got civ {w}"
+    assert w == 0, f"seat 0 should win the culture victory, got civ {w}"
 
     # --- 2) a civ out-touring everyone is the DEFEAT direction -----------
     tour = [0] * (1 + sim.R)

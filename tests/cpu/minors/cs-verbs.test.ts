@@ -117,7 +117,7 @@ describe('A-12 (B8-L): civ levy', () => {
     cs.met = [];
     setMet(cs, civ.seat);
     cs.envoys = {  };
-    cs.envoys[civ.seat] = 5; // strict suzerain (player 0, no other civ)
+    cs.envoys[civ.seat] = 5; // strict suzerain (seat 0 at zero, no other civ)
     return { state, civ, cs };
   }
 
@@ -256,8 +256,8 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('A-12 (B8-L): PLAYER quest draw-count neutrality', () => {
-  it('the civ-quest path consumes ZERO rng, so the shared PRNG (and the player path) is untouched', () => {
+describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
+  it('the civ-quest path consumes ZERO rng, so the shared PRNG (and the seat-0 path) is untouched', () => {
     // A civ that would issue AND resolve a quest, at peace (no combat/war
     // draws), belief-opted-out: seatPhase must leave rngState untouched by
     // the quest machinery — the explicit before/after neutrality proof.
@@ -288,7 +288,7 @@ describe('A-12 (B8-L): PLAYER quest draw-count neutrality', () => {
     expect(state.rngState).toBe(rng0);
   });
 
-  it('cityStatePhase issues a player quest drawing ZERO — the seats share one issuer', () => {
+  it('cityStatePhase issues a seat-0 quest drawing ZERO — the seats share one issuer', () => {
     // ONE issuer, and it is deterministic: fixed order, with the district
     // keyed to the CS's OWN type. Every seat issues quests without touching
     // the shared PRNG, so quest issuance can never shift a draw count.

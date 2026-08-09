@@ -261,7 +261,7 @@ describe('civ envoys and the suzerain contest (A-12)', () => {
 });
 
 describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
-  it('grants the shipped channel yield to a strict player suzerain', () => {
+  it('grants the shipped channel yield to a strict seat-0 suzerain', () => {
     const state = makeState();
     // Geneva (scientific) is a SHIPPED row -> science channel.
     const cs = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
@@ -284,7 +284,7 @@ describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
   it('loses the perk when a civ wins the strict contest', () => {
     const state = makeState();
     const cs = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    cs.envoys = { [seatOfIndex(0)]: 4 }; // civ 0 out-envoys the player
+    cs.envoys = { [seatOfIndex(0)]: 4 }; // civ 0 out-envoys seat 0
     expect(isSuzerain(cs, 0)).toBe(false);
     expect(csSuzerainCapitalBonus(state, 0)).toEqual({});
   });

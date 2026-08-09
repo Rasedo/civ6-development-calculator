@@ -5,7 +5,7 @@ import { endTurn } from '../../../cpu/core/game';
 import { spawnUnit } from '../../../cpu/core/units';
 
 // An insolvent treasury (after unit upkeep) disbands ONE unit per turn —
-// the priciest player unit, tie -> lowest id (oldest spawn). Inert at the gate
+// the priciest seat-0 unit, tie -> lowest id (oldest spawn). Inert at the gate
 // (play stays gold-positive), so these focused cases pin the semantics.
 describe('GV-5 bankruptcy', () => {
   it('disbands one unit per turn: the priciest, tie -> lowest id', () => {
@@ -18,8 +18,8 @@ describe('GV-5 bankruptcy', () => {
     seatOf(state, 0)!.treasury = 1;
     endTurn(state, 0);
 
-    const players = state.units.filter((u) => (u.seat) === 0);
-    expect(players.length).toBe(2); // exactly one disbanded, not the whole army
+    const seat0Units = state.units.filter((u) => (u.seat) === 0);
+    expect(seat0Units.length).toBe(2); // exactly one disbanded, not the whole army
     expect(state.units.some((u) => u.id === h1!.id)).toBe(false); // priciest + oldest id -> gone
     expect(state.units.some((u) => u.id === h2!.id)).toBe(true); // the tie went to the lower id
   });

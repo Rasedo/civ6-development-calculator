@@ -149,15 +149,12 @@ class SimInit:
         # and loyalty's grown/not-grown pop mix — compares seq, not column index.
         self.city_seq = torch.zeros(B, C, dtype=torch.long, device=device)
         self.city_seq_next = torch.zeros(B, dtype=torch.long, device=device)  # no city exists yet
-        # The capital is an IDENTITY (is_cap plus cap_tile_player /
-        # cap_tile_civ), not column 0: a captured capital's hole-reused column
-        # must not pin loyalty, carry the Palace or anchor domination, and
-        # _reclaim_rc compaction permutes slots underneath.
+        # The capital is an IDENTITY (is_cap plus civ_cap_tile), not column 0:
+        # a captured capital's hole-reused column must not pin loyalty, carry
+        # the Palace or anchor domination, and _reclaim_rc compaction permutes
+        # slots underneath. civ_cap_tile is allocated with the civ block below.
         import os as _os
         self._reclaim_at = int(_os.environ.get("CIV6_RECLAIM_AT", simbase.U_MAX - 24))
-        # No capital exists at t0 — the first FOUND crowns it (new_cap in
-        # _found_player_at) and writes cap_tile_player then.
-        self.cap_tile_player = torch.full((B,), -1, dtype=torch.long, device=device)
 
         # --- city-states: static, placed at game creation ----------------------
         s_pad = max(self.S, 1)  # self.S is set with the city block
@@ -235,10 +232,6 @@ class SimInit:
         n_gp = len(rr.get("gpClassDistrict", [])) or 5  # GP class count (Scientist..General)
         # The unified civ index space: 0 = seat 0, r+1 = civ index r.
         self.O = 1 + self.R
-        cv = rules.civs or {}
-        assert int(cv.get("player", PLAYER_CIV)) == PLAYER_CIV and int(cv.get("civBase", 1)) == 1, (
-            "fixture civ numbering disagrees with engine constants (civs.ts drift?)"
-        )
         # rc slots append at last-alive+1 (order-preserving), so churn can
         # exhaust the space while holes sit below — compact at the step end once
         # the high-water nears the cap (forced low via CIV6_RC_RECLAIM_AT).
@@ -458,10 +451,15 @@ class SimInit:
         # yields/upkeep/counts; the paving still blocks).
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         self.rc_id = torch.zeros(B, r_pad, rc_pad, dtype=torch.long, device=device)
-        # capitalTiles[r+1]: only an isCapital founding (t0 or a total-collapse
-        # refound) writes it. The capital is an identity (rc_is_cap), not a
-        # slot — _reclaim_rc compaction permutes slots underneath.
-        self.cap_tile_civ = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        # capitalTiles, seat-indexed: only an isCapital founding (t0 or a
+        # total-collapse refound) writes a row. The capital is an identity
+        # (cty_is_cap), not a slot — _reclaim_rc compaction permutes slots
+        # underneath. Row 0 starts -1 (no capital until the first FOUND crowns
+        # it); cap_tile / r_cap_tile are the row views.
+        self.civ_cap_tile = torch.zeros(B, 1 + r_pad, dtype=torch.long, device=device)
+        self.civ_cap_tile[:, 0] = -1
+        self.cap_tile = self.civ_cap_tile[:, 0]
+        self.r_cap_tile = self.civ_cap_tile[:, 1:]
         # Trade routes — (from_id, to_id) rc-id pairs, -1 = empty column.
         # Id-keyed like tile_city, so _reclaim_rc slot permutations never touch
         # it. K must cover the real capacity bound (tradeCapacity):
@@ -1255,7 +1253,7 @@ class SimInit:
         self.alive[:, 0] = True
         self.pop[:, 0] = 1
         # The fixture's owner column is a CITY index; it seeds `tile_city`, and
-        # `tile_seat` gets PLAYER_SEAT wherever it is set.
+        # `tile_seat` gets 0 wherever it is set.
         self.tile_city = torch.tensor([f["ownerInit"] for f in fixtures], dtype=torch.long, device=device)  # [B, T]
         # Bumped by EVERY write to owner / civ_at; keys the derived views below.
         # Not a tensor — python state, so it is not in _MUTABLE.
@@ -1468,7 +1466,7 @@ class SimInit:
 
         # Seat 0's t0 units seed the p-pool HERE — after the roster tables and
         # the pool planes exist. Slot order is the file's unit order (the wire
-        # contract); charges/MP mirror _spawn_player's writes, minus the spot
+        # contract); charges/MP mirror _spawn_p's writes, minus the spot
         # search (the file tile is the tile).
         for b, f in enumerate(fixtures):
             for cv in f["civs"]:
@@ -1559,7 +1557,7 @@ class SimInit:
         p, v, u = self.POOL_LO["p"], self.POOL_LO["v"], self.POOL_LO["u"]
         pe, ve, ue = self.POOL_HI["p"], self.POOL_HI["v"], self.POOL_HI["u"]
         if not bool(((seat[:, p:pe] == 0) | ~al[:, p:pe]).all()):
-            raise AssertionError("SEAT DRIFT: a living PLAYER slot does not carry seat 0")
+            raise AssertionError("SEAT DRIFT: a living p-pool slot does not carry seat 0")
         # EVERY civ slot, alive or not: the range is seeded to seat 1
         # so `v_seat - 1 == v_civ` is total. A dead slot with a bogus seat is
         # not harmless — the encampment probe subtracts 1 and indexes r_atwar.
@@ -1592,10 +1590,10 @@ class SimInit:
     #: engine's dtype.
     _CIV_PAIR_FIELDS = (
         ("culture", "culture_total", "r_culture", None, None),
-        ("faith", "player_faith", "r_faith", None, None),
+        ("faith", "faith", "r_faith", None, None),
         ("tourism", "tourism_total", "r_tourism", torch.long, None),
         ("warmonger", "p_warmonger", "r_warmonger", torch.long, None),
-        ("gpp", "player_gp_points", "r_gpp", None, "_gp_nc"),
+        ("gpp", "gp_points", "r_gpp", None, "_gp_nc"),
     )
 
     def _alloc_civ_pairs(self, B: int, r_pad: int, dtype, device) -> None:
@@ -1651,7 +1649,7 @@ class SimInit:
         # seat sitting in this row"), and a row-indexed lookup keeps that a
         # gather rather than a Python branch per seat class.
         _rs = torch.full((self.NS,), NO_SEAT, dtype=torch.long, device=device)
-        _rs[0] = PLAYER_SEAT
+        _rs[0] = 0
         for _r in range(r_pad):
             _rs[1 + _r] = _r + 1
         for _c in range(s_pad):

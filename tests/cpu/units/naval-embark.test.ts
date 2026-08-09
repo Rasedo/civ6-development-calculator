@@ -49,7 +49,7 @@ function addCivAtWar(state: GameState, col: number, row: number, techs: string[]
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   // A minimal off-map "home" so the civ is a real civ; the war-march targets
-  // the PLAYER city, so no other civ city geometry is needed here.
+  // the SEAT-0 city, so no other civ city geometry is needed here.
   state.seats.push(civ);
   setWar(state, civ.seat, 0, true);
   const tile = tileAtCoords(state.map, col, row);
@@ -109,12 +109,12 @@ describe('#45/B-6 movement primitives', () => {
     state.unitsMode = true;
     addCivAtWar(state, 5, 5, []);
     const exerter = state.units.find((u) => isCiv(u.seat))!;
-    const player: Unit = { id: 999, type: 'WARRIOR', seat: 0, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2, hp: 100, charges: null, path: null };
-    // the mover is the player; a hostile civ military adjacent exerts ZOC
-    expect(inEnemyZoc(state, player.tileIndex, player)).toBe(true);
+    const mover: Unit = { id: 999, type: 'WARRIOR', seat: 0, tileIndex: tileAtCoords(state.map, 6, 5).index, movesLeft: 2, hp: 100, charges: null, path: null };
+    // the mover belongs to seat 0; a hostile civ military adjacent exerts ZOC
+    expect(inEnemyZoc(state, mover.tileIndex, mover)).toBe(true);
     // once that civ is EMBARKED it exerts nothing
     exerter.embarked = true;
-    expect(inEnemyZoc(state, player.tileIndex, player)).toBe(false);
+    expect(inEnemyZoc(state, mover.tileIndex, mover)).toBe(false);
   });
 });
 
@@ -133,7 +133,7 @@ describe('#45/B-6 spawn stays ashore', () => {
 
 describe('#45/B-6 war-march water steps (behind the inert live switch)', () => {
   function marchScenario(techs: string[]): { state: GameState; unit: Unit } {
-    // Almost-all-water map: unit start + player city are the only land, so the
+    // Almost-all-water map: unit start + seat-0 city are the only land, so the
     // strictly-closer march step is always a water tile (forces an embark).
     const state = makeState(makeMap(14, 12, 'COAST'));
     state.unitsMode = true;
@@ -322,7 +322,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     state.unitsMode = true;
     const civ = bareCiv(state);
-    // a land tile for the player warrior, an adjacent water tile for the embarked builder
+    // a land tile for the seat-0 warrior, an adjacent water tile for the embarked builder
     const warriorTile = tileAtCoords(state.map, 5, 5);
     const builderTile = neighbors(state.map, warriorTile)[0];
     builderTile.terrain = 'COAST';
@@ -330,7 +330,7 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const builder = spawnUnit(state, 'BUILDER', warriorTile.index, civ.seat)!;
     builder.tileIndex = builderTile.index; // embarked civilian on the water tile
     builder.embarked = true;
-    // add another player unit AFTER the builder so pool-end is observable
+    // add another seat-0 unit AFTER the builder so pool-end is observable
     const tail = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 9).index, 0)!;
     const res = meleeAttack(state, warrior.id, builderTile.index, 0);
     expect(res.ok).toBe(true);
@@ -379,10 +379,10 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     expect(rc.hp).toBeLessThan(before); // the ship battered the coastal city
   });
 
-  it('a PLAYER galley MOVES across water (findPath naval) then attacks a coastal city', () => {
+  it('a SEAT-0 galley MOVES across water (findPath naval) then attacks a coastal city', () => {
     // The GPU RL/controlled head cannot order a ship's water move yet (that is
     // the #50 residual — its move-apply reads the land plane); TS findPath/
-    // walkPath ARE naval-aware, so the player-naval MOVE end-to-end lives here.
+    // walkPath ARE naval-aware, so the seat-0 naval MOVE end-to-end lives here.
     const state = makeState(makeMap(14, 12, 'COAST')); // all-water map
     state.unitsMode = true;
     const civ = bareCiv(state);

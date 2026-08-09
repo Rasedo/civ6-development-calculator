@@ -478,10 +478,9 @@
       "Seat.capitalTile"
      ],
      "planes": [
-      "cap_tile_player",
-      "cap_tile_civ"
+      "civ_cap_tile"
      ],
-     "note": "seat 0's original capital tile lives in cap_tile_player and every other seat's in cap_tile_civ — two planes for one fact, so the extractor has to know which seat it is holding. cap_tile_civ is zero-initialised, so an unfounded seat reads tile 0 rather than 'none'."
+     "note": "one seat-indexed plane; row 0 starts -1 (no capital yet) while civ rows are zero-initialised, so an unfounded civ seat reads tile 0 rather than 'none'."
     },
     {
      "name": "holyTile",

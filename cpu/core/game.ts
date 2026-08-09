@@ -1,5 +1,5 @@
 /**
- * Game state lifecycle: creation, player actions (found city, improve,
+ * Game state lifecycle: creation, seat 0 actions (found city, improve,
  * place districts/buildings, buy tiles, pick research, run government),
  * the end-of-turn loop, and serialization.
  */
@@ -20,7 +20,7 @@ import { disasterPhase } from './disasters';
 import { placeCityStates, cityStatePhase } from './cityStates';
 import { placeSeats, seatPhase, worldCongress, nextCityName } from './phase';
 import { commitProduction, commitResearch } from './seatTurn';
-import { expirePlayerRoutes } from './trade';
+import { expireTradeRoutes } from './trade';
 import { ERA_SCORE_FOUND, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS } from '../data/seats';
 import { addEraScore, eraBoundary, applyDedications, dedicationEvent, goldenBoostBonus } from './eras';
 import { UNITS, WALLS_HP, ENCAMPMENT_HP, CITY_MAX_HP } from '../data/units';
@@ -67,7 +67,7 @@ export function districtCostIn(research: ResearchState): number {
 /**
  * ONE discount rule for every seat — n < ceil(D/U) with D >= U, over the
  * seat's OWN unlocked-district set and its OWN cities. `owner` supplies both;
- * omitted means seat 0, which is what every player call site meant.
+ * omitted means seat 0, which is what every seat 0 call site meant.
  */
 export function districtDiscounted(
   state: GameState,
@@ -133,7 +133,7 @@ export function createGameFromMap(map: GameState['map'], sandbox = false, unitsM
     fogOfWar: false,
     eventLog: [],
     cityStates: [],
-    // The player is seat 0 and holds the SAME shape a seat does.
+    // The seat 0 is seat 0 and holds the SAME shape a seat does.
     // Seat seats are appended by the seat factory (they are the same objects
     // as `the other seats[]` while the field-by-field migration proceeds).
     seats: [emptySeat(0)],
@@ -672,7 +672,7 @@ export function setSpecialists(
   return { ok: true };
 }
 
-// Exported — the RIVAL production add needs the same test, and a
+// Exported — the CIV SEAT production add needs the same test, and a
 // second copy of it in phase.ts is exactly how the two drift apart.
 export function isEncampmentItem(item: QueueItem): boolean {
   if (item.kind === 'district') return item.district === 'ENCAMPMENT';
@@ -690,12 +690,12 @@ export function isEncampmentItem(item: QueueItem): boolean {
  * empire-wide — fully decoupled from the culture-growth counter. Without a
  * target tile (UI headline price) the ring-2 base is shown. */
 /**
- * ONE tile-price text for every seat. The player's and that seat's were
+ * ONE tile-price text for every seat. The seat 0's and that seat's were
  * character-identical formulas over different planes — the seat's own
  * research fraction, its own purchase count, its own tilePurchaseMult
- * (LAND_SURVEYORS is a policy card, not the player's alone). `owner` supplies
+ * (LAND_SURVEYORS is a policy card, not the seat 0's alone). `owner` supplies
  * those three; callers that pass nothing get seat 0, which is what every
- * existing player call site meant.
+ * existing seat 0 call site meant.
  */
 export function tilePurchaseCost(
   state: GameState,
@@ -831,7 +831,7 @@ export function endTurn(state: GameState, seat: number): void {
   if (state.unitsMode) {
     seatOf(state, seat)!.treasury -= unitMaintenance(state, seat);
     // bankruptcy: an insolvent treasury disbands ONE unit per turn (Civ 6
-    // rule) — the priciest player unit, tie -> lowest id (= oldest spawn; a
+    // rule) — the priciest seat 0 unit, tie -> lowest id (= oldest spawn; a
     // deterministic order the GPU shares slot-for-slot, both append-only). No
     // refund; the eased upkeep pulls the treasury back over the next turns.
     if (Math.round(seatOf(state, seat)!.treasury * 1000) < 0) {
@@ -853,9 +853,9 @@ export function endTurn(state: GameState, seat: number): void {
   cityStatePhase(state, seat);
   seatPhase(state, seat);
 
-  // duration: expire the player's due trade routes after the turn's
+  // duration: expire the seat 0's due trade routes after the turn's
   // phases — the freed capacity re-picks next turn (arithmetic, zero draws).
-  expirePlayerRoutes(state);
+  expireTradeRoutes(state);
 
 
   // Religious pressure spread — after all foundings/settles/flips this
@@ -885,16 +885,16 @@ export function endTurn(state: GameState, seat: number): void {
   // Religious victory — checked on the follow set the spread above just
   // flipped (real-time predominance, the domination pattern: live recompute,
   // no freeze). Precedence space > domination > religion > score; 5 = the
-  // player's religion wins, 6 = a seat religion wins (defeat).
+  // seat 0's religion wins, 6 = a seat religion wins (defeat).
   const rel = religiousVictor(state);
   // CULTURE victory, checked LAST of the real conditions —
   // precedence space > domination > religion > culture > score. 7 = the
-  // player wins on tourism, 8 = a seat does (defeat).
+  // seat 0 wins on tourism, 8 = a seat does (defeat).
   const cul = rel >= 0 ? -1 : cultureVictor(state);
   // DIPLOMATIC victory — 20 Diplomatic Victory Points, real
   // Civ 6's threshold. Checked LAST of the real conditions: precedence is
   // space > domination > religion > culture > DIPLOMATIC > score. 9 = the
-  // player wins, 10 = a seat does (defeat).
+  // seat 0 wins, 10 = a seat does (defeat).
   const dip = rel >= 0 || cul >= 0 ? -1 : diplomaticVictor(state);
   state.gameOver = spaceWon || dom >= 0 || rel >= 0 || cul >= 0 || dip >= 0 || state.turn > TURN_LIMIT;
   state.victoryType = spaceWon
@@ -947,7 +947,7 @@ function diplomaticVictor(state: GameState): number {
  * civ, so the per-civ divisor is applied to the total instead — the same
  * threshold, without per-pair bookkeeping the engines do not have.
  *
- * Returns the winning unified civ id (0 player, r+1 seat r), or -1. A civ
+ * Returns the winning unified civ id (0 seat 0, r+1 seat r), or -1. A civ
  * with NO cities cannot win (a dead civ attracts nobody); the ascending scan
  * breaks ties toward the lowest id, and the > comparison means two civs can
  * never both qualify against each other.
@@ -980,7 +980,7 @@ function cultureVictor(state: GameState): number {
 
 /**
  * Religious victory (real Civ 6 predominance-in-every-civilization,
- * sized to modeled scope) — religion g wins when EVERY alive civ (the player
+ * sized to modeled scope) — religion g wins when EVERY alive civ (the seat 0
  * if they hold ≥1 city, each seat with ≥1 city) has MORE THAN HALF of its
  * cities following g. At most one g can predominate in a given civ, so no
  * tie-break is needed beyond the ascending scan (lowest id first). Requires
@@ -1017,9 +1017,9 @@ function religiousVictor(state: GameState): number {
 
 /**
  * religious pressure spread (deterministic, zero-RNG). Religions are
- * indexed in the unified civ space: 0 = the player's, i+1 = seat i's. A
+ * indexed in the unified civ space: 0 = the seat 0's, i+1 = seat i's. A
  * founded religion's HOLY tile (its capital center, frozen at founding) emits
- * pressure to every city (player + seat, symmetric) within
+ * pressure to every city (seat 0 + seat, symmetric) within
  * RELIGION_PRESSURE_RANGE tiles: +RELIGION_PRESSURE_PER_TURN integer pressure
  * to that city's accumulator for that religion, once per turn. A city then
  * FOLLOWS the religion with the most accumulated pressure (>0); ties resolve
@@ -1109,7 +1109,7 @@ export function deserialize(json: string): GameState {
   state.seats ??= [];
   if (state.seats.length === 0) state.seats.push(emptySeat(0));
   // Every seat gets its defaults; an older save is missing them everywhere,
-  // not just on the seat that happened to be the player.
+  // not just on the seat that happened to be the seat 0.
   for (const sx of state.seats) {
     sx.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
     sx.research.boosted ??= [];
@@ -1248,7 +1248,7 @@ export function choosePantheon(state: GameState, beliefId: string, seat: number)
   }
   if (!state.sandbox) seatOf(state, seat)!.faith -= PANTHEON_FAITH_COST;
   seatOf(state, seat)!.religion.pantheon = beliefId;
-  addEraScore(state, seat, ERA_SCORE_PANTHEON); // B-24: player verb — gate-unreachable, TS-only (actor hook mirrors)
+  addEraScore(state, seat, ERA_SCORE_PANTHEON); // B-24: seat 0 verb — gate-unreachable, TS-only (actor hook mirrors)
   return { ok: true };
 }
 
@@ -1289,7 +1289,7 @@ export function foundReligion(
   return { ok: true };
 }
 
-/** can the player enhance its religion (add the Enhancer belief)? Real
+/** can the seat 0 enhance its religion (add the Enhancer belief)? Real
  * Civ 6 spends a second Great Prophet — modeled here as a SECOND earned
  * Prophet-class great person (the first funds founding). */
 export function canEnhanceReligion(state: GameState, seat: number): RuleResult {
@@ -1301,7 +1301,7 @@ export function canEnhanceReligion(state: GameState, seat: number): RuleResult {
   return { ok: true };
 }
 
-/** add an Enhancer belief to the player's founded religion. Effects are
+/** add an Enhancer belief to the seat 0's founded religion. Effects are
  * inert this round (they need religious pressure / missionary / combat systems
  * that do not exist yet); the slot and claim are real and mirror the
  * follower/founder claimed-pool exclusion. */

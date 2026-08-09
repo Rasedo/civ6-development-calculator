@@ -53,7 +53,7 @@ def main() -> int:
         s.centre_slot_at[0, ct] = 1  # a seat-0 city sits here now
         s.tile_seat[0, ct] = 0       # the centre's owner names the seat
     s._tile_owner_ver += 1           # direct plane pokes must invalidate the derived views
-    assert dom(s) == 0, f"player domination should be 0, got {dom(s)}"
+    assert dom(s) == 0, f"seat-0 domination should be 0, got {dom(s)}"
 
     # 3. Civ 0 holds every capital (seat 0's + civ 1's captured) -> civ id 1.
     s = build(rules, path)
@@ -75,7 +75,7 @@ def main() -> int:
     s._tile_owner_ver += 1
     assert dom(s) == -1, f"razed capital should block domination, got {dom(s)}"
 
-    print("domination OK — split/-player/-civ/-razed all match dominationWinner")
+    print("domination OK — split/-seat0/-civ/-razed all match dominationWinner")
     return 0
 
 

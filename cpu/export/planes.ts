@@ -58,7 +58,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const tiles = map.tiles.map((t) => {
     // C1-B1: the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
-    // GPU consumer, and rival centers need their real (district-nulled)
+    // GPU consumer, and civ-seat centers need their real (district-nulled)
     // yields live (tileYieldsForCenter). Only t=0 district tiles (capitals)
     // differ from the old export.
     const y = tileYields(ctx, t.district ? { ...t, district: null } : t);
@@ -68,7 +68,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       res: t.resource ? (RESOURCES[t.resource].category === 'luxury' ? 3 : RESOURCES[t.resource].category === 'strategic' ? 2 : 1) : 0,
       // near a natural wonder (for the ASTROLOGY-style eureka)
       wnear: t.wonder !== null || neighbors(map, t).some((n) => n.wonder !== null) ? 1 : 0,
-      // coastal land (A-3: rival coastalCity eurekas — the player's uses
+      // coastal land (A-3: civ-seat coastalCity eurekas — seat 0's uses
       // the per-city flag set at founding/capture)
       cl: isCoastalLand(map, t) ? 1 : 0,
       // feature id (A-7: belief featureYields — Lady of the Reeds tiles);
@@ -132,10 +132,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // (#96 tail: the `rv`/`rci` civ-territory keys are DELETED — format-2
       // worlds have no civ cities at t0, so both were provably all -1; the
       // engine starts its tile_seat civ half and rc_tile_id registry empty.)
-      // C1-B4b-2: Water Mill gates on a river at RIVAL centers too
+      // C1-B4b-2: Water Mill gates on a river at CIV-SEAT centers too
       riv: hasRiver(t) ? 1 : 0,
       // C1-B5b-iii: water housing IF a center stood here (fresh 5 /
-      // coastal 3 / dry 2) — rival housing reads it at their centers.
+      // coastal 3 / dry 2) — civ-seat housing reads it at their centers.
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
       // V-H1 chop planes: ftr = the chop grant key when this tile's feature
       // is removable AND carries a chopYield AND no resource depends on it
@@ -152,7 +152,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
         !(t.resource && RESOURCES[t.resource].category !== 'bonus') ? 1 : 0,
       fw: hasFreshWater(map, t) ? 1 : 0,
       nw: t.wonder ? 1 : 0,
-      // statically settleable for rival expansion (mirrors siteQuality's -1s;
+      // statically settleable for civ-seat expansion (mirrors siteQuality's -1s;
       // ownership and dynamic districts are the engine's job). GEO-H (#55):
       // `st` must NOT bake `!t.district` — the district is a LIVE property
       // (siteQuality reads tile.district each call), and the engine already
@@ -194,9 +194,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // (P2), so the engine must withdraw this too — foundCity does NOT
       // (it only clears removable features).
       nfadj: PLACEABLE_DISTRICTS.map((id) => featureAdjContribution(t, id, false)),
-      // The removable feature's OWN yields (C1-B3 gate catch): PLAYER founding
+      // The removable feature's OWN yields (C1-B3 gate catch): SEAT-0 founding
       // strips the feature, so a later loyalty-flip must read this center
-      // stripped — rival founding does NOT strip, and the t=0 capitals were
+      // stripped — civ-seat founding does NOT strip, and the t=0 capitals were
       // exported already-stripped.
       fy: t.feature && FEATURES[t.feature].removable ? YIELD_KEYS.map((k) => FEATURES[t.feature!].yields?.[k] ?? 0) : [0, 0, 0, 0, 0, 0],
       // Aqueduct water source (requiresWaterSourceOrMountain): on a river, or
@@ -261,7 +261,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // Gate Bridge, Alvar Aalto, Charles Correa) would modify these, and none
       // are modelled.
       apo: t.wonder ? 5 : isMountain(t) ? 4 : -999,
-      // AUDIT A-8: river-edge crossing bits for the rival MP walkers. The
+      // AUDIT A-8: river-edge crossing bits for the civ-seat MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —
       // the same order riverMask bits use — so bit d = crossing toward
       // neighbor column d, both engines.

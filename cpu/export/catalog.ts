@@ -60,7 +60,7 @@ const civicIdx = new Map(civicList.map((c, i) => [c.id, i]));
 // scaffold places — DERIVED from SCAFFOLD_DISTRICTS so the two never drift (the
 // scaffold places HARBOR by ~t270, so its buildings — Lighthouse/Shipyard/Seaport —
 // must be buildable; Aqueduct has no buildings, harmless). Worship buildings still
-// excluded below. (Harbor stage: pairs with the _city_totals player-yield mirror.)
+// excluded below. (Harbor stage: pairs with the _city_totals seat-0-yield mirror.)
 // #70: the ordering moved to cpu/core/prodLayout.ts so the ENGINE can derive the
 // identical column layout when it replays an action file. While this derivation
 // lived only here, nothing else could see it — and a second copy elsewhere would

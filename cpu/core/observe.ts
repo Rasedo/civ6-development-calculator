@@ -67,7 +67,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   // tables' own convention — iterating the live array narrowed the vector
   // after a CS capture). Each slot renders THE SEAT'S OWN view: seat met
   // is cs.seatMet (the envoy-verb plane), envoysOf is seat-keyed already,
-  // and quests are a player-only mechanic (zero for opponents, both engines).
+  // and quests are a seat-0-only mechanic (zero for opponents, both engines).
   const cs: number[] = [];
   const nCs = csMax ?? (state.cityStates ?? []).length;
   for (let i = 0; i < nCs; i++) {
@@ -147,7 +147,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   // ladder compares these exactly; a /10 scale does not round-trip
   // bit-stably in f64). Formulas are the SCRIPTED SITES' own — the GPU twin
   // is env._ctx_block. Seat 0 zeroes the DoW-specific quintet exactly as
-  // the GPU does (the player has no scripted DoW policy).
+  // the GPU does (seat 0 has no scripted DoW policy).
   const own = state.units.filter((u) => u.seat === seat);
   const qHeads = cities.map((c) => c.queue[0]).filter((q): q is QueueItem => !!q && q.kind === 'unit');
   const qMil = qHeads.filter((q) => ((UNITS[(q as { unit: string }).unit]?.combat ?? 0) > 0));

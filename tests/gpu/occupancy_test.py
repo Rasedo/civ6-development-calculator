@@ -15,7 +15,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import PLAYER_SEAT, BARB_SEAT  # seat-keyed occupancy
+from core.engine import BARB_SEAT  # seat-keyed occupancy
 
 
 def main() -> None:
@@ -49,8 +49,8 @@ def main() -> None:
     sim.v_next[0] += 1
 
     tiles = torch.tensor([[t]])
-    assert bool(sim._blocked_for(tiles, PLAYER_SEAT)[0, 0]), "civ civilian must block player military (foreign)"
-    assert bool(sim._blocked_for(tiles, PLAYER_SEAT, is_civilian=True)[0, 0]), "civ civilian must block player civilian (foreign)"
+    assert bool(sim._blocked_for(tiles, 0)[0, 0]), "civ civilian must block seat-0 military (foreign)"
+    assert bool(sim._blocked_for(tiles, 0, is_civilian=True)[0, 0]), "civ civilian must block seat-0 civilian (foreign)"
     assert bool(sim._blocked_for(tiles, BARB_SEAT)[0, 0]), "civ civilian must block barbarians"
     assert not bool(sim._blocked_for(tiles, 0 + 1)[0, 0]), "own-civ military stacks cross-domain"
     assert bool(sim._blocked_for(tiles, 1 + 1)[0, 0]), "foreign-civ civ military is blocked"
@@ -95,9 +95,9 @@ def main() -> None:
     # standing builder (cross-domain, tileFreeForUnit); a foreign spawn probe
     # bounces.
     anchor = torch.tensor([t])
-    f_own, spot_own = sim._first_free_spot(anchor, "civ", civ=0)
+    f_own, spot_own = sim._first_free_spot(anchor, "v", civ=0)
     assert bool(f_own[0]) and int(spot_own[0]) == t, "own-civ military spawn must land ON the builder tile"
-    f_for, spot_for = sim._first_free_spot(anchor, "civ", civ=1)
+    f_for, spot_for = sim._first_free_spot(anchor, "v", civ=1)
     assert bool(f_for[0]) and int(spot_for[0]) != t, "foreign spawn must bounce off the builder tile"
 
     print("B5 OCCUPANCY OK")

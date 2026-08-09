@@ -59,7 +59,7 @@ def q(x: float) -> int:
     return math.floor(x * 1000 + 0.5)
 
 
-def add_player_city(sim, col: int, tile: int, pop: int, loy: float, seq: int) -> None:
+def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float, seq: int) -> None:
     sim.alive[0, col] = True
     sim.is_cap[0, col] = False
     sim.site[0, col] = tile
@@ -68,7 +68,7 @@ def add_player_city(sim, col: int, tile: int, pop: int, loy: float, seq: int) ->
     sim.city_seq[0, col] = seq
 
 
-def recon_player_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
+def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     """Closed-form applyLoyalty for seat-0 city c: every source contribution
     scaled by its seat's age factor, then pressure + amenity + governor,
     clamped. Matches _apply_loyalty_and_flips when pop_before == pop, which is
@@ -102,7 +102,7 @@ def recon_player_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     return max(0.0, min(100.0, float(sim.loyalty[0, c]) + press + amen + gov))
 
 
-def two_player_setup(rules, path):
+def two_city_setup(rules, path):
     """A capital + two forced non-capital seat-0 cities on the capital's
     neighbours, civics wiped (titles 0). Returns (sim, [non-cap cols])."""
     sim = build(rules, path)
@@ -111,8 +111,8 @@ def two_player_setup(rules, path):
     nb = [int(x) for x in sim.neigh[int(sim.site[0, cap])].tolist() if x >= 0]
     free = (~sim.alive[0]).nonzero(as_tuple=True)[0].tolist()
     cols = free[:2]
-    add_player_city(sim, cols[0], nb[0], 4, 55.0, 10)
-    add_player_city(sim, cols[1], nb[1], 4, 59.0, 11)
+    add_seat0_city(sim, cols[0], nb[0], 4, 55.0, 10)
+    add_seat0_city(sim, cols[1], nb[1], 4, 59.0, 11)
     # GUARANTEE FOREIGN PRESSURE. Loyalty pressure is a RATIO —
     # `scale * (own - foreign) / (own + foreign)` — so with foreign == 0 it is
     # `own/own` and the SOURCE-seat age factor CANCELS ALGEBRAICALLY, leaving
@@ -195,7 +195,7 @@ def poke_age_pressure(rules, path):
     age factor — EXACT reconstruction across five (seat 0, r0, r1) age combos.
     (1,0,0)/(1,2,2) isolate the FOREIGN source factor ½/1½; (0,1,1)/(2,1,1) the
     OWN factor — every term is a multiple of ½ (exact f64)."""
-    sim, cols = two_player_setup(rules, path)
+    sim, cols = two_city_setup(rules, path)
     tier = torch.zeros(sim.B, sim.C, dtype=torch.long)
     pop_before = sim.pop.clone()
     snap = sim.snapshot()
@@ -204,7 +204,7 @@ def poke_age_pressure(rules, path):
         sim.restore(snap)
         for i in range(1 + sim.R):
             sim.civ_age[0, i] = combo[i] if i < len(combo) else 1
-        exp = {c: recon_player_next(sim, c, 0, False) for c in range(sim.C) if bool(sim.alive[0, c])}
+        exp = {c: recon_seat0_next(sim, c, 0, False) for c in range(sim.C) if bool(sim.alive[0, c])}
         sim._apply_loyalty_and_flips(tier, pop_before)
         for c in exp:
             got = float(sim.loyalty[0, c])
@@ -261,10 +261,10 @@ def poke_governor_civ(rules, path):
     print(f"  d governor civ OK (titles 2 → slots {got8} +{gov}; rank-1 tie broke to lower slot {noncap[1]})")
 
 
-def poke_governor_player(rules, path):
+def poke_governor_seat0(rules, path):
     """d(seat 0). titles=1 seats the single LOWEST-loyalty non-capital seat-0
     city; two-run diff (titles 1 vs 0) isolates the +GOVERNOR_LOYALTY."""
-    sim, cols = two_player_setup(rules, path)  # loyalties 55, 59; capital 100
+    sim, cols = two_city_setup(rules, path)  # loyalties 55, 59; capital 100
     tier = torch.zeros(sim.B, sim.C, dtype=torch.long)
     pop_before = sim.pop.clone()
     gov = sim._gov_loy
@@ -283,10 +283,10 @@ def poke_governor_player(rules, path):
             assert abs(d - gov) < 1e-9, f"the weakest city {c} must gain +{gov} (got {d})"
         else:
             assert abs(d) < 1e-9, f"city {c} must not move (got {d})"
-    print(f"  d governor player OK (titles 1 → weakest col {weakest} +{gov}; others unchanged)")
+    print(f"  d governor seat 0 OK (titles 1 → weakest col {weakest} +{gov}; others unchanged)")
 
 
-def poke_player_golden(rules, path):
+def poke_seat0_golden(rules, path):
     """e. era_score[0] ≥ goldenT across a boundary flips SEAT 0 to Golden (the
     axis the scripted gate never reaches — seat 0 caps below goldenT there),
     and its OWN-pressure term then scales ×1.5 vs Normal."""
@@ -298,27 +298,27 @@ def poke_player_golden(rules, path):
     sim.era_score[:] = 0
     sim.era_score[0, 0] = gold - 1
     sim.step()
-    assert int(sim.civ_age[0, 0]) == 1, "goldenT-1 keeps the player Normal"
+    assert int(sim.civ_age[0, 0]) == 1, "goldenT-1 keeps seat 0 Normal"
     sim.restore(snap0)
     sim.turn = elen - 1
     sim.era_score[:] = 0
     sim.era_score[0, 0] = gold
     sim.step()
-    assert int(sim.civ_age[0, 0]) == 2, "goldenT flips the player to Golden (the gate-unreachable axis)"
+    assert int(sim.civ_age[0, 0]) == 2, "goldenT flips seat 0 to Golden (the gate-unreachable axis)"
 
     # own-pressure ×1.5: reconstruct the seat-0 loyalty at Normal vs Golden and
     # confirm the engine matches Golden exactly (own term × af[2]=1.5).
-    sim2, cols = two_player_setup(rules, path)
+    sim2, cols = two_city_setup(rules, path)
     tier = torch.zeros(sim2.B, sim2.C, dtype=torch.long)
     pop_before = sim2.pop.clone()
     snap = sim2.snapshot()
     sim2.civ_age[0, 0] = 1
-    exp_norm = {c: recon_player_next(sim2, c, 0, False) for c in cols}
+    exp_norm = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
     sim2._apply_loyalty_and_flips(tier, pop_before)
     got_norm = {c: float(sim2.loyalty[0, c]) for c in cols}
     sim2.restore(snap)
     sim2.civ_age[0, 0] = 2  # seat 0 Golden
-    exp_gold = {c: recon_player_next(sim2, c, 0, False) for c in cols}
+    exp_gold = {c: recon_seat0_next(sim2, c, 0, False) for c in cols}
     sim2._apply_loyalty_and_flips(tier, pop_before)
     got_gold = {c: float(sim2.loyalty[0, c]) for c in cols}
     af = sim2._age_factor.tolist()
@@ -327,7 +327,7 @@ def poke_player_golden(rules, path):
             f"reconstruction must match engine at both ages (city {c})"
         )
         assert q(got_gold[c]) != q(got_norm[c]), f"Golden own-pressure (×{af[2]}) must move city {c} vs Normal"
-    print(f"  e player-Golden OK (goldenT {gold} → civ_age[0]=2 reachable; own-pressure ×{af[2]} reconstructed exactly)")
+    print(f"  e seat-0 Golden OK (goldenT {gold} → civ_age[0]=2 reachable; own-pressure ×{af[2]} reconstructed exactly)")
 
 
 def poke_capital_immunity(rules, path):
@@ -353,7 +353,7 @@ def poke_capital_immunity(rules, path):
     sim2.civics[0, : sim2._gov_per] = True
     tier = torch.zeros(sim2.B, sim2.C, dtype=torch.long)
     sim2._apply_loyalty_and_flips(tier, sim2.pop.clone())
-    assert float(sim2.loyalty[0, pcap]) == lmax, f"a governor-picked player capital must pin at {lmax}"
+    assert float(sim2.loyalty[0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"
     print(f"  f capital immunity OK (governor-picked capitals pin at {lmax}, both engines)")
 
 
@@ -368,8 +368,8 @@ def main() -> None:
     poke_boundary(rules, path)
     poke_age_pressure(rules, path)
     poke_governor_civ(rules, path)
-    poke_governor_player(rules, path)
-    poke_player_golden(rules, path)
+    poke_governor_seat0(rules, path)
+    poke_seat0_golden(rules, path)
     poke_capital_immunity(rules, path)
     print("GOVERNORS (B-24) POKES OK")
 

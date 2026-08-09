@@ -186,7 +186,7 @@ describe('city-state conquest and levies', () => {
     attacker.tileIndex = adj.index;
     attacker.movesLeft = 2;
 
-    // A city-state is a separate player — you must DECLARE first.
+    // A city-state is a separate seat — you must DECLARE first.
     // Peace is the default, and the resolver now refuses a peaceful target.
     expect(meleeAttack(state, attacker.id, cs.centerIndex, 0).ok).toBe(false);
     expect(declareWarOnCityState(state, cs.id, 0).ok).toBe(true);

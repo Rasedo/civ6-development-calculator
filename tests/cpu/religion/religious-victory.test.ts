@@ -44,7 +44,7 @@ describe('B6-S3 religious victory', () => {
     expect(state.gameOver).toBe(true);
   });
 
-  it("the player's religion predominant everywhere wins (victoryType 5)", () => {
+  it("seat 0's religion predominant everywhere wins (victoryType 5)", () => {
     const state = newGame(1);
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.holyTile = seatOf(state, 0)!.cities[0].centerIndex;
@@ -60,11 +60,11 @@ describe('B6-S3 religious victory', () => {
     rv.religion.founded = true;
     rv.religion.holyTile = rv.cities[0].centerIndex;
     pressAll(state, 1);
-    // The player's single city resists: a dominant religion-0 accumulator
+    // Seat 0's single city resists: a dominant religion-0 accumulator
     // outweighs any ambient +1 religion-1 pressure this turn's spread adds.
     seatOf(state, 0)!.cities[0].religionPressure = [500, 0];
     endTurn(state, 0);
-    // 0 of 1 player cities follow religion 1 -> 0*2 <= 1 blocks the win.
+    // 0 of 1 seat-0 cities follow religion 1 -> 0*2 <= 1 blocks the win.
     expect(state.victoryType).toBe(0);
     expect(state.gameOver).toBe(false);
   });

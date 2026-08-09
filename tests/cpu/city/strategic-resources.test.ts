@@ -13,7 +13,7 @@ function resState(resource: string, improvement: string | null, ...techs: string
   const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
   grantTechs(state, ...techs);
   const tile = tileAtCoords(state.map, 8, 9);
-  setTileOwner(tile, city.seat, city.id); // owned by the player capital
+  setTileOwner(tile, city.seat, city.id); // owned by the seat-0 capital
   tile.resource = resource;
   tile.elevation = resource === 'IRON' ? 'HILLS' : 'FLAT';
   tile.improvement = improvement;
@@ -45,13 +45,13 @@ describe('B-9 civHasStrategic access', () => {
     expect(has(state, 'HORSES')).toBe(false);
   });
 
-  it('access is lost when the tile leaves player territory (capture/loss)', () => {
+  it('access is lost when the tile leaves seat-0 territory (capture/loss)', () => {
     const { state, tile } = resState('IRON', 'MINE');
     expect(has(state, 'IRON')).toBe(true);
     // ownership loss (capture / border loss): cityId cleared, civ takes it
     setTileOwner(tile, NO_SEAT);
     expect(has(state, 'IRON')).toBe(false);
-    setTileOwner(tile, seatOfIndex(0), tileCity(tile)); // now owned by civ 0 (civ 1), not the player
+    setTileOwner(tile, seatOfIndex(0), tileCity(tile)); // now owned by civ 0 (civ 1), not seat 0
     expect(civHasStrategic(state, 0, 'IRON')).toBe(false);
     expect(civHasStrategic(state, 1, 'IRON')).toBe(true); // the civ now has access
   });

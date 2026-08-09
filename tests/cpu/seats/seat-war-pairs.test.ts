@@ -31,7 +31,7 @@ describe('the war relation covers every seat pair', () => {
     expect(civsAtWar(state, seat, 0)).toBe(true);
   });
 
-  it('a city-state unit is hostile to a player unit exactly when at war', () => {
+  it('a city-state unit is hostile to a seat-0 unit exactly when at war', () => {
     const state = newGame();
     const cs = state.cityStates![0];
     const a = { seat: seatOfCityState(cs.id) };

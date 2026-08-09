@@ -62,7 +62,7 @@ describe('B-24 golden movement dedications', () => {
     expect(unitFullMoves(state, m)).toBe(UNITS.MISSIONARY.moves);
   });
 
-  it('MONUMENTALITY lifts Builders — for a civ exactly as for the player', () => {
+  it('MONUMENTALITY lifts Builders — for a civ seat exactly as for seat 0', () => {
     const state = newGame();
     golden(state, 0, DED_MONUMENTALITY);
     golden(state, seatOfIndex(0), DED_MONUMENTALITY);
@@ -148,7 +148,7 @@ describe('B-24 golden dedications reach the civ that committed them', () => {
     return state;
   }
 
-  it('EXODUS pays a RIVAL +4 Great Prophet points a turn', () => {
+  it('EXODUS pays a CIV SEAT +4 Great Prophet points a turn', () => {
     const T = 6;
     const withDed = civRun(DED_EXODUS, T);
     const without = civRun(null, T);
@@ -157,7 +157,7 @@ describe('B-24 golden dedications reach the civ that committed them', () => {
     expect(a - b).toBe(4 * T);
   });
 
-  it('FREE_INQUIRY discounts a RIVAL boosted tech by an extra 10%', () => {
+  it('FREE_INQUIRY discounts a CIV SEAT boosted tech by an extra 10%', () => {
     const state = newGame();
     const civ = state.seats.slice(1)[0];
     const id = civ.research.techs.length ? null : Object.keys(TECHS)[0];
@@ -169,7 +169,7 @@ describe('B-24 golden dedications reach the civ that committed them', () => {
     const g = goldenBoostBonus(state, seatOfIndex(0), false);
     expect(g).toBeGreaterThan(0);
     expect(effectiveResearchCostIn(civ.research, id!, base, g)).toBeLessThan(plain);
-    // ...and the PLAYER's Golden age does not pay for the civ
+    // ...and SEAT 0's Golden age does not pay for the civ
     const other = newGame();
     golden(other, 0, DED_FREE_INQUIRY);
     expect(goldenBoostBonus(other, seatOfIndex(0), false)).toBe(0);

@@ -222,7 +222,7 @@ def poke_capture_luxury_pool(rules, path):
     j = int(sim.rc_alive[0, r].nonzero(as_tuple=True)[0][0])
     c_t = int(sim.rc_center[0, r, j])
     cid = int(sim.rc_id[0, r, j])
-    assert int(sim.alive[0].sum()) < 6, "player at the city cap — capture would raze; pick an earlier turn"
+    assert int(sim.alive[0].sum()) < 6, "seat 0 at the city cap — capture would raze; pick an earlier turn"
 
     # an in-roster luxury spec whose id is NOT already active for seat 0
     # (a duplicate would not change the unique-luxury count)
@@ -233,7 +233,7 @@ def poke_capture_luxury_pool(rules, path):
          and int(sim.lux_id[0, t]) not in active_ids),
         -1,
     )
-    assert src >= 0, "no in-roster luxury id free of player activation on this map"
+    assert src >= 0, "no in-roster luxury id free of seat-0 activation on this map"
     lid, req = int(sim.lux_id[0, src]), int(sim.lux_req[0, src])
 
     # plant it IMPROVED on a free tile registered to the civ city
@@ -256,10 +256,10 @@ def poke_capture_luxury_pool(rules, path):
 
     sim._capture_civ_city(torch.tensor([0]), torch.tensor([r]), torch.tensor([j]), torch.tensor([c_t]))
     c_new = int(sim.center_at[0, c_t])
-    assert c_new >= 0 and bool(sim.alive[0, c_new]), "capture did not land a player city"
+    assert c_new >= 0 and bool(sim.alive[0, c_new]), "capture did not land a seat-0 city"
     assert int(sim.owner[0, t]) == c_new, "the luxury tile did not re-own to the captured city (A-17 ring)"
     after = float(sim._luxury_amenities(have, need).sum())
-    assert after >= base + 1.0, f"captured improved luxury did not feed the player pool ({base} -> {after})"
+    assert after >= base + 1.0, f"captured improved luxury did not feed the seat-0 pool ({base} -> {after})"
     sim._check_rc_registry_invariant()  # the handover leaves the registry coherent
     print(f"  d capture-luxury handover OK (lux {lid} req {req}: civ rc {cid} tile {t} -> city {c_new}, grants {base} -> {after})")
 

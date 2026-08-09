@@ -80,7 +80,7 @@ describe('founding a religion', () => {
     ).toBe(true);
 
     // FOLLOWER beliefs act per-city on the religion the CITY follows. The
-    // holy city follows the player's religion (id 0) once pressure spreads from
+    // holy city follows seat 0's religion (id 0) once pressure spreads from
     // its own holy tile; assert on a following city.
     city.followedReligion = 0;
     const after = computeCityStats(state, city);
@@ -115,7 +115,7 @@ describe('founding a religion', () => {
 
   // The Enhancer belief slot — a founded religion, a SECOND prophet,
   // and the claimed-pool exclusion (mirrors the follower/founder gate). The
-  // rollout never founds a player religion, so this path is poke-only.
+  // rollout never founds a seat-0 religion, so this path is poke-only.
   it('enhancing needs a founded religion and a second prophet; slot fills, pool excludes', () => {
     const { state } = ready();
     foundReligion(state, {
@@ -199,7 +199,7 @@ describe('religious pressure spread (B-18)', () => {
     const cap = foundCity(state, tileAtCoords(state.map, 5, 10).index, 0).city!;
     const near = foundCity(state, tileAtCoords(state.map, 9, 10).index, 0).city!; // 4 tiles
     const far = foundCity(state, tileAtCoords(state.map, 32, 10).index, 0).city!; // 27 tiles
-    // Player founds a religion; the capital's center is the holy tile (id 0).
+    // Seat 0 founds a religion; the capital's center is the holy tile (id 0).
     seatOf(state, 0)!.religion.founded = true;
     seatOf(state, 0)!.religion.holyTile = cap.centerIndex;
 
@@ -215,6 +215,6 @@ describe('religious pressure spread (B-18)', () => {
     expect(far.religionPressure?.[0] ?? 0).toBe(0);
     // The majority-pressure flip and the cross-civ tie -> lowest-id case are
     // covered by the GPU poke (gpu/religion_gp_test.py) and the parity gate,
-    // where 24 player cities flip to the two civ religions turn-exact.
+    // where 24 seat-0 cities flip to the two civ religions turn-exact.
   });
 });

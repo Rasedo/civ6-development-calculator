@@ -176,7 +176,7 @@ export const CS_DISTRICT_BONUS = 2;
 export const SUZERAIN_ENVOYS = 3;
 /** a seat meets a CS once one of its cities or units sits within
  * this range of the CS center — the explore-to-meet mirror (the other seats have
- * no fog; the player meets via isExplored). */
+ * no fog; seat 0 meets via isExplored). */
 export const CS_MEET_RANGE = 3;
 /** New quests are issued this many turns after the last one resolved. */
 export const QUEST_COOLDOWN = 12;

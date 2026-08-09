@@ -4,7 +4,7 @@ import { DEDICATIONS, DED_EVENT_SCORE, ERA_LENGTH, ERA_DARK_T, ERA_GOLDEN_T, AGE
 
 // ---------------------------------------------------------------------------
 // (task #68, gpu/docs/design/GOVERNORS_DESIGN.md): era score / Ages.
-// Unified civ ids: 0 = the player, r+1 = seat r (the civsAtWar convention).
+// Unified civ ids: 0 = seat 0, r+1 = seat r (the civsAtWar convention).
 // Every hook is a plain `+= const` (zero-draw). Ages: 0 Dark / 1 Normal /
 // 2 Golden, assigned at each era boundary from the just-ended window's score.
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ export function goldenDedication(state: GameState, civ: number, kind: number): b
 
 /**
  * The MOVEMENT half of the golden dedications, keyed on the unit's OWN
- * seat so a seat in a Golden age gets it exactly as the player does.
+ * seat so a seat in a Golden age gets it exactly as seat 0 does.
  *
  * SOURCE (Civilopedia, Gathering Storm):
  *   MONUMENTALITY — "If chosen at the start of a Golden Age, +2 Movement for
@@ -199,7 +199,7 @@ export function governorPicks(qLoys: number[], titles: number): Set<number> {
  * era score (the climb-out dedication). Both scale with the dedication COUNT,
  * so a Heroic age pays triple. Zero-draw, integer-only.
  *
- * `addFaith` is injected because the player's faith lives on GameState while
+ * `addFaith` is injected because seat 0's faith lives on GameState while
  * each seat keeps its own — the caller knows which accumulator to touch.
  */
 export function applyDedications(state: GameState, addFaith: (civ: number, amount: number) => void): void {

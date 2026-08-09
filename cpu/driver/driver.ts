@@ -98,9 +98,9 @@ for (let t = 0; t < N_TURNS; t++) {
         const nT = state.map.tiles.length;
     {
       // Seat 0's job rows — the SAME job predicate over its own planes
-      // (_seat_job_mask's TS mirror), rows per LIVE player unit in array
+      // (_seat_job_mask's TS mirror), rows per LIVE seat-0 unit in array
       // order (the GPU compacts its raw p-pool rows by p_alive to match).
-      // SPREAD stays EMPTY: player religion founding has no GPU twin yet
+      // SPREAD stays EMPTY: seat-0 religion founding has no GPU twin yet
       // — the gate compares the shared gate, not TS's richer plane.
       const jr0: number[] = [];
       const sr0: number[] = [];
@@ -341,7 +341,7 @@ for (let t = 0; t < N_TURNS; t++) {
   if (seat0rec) {
     // SEAT 0 DRIVEN: the wire's picks apply through the same queue
     // functions; the scripted chain below stands down entirely. Base
-    // classes v1 (the scripted player's own expressiveness); the
+    // classes v1 (the scripted seat 0's own expressiveness); the
     // wonder/project/purchase arms port with the replay dispatch next.
     // UNITS FIRST — the rollout replayer's proven order (the GPU steps units at the
     // top of step(), before the production section's district scan reads

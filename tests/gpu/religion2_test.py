@@ -480,7 +480,7 @@ def poke_combat_cs(rules, rj, path):
 
     # a religion-less participant (barbarian / seat 0, civ_r = -1) gets nothing.
     z = float(sim._rel_atk_cs(torch.tensor([-1]), bt)[0])
-    assert z == 0.0, f"barb/player must get no religious combat bonus ({z})"
+    assert z == 0.0, f"barb/seat 0 must get no religious combat bonus ({z})"
 
     # no founded religion -> no adder either.
     sim.r_religion_done[:, r] = False
@@ -561,7 +561,7 @@ def poke_victor_direct(rules, rj, path):
     sim.holy_tile[0] = -1
     sim.holy_tile[0, 0] = 0
     set_follow(0, {ri: 0 for ri in range(sim.R)})
-    assert int(sim._religious_victor()[0]) == 0, "player-predominant religion 0 must win"
+    assert int(sim._religious_victor()[0]) == 0, "seat-0-predominant religion 0 must win"
 
     # a civ seat wins: only g founded, everyone follows g.
     sim2 = build(rules, path)
@@ -589,7 +589,7 @@ def poke_victor_direct(rules, rj, path):
     # drops out of the every-seat test -> g wins.
     sim3.rc_alive[0, 0] = False
     assert int(sim3._religious_victor()[0]) == g, "a cityless civ must be excluded from the every-civ requirement"
-    print("  9 religious victor (direct) OK (player 0, civ g, refusal -1, cityless excluded)")
+    print("  9 religious victor (direct) OK (seat 0, civ g, refusal -1, cityless excluded)")
 
 
 def poke_victor_through_step(rules, rj, path):
@@ -633,13 +633,13 @@ def poke_victor_through_step(rules, rj, path):
         return sim
 
     sim = drive(0, 5)
-    assert int(sim.victory_type[0]) == 5, f"player religious victory must set victory_type 5 (got {int(sim.victory_type[0])})"
-    assert bool(sim.game_over[0]), "player religious victory must end the game"
+    assert int(sim.victory_type[0]) == 5, f"seat-0 religious victory must set victory_type 5 (got {int(sim.victory_type[0])})"
+    assert bool(sim.game_over[0]), "seat-0 religious victory must end the game"
 
     sim2 = drive(1, 6)
     assert int(sim2.victory_type[0]) == 6, f"civ religious victory must set victory_type 6 (got {int(sim2.victory_type[0])})"
     assert bool(sim2.game_over[0]), "civ religious victory must end the game"
-    print("  10 religious victor (through-step) OK (player -> 5, civ -> 6, game_over)")
+    print("  10 religious victor (through-step) OK (seat 0 -> 5, civ -> 6, game_over)")
 
 
 def main() -> None:

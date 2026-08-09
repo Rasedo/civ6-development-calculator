@@ -262,8 +262,8 @@ export function assignEnvoy(state: GameState, csId: number, seat: number): RuleR
 /**
  * ONE "is this quest done?" rule for every seat. Camps are global; the
  * route and district tests read the SEAT's own lists, which `owner` supplies
- * (omitted = seat 0, what every player call site meant). Note the quest
- * ISSUERS are deliberately NOT merged: the player's draws RNG and that seat's
+ * (omitted = seat 0, what every seat-0 call site meant). Note the quest
+ * ISSUERS are deliberately NOT merged: seat 0's draws RNG and that seat's
  * is zero-draw by design (B8), and choosing a quest is policy, not a rule.
  */
 export function questSatisfied(
@@ -337,7 +337,7 @@ export function issueQuest(
 
 /**
  * DECLARE WAR on a city-state. Real Civ 6 treats a city-state as a
- * separate player: you must declare before you can attack it, and peace is the
+ * separate seat: you must declare before you can attack it, and peace is the
  * default. This is the verb the CS-attack mask column was blocked on — without
  * it `attackTargets` could never legally offer a city-state centre, because
  * offering a PEACEFUL one is exactly what the autopilot invariant forbids.
@@ -406,7 +406,7 @@ export function questLabel(quest: CityStateQuest): string {
 export function cityStatePhase(state: GameState, seat: number): void {
   if (state.cityStates.length === 0) return;
 
-  // Tick the player<->city-state war clock — the Seat.warTurns
+  // Tick the seat 0 <-> city-state war clock — the Seat.warTurns
   // twin. Peace unlocks at WAR_MIN_TURNS (one constant, every seat).
   for (const cs of state.cityStates) {
     if (civsAtWar(state, cs.seat, seat)) cs.csWarTurns = (cs.csWarTurns ?? 0) + 1;

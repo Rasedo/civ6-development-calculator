@@ -13,7 +13,7 @@ instead.
 Covered here (all gate-unreachable):
   1. spawn-only exclusion — GENERAL/ADMIRAL never appear in the production
      mask's train columns (the trainableUnits filter's GPU mirror).
-  2. spawn-at-claim — _advance_player_great_people spawns a GENERAL (and an
+  2. spawn-at-claim — _advance_great_people spawns a GENERAL (and an
      ADMIRAL) civilian at seat 0's capital on the claim, on top of the effect.
   3. aura CS helper — _gen_aura_cs: +5 for own LAND military within 2 of an own
      GENERAL (0 at range 3, 0 for another seat, 0 for a barbarian); +5 for own
@@ -179,13 +179,13 @@ def poke_exclusion(rules, rj, path):
     print(f"  1 exclusion OK — GENERAL/ADMIRAL never queue or purchase (spawn_only)")
 
 
-def poke_player_spawn(rules, rj, path):
+def poke_seat0_spawn(rules, rj, path):
     """2. A GENERAL/ADMIRAL claim spawns its support civilian at seat 0's
     capital (city slot 0), on top of the instant effect."""
     for uidx, cls, nm in ((sim0._general_unit_idx, sim0._general_cls, "GENERAL"),
                           (sim0._admiral_unit_idx, sim0._admiral_cls, "ADMIRAL")):
         sim = build(rules, path)
-        assert bool(sim.alive[0, 0]), "player capital (slot 0) must be alive"
+        assert bool(sim.alive[0, 0]), "seat-0 capital (slot 0) must be alive"
         # a completed, owned district of this class so the class accrues + claims
         d = int(sim._gp_class_district[cls])
         assert d >= 0
@@ -199,17 +199,17 @@ def poke_player_spawn(rules, rj, path):
         # fund EXACTLY one person (gpCost(0)); the +1 district accrual keeps the
         # leftover well under gpCost(1), so the claim loop fires exactly once.
         sim.gp_earned[:, cls] = 0
-        sim.player_gp_points[0, cls] = float(sim._gp_costs[0])
+        sim.gp_points[0, cls] = float(sim._gp_costs[0])
         before = int((sim.p_alive[0] & (sim.p_type[0] == uidx)).sum())
-        sim._advance_player_great_people()
+        sim._advance_great_people()
         after = int((sim.p_alive[0] & (sim.p_type[0] == uidx)).sum())
-        assert after == before + 1, f"player {nm} claim did not spawn exactly one unit ({before}->{after})"
+        assert after == before + 1, f"seat-0 {nm} claim did not spawn exactly one unit ({before}->{after})"
         # spawned at/adjacent to the capital, civilian, 1 charge (not military)
         u = (sim.p_alive[0] & (sim.p_type[0] == uidx)).nonzero(as_tuple=True)[0][-1].item()
         cap = int(sim.site[0, 0])
         assert int(sim.pair_dist[cap, int(sim.p_tile[0, u])]) <= 1, f"{nm} not spawned at the capital"
         assert bool(sim._p_civ[uidx]) and int(sim.p_charges[0, u]) >= 1, f"{nm} must be a civilian (charges>=1)"
-    print("  2 player spawn-at-claim OK — GENERAL + ADMIRAL born at the capital")
+    print("  2 seat-0 spawn-at-claim OK — GENERAL + ADMIRAL born at the capital")
 
 
 def poke_aura_helper(rules, rj, path):
@@ -239,7 +239,7 @@ def poke_aura_helper(rules, rj, path):
     assert a_nav == 0.0, f"GENERAL must not aura a naval unit, got {a_nav}"
     # another seat's unit standing by a SEAT-0 general → 0
     a_civ = float(sim._gen_aura_cs(torch.ones(B, dtype=torch.long), torch.tensor([t1]), land)[0])
-    assert a_civ == 0.0, f"a civ unit must not read the player general's aura, got {a_civ}"
+    assert a_civ == 0.0, f"a civ unit must not read seat 0's general aura, got {a_civ}"
     # barbarian (-1) → 0
     a_barb = float(sim._gen_aura_cs(torch.full((B,), -1, dtype=torch.long), torch.tensor([t1]), land)[0])
     assert a_barb == 0.0, f"barb must get no aura, got {a_barb}"
@@ -288,19 +288,19 @@ def poke_aura_in_combat(rules, rj, path):
     # --- attacker aura: civ attacker +5 -> more damage to the seat-0 defender
     base, pdef, ratk, dtile = setup(False, False)
     hp0 = int(base.p_hp[0, pdef])
-    base._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile]), "civ", ratk)
+    base._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile]), "v", ratk)
     dmg_base = hp0 - int(base.p_hp[0, pdef])
 
     ga, pdef2, ratk2, dtile2 = setup(True, False)
     hp0b = int(ga.p_hp[0, pdef2])
-    ga._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile2]), "civ", ratk2)
+    ga._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile2]), "v", ratk2)
     dmg_atkgen = hp0b - int(ga.p_hp[0, pdef2])
     assert dmg_atkgen > dmg_base, f"attacker general aura did not raise damage ({dmg_base} -> {dmg_atkgen})"
 
     # --- defender aura: seat-0 defender +5 -> LESS damage taken
     gd, pdef3, ratk3, dtile3 = setup(False, True)
     hp0c = int(gd.p_hp[0, pdef3])
-    gd._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile3]), "civ", ratk3)
+    gd._hostile_vs_unit(torch.tensor([True]), torch.tensor([dtile3]), "v", ratk3)
     dmg_defgen = hp0c - int(gd.p_hp[0, pdef3])
     assert dmg_defgen < dmg_base, f"defender general aura did not lower damage taken ({dmg_base} -> {dmg_defgen})"
     print(f"  4 aura in combat OK — atk+gen {dmg_base}->{dmg_atkgen} dmg dealt, def+gen {dmg_base}->{dmg_defgen} dmg taken")
@@ -326,8 +326,8 @@ def poke_capture(rules, rj, path):
     pgen = place_pciv(sim, gtile, gi)  # a lone seat-0 general
     ratk = place_rmil(sim, 0, atile, WARRIOR)
     v_before = int(sim.v_next[0])
-    sim._hostile_vs_unit(torch.tensor([True]), torch.tensor([gtile]), "civ", ratk)
-    assert not bool(sim.p_alive[0, pgen]), "captured player general must leave the player pool"
+    sim._hostile_vs_unit(torch.tensor([True]), torch.tensor([gtile]), "v", ratk)
+    assert not bool(sim.p_alive[0, pgen]), "captured seat-0 general must leave the seat-0 pool"
     # POOL-END: appended at the old v_next slot, type carried, owned by civ 0
     cap = v_before
     assert bool(sim.v_alive[0, cap]) and int(sim.v_type[0, cap]) == gi, "captured general not appended to the civ pool tail as a GENERAL"
@@ -336,7 +336,7 @@ def poke_capture(rules, rj, path):
     print("  6 GENERAL capture OK — B-31 POOL-END transfer, type carried")
 
 
-sim0 = None  # module-level handle for poke_player_spawn's roster indices
+sim0 = None  # module-level handle for poke_seat0_spawn's roster indices
 
 
 def main() -> None:
@@ -350,7 +350,7 @@ def main() -> None:
     sim0 = build(rules, path, steps=1)  # roster indices only
 
     poke_exclusion(rules, rj, path)
-    poke_player_spawn(rules, rj, path)
+    poke_seat0_spawn(rules, rj, path)
     poke_aura_helper(rules, rj, path)
     poke_aura_in_combat(rules, rj, path)
     poke_capture(rules, rj, path)

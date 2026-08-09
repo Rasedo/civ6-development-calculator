@@ -52,7 +52,7 @@ describe('B-25 science victory', () => {
     expect(avail).toEqual(['LAUNCH_MOON_LANDING']);
   });
 
-  it('completing the whole chain sets victoryType 3 (player science win)', () => {
+  it('completing the whole chain sets victoryType 3 (seat-0 science win)', () => {
     const { state, city } = newGameWithCampus();
     seatOf(state, 0)!.research.techs.push(...GATING_TECHS);
     for (const id of CHAIN) {

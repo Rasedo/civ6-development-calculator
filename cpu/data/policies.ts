@@ -25,7 +25,7 @@ export type SlotKind = 'military' | 'economic' | 'diplomatic' | 'wildcard';
  * turn-exactly to both seats) shifts the seat build/train trajectory onto a
  * configuration where the war-march (`hostileUnitAct`, phase.ts) —
  * whose GPU twin iterates unit SLOTS while TS iterates spawn/insertion order —
- * captures a player builder one turn apart t98 `punits`, a single
+ * captures a seat-0 builder one turn apart t98 `punits`, a single
  * self-correcting off-by-one). That latent is in the seat-combat domain
  * (chapter B / other slices), not economy. Flip this to `true` in the slice
  * that fixes the seat-march ordering; the exporter mirrors it into

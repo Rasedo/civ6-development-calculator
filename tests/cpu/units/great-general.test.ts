@@ -74,7 +74,7 @@ describe('B7-G (B-8) aura', () => {
     // range 3 → 0
     war.tileIndex = t3;
     expect(generalAuraCS(state, war, war.tileIndex)).toBe(0);
-    // a foreign unit near the PLAYER general → 0
+    // a foreign unit near the SEAT-0 general → 0
     const rw: Unit = { ...war, seat: (state.seats[(0) + 1] as Seat).seat, tileIndex: t2 };
     expect(generalAuraCS(state, rw, rw.tileIndex)).toBe(0);
     // a naval unit near a GENERAL (not an ADMIRAL) → 0
@@ -131,7 +131,7 @@ describe('B7-G (B-8) aura', () => {
 });
 
 describe('B7-G (B-8) spawn-at-claim & capture', () => {
-  it('a player GENERAL claim spawns a general civilian at the capital', () => {
+  it('a seat-0 GENERAL claim spawns a general civilian at the capital', () => {
     const state = newGame();
     // fund exactly one GENERAL; advanceGreatPeople (in endTurn) claims + spawns.
     seatOf(state, 0)!.gpp.GENERAL = gpCost(0);
@@ -147,7 +147,7 @@ describe('B7-G (B-8) spawn-at-claim & capture', () => {
     expect(g.charges).toBe(1);
   });
 
-  it('B-31: an at-war civ melee on a lone player GENERAL captures it', () => {
+  it('B-31: an at-war civ melee on a lone seat-0 GENERAL captures it', () => {
     const state = newGame();
     setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, true);
     const cap = seatOf(state, 0)!.cities[0].centerIndex;

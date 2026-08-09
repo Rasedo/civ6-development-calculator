@@ -23,7 +23,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import BARB_SEAT, PLAYER_SEAT
+from core.engine import BARB_SEAT
 
 
 def build():
@@ -35,15 +35,15 @@ def build():
     return sim
 
 
-def place(sim, tile, seat_is_player, hp=100):
+def place(sim, tile, seat0, hp=100):
     """Put a MILITARY unit of the given side on `tile`, return its pool slot."""
-    if seat_is_player:
+    if seat0:
         slot = int(sim.p_next[0])
         sim.p_alive[0, slot] = True
         sim.p_type[0, slot] = 2  # WARRIOR
         sim.p_tile[0, slot] = tile
         sim.p_hp[0, slot] = hp
-        sim.p_seat[0, slot] = PLAYER_SEAT
+        sim.p_seat[0, slot] = 0
         sim.occ_mil[0, tile] = slot
         sim.p_next[0] += 1
         return slot
@@ -78,8 +78,8 @@ def scenario(sim):
 def run(ranged: bool) -> None:
     sim = build()
     rv_tile, pl_tile = scenario(sim)
-    v = place(sim, rv_tile, seat_is_player=False)
-    p = place(sim, pl_tile, seat_is_player=True)
+    v = place(sim, rv_tile, seat0=False)
+    p = place(sim, pl_tile, seat0=True)
 
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
     sim.r_atwar[0, 0] = False
@@ -94,31 +94,31 @@ def run(ranged: bool) -> None:
     att[0] = True
     tgt = torch.full((sim.B,), pl_tile, dtype=torch.long)
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "civ", v)
+        sim._hostile_ranged_strike(att, tgt, "v", v)
     else:
-        sim._hostile_vs_unit(att, tgt, "civ", v)
+        sim._hostile_vs_unit(att, tgt, "v", v)
     after = int(sim.p_hp[0, p])
     kind = "ranged" if ranged else "melee"
     assert after == before, (
-        f"{kind}: a civ AT PEACE with the player damaged a player unit "
+        f"{kind}: a civ AT PEACE with seat 0 damaged a seat-0 unit "
         f"({before} -> {after}) — attackTargets gates on unitsHostile"
     )
-    print(f"  {kind}: at peace -> player unit untouched (hp {after})")
+    print(f"  {kind}: at peace -> seat-0 unit untouched (hp {after})")
 
     # ...and the SAME attack lands once war is declared, so the assertion above
     # is about the peace treaty and not about a broken scenario.
     sim.r_atwar[0, 0] = True
     sim.sync_war()  # close the poke under transpose
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "civ", v)
+        sim._hostile_ranged_strike(att, tgt, "v", v)
     else:
-        sim._hostile_vs_unit(att, tgt, "civ", v)
+        sim._hostile_vs_unit(att, tgt, "v", v)
     at_war = int(sim.p_hp[0, p])
     assert at_war < before, (
         f"{kind}: the scenario is inert — the attack did not land even AT WAR "
         f"({before} -> {at_war}); the peace assertion above proves nothing"
     )
-    print(f"  {kind}: at war   -> player unit struck (hp {before} -> {at_war})")
+    print(f"  {kind}: at war   -> seat-0 unit struck (hp {before} -> {at_war})")
 
 
 def main() -> None:

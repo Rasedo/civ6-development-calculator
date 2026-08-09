@@ -7,7 +7,7 @@ import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import { WAR_MIN_TURNS } from '../../../cpu/data/seats';
 import type { CityState, GameState, Seat } from '../../../cpu/core/types';
 
-// PLAYER <-> CITY-STATE PEACE. Sourced from the Civ 6 wiki:
+// SEAT 0 <-> CITY-STATE PEACE. Sourced from the Civ 6 wiki:
 //   - peace may be offered only 10 turns after the war began;
 //   - a city-state "will always accept an offer of peace without preconditions";
 //   - a city-state is dragged into its SUZERAIN's wars and cannot make separate
@@ -69,7 +69,7 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
   return civ;
 }
 
-describe('#50: player <-> city-state peace', () => {
+describe('#50: seat 0 <-> city-state peace', () => {
   it('peace is refused before the sourced 10-turn floor, then always accepted', () => {
     const state = makeState();
     const cs = addCs(state, 1);

@@ -42,7 +42,7 @@ export const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
 /** any non-barbarian unit entering a camp tile clears it —
- * +50 to ITS civ's treasury (the other seats bank it like the player). */
+ * +50 to ITS civ's treasury (the other seats bank it like the seat 0). */
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number, seat: number): void {
   // You do not clear your OWN camps. This was `isBarbSeat(...)` —
   // an identity test standing in for that rule, which only became sayable once
@@ -410,8 +410,8 @@ function sackCity(state: GameState, city: City | City, seat: number): void {
  *
  * The enhancer adders apply to city assaults too — Crusade/Just
  * War raise the UNIT's combat strength by where it STANDS, not by what it
- * hits. Scoped to RIVAL attackers only, because the GPU never sets the
- * PLAYER's holy city (holy_tile[:, 0] is written nowhere), so a player
+ * hits. Scoped to CIV SEAT attackers only, because the GPU never sets the
+ * SEAT 0's holy city (holy_tile[:, 0] is written nowhere), so a seat 0
  * religion exists in TS and not on the GPU. That asymmetry is PRE-EXISTING
  * (the unit-vs-unit sites carry it too, dormant). Drop this guard the moment
  * the GPU grows a holy city for that seat.
@@ -583,12 +583,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   const csTarget = (() => {
     const cs = cityStateAt(state, targetIndex);
     if (!cs || cs.centerIndex !== targetIndex) return undefined;
-    // A city-state is a separate player: war must be DECLARED before its
+    // A city-state is a separate seat 0: war must be DECLARED before its
     // centre is a target. Both this and `attackTargets` ask `civsAtWar`, so an
     // order can never reach a city-state the attacker is at peace with.
     if (attacker.seat === seat) return civsAtWar(state, cs.seat, seat) ? cs : undefined;
     // join-the-suzerain's-war: an AT-WAR seat may siege a CS whose
-    // suzerain is the player (attackTargets applies the same gate).
+    // suzerain is the seat 0 (attackTargets applies the same gate).
     if (isCiv(attacker.seat)) {
       const rv = seatOf(state, attacker.seat);
       if (rv && civsAtWar(state, rv.seat, seat) && isSuzerain(cs, seat)) return cs;
@@ -650,7 +650,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
 
   if ((defDef?.combat ?? 0) <= 0) {
     // A melee attack on a lone civilian CAPTURES it — no combat
-    // roll (draw-count neutral). Player and seat attackers flip the
+    // roll (draw-count neutral). Seat 0 and seat attackers flip the
     // defender to their side in place (movesLeft=0, hp and charges kept,
     // unit stays on its tile); the attacker spends its attack but does NOT
     // advance (single-occupancy model). Barbarians still merely kill — no
@@ -666,7 +666,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       // it out of state.units and push it back — so both engines iterate the
       // captured unit LAST in every array-order loop (builderActions,
       // the war loop, the builder walker). Flipping owner in place would keep
-      // the unit at its original PLAYER-spawn index, which the pooled GPU has
+      // the unit at its original SEAT 0-spawn index, which the pooled GPU has
       // no way to reproduce; the resulting order desync surfaces (dormant)
       // when two same-civ builders contend for a job the same turn.
       state.units = state.units.filter((u) => u.id !== defender.id);
@@ -747,7 +747,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
       const rc = cityAtIndex(state, targetIndex);
       if (rc && civsAtWar(state, rc.holder.seat, seat)) {
         const defCS = cityDefenseStrength(state, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
+        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
         warWearinessBattle(state, attacker.seat, rc.city.seat, targetIndex, { city: true }); // #51/S7.8f
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
@@ -758,11 +758,11 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
       // seat arm one branch up and `meleeAttack`'s csTarget both ask
       // civsAtWar, but this arm took ANY city-state — so the
       // two TS paths disagreed with each other about one rule. Real Civ 6
-      // treats a city-state as a separate player you must declare on, so the
+      // treats a city-state as a separate seat 0 you must declare on, so the
       // RANGED arm is the wrong one. See [[target-legality-gates]].
       if (cs && cs.centerIndex === targetIndex && civsAtWar(state, cs.seat, seat)) {
         const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path is PLAYER-only and the GPU never sets the player's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
+        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
         warWearinessBattle(state, attacker.seat, seatOfCityState(cs.id), targetIndex, { city: true }); // #51/S7.8f
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
@@ -790,7 +790,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
 
 /**
  * A hostile RANGED unit strikes — one roll, no retaliation, no
- * advance (rangedAttack's shape from the attacker's seat). A PLAYER city
+ * advance (rangedAttack's shape from the attacker's seat). A SEAT 0 city
  * takes the hit first even with a garrison (meleeAttack's city precedence)
  * and holds at 1 HP — ranged fire never captures; else the units on the
  * tile (military first; civilians take the roll too, rangedAttack's
@@ -920,7 +920,7 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, 
   }
 }
 
-/** Player siege of a city-state (attacking it IS the declaration of war). */
+/** Seat 0 siege of a city-state (attacking it IS the declaration of war). */
 function attackCityState(state: GameState, attacker: Unit, cs: CityState, seat: number): void {
   const atkCS = assaultAtkCS(state, attacker, cs.centerIndex);
   const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
@@ -980,7 +980,7 @@ export function captureCityState(state: GameState, cs: CityState, seat: number):
   setTileOwner(center, seat, id);
   seatOf(state, seat)!.cities.push({
     id,
-    seat: seat, // #51/S1.3d: a conquered city-state joins the PLAYER's seat
+    seat: seat, // #51/S1.3d: a conquered city-state joins the SEAT 0's seat
     foundedTurn: state.turn,  // #51/S4.1r
     name: cs.name,
     centerIndex: cs.centerIndex,
@@ -1083,7 +1083,7 @@ function barbUnits(state: GameState): Unit[] {
 }
 
 /**
- * One hostile unit's turn against the player: attack > pillage > advance.
+ * One hostile unit's turn against the seat 0: attack > pillage > advance.
  * Shared by barbarian raiders and at-war units.
  */
 export function hostileUnitAct(state: GameState, unit: Unit): void {
@@ -1091,7 +1091,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
 
-  // 1. Attack anything hostile in reach (player or, for barbarians, the other seats too).
+  // 1. Attack anything hostile in reach (seat 0 or, for barbarians, the other seats too).
   // Ranged units strike (one roll, no retaliation) instead of
   // meleeing — attackTargets already scanned at their full range.
   const targets = attackTargets(state, unit);
@@ -1105,11 +1105,11 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   // improvements heal the pillager (+25); the rest are wrecked for yields
   // the raiders here can't bank — pillaged, no heal.
   // BARBARIANS raid foreign improvements too; raiders keep pillaging
-  // the player only (they never war the other seats).
+  // the seat 0 only (they never war the other seats).
   const here = tile();
-  // A seat pillages/raids PLAYER tiles only while at war with
-  // the player (barbarians always); a seat-only-war seat leaves the neutral
-  // player's improvements alone. Seat-foreign improvements pillage is out of
+  // A seat pillages/raids SEAT 0 tiles only while at war with
+  // the seat 0 (barbarians always); a seat-only-war seat leaves the neutral
+  // seat 0's improvements alone. Seat-foreign improvements pillage is out of
   // scope (residual) — enemy TILES are never a pillage/march target here.
   // Pillage any CIV's improvement this unit is at war with. Barbarians are
   // hostile to everyone, so they need no war state.
@@ -1124,7 +1124,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     return;
   }
   // Else pillage the district underfoot — a COMPLETE, non-
-  // CITY_CENTER, unpillaged enemy district (player districts for any raider,
+  // CITY_CENTER, unpillaged enemy district (seat 0 districts for any raider,
   // seat districts for barbarians too). No heal, no loot
   // (v1 — matches yield-type pillages bank nothing).
   if (
@@ -1191,7 +1191,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     target = best;
   }
   if (!target) return;
-  // RIVAL and BARBARIAN units both walk the march on REAL
+  // CIV SEAT and BARBARIAN units both walk the march on REAL
   // MP — each step re-picks the passable free neighbor closest to the (fixed)
   // target, moves only if strictly closer, and pays walkPath's exact charge
   // (tile cost + 3 per river crossing; a full-MP unit always affords its first
@@ -1211,9 +1211,9 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
         (n) =>
           tileFreeForUnit(state, n.index, 0, unit, allowEmbark) &&
           // A CLIFF closes the embark/disembark edge for the
-          // war-march too — the GPU's _rival_unit_war_act has always masked it
-          // out of step_ok, and TS did not, so a seat musketman walked over a
-          // cliff onto water in the off-script gate, t198).
+          // war-march too — the GPU's _apply_seat_unit_actions war-march scan
+          // masks it out of its step candidates, and TS did not, so a seat
+          // musketman walked over a cliff onto water in the off-script gate, t198).
           // Filtered as a CANDIDATE (not a halt) so the march routes around it.
           !cliffBlocksStep(state, at, n, unit),
       )
@@ -1231,7 +1231,7 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     // ZOC: a march step ending adjacent to a hostile MILITARY unit halts.
     // Barbarians OBEY ZOC exactly as seat movers
     // do — unitsHostile makes a barb halt at any adjacent non-barb military
-    // (player always, at-war the other seats always — barbs raid the other seats too); other
+    // (seat 0 always, at-war the other seats always — barbs raid the other seats too); other
     // barbs exert nothing. The GPU barb walk mirrors this via
     // _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
     if (stepUnit(state, unit, step) !== 'moved') return;
@@ -1301,7 +1301,7 @@ export function barbarianPhase(state: GameState, seat: number): void {
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
   // New camp? ANY live civilization sustains the barb world —
-  // the other seats count, not just the player (the roll-gate short-circuit is part
+  // the other seats count, not just the seat 0 (the roll-gate short-circuit is part
   // of the draw-count contract; both engines change together).
   const anyCivCity = state.seats.some((sx) => sx.cities.length > 0);
   if (anyCivCity && state.barbSeat.camps.length < maxCamps && nextRandom(state) < 0.08) {
@@ -1379,7 +1379,7 @@ export function barbarianPhase(state: GameState, seat: number): void {
   }
 
   // A city WITH ANCIENT_WALLS fires once per turn — range 2, at
-  // the nearest unit hostile to the player (barbarians always; at-war
+  // the nearest unit hostile to the seat 0 (barbarians always; at-war
   // units, civilians included — the unitsHostile predicate), ties broken by
   // lowest tile index (the standard tile-order scan). One roll at the city's
   // defense strength vs the target's defense, mirroring hostileRangedStrike:
@@ -1433,7 +1433,7 @@ export function barbarianPhase(state: GameState, seat: number): void {
 
   // The ADDITIONAL Encampment strike (walls-first order
   // documented above). A city with a COMPLETE unpillaged ENCAMPMENT fires the
-  // same pattern — range 2, nearest player-hostile unit, one roll at the
+  // same pattern — range 2, nearest seat 0-hostile unit, one roll at the
   // city's defense strength, no retaliation, never captures — under k="pestk".
   // The strike needs a LIVE garrison: an Encampment beaten to 0 HP is
   // occupied, and an occupied Encampment fires nothing (real Civ 6).

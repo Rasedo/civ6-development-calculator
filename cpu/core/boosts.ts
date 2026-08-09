@@ -14,7 +14,7 @@ import { isCoastalLand } from '../../world/query';
 export { BOOST_FRACTION };
 
 /** the eureka/inspiration discount, scoped to any civ's
- * research state (the player's effectiveResearchCost delegates here). */
+ * research state (seat 0's effectiveResearchCost delegates here). */
 export function effectiveResearchCostIn(
   rsr: ResearchState,
   id: string,

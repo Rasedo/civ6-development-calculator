@@ -15,7 +15,7 @@ import type { GameState } from '../../../cpu/core/types';
 // exist, and both saying so in their own comments:
 //
 //   walls / Encampment STRIKE   filtered candidates with `!isCiv(u.seat)`
-//   trade route RAIDING         `RIVAL_RIVAL_RAIDS_LIVE = false`
+//   trade route RAIDING         a civ↔civ raid flag left permanently off
 //
 // The engines AGREED, so no gate caught it — it is a fidelity gap against
 // Civ 6, where a city's strike picks its target by combat strength and a war
@@ -51,7 +51,7 @@ function tilesNear(state: GameState, centre: number): { near: number; far: numbe
 }
 
 describe('#51/S7.1 (#59) civ↔civ trade raiding', () => {
-  it('an at-war RIVAL suspends another civ\'s route, exactly as the player does', () => {
+  it('an at-war CIV SEAT suspends another civ\'s route, exactly as seat 0 does', () => {
     const state = newGame();
     const centre = seatOf(state, 0)!.cities[0].centerIndex;
     const { near, far } = tilesNear(state, centre);

@@ -49,7 +49,7 @@ describe('#51/S6.11 seat classes', () => {
 });
 
 describe('#51/S6.11 caps.xp', () => {
-  it('a barbarian gets NO xp field; the player and a civ each get one', () => {
+  it('a barbarian gets NO xp field; seat 0 and a civ each get one', () => {
     const state = newGame();
     const land = state.map.tiles.findIndex((t) => t.terrain !== 'OCEAN' && t.terrain !== 'COAST');
     const barb = spawnUnit(state, 'WARRIOR', land, BARB_SEAT)!;

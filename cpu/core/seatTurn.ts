@@ -1,14 +1,14 @@
 /**
  * The per-seat turn body.
  *
- * The player's turn work lived in `game.ts:endTurn` and each seat's in the
+ * Seat 0's turn work lived in `game.ts:endTurn` and each seat's in the
  * per-seat loop of `phase.ts:seatPhase`, as two independent transcriptions
  * of the same rules. They had already drifted into being maintained by
- * comment: the seat copies carry "the player's twin", "the same position the
- * player uses", "mirrors the player's endTurn-top ...". This file is where
+ * comment: the seat copies carry "seat 0's twin", "the same position seat
+ * 0 uses", "mirrors seat 0's endTurn-top ...". This file is where
  * that stops being a promise and starts being one body.
  *
- * The PHASE DRIVER is untouched: game.ts still runs the player's block where
+ * The PHASE DRIVER is untouched: game.ts still runs seat 0's block where
  * it always did and seatPhase still runs each seat's where it always did,
  * so the draw order both engines depend on is exactly as before. Only the
  * work itself is shared.
@@ -41,9 +41,9 @@ export function diplomaticFavorPerTurn(gov: string | null, suzerains: number): n
  * Which government a seat is running.
  *
  * This is divergence (1) from `getModifiers`, and it lives in ONE place so the
- * two readers cannot drift: the player's government is STORED (an RL agent or
+ * two readers cannot drift: seat 0's government is STORED (an RL agent or
  * the UI slots the cards), a seat's is DERIVED from its research. They agree
- * today only because the scripted player adopts with the same function.
+ * today only because the scripted seat 0 adopts with the same function.
  * Round 7 gives the other seats stored slots and this collapses to `s.government`.
  */
 export function seatGovernmentId(state: GameState, seat: number): string | null {
@@ -100,7 +100,7 @@ export { seatOfIndex };
  * held one copy and the per-seat loop in `phase.ts` held the other.
  *
  * The CALLER still computes the surplus, because the two seats reach it
- * differently — the player's `computeCityStats` returns
+ * differently — seat 0's `computeCityStats` returns
  * `effectiveFoodSurplus` with the housing/amenity/growth-mult chain already
  * folded in, while the seat path folds that chain at the call site. That
  * difference is real and is its own slice; the growth RULE is not.

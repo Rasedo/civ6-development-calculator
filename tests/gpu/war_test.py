@@ -167,7 +167,7 @@ def test_capture_plunder(rules, path):
             assert not bool(sim.r_atwar[0, r]), "last city captured -> the war must end"
     eliminated = not bool(sim.rc_alive[0, r].any())
     assert caps >= 1, "no captures exercised"
-    assert eliminated, "player slots filled before elimination — last-city branch untested on this seed"
+    assert eliminated, "seat-0 slots filled before elimination — last-city branch untested on this seed"
     # raze path: fake a full empire — every seat-0 city slot occupied
     idx2 = sim.rc_alive[0].nonzero()
     if len(idx2):
@@ -246,7 +246,7 @@ def test_cs_siege(rules, path):
         mel = next(i for i in range(len(sim._p_combat)) if float(sim._p_combat[i]) > 0 and float(sim._p_rng_str[i]) == 0)
         nb = sim.neigh[ctr]
         spot = next(int(nb[d]) for d in range(6) if int(nb[d]) >= 0 and int(sim.pmil_at[0, int(nb[d])]) < 0 and int(sim.center_at[0, int(nb[d])]) < 0)
-        sim._spawn_player(torch.tensor([True]), torch.tensor([spot]), torch.tensor([mel]))
+        sim._spawn_p(torch.tensor([True]), torch.tensor([spot]), torch.tensor([mel]))
         p_ = int(sim.p_next[0]) - 1
         assert bool(sim.p_alive[0, p_]), "spawn failed"
     act = _place_next_to(sim, p_, ctr)
@@ -285,7 +285,7 @@ def test_cs_siege(rules, path):
     # >= not ==: an organic settler founding can land in the same step as the
     # capture (+2 total); the capture itself is pinned by the
     # center_at/owner/pop assertions below.
-    assert int(sim.alive[0].sum()) >= ncity0 + 1, "capture must found a player city"
+    assert int(sim.alive[0].sum()) >= ncity0 + 1, "capture must found a seat-0 city"
     c_new = int(sim.center_at[0, ctr])
     assert c_new >= 0 and bool(sim.alive[0, c_new]), "center must map to the new city"
     assert int(sim.owner[0, ctr]) == c_new, "center tile must transfer"

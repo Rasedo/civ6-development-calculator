@@ -7,13 +7,13 @@ WRITER inside 250t is uncommon; MUSEUM even rarer):
     (Amphitheater 2, Art Museum 3, Broadcast Center 1);
   * per-city tensors (gw_writing/gw_art/gw_music + the rc_ twins) exist
     with matched shapes and round-trip through snapshot()/restore() (_MUTABLE);
-  * _place_player_works / _place_civ_works: deterministic lowest-city then
+  * _place_c_works / _place_rc_works: deterministic lowest-city then
     lowest-slot fill into the matching building, cap at that kind's slots,
     overflow charges degrade to the instant culture lump;
   * the per-work culture/turn building-tier yield is LIVE and
     version-invalidated (adding a work raises the city's culture yield,
     linearly per work);
-  * WRITER/MUSICIAN earned through _advance_player_great_people apply NO instant
+  * WRITER/MUSICIAN earned through _advance_great_people apply NO instant
     civic lump when a slot exists;
   * _reclaim_rc carries a city's works with it through slot compaction.
 
@@ -72,21 +72,21 @@ def main() -> None:
         print("GREAT-WORKS OK (districts off — placement paths skipped)")
         return
 
-    # --- _place_player_works: single Writer fills 2 Amphitheater slots ------
+    # --- _place_c_works: single Writer fills 2 Amphitheater slots ------
     assert bool(sim.alive[:, 0].all()), "fixture capital (city 0) must be alive"
     sim.gw_writing.zero_(); sim.gw_art.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, amph] = True  # capital gets an Amphitheater
     civic0 = sim.civic_prog.clone()
     ver0 = sim._eff_version
     cval = torch.full((B,), 45.0, dtype=torch.float64)  # Li Bai's culture value
-    sim._place_player_works(torch.ones(B, dtype=torch.bool), cval, 0)
+    sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
     assert bool((sim.gw_writing[:, 0] == 2).all()), "both works must slot into the Amphitheater"
     assert bool((sim.civic_prog == civic0).all()), "a fully-slotted Writer applies NO instant lump"
     assert sim._eff_version > ver0, "a slot write must bump _eff_version (yield-bearing state)"
 
     # --- overflow: a second Writer finds no open slot -> instant lump -------
     civic1 = sim.civic_prog.clone()
-    sim._place_player_works(torch.ones(B, dtype=torch.bool), cval, 0)
+    sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
     assert bool((sim.gw_writing[:, 0] == 2).all()), "slots stay capped at gwSlots (2)"
     assert bool((sim.civic_prog - civic1 == 90.0).all()), "both overflow charges -> 2 x 45 lump"
 
@@ -98,11 +98,11 @@ def main() -> None:
         # First Writer -> all 2 into the LOWER city_seq (capital = seq 0).
         cap = int(sim.city_seq[0, 0]); nxt = int(sim.city_seq[0, 1])
         lo, hi = (0, 1) if cap < nxt else (1, 0)
-        sim._place_player_works(torch.ones(B, dtype=torch.bool), cval, 0)
+        sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, lo] == 2).all()), "the lowest-seq city fills first"
         assert bool((sim.gw_writing[:, hi] == 0).all()), "the higher-seq city stays empty"
         # Second Writer -> spills into the higher-seq city.
-        sim._place_player_works(torch.ones(B, dtype=torch.bool), cval, 0)
+        sim._place_c_works(torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, hi] == 2).all()), "overflow spills to the next city"
         sim.buildings[:, 1, amph] = False
 
@@ -147,12 +147,12 @@ def main() -> None:
     sim.buildings[:, 0, museum] = True
     sim.buildings[:, 0, broadcast] = False
     civic2 = sim.civic_prog.clone()
-    sim._place_player_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
+    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
     assert bool((sim.gw_music[:, 0] == 0).all()), "no BROADCAST CENTER -> music works do not slot"
     assert bool((sim.civic_prog - civic2 == 100.0).all()), "music works overflow to the lump (2 x 50)"
     sim.buildings[:, 0, broadcast] = True
     civic3 = sim.civic_prog.clone()
-    sim._place_player_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
+    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
     assert bool((sim.gw_music[:, 0] == 1).all()), "the Broadcast Center holds exactly ONE music work"
     assert bool((sim.civic_prog - civic3 == 50.0).all()), "the second music work overflows to the lump"
 
@@ -161,12 +161,12 @@ def main() -> None:
     sim.gw_writing.zero_(); sim.gw_art.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, museum] = False
     civicA = sim.civic_prog.clone()
-    sim._place_player_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
+    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
     assert bool((sim.gw_art[:, 0] == 0).all()), "no ART MUSEUM -> art works do not slot"
     assert bool((sim.civic_prog - civicA == 60.0).all()), "all 3 art works overflow (3 x 20)"
     sim.buildings[:, 0, museum] = True
     civicB = sim.civic_prog.clone()
-    sim._place_player_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
+    sim._place_c_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
     assert bool((sim.gw_art[:, 0] == 3).all()), "one Artist fills the Art Museum's 3 slots exactly"
     assert bool((sim.civic_prog == civicB).all()), "a fully-slotted Artist applies no lump"
 
@@ -175,20 +175,20 @@ def main() -> None:
     sim.buildings[:, 0, amph] = True
     civicE = sim.civic_prog.clone()
     earned0 = sim.gp_earned[:, wc].clone()
-    sim.player_gp_points[:, wc] = 100.0  # >= gpCost(0) = 60
-    sim._advance_player_great_people()
+    sim.gp_points[:, wc] = 100.0  # >= gpCost(0) = 60
+    sim._advance_great_people()
     assert bool((sim.gp_earned[:, wc] == earned0 + 1).all()), "Writer not earned"
     assert bool((sim.gw_writing[:, 0] == 2).all()), "earned Writer's works slot into the Amphitheater"
     assert bool((sim.civic_prog == civicE).all()), "a slotted earned Writer applies NO instant culture lump"
 
-    # --- civ-seat placement: _place_civ_works fills rc slots + overflows ---
+    # --- civ-seat placement: _place_rc_works fills rc slots + overflows ---
     if sim.R > 0 and bool(sim.rc_alive[:, 0, 0].any()):
         r = 0
         live = sim.rc_alive[:, r, 0]
         sim.rc_gw_writing.zero_(); sim.rc_gw_art.zero_(); sim.rc_gw_music.zero_()
         sim.rc_bldg[:, r, 0, amph] = True
         rc0 = sim.r_civic_prog[:, r].clone()
-        sim._place_civ_works(r, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
+        sim._place_rc_works(r, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
         assert bool((sim.rc_gw_writing[live, r, 0] == 2).all()), "civ Writer slots into its Amphitheater"
         assert bool(((sim.r_civic_prog[:, r] - rc0)[live] == 0).all()), "a slotted civ Writer applies no lump"
         # A dead rc slot cannot slot -> the whole person overflows to a lump.

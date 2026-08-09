@@ -90,7 +90,6 @@ class Rules:
     game_speed: float
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
     turn_limit: int  # game over once turn > this
-    civs: dict  # {player: 0, civBase: 1} — the civ-id space (asserted vs engine constants)
     district_cost: dict  # districtCost params {base, scale} — each seat pays it from ITS OWN research
     score_pop_weight: float
     score_yield_weights: torch.Tensor  # [6]
@@ -170,7 +169,6 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         game_speed=r["scenario"].get("gameSpeed", 0.6),
         gold_purchase_mult=r["scenario"].get("goldPurchaseMult", 4),
         turn_limit=r["scenario"].get("turnLimit", 250),  # TURN_LIMIT
-        civs=r.get("civs", {"player": 0, "civBase": 1}),
         district_cost=r.get("districtCost", {"base": 54, "scale": 8}),
         score_pop_weight=r["score"]["popWeight"],
         score_yield_weights=torch.tensor(r["score"]["yieldWeights"], dtype=torch.float64),
@@ -308,7 +306,6 @@ WW_BATTLE_KEYS = frozenset({
     "restk",    # a civ-seat city's Encampment strike
 })
 
-PLAYER_SEAT = 0  # seat 0 — one of the major civs in cpu/core/seats.ts' absolute space
 BARB_SEAT = 200  # the barbarians — cpu/core/seats.ts BARB_SEAT
 
 # WHAT A SEAT MAY DO — the twin of cpu/data/seats.ts, same two bits. See that
@@ -326,11 +323,9 @@ SEAT_CAPS = {
 
 #: Which class each UNIT POOL belongs to. The pools are already split by class
 #: ("p" seat 0, "v" civ seats, "u" barbarian), so a pool name answers "what may
-#: this actor do?" without touching the batch.
+#: this actor do?" without touching the batch. The attack paths' `atk_kind`
+#: tag uses the same letters, so this one table serves both.
 POOL_CLASS = {"p": "major", "v": "major", "u": "hostile"}
-
-#: `atk_kind` as the attack paths spell it, mapped to the same classes.
-ATK_KIND_CLASS = {"player": "major", "civ": "major", "barb": "hostile"}
 
 
 def seat_class(seat: int) -> str:
@@ -370,7 +365,6 @@ XP_LEVELS = (15, 45, 90)
 # The plane families still carry the split: the [B, C] city tensors ARE civ 0's
 # seat, and a civ plane's dim-1 index r means civ r+1. NB: the `_p_civ` unit
 # tensor means "unit type is CIVILIAN" and is unrelated.
-PLAYER_CIV = 0
 
 
 def seat_of_index(r: int) -> int:
@@ -477,7 +471,7 @@ _MUTABLE = [
     "district_dead",  # captured districts are paved-but-dead
     "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "founded_n", "city_seq", "city_seq_next",  # TS array-order rank per column
-    "cap_tile_player",  # capital identity + the domination anchor
+    "civ_cap_tile",  # capitalTiles — capital identity + the domination anchor (cap_tile / r_cap_tile are views)
     # `tile_seat` is STATE — the city-state part of tile ownership is stored
     # only here (`cs_at` is a view of it), so it must round-trip.
     "tile_seat", "tile_city",
@@ -489,7 +483,6 @@ _MUTABLE = [
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; r_route_dest is the [:, 1:] view
     "rc_id",
-    "cap_tile_civ",  # rc.isCapital + capitalTiles[r+1] — explicit, compaction-safe
     "v_civ", "v_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks

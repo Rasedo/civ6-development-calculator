@@ -64,7 +64,7 @@ const rawList: BuildingDef[] = [
   // --- Holy Site -------------------------------------------------------------
   { id: 'SHRINE', name: 'Shrine', district: 'HOLY_SITE', cost: 65, yields: { faith: 2 }, maintenance: 1 },
   { id: 'TEMPLE', name: 'Temple', district: 'HOLY_SITE', cost: 105, requiresAny: ['SHRINE'], yields: { faith: 4 }, maintenance: 2 },
-  // Worship buildings (one unlocked by founding a religion; player's pick)
+  // Worship buildings (one unlocked by founding a religion; seat 0's pick)
   { id: 'CATHEDRAL', name: 'Cathedral', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, culture: 3 }, worship: true },
   { id: 'GURDWARA', name: 'Gurdwara', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, food: 2 }, worship: true },
   { id: 'MEETING_HOUSE', name: 'Meeting House', district: 'HOLY_SITE', cost: 190, requiresAny: ['TEMPLE'], yields: { faith: 3, production: 2 }, worship: true },

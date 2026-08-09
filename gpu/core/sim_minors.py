@@ -46,7 +46,7 @@ class SimMinors:
         # planes) — one [B, nAskable] table per turn, gathered per s below,
         # instead of 2·S full [B, T] scans.
         if self._askable.numel() > 0 and self.districts_on:
-            own_live = self.district_complete & (self.tile_seat == PLAYER_SEAT) & ~self.district_dead  # [B, T]
+            own_live = self.district_complete & (self.tile_seat == 0) & ~self.district_dead  # [B, T]
             own_tbl = ((self.district.unsqueeze(2) == self._askable.reshape(1, 1, -1)) & own_live.unsqueeze(2)).any(dim=1)  # [B, nA]
         else:
             own_tbl = None
@@ -148,7 +148,7 @@ class SimMinors:
         ti_n = (type_idx if type_idx.dim() > 0 else type_idx.expand(self.B)).clamp(min=0, max=self.NU - 1)
         naval_m = self.unit_naval[ti_n] & mask
         cart_r = self.r_techs[:, civ, self._cartography_tech] if self._cartography_tech >= 0 else None
-        found, spot = self._first_free_spot(at_tile, "civ", civ=civ, naval_mask=naval_m, cart=cart_r)
+        found, spot = self._first_free_spot(at_tile, "v", civ=civ, naval_mask=naval_m, cart=cart_r)
         can = mask & found
         if not bool(can.any()):
             return can

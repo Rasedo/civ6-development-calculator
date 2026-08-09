@@ -181,7 +181,7 @@ export const GW_BUILDINGS = ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'] as co
  *     events before the Modern era — razing a barbarian outpost, or a unit
  *     dying — both of which this engine already raises.
  * MEASURED reachable: NATURAL_HISTORY is researched by 21 of 24 seat civs and
- * 1 of 12 player seeds by t250, so this is exercised in-gate (mostly seat-side)
+ * 1 of 12 seat-0 seeds by t250, so this is exercised in-gate (mostly seat-side)
  * rather than sitting past the horizon like the space race.
  * NOT MODELLED, recorded: THEMING bonuses (three same-era artifacts by
  * different civs double the building's tourism) and Shipwrecks (no water

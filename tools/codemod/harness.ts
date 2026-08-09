@@ -517,8 +517,8 @@ export class Mod {
 
   /**
    * MOVE (or rename) a file, retargeting every importer's specifier — the
-   * perf-rivals/gpu-trace class of job, which as text editing means computing
-   * a fresh relative path per importing file by hand.
+   * class of job that as text editing means computing a fresh relative path
+   * per importing file by hand.
    */
   moveFile(fromRel: string, toRel: string): void {
     const src = this.file(fromRel);

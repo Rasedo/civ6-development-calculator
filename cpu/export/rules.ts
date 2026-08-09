@@ -128,7 +128,7 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
   else if (c.kind === 'improvement') {
     // Improvement eurekas for every improvement in the grown roster (A-13
-    // gate-catch, seed 9066 t57 rTechProg1: rival 1's first QUARRY at t48
+    // gate-catch, seed 9066 t57 rTechProg1: civ seat 1's first QUARRY at t48
     // fired MASONRY's eureka in TS only — the old FARM/MINE/LUMBER
     // hardcode left quarry/pasture rows unexported, so the GPU's research
     // stream forked on the boosted cost). MASONRY (quarry) and
@@ -138,7 +138,7 @@ for (const [id, def] of Object.entries(BOOSTS)) {
     const imp = IMPROVEMENT_IDS.indexOf(c.id);
     if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
   } else if (c.kind === 'anyWonderBuilt') {
-    // A-4: rival wonders make this REACHABLE (it was filtered as
+    // A-4: civ-seat wonders make this REACHABLE (it was filtered as
     // structurally-unreachable before) — both civs' detection reads the
     // same global builtWonderComplete scan.
     row = { kind: 'anyWonderBuilt' };
@@ -161,7 +161,7 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   } else if (c.kind === 'policies') {
     // B-13 (Slice V): the "run N policy cards" inspiration (MEDIEVAL_FAIRES,
     // count 4). Dormant until the new-card unlockPolicy wiring let the scripted
-    // player fill 4+ slots in-gate; the GPU counts the PLAYER's slotted-policy
+    // seat 0 fill 4+ slots in-gate; the GPU counts SEAT 0's slotted-policy
     // mask (`_gov_policy_mods`). Seat-0 only: the civ-seat boost detector has
     // no arm for this kind (civ governments carry no slotted-policy count).
     row = { kind: 'policies', count: c.count };
@@ -195,7 +195,7 @@ const SCRIPTED_CAMPUS = true;
 // tech is in and the per-pop specialty cap allows). The engine mirrors this.
 // placement 'aqueduct' = the non-specialty housing district (adjacent to the
 // city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
-// SCAFFOLD_DISTRICTS moved to data/districts.ts (C1-B4: the rival picker
+// SCAFFOLD_DISTRICTS moved to data/districts.ts (C1-B4: the civ-seat picker
 // shares it). ENCAMPMENT stays held out — see the note there and BUILD_PLAN D6.
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
 
@@ -229,10 +229,6 @@ export function buildRules() {
     // round((50 + 4·n) × GAME_SPEED), n = builders ever trained + queued.
     // P4/D-15: settler 80/30 speed-scales like unit costs (mirrors settlerCost).
     scenario: { settlerBase: Math.round(80 * GAME_SPEED), settlerPerCity: Math.round(30 * GAME_SPEED), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, turnLimit: TURN_LIMIT, builderBase: 50, builderPer: 4, gameSpeed: GAME_SPEED },
-    // One civ-id space (C1-A3, mirrors cpu/core/civs.ts): the player is civ 0,
-    // rival r (array index == rival.id, asserted at export) is civ r+1.
-    // City-states and barbarians stay outside the numbering.
-    civs: { player: 0, civBase: 1 },
       // #51/S0.3: the UNIT ACTION enum (index = position). Both engines dispatch by
     // NAME off this list instead of hardcoded column numbers — the collision that
     // bound PILLAGE to the FORT column and left the real pillage column dead.
@@ -259,8 +255,8 @@ export function buildRules() {
     worshipFaithCost: Math.round(190 * GAME_SPEED),
     // B6-S2: the missionary buy's Shrine gate (phase.ts missionary branch).
     shrineBidx: buildingIdx.get('SHRINE') ?? -1,
-    // AUDIT A-11: rival trade — id-anchored capacity sources + route constants
-    // (the rivalTradeCapacity/routeYields mirror; no CS term until A-12).
+    // AUDIT A-11: civ-seat trade — id-anchored capacity sources + route constants
+    // (the tradeCapacity/routeYields mirror; no CS term until A-12).
     trade: {
       marketBidx: buildingIdx.get('MARKET') ?? -1,
       lighthouseBidx: buildingIdx.get('LIGHTHOUSE') ?? -1,
@@ -269,7 +265,7 @@ export function buildRules() {
         .map((id) => BUILT_WONDER_LIST.findIndex((w) => w.id === id))
         .filter((i) => i >= 0),
       range: TRADE_ROUTE_RANGE,
-      // A-12b: rival CS-route income constants (csRouteYields mirror).
+      // A-12b: civ-seat CS-route income constants (csRouteYields mirror).
       csRouteGold: CS_ROUTE_GOLD,
       csRouteSpec: CS_ROUTE_SPEC,
       // B-23: international-route gold base (routeYieldsInternational: +intlGold
@@ -278,7 +274,7 @@ export function buildRules() {
       duration: TRADE_ROUTE_DURATION,
     },
     // B-15 war weariness (mirrors data/opponents.ts): integer accumulator → flat
-    // empire-wide amenity penalty for the player AND each rival civ.
+    // empire-wide amenity penalty for seat 0 AND each civ seat.
     warWeariness: {
       // #51/S7.8f: the per-BATTLE model. `perTurn`/`cap` are gone — there is no
       // per-turn accrual and no ceiling.
@@ -319,7 +315,7 @@ export function buildRules() {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
       capitalBonus: CS_CAPITAL_BONUS,
-      meetRange: CS_MEET_RANGE, // A-12: rival proximity-meet radius
+      meetRange: CS_MEET_RANGE, // A-12: civ-seat proximity-meet radius
       questCooldown: QUEST_COOLDOWN,
       questEnvoys: QUEST_ENVOYS,
       // V-CS: attackCityState/captureCityState (siege hp + the militaristic +6)
@@ -345,23 +341,23 @@ export function buildRules() {
       // amount in the CS's live channel (CS_SUZERAIN_LIVE). The channel is
       // shipped per-CS-instance on csAtStart (name-keyed), -1 = descoped.
       suzerainYield: CS_SUZERAIN_YIELD,
-      // A-12 (B8-L): RIVAL levy — a militaristic CS's suzerain (rival) at war
+      // A-12 (B8-L): CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
-      // per CS shared across seats. (Player levy is UI-only, absent from the
-      // scripted reference, so the GPU only mirrors the rival path.)
+      // per CS shared across seats. (Seat-0 levy is UI-only, absent from the
+      // scripted reference, so the GPU only mirrors the civ-seat path.)
       levyUnits: LEVY_UNITS,
       levyGoldCost: LEVY_GOLD_COST,
       levyCooldown: LEVY_COOLDOWN,
     },
-    // Rival-civ pacing (mirrors data/opponents.ts). loyaltyAmenity is keyed by
+    // Civ-seat pacing (mirrors data/opponents.ts). loyaltyAmenity is keyed by
     // amenity-tier INDEX in the same order as amenityTiers above. The
-    // pantheon/belief pools matter only as SIZES: a rival's pick consumes a
+    // pantheon/belief pools matter only as SIZES: a civ seat's pick consumes a
     // draw and shrinks the pool, but the identity is inert in covered scope.
     seats: {
       maxCities: MAX_CITIES_PER_SEAT,
-      settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: SETTLER_COST(c) = the player's 48 + 18·max(0, c − 1)
+      settlerBase: Math.round(80 * GAME_SPEED), // P5/S3: SETTLER_COST(c) = seat 0's 48 + 18·max(0, c − 1)
       settlerPer: Math.round(30 * GAME_SPEED),
-      // (P5/S4: borderPeriod died — rival borders grow on culture.)
+      // (P5/S4: borderPeriod died — civ-seat borders grow on culture.)
       // P5/S5: the timed claims died — the pantheon costs faith, religion
       // gates on pantheon + Holy Site + an earned PROPHET-class person.
       pantheonFaithCost: PANTHEON_FAITH_COST,
@@ -410,7 +406,7 @@ export function buildRules() {
       techEra: techList.map((t) => Math.max(0, ERAS.indexOf(t.era))),
       civicEra: civicList.map((c) => Math.max(0, ERAS.indexOf(c.era))),
       warMinTurns: WAR_MIN_TURNS,
-      // A-19/B-33 (S2): pairwise rival↔rival DoW/peace gates (zero-draw).
+      // A-19/B-33 (S2): pairwise civ-seat↔civ-seat DoW/peace gates (zero-draw).
       rrDowProximity: DOW_PROXIMITY,
       rrDowStrengthRatio: DOW_STRENGTH_RATIO,
       rrDowWwMax: DOW_WW_MAX,
@@ -428,7 +424,7 @@ export function buildRules() {
         // AUDIT A-6: the ranged rung — SLINGER is ungated, ARCHER needs this.
         archerTech: techIdx.get('ARCHERY') ?? -1,
       },
-      // C1-B5b: rival builder gates — improvement unlock indices in the tech
+      // C1-B5b: civ-seat builder gates — improvement unlock indices in the tech
       // table (FARM is baseline; hillFarms rides the civic the engine already
       // indexes) and the balanced-weight gain per option for the Δ-tileScore
       // pick (flat catalog yields ⇒ the Δ is a constant per improvement).
@@ -449,15 +445,15 @@ export function buildRules() {
       loyaltyAmenity: ['Ecstatic', 'Happy', 'Content', 'Displeased', 'Unhappy'].map((n) => LOYALTY_AMENITY[n] ?? 0),
       gpCosts: Array.from({ length: 8 }, (_, n) => gpCost(n)),
       gpRoster: GP_CLASSES.map((c) => GREAT_PEOPLE[c].length),
-      // Player great-people (advanceGreatPeople): per class, the PLACEABLE_DISTRICTS
+      // Seat-0 great-people (advanceGreatPeople): per class, the PLACEABLE_DISTRICTS
       // idx that accrues its points, and each person's instant effect
-      // [science→tech, culture→civic, gold→treasury, production→capital]. The player
-      // draws from the SAME gp_earned pool the rival race consumes (opponents claim in
-      // seatPhase first, then the player), so only classDistrict + effects are new.
+      // [science→tech, culture→civic, gold→treasury, production→capital]. Seat 0
+      // draws from the SAME gp_earned pool the civ-seat race consumes (opponents claim in
+      // seatPhase first, then seat 0), so only classDistrict + effects are new.
       gpClassDistrict: GP_CLASSES.map((c) => PLACEABLE_DISTRICTS.indexOf(GP_CLASS_DISTRICT[c])),
       gpEffects: GP_CLASSES.map((c) =>
-        // P5/S5: col 4 = faith (Prophets) — the rival pantheon's funding; the
-        // player's GPU faith stays unmodeled (no consumer — worship is TS-only).
+        // P5/S5: col 4 = faith (Prophets) — the civ-seat pantheon's funding;
+        // seat 0's GPU faith stays unmodeled (no consumer — worship is TS-only).
         GREAT_PEOPLE[c].map((p) => [p.effect.science ?? 0, p.effect.culture ?? 0, p.effect.gold ?? 0, p.effect.productionToCapital ?? 0, p.effect.faith ?? 0]),
       ),
       // B7-G (B-8): Great General / Great Admiral spawn-at-claim + aura anchors.
@@ -474,7 +470,7 @@ export function buildRules() {
       pantheonPool: Object.keys(PANTHEONS).length,
       followerPool: Object.keys(FOLLOWER_BELIEFS).length,
       founderPool: Object.keys(FOUNDER_BELIEFS).length,
-      // B-18: Enhancer pool size. The GPU does not yet race enhancers (rival
+      // B-18: Enhancer pool size. The GPU does not yet race enhancers (civ-seat
       // enhancer claiming + the mirrored draw are a deferred follow-up); this
       // documents the slot for that work.
       enhancerPool: Object.keys(ENHANCER_BELIEFS).length,
@@ -488,7 +484,7 @@ export function buildRules() {
       followerCoupling: B18_FOLLOWER_COUPLING_LIVE,
     },
     // AUDIT A-7: dense belief-effect tables — identity-claimed pantheons/
-    // beliefs now APPLY to rival civs. Row order = the data-file key order;
+    // beliefs now APPLY to civ seats. Row order = the data-file key order;
     // the claim draw picks the k-th OPEN id in this same order in both
     // engines. faithPerWonder shipped by A-4 (fpw); improvementYields shipped
     // by A-13 (impY) now that PASTURE/CAMP/QUARRY/PLANTATION are buildable —
@@ -522,11 +518,11 @@ export function buildRules() {
       // builds only pan/fol/fou tables and ignores this key.
       enhancers: Object.values(ENHANCER_BELIEFS).map(beliefRow),
     },
-    // AUDIT A-4: rival wonders (data order). Static placement lives in the
+    // AUDIT A-4: civ-seat wonders (data order). Static placement lives in the
     // per-tile `wok` bitmask below; LIVE terms (ownership, occupancy,
     // radius, non-bonus resource, adjacent completed district, adjacent
     // un-stripped resource, world uniqueness) are the engine's job.
-    // extraWildcardSlot (Forbidden City) is skipped — no rival government;
+    // extraWildcardSlot (Forbidden City) is skipped — no civ-seat government;
     // regionalAmenities (Colosseum) ships but its district is unplaceable
     // in scope. Costs are already speed-scaled in the data file.
     wonders: {
@@ -569,7 +565,7 @@ export function buildRules() {
       })),
       fpFid: FEAT_IDS.indexOf('FLOODPLAINS'),
     },
-    // AUDIT A-14: rival projects (data order; d = PLACEABLE_DISTRICTS idx,
+    // AUDIT A-14: civ-seat projects (data order; d = PLACEABLE_DISTRICTS idx,
     // y = YIELD_KEYS idx or -1, g = GP_CLASSES idx or -1). Out-of-scaffold
     // districts export d=-1 and never fire — table-driven for A-9's future.
     projects: {
@@ -577,8 +573,8 @@ export function buildRules() {
       // Every row carries sp (space flag) / vic (victory step) plus the tech
       // gate (rt = techs-table idx) and previous-step link (rp = projects-table
       // idx) so the GPU mirrors the sequence + the science victoryType 3/4.
-      // Space rows sit LAST (chain order): the rival greedy pick resolves to a
-      // base project first, and the scripted player never queues projects, so
+      // Space rows sit LAST (chain order): the civ-seat greedy pick resolves to a
+      // base project first, and the scripted seat 0 never queues projects, so
       // the chain is inert in-gate (gate-unreachable at 250t) — proven by the
       // parity gate + gpu/space_race_test.py.
       rows: Object.values(PROJECTS).map((p, _i, all) => ({
@@ -689,7 +685,7 @@ export function buildRules() {
       // V-R: ranged strike stats (Slinger 15/1, Archer 25/2); 0 = melee-only.
       rangedStrength: u.ranged?.strength ?? 0,
       rangedRange: u.ranged?.range ?? 0,
-      // AUDIT A-8: full MP per turn — the rival walkers' budget.
+      // AUDIT A-8: full MP per turn — the civ-seat walkers' budget.
       moves: u.moves,
       // #45/B-6: NAVAL unit (lives on water, never embarks). All-false for the
       // current land-only roster — N2 adds GALLEY/QUADRIREME.
@@ -885,7 +881,7 @@ export function buildRules() {
     // buildingYieldMult, housing/amenity conditionals, yieldMult,
     // encampmentProdMult, tilePurchaseMult) are TS-only — no adopted government
     // or slotted card in the scripted 100-turn gate uses a LIVE instance of one
-    // (verified: player slots VETERANCY[inert]+URBAN_PLANNING, opponents adopt
+    // (verified: seat 0 slots VETERANCY[inert]+URBAN_PLANNING, opponents adopt
     // AUTOCRACY and slot the same), so they stay inert here (see ROUND_B2_LOG).
     governments: Object.values(GOVERNMENTS).map((g) => ({
       id: g.id,

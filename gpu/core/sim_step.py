@@ -115,7 +115,7 @@ class SimStep:
             trainable = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
                 1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
-            trainable = trainable & self._res_avail_mask(self.tile_seat == PLAYER_SEAT)  # re-validate strategic-resource access
+            trainable = trainable & self._res_avail_mask(self.tile_seat == 0)  # re-validate strategic-resource access
             trainable = trainable & ~self._p_faith_only.reshape(1, -1)  # faith-only never queues (trainableUnits mirror)
             valid_u = is_u & trainable.gather(1, ut)
             if self._rl_purchase_active and self._builder_idx >= 0:
@@ -184,7 +184,7 @@ class SimStep:
                         want = (ac == dbase + si) & has_tech & under_cap & not_owned
                         if bool(want.any()):
                             # the discount reads BEFORE the placement registers
-                            disc = self._player_district_discounted(di)
+                            disc = self._district_discounted(di)
                             d_cost_si = torch.where(disc, torch.floor(d_cost * 0.6), d_cost)
                             placed, best = self._place_district(di, want, c, plc)
                             if bool(placed.any()):
@@ -327,7 +327,7 @@ class SimStep:
             if self._settler_idx >= 0 and bool(made_settler.any()):
                 # Completion SPAWNS the settler at the city — a unit like any
                 # other; WHERE it founds is a later FOUND_CITY order.
-                self._spawn_player(made_settler, self.site[bidx, col], torch.full((B,), self._settler_idx, dtype=torch.long, device=dev))
+                self._spawn_p(made_settler, self.site[bidx, col], torch.full((B,), self._settler_idx, dtype=torch.long, device=dev))
             # A completed Settler costs the city 1 pop; the dirty flag
             # refreshes later cities' totals.
             self.pop[bidx, col] = torch.where(made_settler, (self.pop[bidx, col] - 1).clamp(min=1), self.pop[bidx, col])
@@ -346,7 +346,7 @@ class SimStep:
                 # clamp max too: unmasked rows may hold district codes.
                 # A trained military unit inherits city `col`'s Encampment training XP (best tier).
                 xp_col = (self.buildings[bidx, col, :].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
-                self._spawn_player(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
+                self._spawn_p(made_unit, self.site[bidx, col], (cur_c - self.UNIT_BASE).clamp(min=0, max=self.NU - 1), init_xp=xp_col)
                 if self._builder_idx >= 0:
                     # a completed builder moves the cost escalator
                     made_b = made_unit & (cur_c == self.UNIT_BASE + self._builder_idx)
@@ -439,7 +439,7 @@ class SimStep:
                 if expand.any():
                     rows = expand.nonzero(as_tuple=True)[0]
                     self.tile_city[rows, best[rows]] = col[rows]
-                    self.tile_seat[rows, best[rows]] = PLAYER_SEAT  # seat + which city: the two halves of ownerSeat/ownerCity
+                    self.tile_seat[rows, best[rows]] = 0  # seat + which city: the two halves of ownerSeat/ownerCity
                     self._tile_owner_ver += 1
                     # Each claim flips ONE tile (-1 → col, per the cand_b
                     # owner==-1 gate), so adjacency-to-col only GROWS, and only
@@ -471,18 +471,18 @@ class SimStep:
         self.culture_total.add_(cul_add)
         # Seat 0's per-turn faith income, banked in the same city walk as
         # gold/science/culture (the civ-seat twin is `r_faith + faith_sum`).
-        self.player_faith.add_(fth_add)
+        self.faith.add_(fth_add)
         # TOURISM — accumulated ONCE per turn at the seat level, right after
         # the city loop and BEFORE the loyalty collapses.
         self.tourism_total.copy_(self.tourism_total + self._tourism_of(
-            self.gw_writing, self.gw_art, self.gw_music, self.alive, self.tile_seat == PLAYER_SEAT, self._civ_era(self.techs, self.civics),
+            self.gw_writing, self.gw_art, self.gw_music, self.alive, self.tile_seat == 0, self._civ_era(self.techs, self.civics),
             self.relics,
             self.techs[:, self._gw_printing_tech] if self._gw_printing_tech >= 0 else None,
             self.artifacts,
         ))
         # DIPLOMATIC FAVOR — government TIER + suzerainties, once per turn at
         # the seat level.
-        self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._player_suzerain_count())
+        self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count())
         # Seat 0's grievances decay by 1 each turn at peace with EVERY civ seat
         # (floor 0), immediately after the tourism accumulator. The
         # +RR_WARMONGER_DOW accrual on declaring has no twin here because no
@@ -568,7 +568,7 @@ class SimStep:
         # mirroring endTurn's order (the civ seats claimed earlier this step).
         # Science/culture bank toward the next turn's tech/civic;
         # gold/production apply now.
-        self._advance_player_great_people()
+        self._advance_great_people()
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so
@@ -657,7 +657,7 @@ class SimStep:
             _fa = torch.where(_gold, self.dedications * self._ded_faith, torch.zeros_like(self.dedications))
             _es = torch.where(_gold, torch.zeros_like(self.dedications), self.dedications * self._ded_era)
             self.era_score.add_(_es)
-            self.player_faith.copy_(self.player_faith + _fa[:, 0].to(self.player_faith.dtype))
+            self.faith.copy_(self.faith + _fa[:, 0].to(self.faith.dtype))
             if self.R > 0:
                 self.r_faith.copy_(self.r_faith + _fa[:, 1 : 1 + self.R].to(self.r_faith.dtype))
         dom = self._domination()

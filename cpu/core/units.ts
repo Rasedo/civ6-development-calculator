@@ -214,7 +214,7 @@ export function unitDomain(type: string): 'civilian' | 'military' {
  * would have stacked freely with barbarians (`tileFreeForUnit` compares side
 /**
  * Are two units enemies right now? Barbarians fight everyone; seat civs
- * fight the player only while at war; seat civs never fight each other.
+ * fight the seat 0 only while at war; seat civs never fight each other.
  */
 export function unitsHostile(
   state: GameState,
@@ -249,7 +249,7 @@ export function encampmentIntact(tile: Tile): boolean {
 
 /**
  * The OWNER of a district tile, as a hostility probe. Seat
- * territory carries `seatIndex`; otherwise an owned tile belongs to the player.
+ * territory carries `seatIndex`; otherwise an owned tile belongs to the seat 0.
  * (City-states never build Encampments in this model, so `csId` needs no arm.)
  */
 export function tileOwnerSide(tile: Tile): { seat: number } | null {
@@ -411,9 +411,9 @@ export function findPath(state: GameState, unit: Unit, targetIndex: number): num
   const map = state.map;
   const target = map.tiles[targetIndex];
   // A NAVAL unit routes over enterable water only (OCEAN needs the
-  // owner's CARTOGRAPHY); a LAND unit keeps the land plane (no player-ordered
+  // owner's CARTOGRAPHY); a LAND unit keeps the land plane (no seat 0-ordered
   // embark routing in v1 — that rides #50). The scripted walkers never use
-  // findPath, so this only serves player-ordered ship moves / auto-explore.
+  // findPath, so this only serves seat 0-ordered ship moves / auto-explore.
   const naval = !!UNITS[unit.type]?.naval;
   const passOk = (t: Tile): boolean =>
     // Routing never plans THROUGH a live enemy Encampment.
@@ -509,7 +509,7 @@ export type StepOutcome =
  * differ — candidate sets, occupancy tests, stop conditions — and those stay
  * injected at the call site rather than flagged in here.
  *
- * The reveal/goody-hut block is player-only and stays inert for every other
+ * The reveal/goody-hut block is seat 0-only and stays inert for every other
  * walker: hostileUnitAct is fed only by barbUnits/the seat's unit list, and the seat
  * civilian walkers iterate one seat's units.
  */
@@ -544,10 +544,10 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   if (transition) unit.embarked = isWater(to);
   unit.tileIndex = to.index;
-  // THE move commit, for every seat. `walkPath` is the PLAYER's
+  // THE move commit, for every seat. `walkPath` is the SEAT 0's
   // walker; the other seats have their own chassis functions that transcribe its rules
   // by hand ("walkPath's exact charge", three separate copies) — so seaming
-  // walkPath logged 642 player moves and ZERO seat ones. Every seat's step
+  // walkPath logged 642 seat 0 moves and ZERO seat ones. Every seat's step
   // lands here instead: this is the ONLY tile write in core.
   logUnitOrder(state, unit.seat, unit.id, 'move', to.index);
   unit.movesLeft = Math.max(0, unit.movesLeft - cost);
@@ -612,16 +612,16 @@ export function orderMove(state: GameState, unitId: number, targetIndex: number)
  *
  * ONE escalator for every seat, and the QUEUED term is GONE.
  *
- * The player counted builders "ever trained/purchased OR CURRENTLY IN A QUEUE";
+ * The seat 0 counted builders "ever trained/purchased OR CURRENTLY IN A QUEUE";
  * the seat counted only those trained. Civ 6 counts neither queue: the unit
  * cost progression is `CostProgressionParam1="4"` applied to the "number of
  * unit already produced" — producing is the event, and an item sitting in a
- * queue has produced nothing. So the RIVAL was right and the PLAYER was wrong,
+ * queue has produced nothing. So the CIV SEAT was right and the SEAT 0 was wrong,
  * which is exactly why this task's rule is "pick the behaviour closer to real
  * Civ 6", never "mirror the TypeScript engine".
  *   https://forums.civfanatics.com/threads/600489/
  *
- * `seat` defaults to the player so the UI call sites are untouched.
+ * `seat` defaults to the seat 0 so the UI call sites are untouched.
  */
 export function builderCost(state: GameState, seat: number): number {
   return Math.round((50 + 4 * (seatOf(state, seat)?.buildersTrained ?? 0)) * GAME_SPEED);
@@ -631,7 +631,7 @@ export function builderCost(state: GameState, seat: number): number {
  * A city may build/buy NAVAL units iff its CENTER is adjacent to a
  * water tile OR it owns a COMPLETED Harbor. Mirrors the GPU naval-build gate
  * (static center-water-adjacency plane | dynamic completed-Harbor). Works for
- * both player City and City (both carry centerIndex + districts).
+ * both seat 0 City and City (both carry centerIndex + districts).
  */
 export function cityNavalCapable(
   state: GameState,
@@ -650,7 +650,7 @@ export function cityNavalCapable(
 /** Unit types a city can train right now. NAVAL units are offered ONLY
  * when a naval-capable `city` is supplied (center-coastal or a completed
  * Harbor) — callers without a city (RL candidate scan) never see naval, which
- * keeps player naval to poke tests until #50 gives the RL verbs. */
+ * keeps seat 0 naval to poke tests until #50 gives the RL verbs. */
 export function trainableUnits(
   state: GameState,
   seat: number,
@@ -682,7 +682,7 @@ export function trainableUnits(
       if (!has || (held?.artifacts ?? 0) >= ARTIFACT_SLOTS) return false;
     }
     // Strategic-resource access gates build AND purchase (purchaseUnit
-    // funnels through here). Data-driven off UnitDef.requiresResource; the player
+    // funnels through here). Data-driven off UnitDef.requiresResource; the seat 0
     // is civ 0. Sandbox ignores the gate, like the tech gate above.
     if (d.requiresResource && !state.sandbox && !civHasStrategic(state, seat, d.requiresResource)) return false;
     if (d.naval) return !!city && cityNavalCapable(state, city);
@@ -692,7 +692,7 @@ export function trainableUnits(
 
 /**
  * EXCAVATE an Antiquity Site into an Artifact. The Archaeologist
- * must stand on a site, hold a charge, and the tile must be the player's own or
+ * must stand on a site, hold a charge, and the tile must be the seat 0's own or
  * unclaimed — real Civ 6 additionally allows a seat's territory under OPEN
  * BORDERS, which this model has no concept of and which is recorded rather than
  * approximated. The artifact lands in the LOWEST-id own city that has an
@@ -923,16 +923,16 @@ export function builderImprove(state: GameState, unitId: number, imp: Improvemen
 /** Repair a pillaged improvement or district (no charge, ends the builder's
  * turn). Districts join the same repair, mirroring improvement repair. */
 /**
- * The PLAYER PILLAGE verb. Pillaging existed only on
+ * The SEAT 0 PILLAGE verb. Pillaging existed only on
  * the hostile side (`hostileUnitAct` step 2 for barbarians and at-war the other seats),
- * so the other seats wrecked player improvements while the player could only answer by
+ * so the other seats wrecked seat 0 improvements while the seat 0 could only answer by
  * killing units or taking cities.
  *
  * Mirrors the hostile rule exactly: a MILITARY unit standing on an ENEMY tile
  * pillages the improvement first, else a COMPLETE non-CITY_CENTER unpillaged
  * district, in that order; a PILLAGE_HEAL_IMPROVEMENTS target heals +25
  * (capped at UNIT_HP); the turn is spent. Enemy = an at-war seat's tile or a
- * city-state's; the player never pillages its own.
+ * city-state's; the seat 0 never pillages its own.
  */
 export function seatPillage(state: GameState, unitId: number, seat: number): RuleResult {
   const unit = state.units.find((u) => u.id === unitId);
@@ -1032,7 +1032,7 @@ export function unitNeighbor(state: GameState, unit: Unit, d: number): Tile | nu
  *
  * `stepUnit` already held the charge, the ZOC halt and the camp clear, so those
  * were genuinely shared; what was triplicated is the PATHING around it — which
- * is where task #46 came from (a rule inside the player's walker that the hand
+ * is where task #46 came from (a rule inside the seat 0's walker that the hand
  * copies did not carry).
  *
  * Takes a UNIT, not a seat index: nothing here is seat-specific, and the

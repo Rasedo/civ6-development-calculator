@@ -3,11 +3,11 @@ import { cityStateOfSeat, emptySeat, indexOfSeat, isCityStateSeat, seatOfIndex, 
 import { makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
-import { tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, expirePlayerRoutes, TRADE_ROUTE_DURATION, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
+import { tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, specialtyDistricts, expireTradeRoutes, TRADE_ROUTE_DURATION, INTL_ROUTE_GOLD } from '../../../cpu/core/trade';
 import { seatPhase } from '../../../cpu/core/phase';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
 
-// A two-player-city sandbox where the origin holds a Market (so
+// A sandbox of two seat-0 cities where the origin holds a Market (so
 // tradeCapacity >= 1) and the destination holds a completed specialty district.
 function twoCitySandbox() {
   const state = makeState(makeMap(24, 24));
@@ -111,7 +111,7 @@ describe('B-23 international route yields', () => {
     expect(y.food).toBe(0);
   });
 
-  it('a player international route to a civ city pays gold only and is suspended at war', () => {
+  it('a seat-0 international route to a civ city pays gold only and is suspended at war', () => {
     const { state, origin } = twoCitySandbox();
     const civ = addCiv(state, 12, 6); // within TRADE_ROUTE_RANGE of origin
     addCompletedCampus(state, civ.cities[0], 12, 7);
@@ -139,24 +139,24 @@ describe('B-23 route duration', () => {
     expect(state.tradeRoutes[0].expiresTurn).toBe(7 + TRADE_ROUTE_DURATION);
   });
 
-  it('expirePlayerRoutes drops routes at/after expiry, keeps the rest, zero draws', () => {
+  it('expireTradeRoutes drops routes at/after expiry, keeps the rest, zero draws', () => {
     const { state, origin, dest } = twoCitySandbox();
     state.turn = 1;
     addTradeRoute(state, origin.id, dest.id, 0); // expires at 1 + DURATION
     expect(state.tradeRoutes.length).toBe(1);
 
     state.turn = TRADE_ROUTE_DURATION; // still one turn short of expiry
-    expirePlayerRoutes(state);
+    expireTradeRoutes(state);
     expect(state.tradeRoutes.length).toBe(1);
 
     state.turn = 1 + TRADE_ROUTE_DURATION; // expiry turn reached
-    expirePlayerRoutes(state);
+    expireTradeRoutes(state);
     expect(state.tradeRoutes.length).toBe(0);
   });
 });
 
 describe('B-23 civ international pick + income', () => {
-  it('a civ with spare capacity and no domestic/CS destination routes to the nearest player city', () => {
+  it('a civ with spare capacity and no domestic/CS destination routes to the nearest seat-0 city', () => {
     const state = makeState(makeMap(24, 24));
     state.sandbox = true;
     const pcity = foundCity(state, tileAtCoords(state.map, 10, 10).index, 0).city!;
@@ -164,7 +164,7 @@ describe('B-23 civ international pick + income', () => {
     addCompletedCampus(state, pcity, 11, 10);
 
     // Single-city civ (no domestic pair), no met CS, a MARKET for capacity,
-    // placed within trade range of the player city.
+    // placed within trade range of the seat-0 city.
     const civ = addCiv(state, 13, 10);
     expect(tradeCapacity(state, civ.seat)).toBeGreaterThanOrEqual(1);
 

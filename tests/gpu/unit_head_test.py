@@ -39,7 +39,7 @@ def main() -> None:
     _pm = sim.unit_action_mask()
     _rm = sim.seat_unit_mask(0)
     assert _pm.shape[2] == _rm.shape[2] == len(rj["actions"]["unit"]), (
-        f"unit action width disagrees: player {_pm.shape[2]}, civ {_rm.shape[2]}, "
+        f"unit action width disagrees: seat 0 {_pm.shape[2]}, civ {_rm.shape[2]}, "
         f"enum {len(rj['actions']['unit'])}"
     )
     print(f"  0 both seats' unit masks are {_pm.shape[2]} wide (= the enum) OK")

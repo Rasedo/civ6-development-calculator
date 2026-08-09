@@ -233,7 +233,7 @@ describe('B-7 flanking & support', () => {
     const d0 = rollDiff('mel', () => meleeAttack(plain.state, plain.atk.id, defTile, 0));
 
     const flanked = setup();
-    const fn = freeNeighbor(flanked.state, defTile, atkTile); // a SECOND player unit next to the defender
+    const fn = freeNeighbor(flanked.state, defTile, atkTile); // a SECOND seat-0 unit next to the defender
     const flanker = spawnUnit(flanked.state, 'WARRIOR', fn.index, 0)!;
     flanker.tileIndex = fn.index;
     const d1 = rollDiff('mel', () => meleeAttack(flanked.state, flanked.atk.id, defTile, 0));
@@ -327,7 +327,7 @@ describe('B-4 XP & levels', () => {
     expect(xpLevelBonus({})).toBe(0); // undefined xp reads as 0
   });
 
-  it('a fresh player/civ unit starts at 0 xp; a barbarian carries none', () => {
+  it('a fresh seat-0/civ unit starts at 0 xp; a barbarian carries none', () => {
     const { state } = battlefield();
     const p = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
     expect(p.xp).toBe(0);

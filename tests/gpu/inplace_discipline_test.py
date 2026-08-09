@@ -84,8 +84,8 @@ ALIASED: frozenset[str] = frozenset(
     # like every other city field.
     + ["cs_alive", "cs_center", "cs_pop", "cs_hp"]
     # the five pairs whose two sides never shared a name.
-    + ["culture_total", "r_culture", "player_faith", "r_faith", "tourism_total",
-       "r_tourism", "p_warmonger", "r_warmonger", "player_gp_points", "r_gpp"]
+    + ["culture_total", "r_culture", "faith", "r_faith", "tourism_total",
+       "r_tourism", "p_warmonger", "r_warmonger", "gp_points", "r_gpp"]
     # the seat-indexed war clocks.
     + ["r_warturns", "r_peaceturns", "cs_war_turns"]
     # the city block's seat-0 and civ views (the base itself is registered).

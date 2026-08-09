@@ -39,7 +39,7 @@ def main() -> None:
     assert "war" in _MUTABLE, "the war matrix must be registered in _MUTABLE"
     assert "cs_atwar" not in _MUTABLE, "cs_atwar is a VIEW of war — registering it too would double-restore"
     assert sim.cs_atwar.data_ptr() == sim.war[:, 0, 1 + max(sim.R, 1):].data_ptr(), (
-        "cs_atwar must share storage with war[player, city-state]"
+        "cs_atwar must share storage with war[seat 0, city-state]"
     )
     assert sim.cs_atwar.shape == (sim.B, sim.S), f"cs_atwar shape {tuple(sim.cs_atwar.shape)}"
     assert not bool(sim.cs_atwar.any()), "peace is the default — no city-state starts at war"
@@ -74,7 +74,7 @@ def main() -> None:
             continue
         found = (b, cs, ctr, units[0], nbrs[0])
         break
-    assert found is not None, "no fixture has a live city-state and a live player unit"
+    assert found is not None, "no fixture has a live city-state and a live seat-0 unit"
     s2.p_type[found[0], found[3]] = fighter
     b, cs, ctr, u, spot = found
     s2.p_tile[b, u] = spot
@@ -114,7 +114,7 @@ def main() -> None:
     s2._cs_suzerain_release(r, _peace)
     assert not bool(s2.cs_atwar[b, cs]), "the suzerain's peace must end the city-state's war"
     assert int(s2.cs_war_turns[b, cs]) == 0, "the war clock must reset"
-    assert float(s2.ww[b, 0, _cs_row]) == max(0.0, 900.0 - shed), "the player must shed the treaty amount"
+    assert float(s2.ww[b, 0, _cs_row]) == max(0.0, 900.0 - shed), "seat 0 must shed the treaty amount"
     assert int(s2.war_turns[b, _cs_row]) == 0, "cs_war_turns is a VIEW — war_turns must see the reset"
 
     # a civ that is NOT the suzerain releases nothing
@@ -125,7 +125,7 @@ def main() -> None:
     assert bool(s2.cs_atwar[b, cs]), "a non-suzerain's peace must NOT free the city-state"
     print("  c suzerain release: war ends, clock resets through the view, -%d ww OK" % shed)
 
-    print("cs_war_test OK — A-18 player<->city-state war gates the attack mask")
+    print("cs_war_test OK — A-18 seat 0 <-> city-state war gates the attack mask")
 
 
 if __name__ == "__main__":

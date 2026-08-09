@@ -59,7 +59,7 @@ def main() -> None:
     #   capital holds no specialty district, so gold = intlGold(3).
     assert sim.R >= 1 and bool(sim.rc_alive[0, 0, 0]), "need a live civ capital"
     dest_tile = int(sim.site[0, 0])  # seat 0's capital centre tile
-    assert int(sim.center_at[0, dest_tile]) == 0 and bool(sim.alive[0, 0]), "player capital must own its center"
+    assert int(sim.center_at[0, dest_tile]) == 0 and bool(sim.alive[0, 0]), "seat-0 capital must own its center"
     sim.r_routes[0, 0, 0, 0] = int(sim.rc_id[0, 0, 0])  # origin = civ capital
     sim.r_routes[0, 0, 0, 1] = -1                        # intl: dest carried below
     sim.r_route_dest[0, 0, 0] = dest_tile
@@ -121,7 +121,7 @@ def main() -> None:
     s2.r_route_dest[0, 0, 0] = empty_tile
     s2.r_route_exp[0, 0, 0] = int(s2.turn) + s2._trade_duration  # not yet expired
     s2._expire_seat_routes(0)
-    assert int(s2.r_routes[0, 0, 0, 0]) == -1, "an intl route to a non-player-center tile must be dropped"
+    assert int(s2.r_routes[0, 0, 0, 0]) == -1, "an intl route to a tile that is not a seat-0 center must be dropped"
 
     # --- 5) the route tensors ride snapshot/restore ------------------------
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)

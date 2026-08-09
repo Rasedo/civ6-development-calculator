@@ -23,7 +23,7 @@ class SimEconomy:
         out = torch.zeros(B, C, dtype=self.dtype, device=self.device)
         if self._n_lux == 0 or not self.improvements_on:
             return out
-        improved = (self.lux_id >= 0) & (self.tile_seat == PLAYER_SEAT) & (self.improvement == self.lux_req)
+        improved = (self.lux_id >= 0) & (self.tile_seat == 0) & (self.improvement == self.lux_req)
         counts = torch.zeros(B, self._n_lux, dtype=torch.long, device=self.device)
         counts.scatter_add_(1, self.lux_id.clamp(min=0), improved.long())
         rounds = (counts > 0).long().sum(dim=1)  # [B] unique improved luxuries
@@ -105,9 +105,9 @@ class SimEconomy:
         """[B] long - the SEAT of the hostile attacker in pool slot `u`.
         `_hostile_vs_unit` and `_hostile_ranged_strike` are pool-generic over
         atk_kind, so their seat is too."""
-        if atk_kind == "civ":
+        if atk_kind == "v":
             return self.v_seat[:, u]
-        if atk_kind == "player":
+        if atk_kind == "p":
             return self.p_seat[:, u]
         return self.u_seat[:, u]
 
@@ -288,7 +288,7 @@ class SimEconomy:
         for _s in range(self.S):
             self._ww_peace(rel[:, _s], 0, _cs0 + _s)
 
-    def _ww_penalty_player(self) -> torch.Tensor:
+    def _ww_penalty(self) -> torch.Tensor:
         """[B] seat 0's war-weariness amenity penalty (integer floor, then
         dtype) - `warWearinessPenalty(wwMax(...))` on row 0."""
         per = int(self.rules.war_weariness.get("perAmenity", 400))
@@ -353,14 +353,14 @@ class SimEconomy:
         )  # [B, nD]
         return (unl & self._is_specialty.unsqueeze(0)).sum(dim=1)
 
-    def _player_district_discounted(self, di: int) -> torch.Tensor:
+    def _district_discounted(self, di: int) -> torch.Tensor:
         """districtDiscounted for seat 0: [B] bool — 40% off type di while the
         seat has PLACED fewer of it than ceil(D/U) with D = COMPLETED
         specialty districts owned, U = unlocked specialty types, D ≥ U."""
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         U = self._unlocked_specialty_count(self.techs, self.civics)
-        own = (self.tile_seat == PLAYER_SEAT) & ~self.district_dead  # captured = dead, uncounted
+        own = (self.tile_seat == 0) & ~self.district_dead  # captured = dead, uncounted
         spec_t = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)]
         D = (own & spec_t & self.district_complete).sum(dim=1)
         n = (own & (self.district == di)).sum(dim=1)
@@ -682,7 +682,7 @@ class SimEconomy:
             base = base & ~self._b_worship.reshape(1, 1, -1)
         if self.districts_on and self._b_has_reqs:
             nD = len(self.districts_cat)
-            valid = (self.district >= 0) & self.district_complete & (self.tile_seat == PLAYER_SEAT) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
+            valid = (self.district >= 0) & self.district_complete & (self.tile_seat == 0) & ~self.district_dead  # [B, T] (buildingCompletable: district DONE; captured = dead)
             ow_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & valid.unsqueeze(2)  # [B, T, C]
             dt_oh = torch.nn.functional.one_hot(self.district.clamp(min=0), nD).bool()  # [B, T, nD]
             has_dtype = (ow_oh.unsqueeze(3) & dt_oh.unsqueeze(2)).any(dim=1)  # [B, C, nD] city owns a district of type d
@@ -1073,7 +1073,7 @@ class SimEconomy:
             self._eff_version += 1
         return place
 
-    def _place_player_works(self, can_col: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
+    def _place_c_works(self, can_col: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
         """placeGreatWorks for seat 0: distribute gwWorks works per earning
         game across seat 0's cities in state.cities order (city_seq rank),
         lowest slot first, into the AMPHITHEATER (writing) or kind's building
@@ -1115,7 +1115,7 @@ class SimEconomy:
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
-    def _place_civ_works(self, r: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
+    def _place_rc_works(self, r: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
         """placeGreatWorks for civ seat r: distribute gwWorks works across its
         cities in rc slot order (= the seat's cities array order), lowest slot
         first; overflow charges fall back to the instant culture lump on this
@@ -1151,7 +1151,7 @@ class SimEconomy:
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
-    def _advance_player_great_people(self) -> None:
+    def _advance_great_people(self) -> None:
         """advanceGreatPeople for seat 0 (runs after research, after seatPhase
         has claimed): each class accrues 1 + (its district's built buildings)
         per city owning a completed district of its type, earns the n-th person
@@ -1162,7 +1162,7 @@ class SimEconomy:
         if not self.districts_on or self._gp_nc == 0:
             return
         B, C, dev, nCls = self.B, self.C, self.device, self._gp_nc
-        owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & (self.tile_seat == PLAYER_SEAT).unsqueeze(2)  # [B,T,C]
+        owner_oh = torch.nn.functional.one_hot(self.owner.clamp(min=0), C).bool() & (self.tile_seat == 0).unsqueeze(2)  # [B,T,C]
         for cls in range(nCls):
             d = int(self._gp_class_district[cls])
             if d < 0:
@@ -1170,25 +1170,25 @@ class SimEconomy:
             has_d = (((self.district == d) & self.district_complete & ~self.district_dead & ~self.district_pillaged).unsqueeze(2) & owner_oh).any(dim=1)  # [B,C] city owns a completed LIVE district d (pillaged earns no GPP)
             in_d = self._b_req_district == d  # [NB] buildings of district d
             bcount = self.buildings[:, :, in_d].to(self.dtype).sum(dim=2)  # [B,C]
-            self.player_gp_points[:, cls] = self.player_gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
+            self.gp_points[:, cls] = self.gp_points[:, cls] + (has_d.to(self.dtype) * (1.0 + bcount)).sum(dim=1)
         # Golden EXODUS — +4 Great PROPHET points per turn, empire-wide.
         if 0 <= self._prophet_cls < self._gp_nc:
             _ex = self._golden_ded(0, self._ded_exodus)
-            self.player_gp_points[:, self._prophet_cls] = (
-                self.player_gp_points[:, self._prophet_cls] + _ex.to(self.dtype) * 4.0
+            self.gp_points[:, self._prophet_cls] = (
+                self.gp_points[:, self._prophet_cls] + _ex.to(self.dtype) * 4.0
             )
         maxN = self._gp_effects.shape[1]
         for _ in range(maxN):  # usually one earn per class per turn; loop covers the roster
             earned = self.gp_earned[:, :nCls]
             cost = self._gp_costs[earned.clamp(max=self._gp_costs.shape[0] - 1)]  # [B,nCls] gpCost(earned)
-            can = (earned < self._gp_roster[:nCls].unsqueeze(0)) & (self.player_gp_points >= cost)
+            can = (earned < self._gp_roster[:nCls].unsqueeze(0)) & (self.gp_points >= cost)
             if not bool(can.any()):
                 break
             eff = self._gp_effects[torch.arange(nCls, device=dev).reshape(1, nCls), earned.clamp(max=maxN - 1)]  # [B,nCls,5] (col 4 = faith)
             cf = can.to(self.dtype)
             # WRITER/MUSICIAN culture is slotted as Great Works (deferred
             # +2/turn), not applied instantly — mask those columns out of the
-            # standard civic add; _place_player_works handles their slot fill +
+            # standard civic add; _place_c_works handles their slot fill +
             # overflow lump below.
             cf_cult = cf.clone()
             for _kcls in self._gw_cls:  # WRITER / ARTIST / MUSICIAN
@@ -1198,7 +1198,7 @@ class SimEconomy:
             self.civic_prog.add_((eff[:, :, 1] * cf_cult).sum(dim=1))  # culture → current civic (W/M slotted)
             self.treasury.add_((eff[:, :, 2] * cf).sum(dim=1))  # gold → treasury
             if self._gp_effects.shape[2] > 4:  # faith → seat 0's faith bank (mirrors the civ loop)
-                self.player_faith.add_((eff[:, :, 4].double() * cf.double()).sum(dim=1))
+                self.faith.add_((eff[:, :, 4].double() * cf.double()).sum(dim=1))
             prod = (eff[:, :, 3] * cf).sum(dim=1)  # production → capital's current build head
             # applyGreatPersonEffect resolves the capital as
             # `state.cities.find((c) => c.isCapital)` — the FLAG, not the array
@@ -1216,14 +1216,14 @@ class SimEconomy:
                 _nb = (_cap_live & ~has_build).nonzero(as_tuple=True)[0]
                 if len(_nb) > 0:
                     self.prod_bank[_nb, _cap_col[_nb]] = self.prod_bank[_nb, _cap_col[_nb]] + prod[_nb]
-            self.player_gp_points.sub_(cost * cf)
+            self.gp_points.sub_(cost * cf)
             self.gp_earned[:, :nCls] = earned + can.long()
             self.era_score[:, 0] += can.long().sum(dim=1) * self._era_pts["gp"]  # per GP earned
             # Slot the earned WRITER/MUSICIAN's Great Works into seat 0's
             # cities (eff holds the pre-increment person's culture).
             for _k, _kcls in enumerate(self._gw_cls):  # kind order 0/1/2
                 if _kcls >= 0:
-                    self._place_player_works(can[:, _kcls], eff[:, _kcls, 1], _k)
+                    self._place_c_works(can[:, _kcls], eff[:, _kcls, 1], _k)
             # A GENERAL/ADMIRAL claim spawns its support unit (civilian, 4 MP)
             # at seat 0's CAPITAL, on top of the instant effect — the
             # applyGreatPersonEffect mirror. Zero RNG. The capital is `is_cap`,
@@ -1233,7 +1233,7 @@ class SimEconomy:
                     sm = can[:, gcls] & _cap_live  # TS: spawn only if a capital exists
                     if bool(sm.any()):
                         cap_site = self.site.gather(1, _cap_col.unsqueeze(1)).squeeze(1)
-                        self._spawn_player(sm, cap_site, torch.full((B,), guidx, dtype=torch.long, device=dev))
+                        self._spawn_p(sm, cap_site, torch.full((B,), guidx, dtype=torch.long, device=dev))
                         self._gen_ver += 1
 
     def _spread_religious_pressure(self) -> None:
@@ -1296,7 +1296,7 @@ class SimEconomy:
         # per-tile followed religion of the OWNING city (-1 none)
         tfol = torch.full((B, T), -1, dtype=torch.long, device=dev)
         pf = self.cty_followed[:, 0, :self.C].gather(1, self.owner.clamp(min=0))  # [B, T]
-        tfol = torch.where((self.tile_seat == PLAYER_SEAT) & self.alive.gather(1, self.owner.clamp(min=0)), pf, tfol)
+        tfol = torch.where((self.tile_seat == 0) & self.alive.gather(1, self.owner.clamp(min=0)), pf, tfol)
         if self.R > 0:
             for r in range(self.R):
                 for j in range(self.RC):
@@ -1893,7 +1893,7 @@ class SimEconomy:
         # (pre-amenity), like cityBuildingYields' beliefAdd. Computed fresh
         # (not cached): the term is pop-free but cty_followed can change
         # between turns without an _eff_version bump.
-        _pcfol = self._follower_id_for(self._city_rel_player()) if self._bel_any else None
+        _pcfol = self._follower_id_for(self._city_rel_c()) if self._bel_any else None
         if _pcfol is not None:
             # (.to(self.dtype): the fol tables are f64 for the civ-seat paths;
             # this walk runs in self.dtype — f32 under gumbel/training, where
@@ -2122,7 +2122,7 @@ class SimEconomy:
             amen_have = amen_have + gpc_amen.unsqueeze(1)  # amenitiesAll
         if _cond_amen is not None:
             amen_have = amen_have + _cond_amen  # newDeal amenities
-        balance = amen_have - amen_need - self._ww_penalty_player().unsqueeze(1)
+        balance = amen_have - amen_need - self._ww_penalty().unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
         tier_idx = torch.full_like(self.pop, len(self.rules.amenity_tiers) - 1)
@@ -2772,15 +2772,15 @@ class SimEconomy:
         return torch.where(self.winner >= 0, self.winner, pick)
 
     def _domination(self) -> torch.Tensor:
-        """[B] the unified civ id holding EVERY original capital (capitalTiles:
-        cap_tile_player + cap_tile_civ), else -1. Owner of a capital tile: 0 if
-        a seat-0 city is centered there (center_at>=0), else rc_at+1 (civ index
-        -> civ id), else -1 (razed). Mirrors dominationWinner: a solo game
-        (R==0) never dominates; any unowned or split capital -> -1."""
+        """[B] the unified civ id holding EVERY original capital (civ_cap_tile),
+        else -1. Owner of a capital tile: 0 if a seat-0 city is centered there
+        (center_at>=0), else rc_at+1 (civ index -> civ id), else -1 (razed).
+        Mirrors dominationWinner: a solo game (R==0) never dominates; any
+        unowned or split capital -> -1."""
         B, dev = self.B, self.device
         if self.R == 0:
             return torch.full((B,), -1, dtype=torch.long, device=dev)
-        caps = torch.cat([self.cap_tile_player.unsqueeze(1), self.cap_tile_civ[:, : self.R]], dim=1)  # [B, 1+R] capitalTiles — survives rc compaction
+        caps = self.civ_cap_tile[:, : 1 + self.R]  # [B, 1+R] capitalTiles — survives rc compaction
         p_owns = self.center_at.gather(1, caps) >= 0
         rv = self.rc_at.gather(1, caps)  # civ index or -1
         owner = torch.where(p_owns, torch.zeros_like(rv), torch.where(rv >= 0, rv + 1, torch.full_like(rv, -1)))

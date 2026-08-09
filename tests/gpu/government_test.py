@@ -102,7 +102,7 @@ def main() -> None:
     adopted, has_gov = sim._adopted_gov(c3)
     assert int(adopted[0]) == gov_idx["MONARCHY"], "newest tier-2 government => MONARCHY"
     city_y, cap_y, hous, ymult, _sl, _em, _tp, *_ = sim._gov_policy_mods(c3)
-    assert float(hous[0]) == 1.0, "MONARCHY housingAll +1 (player-only channel; civ sites discard it)"
+    assert float(hous[0]) == 1.0, "MONARCHY housingAll +1 (seat-0-only channel; civ sites discard it)"
     GOLD, FAITH = 2, 5
     assert float(cap_y[0, GOLD]) == 1.0 and float(cap_y[0, FAITH]) == 1.0, "GOD_KING spills into MONARCHY's wildcard slot (+1 gold/+1 faith capital)"
     assert float(city_y[0, PROD]) == 1.0, "URBAN_PLANNING keeps the economic slot"

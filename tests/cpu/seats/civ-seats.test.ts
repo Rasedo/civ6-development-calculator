@@ -467,7 +467,7 @@ describe('civ trade routes (A-11)', () => {
     expect(civ.tradeRoutes.length).toBe(0);
   });
 
-  it('civ routes suspend for barbarians always and player units only at war', () => {
+  it('civ routes suspend for barbarians always and seat-0 units only at war', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
@@ -527,7 +527,7 @@ describe('civ CS trade routes (A-12b)', () => {
     cs.envoys = {  };
     cs.envoys[civ.seat] = 3;
     expect(tradeCapacity(state, civ.seat)).toBe(1); // uncontested at the minimum
-    cs.envoys = { [0]: 3 }; // player ties: nobody is suzerain
+    cs.envoys = { [0]: 3 }; // seat 0 ties: nobody is suzerain
     expect(tradeCapacity(state, civ.seat)).toBe(0);
   });
 
@@ -560,12 +560,12 @@ describe('civ CS trade routes (A-12b)', () => {
     expect(civ.tradeRoutes.length).toBe(0);
   });
 
-  it("join-the-suzerain's-war: an at-war civ melee sieges a player-suzerain CS; conquest lands it as a civ city", () => {
+  it("join-the-suzerain's-war: an at-war civ melee sieges a seat-0-suzerain CS; conquest lands it as a civ city", () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 4, 4);
     const cs = addCs(state, 9, 9);
-    cs.envoys = { [0]: 3 }; // the player is suzerain, uncontested
+    cs.envoys = { [0]: 3 }; // seat 0 is suzerain, uncontested
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 8).index, civ.seat);
     const u = state.units[state.units.length - 1];
     expect(attackTargets(state, u)).not.toContain(cs.centerIndex); // at peace: no join-the-war
@@ -588,7 +588,7 @@ describe('civ CS trade routes (A-12b)', () => {
 });
 
 describe('B-31 civilian capture', () => {
-  it('a player melee captures a lone at-war civ civilian (charges kept, no advance)', () => {
+  it('a seat-0 melee captures a lone at-war civ civilian (charges kept, no advance)', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     foundCity(state, tileAtCoords(state.map, 9, 9).index, 0);
@@ -605,10 +605,10 @@ describe('B-31 civilian capture', () => {
 
     expect(meleeAttack(state, atk.id, defTile.index, 0).ok).toBe(true);
 
-    // Captured: SAME unit id, now player-owned, still on its tile, charges kept.
+    // Captured: SAME unit id, now seat-0-owned, still on its tile, charges kept.
     const cap = state.units.find((u) => u.id === builder.id);
     expect(cap).toBeDefined();
-    // One field carries the whole capture — a player-owned unit is
+    // One field carries the whole capture — a seat-0-owned unit is
     // simply seat 0, with no separate "and no civId" half to assert.
     expect(cap!.seat).toBe(0);
     expect(cap!.tileIndex).toBe(defTile.index);
@@ -627,7 +627,7 @@ describe('B-31 civilian capture', () => {
     const defTile = tileAtCoords(state.map, 12, 9);
     const barb = spawnUnit(state, 'WARRIOR', atkTile.index, BARB_SEAT)!;
     barb.tileIndex = atkTile.index;
-    const builder = spawnUnit(state, 'BUILDER', defTile.index, 0)!; // a player civilian
+    const builder = spawnUnit(state, 'BUILDER', defTile.index, 0)!; // a seat-0 civilian
     builder.tileIndex = defTile.index;
 
     expect(meleeAttack(state, barb.id, defTile.index, 0).ok).toBe(true);

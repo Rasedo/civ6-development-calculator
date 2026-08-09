@@ -6,13 +6,13 @@ import type { GameState } from '../../../cpu/core/types';
 // DominationWinner reads only capitalTiles + who currently has a city
 // centered on each. These focused cases pin the semantics (the real risk — the
 // gate never triggers domination by t100, so parity alone can't validate it).
-const mk = (capitalTiles: number[], playerCenters: number[], civCenters: number[][]): GameState =>
+const mk = (capitalTiles: number[], seat0Centers: number[], civCenters: number[][]): GameState =>
   ({
     capitalTiles,
-    // Seats[0] is the player, seats[r+1] the the other civs — and EVERY seat
-    // holds its own cities, so the player's live here like anyone else's.
+    // Seats[0] is seat 0, seats[r+1] the other civs — and EVERY seat
+    // holds its own cities, so seat 0's live here like anyone else's.
     seats: [
-      { seat: 0, cities: playerCenters.map((centerIndex) => ({ centerIndex })) },
+      { seat: 0, cities: seat0Centers.map((centerIndex) => ({ centerIndex })) },
       ...civCenters.map((cs) => ({ cities: cs.map((centerIndex) => ({ centerIndex })) })),
     ],
   }) as unknown as GameState;
@@ -24,7 +24,7 @@ describe('GV-3 dominationWinner', () => {
     expect(dominationWinner(mk(caps, [10], [[20], [30]]))).toBe(-1);
   });
 
-  it('is 0 when the player holds every capital (all captured)', () => {
+  it('is 0 when seat 0 holds every capital (all captured)', () => {
     expect(dominationWinner(mk(caps, [10, 20, 30], [[], []]))).toBe(0);
   });
 
@@ -37,7 +37,7 @@ describe('GV-3 dominationWinner', () => {
   });
 
   it('is -1 before every capital is founded', () => {
-    // only the player and one civ have founded (capitalTiles[2] missing)
+    // only seat 0 and one civ have founded (capitalTiles[2] missing)
     const s = mk([10, 20], [10], [[20], []]);
     [10, 20].forEach((t, i) => { const st = seatOf(s, i); if (st) st.capitalTile = t; }); // seat 2 unfounded, so the capital count falls short of the seat count
     expect(dominationWinner(s)).toBe(-1);

@@ -148,7 +148,7 @@ def poke_encampment_placement(rules, rj, paths):
     for path in paths:
         if _try_encampment_placement(rules, rj, path):
             return
-    raise AssertionError("no fixture's player cities could place an ENCAMPMENT to exercise the rule")
+    raise AssertionError("no fixture's seat-0 cities could place an ENCAMPMENT to exercise the rule")
 
 
 def _try_encampment_placement(rules, rj, path) -> bool:

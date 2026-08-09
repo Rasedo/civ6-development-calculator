@@ -7,7 +7,7 @@ The scripted parity rollout reaches almost none of the naval combat surface:
 seat 0 builds no ships and the civ galley policy rarely fights. These pokes pin
 those semantics the same way space_race_test / war_test do: build a BatchSim
 from a fixture, force the state in-memory, then drive the EXACT engine twin
-(_apply_unit_actions, _barbarian_phase pcstk, _seat_phase rcstk, _spawn_player,
+(_apply_unit_actions, _barbarian_phase pcstk, _seat_phase rcstk, _spawn_p,
 _flank_support) and assert TS-mirroring behaviour.
 
 Covered here (all gate-unreachable):
@@ -15,7 +15,7 @@ Covered here (all gate-unreachable):
   2. GALLEY naval melee — CAPTURE a coastal city-state.
   3. QUADRIREME range-1 bombard — a civ UNIT (no retaliation, no advance).
   4. QUADRIREME range-1 bombard — a civ CITY (HP floors at 1, never captures).
-  5. SEAT-0 naval — spawn on WATER (_spawn_player naval probe) + attack; plus
+  5. SEAT-0 naval — spawn on WATER (_spawn_p naval probe) + attack; plus
      the MOVE-verb limit: the controlled MOVE verb cannot step a ship onto
      water, because its apply reads the land `passable` plane, not wpass.
   6. OCEAN gate — a naval mover's spawn probe is blocked over OCEAN pre-
@@ -175,7 +175,7 @@ def clear_all_civ_units(sim) -> None:
 # ------------------------------------------------------------------ pokes -----
 def poke_galley_city(rules, path, GALLEY):
     """1. A GALLEY on a water tile adjacent to a coastal civ city batters it
-    (siege → _player_attack_civ_city) and CAPTURES it at 0 HP — naval melee
+    (siege → _p_attack_civ_city) and CAPTURES it at 0 HP — naval melee
     takes coastal cities from the sea, through the existing combat path."""
     sim = build(rules, path)
     for _ in range(25):
@@ -199,17 +199,17 @@ def poke_galley_city(rules, path, GALLEY):
     assert int(sim.rc_hp[0, r, j]) < hp0, "the galley did not batter the coastal city"
 
     # capture: grind to the brink, one more naval melee -> the city changes seat
-    assert bool((~sim.alive[0]).any()), "no free player city slot for the capture"
+    assert bool((~sim.alive[0]).any()), "no free seat-0 city slot for the capture"
     sim.rc_hp[0, r, j] = 1
     sim.rc_outer_hp[0, r, j] = 0
     sim.p_hp[0, slot] = 100  # heal the ship (counter fire earlier)
     ncity0 = int(sim.alive[0].sum())
     sim._apply_unit_actions(order(sim, slot, 6 + d))
     assert not bool(sim.rc_alive[0, r, j]), "coastal city at 1 HP not captured by the galley"
-    assert int(sim.alive[0].sum()) == ncity0 + 1, "capture must found a player city"
+    assert int(sim.alive[0].sum()) == ncity0 + 1, "capture must found a seat-0 city"
     c_new = int(sim.center_at[0, ctr])
     assert c_new >= 0 and bool(sim.alive[0, c_new]), "captured center must map to the new city"
-    assert int(sim.owner[0, ctr]) == c_new, "captured center tile must transfer to the player"
+    assert int(sim.owner[0, ctr]) == c_new, "captured center tile must transfer to seat 0"
     print(f"  1 galley captures a coastal city OK (hp {hp0}->batter->1->captured, city {c_new})")
 
 
@@ -243,12 +243,12 @@ def poke_galley_cs(rules, path, GALLEY):
         if int(sim.barb_at[0, t_]) == u:
             sim.occ_mil[0, t_] = -1
     sim.cs_hp[0, s] = 1
-    assert bool((~sim.alive[0]).any()), "no free player city slot for the CS capture"
+    assert bool((~sim.alive[0]).any()), "no free seat-0 city slot for the CS capture"
     pop_before = int(sim.cs_pop[0, s])
     ncity0 = int(sim.alive[0].sum())
     sim._apply_unit_actions(order(sim, slot, 6 + d))
     assert not bool(sim.cs_alive[0, s]), "CS at 1 HP not captured by the galley"
-    assert int(sim.alive[0].sum()) >= ncity0 + 1, "CS capture must found a player city"
+    assert int(sim.alive[0].sum()) >= ncity0 + 1, "CS capture must found a seat-0 city"
     c_new = int(sim.center_at[0, ctr])
     assert c_new >= 0 and int(sim.owner[0, ctr]) == c_new, "captured CS center must transfer"
     assert int(sim.pop[0, c_new]) == max(1, (pop_before * 3) // 4), "captured pop x0.75 (min 1)"
@@ -315,7 +315,7 @@ def poke_quadrireme_city(rules, path, QUAD):
     print(f"  4 quadrireme bombards a city OK (hp {hp0}->{int(sim.rc_hp[0, r, j]) if False else '..'}->floored at 1, no capture)")
 
 
-def poke_player_naval(rules, path, GALLEY, WARRIOR):
+def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     """5. Seat-0 naval end-to-end (forced, since seat 0 builds no ships on its
     own): a GALLEY SPAWNS on the nearest free WATER tile, then attacks. Plus the
     MOVE-verb limit — the controlled MOVE verb reads the land `passable` plane
@@ -334,8 +334,8 @@ def poke_player_naval(rules, path, GALLEY, WARRIOR):
     assert wt >= 0 and wt != anchor
     force_water(sim, wt)
     n0 = int(sim.p_next[0])
-    sim._spawn_player(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
-    assert int(sim.p_next[0]) == n0 + 1, "player galley failed to spawn"
+    sim._spawn_p(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
+    assert int(sim.p_next[0]) == n0 + 1, "seat-0 galley failed to spawn"
     gslot = n0
     assert bool(sim.wpass[0, int(sim.p_tile[0, gslot])]), "naval unit must spawn on WATER"
     assert not bool(sim.p_emb[0, gslot]), "a naval unit is never 'embarked'"
@@ -352,7 +352,7 @@ def poke_player_naval(rules, path, GALLEY, WARRIOR):
     assert da >= 0
     vhp0 = int(sim.v_hp[0, vslot])
     sim._apply_unit_actions(order(sim, gslot, 6 + da))
-    assert int(sim.v_hp[0, vslot]) < vhp0, "player galley dealt no melee damage"
+    assert int(sim.v_hp[0, vslot]) < vhp0, "seat-0 galley dealt no melee damage"
 
     # the controlled MOVE verb cannot move a ship onto water.
     gt2 = int(sim.p_tile[0, gslot])
@@ -365,14 +365,14 @@ def poke_player_naval(rules, path, GALLEY, WARRIOR):
     before = int(sim.p_tile[0, gslot])
     sim._apply_unit_actions(order(sim, gslot, dm))  # a MOVE order (0..5)
     assert int(sim.p_tile[0, gslot]) == before, (
-        "RL/controlled move stepped a ship onto water — the #50 residual (player-naval "
+        "RL/controlled move stepped a ship onto water — the #50 residual (seat-0 naval "
         "water-move columns) is unexpectedly LIVE; TS findPath is the naval-aware path"
     )
-    print("  5 player naval OK (spawn-on-water + attack; RL water-move is the documented #50 residual)")
+    print("  5 seat-0 naval OK (spawn-on-water + attack; RL water-move is the documented #50 residual)")
 
 
 def poke_ocean_gate(rules, path, GALLEY):
-    """6. OCEAN gate for a naval mover (the _spawn_player naval probe shares the
+    """6. OCEAN gate for a naval mover (the _spawn_p naval probe shares the
     exact `wpass & (~ocean | cartography)` gate as the war-march water step):
     an OCEAN spot is refused pre-CARTOGRAPHY, allowed post-; COAST is ungated."""
     cart = None
@@ -404,12 +404,12 @@ def poke_ocean_gate(rules, path, GALLEY):
     # pre-CARTOGRAPHY: the ocean spot is gated out -> no spawn.
     sim.techs[0, cart] = False
     n0 = int(sim.p_next[0])
-    sim._spawn_player(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
+    sim._spawn_p(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
     assert int(sim.p_next[0]) == n0, "ship spawned on OCEAN without CARTOGRAPHY"
 
     # post-CARTOGRAPHY: the ocean spot opens -> the ship lands there.
     sim.techs[0, cart] = True
-    sim._spawn_player(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
+    sim._spawn_p(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
     assert int(sim.p_next[0]) == n0 + 1, "ship failed to spawn on OCEAN with CARTOGRAPHY"
     assert int(sim.p_tile[0, n0]) == ot, "the ship must land on the (now-enterable) ocean tile"
 
@@ -424,7 +424,7 @@ def poke_ocean_gate(rules, path, GALLEY):
     force_water(sim2, ct, ocean=False)  # COAST
     sim2.techs[0, cart] = False
     m0 = int(sim2.p_next[0])
-    sim2._spawn_player(torch.tensor([True]), torch.tensor([anchor2]), torch.tensor([GALLEY]))
+    sim2._spawn_p(torch.tensor([True]), torch.tensor([anchor2]), torch.tensor([GALLEY]))
     assert int(sim2.p_next[0]) == m0 + 1, "COAST spawn must NOT need CARTOGRAPHY"
     print("  6 OCEAN gate OK (pre-CART blocked, post-CART allowed; COAST ungated)")
 
@@ -437,7 +437,7 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     for _ in range(25):
         sim.step()
     assert sim._walls_bidx >= 0
-    assert bool(sim.alive[0, 0]), "player capital must be alive"
+    assert bool(sim.alive[0, 0]), "seat-0 capital must be alive"
     c, ctr = 0, int(sim.site[0, 0])
     sim.buildings[0, c, sim._walls_bidx] = True
     r = 0
@@ -453,7 +453,7 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     sim.best_melee[0] = 40
     base = sim.snapshot()
     sim._barbarian_phase()
-    assert int(sim.v_hp[0, gslot]) < 100, "player city walls did not strike the ship"
+    assert int(sim.v_hp[0, gslot]) < 100, "seat-0 city walls did not strike the ship"
 
     # -- embarked override: a civ-seat WARRIOR at the same tile, embarked vs grounded.
     sim.restore(base)
@@ -501,7 +501,7 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     sim.r_best_melee[0, r] = 40
     base = sim.snapshot()
     sim._seat_phase()
-    assert int(sim.p_hp[0, gslot]) < 100, "civ city walls did not strike the player ship"
+    assert int(sim.p_hp[0, gslot]) < 100, "civ city walls did not strike the seat-0 ship"
 
     # -- embarked override (two-run compare on one RNG).
     sim.restore(base)
@@ -556,12 +556,12 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     assert d >= 0
     sim._apply_unit_actions(order(sim, wslot, 6 + d))
     cap = old_next  # captured unit appends at the pool end
-    assert bool(sim.p_alive[0, cap]), "captured builder not appended to the player pool"
+    assert bool(sim.p_alive[0, cap]), "captured builder not appended to the seat-0 pool"
     assert int(sim.p_type[0, cap]) == BUILDER, "captured unit is the builder"
     assert bool(sim.p_emb[0, cap]), "captured civilian must KEEP embarked under the new owner"
     assert cap > tail_slot, "capture must append at POOL END (after the pre-existing tail)"
     assert not bool(sim.v_alive[0, bslot]), "the civ builder must despawn on capture"
-    assert int(sim.pciv_at[0, bt]) == cap, "captured civilian occupies the tile as a player unit"
+    assert int(sim.pciv_at[0, bt]) == cap, "captured civilian occupies the tile as a seat-0 unit"
     print(f"  8 embarked-civilian capture OK (pool-end slot {cap} > tail {tail_slot}, keeps embarked)")
 
 
@@ -602,7 +602,7 @@ def poke_flank_support(rules, path, GALLEY):
     dtile = torch.tensor([dt]); dseat = torch.tensor([r + 1]); noatk = torch.tensor([-1])
     flank0, sup0 = sim._flank_support(dtile, dseat, noatk)
     assert int(sup0) >= 1, "a civ naval ally must count for support"
-    assert int(flank0) >= 1, "a player naval unit must count for flanking"
+    assert int(flank0) >= 1, "a seat-0 naval unit must count for flanking"
 
     # embark BOTH — neither contributes now.
     sim.v_emb[0, ally] = True
@@ -629,7 +629,7 @@ def main() -> None:
     poke_galley_cs(rules, path, GALLEY)
     poke_quadrireme_unit(rules, path, QUAD, WARRIOR)
     poke_quadrireme_city(rules, path, QUAD)
-    poke_player_naval(rules, path, GALLEY, WARRIOR)
+    poke_seat0_naval(rules, path, GALLEY, WARRIOR)
     poke_ocean_gate(rules, path, GALLEY)
     poke_walls_pcstk(rules, path, GALLEY, WARRIOR)
     poke_walls_rcstk(rules, path, GALLEY, WARRIOR)

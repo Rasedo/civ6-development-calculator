@@ -960,7 +960,7 @@ class SimSeats:
         # applied per tile owner).
         host = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         at_war_pl = self.r_atwar[:, r].unsqueeze(1)
-        host = host | ((self.tile_seat == PLAYER_SEAT) & at_war_pl)
+        host = host | ((self.tile_seat == 0) & at_war_pl)
         for r2 in range(self.R):
             if r2 == r:
                 continue
@@ -1191,7 +1191,7 @@ class SimSeats:
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
-    def _player_suzerain_count(self) -> torch.Tensor:
+    def _suzerain_count(self) -> torch.Tensor:
         """[B] city-states seat 0 is Suzerain of — the `isSuzerain` twin
         (>= suzerainEnvoys and STRICTLY more than every civ seat's envoys; a tie
         leaves no suzerain)."""
@@ -1445,7 +1445,7 @@ class SimSeats:
         table's trailing dims."""
         return self._bel["fol"][key][fol_id + 1]
 
-    def _city_rel_player(self) -> torch.Tensor:
+    def _city_rel_c(self) -> torch.Tensor:
         """The religion id each SEAT-0 city draws its follower belief from —
         followedReligion when the coupling is LIVE, else seat 0's religion id 0."""
         if self._b18_couple:
@@ -1554,14 +1554,14 @@ class SimSeats:
             _hv = self.war[:, int(self._seat_row[r + 1]), :].gather(1, self._seat_row[self.v_seat.clamp(min=0)])  # [B, V]
             _v_host = self.v_alive & _hv  # [B, V]
 
-        def _near_of(tiles: torch.Tensor, player_arm: bool = True) -> torch.Tensor:
+        def _near_of(tiles: torch.Tensor, p_arm: bool = True) -> torch.Tensor:
             """Hostiles within 3 of each tile in `tiles` [B, N] — the
             `routeRaidedAt` twin for one set of endpoints."""
             out = torch.zeros(*tiles.shape, dtype=torch.bool, device=self.device)
             if self.u_tile.numel():  # barbarians: always
                 d_b = self.pair_dist[tiles.unsqueeze(2), self.u_tile.clamp(min=0).unsqueeze(1)] <= 3
                 out = out | (d_b & self.u_alive.unsqueeze(1)).any(dim=2)
-            if player_arm and self.p_tile.numel():  # seat 0: only at war
+            if p_arm and self.p_tile.numel():  # seat 0: only at war
                 d_p = self.pair_dist[tiles.unsqueeze(2), self.p_tile.clamp(min=0).unsqueeze(1)] <= 3
                 out = out | ((d_p & self.p_alive.unsqueeze(1)).any(dim=2) & self.r_atwar[:, r].reshape(B, 1))
             if _v_host is not None:  # a civ, only at war
@@ -1616,14 +1616,14 @@ class SimSeats:
             # per seat-0-city completed specialty district count [B, C]
             own_spec = (self.district >= 0) & self._is_specialty[self.district.clamp(min=0)] & self.district_complete
             p_city_spec = torch.zeros(B, self.C, dtype=torch.long, device=self.device).scatter_add_(
-                1, self.owner.clamp(min=0), (own_spec & (self.tile_seat == PLAYER_SEAT)).long()
+                1, self.owner.clamp(min=0), (own_spec & (self.tile_seat == 0)).long()
             )  # [B, C]
             spec_dest = p_city_spec.gather(1, dest_slot.clamp(min=0))  # [B, K]
             gold_i = (self._trade_intl_gold + spec_dest).double()
             # seat-0 arm off: `pays_i` already requires PEACE with seat 0, so a
             # seat-0 unit term cannot change the answer. A hostile CIV can, and
             # routeRaidedAt counts one.
-            near_dest = _near_of(dest_tile, player_arm=False)
+            near_dest = _near_of(dest_tile, p_arm=False)
             raided_i = near.gather(1, from_j) | near_dest
             pays_i = act & intl & has_from & valid_dest & ~self.r_atwar[:, r].reshape(B, 1) & ~raided_i
             inc.scatter_add_(1, from_j * 6 + 2, gold_i * pays_i.double())
@@ -2308,7 +2308,7 @@ class SimSeats:
         # relocatePalace(from.cities) — the loser re-crowns immediately after its
         # city list loses the slot, before the route prune and territory re-tag,
         # matching the TS order.
-        self._relocate_palace_seat(
+        self._relocate_palace_rc(
             torch.tensor([b], dtype=torch.long, device=self.device),
             torch.tensor([r_from], dtype=torch.long, device=self.device),
         )
@@ -2557,7 +2557,7 @@ class SimSeats:
         self.rc_alive[rows, r, slot] = True
         self.era_score[rows, r + 1] += self._era_pts["found"]  # the founding moment
         self.rc_is_cap[rows, r, slot] = new_cap
-        self.cap_tile_civ[rows, r] = torch.where(new_cap, s_idx, self.cap_tile_civ[rows, r])
+        self.r_cap_tile[rows, r] = torch.where(new_cap, s_idx, self.r_cap_tile[rows, r])
         self.rc_center[rows, r, slot] = s_idx
         self.rc_pop[rows, r, slot] = 1
         self.rc_growth[rows, r, slot] = 0
@@ -2639,7 +2639,7 @@ class SimSeats:
         tile tgt: military defender takes defender-first rolls with terrain
         defense and the victor-survives rule; a lone civilian dies without a
         roll; the attacker advances into an emptied tile."""
-        if atk_kind == "barb":
+        if atk_kind == "u":
             a_hp, a_tile = self.u_hp, self.u_tile
             a_occ, a_lo = self.occ_mil, simbase.P_MAX + simbase.U_MAX
             a_alive = self.u_alive
@@ -2663,18 +2663,18 @@ class SimSeats:
         c_seat = torch.where(cslot_raw >= 0, self.unit_seat.gather(1, cslot_raw.clamp(min=0).unsqueeze(1)).squeeze(1), neg)
         is_rv_m = (m_seat > 0) & (m_seat != BARB_SEAT)
         is_rv_c = (c_seat > 0) & (c_seat != BARB_SEAT)
-        a_seat_h = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
+        a_seat_h = BARB_SEAT if atk_kind == "u" else self.v_seat[:, u].unsqueeze(1)
         ok_m = self._seats_hostile(a_seat_h, m_seat.unsqueeze(1)).squeeze(1)
         ok_c = self._seats_hostile(a_seat_h, c_seat.unsqueeze(1)).squeeze(1)
         d_slot = torch.where(ok_m, mslot_raw, torch.where(ok_c, cslot_raw, neg))
         def_is_barb = ok_m & (m_seat == BARB_SEAT)
         def_is_rv = ok_m & is_rv_m
         mil_att = att & ok_m
-        civ_att = att & ~ok_m & ok_c & (c_seat == PLAYER_SEAT)
+        civ_att = att & ~ok_m & ok_c & (c_seat == 0)
         rvciv_att = att & ~ok_m & ok_c & is_rv_c  # lone civ civilian
         # POOL-LOCAL slots for the capture branches below, which address the
         # p_/v_ ranges directly rather than through the merged pool.
-        dc_ = torch.where(ok_c & (c_seat == PLAYER_SEAT), cslot_raw - self.POOL_LO["p"], neg)
+        dc_ = torch.where(ok_c & (c_seat == 0), cslot_raw - self.POOL_LO["p"], neg)
         dvc = torch.where(ok_c & is_rv_c, cslot_raw - self.POOL_LO["v"], neg)
         if bool(mil_att.any()):
             ds0 = d_slot.clamp(min=0)
@@ -2697,7 +2697,7 @@ class SimSeats:
             def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             # attacker veterancy, gated on the attacking class's `caps.xp` — one
             # table, never a hardcoded pool name.
-            atk_lvl5 = (self._xp_lvl_bonus(self.v_xp[:, u]) if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]
+            atk_lvl5 = (self._xp_lvl_bonus(self.v_xp[:, u]) if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]
                         else torch.zeros_like(a_hp[:, u]))
             atk_e = atk_cs_all - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt) + atk_lvl5  # wound + river + veterancy
             def_e = def_cs - self._wound(def_hp)
@@ -2712,7 +2712,7 @@ class SimSeats:
             # near + Crusade onto following territory); a CIV defender gets the
             # defense terms (embarked = flat, none). Barbs and seat-0 units carry
             # no religion here.
-            if atk_kind == "civ":
+            if atk_kind == "v":
                 atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_rv, _dciv, torch.full_like(_dciv, -1)), tgt).to(def_e.dtype))
             # Great General / Admiral aura. Attacker keyed on its own tile `here`
@@ -2720,7 +2720,7 @@ class SimSeats:
             # keyed on `tgt` — seat 0, a civ seat, or barb (-1). Embarked/naval →
             # the ADMIRAL (sea) plane, NOT zeroed for embarked: generalAuraCS
             # gives an embarked defender the admiral aura on top of its flat CS.
-            if atk_kind == "civ":
+            if atk_kind == "v":
                 atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
                 atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, here, atk_naval).to(atk_e.dtype)
             def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
@@ -2728,7 +2728,7 @@ class SimSeats:
             def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)
             _wwd = self._tile_mil_seat(tgt)  # the defender, before it falls
-            if atk_kind == "civ":
+            if atk_kind == "v":
                 self.v_xp[:, u] = torch.where(mil_att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
             rows, def_dead, atk_dead = self._melee_exchange(
                 mil_att, tgt, ttc, d_slot, ~def_is_barb, a_hp, u, atk_e, def_e)
@@ -2750,7 +2750,7 @@ class SimSeats:
             # advance onto the water tile of a just-killed embarked enemy.
             ttc_adv = tgt.clamp(min=0)
             land_ok = self.passable.gather(1, ttc_adv.unsqueeze(1)).squeeze(1)
-            if atk_kind == "civ":
+            if atk_kind == "v":
                 naval_att = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)]
                 civ_u = self.v_civ[:, u].clamp(min=0)
                 cart_u = (
@@ -2773,19 +2773,19 @@ class SimSeats:
                     land_ok,
                 )
             # the advance probe, by seat (see _blocked_for).
-            _bseat = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
+            _bseat = BARB_SEAT if atk_kind == "u" else self.v_seat[:, u].unsqueeze(1)
             adv = def_dead & ~atk_dead & ~self._blocked_for(tgt.unsqueeze(1), _bseat).squeeze(1) & adv_terr
             if bool(adv.any()):
                 vr = adv.nonzero(as_tuple=True)[0]
                 a_occ[vr, here[vr]] = -1
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
-                if atk_kind == "civ":
+                if atk_kind == "v":
                     self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])
         if bool(civ_att.any()):
             rows = civ_att.nonzero(as_tuple=True)[0]
             ds = dc_[rows]
-            if atk_kind == "civ":
+            if atk_kind == "v":
                 # an at-war civ melee on a lone seat-0 civilian CAPTURES it —
                 # roll-free (draw-count neutral) and no advance
                 # (single-occupancy). Pool TRANSFER p_* -> v_* in spawn order
@@ -2810,7 +2810,7 @@ class SimSeats:
         if bool(rvciv_att.any()):
             rows = rvciv_att.nonzero(as_tuple=True)[0]
             ds = dvc[rows]
-            if atk_kind == "civ":
+            if atk_kind == "v":
                 # a civ CAPTURES an enemy civ's lone civilian, symmetric with the
                 # seat-0 branch above — despawn the old slot, respawn at POOL END
                 # under the attacker's civ; hp/charges/xp/embark kept, moves 0.
@@ -2833,10 +2833,10 @@ class SimSeats:
             self._gen_ver += 1  # the killed/captured civilian may be a general → invalidate the aura plane
         # a captured civilian is NOT killed — its captor does NOT advance
         # onto it. Only a barbarian kill (barb attacker) frees the tile for the
-        # advance; a civ captor (civ_att under atk_kind=="civ") stays put.
-        kill_adv = (civ_att | rvciv_att) if atk_kind == "barb" else torch.zeros_like(civ_att)
+        # advance; a civ captor (civ_att under atk_kind=="v") stays put.
+        kill_adv = (civ_att | rvciv_att) if atk_kind == "u" else torch.zeros_like(civ_att)
         if bool(kill_adv.any()):
-            _bseat2 = BARB_SEAT if atk_kind == "barb" else self.v_seat[:, u].unsqueeze(1)
+            _bseat2 = BARB_SEAT if atk_kind == "u" else self.v_seat[:, u].unsqueeze(1)
             # the SAME naval-plane gate as the melee advance above — a roll-free
             # civilian kill by a barb GALLEY must not walk the hull onto the
             # (land) tile it just cleared.
@@ -2847,7 +2847,7 @@ class SimSeats:
                     self._barb_water_ok(_kt),
                     self.passable.gather(1, _kt.unsqueeze(1)).squeeze(1),
                 )
-                if atk_kind == "barb"
+                if atk_kind == "u"
                 else torch.ones_like(kill_adv)
             )
             adv = kill_adv & _kterr & ~self._blocked_for(tgt.unsqueeze(1), _bseat2).squeeze(1)
@@ -2856,13 +2856,13 @@ class SimSeats:
                 a_occ[vr, here[vr]] = -1
                 a_tile[vr, u] = ttc[vr]
                 a_occ[vr, ttc[vr]] = u + a_lo
-                if atk_kind == "civ":
+                if atk_kind == "v":
                     self._clear_camp_at(adv, ttc, civ=self.v_civ[:, u])
 
     def _attack_civ_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
         """A BARBARIAN's melee assault on a civ city — the shared battle in
         `_assault_civ_city`, then the barbarian SACK (barbs never hold)."""
-        _r = self._assault_civ_city(att, tgt, "barb", u)
+        _r = self._assault_civ_city(att, tgt, "u", u)
         if _r is None:
             return
         rows, civ, slot, died, ttc = _r
@@ -2897,7 +2897,7 @@ class SimSeats:
     def _civ_attack_civ_city(self, att: torch.Tensor, tgt: torch.Tensor, u: int) -> None:
         """A CIV's melee assault on another civ's city — the shared battle
         in `_assault_civ_city`, then the CONQUEST transfer."""
-        _r = self._assault_civ_city(att, tgt, "civ", u)
+        _r = self._assault_civ_city(att, tgt, "v", u)
         if _r is None:
             return
         rows, civ, slot, died, ttc = _r
@@ -3003,7 +3003,7 @@ class SimSeats:
         together."""
         if self._owner_ver != self._tile_owner_ver:
             self._owner_cache = torch.where(
-                self.tile_seat == PLAYER_SEAT, self.tile_city,
+                self.tile_seat == 0, self.tile_city,
                 torch.full_like(self.tile_city, -1),
             )
             self._owner_ver = self._tile_owner_ver
@@ -3032,7 +3032,7 @@ class SimSeats:
         ownership write, so the version covers both."""
         if self._center_at_ver != self._tile_owner_ver:
             self._center_at_cache = torch.where(
-                self.tile_seat == PLAYER_SEAT, self.centre_slot_at,
+                self.tile_seat == 0, self.centre_slot_at,
                 torch.full_like(self.centre_slot_at, -1))
             self._center_at_ver = self._tile_owner_ver
         return self._center_at_cache
@@ -3075,7 +3075,7 @@ class SimSeats:
         # an agreement between planes. The count below can only be 0 or 1 by
         # construction; it stays as a cheap tripwire against a future write
         # reintroducing a second store.
-        n = (self.tile_seat == PLAYER_SEAT).long() + (self.civ_at >= 0).long() + (self.cs_at >= 0).long()
+        n = (self.tile_seat == 0).long() + (self.civ_at >= 0).long() + (self.cs_at >= 0).long()
         if not bool((n <= 1).all()):
             b, t = [int(x[0]) for x in (n > 1).nonzero(as_tuple=True)]
             raise AssertionError(
@@ -3257,9 +3257,9 @@ class SimSeats:
         # cities, not neutral seat-0 improvements.
         hpT = hp.unsqueeze(1)
         if self.improvements_on or self.districts_on:
-            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == PLAYER_SEAT) & hpT
+            imp_job = (self.improvement >= 0) & ~self.pillaged & (self.tile_seat == 0) & hpT
             if self.districts_on:  # pillageable seat-0 districts join the union
-                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.tile_seat == PLAYER_SEAT) & hpT)
+                imp_job = imp_job | ((self.district >= 0) & self.district_complete & ~self.district_pillaged & (self.tile_seat == 0) & hpT)
             d_imp = self.pair_dist[hc.unsqueeze(1), arangeT.unsqueeze(0)].to(torch.long)
             ikey = torch.where(imp_job & (d_imp < 13), d_imp * (T + 1) + arangeT, torch.full_like(d_imp, 10**9))
             imp_min, imp_tgt = ikey.min(dim=1)
@@ -3310,11 +3310,11 @@ class SimSeats:
         owner classes roll under DISJOINT masks. Rows are independent games and
         `_damage_roll` advances only masked rows, so every attacking row still
         draws exactly twice, in TS's order (damage-to-district, then counter)."""
-        if atk_kind == "barb":
+        if atk_kind == "u":
             a_hp, a_tile, a_alive = self.u_hp, self.u_tile, self.u_alive
             a_occ = self.occ_mil
             atk_cs = self._p_combat[self.u_type[:, u]]
-        elif atk_kind == "player":
+        elif atk_kind == "p":
             a_hp, a_tile, a_alive = self.p_hp, self.p_tile, self.p_alive
             a_occ = self.occ_mil
             atk_cs = self._p_combat[self.p_type[:, u]]
@@ -3334,21 +3334,21 @@ class SimSeats:
         # ASK THE TABLE, never branch on the pool name: veterancy is
         # `SEAT_CAPS[...]["xp"]` at every site, so the fact has one source.
         # `hostile` is the only class with xp False, so barbs contribute 0.
-        if not SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]:
+        if not SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_lvl5 = torch.zeros_like(a_hp[:, u])
-        elif atk_kind == "player":
+        elif atk_kind == "p":
             atk_lvl5 = self._xp_lvl_bonus(self.p_xp[:, u])
         else:
             atk_lvl5 = self._xp_lvl_bonus(self.v_xp[:, u])
         atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], tc) + atk_lvl5
-        if atk_kind == "player":
+        if atk_kind == "p":
             # seat 0's aura. Its religion adder is structurally absent here —
             # seat 0 holds no holy city, and TS gates that term on civ seats.
             p_naval = self.unit_naval[self.p_type[:, u].clamp(min=0, max=self.NU - 1)] | self.p_emb[:, u]
             atk_e = atk_e + self._gen_aura_cs(
                 torch.zeros_like(tc), a_tile[:, u], p_naval
             ).to(atk_e.dtype)
-        if atk_kind == "civ":
+        if atk_kind == "v":
             atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
             atk_e = atk_e + (self._rel_atk_cs(self.v_civ[:, u], tc).to(atk_e.dtype) if self._city_rel_live else 0)
             atk_e = atk_e + self._gen_aura_cs(self.v_civ[:, u] + 1, a_tile[:, u], atk_naval).to(atk_e.dtype)
@@ -3365,9 +3365,9 @@ class SimSeats:
         _sr = self._damage_roll(r_att, cdiff, k="rencc", tile=tc)
         d_enc = torch.where(p_att, _dp, _z) + torch.where(r_att, _dr, _z)
         d_self = torch.where(p_att, _sp, _z) + torch.where(r_att, _sr, _z)
-        if atk_kind == "civ":
+        if atk_kind == "v":
             self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
-        elif atk_kind == "player":
+        elif atk_kind == "p":
             self.p_xp[:, u] = torch.where(att, self.p_xp[:, u] + XP_ATTACK, self.p_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         if len(rows) > 0:
@@ -3395,8 +3395,7 @@ class SimSeats:
         so a shared resolver can be written against "the attacker" instead of
         against three near-identical copies keyed on which array it lives in.
         """
-        pre = {"player": "p", "civ": "v", "barb": "u"}[atk_kind]
-        return tuple(getattr(self, f"{pre}_{f}")
+        return tuple(getattr(self, f"{atk_kind}_{f}")
                      for f in ("hp", "tile", "type", "xp", "emb", "alive", "seat"))
 
     def _assault_civ_city(self, att: torch.Tensor, tgt: torch.Tensor,
@@ -3439,9 +3438,9 @@ class SimSeats:
         atk_e = (self._p_combat[a_type[:, u].clamp(min=0, max=self.NU - 1)]
                  - self._wound(a_hp[:, u])
                  - 5.0 * self._river_cross(a_tile[:, u], tgt))
-        if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]:
+        if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
-        if atk_kind == "civ" and self._city_rel_live:
+        if atk_kind == "v" and self._city_rel_live:
             atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(civ, -1), a_seat[:, u])
@@ -3458,7 +3457,7 @@ class SimSeats:
         # counter second, exactly as TS's cityAssault draws them.
         d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
-        if atk_kind == "civ":
+        if atk_kind == "v":
             a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         # the ANCIENT_WALLS outer pool soaks the hit first.
@@ -3504,9 +3503,9 @@ class SimSeats:
         )
         # wound + river (a CS centre is not a unit), then veterancy.
         atk_e = self._p_combat[at0] - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(here, tgt)
-        if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]:
+        if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]:
             atk_e = atk_e + self._xp_lvl_bonus(a_xp[:, u])
-        if atk_kind == "civ" and self._city_rel_live:
+        if atk_kind == "v" and self._city_rel_live:
             atk_e = atk_e + self._rel_atk_cs(self.v_civ[:, u], tgt).to(atk_e.dtype)
         # the aura joins attackCityState's atkCS ONCE, so the cstyc counter-roll
         # sees the same atk_e.
@@ -3517,7 +3516,7 @@ class SimSeats:
         # DRAW ORDER is the parity contract: the minor's damage, then the counter.
         d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
-        if atk_kind == "civ":
+        if atk_kind == "v":
             a_xp[:, u] = torch.where(att, a_xp[:, u] + XP_ATTACK, a_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         self.cs_hp[rows, cs_sc[rows]] -= d_cs[rows]
@@ -3646,7 +3645,7 @@ class SimSeats:
     def _hostile_city_attack(self, att: torch.Tensor, slot: torch.Tensor, atk_kind: str, u: int) -> None:
         """A hostile unit battering a SEAT-0 city (attackCity): garrison-aware
         defense, city-first rolls, sack at 0 HP."""
-        if atk_kind == "barb":
+        if atk_kind == "u":
             a_hp, a_tile, a_alive = self.u_hp, self.u_tile, self.u_alive
             a_occ = self.occ_mil
             atk_cs = self._p_combat[self.u_type[:, u]]
@@ -3660,19 +3659,19 @@ class SimSeats:
         # OWN military garrisons the center — a hostile standing there is a
         # besieger, not a garrison. No population term.
         _gm = self.occ_mil.gather(1, sitec)
-        gm = torch.where((_gm >= 0) & (self.unit_seat.gather(1, _gm.clamp(min=0)) == PLAYER_SEAT), _gm, torch.full_like(_gm, -1))
+        gm = torch.where((_gm >= 0) & (self.unit_seat.gather(1, _gm.clamp(min=0)) == 0), _gm, torch.full_like(_gm, -1))
         gar = (gm.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
         def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
         _ct = self.site.gather(1, slot.clamp(min=0).unsqueeze(1)).squeeze(1)
         # attacker veterancy, gated on the attacking class's `caps.xp` (see
         # _hostile_vs_unit for the same line).
-        atk_lvl5 = (self._xp_lvl_bonus(self.v_xp[:, u]) if SEAT_CAPS[ATK_KIND_CLASS[atk_kind]]["xp"]
+        atk_lvl5 = (self._xp_lvl_bonus(self.v_xp[:, u]) if SEAT_CAPS[POOL_CLASS[atk_kind]]["xp"]
                     else torch.zeros_like(a_hp[:, u]))
         atk_e = atk_cs - self._wound(a_hp[:, u]) - 5.0 * self._river_cross(a_tile[:, u], _ct) + atk_lvl5  # wound + river (city not a unit) + veterancy
         # attackCity's atkCS carries the aura. Only a CIV attacker has one; a
         # BARBARIAN is civ -1 and structurally 0, so its branch emits no term.
         # Added once, before both paired rolls (pcty + the pctyc counter).
-        if atk_kind == "civ":
+        if atk_kind == "v":
             atk_naval = self.unit_naval[self.v_type[:, u].clamp(min=0, max=self.NU - 1)] | self.v_emb[:, u]
             # the enhancer ATTACKER adders apply to city assaults too —
             # Crusade/Just War key on where the UNIT stands, not on what it hits.
@@ -3684,7 +3683,7 @@ class SimSeats:
         # the same city combat from the other side of the board.
         _ww_ad = att & ((a_hp[:, u] - d_self) <= 0)  # BEFORE the hp write
         # +5 for the attack executed (city is not a unit — no defender xp).
-        if atk_kind == "civ":
+        if atk_kind == "v":
             self.v_xp[:, u] = torch.where(att, self.v_xp[:, u] + XP_ATTACK, self.v_xp[:, u])
         rows = att.nonzero(as_tuple=True)[0]
         cs = slot[rows]
@@ -3708,7 +3707,7 @@ class SimSeats:
         sacked_rows = rows[self.city_hp[rows, cs] <= 0]
         # a CIV conqueror TAKES the city, reusing the loyalty-flip transfer;
         # barbarians sack.
-        if atk_kind == "civ" and len(sacked_rows) > 0:
+        if atk_kind == "v" and len(sacked_rows) > 0:
             w_civ = self.v_civ[sacked_rows, u]
             for i in range(len(sacked_rows)):
                 # the conqueror plunders +40 on a REAL transfer only — a raze at
@@ -3761,7 +3760,7 @@ class SimSeats:
         no religion, no general aura and never accrue XP (gainXp guards that).
         Returns the rows that actually struck (the acted set)."""
         ttc = tgt.clamp(min=0)
-        barb = atk_kind == "barb"
+        barb = atk_kind == "u"
         if barb:
             ut0 = self.u_type[:, u].clamp(min=0, max=self.NU - 1)
             atk_rs = self._p_rng_str[ut0]
@@ -3784,7 +3783,7 @@ class SimSeats:
             # 0's own military garrisons the center
             _sitec = self.site.clamp(min=0)
             _gm = self.occ_mil.gather(1, _sitec)
-            gm = torch.where((_gm >= 0) & (self.unit_seat.gather(1, _gm.clamp(min=0)) == PLAYER_SEAT), _gm, torch.full_like(_gm, -1))
+            gm = torch.where((_gm >= 0) & (self.unit_seat.gather(1, _gm.clamp(min=0)) == 0), _gm, torch.full_like(_gm, -1))
             gar = (gm.gather(1, tgt_city.clamp(min=0).unsqueeze(1)).squeeze(1) >= 0).long()
             def_cs = torch.maximum(self.best_melee, torch.full_like(self.best_melee, 15)) + gar * 5
             atk_e = atk_rs - self._wound(a_hp) + a_lvl  # wound (city not a unit) + veterancy

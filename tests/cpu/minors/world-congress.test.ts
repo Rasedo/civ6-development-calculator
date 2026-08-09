@@ -60,7 +60,7 @@ describe('B-22 world congress', () => {
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
     seatOf(state, 0)!.diplomaticFavor = 10;
-    (state.seats[(0) + 1] as Seat).diplomaticFavor = 40; // the civ outspends the player
+    (state.seats[(0) + 1] as Seat).diplomaticFavor = 40; // the civ outspends seat 0
     worldCongress(state);
     expect((state.seats[(0) + 1] as Seat).diplomaticPoints).toBe(DVP_PER_RESOLUTION);
     expect(seatOf(state, 0)!.diplomaticPoints ?? 0).toBe(0);
@@ -68,7 +68,7 @@ describe('B-22 world congress', () => {
     expect((state.seats[(0) + 1] as Seat).diplomaticFavor).toBe(0);
   });
 
-  it('a TIE goes to the lower civ id (the player)', () => {
+  it('a TIE goes to the lower civ id (seat 0)', () => {
     const state = newGame(1);
     medieval(state);
     state.turn = CONGRESS_INTERVAL;
@@ -91,7 +91,7 @@ describe('B-22 world congress', () => {
     expect((state.seats[(0) + 1] as Seat).diplomaticPoints ?? 0).toBe(0);
   });
 
-  it('the Medieval gate reads ANY civ, not just the player', () => {
+  it('the Medieval gate reads ANY civ, not just seat 0', () => {
     const state = newGame(1);
     (state.seats[(0) + 1] as Seat).research.techs.push('APPRENTICESHIP'); // only the civ
     state.turn = CONGRESS_INTERVAL;
@@ -103,7 +103,7 @@ describe('B-22 world congress', () => {
 });
 
 describe('B-22/B-25 diplomatic victory', () => {
-  it('20 points wins for the player (victoryType 9)', () => {
+  it('20 points wins for seat 0 (victoryType 9)', () => {
     const state = newGame(1);
     seatOf(state, 0)!.diplomaticPoints = DIPLO_VICTORY_POINTS;
     endTurn(state, 0);
@@ -129,7 +129,7 @@ describe('B-22/B-25 diplomatic victory', () => {
 
   it('a CULTURE victory outranks a diplomatic one on the same turn', () => {
     const state = newGame(1);
-    // player would win on culture ...
+    // seat 0 would win on culture ...
     seatOf(state, 0)!.tourism = 5 * 2 * 200;
     seatOf(state, 0)!.cultureTotal = 100;
     (state.seats[(0) + 1] as Seat).cultureTotal = 400;

@@ -134,9 +134,9 @@ describe('governors / era score (#68 B-24)', () => {
   // ---- eraBoundary: threshold ages + reset ------------------------------------
   it('eraBoundary assigns Dark/Normal/Golden at the exact thresholds then resets the window', () => {
     const state = makeState();
-    addCiv(state, 5, 5); // one civ → civs 0 (player) and 1
+    addCiv(state, 5, 5); // one civ → civs 0 (seat 0) and 1
     state.turn = ERA_LENGTH; // a boundary turn
-    [ERA_DARK_T - 1, ERA_GOLDEN_T].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; }); // player just-below-Dark, civ at Golden
+    [ERA_DARK_T - 1, ERA_GOLDEN_T].forEach((v, i) => { const sx = seatOf(state, i); if (sx) sx.eraScore = v; }); // seat 0 just-below-Dark, civ at Golden
     eraBoundary(state);
     expect([0, 1].map((i) => seatOf(state, i)?.age)).toEqual([0, 2]); // Dark, Golden
     expect([0, 1].map((i) => seatOf(state, i)?.eraScore ?? 0)).toEqual([0, 0]); // window reset

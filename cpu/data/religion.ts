@@ -216,7 +216,7 @@ export const FOUNDER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
  * Apostle). Every real GS enhancer boosts a system this engine does not model
  * (religious pressure range, missionary/apostle spread & cost, theological or
  * territorial religious combat, faith-generating trade routes), so they land
- * INERT (empty effects). The slot, catalog and player choose-path exist; the
+ * INERT (empty effects). The slot, catalog and seat-0 choose-path exist; the
  * effects and seat enhancer claiming are deferred follow-ups (see
  * gpu/docs/rounds/ROUND_B2_LOG.md).
  */
@@ -247,7 +247,7 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   ].map((b) => [b.id, b]),
 );
 
-/** Worship buildings: exactly one is unlocked by founding (player's pick). */
+/** Worship buildings: exactly one is unlocked by founding (seat 0's pick). */
 export const WORSHIP_BUILDINGS = ['CATHEDRAL', 'GURDWARA', 'MEETING_HOUSE', 'PAGODA', 'STUPA'];
 
 export const RELIGION_NAMES = [
@@ -326,7 +326,7 @@ export const APOSTLE_CAP = 1;
  */
 /** DEBT-2: the city-attack religion-adder switch, landed INERT. The term is
  * written and mirrored at all six sites (TS: seat attackers only, matching the
- * GPU, which never sets the player's holy city); only the switch is off,
+ * GPU, which never sets seat 0's holy city); only the switch is off,
  * because turning it on shifted seat combat outcomes and the engines split on
  * downstream unit counts. Flip when its hunt lands. */
 export const CITY_RELIGION_ADDER_LIVE = true;
@@ -345,7 +345,7 @@ export const THEO_PRESSURE_SWING = 15;
  * pressure→yields coupling master switch (Round B3, slice U). When false
  * (INERT), a city's FOLLOWER-belief yields key on the OWNER civ's religion —
  * byte-identical to the pre-coupling per-civ application. When true (LIVE),
- * they key on the CITY's `followedReligion`, so a player city following a seat
+ * they key on the CITY's `followedReligion`, so a seat-0 city following a seat
  * religion draws that religion's follower belief and a city following none gets
  * no follower-belief yields. PANTHEON + FOUNDER + ENHANCER beliefs stay per-civ
  * either way. Mirrored to the GPU via rules.followerCoupling. The restructure

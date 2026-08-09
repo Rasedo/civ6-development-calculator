@@ -52,7 +52,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
 
   it('fighting at HOME is half what fighting abroad is — per side, on the same battle', () => {
     const state = newGame();
-    const { home } = tiles(state, 0); // the PLAYER's borders
+    const { home } = tiles(state, 0); // SEAT 0's borders
     const civ = seatOfIndex(0);
     warWearinessBattle(state, 0, civ, home);
     const base = WW_ERA_BASE_SURPRISE[0];
@@ -66,7 +66,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
     const { home } = tiles(state, 0);
     const civ = seatOfIndex(0);
     warWearinessBattle(state, 0, civ, home, { city: true });
-    // same tile as the test above, where the player scored a single base
+    // same tile as the test above, where seat 0 scored a single base
     expect(wwGet(seatOf(state, 0)!, civ)).toBe(WW_ERA_BASE_SURPRISE[0] * WW_ABROAD_MULT);
   });
 
@@ -138,7 +138,7 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
     const p = seatOf(state, 0)!;
     p.ww = { [a]: 1000, [b]: 1000 };
     p.wwTurn = { [a]: state.turn }; // blood was spilled against `a` this turn
-    setWar(state, (state.seats[a] as Seat).seat, 0, true); // the player is at war with somebody
+    setWar(state, (state.seats[a] as Seat).seat, 0, true); // seat 0 is at war with somebody
     warWearinessTurn(state, 0);
     expect(wwGet(p, a)).toBe(1000);
     expect(wwGet(p, b)).toBe(1000 - WW_DECAY_AT_WAR);

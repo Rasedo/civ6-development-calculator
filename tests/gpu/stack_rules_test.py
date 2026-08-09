@@ -24,7 +24,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import BARB_SEAT, PLAYER_SEAT
+from core.engine import BARB_SEAT
 
 
 def build(turns: int = 10):
@@ -66,10 +66,10 @@ def test_own_civilian_does_not_block() -> None:
     tiles = torch.tensor([[t]])
     own = bool(sim._blocked_for(tiles, 1)[0, 0])          # civ 0's military
     foreign = bool(sim._blocked_for(tiles, 2)[0, 0])      # civ 1's military
-    player = bool(sim._blocked_for(tiles, PLAYER_SEAT)[0, 0])
+    seat0 = bool(sim._blocked_for(tiles, 0)[0, 0])
     assert not own, "a civ military must STACK with its own civilian (cross-domain)"
     assert foreign, "a foreign civ's military must be blocked by that civilian"
-    assert player, "the player's military must be blocked by a civ civilian"
+    assert seat0, "seat 0's military must be blocked by a civ civilian"
     print("  own civilian stacks; foreign civilians block")
 
 
@@ -93,11 +93,11 @@ def test_spawn_probe_obeys_encampments() -> None:
         print("  SKIP: could not make a live Encampment by poking")
         return
     tiles = torch.tensor([[t]])
-    assert bool(sim._blocked_for(tiles, PLAYER_SEAT)[0, 0]), (
-        "a live enemy Encampment must bar the tile for the player"
+    assert bool(sim._blocked_for(tiles, 0)[0, 0]), (
+        "a live enemy Encampment must bar the tile for seat 0"
     )
     found, spot = sim._first_free_spot(
-        torch.tensor([t]), "player",
+        torch.tensor([t]), "p",
         civ_mask=torch.zeros(sim.B, dtype=torch.bool),
     )
     assert int(spot[0]) != t, (
