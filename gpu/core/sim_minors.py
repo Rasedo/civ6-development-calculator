@@ -12,18 +12,22 @@ from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_C
 
 class SimMinors:
     def _city_state_phase(self) -> None:
-        """Mirrors cityStatePhase draw for draw: meeting (instant, fog off) →
-        influence → envoys → quest resolve/issue per city-state in id order
-        (issuing draws twice: the askable district, then the option pick —
-        the trade-route option always exists here, so the pool is never
-        empty) → cosmetic growth every 12 turns."""
+        """Mirrors the OLD cityStatePhase seat-0 arm draw for draw: meeting
+        (by EXPLORATION — fog is live) → influence → envoys → quest
+        resolve/issue per city-state in id order → cosmetic growth every 12
+        turns. SCHEDULE DEBT: TS moved seat 0's diplomacy into the seatPhase
+        loop (row 0's block, AFTER the CS seats' own turn); this body still
+        sits at the CS-phase position — the seat0-schedule slice moves it.
+        The city-states' OWN turn (war clock, growth, recovery) stays here."""
         if self.S == 0:
             return
         # The seat-0 <-> city-state war clock ticks FIRST, exactly where
         # cityStatePhase does — before meeting/influence/envoys.
         self.citystate_war_turns.add_(self.citystate_atwar.long())
         r = self.rules.citystate
-        self.citystate_met.logical_or_(self.citystate_alive)
+        # Meet by EXPLORATION — one rule for every seat: a city-state is met
+        # the moment its centre is out of this seat's fog (fog off = instant).
+        self.citystate_met.logical_or_(self.citystate_alive & self._explored_at(0, self.citystate_center.clamp(min=0)))
         any_met = self.citystate_met.any(dim=1)
         # Seat 0's adopted-government influence tier joins the flat rate
         # (cityStates.ts `INFLUENCE_PER_TURN + GOV_INFLUENCE_TIER`); tier 0
@@ -160,6 +164,7 @@ class SimMinors:
         self.civ_unit_seat[rows, slot] = civ + 1  # seat id of civ index `civ`
         self.civ_unit_type[rows, slot] = type_idx[rows] if type_idx.dim() > 0 else type_idx
         self.civ_unit_tile[rows, slot] = spot[rows]
+        self._reveal_around(rows, civ + 1, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
         self.civ_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.civ_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         # a fresh slot starts at 0 xp unless the training city grants Encampment XP.

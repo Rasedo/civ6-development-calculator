@@ -372,6 +372,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     width: map.width,
     height: map.height,
     unitsMode: 1,
+    fogOfWar: 1, // fog is LIVE in units mode — both engines derive t0 explored from the start units
     disasters: 1,
     volcanoes,
     maxCamps,

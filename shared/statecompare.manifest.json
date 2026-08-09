@@ -176,6 +176,17 @@
    ],
    "fields": [
     {
+     "name": "explored",
+     "compare": "exact",
+     "covers": [
+      "Seat.explored"
+     ],
+     "planes": [
+      "seat_explored"
+     ],
+     "note": "per-seat fog, dense 0/1 over tiles. TS's empty array (nothing revealed yet) renders dense-zero; every seat reveals at its t0 spawn, so the empty state never reaches a digest."
+    },
+    {
      "name": "treasury",
      "compare": "milli",
      "covers": [
@@ -1353,10 +1364,6 @@
    {
     "path": "Seat.aggression",
     "why": "a personality constant read only by the scripted picker, which the decision server replaces."
-   },
-   {
-    "path": "Seat.explored",
-    "why": "per-seat fog of war. The GPU models no fog — there is no plane to compare against. A real coverage gap, recorded here rather than papered over."
    },
    {
     "path": "Seat.government",

@@ -504,6 +504,8 @@ _MUTABLE = [
     # the (civ, city-state) relation bases — citystate_x is row 0 and civ_only_citystate_x rows 1..,
     # both VIEWS, so only the base may be registered.
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
+    # per-seat FOG — Seat.explored's twin, [B, 1+R, T] (explored / civ_only_explored are views)
+    "seat_explored",
     # more seat-indexed scalar bases; the per-family names are VIEWS of these,
     # so only the base may be registered.
     "civ_culture", "civ_faith", "civ_tourism", "civ_warmonger", "civ_gpp",

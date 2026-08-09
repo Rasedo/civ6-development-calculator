@@ -37,6 +37,9 @@ export function revealAround(
   radius = SIGHT_RANGE,
 ): void {
   if (!state.fogOfWar) return;
+  // MAJOR seats only: nothing reads a city-state's or the barbarians' fog,
+  // so tracking it would be write-only state (and a digest liability).
+  if (!isCiv(seat)) return;
   const s = seatOf(state, seat);
   if (!s) return;
   if (s.explored.length === 0) s.explored = new Array(state.map.tiles.length).fill(0);

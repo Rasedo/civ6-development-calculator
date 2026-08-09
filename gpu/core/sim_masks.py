@@ -688,6 +688,39 @@ class SimMasks:
         self.military_at[(rows, spot[rows])] = slot + simbase.SEAT0_POOL_MAX + simbase.POOL_MAX
         self.next_slot[rows] += 1
 
+    def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius: int) -> None:
+        """revealAround's twin: lift `seat_row`'s fog within `radius` of
+        `tiles`. rows [K] batch indices (UNIQUE per call — advanced-index
+        assignment is last-write-wins), seat_row an int or [K] long (0 =
+        seat 0, r+1 = civ r), tiles [K] long. No-op with fog off — TS's
+        revealAround gates on state.fogOfWar the same way, so a fog-off
+        world accrues NO explored state on either engine.
+
+        WIRED: t0 fixture load (r2/unit), the three major spawn bodies (r2),
+        both founding bodies (r3). FOG-DEBT — TS reveal sites still without
+        a twin here (grep FOG-DEBT; the fog slice's checklist):
+          - every WALK HOP, r2 (units.ts stepUnit): the seat-0 apply move,
+            the civ war-march / walker hops, embark steps, the general walk;
+          - unit CAPTURE/transfer spawns, r2 (builder capture, levy);
+          - border growth, r1 (city.ts acquireTile);
+          - civ-city capture, r3 (phase.ts) and CS conquest, r3 (combat.ts);
+          - the goody-hut maps reward, r5 (fog.ts, RNG case 4).
+        Until those land, GPU fog under-reveals vs TS and the explored
+        digest reds — the fog twin is NOT gate-ready without them."""
+        if not self.fog_of_war or rows.numel() == 0:
+            return
+        disk = self.pair_dist[tiles.clamp(min=0)] <= radius  # [K, T]
+        self.seat_explored[rows, seat_row] |= disk
+
+    def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
+        """isExplored's twin over a tile tensor: True wherever `seat_row` has
+        lifted the fog (fog off = everything explored). tiles [...]-shaped
+        long; returns a same-shaped bool."""
+        if not self.fog_of_war:
+            return torch.ones_like(tiles, dtype=torch.bool)
+        ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
+        return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
+
     def _spawn_seat0(self, mask: torch.Tensor, at_tile: torch.Tensor, type_idx: torch.Tensor, init_xp: torch.Tensor | None = None) -> None:
         """A trained unit appears at/near its city center (spawnUnit). init_xp
         (a [B] long tensor) seeds a MILITARY unit's starting XP from its city's
@@ -709,6 +742,7 @@ class SimMasks:
         self.seat0_unit_alive[rows, slot] = True
         self.seat0_unit_type[rows, slot] = type_idx[rows]
         self.seat0_unit_tile[rows, slot] = spot[rows]
+        self._reveal_around(rows, 0, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
         self.seat0_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.seat0_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         if init_xp is None:

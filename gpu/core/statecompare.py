@@ -275,6 +275,9 @@ def _civ_pair_relation(plane: str, live):
 
 
 SEAT = {
+    # Fog — the seat_explored [1+R, T] row per seat, dense 0/1 (the TS
+    # extractor renders its empty-array state dense the same way).
+    "explored": _civ_scalar("seat_explored"),
     "treasury": _civ_scalar("civ_treasury"),
     "cultureTotal": _civ_scalar("civ_culture"),
     "faith": _civ_scalar("civ_faith"),

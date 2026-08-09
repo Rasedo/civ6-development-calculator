@@ -1665,6 +1665,10 @@ class SimOrders:
             rcc_w = self.civ_city_center[wr].reshape(len(wr), -1)
             near_rc_w = ((self.pair_dist[rcc_w.clamp(min=0)] < 5) & self.civ_city_alive[wr].reshape(len(wr), -1).unsqueeze(2)).any(dim=1)
             cand_w = self.camp_ok[wr] & (self.owner[wr] == -1) & (self.citystate_at[wr] < 0) & (self.civ_at[wr] < 0) & ~near_city_w & ~near_rc_w & (self.district[wr] < 0) & (self.built_wonder[wr] < 0)  # a live builtWonder excludes the tile too
+            if self.fog_of_war:
+                # camps rise IN THE FOG — only on tiles dark to EVERY major
+                # seat (unexploredByAll; combat.ts's preferFog term).
+                cand_w = cand_w & ~self.seat_explored[wr].any(dim=1)
             if self.K > 0:
                 camp_d_w = self.pair_dist[self.camp_tile[wr].clamp(min=0)].to(torch.long)  # [n, K, T]
                 near_camp_w = ((camp_d_w < 5) & (self.camp_tile[wr] >= 0).unsqueeze(2)).any(dim=1)

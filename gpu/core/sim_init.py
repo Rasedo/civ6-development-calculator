@@ -45,6 +45,11 @@ class SimInit:
         # index the war matrix uses, so "which row is this seat" has one answer
         # everywhere; `S` is hoisted here beside `R`.
         self.S = int(f0.get("cityStateMax", 0))
+        # FOG IS LIVE in units mode (fogOfWar rides the fixture; older
+        # fixtures predate the key and fall back to unitsMode — the creation
+        # rule). Reveals gate on this exactly as TS's revealAround gates on
+        # state.fogOfWar, so a fog-off world accrues NO explored state.
+        self.fog_of_war = bool(f0.get("fogOfWar", f0.get("unitsMode", 0)))
         _rp, _rcp, _sp = max(self.R, 1), self.RC, max(self.S, 1)
         self._CITY_MINOR0 = 1 + _rp
         self._aliases: dict = {}
@@ -282,6 +287,16 @@ class SimInit:
         self.civ_alive[:, 0] = True
         self.civ_only_alive = self.civ_alive[:, 1:]
         self.register_alias("civ_only_alive", lambda sim: sim.civ_alive[:, 1:])
+        # Per-seat FOG — Seat.explored's twin. Row 0 = seat 0, r+1 = civ r;
+        # a tile is dark until a reveal (spawn/walk/found/growth/capture)
+        # lifts it for THAT seat. Accrues only with fog_of_war (the
+        # revealAround gate), and the t0 unit loads below seed the start
+        # disks exactly as the seeder's spawn reveals did.
+        self.seat_explored = torch.zeros(B, 1 + r_pad, self.T, dtype=torch.bool, device=device)
+        self.explored = self.seat_explored[:, 0]
+        self.civ_only_explored = self.seat_explored[:, 1:]
+        self.register_alias("explored", lambda sim: sim.seat_explored[:, 0])
+        self.register_alias("civ_only_explored", lambda sim: sim.seat_explored[:, 1:])
         self.civ_aggression = torch.zeros(B, 1 + r_pad, dtype=torch.float64, device=device)
         self.civ_only_aggression = self.civ_aggression[:, 1:]
         self.register_alias("civ_only_aggression", lambda sim: sim.civ_aggression[:, 1:])
@@ -753,6 +768,10 @@ class SimInit:
                         self.civilian_at[(b, u_['tile'])] = v + simbase.SEAT0_POOL_MAX
                     else:
                         self.military_at[(b, u_['tile'])] = v + simbase.SEAT0_POOL_MAX
+                    # the seeder's spawn reveal — t0 explored derives from the
+                    # start units on BOTH engines (the fixture carries none).
+                    if self.fog_of_war:
+                        self.seat_explored[b, rid + 1] |= self.pair_dist[int(u_["tile"])] <= 2
                     self.civ_unit_next[b] += 1
         self._gp_costs = torch.tensor(rr.get("gpCosts", [60 * 2**n for n in range(8)]), dtype=torch.float64, device=device)
         self._gp_roster = torch.tensor(rr.get("gpRoster", [4, 4, 4, 4, 4]), dtype=torch.long, device=device)
@@ -1487,6 +1506,9 @@ class SimInit:
                         self.civilian_at[(b, int(u_["tile"]))] = i
                     else:
                         self.military_at[(b, int(u_["tile"]))] = i
+                    # the seeder's spawn reveal — see the civ loop's twin above.
+                    if self.fog_of_war:
+                        self.seat_explored[b, 0] |= self.pair_dist[int(u_["tile"])] <= 2
                     self.seat0_unit_next[b] += 1
 
         # The FIXTURE-LOADED starting units must seed the best-melee trackers:

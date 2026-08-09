@@ -282,6 +282,10 @@ const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): num
 };
 
 const SEAT: Record<string, Extractor> = {
+  // Fog — rendered DENSE: an empty array (nothing revealed yet) digests as
+  // all-zeros, the GPU plane's zeros init. Every seat spawns (and reveals)
+  // at t0, so the empty state never survives to a digest in practice.
+  explored: overSeats((s, st) => (s.explored?.length ? s.explored : new Array(st.map.tiles.length).fill(0))),
   treasury: overSeats((s) => s.treasury),
   cultureTotal: overSeats((s) => s.cultureTotal),
   faith: overSeats((s) => s.faith),

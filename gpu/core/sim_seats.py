@@ -997,6 +997,7 @@ class SimSeats:
         self.civ_unit_seat[rows, slot] = civ + 1  # civ index i lives at seat i+1
         self.civ_unit_type[rows, slot] = ti
         self.civ_unit_tile[rows, slot] = spot[rows]
+        self._reveal_around(rows, civ + 1, spot[rows], 2)  # spawnUnit's revealAround (SIGHT_RANGE)
         self.civ_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
         self.civ_unit_fortify[rows, slot] = 0  # civilian never fortifies; keep the (reclaimed) slot clean
         self.civ_unit_xp[rows, slot] = 0  # civilian never fights; keep the (reclaimed) slot at 0 xp
@@ -2539,6 +2540,7 @@ class SimSeats:
         occ_idx = torch.arange(self.RC, device=self.device).reshape(1, -1)
         slot = (torch.where(self.civ_city_alive[rows, r], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
         assert int(slot.max()) < self.RC, "civ city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
+        self._reveal_around(rows, r + 1, best_site[rows], 3)  # foundCityAt's revealAround(seat, tile, 3)
         s_idx = best_site[rows]
         # isCapital = civ.cities.length === 0: a total-collapse refound re-crowns
         # and updates capitalTiles[r+1]; every other settle founds a
@@ -3895,28 +3897,20 @@ class SimSeats:
 
     def _seat_cs_phase(self, r: int, active: torch.Tensor) -> None:
         """CS diplomacy from a civ seat — the seatPhase block after boost
-        detection. Meet by PROXIMITY (a living city center or unit of this civ
-        within meetRange of the CS center; TS gates meeting on isExplored for
-        every seat, but fog is OFF in gated worlds and the GPU models no fog
-        yet, so proximity is the whole rule here), then the influence→envoy accrual (flat rate + the
-        adopted government's tier), then the scripted greedy assignment:
-        neediest met CS by THIS civ's own envoys, ties to the lowest id, until
-        the bank is spent (the envoys*64+id key)."""
+        detection. Meet by EXPLORATION (isExplored at the CS centre — fog is
+        live for every seat), then the influence→envoy accrual (flat rate +
+        the adopted government's tier), then the driven envoy picks at the
+        post-accrual position."""
         if self.S == 0:
             return
         B, S, dev = self.B, self.S, self.device
         rr = self.rules.citystate
         csc = self.citystate_center[:, :S].clamp(min=0)  # [B, S]
-        meet_range = int(rr.get("meetRange", 3))
-        # cities within range
-        rcc = self.civ_city_center[:, r].clamp(min=0)  # [B, RC]
-        d_city = self.pair_dist[csc.unsqueeze(2), rcc.unsqueeze(1)] <= meet_range  # [B, S, RC]
-        near = (d_city & self.civ_city_alive[:, r].unsqueeze(1)).any(dim=2)
-        # units of this civ within range
-        vmask = self.civ_unit_alive & (self.civ_unit_civ == r)  # [B, V]
-        if bool(vmask.any()):
-            d_unit = self.pair_dist[csc.unsqueeze(2), self.civ_unit_tile.clamp(min=0).unsqueeze(1)] <= meet_range  # [B, S, V]
-            near = near | (d_unit & vmask.unsqueeze(1)).any(dim=2)
+        # Meet by EXPLORATION — one rule for every seat, fog is live: a
+        # city-state is met the moment its centre is out of this civ's fog.
+        # (The proximity surrogate — "cities or units within meetRange" — is
+        # deleted; scouting is what meets now, the real Civ 6 rule.)
+        near = self._explored_at(r + 1, csc)  # [B, S]
         newly = active.unsqueeze(1) & self.citystate_alive[:, :S] & ~self.civ_only_citystate_met[:, r, :S] & near
         self.civ_only_citystate_met[:, r, :S] = self.civ_only_citystate_met[:, r, :S] | newly
         met_live = self.civ_only_citystate_met[:, r, :S] & self.citystate_alive[:, :S]

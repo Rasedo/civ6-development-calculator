@@ -1547,6 +1547,7 @@ class SimPhase:
         c_new = slot_new[rows]
         new_cap = self.alive[rows].sum(dim=1) == 0  # first city (or total-collapse refound) IS the capital
         s_idx = tile[rows]
+        self._reveal_around(rows, 0, s_idx, 3)  # foundCityAt's revealAround(seat, tile, 3)
         self.site[rows, c_new] = s_idx
         # LIVE centre stats, the same convention the civ centres use: stripped-
         # tile yields with the centre floors, pre-clamp raw food, water housing
