@@ -4,7 +4,7 @@
 //    but it catches the class where a mangled file killed a gate with an
 //    empty error while tsc, vitest and the fixtures all stayed green.
 //
-// 2. THE BOUNDARY (docs/design/SEEDER_DESIGN.md): `world/` imports nothing
+// 2. THE BOUNDARY: `world/` imports nothing
 //    but itself and node builtins; `seeder/` imports only itself, `world/`
 //    and node builtins. If a seeder symbol needs to know what a tile is
 //    WORTH or what a rule DOES, it does not belong there — this check makes

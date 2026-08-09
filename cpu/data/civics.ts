@@ -7,7 +7,7 @@
  *
  * The appended nodes are PURE TREE NODES: their real unlocks are policy cards
  * and tier-3 governments — the POLICIES/GOVERNMENTS surface owned by Slice P
- * — so they carry NO unlock effects here (recorded in ROUND_B2_LOG),
+ * — so they carry NO unlock effects here,
  * keeping the merge clean. Inspirations attach only where expressible against
  * an exported target; the rest are uninspirable (recorded).
  */

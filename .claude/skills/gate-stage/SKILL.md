@@ -11,7 +11,7 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
 ## Procedure
 
 1. **Scope on paper first.** For multi-slice rounds, write/extend a design
-   note (BUILD_PLAN entry or a design doc — see `gpu/ARCHIVE.md` for the
+   note (a docs/ROADMAP.md entry or a task-list design note — git history has
    pattern). Name the slices; each slice must be independently gateable.
 2. **Inert plumbing before behavior.** New state (tensors, planes, masks)
    lands in a slice that provably changes nothing: fixtures hash
@@ -32,10 +32,10 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
 5. **Validate**: `export PYTHONUTF8=1 && python gpu/battery.py --no-eval`
    (~3 min; `--full` only when search code changed). Behavior-changing
    stages then re-baseline: `python gpu/eval/eval.py --policy random|scripted
-   --episodes 50`, recorded in `gpu/TRAINING.md` (all prior nets go
+   --episodes 50`, recorded in docs/ROADMAP.md §Training log (all prior nets go
    stale — say so).
 6. **Commit per stage, push**, with a message that names what the gates
-   caught. Update the BUILD_PLAN status log. Poke self-tests for paths the
+   caught. Update the task record. Poke self-tests for paths the
    random rollout can't reach organically (the purchase_test /
    occupancy_test / controlled_test pattern) and wire them into
    `gpu/battery.py`.

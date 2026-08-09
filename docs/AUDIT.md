@@ -11,6 +11,12 @@ original ids, new findings continue each chapter's numbering.
 fix BY SYMBOL — function/method/class/exported-constant names — never
 by line number. Line numbers rot; symbols are greppable.**
 
+**Docs sweep (2026-08-09): every round brief, design doc and plan cited
+below (gpu/docs/rounds/*, gpu/docs/design/*, BUILD_PLAN, docs/archive/*)
+was deleted with the historical docs — recover any cited path from git
+history. The living docs are this file, docs/GPU_ENGINE.md and
+docs/ROADMAP.md.**
+
 **Ladder state:** P1–P7 done; P8 (#26) PARKED by owner directive until
 this file is clean — the chapters below ARE the roadmap (tasks #41-#48,
 then #50/A-18 with the ONE pre-P8 re-baseline).
@@ -3663,4 +3669,4 @@ G-1..G-7 resolved (detail in git history / the cited logs):
 ## F. Hunt tooling — MOVED (2026-07-13)
 
 The hunt-tooling reference is IMPLEMENTED machinery, not an open gap;
-it now lives in gpu/HUNTING.md (same content, maintained there).
+it lives in docs/GPU_ENGINE.md (the Hunting section).

@@ -50,7 +50,7 @@ export interface ProjectDef {
   /** Completing this project wins the science victory. */
   victory?: boolean;
   /** Marks a space-race project: filtered out of the GPU projects table (the
-   *  GPU space-race SIMULATION is deferred — see ROUND_B2_LOG), and placed
+   *  GPU space-race SIMULATION is deferred), and placed
    *  AFTER the base projects so the seat greedy `.find` never selects it. */
   space?: boolean;
 }

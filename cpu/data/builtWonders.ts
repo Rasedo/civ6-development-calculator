@@ -204,7 +204,7 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     // real effect needing an absent system (tourism/appeal, naval, Great-Work
     // slots, envoys, era score, relic/martyr, policy slots, per-improvement
     // amenities, tile-terrain bonuses) is DEGRADED to flat cityYields or
-    // dropped — each recorded in ROUND_B2_LOG. Placement predicates are drawn
+    // dropped. Placement predicates are drawn
     // only from the combos the existing 13 already exercise.
     // ========================================================================
 

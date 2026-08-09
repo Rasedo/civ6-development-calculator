@@ -196,7 +196,7 @@ const SCRIPTED_CAMPUS = true;
 // placement 'aqueduct' = the non-specialty housing district (adjacent to the
 // city center + a river/lake/oasis/mountain; no adjacency yield → lowest tile).
 // SCAFFOLD_DISTRICTS moved to data/districts.ts (C1-B4: the civ-seat picker
-// shares it). ENCAMPMENT stays held out — see the note there and BUILD_PLAN D6.
+// shares it). ENCAMPMENT stays held out — see the note there.
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3 } as const;
 
 // A-7r: policy/government slot-kind wire encoding.
@@ -882,7 +882,7 @@ export function buildRules() {
     // encampmentProdMult, tilePurchaseMult) are TS-only — no adopted government
     // or slotted card in the scripted 100-turn gate uses a LIVE instance of one
     // (verified: seat 0 slots VETERANCY[inert]+URBAN_PLANNING, opponents adopt
-    // AUTOCRACY and slot the same), so they stay inert here (see ROUND_B2_LOG).
+    // AUTOCRACY and slot the same), so they stay inert here.
     governments: Object.values(GOVERNMENTS).map((g) => ({
       id: g.id,
       tier: g.tier,

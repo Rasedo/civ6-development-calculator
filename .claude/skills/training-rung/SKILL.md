@@ -6,7 +6,7 @@ description: Launch, assess and record one self-play/FFA training run (a ladder 
 # Training rung — launch, assess, record, decide
 
 One rung = one run + its READ. The read (what it means, not just the
-numbers) goes to `gpu/TRAINING.md` and decides the next rung. Never crown
+numbers) goes to docs/ROADMAP.md §Training log and decides the next rung. Never crown
 a net on raw eval alone.
 
 ## Launch
@@ -33,7 +33,7 @@ a net on raw eval alone.
 ## Assess (all four, on landing)
 
 1. `python gpu/eval/eval.py --policy <ckpt> --episodes 50` — the standard
-   scripted-world number (family context in TRAINING.md).
+   scripted-world number (family context in docs/ROADMAP.md §Training log).
 2. `python gpu/eval/duel_eval.py --a <new> --b <champion>` AND the reverse
    ordering — the seat asymmetry is part of the game; report both.
 3. `python gpu/eval/alpharank.py <family checkpoints> --episodes 12` — the
@@ -46,7 +46,7 @@ a net on raw eval alone.
 
 ## Record and decide
 
-- Write the READ into `gpu/TRAINING.md`: what changed, WHY (mechanism,
+- Write the READ into docs/ROADMAP.md §Training log: what changed, WHY (mechanism,
   not vibes), and the decision it implies. Commit + push.
 - Champion changes only via α-Rank. New engine world (any gate-stage
   landed since) = every prior net is stale; re-baseline and say so.

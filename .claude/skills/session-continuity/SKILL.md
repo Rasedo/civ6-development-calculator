@@ -29,7 +29,7 @@ milestone AND before every risky operation:
   vacuously") — recon is expensive; write it the moment it's proven.
 - **Gotchas as standing rules** the moment they bite (resume counters,
   best.pt watermarks, heredoc mangling). One sentence each.
-- Working docs (BUILD_PLAN/TRAINING.md) carry the durable program state;
+- Working docs (docs/ROADMAP.md, docs/AUDIT.md) carry the durable program state;
   memory carries the SESSION state (in-flight, next, uncommitted).
 
 ## Background jobs

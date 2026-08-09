@@ -65,7 +65,7 @@ its own gate-stage.
   exercises it (`purchase_test`/`occupancy_test` pattern), wired into
   the battery.
 - Behavior change → regenerate fixtures, both gates, fresh baselines in
-  TRAINING.md, and a **canary**: name the observable that MUST diverge
+  docs/ROADMAP.md §Training log, and a **canary**: name the observable that MUST diverge
   if the mechanic breaks (e.g. "builder charges 3→4 diverges the global
   improvements count at the 4th build") — if you can't name one, the
   gates can't see the mechanic.

@@ -8,7 +8,7 @@ import { SPACE_PROJECTS } from '../../../cpu/data/projects';
 // space race / science victory. Structurally unreachable in the 100-turn
 // scripted parity gate (gated on Information/Future techs), so these focused
 // pokes pin the semantics the rollout can't reach. The GPU space-race
-// SIMULATION is deferred (see gpu/ROUND_B2_LOG.md) — the chain lives in TS.
+// SIMULATION is deferred — the chain lives in TS.
 
 function newGameWithCampus(opponents = 0) {
   const state = createGame({

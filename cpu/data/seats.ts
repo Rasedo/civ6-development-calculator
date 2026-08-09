@@ -246,7 +246,7 @@ export const WAR_WEARINESS_PER_AMENITY = 400;
  * CivFanatics thread, with the caveat above. The GlobalParameters rows have
  * NOT been read directly — a claim about shipped game data must name a source
  * that was actually fetched. */
-/** Era score and Ages (see docs/design/GOVERNORS_DESIGN.md). The game is
+/** Era score and Ages. The game is
  *  divided into fixed ERA_LENGTH-turn eras (no per-civ tech-era drift —
  *  recorded residual). Each civ accrues an INTEGER era score from zero-draw
  *  "historic moment" events; the accumulator resets at every era boundary

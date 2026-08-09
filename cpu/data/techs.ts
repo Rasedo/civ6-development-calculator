@@ -7,7 +7,7 @@
  *
  * Nodes past the modeled roster are PURE TREE NODES: their real unlocks are
  * military units, naval hulls, or absent systems
- * (aircraft, nukes), so they unlock nothing yet — recorded in ROUND_B2_LOG.
+ * (aircraft, nukes), so they unlock nothing yet.
  * Eurekas are attached only where the boost condition is expressible in
  * data/boosts.ts terms AND the target is exported (Campus/Harbor tiers,
  * districts, roster improvements); everything else is unboostable (recorded).

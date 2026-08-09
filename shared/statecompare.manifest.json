@@ -1,6 +1,6 @@
 {
  "version": 1,
- "what": "The declarative field manifest both engines compare through. cpu/core/statecompare.ts and gpu/core/statecompare.py each implement an extractor per (group, field) NAME; a name in this file with no extractor, or an extractor with no name here, is a hard error rather than a silently missing column. See docs/design/STATE_COMPARE_DESIGN.md.",
+ "what": "The declarative field manifest both engines compare through. cpu/core/statecompare.ts and gpu/core/statecompare.py each implement an extractor per (group, field) NAME; a name in this file with no extractor, or an extractor with no name here, is a hard error rather than a silently missing column.",
  "compare": {
   "exact": "an integer-valued fact. The two engines must produce the same integer. Folded into the group's `exact` digest.",
   "milli": "a float accumulator. Quantised to milli-units (JS Math.round of value*1000) and folded into the group's separate `milli` digest, so a float disagreement is reported apart from an integer one. A hash cannot carry a tolerance, which is why the two are separate digests rather than one."

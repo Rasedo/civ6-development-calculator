@@ -1,5 +1,5 @@
 /**
- * TS engine TURN-THROUGHPUT driver (PERF_PLAN): headless endTurn over full
+ * TS engine TURN-THROUGHPUT driver: headless endTurn over full
  * worlds — barbarians, city-states and the seat phase dominate the cost.
  *
  *   npx vite-node tools/cpu/perf-turns.ts                 # prints turns/sec

@@ -7,7 +7,7 @@ description: Choose, design and judge the next RL avenue (self-play modes, leagu
 
 The program's epistemics, in one line: **literature proposes, structure
 disposes, measurement decides.** Every methodology conclusion in
-TRAINING.md was bought with a run; don't re-litigate them without new
+docs/ROADMAP.md was bought with a run; don't re-litigate them without new
 evidence, and don't extrapolate them past their scope.
 
 ## Choosing the next avenue
@@ -20,7 +20,7 @@ evidence, and don't extrapolate them past their scope.
 2. **Prefer the cheapest experiment that can falsify.** Small rungs
    (batch 64, 40 updates, ~40 min) while methodology is unsettled; big
    budgets only for settled recipes. A rung must change ONE variable.
-3. **Mine the synthesis before the web**: `gpu/ARCHIVE.md` holds the
+3. **Mine the synthesis before the web**: the archived synthesis (git history) holds the
    literature map (Gumbel MuZero → our SH-over-depth variant; OpenAI
    Five's 80/20 → the EMA+pool mixture; AlphaStar → PFSP; Diplodocus →
    piKL anchoring; MAZero/A0C → the M3d target menu). Adapt to THIS
@@ -59,7 +59,7 @@ evidence, and don't extrapolate them past their scope.
 
 ## Reporting
 
-Every rung's entry in TRAINING.md must contain the MECHANISM ("because
+Every rung's entry in docs/ROADMAP.md §Training log must contain the MECHANISM ("because
 X, therefore Y"), not just numbers — the next agent inherits reads, not
 tea leaves. Negative results with a named cause are first-class output;
 two of this program's most valuable findings were regressions.

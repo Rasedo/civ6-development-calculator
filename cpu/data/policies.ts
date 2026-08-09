@@ -136,8 +136,8 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     // real effects need systems this calculator does not model (unit combat,
     // unit/settler/builder/wonder production multipliers, trade routes,
     // tourism, envoys, grievances, spies, great-people points). Per common
-    // rule 2 they land as catalog rows with empty effects (recorded in
-    // ROUND_B2_LOG). Cards whose real effect maps to an existing channel carry
+    // rule 2 they land as catalog rows with empty effects.
+    // Cards whose real effect maps to an existing channel carry
     // it. Diplomatic cards exist now so diplomatic slots stop sitting idle.
 
     // --- Military (combat / unit-production — inert) ---------------------------

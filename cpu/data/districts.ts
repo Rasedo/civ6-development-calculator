@@ -251,7 +251,7 @@ export const PLACEABLE_DISTRICTS: DistrictId[] = [
  * GPU fixture exporter's scaffold, the GPU engine, and the seat district
  * picker. The full specialty catalog is scaffolded
  * now — the original five keep their order (first-placeable-wins semantics),
- * the append runs yields-first with Encampment last (its BUILD_PLAN D6
+ * the append runs yields-first with Encampment last (its scaffold
  * hold-out is lifted; cap competition is intended, real AIs build early
  * Encampments). `unlockKind: 'civic'` marks civic-tree unlocks (the default
  * is a tech id). NEIGHBORHOOD's appeal-housing MACHINERY is in on
