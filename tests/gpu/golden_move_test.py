@@ -37,11 +37,11 @@ def put(sim: BatchSim, pre: str, type_idx: int, seat: int, civ: int = 0) -> int:
     """Park a unit of `type_idx` in the given pool and return its slot."""
     counter = {"seat0": "seat0_unit_next", "civ": "civ_unit_next", "barb": "next_slot"}[pre]
     slot = int(getattr(sim, counter)[0])
-    getattr(sim, f"{pre}_alive")[0, slot] = True
-    getattr(sim, f"{pre}_type")[0, slot] = type_idx
-    getattr(sim, f"{pre}_seat")[0, slot] = seat
-    getattr(sim, f"{pre}_emb")[0, slot] = False
-    getattr(sim, f"{pre}_aura_mp")[0, slot] = 0
+    getattr(sim, f"{pre}_unit_alive")[0, slot] = True
+    getattr(sim, f"{pre}_unit_type")[0, slot] = type_idx
+    getattr(sim, f"{pre}_unit_seat")[0, slot] = seat
+    getattr(sim, f"{pre}_unit_emb")[0, slot] = False
+    getattr(sim, f"{pre}_unit_aura_mp")[0, slot] = 0
     if pre == "civ":
         sim.civ_unit_civ[0, slot] = civ
     getattr(sim, counter)[0] += 1

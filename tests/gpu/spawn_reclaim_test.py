@@ -43,10 +43,10 @@ def poison_slot(sim, pre: str) -> int:
     dead, but still flagged embarked — exactly what a reclaim leaves behind."""
     counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(pre, "seat0_unit_next")
     slot = int(getattr(sim, counter)[0])
-    getattr(sim, f"{pre}_alive")[0, slot] = False
-    getattr(sim, f"{pre}_emb")[0, slot] = True  # the drowned occupant's flag
-    getattr(sim, f"{pre}_mp")[0, slot] = 0
-    getattr(sim, f"{pre}_mp_full")[0, slot] = 0
+    getattr(sim, f"{pre}_unit_alive")[0, slot] = False
+    getattr(sim, f"{pre}_unit_emb")[0, slot] = True  # the drowned occupant's flag
+    getattr(sim, f"{pre}_unit_mp")[0, slot] = 0
+    getattr(sim, f"{pre}_unit_mp_full")[0, slot] = 0
     return slot
 
 
@@ -58,11 +58,11 @@ def free_land(sim) -> int:
 
 
 def check(sim, pre: str, slot: int, label: str) -> None:
-    mp = int(getattr(sim, f"{pre}_mp")[0, slot])
-    full = int(getattr(sim, f"{pre}_mp_full")[0, slot])
-    typ = int(getattr(sim, f"{pre}_type")[0, slot])
+    mp = int(getattr(sim, f"{pre}_unit_mp")[0, slot])
+    full = int(getattr(sim, f"{pre}_unit_mp_full")[0, slot])
+    typ = int(getattr(sim, f"{pre}_unit_type")[0, slot])
     want = int(sim._type_moves[typ])
-    emb = int(getattr(sim, f"{pre}_emb")[0, slot])
+    emb = int(getattr(sim, f"{pre}_unit_emb")[0, slot])
     print(f"  {label}: type={typ} mp={mp} mp_full={full} (type's moves={want}) emb={emb}")
     assert emb == 0, (
         f"{label}: the spawned unit is still flagged EMBARKED — a reclaimed "

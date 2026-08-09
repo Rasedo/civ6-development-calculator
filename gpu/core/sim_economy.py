@@ -288,16 +288,12 @@ class SimEconomy:
         for _s in range(self.S):
             self._ww_peace(rel[:, _s], 0, _cs0 + _s)
 
-    def _ww_penalty(self) -> torch.Tensor:
-        """[B] seat 0's war-weariness amenity penalty (integer floor, then
-        dtype) - `warWearinessPenalty(wwMax(...))` on row 0."""
+    def _ww_penalty(self, row: int, dtype=None) -> torch.Tensor:
+        """[B] a seat row's war-weariness amenity penalty (integer floor, then
+        dtype) - `warWearinessPenalty(wwMax(...))` on that row. The civ yield
+        paths pass float64 explicitly; seat 0 takes the engine dtype."""
         per = int(self.rules.war_weariness.get("perAmenity", 400))
-        return torch.div(self._ww_max(0), per, rounding_mode="floor").to(self.dtype)
-
-    def _ww_penalty_civ(self, r: int) -> torch.Tensor:
-        """[B] civ r's amenity penalty - the same function on row r+1."""
-        per = int(self.rules.war_weariness.get("perAmenity", 400))
-        return torch.div(self._ww_max(r + 1), per, rounding_mode="floor").to(torch.float64)
+        return torch.div(self._ww_max(row), per, rounding_mode="floor").to(dtype or self.dtype)
 
     def _amenity_factors(self, balance: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         growth = torch.full_like(balance, self.rules.amenity_tiers[-1][1])
@@ -1073,81 +1069,61 @@ class SimEconomy:
             self._eff_version += 1
         return place
 
-    def _place_seat0_works(self, can_col: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
-        """placeGreatWorks for seat 0: distribute gwWorks works per earning
-        game across seat 0's cities in state.cities order (city_seq rank),
-        lowest slot first, into the AMPHITHEATER (writing) or kind's building
-        column at that kind's slot count. Charges that find no open slot
-        anywhere overflow to the person's instant culture lump on the current
-        civic. Every slot write bumps _eff_version (yield-bearing)."""
-        bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
-        if bcol < 0:  # building absent from the catalog: every charge overflows
-            self.civic_prog.add_(can_col.to(self.dtype) * nworks * culture_val)
-            return
-        used = (self.gw_writing, self.gw_art, self.gw_music)[kind]  # [B, C]
-        cap = self.buildings[:, :, bcol].long() * nslots  # [B, C] (a city holds 1 such building max)
-        # Plus slots granted by COMPLETED WONDERS (Great Library +2 writing),
-        # mirroring greatPeople.ts's `extra` resolver. Seat 0's wonders have no
-        # per-city registry the way the civ seats' do, so they attribute by
-        # TILE OWNERSHIP — which is also what makes capture carry them.
-        if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
-            wsl = self._wond_gw[:, kind]  # [nW]
-            live_w = (self.built_wonder >= 0) & self.built_wonder_complete  # [B, T]
-            tile_sl = torch.where(live_w, wsl[self.built_wonder.clamp(min=0)], torch.zeros_like(self.built_wonder))
-            for c in range(self.C):
-                cap[:, c] = cap[:, c] + (tile_sl * (self.owner == c).long()).sum(dim=1)
-        openc = (cap - used).clamp(min=0) * self.alive.long()  # [B, C] open slots per live city
-        W = nworks * can_col.long()  # [B] works to place this earn
-        # state.cities array order = city_seq rank (acquisition order).
-        ordv = torch.argsort(torch.where(self.alive, self.city_seq, self.city_seq + 10**6), dim=1, stable=True)
-        open_ord = openc.gather(1, ordv)  # [B, C] open slots in visit order
-        prefix = open_ord.cumsum(dim=1) - open_ord  # exclusive: slots filled before this city
-        alloc_ord = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(open_ord)  # greedy lowest-first fill
-        alloc = torch.zeros_like(openc).scatter(1, ordv, alloc_ord)  # back to city index
-        overflow = (W - alloc_ord.sum(dim=1)).clamp(min=0)  # [B] charges with no slot
-        if kind == 0:
-            self.gw_writing.add_(alloc)
-        elif kind == 1:
-            self.gw_art.add_(alloc)
-        else:
-            self.gw_music.add_(alloc)
-        self.civic_prog.add_(overflow.to(self.dtype) * culture_val)
-        if bool((alloc != 0).any()):
-            self._eff_version += 1
+    def _place_works(self, row: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
+        """placeGreatWorks for seat row `row`: distribute gwWorks works per
+        earning game across the row's cities in ITS cities-array order — row 0
+        visits by acquisition rank (city_seq, the state.cities order), a civ
+        row visits in slot order (its cities array) — lowest slot first, into
+        the kind's building column at that kind's slot count. Charges with no
+        open slot anywhere overflow to the seat's instant culture lump on its
+        current civic. Every slot write bumps _eff_version (yield-bearing).
 
-    def _place_civ_works(self, r: int, hit: torch.Tensor, culture_val: torch.Tensor, kind: int) -> None:
-        """placeGreatWorks for civ seat r: distribute gwWorks works across its
-        cities in rc slot order (= the seat's cities array order), lowest slot
-        first; overflow charges fall back to the instant culture lump on this
-        seat's civic progress. Every slot write bumps _eff_version."""
+        The completed-WONDER slot term (Great Library +2 writing) still has
+        two sources: row 0 attributes wonders by TILE OWNERSHIP (its wonder
+        registry rows carry no writes yet), a civ row reads its
+        civ_city_wonder registry — the same source the Petra block uses."""
         bcol, nslots, nworks = self._gw_bidx[kind], self._gw_slots_k[kind], self._gw_works_k[kind]
-        if bcol < 0:
-            self.civ_only_civic_prog[:, r] = self.civ_only_civic_prog[:, r] + hit.double() * nworks * culture_val
+        dt = self.dtype if row == 0 else torch.float64  # the civ yield paths run f64
+        civic = self.civ_civic_prog
+        if bcol < 0:  # building absent from the catalog: every charge overflows
+            civic[:, row] = civic[:, row] + hit.to(dt) * nworks * culture_val
             return
-        used = (self.civ_city_gw_writing, self.civ_city_gw_art, self.civ_city_gw_music)[kind][:, r]  # [B, RC]
-        cap = self.civ_city_bldg[:, r, :, bcol].long() * nslots  # [B, RC]
-        # Plus COMPLETED-WONDER slots, the civ-seat twin of the seat-0 term.
-        # Civ seats DO carry a per-city wonder registry, so this reads
-        # civ_city_wonder directly instead of going via tile ownership — the same
-        # source and completeness test the Petra block uses.
+        gw_base = (self.city_gw_writing, self.city_gw_art, self.city_gw_music)[kind]
+        used = gw_base[:, row]  # [B, RC]
+        cap = self.city_bldg[:, row, :, bcol].long() * nslots  # [B, RC] (a city holds 1 such building max)
         if getattr(self, "_wond_gw", None) is not None and int(self._wond_gw[:, kind].sum()) > 0:
-            wreg = self.civ_city_wonder[:, r]  # [B, RC, nW]
-            compw = (wreg >= 0) & self.built_wonder_complete.gather(
-                1, wreg.clamp(min=0).reshape(self.B, -1)
-            ).reshape_as(wreg)
-            cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
-        openc = (cap - used).clamp(min=0) * self.civ_city_alive[:, r].long()  # [B, RC]
-        W = nworks * hit.long()  # [B]
-        prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
-        alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)  # [B, RC]
-        overflow = (W - alloc.sum(dim=1)).clamp(min=0)  # [B]
-        if kind == 0:
-            self.civ_city_gw_writing[:, r] = self.civ_city_gw_writing[:, r] + alloc
-        elif kind == 1:
-            self.civ_city_gw_art[:, r] = self.civ_city_gw_art[:, r] + alloc
+            if row == 0:
+                wsl = self._wond_gw[:, kind]  # [nW]
+                live_w = (self.built_wonder >= 0) & self.built_wonder_complete  # [B, T]
+                tile_sl = torch.where(live_w, wsl[self.built_wonder.clamp(min=0)], torch.zeros_like(self.built_wonder))
+                for c in range(self.C):
+                    cap[:, c] = cap[:, c] + (tile_sl * (self.owner == c).long()).sum(dim=1)
+            else:
+                wreg = self.civ_city_wonder[:, row - 1]  # [B, RC, nW]
+                compw = (wreg >= 0) & self.built_wonder_complete.gather(
+                    1, wreg.clamp(min=0).reshape(self.B, -1)
+                ).reshape_as(wreg)
+                cap = cap + (compw.long() * self._wond_gw[:, kind].reshape(1, 1, -1)).sum(dim=2)
+        alive = self.city_alive[:, row]  # [B, RC]
+        openc = (cap - used).clamp(min=0) * alive.long()  # [B, RC] open slots per live city
+        W = nworks * hit.long()  # [B] works to place this earn
+        if row == 0:
+            # state.cities array order = city_seq rank (acquisition order).
+            seq = torch.full_like(openc, 10**9)
+            seq[:, : self.C] = torch.where(alive[:, : self.C], self.city_seq, self.city_seq + 10**6)
+            ordv = torch.argsort(seq, dim=1, stable=True)
+            open_ord = openc.gather(1, ordv)  # open slots in visit order
+            prefix = open_ord.cumsum(dim=1) - open_ord  # exclusive: filled before this city
+            alloc_ord = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(open_ord)  # greedy lowest-first
+            alloc = torch.zeros_like(openc).scatter(1, ordv, alloc_ord)  # back to slot index
+            placed = alloc_ord.sum(dim=1)
         else:
-            self.civ_city_gw_music[:, r] = self.civ_city_gw_music[:, r] + alloc
-        self.civ_only_civic_prog[:, r] = self.civ_only_civic_prog[:, r] + overflow.double() * culture_val
+            prefix = openc.cumsum(dim=1) - openc  # exclusive prefix in slot order
+            alloc = (W.unsqueeze(1) - prefix).clamp(min=0).minimum(openc)
+            placed = alloc.sum(dim=1)
+        overflow = (W - placed).clamp(min=0)  # [B] charges with no slot
+        gw_base[:, row] = gw_base[:, row] + alloc
+        civic[:, row] = civic[:, row] + overflow.to(dt) * culture_val
         if bool((alloc != 0).any()):
             self._eff_version += 1
 
@@ -1223,7 +1199,7 @@ class SimEconomy:
             # cities (eff holds the pre-increment person's culture).
             for _k, _kcls in enumerate(self._gw_cls):  # kind order 0/1/2
                 if _kcls >= 0:
-                    self._place_seat0_works(can[:, _kcls], eff[:, _kcls, 1], _k)
+                    self._place_works(0, can[:, _kcls], eff[:, _kcls, 1], _k)
             # A GENERAL/ADMIRAL claim spawns its support unit (civilian, 4 MP)
             # at seat 0's CAPITAL, on top of the instant effect — the
             # applyGreatPersonEffect mirror. Zero RNG. The capital is `is_cap`,
@@ -1486,8 +1462,8 @@ class SimEconomy:
 
         `seat` is a tensor because a civ seat's varies per slot; for the other
         two pools `torch.full_like` keeps it the same expression."""
-        t = getattr(self, f"{pre}_tile").clamp(min=0)
-        seat = getattr(self, f"{pre}_seat")
+        t = getattr(self, f"{pre}_unit_tile").clamp(min=0)
+        seat = getattr(self, f"{pre}_unit_seat")
         here = self.tile_seat.gather(1, t)
         home = here == seat
         # A city CENTRE here — any seat's; `home` already restricts it to this
@@ -1506,7 +1482,7 @@ class SimEconomy:
     def _spent_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — has this unit spent MP since its last refresh? TS asks
         `unit.movesLeft < grantedLast` and nothing else."""
-        return getattr(self, f"{pre}_mp") < getattr(self, f"{pre}_mp_full")
+        return getattr(self, f"{pre}_unit_mp") < getattr(self, f"{pre}_unit_mp_full")
 
     def _full_mp(self, pre: str) -> torch.Tensor:
         """[B, U] — refreshUnits' `full + generalAuraMP(state, unit)`, one rule
@@ -1516,18 +1492,18 @@ class SimEconomy:
 
         Every walker and every afford rule (`mp >= full`) must read this same
         expression — `stepUnit` is embark-aware for all three pools."""
-        typ = getattr(self, f"{pre}_type").clamp(min=0, max=self.NU - 1)
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # The golden dedication raises the unit's OWN movement, so it is added
         # to the type pool and then OVERRIDDEN by the embark pool below —
         # embarkation speed is not a unit's movement stat. `unitFullMoves` has
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
         base = self._type_moves[typ] + self._golden_move_mp(pre)
         if self._embark_live:
-            emb = getattr(self, f"{pre}_emb")
+            emb = getattr(self, f"{pre}_unit_emb")
             base = torch.where(
                 emb & ~self.unit_naval[typ], torch.full_like(base, self._embark_moves), base
             )
-        return base + getattr(self, f"{pre}_aura_mp")
+        return base + getattr(self, f"{pre}_unit_aura_mp")
 
     def _reset_mp(self, pre: str) -> None:
         """The movesLeft/movesFull reset: `granted = full + aura`, both fields.
@@ -1535,8 +1511,8 @@ class SimEconomy:
         writing only one breaks next turn's "spent no MP" gate for a seat that
         never moved."""
         f = self._full_mp(pre)
-        getattr(self, f"{pre}_mp_full").copy_(f)
-        getattr(self, f"{pre}_mp").copy_(f)
+        getattr(self, f"{pre}_unit_mp_full").copy_(f)
+        getattr(self, f"{pre}_unit_mp").copy_(f)
 
     def _refresh_aura_mp(self) -> None:
         """FREEZE the aura's +generalAuraMp per unit slot, at the refreshUnits
@@ -2122,7 +2098,7 @@ class SimEconomy:
             amen_have = amen_have + gpc_amen.unsqueeze(1)  # amenitiesAll
         if _cond_amen is not None:
             amen_have = amen_have + _cond_amen  # newDeal amenities
-        balance = amen_have - amen_need - self._ww_penalty().unsqueeze(1)
+        balance = amen_have - amen_need - self._ww_penalty(0).unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         # Amenity-tier INDEX (0 Ecstatic … 4 Unhappy) — loyalty reads it.
         tier_idx = torch.full_like(self.pop, len(self.rules.amenity_tiers) - 1)

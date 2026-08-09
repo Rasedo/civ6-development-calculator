@@ -1065,7 +1065,7 @@ class SimPhase:
             )
             self.civ_only_tourism[:, r] = torch.where(active, self.civ_only_tourism[:, r] + _tour_r, self.civ_only_tourism[:, r])
             # DIPLOMATIC FAVOR — every seat's twin, at the same position.
-            _fav_r = self._adopted_gov_tier(self.civ_only_civics[:, r]) + self._favor_per_suz * self._civ_suzerain_count(r)
+            _fav_r = self._adopted_gov_tier(self.civ_only_civics[:, r]) + self._favor_per_suz * self._suzerain_count(r + 1)
             self.civ_only_diplo_favor[:, r] = torch.where(active, self.civ_only_diplo_favor[:, r] + _fav_r, self.civ_only_diplo_favor[:, r])
             # grievances DECAY by 1 per turn at peace, on every axis
             _at_peace = ~self.civ_only_atwar[:, r] & ~self.civ_pair_war[:, r].any(dim=1)
@@ -1151,7 +1151,7 @@ class SimPhase:
                     # _place_civ_works.
                     _kind = self._gw_cls.index(cls) if cls in self._gw_cls else -1
                     if _kind >= 0:
-                        self._place_civ_works(r, hit, eff[:, 1].double(), _kind)
+                        self._place_works(r + 1, hit, eff[:, 1].double(), _kind)
                     else:
                         self.civ_only_civic_prog[:, r] = self.civ_only_civic_prog[:, r] + eff[:, 1].double() * hf
                     self.civ_only_treasury[:, r] = self.civ_only_treasury[:, r] + eff[:, 2].double() * hf
@@ -1797,10 +1797,10 @@ class SimPhase:
         # is the one field that is not a merged plane.
         counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(prefix, "seat0_unit_next")
         maps: list = []
-        fields = [f"{prefix}_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
+        fields = [f"{prefix}_unit_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
         if prefix == "civ":
             fields.append("civ_unit_civ")
-        alive = getattr(self, f"{prefix}_alive")
+        alive = getattr(self, f"{prefix}_unit_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept
         inv = torch.empty_like(perm)

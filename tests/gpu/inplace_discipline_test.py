@@ -69,7 +69,7 @@ _CIV_FIELDS = (
     "treasury", "war_weariness", "techs", "civics", "tech_boosted", "civic_boosted",
 )
 ALIASED: frozenset[str] = frozenset(
-    [f"{pre}_{plane}" for pre in ("seat0", "civ", "barb") for plane in _POOL_PLANES]
+    [f"{pre}_unit_{plane}" for pre in ("seat0", "civ", "barb") for plane in _POOL_PLANES]
     + [f for n in _CIV_FIELDS for f in (n, f"civ_only_{n}")]
     # the three legacy war names are SLICES of `war`. A rebind detaches the
     # relation from the matrix every reader consults, and every gate stays

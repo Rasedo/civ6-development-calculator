@@ -826,11 +826,11 @@ class SimMasks:
         Apostles, and Inquisitors" — this roster has no INQUISITOR. Keyed on the
         unit's OWN seat, so every seat in a Golden age gets it on the same rule;
         barbarians and city-states hold no dedications."""
-        typ = getattr(self, f"{pre}_type").clamp(min=0, max=self.NU - 1)
+        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         out = torch.zeros_like(typ)
         if self._golden_move <= 0:
             return out
-        seat = getattr(self, f"{pre}_seat")
+        seat = getattr(self, f"{pre}_unit_seat")
         civ_ok = (seat >= 0) & (seat < self.civ_age.shape[1])
         civ = torch.where(civ_ok, seat, torch.zeros_like(seat))
         for kind, types in (

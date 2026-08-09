@@ -1191,27 +1191,17 @@ class SimSeats:
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, g), winner)
         return winner
 
-    def _suzerain_count(self) -> torch.Tensor:
-        """[B] city-states seat 0 is Suzerain of — the `isSuzerain` twin
-        (>= suzerainEnvoys and STRICTLY more than every civ seat's envoys; a tie
-        leaves no suzerain)."""
+    def _suzerain_count(self, row: int) -> torch.Tensor:
+        """[B] city-states seat row `row` is Suzerain of — the `isSuzerain`
+        twin: >= suzerainEnvoys, alive, and STRICTLY more envoys than every
+        other seat row (a tie leaves no suzerain)."""
         suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        m = (self.citystate_envoys >= suz_min) & self.citystate_alive
-        if self.R > 0:
-            m = m & (self.citystate_envoys > self.civ_only_citystate_envoys.max(dim=1).values)
-        return m.sum(dim=1)
-
-    def _civ_suzerain_count(self, r: int) -> torch.Tensor:
-        """[B] city-states civ r is Suzerain of — the `isSuzerain` twin from a civ
-        seat's side (>= suzerainEnvoys, strictly more than seat 0 and strictly
-        more than every OTHER civ seat)."""
-        suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
-        mine = self.civ_only_citystate_envoys[:, r]  # [B, S]
-        m = (mine >= suz_min) & self.citystate_alive & (mine > self.citystate_envoys)
-        for o in range(self.R):
-            if o == r:
-                continue
-            m = m & (mine > self.civ_only_citystate_envoys[:, o])
+        env = self.seat_citystate_envoys  # [B, 1+R, S]
+        mine = env[:, row]
+        m = (mine >= suz_min) & self.citystate_alive
+        for o in range(1 + self.R):
+            if o != row:
+                m = m & (mine > env[:, o])
         return m.sum(dim=1)
 
     def _world_congress(self) -> None:
@@ -2252,7 +2242,7 @@ class SimSeats:
             balance = have + out - need
         # war-weariness drag, subtracted from the tier balance after the luxury
         # grants — the same position every seat uses.
-        balance = balance - self._ww_penalty_civ(r).unsqueeze(1)
+        balance = balance - self._ww_penalty(r + 1, torch.float64).unsqueeze(1)
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.civ_city_pop[:, r], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
@@ -3395,7 +3385,7 @@ class SimSeats:
         so a shared resolver can be written against "the attacker" instead of
         against three near-identical copies keyed on which array it lives in.
         """
-        return tuple(getattr(self, f"{atk_kind}_{f}")
+        return tuple(getattr(self, f"{atk_kind}_unit_{f}")
                      for f in ("hp", "tile", "type", "xp", "emb", "alive", "seat"))
 
     def _assault_civ_city(self, att: torch.Tensor, tgt: torch.Tensor,

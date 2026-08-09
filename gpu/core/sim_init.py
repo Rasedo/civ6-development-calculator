@@ -548,11 +548,11 @@ class SimInit:
             setattr(self, f"unit_{_pl}", _base)
             self._UNIT_PLANES.append(_pl)
             for _pre in ("seat0", "civ", "barb"):
-                setattr(self, f"{_pre}_{_pl}", _base[:, self.POOL_LO[_pre]:self.POOL_HI[_pre]])
+                setattr(self, f"{_pre}_unit_{_pl}", _base[:, self.POOL_LO[_pre]:self.POOL_HI[_pre]])
                 # Assert forever that the view still shares storage with the
                 # merged pool.
                 self.register_alias(
-                    f"{_pre}_{_pl}",
+                    f"{_pre}_unit_{_pl}",
                     lambda sim, pl=_pl, pre=_pre: getattr(sim, f"unit_{pl}")[
                         :, sim.POOL_LO[pre]:sim.POOL_HI[pre]
                     ],

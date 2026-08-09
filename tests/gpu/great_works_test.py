@@ -79,14 +79,14 @@ def main() -> None:
     civic0 = sim.civic_prog.clone()
     ver0 = sim._eff_version
     cval = torch.full((B,), 45.0, dtype=torch.float64)  # Li Bai's culture value
-    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
+    sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
     assert bool((sim.gw_writing[:, 0] == 2).all()), "both works must slot into the Amphitheater"
     assert bool((sim.civic_prog == civic0).all()), "a fully-slotted Writer applies NO instant lump"
     assert sim._eff_version > ver0, "a slot write must bump _eff_version (yield-bearing state)"
 
     # --- overflow: a second Writer finds no open slot -> instant lump -------
     civic1 = sim.civic_prog.clone()
-    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
+    sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
     assert bool((sim.gw_writing[:, 0] == 2).all()), "slots stay capped at gwSlots (2)"
     assert bool((sim.civic_prog - civic1 == 90.0).all()), "both overflow charges -> 2 x 45 lump"
 
@@ -98,11 +98,11 @@ def main() -> None:
         # First Writer -> all 2 into the LOWER city_seq (capital = seq 0).
         cap = int(sim.city_seq[0, 0]); nxt = int(sim.city_seq[0, 1])
         lo, hi = (0, 1) if cap < nxt else (1, 0)
-        sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
+        sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, lo] == 2).all()), "the lowest-seq city fills first"
         assert bool((sim.gw_writing[:, hi] == 0).all()), "the higher-seq city stays empty"
         # Second Writer -> spills into the higher-seq city.
-        sim._place_seat0_works(torch.ones(B, dtype=torch.bool), cval, 0)
+        sim._place_works(0, torch.ones(B, dtype=torch.bool), cval, 0)
         assert bool((sim.gw_writing[:, hi] == 2).all()), "overflow spills to the next city"
         sim.buildings[:, 1, amph] = False
 
@@ -147,12 +147,12 @@ def main() -> None:
     sim.buildings[:, 0, museum] = True
     sim.buildings[:, 0, broadcast] = False
     civic2 = sim.civic_prog.clone()
-    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
+    sim._place_works(0, torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
     assert bool((sim.gw_music[:, 0] == 0).all()), "no BROADCAST CENTER -> music works do not slot"
     assert bool((sim.civic_prog - civic2 == 100.0).all()), "music works overflow to the lump (2 x 50)"
     sim.buildings[:, 0, broadcast] = True
     civic3 = sim.civic_prog.clone()
-    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
+    sim._place_works(0, torch.ones(B, dtype=torch.bool), torch.full((B,), 50.0, dtype=torch.float64), 2)
     assert bool((sim.gw_music[:, 0] == 1).all()), "the Broadcast Center holds exactly ONE music work"
     assert bool((sim.civic_prog - civic3 == 50.0).all()), "the second music work overflows to the lump"
 
@@ -161,12 +161,12 @@ def main() -> None:
     sim.gw_writing.zero_(); sim.gw_art.zero_(); sim.gw_music.zero_()
     sim.buildings[:, 0, museum] = False
     civicA = sim.civic_prog.clone()
-    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
+    sim._place_works(0, torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
     assert bool((sim.gw_art[:, 0] == 0).all()), "no ART MUSEUM -> art works do not slot"
     assert bool((sim.civic_prog - civicA == 60.0).all()), "all 3 art works overflow (3 x 20)"
     sim.buildings[:, 0, museum] = True
     civicB = sim.civic_prog.clone()
-    sim._place_seat0_works(torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
+    sim._place_works(0, torch.ones(B, dtype=torch.bool), torch.full((B,), 20.0, dtype=torch.float64), 1)
     assert bool((sim.gw_art[:, 0] == 3).all()), "one Artist fills the Art Museum's 3 slots exactly"
     assert bool((sim.civic_prog == civicB).all()), "a fully-slotted Artist applies no lump"
 
@@ -188,7 +188,7 @@ def main() -> None:
         sim.civ_city_gw_writing.zero_(); sim.civ_city_gw_art.zero_(); sim.civ_city_gw_music.zero_()
         sim.civ_city_bldg[:, r, 0, amph] = True
         rc0 = sim.civ_only_civic_prog[:, r].clone()
-        sim._place_civ_works(r, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
+        sim._place_works(r + 1, torch.ones(B, dtype=torch.bool), torch.full((B,), 45.0, dtype=torch.float64), 0)
         assert bool((sim.civ_city_gw_writing[live, r, 0] == 2).all()), "civ Writer slots into its Amphitheater"
         assert bool(((sim.civ_only_civic_prog[:, r] - rc0)[live] == 0).all()), "a slotted civ Writer applies no lump"
         # A dead rc slot cannot slot -> the whole person overflows to a lump.

@@ -215,9 +215,9 @@ class SimStep:
             cap = self.rules.combat.get("unitHp", 100)
             # ONE heal rule, three pools. See _seat_heal.
             for _pre in ("barb", "civ", "seat0"):
-                _hp = getattr(self, f"{_pre}_hp")
+                _hp = getattr(self, f"{_pre}_unit_hp")
                 _hp.copy_(torch.where(
-                    getattr(self, f"{_pre}_alive") & ~self._spent_mp(_pre),
+                    getattr(self, f"{_pre}_unit_alive") & ~self._spent_mp(_pre),
                     (_hp + self._seat_heal(_pre)).clamp(max=cap), _hp,
                 ))
             # FORTIFY: co-located with the heal and keyed on the EXACT SAME
@@ -227,10 +227,10 @@ class SimStep:
             # fortify. ONE rule, three pools — every pool can hold a hull, so
             # the naval gate applies to all three.
             for _pre in ("barb", "civ", "seat0"):
-                _alive = getattr(self, f"{_pre}_alive")
-                _typ = getattr(self, f"{_pre}_type")
+                _alive = getattr(self, f"{_pre}_unit_alive")
+                _typ = getattr(self, f"{_pre}_unit_type")
                 _spent = self._spent_mp(_pre)
-                _fort = getattr(self, f"{_pre}_fortify")
+                _fort = getattr(self, f"{_pre}_unit_fortify")
                 _mil = (self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
                 _fort.copy_(torch.where(
                     _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
@@ -482,7 +482,7 @@ class SimStep:
         ))
         # DIPLOMATIC FAVOR — government TIER + suzerainties, once per turn at
         # the seat level.
-        self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count())
+        self.diplo_favor.add_(self._adopted_gov_tier(self.civics) + self._favor_per_suz * self._suzerain_count(0))
         # Seat 0's grievances decay by 1 each turn at peace with EVERY civ seat
         # (floor 0), immediately after the tourism accumulator. The
         # +WARMONGER_DOW accrual on declaring has no twin here because no

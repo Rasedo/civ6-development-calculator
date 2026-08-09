@@ -161,10 +161,10 @@ def main() -> None:
     # --- the amenity conversion, with no ceiling -------------------------
     sim.ww[:] = 0
     sim.ww[:, 0, 1] = per * 12 + (per - 1)
-    assert int(sim._ww_penalty()[0]) == 12, int(sim._ww_penalty()[0])
-    assert int(sim._ww_penalty_civ(0)[0]) == 0, "civ 0 has fought nothing"
+    assert int(sim._ww_penalty(0)[0]) == 12, int(sim._ww_penalty(0)[0])
+    assert int(sim._ww_penalty(1)[0]) == 0, "civ 0 has fought nothing"
     sim.ww[:, 0, 1] = per - 1
-    assert int(sim._ww_penalty()[0]) == 0, "the remainder buys nothing"
+    assert int(sim._ww_penalty(0)[0]) == 0, "the remainder buys nothing"
     print(f"  {per} points buy one amenity, remainder lost, and 12 is reachable (no cap)")
 
     # --- the accumulator round-trips snapshot/restore ---------------------
