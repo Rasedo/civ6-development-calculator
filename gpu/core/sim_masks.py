@@ -696,17 +696,18 @@ class SimMasks:
         revealAround gates on state.fogOfWar the same way, so a fog-off
         world accrues NO explored state on either engine.
 
-        WIRED: t0 fixture load (r2/unit), the three major spawn bodies (r2),
-        both founding bodies (r3). FOG-DEBT — TS reveal sites still without
-        a twin here (grep FOG-DEBT; the fog slice's checklist):
-          - every WALK HOP, r2 (units.ts stepUnit): the seat-0 apply move,
-            the civ war-march / walker hops, embark steps, the general walk;
-          - unit CAPTURE/transfer spawns, r2 (builder capture, levy);
-          - border growth, r1 (city.ts acquireTile);
-          - civ-city capture, r3 (phase.ts) and CS conquest, r3 (combat.ts);
-          - the goody-hut maps reward, r5 (fog.ts, RNG case 4).
-        Until those land, GPU fog under-reveals vs TS and the explored
-        digest reds — the fog twin is NOT gate-ready without them."""
+        WIRED — the full TS reveal-site set: t0 fixture load (r2/unit), the
+        three major spawn bodies (r2), both founding bodies (r3), every walk
+        hop through _step_verb's one tile write (r2 — all movers route
+        there), tile acquisition r1 at all three sites (seat-0 border
+        growth, civ border growth, the driven tile buy), and the captor's
+        r3 at all five capture bodies (seat-0/civ city captures + transfers,
+        both CS conquests). NOT reveals on either engine: the melee
+        advance-into-freed-tile and unit capture/transfers (TS writes
+        tileIndex directly — no stepUnit, no reveal). FOG-DEBT remaining:
+        the goody-hut maps reward r5 has no twin because the GPU has no
+        goody-hut mechanic at all (a pre-existing feature gap, not a fog
+        one)."""
         if not self.fog_of_war or rows.numel() == 0:
             return
         disk = self.pair_dist[tiles.clamp(min=0)] <= radius  # [K, T]

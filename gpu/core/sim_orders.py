@@ -623,6 +623,8 @@ class SimOrders:
                 self.founded_n[b] += 1
             self.alive[b, c_new] = True
             self.era_score[b, 0] += self._era_pts["conquer"]  # gained a city (the raze paths continue above)
+            if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
+                self.seat_explored[b, 0] |= self.pair_dist[c_t] <= 3
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
             self.is_cap[b, c_new] = False  # captured cities are never capitals (TS isCapital: false)
@@ -737,6 +739,8 @@ class SimOrders:
                 self.founded_n[b] += 1
             self.alive[b, c_new] = True
             self.era_score[b, 0] += self._era_pts["conquer"]  # gained a city (the raze paths continue above)
+            if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
+                self.seat_explored[b, 0] |= self.pair_dist[c_t] <= 3
             self.city_seq[b, c_new] = int(self.city_seq_next[b])
             self.city_seq_next[b] += 1
             self.is_cap[b, c_new] = False  # captured cities are never capitals (TS isCapital: false)
@@ -815,6 +819,8 @@ class SimOrders:
             self.tile_city[b] = torch.where(ring, torch.full_like(self.tile_city[b], new_id), self.tile_city[b])
             self.civ_city_alive[b, r, slot] = True
             self.era_score[b, r + 1] += self._era_pts["conquer"]  # gained a city (the raze path continues above)
+            if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
+                self.seat_explored[b, r + 1] |= self.pair_dist[c_t] <= 3
             self.civ_city_is_cap[b, r, slot] = False
             self.civ_city_center[b, r, slot] = c_t
             self.civ_city_pop[b, r, slot] = pop

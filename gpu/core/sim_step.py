@@ -441,6 +441,7 @@ class SimStep:
                     self.tile_city[rows, best[rows]] = col[rows]
                     self.tile_seat[rows, best[rows]] = 0  # seat + which city: the two halves of ownerSeat/ownerCity
                     self._tile_owner_ver += 1
+                    self._reveal_around(rows, 0, best[rows], 1)  # acquireTile's revealAround(seat, tile, 1)
                     # Each claim flips ONE tile (-1 → col, per the cand_b
                     # owner==-1 gate), so adjacency-to-col only GROWS, and only
                     # at the claimed tile's ≤6 on-map neighbours — the same

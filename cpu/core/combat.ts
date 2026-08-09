@@ -1025,6 +1025,8 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
       setTileOwner(t, actor.seat, id); // A-17: the claim registers to the new civCity
     }
   }
+  // Every captor reveals around the taken city (the seat-0 arm's rule).
+  revealAround(state, actor.seat, cityState.centerIndex, 3);
   center.district = 'CITY_CENTER'; // #70 HUNT: the captureCityState twin — see the note there
   actor.cities.push({
     id,

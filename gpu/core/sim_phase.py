@@ -292,6 +292,7 @@ class SimPhase:
                         self.civ_only_treasury[_rows, r] -= cost_t[_rows]
                         self.tile_seat[_rows, tt5[_rows]] = r + 1  # civ tile ownership lives in tile_seat
                         self._tile_owner_ver += 1  # one storage: nothing else to retag
+                        self._reveal_around(_rows, r + 1, tt5[_rows], 1)  # acquireTile's revealAround(seat, tile, 1)
                         self.tile_city[_rows, tt5[_rows]] = self.civ_city_id[_rows, r, jt5[_rows]]
                         self.civ_city_acquired[_rows, r, jt5[_rows]] += 1
                         self.civ_only_tiles_purchased[_rows, r] += 1
@@ -1456,6 +1457,8 @@ class SimPhase:
         assert slot < self.RC, "civ city slots exhausted — raise RC (compaction already ran; this is true living capacity)"
         self.civ_city_alive[b, w_, slot] = True
         self.era_score[b, w_ + 1] += self._era_pts["conquer"]  # gained a city (flip/conquest; the raze path returned above)
+        if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
+            self.seat_explored[b, w_ + 1] |= self.pair_dist[int(self.site[b, c])] <= 3
         self.civ_city_is_cap[b, w_, slot] = False  # a received city is never the capital
         self.civ_city_center[b, w_, slot] = self.site[b, c]
         self.civ_city_pop[b, w_, slot] = max(1, (old_pop * 3) // 4)

@@ -86,20 +86,21 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   sit at the four sim_masks.py sites. Seat-0 columns for tile buy and
   faith purchases (the #104 wire kinds) belong to the same family.
 
-- **A-27. FOG twin partial + the schedule move (the seat0-merge round's
-  live tail).** Fog is ACTIVE (`fogOfWar = unitsMode` at creation): CS
-  meets are exploration-gated on BOTH engines, camps rise only in
-  all-dark tiles, and `Seat.explored` is a compared digest field
-  (`seat_explored [B,1+R,T]`). The GPU reveals at t0 load, the three
-  spawn bodies and both founding bodies — but NOT yet at walk hops,
-  capture/transfer spawns, border growth, city capture/CS conquest or
-  the goody maps reward (checklist in `_reveal_around`'s docstring,
-  grep FOG-DEBT) — until those land the explored digest reds. The GPU
-  also still runs seat 0's whole turn inline in `step()` before the
-  barb/CS phases, while TS's seatPhase loop now owns rows 0..R — the
-  schedule-move spec is in .claude/HANDOFF.md. The last structural
-  seat-0 bilateralism is the WAR_COLUMN_SEAT family (warTurns/
-  peaceTurns/cityStateWarTurns + the war-column wire layout).
+- **A-27. The seat0-merge round's live tail.** Fog is ACTIVE
+  (`fogOfWar = unitsMode` at creation) and FULLY twinned at the reveal
+  level: CS meets exploration-gated on both engines, camps rise only in
+  all-dark tiles, `Seat.explored` is a compared digest field
+  (`seat_explored [B,1+R,T]`), and every TS reveal site has a GPU twin
+  (walk hops via `_step_verb`'s one tile write, acquisitions,
+  captures, spawns, foundings, t0 load — see `_reveal_around`'s
+  docstring). Residuals: (1) the goody-hut maps reward has no twin
+  because the GPU has NO goody-hut mechanic (check hut placement in
+  gate worlds at the hunt — TS's goody path draws RNG); (2) the GPU
+  still runs seat 0's whole turn inline in `step()` before the barb/CS
+  phases while TS's seatPhase loop owns rows 0..R — the schedule-move
+  spec is in .claude/HANDOFF.md; (3) the WAR_COLUMN_SEAT family
+  (warTurns/peaceTurns/cityStateWarTurns + the war-column wire layout)
+  is the last structural seat-0 bilateralism.
 
 ## B. Fidelity vs real Civ 6 — open residuals
 

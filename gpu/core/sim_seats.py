@@ -2323,6 +2323,8 @@ class SimSeats:
         assert slot < self.RC, "civ city slots exhausted - raise RC (compaction already ran; this is true living capacity)"
         self.civ_city_alive[b, civ_only_to, slot] = True
         self.era_score[b, civ_only_to + 1] += self._era_pts["conquer"]  # gained a city
+        if self.fog_of_war:  # the captor reveals around the taken city (revealAround r3)
+            self.seat_explored[b, civ_only_to + 1] |= self.pair_dist[c_t] <= 3
         self.civ_city_is_cap[b, civ_only_to, slot] = False  # a transferred city is never a capital
         self.civ_city_center[b, civ_only_to, slot] = c_t
         self.civ_city_pop[b, civ_only_to, slot] = max(1, (old_pop * 3) // 4)
@@ -2465,6 +2467,7 @@ class SimSeats:
                 self.tile_seat[rows, spot] = r + 1  # tile ownership lives in tile_seat
                 self._tile_owner_ver += 1  # one storage: nothing else to retag
                 self.tile_city[rows, spot] = self.civ_city_id[rows, r, j]  # claim registers to THIS city
+                self._reveal_around(rows, r + 1, spot, 1)  # acquireTile's revealAround(seat, tile, 1)
                 # invalidate the batched-yields cache ONLY if this claim
                 # can change a later column — i.e. the spot lands inside a
                 # LATER same-civ city's radius-3 worked window (columns <= j
@@ -3177,6 +3180,13 @@ class SimSeats:
             self.military_at[(mil_rows, here[mil_rows])] = -1
             self.military_at[(mil_rows, dest[mil_rows])] = gslot[mil_rows]
         self.unit_tile[rows, gs] = dest[rows]
+        # stepUnit's revealAround: EVERY hop lifts the mover's fog (r2).
+        # Major seats only — revealAround gates to isCiv on TS the same way,
+        # so barbarian/city-state movers accrue nothing on either engine.
+        srow = self.unit_seat[rows, gs]
+        major = srow <= self.R
+        if bool(major.any()):
+            self._reveal_around(rows[major], srow[major], dest[rows][major], 2)
         if clear_camp:
             if camp_civ is None:
                 self._clear_camp_at(moved, dest)
