@@ -52,9 +52,9 @@ export interface DriverOpts {
   state: GameState;
   seed: number;
   turns: number;
-  cMax: number;
-  csMax: number;
-  rMax: number;
+  cityMax: number;
+  cityStateMax: number;
+  civMax: number;
   horizon: number;
   improvementIds: string[];
   scaffoldDistricts: { id: DistrictId }[];
@@ -74,7 +74,7 @@ export interface DriverOpts {
 const UNROUTED_SEAT = 0;
 
 export async function runDriver(o: DriverOpts): Promise<void> {
-  const { state, seed, turns: N_TURNS, cMax: C_MAX, csMax: CS_MAX, rMax: R_MAX } = o;
+  const { state, seed, turns: N_TURNS, cityMax: CITY_MAX, cityStateMax: CITY_STATE_MAX, civMax: CIV_MAX } = o;
   let seat0rec: Seat0Rec | null = null;
 for (let t = 0; t < N_TURNS; t++) {
   {
@@ -86,7 +86,7 @@ for (let t = 0; t < N_TURNS; t++) {
     // The wire is SEAT-keyed: every key is a seat id, and "0" is a seat like
     // any other.
     const obs: Record<string, number[]> = {};
-    for (let seat = 0; seat <= R_MAX; seat++) obs[String(seat)] = observeSeat(state, seat, C_MAX, o.horizon, CS_MAX);
+    for (let seat = 0; seat <= CIV_MAX; seat++) obs[String(seat)] = observeSeat(state, seat, CITY_MAX, o.horizon, CITY_STATE_MAX);
     // per-unit obs twins — the drive.py extractors' TS mirrors, per
     // seat unit IN UNIT-ARRAY ORDER (the proven slot-map mirror):
     // job = nearest hasJob tile (d*T + index key, ties lowest);
@@ -145,23 +145,23 @@ for (let t = 0; t < N_TURNS; t++) {
         }
       }
     }
-    for (let r = 0; r < R_MAX; r++) {
-      const rv = state.seats[r + 1];
+    for (let r = 0; r < CIV_MAX; r++) {
+      const civSeat = state.seats[r + 1];
       const jr: number[] = [];
       const sr: number[] = [];
-      if (rv) {
-        const owns = (t: Tile) => tileOwnedByCiv(t, rv.seat);
-        const unl = computeUnlocksIn(rv.research);
+      if (civSeat) {
+        const owns = (t: Tile) => tileOwnedByCiv(t, civSeat.seat);
+        const unl = computeUnlocksIn(civSeat.research);
         const jobTiles = state.map.tiles.filter((t) =>
           owns(t) && !isWater(t)
           && (t.pillaged || t.districtPillaged
             || (!t.improvement && validImprovementsIn(t, { unlocks: unl, ownsTile: owns, map: state.map }).length > 0)));
         const g = r + 1;
-        const spreadTargets = rv.religion.founded
+        const spreadTargets = civSeat.religion.founded
           ? allCities(state).filter((c) => c.followedReligion !== g)
           : [];
         for (const u of state.units) {
-          if (u.seat !== rv.seat) continue;
+          if (u.seat !== civSeat.seat) continue;
           let jt = -1;
           if (UNITS[u.type]?.charges !== undefined && (u.charges ?? 0) > 0) {
             const ut = state.map.tiles[u.tileIndex];
@@ -191,11 +191,11 @@ for (let t = 0; t < N_TURNS; t++) {
         let buyC = -1;
         let buyB = -1;
         let bd: (typeof BUILDINGS)[string] | null = null;
-        let bc: (typeof rv.cities)[number] | null = null;
-        for (const rc of rv.cities) {
-          const have = new Set(rc.buildings);
-          const done = new Set(rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type));
-          const center = state.map.tiles[rc.centerIndex];
+        let bc: (typeof civSeat.cities)[number] | null = null;
+        for (const civCity of civSeat.cities) {
+          const have = new Set(civCity.buildings);
+          const done = new Set(civCity.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type));
+          const center = state.map.tiles[civCity.centerIndex];
           for (const def of Object.values(BUILDINGS)) {
             if (have.has(def.id) || def.worship || SCRIPTED_HELD_BUILDINGS.has(def.id)) continue;
             if (!done.has(def.district)) continue;
@@ -203,43 +203,43 @@ for (let t = 0; t < N_TURNS; t++) {
             if (def.requiresAny && !def.requiresAny.some((x) => have.has(x))) continue;
             if (def.exclusiveWith?.some((x) => have.has(x))) continue;
             if (def.special === 'WATER_MILL' && !hasRiver(center)) continue;
-            if (rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id) continue;
+            if (civCity.queue[0]?.kind === 'building' && civCity.queue[0].building === def.id) continue;
             if (!bd || def.cost < bd.cost || (def.cost === bd.cost && def.id < bd.id)) {
               bd = def;
-              bc = rc;
+              bc = civCity;
             }
           }
         }
-        if (bd && bc && Math.round((rv.treasury ?? 0) * 1000) >= Math.round((bd.cost * GOLD_PURCHASE_MULT + PEACE_GOLD_COST(0)) * 1000)) {
+        if (bd && bc && Math.round((civSeat.treasury ?? 0) * 1000) >= Math.round((bd.cost * GOLD_PURCHASE_MULT + PEACE_GOLD_COST(0)) * 1000)) {
           buyC = bc.centerIndex;
           buyB = prodLayout().buildings.indexOf(bd.id);
         }
         // The settler is a UNIT purchase now (#71): it spawns at the capital
         // (else the first city), which must afford the live escalating price
         // and have the pop to pay (a 1-pop city may not buy one).
-        const settlerSpawnCity = rv.cities.find((c) => c.isCapital) ?? rv.cities[0];
+        const settlerSpawnCity = civSeat.cities.find((c) => c.isCapital) ?? civSeat.cities[0];
         const settlerOk = settlerSpawnCity !== undefined && settlerSpawnCity.population >= 2
-          && goldAffordable(rv.treasury ?? 0, settlerCost(state, rv.seat) * GOLD_PURCHASE_MULT);
+          && goldAffordable(civSeat.treasury ?? 0, settlerCost(state, civSeat.seat) * GOLD_PURCHASE_MULT);
         let mil = 0;
         for (const u of state.units) {
-          if (u.seat !== rv.seat) continue;
+          if (u.seat !== civSeat.seat) continue;
           if ((UNITS[u.type]?.combat ?? 0) > 0) mil += 1;
         }
-        for (const rc of rv.cities) {
-          const q = rc.queue[0];
+        for (const civCity of civSeat.cities) {
+          const q = civCity.queue[0];
           if (q?.kind === 'unit' && q.unit && (UNITS[q.unit]?.combat ?? 0) > 0) mil += 1;
         }
         let anyU = false;
         for (const cand of BUY_UNITS) {
-          if (cand.tech && !rv.research.techs.includes(cand.tech)) continue;
+          if (cand.tech && !civSeat.research.techs.includes(cand.tech)) continue;
           const def = UNITS[cand.id];
           if (!def) continue;
-          if (def.requiresResource && !civHasStrategic(state, rv.seat, def.requiresResource)) continue;
-          if (!goldAffordable(rv.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
+          if (def.requiresResource && !civHasStrategic(state, civSeat.seat, def.requiresResource)) continue;
+          if (!goldAffordable(civSeat.treasury ?? 0, def.cost * GOLD_PURCHASE_MULT)) continue;
           anyU = true;
           break;
         }
-        const unitOk = rv.cities.length > 0 && mil < rv.cities.length * 2 && anyU;
+        const unitOk = civSeat.cities.length > 0 && mil < civSeat.cities.length * 2 && anyU;
         // #104 the TILE candidate twin — the first city in array order with
         // a border candidate names the pick (pickBorderTile, the culture
         // claim's own key, with THIS seat's mods); an unaffordable pick
@@ -248,44 +248,44 @@ for (let t = 0; t < N_TURNS; t++) {
         let tileOk = 0;
         let tileT = -1;
         let tileC = -1;
-        const rvMods = getModifiers(state, rv.seat);
-        for (const rc of rv.cities) {
-          const next = pickBorderTile(state, rc, { map: state.map, mods: rvMods });
+        const civSeatMods = getModifiers(state, civSeat.seat);
+        for (const civCity of civSeat.cities) {
+          const next = pickBorderTile(state, civCity, { map: state.map, mods: civSeatMods });
           if (next === null) continue;
-          if (goldAffordable(rv.treasury ?? 0, tilePurchaseCost(state, rc, next))) {
+          if (goldAffordable(civSeat.treasury ?? 0, tilePurchaseCost(state, civCity, next))) {
             tileOk = 1;
             tileT = next;
-            tileC = rc.centerIndex;
+            tileC = civCity.centerIndex;
           }
           break;
         }
         // #104 the FAITH candidate twins: worship (independent) + the ONE
         // religious unit (missionary saturates before apostle) — the
         // _seat_faith_buy_candidates mirror, first eligible city in order.
-        const hsOk = (rc: (typeof rv.cities)[number]): boolean => {
-          const hs = rc.districts.find((d) => d.type === 'HOLY_SITE');
+        const hsOk = (civCity: (typeof civSeat.cities)[number]): boolean => {
+          const hs = civCity.districts.find((d) => d.type === 'HOLY_SITE');
           const ht = hs ? state.map.tiles[hs.tileIndex] : undefined;
           return !!ht?.districtComplete && !ht.districtPillaged;
         };
         let worshipC = -1;
         let religKind = -1;
         let religC = -1;
-        if (rv.religion.founded) {
-          const wid = WORSHIP_BUILDINGS[rv.seat % WORSHIP_BUILDINGS.length];
-          if (goldAffordable(rv.faith ?? 0, buildingFaithCost(wid))) {
-            worshipC = rv.cities.find((rc) => !rc.buildings.includes(wid) && rc.buildings.includes('TEMPLE') && hsOk(rc))?.centerIndex ?? -1;
+        if (civSeat.religion.founded) {
+          const wid = WORSHIP_BUILDINGS[civSeat.seat % WORSHIP_BUILDINGS.length];
+          if (goldAffordable(civSeat.faith ?? 0, buildingFaithCost(wid))) {
+            worshipC = civSeat.cities.find((civCity) => !civCity.buildings.includes(wid) && civCity.buildings.includes('TEMPLE') && hsOk(civCity))?.centerIndex ?? -1;
           }
-          const shrineCity = rv.cities.find((rc) => rc.buildings.includes('SHRINE') && hsOk(rc));
+          const shrineCity = civSeat.cities.find((civCity) => civCity.buildings.includes('SHRINE') && hsOk(civCity));
           if (shrineCity) {
-            const eb = rv.religion.enhancer ? ENHANCER_BELIEFS[rv.religion.enhancer]?.effects : undefined;
-            const liveM = state.units.filter((u) => u.seat === rv.seat && u.type === 'MISSIONARY').length;
+            const eb = civSeat.religion.enhancer ? ENHANCER_BELIEFS[civSeat.religion.enhancer]?.effects : undefined;
+            const liveM = state.units.filter((u) => u.seat === civSeat.seat && u.type === 'MISSIONARY').length;
             const mCost = Math.round(UNITS.MISSIONARY.cost * (eb?.missionaryCostMult ?? 1));
-            if (liveM < MISSIONARY_CAP && goldAffordable(rv.faith ?? 0, mCost)) {
+            if (liveM < MISSIONARY_CAP && goldAffordable(civSeat.faith ?? 0, mCost)) {
               religKind = 5;
               religC = shrineCity.centerIndex;
             } else {
-              const liveA = state.units.filter((u) => u.seat === rv.seat && u.type === 'APOSTLE').length;
-              if (liveA < APOSTLE_CAP && goldAffordable(rv.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
+              const liveA = state.units.filter((u) => u.seat === civSeat.seat && u.type === 'APOSTLE').length;
+              if (liveA < APOSTLE_CAP && goldAffordable(civSeat.faith ?? 0, Math.round(UNITS.APOSTLE.cost))) {
                 religKind = 6;
                 religC = shrineCity.centerIndex;
               }
@@ -296,11 +296,11 @@ for (let t = 0; t < N_TURNS; t++) {
         // seat 0) is the POLICY gate; the rule body levyUnits has no war
         // test. First eligible CS in order.
         let levyIdx = -1;
-        if (civsAtWar(state, rv.seat, UNROUTED_SEAT) && goldAffordable(rv.treasury ?? 0, LEVY_GOLD_COST)) {
+        if (civsAtWar(state, civSeat.seat, UNROUTED_SEAT) && goldAffordable(civSeat.treasury ?? 0, LEVY_GOLD_COST)) {
           for (let ci = 0; ci < state.cityStates.length; ci++) {
             const csl = state.cityStates[ci];
             if (csl.type !== 'militaristic') continue;
-            if (!isSuzerain(csl, rv.seat)) continue;
+            if (!isSuzerain(csl, civSeat.seat)) continue;
             if (state.turn - (csl.lastLevyTurn ?? -LEVY_COOLDOWN) < LEVY_COOLDOWN) continue;
             levyIdx = ci;
             break;
@@ -333,8 +333,8 @@ for (let t = 0; t < N_TURNS; t++) {
     // and availability re-validated inside it, refusals soft on both
     // engines. #100: the scripted greedy fallback is DELETED — a seat
     // with no record assigns nothing, like every other verb.
-    for (const csIdx of seat0rec.envoys) {
-      const cs0 = state.cityStates[csIdx];
+    for (const cityStateIdx of seat0rec.envoys) {
+      const cs0 = state.cityStates[cityStateIdx];
       if (cs0) assignEnvoy(state, cs0.id, UNROUTED_SEAT);
     }
   }

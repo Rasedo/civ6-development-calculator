@@ -203,9 +203,9 @@ describe('#70 the action FILE drives the TS civ', () => {
       seatPhase(state, 0);
       return civ.cities[0];
     };
-    const rc = mk(false);
-    expect(rc.queue[0]?.kind).toBe('wonder');
-    expect(rc.wonders.some((w) => w.id === 'ORACLE')).toBe(true);
+    const civCity = mk(false);
+    expect(civCity.queue[0]?.kind).toBe('wonder');
+    expect(civCity.wonders.some((w) => w.id === 'ORACLE')).toBe(true);
     const rc2 = mk(true);
     expect(rc2.queue.find((q) => q.kind === 'wonder')).toBeUndefined(); // refused, never double-built
   });
@@ -215,14 +215,14 @@ describe('#70 the action FILE drives the TS civ', () => {
     const col = L.projectLo + L.projects.indexOf('RESEARCH_GRANTS');
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const civ = addCiv(state, 6, 6);
-    const rc = civ.cities[0];
-    const dt = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== rc.centerIndex)!;
+    const civCity = civ.cities[0];
+    const dt = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== civCity.centerIndex)!;
     dt.district = 'CAMPUS';
     dt.districtComplete = true;
-    rc.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
-    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[rc.centerIndex, col]], tech: null, civic: null, units: [] } } };
+    civCity.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [[civCity.centerIndex, col]], tech: null, civic: null, units: [] } } };
     seatPhase(state, 0);
-    expect(rc.queue[0]?.kind).toBe('project');
+    expect(civCity.queue[0]?.kind).toBe('project');
   });
 
   it('#93: a recorded DECLARE flips the seat to war; a recorded PEACE pays or refuses', () => {
@@ -261,15 +261,15 @@ describe('#70 the action FILE drives the TS civ', () => {
   it('#93: recorded ENVOYS land at the named city-state — bank first, else influence', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const civ = addCiv(state, 6, 6);
-    const cs = state.cityStates[0];
-    if (!cs) return; // fixture map without CS — nothing to pin here
-    setMet(cs, civ.seat);
+    const cityState = state.cityStates[0];
+    if (!cityState) return; // fixture map without CS — nothing to pin here
+    setMet(cityState, civ.seat);
     civ.envoysAvailable = 1;
     civ.influencePoints = 100;
     state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, envoys: [0, 0, 0], units: [] } } };
     seatPhase(state, 0);
     // pick 1 spends the bank, pick 2 spends 100 influence, pick 3 REFUSES (broke)
-    expect(envoysOf(cs, civ.seat)).toBe(2);
+    expect(envoysOf(cityState, civ.seat)).toBe(2);
     expect(civ.envoysAvailable).toBe(0);
     // the accrual may have added a few points this turn, but never 100
     expect(civ.influencePoints).toBeLessThan(100);

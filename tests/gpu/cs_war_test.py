@@ -60,11 +60,11 @@ def main() -> None:
     # CONSTRUCT the configuration rather than hunt for it: take any live seat-0
     # unit, make it a fighter, and stand it next to a live city-state centre —
     # a poke that silently skips proves nothing.
-    fighter = int((s2._p_combat > 0).nonzero().flatten()[0])
+    fighter = int((s2._type_combat > 0).nonzero().flatten()[0])
     found = None
     for b in range(s2.B):
         live = s2.citystate_alive[b].nonzero().flatten().tolist()
-        units = s2.p_alive[b].nonzero().flatten().tolist()
+        units = s2.seat0_unit_alive[b].nonzero().flatten().tolist()
         if not live or not units:
             continue
         cs = live[0]
@@ -75,9 +75,9 @@ def main() -> None:
         found = (b, cs, ctr, units[0], nbrs[0])
         break
     assert found is not None, "no fixture has a live city-state and a live seat-0 unit"
-    s2.p_type[found[0], found[3]] = fighter
+    s2.seat0_unit_type[found[0], found[3]] = fighter
     b, cs, ctr, u, spot = found
-    s2.p_tile[b, u] = spot
+    s2.seat0_unit_tile[b, u] = spot
     s2.citystate_atwar[b, cs] = False
     s2.sync_war()  # close the poke under transpose
     m_peace = s2.unit_action_mask()[b, u, 6:12]

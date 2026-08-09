@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (U_MAX/P_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
 
 
 class SimEconomy:
@@ -91,13 +91,13 @@ class SimEconomy:
         """[B] long - the SEAT of the military unit on `tile`, NO_SEAT if none.
         The unit pool is one plane with `unit_seat` carrying ownership, so this
         is one gather rather than a per-pool chain."""
-        s = self.occ_mil.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        s = self.military_at.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
         return torch.where(s >= 0, self.unit_seat.gather(1, s.clamp(min=0).unsqueeze(1)).squeeze(1),
                            torch.full_like(s, NO_SEAT))
 
     def _tile_civ_seat(self, tile: torch.Tensor) -> torch.Tensor:
         """[B] long - the SEAT of the civilian on `tile`, NO_SEAT if none."""
-        s = self.occ_civ.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
+        s = self.civilian_at.gather(1, tile.clamp(min=0).unsqueeze(1)).squeeze(1)
         return torch.where(s >= 0, self.unit_seat.gather(1, s.clamp(min=0).unsqueeze(1)).squeeze(1),
                            torch.full_like(s, NO_SEAT))
 
@@ -105,11 +105,11 @@ class SimEconomy:
         """[B] long - the SEAT of the hostile attacker in pool slot `u`.
         `_hostile_vs_unit` and `_hostile_ranged_strike` are pool-generic over
         atk_kind, so their seat is too."""
-        if atk_kind == "v":
-            return self.v_seat[:, u]
-        if atk_kind == "p":
-            return self.p_seat[:, u]
-        return self.u_seat[:, u]
+        if atk_kind == "civ":
+            return self.civ_unit_seat[:, u]
+        if atk_kind == "seat0":
+            return self.seat0_unit_seat[:, u]
+        return self.barb_unit_seat[:, u]
 
     def _row_of(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] long - the war-matrix ROW for each game's absolute seat, with
@@ -129,8 +129,8 @@ class SimEconomy:
         # Bit 0 is the military map, bit 1 the civilian one. They are read
         # SEPARATELY and not ORed: a tile can hold one of each, and ORing them
         # hides a military death behind the civilian still standing there.
-        return ((self.occ_mil.gather(1, t).squeeze(1) >= 0).long()
-                | ((self.occ_civ.gather(1, t).squeeze(1) >= 0).long() << 1))
+        return ((self.military_at.gather(1, t).squeeze(1) >= 0).long()
+                | ((self.civilian_at.gather(1, t).squeeze(1) >= 0).long() << 1))
 
     def _ww_holds(self, row: int) -> bool:
         """Only MAJOR civs keep an accumulator: rows 0..R. A city-state is a
@@ -322,18 +322,18 @@ class SimEconomy:
         r = self.rules
         return js_round((r.builder_base + r.builder_per * n.to(self.dtype)) * r.game_speed)
 
-    def _p_settlers(self) -> torch.Tensor:
+    def _seat0_settlers(self) -> torch.Tensor:
         """[B] seat 0's LIVE settler units — what the settlerCost escalator
         counts."""
         if self._settler_idx < 0:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        return (self.p_alive & (self.p_type == self._settler_idx)).sum(dim=1)
+        return (self.seat0_unit_alive & (self.seat0_unit_type == self._settler_idx)).sum(dim=1)
 
     def _civ_only_settlers_of(self, r: int) -> torch.Tensor:
         """[B] civ r's LIVE settler units."""
         if self._settler_idx < 0:
             return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        return (self.v_alive & (self.v_civ == r) & (self.v_type == self._settler_idx)).sum(dim=1)
+        return (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._settler_idx)).sum(dim=1)
 
     def _afford(self, tre: torch.Tensor, cost) -> torch.Tensor:
         """Milli-rounded gold-threshold compare — the `goldAffordable` twin.
@@ -905,7 +905,7 @@ class SimEconomy:
         """(seat_tag, _eff_version)-keyed wrapper over _gov_policy_mods. The
         only mutable input is civics2 (a seat's researched civics) and every
         civic completion bumps _eff_version, so the eff epoch is a complete
-        key. seat_tag is 'p' for seat 0 or the civ index — the tag is the key,
+        key. seat_tag is 'seat0' for seat 0 or the civ index — the tag is the key,
         the tensor is never hashed. Consumers only READ the returned tuple, so
         sharing one object across the per-city loop is safe."""
         if self._gov_pol_cache is None or self._gov_pol_cache[0] != self._eff_version:
@@ -1386,10 +1386,10 @@ class SimEconomy:
         _rel_combat_planes.near3 (scatter_add of longs then >0)."""
         B, T, O, dev = self.B, self.T, self._O, self.device
         gi, ai = self._general_unit_idx, self._admiral_unit_idx
-        p_g = self.p_alive & (self.p_type == gi) if gi >= 0 else torch.zeros(B, simbase.P_MAX, dtype=torch.bool, device=dev)
-        p_a = self.p_alive & (self.p_type == ai) if ai >= 0 else torch.zeros(B, simbase.P_MAX, dtype=torch.bool, device=dev)
-        v_g = self.v_alive & (self.v_type == gi) if gi >= 0 else torch.zeros(B, simbase.U_MAX, dtype=torch.bool, device=dev)
-        v_a = self.v_alive & (self.v_type == ai) if ai >= 0 else torch.zeros(B, simbase.U_MAX, dtype=torch.bool, device=dev)
+        p_g = self.seat0_unit_alive & (self.seat0_unit_type == gi) if gi >= 0 else torch.zeros(B, simbase.SEAT0_POOL_MAX, dtype=torch.bool, device=dev)
+        p_a = self.seat0_unit_alive & (self.seat0_unit_type == ai) if ai >= 0 else torch.zeros(B, simbase.SEAT0_POOL_MAX, dtype=torch.bool, device=dev)
+        v_g = self.civ_unit_alive & (self.civ_unit_type == gi) if gi >= 0 else torch.zeros(B, simbase.POOL_MAX, dtype=torch.bool, device=dev)
+        v_a = self.civ_unit_alive & (self.civ_unit_type == ai) if ai >= 0 else torch.zeros(B, simbase.POOL_MAX, dtype=torch.bool, device=dev)
         present = bool(p_g.any()) or bool(p_a.any()) or bool(v_g.any()) or bool(v_a.any())
         if present:
             arp = torch.arange(1, p_g.shape[1] + 1, device=dev)
@@ -1397,8 +1397,8 @@ class SimEconomy:
             # Tile (+1 so tile 0 counts), pool (p vs v via distinct base mults),
             # type (general vs admiral via ×3) and slot — a swap or a same-tile
             # pool transfer (capture) still changes the sum.
-            p_fp = int((((self.p_tile + 1) * (1 + 2 * p_a.long()) * arp) * (p_g | p_a).long()).sum())
-            v_fp = int((((self.v_tile + 1) * (1 + 2 * v_a.long()) * arv) * (v_g | v_a).long()).sum())
+            p_fp = int((((self.seat0_unit_tile + 1) * (1 + 2 * p_a.long()) * arp) * (p_g | p_a).long()).sum())
+            v_fp = int((((self.civ_unit_tile + 1) * (1 + 2 * v_a.long()) * arv) * (v_g | v_a).long()).sum())
             fp = p_fp * 100003 + v_fp + int((p_g | p_a).sum()) * 31 + int((v_g | v_a).sum())
         else:
             fp = 0
@@ -1411,8 +1411,8 @@ class SimEconomy:
         off = self._gen_off
         land = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
         sea = torch.zeros(B, O, T, dtype=torch.bool, device=dev)
-        pwin = tiles_from_offsets(self.p_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.P_MAX, -1)
-        vwin = tiles_from_offsets(self.v_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.U_MAX, -1) if self.R > 0 else None
+        pwin = tiles_from_offsets(self.seat0_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.SEAT0_POOL_MAX, -1)
+        vwin = tiles_from_offsets(self.civ_unit_tile.clamp(min=0).reshape(-1), off, self.W, self.H).reshape(B, simbase.POOL_MAX, -1) if self.R > 0 else None
 
         def dilate(mask: torch.Tensor, win: torch.Tensor) -> torch.Tensor:
             src = torch.zeros(B, T, dtype=torch.long, device=dev)
@@ -1426,8 +1426,8 @@ class SimEconomy:
             sea[:, 0] = dilate(p_a, pwin)
         if self.R > 0:
             for r in range(self.R):
-                rg = v_g & (self.v_civ == r)
-                ra = v_a & (self.v_civ == r)
+                rg = v_g & (self.civ_unit_civ == r)
+                ra = v_a & (self.civ_unit_civ == r)
                 if bool(rg.any()):
                     land[:, r + 1] = dilate(rg, vwin)
                 if bool(ra.any()):
@@ -1446,9 +1446,9 @@ class SimEconomy:
         the +MP one, so the two cannot drift apart.
 
         Shape-generic on the trailing dims (leading dim must be B): [B] at the
-        combat call sites, [B, simbase.P_MAX] / [B, simbase.U_MAX] at the pooled snapshot.
+        combat call sites, [B, simbase.SEAT0_POOL_MAX] / [B, simbase.POOL_MAX] at the pooled snapshot.
         Does NOT screen civilians — callers own that (the combat sites only ever
-        ask about a combatant; the snapshot masks on _p_combat > 0)."""
+        ask about a combatant; the snapshot masks on _type_combat > 0)."""
         planes = self._gen_aura_planes()
         if planes is None:
             return torch.zeros_like(tile, dtype=torch.bool)
@@ -1493,7 +1493,7 @@ class SimEconomy:
         # A city CENTRE here — any seat's; `home` already restricts it to this
         # one, and the one-owner invariant makes a centre tile its own seat's.
         center = (self.center_at.gather(1, t) >= 0) | (self.civ_city_at.gather(1, t) >= 0)
-        camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "u" else None
+        camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "barb" else None
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),
                torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
@@ -1521,7 +1521,7 @@ class SimEconomy:
         # to the type pool and then OVERRIDDEN by the embark pool below —
         # embarkation speed is not a unit's movement stat. `unitFullMoves` has
         # the same shape (`if (embarked && !naval) return EMBARK_MOVES`).
-        base = self._p_moves[typ] + self._golden_move_mp(pre)
+        base = self._type_moves[typ] + self._golden_move_mp(pre)
         if self._embark_live:
             emb = getattr(self, f"{pre}_emb")
             base = torch.where(
@@ -1544,24 +1544,24 @@ class SimEconomy:
         inside refreshUnits — the TOP of endTurn, before anything moves — and
         spends movesLeft down from that frozen pool all turn. The GPU keeps no
         persistent movesLeft: every walker recomputes `full_mp` from
-        `_p_moves[type]` MID-turn, which is safe only for terms that depend on
+        `_type_moves[type]` MID-turn, which is safe only for terms that depend on
         unit TYPE. The aura is not one — it keys on a GENERAL's POSITION, and
         generals move during the very phase the unit orders execute, so a
         recompute could read a POST-move general where TS read a PRE-move one.
-        Hence the snapshot; the walkers add p_aura_mp / v_aura_mp.
+        Hence the snapshot; the walkers add seat0_unit_aura_mp / civ_unit_aura_mp.
 
         Barbarians never own a GENERAL/ADMIRAL, so the u_ pool has no plane
-        (mirrors p_xp/v_xp). Civilians are screened here (TS inGeneralAura
+        (mirrors seat0_unit_xp/civ_unit_xp). Civilians are screened here (TS inGeneralAura
         returns false at combat <= 0), as are dead slots, so a stale reclaimed
         slot cannot leak a bonus. Zero RNG, integer arithmetic."""
         gm = self._gen_aura_mp
-        p_ok = self.p_alive & (self._p_combat[self.p_type] > 0)
+        p_ok = self.seat0_unit_alive & (self._type_combat[self.seat0_unit_type] > 0)
         p_hit = self._gen_aura_hit(
-            torch.zeros_like(self.p_tile),  # seat 0 is civ_unified 0
-            self.p_tile,
-            self.unit_naval[self.p_type] | self.p_emb,  # ADMIRAL-keyed when naval OR embarked
+            torch.zeros_like(self.seat0_unit_tile),  # seat 0 is civ_unified 0
+            self.seat0_unit_tile,
+            self.unit_naval[self.seat0_unit_type] | self.seat0_unit_emb,  # ADMIRAL-keyed when naval OR embarked
         )
-        self.p_aura_mp.copy_((p_hit & p_ok).long() * gm)
+        self.seat0_unit_aura_mp.copy_((p_hit & p_ok).long() * gm)
 
     def _refresh_aura_mp_civ(self) -> None:
         """The CIV-SEAT pool freezes at a DIFFERENT moment than seat 0's — the
@@ -1574,17 +1574,17 @@ class SimEconomy:
         rewrites `movesFull`. Freezing here also lands BEFORE the unit-order
         phase moves any general, so both engines read the same pre-move
         positions."""
-        v_ok = self.v_alive & (self._p_combat[self.v_type] > 0)
+        v_ok = self.civ_unit_alive & (self._type_combat[self.civ_unit_type] > 0)
         v_hit = self._gen_aura_hit(
-            self.v_civ + 1,  # civ index r is civ_unified r+1
-            self.v_tile,
-            self.unit_naval[self.v_type] | self.v_emb,
+            self.civ_unit_civ + 1,  # civ index r is civ_unified r+1
+            self.civ_unit_tile,
+            self.unit_naval[self.civ_unit_type] | self.civ_unit_emb,
         )
-        self.v_aura_mp.copy_((v_hit & v_ok).long() * self._gen_aura_mp)
+        self.civ_unit_aura_mp.copy_((v_hit & v_ok).long() * self._gen_aura_mp)
         # seatPhase writes `u.movesLeft = full + generalAuraMP(...)` and
         # `u.movesFull = u.movesLeft` in this very loop — the reset that
         # establishes a civ seat's budget for the turn.
-        self._reset_mp("v")
+        self._reset_mp("civ")
 
     def _civ_era(self, techs: torch.Tensor, civics: torch.Tensor) -> torch.Tensor:
         """[B] — the `civEraIndex` twin. The HIGHEST era among a seat's
@@ -1935,9 +1935,9 @@ class SimEconomy:
                 dcount_all = owned_d.to(torch.long).sum(dim=2)  # [B, C]
                 # Per-city COMPLETED specialty district count (Zen Meditation min).
                 spec_count = (owned_d & self._is_specialty[dt.clamp(min=0)]).to(torch.long).sum(dim=2)  # [B, C]
-                # City-state envoy bonus, keyed to BUILDINGS (csEnvoyBonuses):
+                # City-state envoy bonus, keyed to BUILDINGS (cityStateEnvoyBonuses):
                 # a CS at >=3 envoys grants +districtBonus in its TYPE channel
-                # (CS_TYPE_YIELD) to every city holding the type's TIER-1
+                # (CITY_STATE_TYPE_YIELD) to every city holding the type's TIER-1
                 # building; at >=6, again on the TIER-2 building — the bonus
                 # lands on the district's buildings, not the bare district.
                 # Routed through bf_live — the pillaged-dark + regional-masked
@@ -2072,7 +2072,7 @@ class SimEconomy:
             total += cap_bonus.unsqueeze(1) * _cap_m
             # The suzerain's per-CS unique perk — a flat +suzerainYield in the
             # CS's live channel (citystate_suz_key, -1 = descoped) to whichever seat
-            # holds the STRICT suzerain contest (csSuzerainCapitalBonus).
+            # holds the STRICT suzerain contest (cityStateSuzerainCapitalBonus).
             # Seat 0 here — the isSuzerain twin (>= suz_min, strictly > every
             # civ seat).
             suz_min = int(self.rules.citystate.get("suzerainEnvoys", 3))
@@ -2089,7 +2089,7 @@ class SimEconomy:
         # summed pre-amenity-factor. Food (col 0) is left unscaled by the
         # amenity factor below, matching TS.
         if self._gov_has_effects:
-            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult, _gpc_tp, gpc_amen, gpc_hid, gpc_nd = self._gov_policy_mods_cached("p", self.civics)
+            gpc_city, gpc_cap, gpc_hous, gpc_ymult, gpc_slotted, _gpc_emult, _gpc_tp, gpc_amen, gpc_hid, gpc_nd = self._gov_policy_mods_cached("seat0", self.civics)
             # Both conditional rules once, here — the amenity half is needed
             # BEFORE the tier balance and the housing half AFTER it.
             _cond_house, _cond_amen = (

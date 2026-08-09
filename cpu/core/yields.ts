@@ -167,8 +167,8 @@ export function cityDistrictYields(ctx: YieldCtx, city: City): Yields {
     const tile = ctx.map.tiles[d.tileIndex];
     if (!tile.districtComplete || tile.districtPillaged) continue; // B-32: pillaged = dark
     const def = DISTRICTS[d.type];
-    const csAdd = ctx.mods.districtYieldAdd[d.type];
-    if (csAdd) addYields(out, csAdd);
+    const cityStateAdd = ctx.mods.districtYieldAdd[d.type];
+    if (cityStateAdd) addYields(out, cityStateAdd);
     if (def.adjacencyYield) {
       const adj = effectiveAdjacency(ctx, tile, d.type);
       out[def.adjacencyYield] += adj;

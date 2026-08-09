@@ -25,7 +25,7 @@ RULE 3 - no `setattr(self, name, ...)` rebinding (plus 3b: `_alloc_*` helpers,
     rebind a whole pool in one statement — so it is banned outside allocation.
 
 RULE 4 - no rebinding at all of a plane listed in ALIASED, self-referential or
-    not. `self.p_aura_mp = (p_hit & p_ok).long() * gm` mentions no p_aura_mp,
+    not. `self.seat0_unit_aura_mp = (p_hit & p_ok).long() * gm` mentions no seat0_unit_aura_mp,
     passes RULE 1 clean, and still detaches the plane from its pool.
 
 The rules are static and cost milliseconds, which is the point -- they guard
@@ -69,7 +69,7 @@ _CIV_FIELDS = (
     "treasury", "war_weariness", "techs", "civics", "tech_boosted", "civic_boosted",
 )
 ALIASED: frozenset[str] = frozenset(
-    [f"{pre}_{plane}" for pre in ("p", "v", "u") for plane in _POOL_PLANES]
+    [f"{pre}_{plane}" for pre in ("seat0", "civ", "barb") for plane in _POOL_PLANES]
     + [f for n in _CIV_FIELDS for f in (n, f"civ_only_{n}")]
     # the three legacy war names are SLICES of `war`. A rebind detaches the
     # relation from the matrix every reader consults, and every gate stays
@@ -85,7 +85,7 @@ ALIASED: frozenset[str] = frozenset(
     + ["citystate_alive", "citystate_center", "citystate_pop", "citystate_hp"]
     # the five pairs whose two sides never shared a name.
     + ["culture_total", "civ_only_culture", "faith", "civ_only_faith", "tourism_total",
-       "civ_only_tourism", "p_warmonger", "civ_only_warmonger", "gp_points", "civ_only_gpp"]
+       "civ_only_tourism", "warmonger", "civ_only_warmonger", "gp_points", "civ_only_gpp"]
     # the seat-indexed war clocks.
     + ["civ_only_warturns", "civ_only_peaceturns", "citystate_war_turns"]
     # the city block's seat-0 and civ views (the base itself is registered).

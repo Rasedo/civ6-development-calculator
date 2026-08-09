@@ -345,14 +345,14 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const state = makeState(makeMap(14, 12, 'COAST'));
     state.unitsMode = true;
     const civ = bareCiv(state);
-    const rcCenter = tileAtCoords(state.map, 8, 5);
-    rcCenter.terrain = 'GRASSLAND';
-    setTileOwner(rcCenter, civ.seat, tileCity(rcCenter));
-    const rc: City = {
+    const civCityCenter = tileAtCoords(state.map, 8, 5);
+    civCityCenter.terrain = 'GRASSLAND';
+    setTileOwner(civCityCenter, civ.seat, tileCity(civCityCenter));
+    const civCity: City = {
       id: 0,
       name: 'Utica',
       seat: seatOfIndex(1),
-      centerIndex: rcCenter.index,
+      centerIndex: civCityCenter.index,
       population: 5,
       foodBox: 0,
       cultureBox: 0,
@@ -362,21 +362,21 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
       queue: [],
       isCapital: true,
       buildings: [],
-      districts: [{ type: 'CITY_CENTER', tileIndex: rcCenter.index }],
+      districts: [{ type: 'CITY_CENTER', tileIndex: civCityCenter.index }],
       wonders: [],
       specialists: {},
       hp: 200,
       foundedTurn: 1,
     };
-    civ.cities.push(rc);
+    civ.cities.push(civCity);
     // a galley on a water tile adjacent to the foreign city center
-    const waterAdj = neighbors(state.map, rcCenter).find((n) => isWater(n))!;
+    const waterAdj = neighbors(state.map, civCityCenter).find((n) => isWater(n))!;
     const galley = spawnUnit(state, 'GALLEY', waterAdj.index, 0)!;
     expect(galley.tileIndex).toBe(waterAdj.index);
-    const before = rc.hp;
-    const res = meleeAttack(state, galley.id, rcCenter.index, 0);
+    const before = civCity.hp;
+    const res = meleeAttack(state, galley.id, civCityCenter.index, 0);
     expect(res.ok).toBe(true);
-    expect(rc.hp).toBeLessThan(before); // the ship battered the coastal city
+    expect(civCity.hp).toBeLessThan(before); // the ship battered the coastal city
   });
 
   it('a SEAT-0 galley MOVES across water (findPath naval) then attacks a coastal city', () => {
@@ -386,14 +386,14 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     const state = makeState(makeMap(14, 12, 'COAST')); // all-water map
     state.unitsMode = true;
     const civ = bareCiv(state);
-    const rcCenter = tileAtCoords(state.map, 9, 5);
-    rcCenter.terrain = 'GRASSLAND';
-    setTileOwner(rcCenter, civ.seat, tileCity(rcCenter));
-    const rc: City = {
+    const civCityCenter = tileAtCoords(state.map, 9, 5);
+    civCityCenter.terrain = 'GRASSLAND';
+    setTileOwner(civCityCenter, civ.seat, tileCity(civCityCenter));
+    const civCity: City = {
       id: 0,
       name: 'Kart-Hadasht',
       seat: seatOfIndex(1),
-      centerIndex: rcCenter.index,
+      centerIndex: civCityCenter.index,
       population: 5,
       foodBox: 0,
       cultureBox: 0,
@@ -403,18 +403,18 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
       queue: [],
       isCapital: true,
       buildings: [],
-      districts: [{ type: 'CITY_CENTER', tileIndex: rcCenter.index }],
+      districts: [{ type: 'CITY_CENTER', tileIndex: civCityCenter.index }],
       wonders: [],
       specialists: {},
       hp: 200,
       foundedTurn: 1,
     };
-    civ.cities.push(rc);
+    civ.cities.push(civCity);
     // spawn the galley on OPEN WATER several tiles from the city
     const galley = spawnUnit(state, 'GALLEY', tileAtCoords(state.map, 4, 5).index, 0)!;
     expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true);
     const startIdx = galley.tileIndex;
-    const waterAdj = neighbors(state.map, rcCenter).find((n) => isWater(n))!;
+    const waterAdj = neighbors(state.map, civCityCenter).find((n) => isWater(n))!;
     // order the sea move; walk it home over a few turns' MP (naval routing)
     const mv = orderMove(state, galley.id, waterAdj.index);
     expect(mv.ok).toBe(true);
@@ -427,9 +427,9 @@ describe('#45/B-6 N2 naval spawn + combat', () => {
     expect(isWater(state.map.tiles[galley.tileIndex])).toBe(true); // arrived, still afloat
     expect(galley.embarked).toBeFalsy(); // a naval unit is never embarked
     // and it batters the coastal city from the sea it just crossed
-    const before = rc.hp;
-    const atk = meleeAttack(state, galley.id, rcCenter.index, 0);
+    const before = civCity.hp;
+    const atk = meleeAttack(state, galley.id, civCityCenter.index, 0);
     expect(atk.ok).toBe(true);
-    expect(rc.hp).toBeLessThan(before);
+    expect(civCity.hp).toBeLessThan(before);
   });
 });

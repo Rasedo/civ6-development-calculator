@@ -42,7 +42,7 @@ def free_land(sim, skip=()):
     for t in range(sim.T):
         if t in skip or not bool(sim.passable[0, t]):
             continue
-        if int(sim.occ_mil[0, t]) >= 0 or int(sim.occ_civ[0, t]) >= 0:
+        if int(sim.military_at[0, t]) >= 0 or int(sim.civilian_at[0, t]) >= 0:
             continue
         return t
     raise AssertionError("no free land tile")
@@ -53,15 +53,15 @@ def test_own_civilian_does_not_block() -> None:
     sim = build()
     t = free_land(sim)
     # a civ-0 civilian sits there
-    slot = int(sim.v_next[0])
-    sim.v_alive[0, slot] = True
-    sim.v_civ[0, slot] = 0
-    sim.v_seat[0, slot] = 1
-    sim.v_type[0, slot] = 0
-    sim.v_tile[0, slot] = t
-    sim.v_charges[0, slot] = 3  # civilian
-    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
-    sim.v_next[0] += 1
+    slot = int(sim.civ_unit_next[0])
+    sim.civ_unit_alive[0, slot] = True
+    sim.civ_unit_civ[0, slot] = 0
+    sim.civ_unit_seat[0, slot] = 1
+    sim.civ_unit_type[0, slot] = 0
+    sim.civ_unit_tile[0, slot] = t
+    sim.civ_unit_charges[0, slot] = 3  # civilian
+    sim.civilian_at[0, t] = slot + sim.POOL_LO["civ"]
+    sim.civ_unit_next[0] += 1
 
     tiles = torch.tensor([[t]])
     own = bool(sim._blocked_for(tiles, 1)[0, 0])          # civ 0's military
@@ -97,7 +97,7 @@ def test_spawn_probe_obeys_encampments() -> None:
         "a live enemy Encampment must bar the tile for seat 0"
     )
     found, spot = sim._first_free_spot(
-        torch.tensor([t]), "p",
+        torch.tensor([t]), "seat0",
         civ_mask=torch.zeros(sim.B, dtype=torch.bool),
     )
     assert int(spot[0]) != t, (

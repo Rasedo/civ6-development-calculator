@@ -57,7 +57,7 @@ python gpu/tools/logdiff.py          # prints the FIRST divergent line
   values when in doubt, not labels.
 - Current fields: PT (totals, gp, esc), PU/BU/RU (positions, hp, acted),
   TI/TD (tiles), CA (camp locations), PC (pop/progress/boxes/loy/
-  yields), RT (rival totals, fai, terr + tsum shape-checksum), RC (queue
+  yields), RT (civ-seat totals, fai, terr + tsum shape-checksum), RC (queue
   kind/cost/progress, loy, cb, til, hp, yields), CB (EVERY damage roll:
   k = the TS call-site tag [mel/melc, rng, rngrc, rngcs, rcty/rctyc,
   csty/cstyc, pcty/pctyc], t = target tile, c = the rng counter BEFORE

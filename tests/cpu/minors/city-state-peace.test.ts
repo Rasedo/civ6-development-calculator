@@ -16,7 +16,7 @@ import type { CityState, GameState, Seat } from '../../../cpu/core/types';
 
 function addCs(state: GameState, id: number): CityState {
   const t = tileAtCoords(state.map, 8, 8);
-  const cs: CityState = {
+  const cityState: CityState = {
     id,
     name: 'Kandy',
     type: 'scientific',
@@ -27,8 +27,8 @@ function addCs(state: GameState, id: number): CityState {
     quest: null,
     questIssuedTurn: 0,
   } as CityState;
-  state.cityStates.push(cs);
-  return cs;
+  state.cityStates.push(cityState);
+  return cityState;
 }
 
 function addCiv(state: GameState, id: number, atWar: boolean): Seat {
@@ -72,35 +72,35 @@ function addCiv(state: GameState, id: number, atWar: boolean): Seat {
 describe('#50: seat 0 <-> city-state peace', () => {
   it('peace is refused before the sourced 10-turn floor, then always accepted', () => {
     const state = makeState();
-    const cs = addCs(state, 1);
-    expect(declareWarOnCityState(state, cs.id, 0).ok).toBe(true);
-    expect(civsAtWar(state, cs.seat, 0)).toBe(true);
+    const cityState = addCs(state, 1);
+    expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
+    expect(civsAtWar(state, cityState.seat, 0)).toBe(true);
 
-    expect(sueForPeaceWithCityState(state, cs.id, 0).ok).toBe(false); // 0 turns waited
+    expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(false); // 0 turns waited
     for (let i = 0; i < WAR_MIN_TURNS - 1; i++) cityStatePhase(state, 0);
-    expect(sueForPeaceWithCityState(state, cs.id, 0).ok).toBe(false); // one short
+    expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(false); // one short
     cityStatePhase(state, 0);
     // ... and at the floor it is accepted unconditionally (no gold, no roll)
-    expect(sueForPeaceWithCityState(state, cs.id, 0).ok).toBe(true);
-    expect(civsAtWar(state, cs.seat, 0)).toBe(false);
-    expect(cs.csWarTurns).toBe(0); // a re-declaration waits the floor out again
+    expect(sueForPeaceWithCityState(state, cityState.id, 0).ok).toBe(true);
+    expect(civsAtWar(state, cityState.seat, 0)).toBe(false);
+    expect(cityState.cityStateWarTurns).toBe(0); // a re-declaration waits the floor out again
   });
 
   it('a city-state will NOT make separate peace while its suzerain is at war', () => {
     const state = makeState();
-    const cs = addCs(state, 1);
+    const cityState = addCs(state, 1);
     const rome = addCiv(state, 0, true);
-    cs.envoys = { [seatOfIndex(0)]: SUZERAIN_ENVOYS }; // Rome is suzerain
-    expect(declareWarOnCityState(state, cs.id, 0).ok).toBe(true);
+    cityState.envoys = { [seatOfIndex(0)]: SUZERAIN_ENVOYS }; // Rome is suzerain
+    expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
     for (let i = 0; i < WAR_MIN_TURNS + 2; i++) cityStatePhase(state, 0);
 
-    const r = sueForPeaceWithCityState(state, cs.id, 0);
+    const r = sueForPeaceWithCityState(state, cityState.id, 0);
     expect(r.ok).toBe(false);
     expect(r.reason).toContain('suzerain');
-    expect(civsAtWar(state, cs.seat, 0)).toBe(true);
+    expect(civsAtWar(state, cityState.seat, 0)).toBe(true);
 
     // ... and the way out is peace with the SUZERAIN, which forces it
     setWar(state, rome.seat, 0, false);
-    expect(civsAtWar(state, cs.seat, 0)).toBe(true); // not automatic until makePeace runs
+    expect(civsAtWar(state, cityState.seat, 0)).toBe(true); // not automatic until makePeace runs
   });
 });

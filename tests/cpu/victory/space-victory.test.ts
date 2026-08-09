@@ -67,8 +67,8 @@ describe('B-25 science victory', () => {
 
   it('a civ finishing the race first is a science DEFEAT (victoryType 4)', () => {
     const { state } = newGameWithCampus(1);
-    const rc = (state.seats[(0) + 1] as Seat).cities[0];
-    rc.queue = [{ kind: 'project', project: 'EXOPLANET_EXPEDITION', progress: 100000, cost: 1 }];
+    const civCity = (state.seats[(0) + 1] as Seat).cities[0];
+    civCity.queue = [{ kind: 'project', project: 'EXOPLANET_EXPEDITION', progress: 100000, cost: 1 }];
     endTurn(state, 0);
     expect(state.victoryType).toBe(4);
     expect(state.gameOver).toBe(true);

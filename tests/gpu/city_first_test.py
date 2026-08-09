@@ -25,7 +25,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import P_MAX
+from core.engine import SEAT0_POOL_MAX
 
 
 def build():
@@ -48,7 +48,7 @@ def civ_centre(sim) -> tuple[int, int]:
             for nb in sim.neigh[ctr].tolist():
                 if nb < 0 or not bool(sim.passable[0, nb]):
                     continue
-                if int(sim.occ_mil[0, nb]) >= 0 or int(sim.occ_civ[0, nb]) >= 0:
+                if int(sim.military_at[0, nb]) >= 0 or int(sim.civilian_at[0, nb]) >= 0:
                     continue
                 sim.civ_only_atwar[0, r] = True
                 sim.sync_war()
@@ -57,45 +57,45 @@ def civ_centre(sim) -> tuple[int, int]:
 
 
 def put_p_melee(sim, tile: int) -> int:
-    slot = int(sim.p_next[0])
-    sim.p_alive[0, slot] = True
-    sim.p_type[0, slot] = 2  # WARRIOR
-    sim.p_tile[0, slot] = tile
-    sim.p_hp[0, slot] = 100
-    sim.p_seat[0, slot] = 0
-    sim.p_mp[0, slot] = 2
-    sim.p_mp_full[0, slot] = 2
-    sim.occ_mil[0, tile] = slot + sim.POOL_LO["p"]
-    sim.p_next[0] += 1
+    slot = int(sim.seat0_unit_next[0])
+    sim.seat0_unit_alive[0, slot] = True
+    sim.seat0_unit_type[0, slot] = 2  # WARRIOR
+    sim.seat0_unit_tile[0, slot] = tile
+    sim.seat0_unit_hp[0, slot] = 100
+    sim.seat0_unit_seat[0, slot] = 0
+    sim.seat0_unit_mp[0, slot] = 2
+    sim.seat0_unit_mp_full[0, slot] = 2
+    sim.military_at[0, tile] = slot + sim.POOL_LO["seat0"]
+    sim.seat0_unit_next[0] += 1
     return slot
 
 
 def clear_centre(sim, ctr: int) -> None:
     """Despawn whatever the 40-turn evolution parked on the centre — civs
     garrison their own capitals, so the tile is NOT empty by default."""
-    for plane in ("occ_mil", "occ_civ"):
+    for plane in ("military_at", "civilian_at"):
         occ = int(getattr(sim, plane)[0, ctr])
         if occ >= 0:
-            lo_v = sim.POOL_LO["v"]
+            lo_v = sim.POOL_LO["civ"]
             assert occ >= lo_v, "incumbent should be a civ-pool unit here"
-            sim.v_alive[0, occ - lo_v] = False
+            sim.civ_unit_alive[0, occ - lo_v] = False
             getattr(sim, plane)[0, ctr] = -1
 
 
 def garrison(sim, ctr: int, civilian: bool) -> int:
     """Put a CIV unit on the city centre — military, or a civilian."""
-    slot = int(sim.v_next[0])
-    sim.v_alive[0, slot] = True
-    sim.v_civ[0, slot] = 0
-    sim.v_seat[0, slot] = 1
-    sim.v_type[0, slot] = sim._builder_idx if civilian else 2
-    sim.v_tile[0, slot] = ctr
-    sim.v_hp[0, slot] = 100
+    slot = int(sim.civ_unit_next[0])
+    sim.civ_unit_alive[0, slot] = True
+    sim.civ_unit_civ[0, slot] = 0
+    sim.civ_unit_seat[0, slot] = 1
+    sim.civ_unit_type[0, slot] = sim._builder_idx if civilian else 2
+    sim.civ_unit_tile[0, slot] = ctr
+    sim.civ_unit_hp[0, slot] = 100
     if civilian:
-        sim.occ_civ[0, ctr] = slot + sim.POOL_LO["v"]
+        sim.civilian_at[0, ctr] = slot + sim.POOL_LO["civ"]
     else:
-        sim.occ_mil[0, ctr] = slot + sim.POOL_LO["v"]
-    sim.v_next[0] += 1
+        sim.military_at[0, ctr] = slot + sim.POOL_LO["civ"]
+    sim.civ_unit_next[0] += 1
     return slot
 
 
@@ -114,16 +114,16 @@ def run(civilian: bool, military: bool = False) -> tuple[int, int, bool]:
     r, j = next((r, j) for r in range(sim.R) for j in range(sim.RC)
                 if bool(sim.civ_city_alive[0, r, j]) and int(sim.civ_city_center[0, r, j]) == ctr)
     hp0 = int(sim.civ_city_hp[0, r, j])
-    g_hp0 = int(sim.v_hp[0, g])
+    g_hp0 = int(sim.civ_unit_hp[0, g])
 
     # the melee action toward the centre
     d = next(i for i, nb in enumerate(sim.neigh[from_tile].tolist()) if nb == ctr)
-    act = torch.zeros(sim.B, P_MAX, dtype=torch.long)
+    act = torch.zeros(sim.B, SEAT0_POOL_MAX, dtype=torch.long)
     act[0, p] = 6 + d
     sim._apply_unit_actions(act)
 
-    dead = not bool(sim.v_alive[0, g])
-    return hp0 - int(sim.civ_city_hp[0, r, j]), (g_hp0 if dead else g_hp0 - int(sim.v_hp[0, g])), not dead
+    dead = not bool(sim.civ_unit_alive[0, g])
+    return hp0 - int(sim.civ_city_hp[0, r, j]), (g_hp0 if dead else g_hp0 - int(sim.civ_unit_hp[0, g])), not dead
 
 
 def main() -> None:

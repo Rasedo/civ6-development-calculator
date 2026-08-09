@@ -3,7 +3,7 @@
  *
  *   npm run seed                 # writes seeder/worlds/seed*.world.json + worlds.lock
  *   npm run seed -- --check      # regenerate in memory, diff against worlds.lock
- *   npm run seed -- 12 3 2 out/  # nSeeds, csMax, rMax, outDir
+ *   npm run seed -- 12 3 2 out/  # nSeeds, cityStateMax, civMax, outDir
  *
  * The seeder imports only `world/` and node builtins — if a symbol needs to
  * know what a tile is WORTH or what a rule DOES, it belongs engine-side
@@ -31,8 +31,8 @@ import { genStamp } from './stamp';
 const args = process.argv.slice(2).filter((a) => a !== '--check');
 const CHECK = process.argv.includes('--check');
 const N_SEEDS = Number(args[0] ?? 12);
-const CS_MAX = Number(args[1] ?? 3);
-const R_MAX = Number(args[2] ?? 2);
+const CITY_STATE_MAX = Number(args[1] ?? 3);
+const CIV_MAX = Number(args[2] ?? 2);
 const OUT = args[3] ?? 'seeder/worlds';
 const WIDTH = 44;
 const HEIGHT = 26;
@@ -43,7 +43,7 @@ const LOCK_PATH = 'seeder/worlds.lock';
  *  answered at the level of the SEED SET, never by hand-picking survivors. */
 const seeds = Array.from({ length: N_SEEDS }, (_, s) => 9001 + s * 13);
 
-const params = { width: WIDTH, height: HEIGHT, csMax: CS_MAX, rMax: R_MAX };
+const params = { width: WIDTH, height: HEIGHT, cityStateMax: CITY_STATE_MAX, civMax: CIV_MAX };
 const stamp = genStamp({ ...params, seeds, placement: PLACEMENT_VERSION });
 
 const ELEVATIONS = ['FLAT', 'HILLS', 'MOUNTAIN'];
@@ -59,8 +59,8 @@ function buildWorld(seed: number): WorldFile {
     wonders: Object.keys(WONDERS),
   };
   const idx = (list: string[], v: string | null): number => (v === null ? -1 : list.indexOf(v));
-  const { starts, civs } = placeCivs(map, seed, 1 + R_MAX);
-  const cityStates = placeCityStates(map, seed, CS_MAX, starts);
+  const { starts, civs } = placeCivs(map, seed, 1 + CIV_MAX);
+  const cityStates = placeCityStates(map, seed, CITY_STATE_MAX, starts);
   const world: WorldFile = {
     format: 'world@1',
     gen: { seed, placement: PLACEMENT_VERSION, params, genStamp: stamp },

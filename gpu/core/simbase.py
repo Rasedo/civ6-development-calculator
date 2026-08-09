@@ -277,8 +277,8 @@ RESEARCH_LOOPS = 40  # > tree size: completes every ready tech/civic in one turn
 # Slots in the v_/u_ unit pools per game (append-only; runtime-asserted).
 # Dead slots are recycled by `_reclaim_pool`, so the cap bounds LIVE units,
 # not ever-spawned ones.
-U_MAX = 256
-P_MAX = 256  # slots in the p_ unit pool per game (append-only; runtime-asserted)
+POOL_MAX = 256
+SEAT0_POOL_MAX = 256  # slots in the p_ unit pool per game (append-only; runtime-asserted)
 
 # The absolute SEAT space, shared with cpu/core/seats.ts.
 # Every damage-roll key that OPENS a battle. The paired counter-roll keys
@@ -322,10 +322,10 @@ SEAT_CAPS = {
 }
 
 #: Which class each UNIT POOL belongs to. The pools are already split by class
-#: ("p" seat 0, "v" civ seats, "u" barbarian), so a pool name answers "what may
+#: ("seat0" seat 0, "civ" civ seats, "barb" barbarian), so a pool name answers "what may
 #: this actor do?" without touching the batch. The attack paths' `atk_kind`
 #: tag uses the same letters, so this one table serves both.
-POOL_CLASS = {"p": "major", "v": "major", "u": "hostile"}
+POOL_CLASS = {"seat0": "major", "civ": "major", "barb": "hostile"}
 
 
 def seat_class(seat: int) -> str:
@@ -363,7 +363,7 @@ XP_LEVELS = (15, 45, 90)
 # Seat 0 is civ 0; the civ at fixture array index r (== the TS civ.id, asserted
 # at export) is civ r+1. City-states and barbarians stay outside the numbering.
 # The plane families still carry the split: the [B, C] city tensors ARE civ 0's
-# seat, and a civ plane's dim-1 index r means civ r+1. NB: the `_p_civ` unit
+# seat, and a civ plane's dim-1 index r means civ r+1. NB: the `_type_civilian` unit
 # tensor means "unit type is CIVILIAN" and is unrelated.
 
 
@@ -450,11 +450,11 @@ def pool_view(snap: dict, pre: str, plane: str):
     """Read a p_/v_/u_ slice out of a snapshot() dict.
 
     snapshot() stores the MERGED unit bases, not the per-pool views into them,
-    so `snap["mut"]["u_hp"]` does not exist. This is the supported way to get
+    so `snap["mut"]["barb_unit_hp"]` does not exist. This is the supported way to get
     one pool's slice back, and it keeps the slot-range arithmetic in one place.
     """
-    lo = {"p": 0, "v": P_MAX, "u": P_MAX + U_MAX}[pre]
-    hi = lo + (P_MAX if pre == "p" else U_MAX)
+    lo = {"seat0": 0, "civ": SEAT0_POOL_MAX, "barb": SEAT0_POOL_MAX + POOL_MAX}[pre]
+    hi = lo + (SEAT0_POOL_MAX if pre == "seat0" else POOL_MAX)
     return snap["mut"][f"unit_{plane}"][:, lo:hi]
 
 
@@ -467,7 +467,7 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "winner", "space_done",  # space-race chain progress
-    "p_next", "warrior_trained", "builder_trained",
+    "seat0_unit_next", "warrior_trained", "builder_trained",
     "district_dead",  # captured districts are paved-but-dead
     "center_yields", "center_raw_food", "base_maintenance", "water_housing", "coastal", "river_center", "dist",
     "founded_n", "city_seq", "city_seq_next",  # TS array-order rank per column
@@ -483,7 +483,7 @@ _MUTABLE = [
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dest",  # international dest CENTER TILE (>=0), else -1 (domestic/CS) — SEAT-indexed; civ_only_route_dest is the [:, 1:] view
     "civ_city_id",
-    "v_civ", "v_next",
+    "civ_unit_civ", "civ_unit_next",
     "gp_earned", "pantheon_claimed_n", "claimed_f_n", "claimed_o_n", "claimed_e_n",
     "pan_claimed", "fol_claimed", "fou_claimed",  # belief-claim masks
     "enh_claimed",  # enhancer-claim mask
@@ -496,7 +496,7 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the p_/v_/u_ VIEWS
     # into them — snapshot/restore round-trips one tensor per plane instead of
     # three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "occ_mil", "occ_civ", "war", "ww", "ww_turn",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_emb", "unit_seat", "military_at", "civilian_at", "war", "ww", "ww_turn",
     # per-seat scalar bases (the x / civ_only_x views live on these)
     "civ_best_melee", "civ_builders_trained", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_influence", "civ_tech_prog", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted",
     "civ_enhancer", "civ_enhancer_done", "civ_follower", "civ_founder", "civ_next_city_id",

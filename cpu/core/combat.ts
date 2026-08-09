@@ -16,7 +16,7 @@ import { logUnitOrder } from './seatTurn';  // #51/S8.1e
 import { MODERN_ERA_INDEX } from '../data/techs';
 import { UNITS, UNIT_HP, CITY_MAX_HP, CITY_HEAL_PER_TURN, WALLS_HP, ENCAMPMENT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
-import { CS_MAX_HP } from '../data/cityStates';
+import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { cityStateAt, isSuzerain } from './cityStates';
 import { MAX_CITIES_PER_SEAT, ERA_SCORE_CONQUER } from '../data/seats';
 import { addEraScore } from './eras';
@@ -107,7 +107,7 @@ export function woundPenalty(unit: { hp: number }): number {
 // flanking & support. Real Civ 6: a melee attacker gains +2 CS per
 // OTHER unit adjacent to the defender that is hostile to the defender
 // (flanking); a defender gains +2 CS per friendly MILITARY unit adjacent to it
-// (support), against melee AND ranged. Cities / city-states / rc-city targets
+// (support), against melee AND ranged. Cities / city-states / civCity-city targets
 // are not units — no flanking against them (recorded simplification). Integer
 // CS adds, so the diff quantization (q = round(Δ·10)) is preserved.
 export const FLANKING_CS = 2;
@@ -115,7 +115,7 @@ export const SUPPORT_CS = 2;
 
 // XP & levels. Real Civ 6: units earn experience and promote. Modeled
 // scope (promotion TREES/abilities are the recorded residual): +5 XP per attack
-// EXECUTED (any roll-producing melee/ranged, vs unit/city/CS/rc), +2 per attack
+// EXECUTED (any roll-producing melee/ranged, vs unit/city/CS/civCity), +2 per attack
 // SURVIVED as a MILITARY defender (incl. city/walls strikes). Barbarians accrue
 // nothing; civilians never fight (stay 0). XP_LEVELS grant a flat +5 CS per level
 // at EVERY roll the unit fights (attack AND defense), an integer add entering the
@@ -263,10 +263,10 @@ export function religionAttackCS(state: GameState, attacker: Unit, battleTileInd
   const fx = unitEnhancer(state, attacker);
   if (!fx || (!fx.combatNearFollowing && !fx.combatVsUnitInFollowing)) return 0;
   const tile = state.map.tiles[battleTileIndex];
-  let cs = 0;
-  if (fx.combatNearFollowing && nearFollowingCity(state, tile, g)) cs += fx.combatNearFollowing;
-  if (fx.combatVsUnitInFollowing && tileFollowedReligion(state, tile) === g) cs += fx.combatVsUnitInFollowing;
-  return cs;
+  let bonus = 0;
+  if (fx.combatNearFollowing && nearFollowingCity(state, tile, g)) bonus += fx.combatNearFollowing;
+  if (fx.combatVsUnitInFollowing && tileFollowedReligion(state, tile) === g) bonus += fx.combatVsUnitInFollowing;
+  return bonus;
 }
 
 /** enhancer combat adders for a UNIT DEFENDER (Just War near a
@@ -278,10 +278,10 @@ export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex
   const fx = unitEnhancer(state, defender);
   if (!fx || (!fx.combatNearFollowing && !fx.combatDefendFollowing)) return 0;
   const tile = state.map.tiles[defTileIndex];
-  let cs = 0;
-  if (fx.combatNearFollowing && nearFollowingCity(state, tile, g)) cs += fx.combatNearFollowing;
-  if (fx.combatDefendFollowing && tileFollowedReligion(state, tile) === g) cs += fx.combatDefendFollowing;
-  return cs;
+  let bonus = 0;
+  if (fx.combatNearFollowing && nearFollowingCity(state, tile, g)) bonus += fx.combatNearFollowing;
+  if (fx.combatDefendFollowing && tileFollowedReligion(state, tile) === g) bonus += fx.combatDefendFollowing;
+  return bonus;
 }
 
 /** the defender's total combat strength for a hit on `defTileIndex`,
@@ -573,25 +573,25 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // barbarian standing on it, so this falls through to the unit target
   // instead of diverting to the city and then refusing the whole action.
   const seatTarget = (() => {
-    const rc = cityAtIndex(state, targetIndex);
-    if (!rc) return undefined;
+    const civCity = cityAtIndex(state, targetIndex);
+    if (!civCity) return undefined;
     return capsOf(attacker.seat).alwaysHostile
-      || civsAtWar(state, unitSeat(attacker), rc.holder.seat)
-      ? rc
+      || civsAtWar(state, unitSeat(attacker), civCity.holder.seat)
+      ? civCity
       : undefined;
   })();
-  const csTarget = (() => {
-    const cs = cityStateAt(state, targetIndex);
-    if (!cs || cs.centerIndex !== targetIndex) return undefined;
+  const cityStateTarget = (() => {
+    const cityState = cityStateAt(state, targetIndex);
+    if (!cityState || cityState.centerIndex !== targetIndex) return undefined;
     // A city-state is a separate seat 0: war must be DECLARED before its
     // centre is a target. Both this and `attackTargets` ask `civsAtWar`, so an
     // order can never reach a city-state the attacker is at peace with.
-    if (attacker.seat === seat) return civsAtWar(state, cs.seat, seat) ? cs : undefined;
+    if (attacker.seat === seat) return civsAtWar(state, cityState.seat, seat) ? cityState : undefined;
     // join-the-suzerain's-war: an AT-WAR seat may siege a CS whose
     // suzerain is the seat 0 (attackTargets applies the same gate).
     if (isCiv(attacker.seat)) {
-      const rv = seatOf(state, attacker.seat);
-      if (rv && civsAtWar(state, rv.seat, seat) && isSuzerain(cs, seat)) return cs;
+      const civSeat = seatOf(state, attacker.seat);
+      if (civSeat && civsAtWar(state, civSeat.seat, seat) && isSuzerain(cityState, seat)) return cityState;
     }
     return undefined;
   })();
@@ -600,17 +600,17 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
   // BEFORE the "nothing to attack" bail and AFTER the unit scan, so a garrison
   // standing on the district is fought first (real Civ 6 hits the unit).
   const encamp = enemies.length === 0 ? encampmentDefense(state, attacker, target) : null;
-  if (enemies.length === 0 && !seatTarget && !csTarget && !encamp) {
+  if (enemies.length === 0 && !seatTarget && !cityStateTarget && !encamp) {
     // A seat CITY may sit here and simply not be a legal target
     // (at peace). `seatTarget` is undefined in that case now, so name the
     // REAL reason rather than claiming the tile is empty.
-    const rcHere = cityAtIndex(state, targetIndex);
-    if (rcHere && !civsAtWar(state, unitSeat(attacker), rcHere.holder.seat)) {
-      return no(`You are at peace with ${rcHere.holder.name} — declare war first.`);
+    const civCityHere = cityAtIndex(state, targetIndex);
+    if (civCityHere && !civsAtWar(state, unitSeat(attacker), civCityHere.holder.seat)) {
+      return no(`You are at peace with ${civCityHere.holder.name} — declare war first.`);
     }
     return no('Nothing to attack there.');
   }
-  if (encamp && !seatTarget && !csTarget) {
+  if (encamp && !seatTarget && !cityStateTarget) {
     attackEncampment(state, attacker, targetIndex, encamp.defCS, encamp.k, seat);
     return ok;
   }
@@ -635,8 +635,8 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     return ok;
   }
 
-  if (csTarget && cityFirst) {
-    attackCityState(state, attacker, csTarget, seat);
+  if (cityStateTarget && cityFirst) {
+    attackCityState(state, attacker, cityStateTarget, seat);
     return ok;
   }
 
@@ -744,26 +744,26 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     // no retaliation. Ranged fire never captures: the city holds at 1 HP
     // until melee takes it.
     if (attacker.seat === seat) {
-      const rc = cityAtIndex(state, targetIndex);
-      if (rc && civsAtWar(state, rc.holder.seat, seat)) {
-        const defCS = cityDefenseStrength(state, rc.city);
-        rc.city.hp = Math.max(1, rc.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
-        warWearinessBattle(state, attacker.seat, rc.city.seat, targetIndex, { city: true }); // #51/S7.8f
+      const civCity = cityAtIndex(state, targetIndex);
+      if (civCity && civsAtWar(state, civCity.holder.seat, seat)) {
+        const defCS = cityDefenseStrength(state, civCity.city);
+        civCity.city.hp = Math.max(1, civCity.city.hp - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngrc', targetIndex)); // #70/S2 (B-8)
+        warWearinessBattle(state, attacker.seat, civCity.city.seat, targetIndex, { city: true }); // #51/S7.8f
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment (city not a unit — no defender xp)
         return ok;
       }
-      const cs = cityStateAt(state, targetIndex);
+      const cityState = cityStateAt(state, targetIndex);
       // Bombardment needs a DECLARED war exactly as melee does. The
-      // seat arm one branch up and `meleeAttack`'s csTarget both ask
+      // seat arm one branch up and `meleeAttack`'s cityStateTarget both ask
       // civsAtWar, but this arm took ANY city-state — so the
       // two TS paths disagreed with each other about one rule. Real Civ 6
       // treats a city-state as a separate seat 0 you must declare on, so the
       // RANGED arm is the wrong one. See [[target-legality-gates]].
-      if (cs && cs.centerIndex === targetIndex && civsAtWar(state, cs.seat, seat)) {
-        const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-        cs.hp = Math.max(1, (cs.hp ?? CS_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
-        warWearinessBattle(state, attacker.seat, seatOfCityState(cs.id), targetIndex, { city: true }); // #51/S7.8f
+      if (cityState && cityState.centerIndex === targetIndex && civsAtWar(state, cityState.seat, seat)) {
+        const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
+        cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, (def.ranged.strength - woundPenalty(attacker) + xpLevelBonus(attacker) + /* #71: no religion term — this path fires for seat 0 only and the GPU never sets seat 0's holy city */ generalAuraCS(state, attacker, attacker.tileIndex)) - defCS, 'rngcs', targetIndex)); // #70/S2 (B-8)
+        warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), targetIndex, { city: true }); // #51/S7.8f
         attacker.movesLeft = 0;
         gainXp(attacker, XP_ATTACK); // B-4: +5 for the bombardment
         return ok;
@@ -877,18 +877,18 @@ export function attackTargets(state: GameState, unit: Unit): number[] {
     // A city-state is also dragged into its SUZERAIN's wars, so contesting the
     // suzerain puts the minor's centre in reach. That is stored as the
     // suzerainty, not as a war row, which is why it needs its own term.
-    const csHere = state.cityStates.find((c) => c.centerIndex === t.index);
-    const csTarget =
-      csHere !== undefined &&
+    const cityStateHere = state.cityStates.find((c) => c.centerIndex === t.index);
+    const cityStateTarget =
+      cityStateHere !== undefined &&
       d === 1 &&
       !def.ranged &&
-      (civsAtWar(state, csHere.seat, unitSeat(unit)) ||
-        state.seats.some((sx) => isSuzerain(csHere, sx.seat) && civsAtWar(state, sx.seat, unitSeat(unit))));
+      (civsAtWar(state, cityStateHere.seat, unitSeat(unit)) ||
+        state.seats.some((sx) => isSuzerain(cityStateHere, sx.seat) && civsAtWar(state, sx.seat, unitSeat(unit))));
 
     // An adjacent live enemy Encampment is a melee target — the
     // only way to open its tile. Ranged-vs-district stays out of scope.
     const encampTarget = d === 1 && !def.ranged && encampmentBlocks(state, t, unit);
-    if (hasEnemy || cityTarget || csTarget || encampTarget) out.push(t.index);
+    if (hasEnemy || cityTarget || cityStateTarget || encampTarget) out.push(t.index);
   }
   return out;
 }
@@ -921,53 +921,53 @@ function attackCity(state: GameState, attacker: Unit, holder: Seat, city: City, 
 }
 
 /** Seat 0 siege of a city-state (attacking it IS the declaration of war). */
-function attackCityState(state: GameState, attacker: Unit, cs: CityState, seat: number): void {
-  const atkCS = assaultAtkCS(state, attacker, cs.centerIndex);
-  const defCS = 15 + cs.population + (cs.type === 'militaristic' ? 6 : 0);
-  cs.hp = (cs.hp ?? CS_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cs.centerIndex);
-  attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cs.centerIndex);
+function attackCityState(state: GameState, attacker: Unit, cityState: CityState, seat: number): void {
+  const atkCS = assaultAtkCS(state, attacker, cityState.centerIndex);
+  const defCS = 15 + cityState.population + (cityState.type === 'militaristic' ? 6 : 0);
+  cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
+  attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
   // Warring a city-state wearies you exactly as warring a major
   // does. The minor keeps no accumulator of its own (no amenities, no research
   // to date an era from) — see holdsWeariness.
-  warWearinessBattle(state, attacker.seat, seatOfCityState(cs.id), cs.centerIndex,
+  warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
   attacker.movesLeft = 0;
   gainXp(attacker, XP_ATTACK); // B-4: +5 for the attack executed
   if (attacker.hp <= 0) killUnit(state, attacker, seat);
-  if ((cs.hp ?? 0) <= 0) {
+  if ((cityState.hp ?? 0) <= 0) {
     // A seat conqueror lands the CS as its own city.
     if (isCiv(attacker.seat)) {
-      const rv = seatOf(state, attacker.seat);
-      if (rv) captureCityStateFor(state, rv, cs);
+      const civSeat = seatOf(state, attacker.seat);
+      if (civSeat) captureCityStateFor(state, civSeat, cityState);
     } else {
-      captureCityState(state, cs, attacker.seat);
+      captureCityState(state, cityState, attacker.seat);
     }
   }
 }
 
 /** Conquest of a city-state: it joins your empire; its envoys die with it. */
-export function captureCityState(state: GameState, cs: CityState, seat: number): void {
-  state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
-  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
+export function captureCityState(state: GameState, cityState: CityState, seat: number): void {
+  state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
+  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cityState.id);
   // A route dies with its endpoint, for whichever seat holds it.
   for (const sx of state.seats) {
-    sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cs.id);
+    sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
-  const center = state.map.tiles[cs.centerIndex];
+  const center = state.map.tiles[cityState.centerIndex];
   // The slot cap applies here too: a full empire RAZES the city-state instead
   // of annexing it, the capture path's exact rule.
   if (seatOf(state, seat)!.cities.length >= 6) {
     for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-      if (tileSeat(t) === seatOfCityState(cs.id)) setTileOwner(t, NO_SEAT);
+      if (tileSeat(t) === seatOfCityState(cityState.id)) setTileOwner(t, NO_SEAT);
     }
-    state.eventLog.push(`${cs.name} razed — the empire is full.`);
+    state.eventLog.push(`${cityState.name} razed — the empire is full.`);
     return;
   }
   const captor = seatOf(state, seat);
   if (!captor) return;
   const id = captor.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-    if (tileSeat(t) === seatOfCityState(cs.id)) {
+    if (tileSeat(t) === seatOfCityState(cityState.id)) {
       // keep an existing claim where there is one, else take the tile
       setTileOwner(t, seat, tileSeat(t) === seat ? tileCity(t) : id);
     }
@@ -982,9 +982,9 @@ export function captureCityState(state: GameState, cs: CityState, seat: number):
     id,
     seat: seat, // #51/S1.3d: a conquered city-state joins the SEAT 0's seat
     foundedTurn: state.turn,  // #51/S4.1r
-    name: cs.name,
-    centerIndex: cs.centerIndex,
-    population: Math.max(1, Math.floor(cs.population * 0.75)),
+    name: cityState.name,
+    centerIndex: cityState.centerIndex,
+    population: Math.max(1, Math.floor(cityState.population * 0.75)),
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
@@ -993,47 +993,47 @@ export function captureCityState(state: GameState, cs: CityState, seat: number):
     queue: [],
     isCapital: false,
     buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: cs.centerIndex }],
+    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],
     specialists: {},
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP (S1.3)
   });
-  revealAround(state, seat, cs.centerIndex, 3);
+  revealAround(state, seat, cityState.centerIndex, 3);
   addEraScore(state, 0, ERA_SCORE_CONQUER); // B-24: gained a city (CS conquest)
-  state.eventLog.push(`${cs.name} conquered — the city-state joins your empire.`);
+  state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
 
 /** seat conquest of a city-state — the captureCityState twin on the
- * seat seat (join-the-suzerain's-war). Pop ×0.75 floor 1, the ring-2 csId
- * territory re-tags to the new rc, envoys die with the CS, the
+ * seat seat (join-the-suzerain's-war). Pop ×0.75 floor 1, the ring-2 cityStateId
+ * territory re-tags to the new civCity, envoys die with the CS, the
  * MAX_CITIES_PER_SEAT raze rule, routes pruned with the endpoint. */
-export function captureCityStateFor(state: GameState, actor: Seat, cs: CityState): void {
-  state.cityStates = state.cityStates.filter((c) => c.id !== cs.id);
-  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cs.id);
+export function captureCityStateFor(state: GameState, actor: Seat, cityState: CityState): void {
+  state.cityStates = state.cityStates.filter((c) => c.id !== cityState.id);
+  state.tradeRoutes = state.tradeRoutes.filter((r) => r.toCs !== cityState.id);
   for (const sx of state.seats) {
-    sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cs.id);
+    sx.tradeRoutes = sx.tradeRoutes?.filter((x) => x.toCs !== cityState.id);
   }
-  const center = state.map.tiles[cs.centerIndex];
+  const center = state.map.tiles[cityState.centerIndex];
   if (actor.cities.length >= MAX_CITIES_PER_SEAT) {
     for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-      if (tileSeat(t) === seatOfCityState(cs.id)) setTileOwner(t, NO_SEAT);
+      if (tileSeat(t) === seatOfCityState(cityState.id)) setTileOwner(t, NO_SEAT);
     }
-    state.eventLog.push(`${cs.name} razed — ${actor.name} cannot govern more cities.`);
+    state.eventLog.push(`${cityState.name} razed — ${actor.name} cannot govern more cities.`);
     return;
   }
   const id = actor.nextCityId++;
   for (const t of tilesWithin(state.map, center.col, center.row, 2)) {
-    if (tileSeat(t) === seatOfCityState(cs.id)) {
-      setTileOwner(t, actor.seat, id); // A-17: the claim registers to the new rc
+    if (tileSeat(t) === seatOfCityState(cityState.id)) {
+      setTileOwner(t, actor.seat, id); // A-17: the claim registers to the new civCity
     }
   }
   center.district = 'CITY_CENTER'; // #70 HUNT: the captureCityState twin — see the note there
   actor.cities.push({
     id,
-    name: cs.name,
+    name: cityState.name,
     seat: actor.seat,
-    centerIndex: cs.centerIndex,
-    population: Math.max(1, Math.floor(cs.population * 0.75)),
+    centerIndex: cityState.centerIndex,
+    population: Math.max(1, Math.floor(cityState.population * 0.75)),
     foodBox: 0,
     cultureBox: 0,
     tilesAcquired: 0,
@@ -1042,14 +1042,14 @@ export function captureCityStateFor(state: GameState, actor: Seat, cs: CityState
     queue: [],
     isCapital: false,
     buildings: [],
-    districts: [{ type: 'CITY_CENTER', tileIndex: cs.centerIndex }],
+    districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }],
     wonders: [],
     specialists: {},
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });
   addEraScore(state, actor.seat, ERA_SCORE_CONQUER); // B-24: gained a city (actor CS conquest)
-  state.eventLog.push(`${cs.name} has been conquered by ${actor.name}!`);
+  state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 
 

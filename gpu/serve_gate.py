@@ -244,10 +244,10 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
                 gs_all = drive._spread_targets(sim, seat).tolist()
                 if seat == 0:
                     # seat-0 rows are RAW pool slots; TS emits per LIVE unit in
-                    # array order — compact by p_alive (append-only pool, dead
+                    # array order — compact by seat0_unit_alive (append-only pool, dead
                     # slots never reused, so alive-ascending IS array order;
                     # civ seats get this via seat_slot_map instead).
-                    _pa0 = sim.p_alive.tolist()
+                    _pa0 = sim.seat0_unit_alive.tolist()
                     gj_all = [[jv for jv, av in zip(row, arow) if av] for row, arow in zip(gj_all, _pa0)]
                     gs_all = [[sv for sv, av in zip(row, arow) if av] for row, arow in zip(gs_all, _pa0)]
                 gb_all = None
@@ -300,9 +300,9 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             # presence is what stands the TS walker down, mirroring units=.
             u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
             _u0_l = u0.tolist()
-            _pt_l = sim.p_tile.tolist()
-            _pc_l = sim._p_civ[sim.p_type].tolist()
-            _pa_l = sim.p_alive.tolist()
+            _pt_l = sim.seat0_unit_tile.tolist()
+            _pc_l = sim._type_civilian[sim.seat0_unit_type].tolist()
+            _pa_l = sim.seat0_unit_alive.tolist()
             # The ENVOY verb, seat 0: the same greedy sequence as every seat
             # (bank-only — seat 0 converts no influence). ALWAYS a tensor: the
             # envoy= argument stands the GPU's scripted greedy down, and the
@@ -498,12 +498,12 @@ def main() -> None:
         # Per-unit obs twins: the GPU extractors against the TS arrays, per
         # slot-map row (TS rows = live units in mirrored order; GPU rows beyond
         # the live count must be -1). Seat 0's raw pool rows are compacted by
-        # p_alive, as in the batched path.
+        # seat0_unit_alive, as in the batched path.
         for seat in [0] + [r + 1 for r in seats]:
             gj = drive._builder_jobs(sim, seat)[0].tolist()
             gs = drive._spread_targets(sim, seat)[0].tolist()
             if seat == 0:
-                _pa0 = sim.p_alive[0].tolist()
+                _pa0 = sim.seat0_unit_alive[0].tolist()
                 gj = [jv for jv, av in zip(gj, _pa0) if av]
                 gs = [sv for sv, av in zip(gs, _pa0) if av]
             tj = msg.get("jobs", {}).get(str(seat), [])
@@ -535,11 +535,11 @@ def main() -> None:
                                       f" dpill {bool(sim.district_pillaged[0, _dt])} farm {bool(sim.farm_flat[0, _dt])}"
                                       f" mine {bool(sim.mine_ok[0, _dt])} lumber {bool(sim.lumber_ok[0, _dt])}"
                                       f" res {int(sim.res_imp[0, _dt])}")
-                            for _p in range(int(sim.p_next[0])):
-                                if not bool(sim.p_alive[0, _p]):
+                            for _p in range(int(sim.seat0_unit_next[0])):
+                                if not bool(sim.seat0_unit_alive[0, _p]):
                                     continue
-                                print(f"  p[{_p}] tile {int(sim.p_tile[0, _p])} type {int(sim.p_type[0, _p])}"
-                                      f" charges {int(sim.p_charges[0, _p])}")
+                                print(f"  p[{_p}] tile {int(sim.seat0_unit_tile[0, _p])} type {int(sim.seat0_unit_type[0, _p])}"
+                                      f" charges {int(sim.seat0_unit_charges[0, _p])}")
                         print(rep)
                         if first_report is None:
                             first_report = rep
@@ -564,9 +564,9 @@ def main() -> None:
         # The UNIT verb, seat 0 — the batched path's twin block.
         u0, _uj0, _us0, _um0, _uo0 = drive._seat_unit_orders(sim, 0)
         _u0_l = u0[0].tolist()
-        _pt_l = sim.p_tile[0].tolist()
-        _pc_l = sim._p_civ[sim.p_type][0].tolist()
-        _pa_l = sim.p_alive[0].tolist()
+        _pt_l = sim.seat0_unit_tile[0].tolist()
+        _pc_l = sim._type_civilian[sim.seat0_unit_type][0].tolist()
+        _pa_l = sim.seat0_unit_alive[0].tolist()
         env0 = drive._seat_envoys(sim, 0)
         env0_t = env0 if env0 is not None else _neg0.unsqueeze(1)
         # The geopolitics decide ONCE per turn — the batched path's twin.

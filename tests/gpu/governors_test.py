@@ -106,7 +106,7 @@ def two_city_setup(rules, path):
     """A capital + two forced non-capital seat-0 cities on the capital's
     neighbours, civics wiped (titles 0). Returns (sim, [non-cap cols])."""
     sim = build(rules, path)
-    sim.v_alive[:] = False
+    sim.civ_unit_alive[:] = False
     cap = int(sim.is_cap[0].nonzero()[0])
     nb = [int(x) for x in sim.neigh[int(sim.site[0, cap])].tolist() if x >= 0]
     free = (~sim.alive[0]).nonzero(as_tuple=True)[0].tolist()
@@ -162,7 +162,7 @@ def poke_boundary(rules, path):
     so the score forced right before the boundary is exactly what the boundary
     reads."""
     sim = build(rules, path)
-    sim.v_alive[:] = False
+    sim.civ_unit_alive[:] = False
     dark, gold, elen = sim._era_dark, sim._era_gold, sim._era_len
     sim.turn = elen - 1
     snap = sim.snapshot()
@@ -217,7 +217,7 @@ def poke_governor_civ(rules, path):
     a boundary TIE resolves to the lower slot index. Two-run diff (titles 2 vs
     0) isolates the +GOVERNOR_LOYALTY from the (identical) pressure."""
     sim = build(rules, path)
-    sim.v_alive[:] = False
+    sim.civ_unit_alive[:] = False
     r = 0
     slots = sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist()
     cap = next(s for s in slots if bool(sim.civ_city_is_cap[0, r, s]))
@@ -291,7 +291,7 @@ def poke_seat0_golden(rules, path):
     axis the scripted gate never reaches — seat 0 caps below goldenT there),
     and its OWN-pressure term then scales ×1.5 vs Normal."""
     sim = build(rules, path)
-    sim.v_alive[:] = False
+    sim.civ_unit_alive[:] = False
     elen, gold = sim._era_len, sim._era_gold
     sim.turn = elen - 1
     snap0 = sim.snapshot()
@@ -337,7 +337,7 @@ def poke_capital_immunity(rules, path):
     lmax = float(rules.seats.get("loyaltyMax", 100))
     # a civ capital
     sim = build(rules, path)
-    sim.v_alive[:] = False
+    sim.civ_unit_alive[:] = False
     r = 0
     cap = next(s for s in sim.civ_city_alive[0, r].nonzero(as_tuple=True)[0].tolist() if bool(sim.civ_city_is_cap[0, r, s]))
     sim.civ_city_loyalty[0, r, cap] = 5.0                 # lowest → would be picked
@@ -347,7 +347,7 @@ def poke_capital_immunity(rules, path):
 
     # the seat-0 capital
     sim2 = build(rules, path)
-    sim2.v_alive[:] = False
+    sim2.civ_unit_alive[:] = False
     pcap = int(sim2.is_cap[0].nonzero()[0])
     sim2.loyalty[0, pcap] = 5.0
     sim2.civics[0, : sim2._gov_per] = True

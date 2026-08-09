@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (U_MAX/P_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
 
 
 class SimPhase:
@@ -62,10 +62,10 @@ class SimPhase:
             # the TS pick loop — that sequencing is load-bearing.
             # Best-of-roster type pick, data-driven over the unit tables. This
             # civ's per-unit strategic access and trainable mask (requiresTech
-            # satisfied over the FULL tech tree civ_only_techs, via _p_tech; -1 =
+            # satisfied over the FULL tech tree civ_only_techs, via _type_tech; -1 =
             # ungated) gate both lanes.
             tr_u_r = self._seat_trainable_units(r)  # [B, NU]
-            rng_type = self._p_rng_str > 0  # [NU]
+            rng_type = self._type_ranged_strength > 0  # [NU]
             # melee lane: highest combat among non-ranged non-naval military;
             # ranged lane: highest ranged strength among ranged non-naval units.
             # key = strength·NU − idx ⇒ argmax ties to the LOWEST unit index =
@@ -76,13 +76,13 @@ class SimPhase:
             # 0), live + queued, updated through the pick loop like TS's
             # meleeCount/rangedCount; train ranged while the army holds fewer
             # than 1 ranged per 2 melee.
-            vt_all = self.v_type.clamp(min=0, max=self.NU - 1)
-            mil_live = self.v_alive & (self.v_civ == r) & (self._p_combat[vt_all] > 0)
+            vt_all = self.civ_unit_type.clamp(min=0, max=self.NU - 1)
+            mil_live = self.civ_unit_alive & (self.civ_unit_civ == r) & (self._type_combat[vt_all] > 0)
             n_ranged = (mil_live & rng_type[vt_all]).sum(dim=1)
             n_melee = (mil_live & ~rng_type[vt_all]).sum(dim=1)
             qcur = self.civ_city_current[:, r]
             q_ty = (qcur - 1).clamp(min=0, max=self.NU - 1)
-            q_mil = (qcur >= 1) & (qcur <= self.NU) & (self._p_combat[q_ty] > 0)
+            q_mil = (qcur >= 1) & (qcur <= self.NU) & (self._type_combat[q_ty] > 0)
             n_ranged = n_ranged + (q_mil & rng_type[q_ty]).sum(dim=1)
             n_melee = n_melee + (q_mil & ~rng_type[q_ty]).sum(dim=1)
             # Production picks arrive on the wire (_consume_driven_picks
@@ -140,7 +140,7 @@ class SimPhase:
                     bought_r5 = bought_r5 | landed_ds
             # MILITARY UNIT — nothing else bought and live+queued military
             # under the quota (2× cities). Buy the STRONGEST affordable
-            # trainable military unit (highest _p_combat, ties to lowest unit
+            # trainable military unit (highest _type_combat, ties to lowest unit
             # index = table order), spawned via _spawn_seat_unit at the capital
             # (else the first alive city); pay only where it LANDED (no free
             # spot = refund).
@@ -161,7 +161,7 @@ class SimPhase:
                 if bool(elig_u5.any()):
                     # highest combat wins; combat·NU − index breaks ties to the
                     # lowest index (table order), matching the TS strict-`>` scan
-                    key_u5 = self._p_combat.double().unsqueeze(0) * self.NU - torch.arange(self.NU, device=dev, dtype=torch.float64).unsqueeze(0)
+                    key_u5 = self._type_combat.double().unsqueeze(0) * self.NU - torch.arange(self.NU, device=dev, dtype=torch.float64).unsqueeze(0)
                     key_u5 = torch.where(cand_u5, key_u5.expand(B, -1), torch.full((B, self.NU), -1e18, dtype=torch.float64, device=dev))
                     pick_ty5 = key_u5.argmax(dim=1)
                     cap_is5 = self.civ_city_is_cap[:, r]
@@ -172,7 +172,7 @@ class SimPhase:
                     bidx5 = torch.arange(self.B, device=self.device)
                     xp_cap5 = (self.civ_city_bldg[bidx5, r, spawn_slot5].long() * self._b_train_xp.reshape(1, -1)).max(dim=1).values
                     landed_u5 = self._spawn_seat_unit(elig_u5, ctr5, pick_ty5, r, init_xp=xp_cap5)
-                    price_u5 = self._p_cost.gather(0, pick_ty5).double() * mult_r5
+                    price_u5 = self._type_cost.gather(0, pick_ty5).double() * mult_r5
                     self.civ_only_treasury[:, r] = torch.where(landed_u5, self.civ_only_treasury[:, r] - price_u5, self.civ_only_treasury[:, r])
                     bought_r5 = bought_r5 | landed_u5
             # Kind 4: the WORSHIP faith buy is a wire DECISION — the driver
@@ -217,7 +217,7 @@ class SimPhase:
             else:
                 rel_kind, rel_j = None, None
             if rel_kind is not None and rel_j is not None and self._missionary_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0:
-                n_live_m5 = (self.v_alive & (self.v_civ == r) & (self.v_type == self._missionary_idx)).sum(dim=1)
+                n_live_m5 = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._missionary_idx)).sum(dim=1)
                 mcost5 = self._enh["mcost"][self.civ_only_enhancer[:, r] + 1]  # [B] f64
                 want_m5 = active & self.controlled[:, r] & (rel_kind == 5) & (rel_j >= 0) & self.civ_only_religion_done[:, r] \
                     & (n_live_m5 < self._missionary_cap) & self._afford(self.civ_only_faith[:, r], mcost5)
@@ -229,7 +229,7 @@ class SimPhase:
                     buy_m5 = want_m5 & self.civ_city_alive[bidx_m, r, jm5] & self.civ_city_bldg[bidx_m, r, jm5, self._shrine_bidx] & hs_okm5
                     if bool(buy_m5.any()):
                         at_m5 = self.civ_city_center[bidx_m, r, jm5].clamp(min=0)
-                        chg_m5 = self._p_charges[self._missionary_idx] + self._enh["mchg"][self.civ_only_enhancer[:, r] + 1]
+                        chg_m5 = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_only_enhancer[:, r] + 1]
                         landed_m5 = self._spawn_seat_civilian(buy_m5, at_m5, r, type_idx=self._missionary_idx, charges=chg_m5)
                         self.civ_only_faith[:, r] = torch.where(landed_m5, self.civ_only_faith[:, r] - mcost5, self.civ_only_faith[:, r])
                         _bought_relig = _bought_relig | landed_m5
@@ -238,7 +238,7 @@ class SimPhase:
             # DECISION on the NAMED slot, same SHRINE + complete unpillaged
             # HOLY_SITE gate, same spawn-refund convention.
             if rel_kind is not None and rel_j is not None and self._apostle_idx >= 0 and self._shrine_bidx >= 0 and self._hs_idx >= 0:
-                n_live_a = (self.v_alive & (self.v_civ == r) & (self.v_type == self._apostle_idx)).sum(dim=1)
+                n_live_a = (self.civ_unit_alive & (self.civ_unit_civ == r) & (self.civ_unit_type == self._apostle_idx)).sum(dim=1)
                 # FLAT cost — missionaryCostMult is a MISSIONARY discount and
                 # does not extend to apostles.
                 acost = torch.full((self.B,), float(round(self._apostle_cost)), dtype=torch.float64, device=self.device)
@@ -255,7 +255,7 @@ class SimPhase:
                     buy_a = want_a & self.civ_city_alive[bidx_a, r, ja5] & self.civ_city_bldg[bidx_a, r, ja5, self._shrine_bidx] & hs_oka
                     if bool(buy_a.any()):
                         at_a = self.civ_city_center[bidx_a, r, ja5].clamp(min=0)
-                        landed_a = self._spawn_seat_civilian(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._p_charges[self._apostle_idx].expand(self.B))
+                        landed_a = self._spawn_seat_civilian(buy_a, at_a, r, type_idx=self._apostle_idx, charges=self._type_charges[self._apostle_idx].expand(self.B))
                         self.civ_only_faith[:, r] = torch.where(landed_a, self.civ_only_faith[:, r] - acost, self.civ_only_faith[:, r])
             # Kind 3: TILE PURCHASE — the LAST rung of the gold ladder, a wire
             # DECISION. Position matters: the buy sits in the gold block, which
@@ -777,7 +777,7 @@ class SimPhase:
                         # ANY unit hostile to this civ, read off _seats_hostile
                         # — the war relation is one symmetric matrix, so
                         # hostility is looked up rather than transcribed.
-                        _mil, _civ = self.occ_mil, self.occ_civ
+                        _mil, _civ = self.military_at, self.civilian_at
                         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
                         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
                         hm = self._seats_hostile(r + 1, _mseat)
@@ -805,14 +805,14 @@ class SimPhase:
                             d_type = self.unit_type[bidx, ds0]
                             # only a target whose class earns xp carries veterancy
                             def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
-                            def_cs = self._p_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
+                            def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
                             # An embarked target (military or civilian; barbs
                             # never embark) → flat CS, no terrain, no support.
                             d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                             # Garrison bonus: this civ's OWN military standing
                             # on the city's centre tile.
-                            gslot = self.occ_mil[bidx, ctr]
+                            gslot = self.military_at[bidx, ctr]
                             gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == r + 1)).long()
                             atk_cs = torch.maximum(self.civ_only_best_melee[:, r], torch.full_like(self.civ_only_best_melee[:, r], 15)) + gar * 5
                             # the defending unit is wounded (the attacker is the city)
@@ -859,7 +859,7 @@ class SimPhase:
                         # ANY unit hostile to this civ, read off _seats_hostile
                         # — the war relation is one symmetric matrix, so
                         # hostility is looked up rather than transcribed.
-                        _mil, _civ = self.occ_mil, self.occ_civ
+                        _mil, _civ = self.military_at, self.civilian_at
                         _mseat = torch.where(_mil >= 0, self.unit_seat.gather(1, _mil.clamp(min=0)), torch.full_like(_mil, -1))
                         _cseat = torch.where(_civ >= 0, self.unit_seat.gather(1, _civ.clamp(min=0)), torch.full_like(_civ, -1))
                         hm = self._seats_hostile(r + 1, _mseat)
@@ -886,12 +886,12 @@ class SimPhase:
                             is_vet_mil = _okm & ~is_barb
                             d_type = self.unit_type[bidx, ds0]
                             def_xp = torch.where(is_vet_mil, self._xp_lvl_bonus(self.unit_xp[bidx, ds0]), torch.zeros_like(tt))
-                            def_cs = self._p_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
+                            def_cs = self._type_combat[d_type] + self._tdef_i(bidx, tt) + def_xp
                             d_emb = self.unit_emb[bidx, ds0] & (d_slot >= 0)
                             def_cs = torch.where(d_emb, torch.full_like(def_cs, self._embarked_defense_cs), def_cs)
                             # Garrison bonus: this civ's OWN military standing
                             # on the city's centre tile.
-                            gslot = self.occ_mil[bidx, ctr]
+                            gslot = self.military_at[bidx, ctr]
                             gar = ((gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == r + 1)).long()
                             atk_cs = torch.maximum(self.civ_only_best_melee[:, r], torch.full_like(self.civ_only_best_melee[:, r], 15)) + gar * 5
                             def_hp = self.unit_hp[bidx, ds0]
@@ -915,9 +915,9 @@ class SimPhase:
                 # or barbarians — read live at this point in the city loop.
                 nbh = self.neigh[self.civ_city_center[:, r, j].clamp(min=0)]  # [B, 6]
                 nbhc = nbh.clamp(min=0)
-                _ha_m = self.occ_mil.gather(1, nbhc)
+                _ha_m = self.military_at.gather(1, nbhc)
                 _ha_s = torch.where(_ha_m >= 0, self.unit_seat.gather(1, _ha_m.clamp(min=0)), torch.full_like(_ha_m, -1))
-                _ha_c = self.occ_civ.gather(1, nbhc)
+                _ha_c = self.civilian_at.gather(1, nbhc)
                 _ha_cs = torch.where(_ha_c >= 0, self.unit_seat.gather(1, _ha_c.clamp(min=0)), torch.full_like(_ha_c, -1))
                 hostile_adj = (_ha_s == BARB_SEAT) | (
                     ((_ha_s == 0) | (_ha_cs == 0))
@@ -1011,24 +1011,24 @@ class SimPhase:
             # milli-rounded test, disband the priciest-upkeep unit, tie →
             # lowest slot = spawn order, no refund. Runs right after the gold
             # lands, before war marches.
-            mine_r = self.v_alive & (self.v_civ == r)
-            upkeep_r = (self._p_maint[self.v_type.clamp(min=0, max=self.NU - 1)] * mine_r.to(self.dtype)).sum(dim=1)
+            mine_r = self.civ_unit_alive & (self.civ_unit_civ == r)
+            upkeep_r = (self._type_maintenance[self.civ_unit_type.clamp(min=0, max=self.NU - 1)] * mine_r.to(self.dtype)).sum(dim=1)
             self.civ_only_treasury[:, r] = torch.where(active, self.civ_only_treasury[:, r] - upkeep_r, self.civ_only_treasury[:, r])
             broke_r = active & (js_round(self.civ_only_treasury[:, r] * 1000) < 0)
             if bool(broke_r.any()):
-                vm = self._p_maint[self.v_type.clamp(min=0, max=self.NU - 1)]  # [B, simbase.U_MAX]
-                slots_ar = torch.arange(self.v_alive.shape[1], device=dev, dtype=self.dtype).reshape(1, -1)
+                vm = self._type_maintenance[self.civ_unit_type.clamp(min=0, max=self.NU - 1)]  # [B, simbase.POOL_MAX]
+                slots_ar = torch.arange(self.civ_unit_alive.shape[1], device=dev, dtype=self.dtype).reshape(1, -1)
                 key_v = torch.where(mine_r & (vm > 0), vm * 4096 - slots_ar, torch.full_like(vm, -1.0))
                 best_v, victim = key_v.max(dim=1)
                 kill = broke_r & (best_v > 0)
                 if bool(kill.any()):
                     kr = kill.nonzero(as_tuple=True)[0]
                     vs = victim[kr]
-                    vt = self.v_tile[kr, vs]
-                    is_civ_v = self._p_charges[self.v_type[kr, vs]] > 0
-                    self.v_alive[kr, vs] = False
-                    self.occ_mil[(kr[~is_civ_v], vt[~is_civ_v])] = -1
-                    self.occ_civ[(kr[is_civ_v], vt[is_civ_v])] = -1
+                    vt = self.civ_unit_tile[kr, vs]
+                    is_civ_v = self._type_charges[self.civ_unit_type[kr, vs]] > 0
+                    self.civ_unit_alive[kr, vs] = False
+                    self.military_at[(kr[~is_civ_v], vt[~is_civ_v])] = -1
+                    self.civilian_at[(kr[is_civ_v], vt[is_civ_v])] = -1
             for _ in range(RESEARCH_LOOPS):
                 curt = self.civ_only_cur_tech[:, r]
                 # boosted techs complete at the discounted cost (_eff_cost —
@@ -1667,7 +1667,7 @@ class SimPhase:
         # cities are -1 and building/unit codes never write SETTLER)…
         queued_live = (self.current == self.SETTLER).sum(dim=1)
         # …and the settler stock, which purchases grow as the walk proceeds
-        settlers_live = self._p_settlers()  # LIVE units, not a bank
+        settlers_live = self._seat0_settlers()  # LIVE units, not a bank
         # The builder escalator's live count: builders queued in EARLIER turns
         # plus, as the walk proceeds, this turn's queues and purchases (act.p
         # applies sequentially and both move builderCost).
@@ -1724,7 +1724,7 @@ class SimPhase:
                 ) * mult
                 # The settler SPAWNS at the buying city (pop >= 2, and no free
                 # spot = refund — the purchaseSettler rule).
-                found_ps, _ = self._first_free_spot(self.site[:, c], "p", torch.ones(self.B, dtype=torch.bool, device=self.device))
+                found_ps, _ = self._first_free_spot(self.site[:, c], "seat0", torch.ones(self.B, dtype=torch.bool, device=self.device))
                 can = is_ps & (self.pop[:, c] >= 2) & self._afford(self.treasury, s_cost) & found_ps
                 self.treasury.copy_(torch.where(can, self.treasury - s_cost, self.treasury))
                 if bool(can.any()):
@@ -1737,19 +1737,19 @@ class SimPhase:
             is_pu = (pu >= 0) & (pu < self.NU)
             if bool(is_pu.any()):
                 utp = pu.clamp(min=0, max=self.NU - 1)
-                p_tech = self._p_tech[utp]
+                p_tech = self._type_tech[utp]
                 tech_ok = (p_tech < 0) | self.techs.gather(1, p_tech.clamp(min=0).unsqueeze(1)).squeeze(1)
                 # Strategic-resource access gates the purchase (purchaseUnit →
                 # trainableUnits), per this slot's chosen unit.
                 res_ok = self._res_avail_mask(self.tile_seat == 0).gather(1, utp.unsqueeze(1)).squeeze(1)
-                tech_ok = tech_ok & res_ok & ~self._p_faith_only[utp]  # faith-only units never gold-buy
-                cost = self._p_cost[utp] * mult
+                tech_ok = tech_ok & res_ok & ~self._type_faith_only[utp]  # faith-only units never gold-buy
+                cost = self._type_cost[utp] * mult
                 if self._builder_idx >= 0:
                     # bought builders price off the live escalator…
                     b_now = self._builder_cost(self.builders_trained)  # ALREADY PRODUCED only — a queued item has produced nothing
                     b_now = b_now * mult
                     cost = torch.where(utp == self._builder_idx, b_now, cost)
-                found, _ = self._first_free_spot(self.site[:, c], "p", self._p_civ[utp])
+                found, _ = self._first_free_spot(self.site[:, c], "seat0", self._type_civilian[utp])
                 can = is_pu & tech_ok & self._afford(self.treasury, cost) & found
                 if bool(can.any()):
                     self.treasury.copy_(torch.where(can, self.treasury - cost, self.treasury))
@@ -1793,13 +1793,13 @@ class SimPhase:
         CIV6_RECLAIM_AT lowers the trigger for forced-compaction gates."""
         # The field list is DERIVED from the pool's plane list, never
         # transcribed — a hand-written list drifts and silently leaves a plane
-        # behind at the old slot index. `alive` permutes separately, and v_civ
+        # behind at the old slot index. `alive` permutes separately, and civ_unit_civ
         # is the one field that is not a merged plane.
-        counter = {"u": "next_slot", "v": "v_next"}.get(prefix, "p_next")
+        counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(prefix, "seat0_unit_next")
         maps: list = []
         fields = [f"{prefix}_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
-        if prefix == "v":
-            fields.append("v_civ")
+        if prefix == "civ":
+            fields.append("civ_unit_civ")
         alive = getattr(self, f"{prefix}_alive")
         B, U = alive.shape
         perm = torch.argsort((~alive).long(), dim=1, stable=True)  # living first, order kept
@@ -1819,7 +1819,7 @@ class SimPhase:
         # The merged maps hold MERGED slots, so the inverse permutation applies
         # only to entries inside THIS pool's range.
         lo, hi = self.POOL_LO[prefix], self.POOL_HI[prefix]
-        for m in ("occ_mil", "occ_civ"):
+        for m in ("military_at", "civilian_at"):
             at = getattr(self, m)
             mine = (at >= lo) & (at < hi)
             # gather evaluates EVERY lane, including the ones torch.where

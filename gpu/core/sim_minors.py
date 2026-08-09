@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (U_MAX/P_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
 
 
 class SimMinors:
@@ -148,41 +148,41 @@ class SimMinors:
         ti_n = (type_idx if type_idx.dim() > 0 else type_idx.expand(self.B)).clamp(min=0, max=self.NU - 1)
         naval_m = self.unit_naval[ti_n] & mask
         cart_r = self.civ_only_techs[:, civ, self._cartography_tech] if self._cartography_tech >= 0 else None
-        found, spot = self._first_free_spot(at_tile, "v", civ=civ, naval_mask=naval_m, cart=cart_r)
+        found, spot = self._first_free_spot(at_tile, "civ", civ=civ, naval_mask=naval_m, cart=cart_r)
         can = mask & found
         if not bool(can.any()):
             return can
         rows = can.nonzero(as_tuple=True)[0]
-        slot = self.v_next[rows]
-        assert int(slot.max()) < simbase.U_MAX, "civ slot pool exhausted — raise simbase.U_MAX"
-        self.v_alive[rows, slot] = True
-        self.v_civ[rows, slot] = civ
-        self.v_seat[rows, slot] = civ + 1  # seat id of civ index `civ`
-        self.v_type[rows, slot] = type_idx[rows] if type_idx.dim() > 0 else type_idx
-        self.v_tile[rows, slot] = spot[rows]
-        self.v_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
-        self.v_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
+        slot = self.civ_unit_next[rows]
+        assert int(slot.max()) < simbase.POOL_MAX, "civ slot pool exhausted — raise simbase.POOL_MAX"
+        self.civ_unit_alive[rows, slot] = True
+        self.civ_unit_civ[rows, slot] = civ
+        self.civ_unit_seat[rows, slot] = civ + 1  # seat id of civ index `civ`
+        self.civ_unit_type[rows, slot] = type_idx[rows] if type_idx.dim() > 0 else type_idx
+        self.civ_unit_tile[rows, slot] = spot[rows]
+        self.civ_unit_hp[rows, slot] = self.rules.combat.get("unitHp", 100)
+        self.civ_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
         # a fresh slot starts at 0 xp unless the training city grants Encampment XP.
-        self.v_xp[rows, slot] = 0 if init_xp is None else init_xp[rows]
-        self.v_aura_mp[rows, slot] = 0  # no frozen grant until the first refresh (TS movesFull undefined)
+        self.civ_unit_xp[rows, slot] = 0 if init_xp is None else init_xp[rows]
+        self.civ_unit_aura_mp[rows, slot] = 0  # no frozen grant until the first refresh (TS movesFull undefined)
         # `emb` MUST be cleared BEFORE _full_mp, which reads it: a reclaimed
         # slot carries the dead occupant's flag, and _full_mp overrides an
         # embarked unit's pool to the flat EMBARK_MOVES.
-        self.v_emb[rows, slot] = False
+        self.civ_unit_emb[rows, slot] = False
         # `movesLeft: def.moves` + this seat's golden dedication.
-        _m = self._full_mp("v")[rows, slot]
-        self.v_mp[rows, slot] = _m
-        self.v_mp_full[rows, slot] = _m
-        self.v_charges[rows, slot] = 0  # military; builder spawns set their own charges
-        self.occ_mil[(rows, spot[rows])] = slot + simbase.P_MAX  # merged-pool index of the v_ slot
-        self.v_next[rows] += 1
+        _m = self._full_mp("civ")[rows, slot]
+        self.civ_unit_mp[rows, slot] = _m
+        self.civ_unit_mp_full[rows, slot] = _m
+        self.civ_unit_charges[rows, slot] = 0  # military; builder spawns set their own charges
+        self.military_at[(rows, spot[rows])] = slot + simbase.SEAT0_POOL_MAX  # merged-pool index of the v_ slot
+        self.civ_unit_next[rows] += 1
         # the seat's strongest melee ever (city defense); a roster type counts
         # as melee unless it carries ranged strength.
         # clamp max too: unmasked rows may hold district queue codes.
         ti = (type_idx if type_idx.dim() > 0 else type_idx.expand(self.B)).clamp(min=0, max=self.NU - 1)
         melee_cs = torch.where(
-            can & (self._p_rng_str[ti] == 0),
-            self._p_combat[ti],
+            can & (self._type_ranged_strength[ti] == 0),
+            self._type_combat[ti],
             torch.zeros_like(self.civ_only_best_melee[:, civ]),
         )
         self.civ_only_best_melee[:, civ] = torch.maximum(self.civ_only_best_melee[:, civ], melee_cs)

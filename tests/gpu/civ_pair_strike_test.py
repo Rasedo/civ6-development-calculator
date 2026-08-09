@@ -56,34 +56,34 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
     tile = -1
     for t in range(sim.T):
         d = int(sim.pair_dist[ctr, t])
-        if 1 <= d <= 2 and bool(sim.passable[0, t]) and int(sim.occ_mil[0, t]) < 0 and int(sim.occ_civ[0, t]) < 0:
+        if 1 <= d <= 2 and bool(sim.passable[0, t]) and int(sim.military_at[0, t]) < 0 and int(sim.civilian_at[0, t]) < 0:
             tile = t
             break
     assert tile >= 0, "no free tile in strike range of the walled city"
 
     # EVERY other unit of the striker dies, so only its CITY can reach the
     # victim — otherwise a melee war-act would satisfy the assertion instead.
-    kill = sim.v_civ[0] == STRIKER
-    sim.v_alive[0][kill] = False
+    kill = sim.civ_unit_civ[0] == STRIKER
+    sim.civ_unit_alive[0][kill] = False
     for slot in kill.nonzero(as_tuple=True)[0].tolist():
-        t_old = int(sim.v_tile[0, slot])
-        gslot = slot + sim.POOL_LO["v"]
-        if t_old >= 0 and int(sim.occ_mil[0, t_old]) == gslot:
-            sim.occ_mil[0, t_old] = -1
-        if t_old >= 0 and int(sim.occ_civ[0, t_old]) == gslot:
-            sim.occ_civ[0, t_old] = -1
+        t_old = int(sim.civ_unit_tile[0, slot])
+        gslot = slot + sim.POOL_LO["civ"]
+        if t_old >= 0 and int(sim.military_at[0, t_old]) == gslot:
+            sim.military_at[0, t_old] = -1
+        if t_old >= 0 and int(sim.civilian_at[0, t_old]) == gslot:
+            sim.civilian_at[0, t_old] = -1
 
-    slot = int(sim.v_next[0])
-    sim.v_alive[0, slot] = True
-    sim.v_civ[0, slot] = VICTIM
-    sim.v_seat[0, slot] = VICTIM + 1
-    sim.v_type[0, slot] = 2  # WARRIOR
-    sim.v_tile[0, slot] = tile
-    sim.v_hp[0, slot] = 100
-    sim.v_mp[0, slot] = 0  # spent: it stays put and takes no heal this turn
-    sim.v_mp_full[0, slot] = 2
-    sim.occ_mil[0, tile] = slot + sim.POOL_LO["v"]
-    sim.v_next[0] += 1
+    slot = int(sim.civ_unit_next[0])
+    sim.civ_unit_alive[0, slot] = True
+    sim.civ_unit_civ[0, slot] = VICTIM
+    sim.civ_unit_seat[0, slot] = VICTIM + 1
+    sim.civ_unit_type[0, slot] = 2  # WARRIOR
+    sim.civ_unit_tile[0, slot] = tile
+    sim.civ_unit_hp[0, slot] = 100
+    sim.civ_unit_mp[0, slot] = 0  # spent: it stays put and takes no heal this turn
+    sim.civ_unit_mp_full[0, slot] = 2
+    sim.military_at[0, tile] = slot + sim.POOL_LO["civ"]
+    sim.civ_unit_next[0] += 1
 
     sim.civ_pair_war[0, STRIKER, VICTIM] = at_war
     sim.civ_pair_war[0, VICTIM, STRIKER] = at_war
@@ -94,9 +94,9 @@ def setup(sim, at_war: bool) -> tuple[int, int]:
 def run(at_war: bool) -> int:
     sim = build()
     slot, _ = setup(sim, at_war)
-    before = int(sim.v_hp[0, slot])
+    before = int(sim.civ_unit_hp[0, slot])
     sim._seat_phase()
-    after = int(sim.v_hp[0, slot]) if bool(sim.v_alive[0, slot]) else 0
+    after = int(sim.civ_unit_hp[0, slot]) if bool(sim.civ_unit_alive[0, slot]) else 0
     label = "at war" if at_war else "at peace"
     print(f"  {label:9s}: victim hp {before} -> {after}")
     return before - after

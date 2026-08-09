@@ -22,7 +22,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import P_MAX, pool_view
+from core.engine import SEAT0_POOL_MAX, pool_view
 
 HOLD = 12
 
@@ -38,8 +38,8 @@ def find_fight(rules, paths):
             att = m[:, 6:12].any(dim=1)
             for p in att.nonzero(as_tuple=True)[0].tolist():
                 for d in m[p, 6:12].nonzero(as_tuple=True)[0].tolist():
-                    tgt = int(sim.neigh[int(sim.p_tile[0, p]), d])
-                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or int(sim.vmil_at[0, tgt]) >= 0):
+                    tgt = int(sim.neigh[int(sim.seat0_unit_tile[0, p]), d])
+                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or int(sim.civ_military_at[0, tgt]) >= 0):
                         return sim, p, 6 + d, path.name
             sim.step()
     raise AssertionError("no adjacent-hostile situation found in scripted play")
@@ -48,10 +48,10 @@ def find_fight(rules, paths):
 def defender_state(sim, tile, pre=None):
     b = int(sim.barb_at[0, tile])
     if b >= 0:
-        return ("barb", b, int(sim.u_hp[0, b]), bool(sim.u_alive[0, b]))
-    v = int(sim.vmil_at[0, tile])
+        return ("barb", b, int(sim.barb_unit_hp[0, b]), bool(sim.barb_unit_alive[0, b]))
+    v = int(sim.civ_military_at[0, tile])
     if v >= 0:
-        return ("civ", v, int(sim.v_hp[0, v]), bool(sim.v_alive[0, v]))
+        return ("civ", v, int(sim.civ_unit_hp[0, v]), bool(sim.civ_unit_alive[0, v]))
     # the strike killed the defender and the map slot cleared — report it
     # dead via the pre-attack identity (a wounded defender CAN die to a
     # single ranged hit)
@@ -68,12 +68,12 @@ def main() -> None:
     assert sim._rl_ranged_active, "flag ships ON since V-R"
 
     slinger = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "SLINGER")
-    assert float(sim._p_rng_str[slinger]) > 0, "SLINGER rangedStrength not exported"
-    sim.p_type[0, p] = slinger
-    here = int(sim.p_tile[0, p])
+    assert float(sim._type_ranged_strength[slinger]) > 0, "SLINGER rangedStrength not exported"
+    sim.seat0_unit_type[0, p] = slinger
+    here = int(sim.seat0_unit_tile[0, p])
     dirs = code - 6
     tgt = int(sim.neigh[here, dirs])
-    hp0 = int(sim.p_hp[0, p])
+    hp0 = int(sim.seat0_unit_hp[0, p])
 
     # mask invariance under the flag
     m_on = sim.unit_action_mask().clone()
@@ -82,7 +82,7 @@ def main() -> None:
     assert torch.equal(m_on, m_off), "flag must not change the action mask"
     sim._rl_ranged_active = True
 
-    ua = torch.full((1, P_MAX), HOLD, dtype=torch.long)
+    ua = torch.full((1, SEAT0_POOL_MAX), HOLD, dtype=torch.long)
     ua[0, p] = code
     snap = sim.snapshot()
     pre_kind, pre_slot, pre_hp, _ = defender_state_from_snap(snap, tgt)
@@ -93,10 +93,10 @@ def main() -> None:
     # --- ranged (flag ON): no retaliation, no advance, defender damaged
     sim._apply_unit_actions(ua)
     kind, slot, hp_d, alive_d = defender_state(sim, tgt, (pre_kind, pre_slot, pre_hp, True))
-    assert int(sim.p_hp[0, p]) == hp0, (
-        f"ranged attacker took retaliation ({hp0} -> {int(sim.p_hp[0, p])})"
+    assert int(sim.seat0_unit_hp[0, p]) == hp0, (
+        f"ranged attacker took retaliation ({hp0} -> {int(sim.seat0_unit_hp[0, p])})"
     )
-    assert int(sim.p_tile[0, p]) == here, "ranged attacker advanced"
+    assert int(sim.seat0_unit_tile[0, p]) == here, "ranged attacker advanced"
     assert (not alive_d) or hp_d <= pre_hp - 1, "defender untouched by the strike"
     print(f"  ranged OK: attacker hp {hp0} (untouched), stayed at {here}; {kind} defender {pre_hp}->{hp_d if alive_d else 'dead'}")
 
@@ -104,8 +104,8 @@ def main() -> None:
     sim.restore(snap)
     sim._rl_ranged_active = False
     sim._apply_unit_actions(ua)
-    hp_melee = int(sim.p_hp[0, p])
-    dead_melee = not bool(sim.p_alive[0, p])
+    hp_melee = int(sim.seat0_unit_hp[0, p])
+    dead_melee = not bool(sim.seat0_unit_alive[0, p])
     assert dead_melee or hp_melee <= hp0 - 1, f"melee attacker took no retaliation? ({hp0} -> {hp_melee})"
     sim.restore(snap)
     sim._rl_ranged_active = True
@@ -115,13 +115,13 @@ def main() -> None:
 
 def defender_state_from_snap(snap, tile):
     # the snapshot stores the MERGED occupancy planes
-    _m = int(snap["mut"]["occ_mil"][0, tile])
-    b = _m - P_MAX - 256 if _m >= P_MAX + 256 else -1
+    _m = int(snap["mut"]["military_at"][0, tile])
+    b = _m - SEAT0_POOL_MAX - 256 if _m >= SEAT0_POOL_MAX + 256 else -1
     if b >= 0:
-        return ("barb", b, int(pool_view(snap, "u", "hp")[0, b]), bool(pool_view(snap, "u", "alive")[0, b]))
-    v = _m - P_MAX if P_MAX <= _m < P_MAX + 256 else -1
+        return ("barb", b, int(pool_view(snap, "barb", "hp")[0, b]), bool(pool_view(snap, "barb", "alive")[0, b]))
+    v = _m - SEAT0_POOL_MAX if SEAT0_POOL_MAX <= _m < SEAT0_POOL_MAX + 256 else -1
     assert v >= 0
-    return ("civ", v, int(pool_view(snap, "v", "hp")[0, v]), bool(pool_view(snap, "v", "alive")[0, v]))
+    return ("civ", v, int(pool_view(snap, "civ", "hp")[0, v]), bool(pool_view(snap, "civ", "alive")[0, v]))
 
 
 if __name__ == "__main__":

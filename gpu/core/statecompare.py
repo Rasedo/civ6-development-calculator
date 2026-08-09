@@ -133,7 +133,7 @@ def _citystate_rows(sim, b: int) -> list[int]:
 
 
 def _is_civilian(sim, unit_type: int) -> bool:
-    return bool(sim._p_civ[unit_type])
+    return bool(sim._type_civilian[unit_type])
 
 
 def group_rows(sim, b: int, group: str) -> list:

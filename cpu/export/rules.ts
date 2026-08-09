@@ -14,12 +14,12 @@ import { IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL } from '../data/improvements'; 
 import type { ImprovementId } from '../core/types';
 import { GENERAL_AURA_CS, GENERAL_AURA_RANGE, BARB_SCOUT_OPENER_LIVE } from '../core/combat';
 import { GENERAL_AURA_MP } from '../core/aura'; // #70/S3 (B-8)
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CS_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CS_TYPE_YIELD, CS_TYPE_DISTRICT, CS_TYPE_BUILDINGS, CS_DISTRICT_BONUS, CS_SUZERAIN_YIELD, CS_MAX_HP, CS_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_CAPITAL_BONUS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_TYPE_DISTRICT, CITY_STATE_TYPE_BUILDINGS, CITY_STATE_DISTRICT_BONUS, CITY_STATE_SUZERAIN_YIELD, CITY_STATE_MAX_HP, CITY_STATE_MEET_RANGE, LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN } from '../data/cityStates';
 import { GP_CLASSES, GREAT_PEOPLE, gpCost, GP_CLASS_DISTRICT, GW_BUILDINGS, GW_SLOTS, GW_WONDER_SLOTS, GW_WORKS_PER_PERSON, GW_CULTURE, GW_TOURISM, GW_PRINTING_TECH, GW_PRINTING_WRITING_MULT, RELIC_BUILDING, RELIC_SLOTS_PER_BUILDING, RELIC_FAITH, RELIC_TOURISM, ARTIFACT_BUILDING, ARTIFACT_SLOTS, ARTIFACT_CULTURE, ARTIFACT_TOURISM, SPECIALIST_YIELDS } from '../data/greatPeople';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, JUST_WAR_RANGE, B18_FOLLOWER_COUPLING_LIVE, WORSHIP_BUILDINGS, SPREAD_PRESSURE, MISSIONARY_CAP, APOSTLE_CAP, CITY_RELIGION_ADDER_LIVE, THEO_DAMAGE, THEO_BASE_DAMAGE, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, type BeliefEffects } from '../data/religion';
 import { PROJECTS, PROJECT_YIELD_FRACTION, PROJECT_GPP_FRACTION, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { TRADE_ROUTE_RANGE, CS_ROUTE_GOLD, CS_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../core/trade';
+import { TRADE_ROUTE_RANGE, CITY_STATE_ROUTE_GOLD, CITY_STATE_ROUTE_SPEC, INTL_ROUTE_GOLD, TRADE_ROUTE_DURATION } from '../core/trade';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESSURE_SCALE, LOYALTY_AMENITY, PEACE_GOLD_COST, TECH_PROD_DIV, CITY_DEF_PER_TECH, WW_ERA_BASE_FORMAL, WW_ERA_BASE_SURPRISE, WW_ABROAD_MULT, WW_DEATH_MULT, WW_DECAY_AT_WAR, WW_DECAY_AT_PEACE, WW_PEACE_TREATY, WAR_WEARINESS_PER_AMENITY, DOW_PROXIMITY, DOW_STRENGTH_RATIO, DOW_WW_MAX, PEACE_WW, FORMAL_WAR_MIN_TURNS, ERA_LENGTH, ERA_SCORE_FOUND, ERA_SCORE_CONQUER, ERA_SCORE_WONDER, ERA_SCORE_PANTHEON, ERA_SCORE_RELIGION, ERA_SCORE_GP, ERA_DARK_T, ERA_GOLDEN_T, AGE_PRESSURE, GOV_CIVICS_PER_TITLE, GOV_MAX_TITLES, GOVERNOR_LOYALTY, HEROIC_DEDICATIONS, ADMIRAL_MARCH_LIVE, DEDICATION_FAITH, GOLDEN_MOVE_BONUS, DEDICATION_ERA_SCORE, DEDICATION_PAYOUTS_LIVE, ALLY_MIN_PEACE, WARMONGER_DOW, WARMONGER_CAPTURE, WARMONGER_GANG, DIPLO_FAVOR_PER_SUZERAIN, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DED_EVENT_SCORE, DIPLO_VICTORY_POINTS, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, ENGINEER_LIVE, DED_MONUMENTALITY, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE, DED_EXODUS } from '../data/seats';
 import { WONDER_TOURISM_BASE } from '../core/city';
@@ -265,9 +265,9 @@ export function buildRules() {
         .map((id) => BUILT_WONDER_LIST.findIndex((w) => w.id === id))
         .filter((i) => i >= 0),
       range: TRADE_ROUTE_RANGE,
-      // A-12b: civ-seat CS-route income constants (csRouteYields mirror).
-      csRouteGold: CS_ROUTE_GOLD,
-      csRouteSpec: CS_ROUTE_SPEC,
+      // A-12b: civ-seat CS-route income constants (cityStateRouteYields mirror).
+      cityStateRouteGold: CITY_STATE_ROUTE_GOLD,
+      cityStateRouteSpec: CITY_STATE_ROUTE_SPEC,
       // B-23: international-route gold base (routeYieldsInternational: +intlGold
       // +1 gold per destination completed specialty district) + route duration.
       intlGold: INTL_ROUTE_GOLD,
@@ -311,36 +311,36 @@ export function buildRules() {
     // City-state rules (mirrors data/cityStates.ts; covered scope only — the
     // 3/6-envoy district tiers are inert without districts, and the CHIEFDOM
     // influence tier is 0, so influence accrues at the flat base rate).
-    cs: {
+    cityState: {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
-      capitalBonus: CS_CAPITAL_BONUS,
-      meetRange: CS_MEET_RANGE, // A-12: civ-seat proximity-meet radius
+      capitalBonus: CITY_STATE_CAPITAL_BONUS,
+      meetRange: CITY_STATE_MEET_RANGE, // A-12: civ-seat proximity-meet radius
       questCooldown: QUEST_COOLDOWN,
       questEnvoys: QUEST_ENVOYS,
       // V-CS: attackCityState/captureCityState (siege hp + the militaristic +6)
-      maxHp: CS_MAX_HP,
+      maxHp: CITY_STATE_MAX_HP,
       militaristicIdx: CITY_STATE_TYPES.indexOf('militaristic'),
       tradeIdx: CITY_STATE_TYPES.indexOf('trade'), // A-12b: suzerain trade capacity
       suzerainEnvoys: SUZERAIN_ENVOYS, // A-12b: the strict-contest minimum
       // per CS type (by index): which yield column its envoys boost
-      typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CS_TYPE_YIELD[t])),
+      typeYieldIdx: CITY_STATE_TYPES.map((t) => YIELD_KEYS.indexOf(CITY_STATE_TYPE_YIELD[t])),
       // per CS type: the district whose count carries the 3-/6-envoy bonus, and
-      // the per-district amount (csEnvoyBonuses: +CS_DISTRICT_BONUS at >=3, again
+      // the per-district amount (cityStateEnvoyBonuses: +CITY_STATE_DISTRICT_BONUS at >=3, again
       // at >=6, added to each owned completed district of that type).
-      typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CS_TYPE_DISTRICT[t])),
-      districtBonus: CS_DISTRICT_BONUS,
+      typeDistrictIdx: CITY_STATE_TYPES.map((t) => PLACEABLE_DISTRICTS.indexOf(CITY_STATE_TYPE_DISTRICT[t])),
+      districtBonus: CITY_STATE_DISTRICT_BONUS,
       // B-21: the 3/6-envoy bonus now lands on the type's tier-1 (>=3) and
-      // tier-2 (>=6) BUILDING (CS_TYPE_BUILDINGS[t][0]/[1]) — the catalog index
+      // tier-2 (>=6) BUILDING (CITY_STATE_TYPE_BUILDINGS[t][0]/[1]) — the catalog index
       // into centerBuildings, -1 if the building is absent from the roster.
       // Regional tier-2 buildings (FACTORY/POWER_PLANT) are excluded by the
       // building-yield loop in BOTH engines (parity-safe; industrial 6-tier inert).
-      typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CS_TYPE_BUILDINGS[t][0]) ?? -1),
-      typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CS_TYPE_BUILDINGS[t][1]) ?? -1),
+      typeB1Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][0]) ?? -1),
+      typeB2Idx: CITY_STATE_TYPES.map((t) => buildingIdx.get(CITY_STATE_TYPE_BUILDINGS[t][1]) ?? -1),
       // B-21: the suzerain's per-CS unique perk — a flat capital yield of this
-      // amount in the CS's live channel (CS_SUZERAIN_LIVE). The channel is
-      // shipped per-CS-instance on csAtStart (name-keyed), -1 = descoped.
-      suzerainYield: CS_SUZERAIN_YIELD,
+      // amount in the CS's live channel (CITY_STATE_SUZERAIN_LIVE). The channel is
+      // shipped per-CS-instance on cityStateAtStart (name-keyed), -1 = descoped.
+      suzerainYield: CITY_STATE_SUZERAIN_YIELD,
       // A-12 (B8-L): CIV-SEAT levy — a militaristic CS's suzerain (a civ seat) at war
       // spawns levyUnits units at levyGoldCost off its treasury, levyCooldown
       // per CS shared across seats. (Seat-0 levy is UI-only, absent from the

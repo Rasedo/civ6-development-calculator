@@ -98,10 +98,10 @@ describe('#51/S6.13 the camps belong to the barbarian seat', () => {
   it('a city-state reloads as a Seat, not a bare record', () => {
     const state = newGame();
     const back = deserialize(serialize(state));
-    const cs = seatOf(back, seatOfCityState(0));
-    expect(cs).toBeDefined();
-    expect(cs!.seat).toBe(seatOfCityState(0));
-    expect(cs!.camps).toEqual([]);
-    expect(cs!.research.techs).toEqual([]); // zero, and zero is the RULE
+    const cityState = seatOf(back, seatOfCityState(0));
+    expect(cityState).toBeDefined();
+    expect(cityState!.seat).toBe(seatOfCityState(0));
+    expect(cityState!.camps).toEqual([]);
+    expect(cityState!.research.techs).toEqual([]); // zero, and zero is the RULE
   });
 });

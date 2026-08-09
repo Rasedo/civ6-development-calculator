@@ -15,7 +15,7 @@ spec); the building branch keeps its peace-cost reserve.
 
 The scenarios drive `_seat_phase()` directly on a single-batch CPU sim with
 the civ forced to PEACE and its city queues cleared, so the ONLY structural
-moves the phase can make are the three buys: v_next only advances on a unit
+moves the phase can make are the three buys: civ_unit_next only advances on a unit
 spawn, civ_city_alive only grows on a settler found, civ_city_bldg only gains on a
 building buy.
 """
@@ -46,13 +46,13 @@ def n_bldg(sim) -> int:
     return int(sim.civ_city_bldg[0, R].sum())
 
 
-def v_next(sim) -> int:
-    return int(sim.v_next[0])
+def civ_unit_next(sim) -> int:
+    return int(sim.civ_unit_next[0])
 
 
 def mil_count(sim) -> int:
-    t = sim.v_type[0].clamp(min=0, max=sim.NU - 1)
-    return int((sim.v_alive[0] & (sim.v_civ[0] == R) & (sim._p_combat[t] > 0)).sum())
+    t = sim.civ_unit_type[0].clamp(min=0, max=sim.NU - 1)
+    return int((sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == R) & (sim._type_combat[t] > 0)).sum())
 
 
 def cap_center(sim) -> int:
@@ -67,7 +67,7 @@ def settler_price(sim) -> float:
 
 
 def unit_price(sim, idx: int) -> float:
-    return float(sim._p_cost[idx]) * sim.rules.gold_purchase_mult
+    return float(sim._type_cost[idx]) * sim.rules.gold_purchase_mult
 
 
 def prep_peace(sim) -> None:
@@ -85,8 +85,8 @@ def empty_land_tiles(sim, k: int) -> list[int]:
     military far from the capital so it perturbs no spawn probe)."""
     free = (
         sim.passable[0]
-        & (sim.vmil_at[0] < 0)
-        & (sim.vciv_at[0] < 0)
+        & (sim.civ_military_at[0] < 0)
+        & (sim.civ_civilian_at[0] < 0)
         & (sim.barb_at[0] < 0)
         & (sim.pmil_at[0] < 0)
         & (sim.pciv_at[0] < 0)
@@ -103,16 +103,16 @@ def inject_mil(sim, tiles: list[int], type_idx: int) -> None:
     """Append civ-R military units on the given empty tiles (the
     _spawn_seat_unit field writes, minus the free-spot probe)."""
     for t in tiles:
-        slot = int(sim.v_next[0])
-        sim.v_alive[0, slot] = True
-        sim.v_civ[0, slot] = R
-        sim.v_type[0, slot] = type_idx
-        sim.v_tile[0, slot] = t
-        sim.v_hp[0, slot] = 100
-        sim.v_charges[0, slot] = 0
-        sim.v_fortify[0, slot] = 0
-        sim.occ_mil[0, t] = slot + sim.POOL_LO["v"]
-        sim.v_next[0] += 1
+        slot = int(sim.civ_unit_next[0])
+        sim.civ_unit_alive[0, slot] = True
+        sim.civ_unit_civ[0, slot] = R
+        sim.civ_unit_type[0, slot] = type_idx
+        sim.civ_unit_tile[0, slot] = t
+        sim.civ_unit_hp[0, slot] = 100
+        sim.civ_unit_charges[0, slot] = 0
+        sim.civ_unit_fortify[0, slot] = 0
+        sim.military_at[0, t] = slot + sim.POOL_LO["civ"]
+        sim.civ_unit_next[0] += 1
 
 
 def block_spawn(sim) -> None:
@@ -121,7 +121,7 @@ def block_spawn(sim) -> None:
     ctr = cap_center(sim)
     tiles = [ctr] + [int(n) for n in sim.neigh[ctr].tolist() if n >= 0]
     for t in tiles:
-        sim.occ_mil[0, t] = 0  # ≥0 blocks the probe; the slot value is never read at peace
+        sim.military_at[0, t] = 0  # ≥0 blocks the probe; the slot value is never read at peace
 
 
 def research_tech(sim, key: str) -> int:
@@ -155,11 +155,11 @@ def main() -> None:
     assert int(sim.rules_dev.b_unlock[mon]) == -1 and int(sim.rules_dev.b_unlock_civic[mon]) == -1, "MONUMENT unexpectedly gated"
     sim.civ_city_bldg[0, R, :, mon] = False
     sim.civ_only_treasury[0, R] = 10_000.0
-    b0, c0, vn0 = n_bldg(sim), n_rc(sim), v_next(sim)
+    b0, c0, vn0 = n_bldg(sim), n_rc(sim), civ_unit_next(sim)
     sim._seat_phase()
     assert n_bldg(sim) == b0 + 1, f"building priority: expected +1 building, got {n_bldg(sim) - b0}"
     assert n_rc(sim) == c0, "building priority: a settler was founded too (not one-per-turn)"
-    assert v_next(sim) == vn0, "building priority: a unit was bought too (not one-per-turn)"
+    assert civ_unit_next(sim) == vn0, "building priority: a unit was bought too (not one-per-turn)"
     assert bool(sim.civ_city_bldg[0, R, :, mon].any()), "the bought building was not MONUMENT"
     print("  1 priority building > settler/unit OK (one purchase, MONUMENT)")
 
@@ -172,10 +172,10 @@ def main() -> None:
     assert n_rc(sim) < sim.rules.seats["maxCities"], "civ already at city cap — pick an earlier turn"
     price_s = settler_price(sim)
     sim.civ_only_treasury[0, R] = price_s
-    c0, vn0 = n_rc(sim), v_next(sim)
+    c0, vn0 = n_rc(sim), civ_unit_next(sim)
     sim._seat_phase()
     assert n_rc(sim) == c0 + 1, "settler at price: no city founded"
-    assert v_next(sim) == vn0, "settler priority: a unit was bought too (not one-per-turn)"
+    assert civ_unit_next(sim) == vn0, "settler priority: a unit was bought too (not one-per-turn)"
     print(f"  2 settler buy OK at {price_s:.0f} gold (founds, blocks the unit branch)")
 
     # just below the price: settler unaffordable → no found (threshold)
@@ -239,10 +239,10 @@ def main() -> None:
         assert tre < settler_price(sim), f"{label} price {tre} not below the settler price — scenario invalid"
         assert mil_count(sim) < 2 * n_rc(sim), "military already at quota — pick an earlier turn"
         sim.civ_only_treasury[0, R] = tre
-        vn0 = v_next(sim)
+        vn0 = civ_unit_next(sim)
         sim._seat_phase()
-        assert v_next(sim) == vn0 + 1, f"{label}: no unit spawned at {tre:.0f} gold"
-        got = int(sim.v_type[0, vn0])
+        assert civ_unit_next(sim) == vn0 + 1, f"{label}: no unit spawned at {tre:.0f} gold"
+        got = int(sim.civ_unit_type[0, vn0])
         assert got == want_idx, f"{label}: strongest-affordable picked type {got}, want {want_idx}"
         print(f"  3 strongest-affordable OK: {tre:.0f} gold -> {label}")
 
@@ -259,9 +259,9 @@ def main() -> None:
         inject_mil(sim, empty_land_tiles(sim, need), warr)
     assert mil_count(sim) >= quota
     sim.civ_only_treasury[0, R] = unit_price(sim, warr)  # affordable, but the quota is met
-    vn0, c0 = v_next(sim), n_rc(sim)
+    vn0, c0 = civ_unit_next(sim), n_rc(sim)
     sim._seat_phase()
-    assert v_next(sim) == vn0, "quota gate: bought a unit at/above 2× cities"
+    assert civ_unit_next(sim) == vn0, "quota gate: bought a unit at/above 2× cities"
     assert c0 == n_rc(sim), "quota scenario unexpectedly founded a city"
     print(f"  4 quota gate OK (no buy at military == {quota} = 2× {n_rc(sim)} cities)")
 
@@ -273,9 +273,9 @@ def main() -> None:
     prep_peace(sim)
     sim.civ_city_bldg[0, R] = True
     sim.civ_only_treasury[0, R] = unit_price(sim, warr)
-    vn0 = v_next(sim)
+    vn0 = civ_unit_next(sim)
     sim._seat_phase()  # free-spot twin: warrior spawns
-    assert v_next(sim) == vn0 + 1, "refund control: warrior did not spawn with a free spot"
+    assert civ_unit_next(sim) == vn0 + 1, "refund control: warrior did not spawn with a free spot"
     treasury_spawn = float(sim.civ_only_treasury[0, R])
 
     sim.restore(base)
@@ -283,9 +283,9 @@ def main() -> None:
     sim.civ_city_bldg[0, R] = True
     sim.civ_only_treasury[0, R] = unit_price(sim, warr)
     block_spawn(sim)
-    vn0 = v_next(sim)
+    vn0 = civ_unit_next(sim)
     sim._seat_phase()  # blocked twin: no spot -> refund
-    assert v_next(sim) == vn0, "refund: a unit spawned despite every spot blocked"
+    assert civ_unit_next(sim) == vn0, "refund: a unit spawned despite every spot blocked"
     treasury_refund = float(sim.civ_only_treasury[0, R])
     # WARRIOR upkeep is 0, so the refund keeps exactly its gold price
     assert abs((treasury_refund - treasury_spawn) - unit_price(sim, warr)) < 1e-6, (

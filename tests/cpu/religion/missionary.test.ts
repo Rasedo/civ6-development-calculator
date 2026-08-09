@@ -26,11 +26,11 @@ describe('B6-S2 civ missionary chassis', () => {
     // base lump 10, charges 2 -> survives at 1.
     {
       const state = newGame();
-      const rv = (state.seats[(0) + 1] as Seat);
+      const civSeat = (state.seats[(0) + 1] as Seat);
       const target = seatOf(state, 0)!.cities[0];
       target.followedReligion = 0; // != g (1)
       target.religionPressure = [0, 0];
-      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, rv.seat)!;
+      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civSeat.seat)!;
       u.charges = 2;
       const uid = u.id;
       endTurn(state, 0);
@@ -41,12 +41,12 @@ describe('B6-S2 civ missionary chassis', () => {
     // SCRIPTURE lump 15, charges 1 -> dies (disbanded) at 0.
     {
       const state = newGame();
-      const rv = (state.seats[(0) + 1] as Seat);
-      rv.religion.enhancer = 'SCRIPTURE';
+      const civSeat = (state.seats[(0) + 1] as Seat);
+      civSeat.religion.enhancer = 'SCRIPTURE';
       const target = seatOf(state, 0)!.cities[0];
       target.followedReligion = 0;
       target.religionPressure = [0, 0];
-      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, rv.seat)!;
+      const u = spawnUnit(state, 'MISSIONARY', target.centerIndex, civSeat.seat)!;
       u.charges = 1;
       const uid = u.id;
       endTurn(state, 0);

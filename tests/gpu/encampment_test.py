@@ -55,30 +55,30 @@ def test_catalog(sim) -> None:
 def test_training_xp_wiring(rules, path) -> None:
     sim = BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
     # a military unit type and the builder (civilian) type
-    mil_ty = int(torch.tensor([c if not bool(sim._p_civ[i]) else -1 for i, c in enumerate(sim._p_combat.tolist())]).argmax())
-    assert not bool(sim._p_civ[mil_ty]) and float(sim._p_combat[mil_ty]) > 0, "no military unit type found"
+    mil_ty = int(torch.tensor([c if not bool(sim._type_civilian[i]) else -1 for i, c in enumerate(sim._type_combat.tolist())]).argmax())
+    assert not bool(sim._type_civilian[mil_ty]) and float(sim._type_combat[mil_ty]) > 0, "no military unit type found"
     bld_ty = sim._builder_idx
-    assert bld_ty >= 0 and bool(sim._p_civ[bld_ty]), "builder type not civilian"
+    assert bld_ty >= 0 and bool(sim._type_civilian[bld_ty]), "builder type not civilian"
     ctr = sim.site[:, 0].clamp(min=0)
     init = torch.tensor([10], dtype=torch.long)  # pretend the city holds ARMORY (best tier 10)
 
     # MILITARY: inherits init_xp
-    slot0 = int(sim.p_next[0])
+    slot0 = int(sim.seat0_unit_next[0])
     sim._spawn_seat0(torch.tensor([True]), ctr, torch.tensor([mil_ty]), init_xp=init)
-    assert int(sim.p_next[0]) == slot0 + 1, "military unit did not spawn"
-    assert int(sim.p_xp[0, slot0]) == 10, f"military trained XP = {int(sim.p_xp[0, slot0])}, want 10"
+    assert int(sim.seat0_unit_next[0]) == slot0 + 1, "military unit did not spawn"
+    assert int(sim.seat0_unit_xp[0, slot0]) == 10, f"military trained XP = {int(sim.seat0_unit_xp[0, slot0])}, want 10"
 
     # CIVILIAN: stays 0 even under init_xp
-    slot1 = int(sim.p_next[0])
+    slot1 = int(sim.seat0_unit_next[0])
     sim._spawn_seat0(torch.tensor([True]), ctr, torch.tensor([bld_ty]), init_xp=init)
-    assert int(sim.p_next[0]) == slot1 + 1, "builder did not spawn"
-    assert int(sim.p_xp[0, slot1]) == 0, f"civilian trained XP = {int(sim.p_xp[0, slot1])}, want 0"
+    assert int(sim.seat0_unit_next[0]) == slot1 + 1, "builder did not spawn"
+    assert int(sim.seat0_unit_xp[0, slot1]) == 0, f"civilian trained XP = {int(sim.seat0_unit_xp[0, slot1])}, want 0"
 
     # CIV SEAT mirror: _spawn_seat_unit is military-only, honours init_xp
-    vslot = int(sim.v_next[0])
+    vslot = int(sim.civ_unit_next[0])
     sim._spawn_seat_unit(torch.tensor([True]), ctr, torch.tensor([mil_ty]), 0, init_xp=torch.tensor([15]))
-    assert int(sim.v_next[0]) == vslot + 1, "civ unit did not spawn"
-    assert int(sim.v_xp[0, vslot]) == 15, f"civ trained XP = {int(sim.v_xp[0, vslot])}, want 15"
+    assert int(sim.civ_unit_next[0]) == vslot + 1, "civ unit did not spawn"
+    assert int(sim.civ_unit_xp[0, vslot]) == 15, f"civ trained XP = {int(sim.civ_unit_xp[0, vslot])}, want 15"
     print("  training-XP wiring OK: military inherits tier XP (p=10, v=15), civilian stays 0")
 
 
@@ -93,9 +93,9 @@ def build_strike_scene(rules, path):
     ctr = int(sim.site[0, 0])
     assert ctr >= 0, "no seat-0 capital"
     # clear barbs so the civ unit is the unambiguous nearest hostile
-    _pl = sim.occ_mil[0]  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
-    sim.u_alive[0, :] = False
+    _pl = sim.military_at[0]  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
+    sim.barb_unit_alive[0, :] = False
     sim.n_camps[0] = sim.max_camps[0]
     # an OWNED non-center tile with no district -> plant a complete Encampment
     owned = ((sim.owner[0] == 0) & (sim.district[0] < 0)).nonzero(as_tuple=True)[0]
@@ -112,18 +112,18 @@ def build_strike_scene(rules, path):
     sim.district_dead[0, enc_tile] = False
     # a distance-1 empty tile for the target
     dfc = sim.pair_dist[ctr].to(torch.long)
-    free = ((dfc == 1) & (sim.barb_at[0] < 0) & (sim.vmil_at[0] < 0) & (sim.vciv_at[0] < 0) & (sim.pmil_at[0] < 0) & (sim.pciv_at[0] < 0)).nonzero(as_tuple=True)[0]
+    free = ((dfc == 1) & (sim.barb_at[0] < 0) & (sim.civ_military_at[0] < 0) & (sim.civ_civilian_at[0] < 0) & (sim.pmil_at[0] < 0) & (sim.pciv_at[0] < 0)).nonzero(as_tuple=True)[0]
     assert len(free) > 0, "no free adjacent tile for the target"
     tgt = int(free[0])
-    vslot = int((~sim.v_alive[0]).nonzero(as_tuple=True)[0][0])
+    vslot = int((~sim.civ_unit_alive[0]).nonzero(as_tuple=True)[0][0])
     # high-combat civ type -> small damage rolls -> survives two strikes
-    strong_ty = int(sim._p_combat.argmax())
-    sim.occ_mil[0, tgt] = vslot + sim.POOL_LO["v"]
-    sim.v_alive[0, vslot] = True
-    sim.v_hp[0, vslot] = 100
-    sim.v_type[0, vslot] = strong_ty
-    sim.v_civ[0, vslot] = 0
-    sim.v_emb[0, vslot] = False
+    strong_ty = int(sim._type_combat.argmax())
+    sim.military_at[0, tgt] = vslot + sim.POOL_LO["civ"]
+    sim.civ_unit_alive[0, vslot] = True
+    sim.civ_unit_hp[0, vslot] = 100
+    sim.civ_unit_type[0, vslot] = strong_ty
+    sim.civ_unit_civ[0, vslot] = 0
+    sim.civ_unit_emb[0, vslot] = False
     sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the war matrix under transpose
     return sim, enc_tile, tgt, vslot
@@ -134,22 +134,22 @@ def test_strike(rules, path) -> None:
     sim, enc_tile, tgt, vslot = build_strike_scene(rules, path)
     sim._log_combat_b = 0
     sim._combat_events = []
-    hp0 = int(sim.v_hp[0, vslot])
+    hp0 = int(sim.civ_unit_hp[0, vslot])
     sim._barbarian_phase()
     ev_on = [e for e in sim._combat_events if "k:pestk" in e]
     assert len(ev_on) >= 1, f"Encampment strike did not fire (events: {sim._combat_events})"
-    assert int(sim.v_hp[0, vslot]) < hp0, "target took no Encampment-strike damage"
-    print(f"  strike ON OK: pestk fired, target hp {hp0} -> {int(sim.v_hp[0, vslot])}")
+    assert int(sim.civ_unit_hp[0, vslot]) < hp0, "target took no Encampment-strike damage"
+    print(f"  strike ON OK: pestk fired, target hp {hp0} -> {int(sim.civ_unit_hp[0, vslot])}")
 
     # --- control: no Encampment -> no pestk, target untouched
     sim2, enc2, tgt2, v2 = build_strike_scene(rules, path)
     sim2.district_complete[0, enc2] = False  # incomplete Encampment: no strike
     sim2._log_combat_b = 0
     sim2._combat_events = []
-    hp0b = int(sim2.v_hp[0, v2])
+    hp0b = int(sim2.civ_unit_hp[0, v2])
     sim2._barbarian_phase()
     assert not any("k:pestk" in e for e in sim2._combat_events), "incomplete Encampment still struck"
-    assert int(sim2.v_hp[0, v2]) == hp0b, "control target lost HP with no complete Encampment"
+    assert int(sim2.civ_unit_hp[0, v2]) == hp0b, "control target lost HP with no complete Encampment"
     print("  strike CONTROL OK: incomplete Encampment fires nothing, target untouched")
 
     # --- walls + Encampment: rolls TWICE, walls (pcstk) BEFORE Encampment (pestk)

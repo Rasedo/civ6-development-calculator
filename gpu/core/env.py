@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import torch
 
-from .engine import BatchSim, Rules, P_MAX
+from .engine import BatchSim, Rules, SEAT0_POOL_MAX
 
 def n_unit_acts(rules: Rules) -> int:
     """The unit head's width, read from the SHIPPED action enum — never a literal.
@@ -221,7 +221,7 @@ class BatchEnv:
                 s.civics.sum(dim=1).to(d) / max(s.civics.shape[1], 1),
                 s.tech_prog / 50.0,
                 s.civic_prog / 50.0,
-                s._p_settlers().to(d),  # LIVE settler units
+                s._seat0_settlers().to(d),  # LIVE settler units
                 # LIVE queued-settler count: current == the settler column NB.
                 # It is the live queue, never a cumulative counter.
                 (s.current == s.rules_dev.b_cost.shape[0]).sum(dim=1).to(d),
@@ -230,11 +230,11 @@ class BatchEnv:
                 s.envoys_avail.to(d) / 5.0,
                 s.influence / 100.0,
                 s.n_camps.to(d) / 5.0,
-                s.u_alive.sum(dim=1).to(d) / 10.0,
-                s.p_alive.sum(dim=1).to(d) / 10.0,
+                s.barb_unit_alive.sum(dim=1).to(d) / 10.0,
+                s.seat0_unit_alive.sum(dim=1).to(d) / 10.0,
                 # Army COMPOSITION: the ladder trains ranged while the army
                 # holds melee, so a bare COUNT cannot express the decision.
-                (s.p_alive & (s._p_rng_str[s.p_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
+                (s.seat0_unit_alive & (s._type_ranged_strength[s.seat0_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
         )  # [B, 15]
@@ -269,7 +269,7 @@ class BatchEnv:
                                                       # settlerCost counts cities-1 + LIVE + LIVE-QUEUED settlers,
                                                       # the queued count being (current == the settler column)
                                                       (s.rules.settler_base + s.rules.settler_per_city
-                                                       * (s.alive.sum(dim=1) - 1 + s._p_settlers()
+                                                       * (s.alive.sum(dim=1) - 1 + s._seat0_settlers()
                                                           + (s.current == s.rules_dev.b_cost.shape[0]).sum(dim=1)).clamp(min=0).to(d))), dim=1),
                           s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.tech_boosted, 0).to(d) / 1000.0,
                           s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civic_boosted, 0, is_civic=True).to(d) / 1000.0,
@@ -287,7 +287,7 @@ class BatchEnv:
         d = s.dtype
         B = s.B
         dev = s.device
-        rng_t = s._p_rng_str > 0
+        rng_t = s._type_ranged_strength > 0
         if r is None:
             n_cities = s.alive.sum(dim=1)
             qcur = s.current
@@ -296,16 +296,16 @@ class BatchEnv:
             _nb0 = s.rules_dev.b_cost.shape[0]
             q_ty = (qcur - (_nb0 + 2)).clamp(min=0, max=s.NU - 1)
             q_u = (qcur >= _nb0 + 2) & (qcur < _nb0 + 2 + s.NU)
-            q_mil = q_u & (s._p_combat[q_ty] > 0)
-            pt = s.p_type.clamp(min=0, max=s.NU - 1)
-            mil = s.p_alive & (s._p_combat[pt] > 0)
-            n_units = s.p_alive.sum(dim=1) + q_u.sum(dim=1)
+            q_mil = q_u & (s._type_combat[q_ty] > 0)
+            pt = s.seat0_unit_type.clamp(min=0, max=s.NU - 1)
+            mil = s.seat0_unit_alive & (s._type_combat[pt] > 0)
+            n_units = s.seat0_unit_alive.sum(dim=1) + q_u.sum(dim=1)
             n_rng = (mil & rng_t[pt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
             n_mel = (mil & ~rng_t[pt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
             at_opp = s.civ_only_atwar.any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev)
             # ONE strength formula for every seat — nCities*8 + own-unit
             # combat, the `_civ_pair_strengths` text.
-            own_str = n_cities * 8 + (s.p_alive.to(torch.long) * s._p_combat[pt]).sum(dim=1)
+            own_str = n_cities * 8 + (s.seat0_unit_alive.to(torch.long) * s._type_combat[pt]).sum(dim=1)
             z = torch.zeros(B, dtype=d, device=dev)
             return torch.stack([
                 n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
@@ -317,24 +317,24 @@ class BatchEnv:
         qcur = s.civ_city_current[:, r]
         q_ty = (qcur - 1).clamp(min=0, max=s.NU - 1)
         q_u = (qcur >= 1) & (qcur <= s.NU)
-        q_mil = q_u & (s._p_combat[q_ty] > 0)
-        vt = s.v_type.clamp(min=0, max=s.NU - 1)
-        mine = s.v_alive & (s.v_civ == r)
-        mil = mine & (s._p_combat[vt] > 0)
+        q_mil = q_u & (s._type_combat[q_ty] > 0)
+        vt = s.civ_unit_type.clamp(min=0, max=s.NU - 1)
+        mine = s.civ_unit_alive & (s.civ_unit_civ == r)
+        mil = mine & (s._type_combat[vt] > 0)
         n_units = mine.sum(dim=1) + q_u.sum(dim=1)
         n_rng = (mil & rng_t[vt]).sum(dim=1) + (q_mil & rng_t[q_ty]).sum(dim=1)
         n_mel = (mil & ~rng_t[vt]).sum(dim=1) + (q_mil & ~rng_t[q_ty]).sum(dim=1)
         # The SAME 8-per-city text: this civ seat's view of seat 0, on the one
         # ruler `civ_only_str` below also uses.
-        p_str = s.alive.sum(dim=1) * 8 + (s.p_alive.to(torch.long) * s._p_combat[s.p_type.clamp(min=0, max=s.NU - 1)]).sum(dim=1)
-        own_cs = mine.to(torch.long) * s._p_combat[vt]
+        p_str = s.alive.sum(dim=1) * 8 + (s.seat0_unit_alive.to(torch.long) * s._type_combat[s.seat0_unit_type.clamp(min=0, max=s.NU - 1)]).sum(dim=1)
+        own_cs = mine.to(torch.long) * s._type_combat[vt]
         civ_only_str = torch.floor(n_cities.double() * 8 + own_cs.sum(dim=1).double() + 0.5)
         d_pr = s.pair_dist[
             s.site.clamp(min=0).unsqueeze(2), s.civ_city_center[:, r].clamp(min=0).unsqueeze(1)
         ].to(torch.long)
         pair_ok = s.alive.unsqueeze(2) & s.civ_city_alive[:, r].unsqueeze(1)
         prox = torch.where(pair_ok, d_pr, 999).reshape(B, -1).min(dim=1).values
-        gang = s.p_warmonger >= s._wm_gang
+        gang = s.warmonger >= s._wm_gang
         atwar_any = s.civ_only_atwar[:, r] | (s.civ_pair_war[:, r].any(dim=1) if s.R > 0 else torch.zeros(B, dtype=torch.bool, device=dev))
         return torch.stack([
             n_cities.to(d), n_units.to(d), n_mel.to(d), n_rng.to(d),
@@ -354,17 +354,17 @@ class BatchEnv:
         smap = s.seat_slot_map(r)
         present = smap >= 0
         sc = smap.clamp(min=0)
-        tile = s.v_tile.gather(1, sc).clamp(min=0)
+        tile = s.civ_unit_tile.gather(1, sc).clamp(min=0)
         out = torch.stack(
             [
                 present.to(d),
-                s.v_type.gather(1, sc).to(d) / 10.0,
-                s.v_hp.gather(1, sc).to(d) / 100.0,
+                s.civ_unit_type.gather(1, sc).to(d) / 10.0,
+                s.civ_unit_hp.gather(1, sc).to(d) / 100.0,
                 self._ax_q[tile].to(d) / 20.0,
                 self._ax_r[tile].to(d) / 20.0,
-                torch.zeros(B, P_MAX, dtype=d, device=s.device),
-                torch.zeros(B, P_MAX, dtype=d, device=s.device),
-                s.v_charges.gather(1, sc).to(d) / 3.0,
+                torch.zeros(B, SEAT0_POOL_MAX, dtype=d, device=s.device),
+                torch.zeros(B, SEAT0_POOL_MAX, dtype=d, device=s.device),
+                s.civ_unit_charges.gather(1, sc).to(d) / 3.0,
             ],
             dim=2,
         )
@@ -412,7 +412,7 @@ class BatchEnv:
             ],
             dim=2,
         ) * alive.unsqueeze(2).to(d)  # [B, C, 10] — dead rows ZERO, the TS zero-fill twin
-        n_own_units = (s.v_alive & (s.v_civ == r)).sum(dim=1).to(d)
+        n_own_units = (s.civ_unit_alive & (s.civ_unit_civ == r)).sum(dim=1).to(d)
         emp = torch.stack(
             [
                 torch.full((B,), float(s.turn) / self.horizon, dtype=d, device=dev),
@@ -429,13 +429,13 @@ class BatchEnv:
                 s.civ_only_envoys_avail[:, r].to(d) / 5.0,
                 s.civ_only_influence[:, r].to(d) / 100.0,
                 s.n_camps.to(d) / 5.0,
-                s.u_alive.sum(dim=1).to(d) / 10.0,
+                s.barb_unit_alive.sum(dim=1).to(d) / 10.0,
                 n_own_units / 10.0,
                 # Army COMPOSITION for this seat, the twin of seat 0's — the
                 # ladder trains ranged while the army holds melee, so a bare
                 # unit COUNT cannot express the decision.
-                (s.v_alive & (s.v_civ == r)
-                 & (s._p_rng_str[s.v_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
+                (s.civ_unit_alive & (s.civ_unit_civ == r)
+                 & (s._type_ranged_strength[s.civ_unit_type.clamp(min=0, max=s.NU - 1)] > 0)).sum(dim=1).to(d) / 10.0,
             ],
             dim=1,
         )  # [B, 15]
@@ -503,7 +503,7 @@ class BatchEnv:
         s = self.sim
         d = s.dtype
         B = s.B
-        tile = s.p_tile.clamp(min=0)
+        tile = s.seat0_unit_tile.clamp(min=0)
         uq, ur = self._ax_q[tile], self._ax_r[tile]  # [B, P]
         camp = s.camp_tile  # [B, K], -1 padded
         live_camp = camp >= 0
@@ -516,14 +516,14 @@ class BatchEnv:
         has_camp = live_camp.any(dim=1, keepdim=True)  # [B, 1]
         ndq = dq.gather(2, near_k.unsqueeze(2)).squeeze(2)
         ndr = dr.gather(2, near_k.unsqueeze(2)).squeeze(2)
-        alive = s.p_alive
-        z = torch.zeros(B, P_MAX, dtype=d, device=s.device)
+        alive = s.seat0_unit_alive
+        z = torch.zeros(B, SEAT0_POOL_MAX, dtype=d, device=s.device)
         keep = alive & has_camp
         feats = torch.stack(
             [
                 alive.to(d),
-                torch.where(alive, s.p_type, torch.zeros_like(s.p_type)).to(d) / max(len(s.rules.units or []), 1),
-                torch.where(alive, s.p_hp, torch.zeros_like(s.p_hp)).to(d) / 100.0,
+                torch.where(alive, s.seat0_unit_type, torch.zeros_like(s.seat0_unit_type)).to(d) / max(len(s.rules.units or []), 1),
+                torch.where(alive, s.seat0_unit_hp, torch.zeros_like(s.seat0_unit_hp)).to(d) / 100.0,
                 torch.where(alive, (tile % s.W).to(d) / s.W, z),
                 torch.where(alive, torch.div(tile, s.W, rounding_mode="floor").to(d) / s.H, z),
                 torch.where(keep, (near_d.to(d) / 20.0).clamp(max=1.0), z),

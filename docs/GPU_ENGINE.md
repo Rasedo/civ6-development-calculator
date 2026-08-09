@@ -12,9 +12,9 @@ Every actor is a seat in one absolute id space (`cpu/core/seats.ts`,
 mirrored in `gpu/core/simbase.py`): seat 0 and the civ seats (civ index
 r = seat r+1) are the same kind of actor ("major"), city-states are
 seats 100+, barbarians seat 200, `NO_SEAT = -1`. Seat capabilities come
-from `SEAT_CAPS` keyed by class; the unit pools carry the same letters
-("p" seat 0, "v" civ seats, "u" barbarian) and those letters are also
-the attack paths' `atk_kind` tags.
+from `SEAT_CAPS` keyed by class. The unit pools and the attack paths'
+`atk_kind` tags share one vocabulary: "seat0", "civ", "barb" — the
+pool range views are `seat0_unit_*` / `civ_unit_*` / `barb_unit_*`.
 
 ## Storage geometry
 
@@ -25,7 +25,7 @@ One base tensor per fact, seat-indexed; every legacy name is a view:
 - `city_*  [B, 1+R+S, RC]` — the city block. Row 0 with the `:C` view
   is seat 0, `civ_city_*` views are the civ rows, city-states sit in
   the minor section (`citystate_*` views).
-- `unit_*` — one merged unit pool; `p_/v_/u_` are range views,
+- `unit_*` — one merged unit pool; seat0_unit_*/civ_unit_*/barb_unit_* are range views,
   `unit_seat` holds the owner.
 - Tile planes: `tile_seat` + `tile_city` (owner seat + city id — TS's
   `ownerSeat`/`ownerCity` pair), `centre_slot_at` (owning seat's city

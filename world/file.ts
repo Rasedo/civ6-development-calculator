@@ -70,7 +70,7 @@ export interface WorldFile {
     /** The placement policy version — bump it whenever a placement rule
      *  changes, so worlds.lock says WHY every hash moved. */
     placement: string;
-    params: { width: number; height: number; csMax: number; rMax: number };
+    params: { width: number; height: number; cityStateMax: number; civMax: number };
     /** Hash of the seeder+world sources that generated this file. */
     genStamp: string;
   };

@@ -117,7 +117,7 @@ fractional credit. Chapters C/D/E/G closed in full and dropped.
   close.
 - **B-21r. City-state suzerain rows:** 14 shipped / 10 descoped
   (unit-XP, cavalry, apostle-promotion, trade-route, power and
-  amenities channels — each documented at `CS_SUZERAIN_LIVE`); shipped
+  amenities channels — each documented at `CITY_STATE_SUZERAIN_LIVE`); shipped
   rows degrade %-scaling and conditionals to a flat channel yield.
 - **B-22r. World Congress tails:** one resolution type only (real GS
   rotates many); Emergencies and Scored Competitions — the main real
@@ -168,7 +168,7 @@ Landed behind the compile bar only, in dependency order of suspicion:
    `city_prod_bank`, `civ_cap_tile`) — behaviour-preserving by intent,
    proven only by digests.
 5. The protagonist relabel (#75) and the vocabulary purge (identifier
-   renames, kind tags to pool letters) — behaviour-preserving by
+   renames, spelled storage families and kind tags) — behaviour-preserving by
    intent.
 
 Hunt discipline: scripted-reachability first (the digest gate names the

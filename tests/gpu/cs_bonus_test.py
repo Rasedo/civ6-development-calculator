@@ -9,7 +9,7 @@ in-gate, so the 6-envoy tier-2 building lane and the suzerain contest edges are
 exercised HERE):
 
   1. Catalog: _citystate_b1idx / _citystate_b2idx map each CS type to its tier-1 / tier-2
-     BUILDING catalog index (csEnvoyBonuses), _citystate_suz_amt == 3, and the per-CS
+     BUILDING catalog index (cityStateEnvoyBonuses), _citystate_suz_amt == 3, and the per-CS
      suzerain channel (citystate_suz_key) round-trips from the fixture.
   2. Seat-0 envoy BUILDING bonus: a city holding the CS type's tier-1 building
      collects +districtBonus in the CS channel at >=3 envoys; the tier-2

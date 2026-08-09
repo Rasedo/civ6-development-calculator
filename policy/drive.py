@@ -144,10 +144,10 @@ def _seat_units(sim, seat: int):
         smap = sim.seat_slot_map(seat - 1)
         sc = smap.clamp(min=0)
         return (smap, smap >= 0,
-                sim.v_tile.gather(1, sc), sim.v_type.gather(1, sc), sim.v_charges.gather(1, sc))
-    B, N = sim.p_tile.shape
+                sim.civ_unit_tile.gather(1, sc), sim.civ_unit_type.gather(1, sc), sim.civ_unit_charges.gather(1, sc))
+    B, N = sim.seat0_unit_tile.shape
     smap = torch.arange(N, device=sim.device).unsqueeze(0).expand(B, N)
-    return smap, sim.p_alive, sim.p_tile, sim.p_type, sim.p_charges
+    return smap, sim.seat0_unit_alive, sim.seat0_unit_tile, sim.seat0_unit_type, sim.seat0_unit_charges
 
 
 def _builder_jobs(sim, seat: int) -> torch.Tensor:
@@ -171,7 +171,7 @@ def _builder_jobs(sim, seat: int) -> torch.Tensor:
                 break  # compacted slot-map rows are contiguous
             continue  # raw p-pool rows have HOLES (a dead slot before a live one)
         vt = types[:, n].clamp(min=0, max=sim.NU - 1)
-        civ_row = (sim._p_charges[vt] > 0) & (charges[:, n] > 0)
+        civ_row = (sim._type_charges[vt] > 0) & (charges[:, n] > 0)
         rows = pres & civ_row
         if not bool(rows.any()):
             continue
@@ -376,11 +376,11 @@ def _buy_ctx(sim, r: int) -> dict:
     _spawn_pop = sim.civ_city_pop[:, r].gather(1, _spawn_slot.unsqueeze(1)).squeeze(1)
     settler_ok = active & (_spawn_pop >= 2) & sim._afford(sim.civ_only_treasury[:, r], sett_cost)
     cand_u = sim._seat_buy_unit_candidates(r, sim._seat_trainable_units(r))
-    vt_all = sim.v_type.clamp(min=0, max=sim.NU - 1)
-    mil_live = sim.v_alive & (sim.v_civ == r) & (sim._p_combat[vt_all] > 0)
+    vt_all = sim.civ_unit_type.clamp(min=0, max=sim.NU - 1)
+    mil_live = sim.civ_unit_alive & (sim.civ_unit_civ == r) & (sim._type_combat[vt_all] > 0)
     qcur = sim.civ_city_current[:, r]
     q_ty = (qcur - 1).clamp(min=0, max=sim.NU - 1)
-    q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._p_combat[q_ty] > 0)
+    q_mil = (qcur >= 1) & (qcur <= sim.NU) & (sim._type_combat[q_ty] > 0)
     n_mil = mil_live.sum(dim=1) + q_mil.sum(dim=1)
     unit_ok = active & (n_mil < 2 * n_cities) & cand_u.any(dim=1)
     # kind 3, the TILE candidate — first slot in order with a border
@@ -596,7 +596,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
     B2, N2 = orders0.shape
     ranks = [orders0]
     smap = sim.seat_slot_map(r)
-    cur = sim.v_tile.gather(1, smap.clamp(min=0))
+    cur = sim.civ_unit_tile.gather(1, smap.clamp(min=0))
     # per-row destination: the war target when at war, else the nearest own
     # centre (the same two rules the ladder's own branches follow)
     at_war_rows = uo[:, :, ladder.U_ATWAR] > 0
@@ -620,7 +620,7 @@ def _decide_turn(env, sim, r: int, roster: dict, classes: dict, max_steps: int =
             for n in range(N2):
                 if not bool((smap[:, n] >= 0).any()):
                     break
-                tgt_n, hi, hpc, hrc = sim._war_march_target(sim.v_tile.gather(1, smap.clamp(min=0))[:, n].clamp(min=0), ac, hp_r)
+                tgt_n, hi, hpc, hrc = sim._war_march_target(sim.civ_unit_tile.gather(1, smap.clamp(min=0))[:, n].clamp(min=0), ac, hp_r)
                 has = (hi | hpc | hrc)
                 tgts[:, n] = torch.where(has, tgt_n, tgts[:, n])
             sim._vplan_wt = {"r": r, "tgts": tgts}

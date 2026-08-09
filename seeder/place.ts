@@ -12,7 +12,7 @@
  *     START_RESOURCE_RADIUS, and every civ's count stays within
  *     START_RESOURCE_SPREAD of the first civ's — "somewhat balanced".
  *   - civ starts sit >= MAJOR_START_DIST apart; city-states sit
- *     >= CS_START_DIST from every start and each other.
+ *     >= CITY_STATE_START_DIST from every start and each other.
  *   - one labelled stream per decision (`place/civ/{i}`, `place/cs/{s}`),
  *     never the in-state RNG; candidates in ascending tile order (the
  *     determinism anchor); draw floor(r*n). A cramped map relaxes the
@@ -32,7 +32,7 @@ export const PLACEMENT_VERSION = 'spaced-balanced@1';
 
 /** Owner rule (2026-08-09): each major civ at least ten tiles from the rest. */
 export const MAJOR_START_DIST = 10;
-export const CS_START_DIST = 6;
+export const CITY_STATE_START_DIST = 6;
 export const START_RESOURCE_RADIUS = 3;
 export const START_RESOURCE_MIN = 2;
 export const START_RESOURCE_SPREAD = 3;
@@ -48,8 +48,8 @@ const RELAX: [number, number][] = [
 
 /** City-state types and name pools, keyed by type. Strings only — validated
  *  by the loader against the engine's own catalog. */
-const CS_TYPES = ['scientific', 'cultural', 'trade', 'industrial', 'militaristic', 'religious'] as const;
-const CS_NAMES: Record<(typeof CS_TYPES)[number], string[]> = {
+const CITY_STATE_TYPES = ['scientific', 'cultural', 'trade', 'industrial', 'militaristic', 'religious'] as const;
+const CITY_STATE_NAMES: Record<(typeof CITY_STATE_TYPES)[number], string[]> = {
   scientific: ['Geneva', 'Stockholm', 'Bologna'],
   cultural: ['Nan Madol', 'Kumasi', 'Vilnius'],
   trade: ['Amsterdam', 'Antioch', 'Hunza'],
@@ -130,14 +130,14 @@ export function placeCityStates(map: GameMap, seed: number, nCs: number, civStar
   const used = new Set<string>();
   for (let s = 0; s < nCs; s++) {
     const rng: Rng = mulberry32(deriveSeed(seed, `place/cs/${s}`));
-    for (const dist of [CS_START_DIST, 4]) {
+    for (const dist of [CITY_STATE_START_DIST, 4]) {
       const cands = legal.filter(
         (t) => civStarts.every((c) => far(c, t, dist)) && placed.every((p) => far(p, t, dist)),
       );
       if (cands.length === 0) continue;
       const tile = cands[randInt(rng, cands.length)];
-      const type = CS_TYPES[randInt(rng, CS_TYPES.length)];
-      const name = CS_NAMES[type].find((n) => !used.has(n)) ?? `${CS_NAMES[type][0]} ${s}`;
+      const type = CITY_STATE_TYPES[randInt(rng, CITY_STATE_TYPES.length)];
+      const name = CITY_STATE_NAMES[type].find((n) => !used.has(n)) ?? `${CITY_STATE_NAMES[type][0]} ${s}`;
       used.add(name);
       placed.push(tile);
       out.push({ name, type, center: tile.index });

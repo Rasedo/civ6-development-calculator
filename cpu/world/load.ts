@@ -84,11 +84,11 @@ export function loadWorld(world: WorldFile): GameState {
   state.rngState = world.rngInit >>> 0;
 
   // City-states first (file order = id order), through the one constructor.
-  world.cityStates.forEach((cs, i) => {
-    if (!CITY_STATE_TYPES.includes(cs.type as CityStateType)) {
-      throw new Error(`world file names city-state type '${cs.type}' the engine does not know`);
+  world.cityStates.forEach((cityState, i) => {
+    if (!CITY_STATE_TYPES.includes(cityState.type as CityStateType)) {
+      throw new Error(`world file names city-state type '${cityState.type}' the engine does not know`);
     }
-    placeCityStateAt(state, i, cs.name, cs.type as CityStateType, cs.center);
+    placeCityStateAt(state, i, cityState.name, cityState.type as CityStateType, cityState.center);
   });
 
   // The civs, in seat order — civ 0 included, one constructor for all. NO

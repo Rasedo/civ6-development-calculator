@@ -88,13 +88,13 @@ describe('B-20 (#79): great works and relics ride a city transfer', () => {
     const state = makeState();
     const from = addCiv(state, 4, 4, 'Rome');
     const to = addCiv(state, 9, 9, 'Greece');
-    const rc = from.cities[0];
-    rc.relics = 1;
-    rc.greatWorksWriting = 2;
-    rc.greatWorksArt = 3;
-    rc.greatWorksMusic = 1;
+    const civCity = from.cities[0];
+    civCity.relics = 1;
+    civCity.greatWorksWriting = 2;
+    civCity.greatWorksArt = 3;
+    civCity.greatWorksMusic = 1;
 
-    transferCity(state, from.seat, to, rc, 'conquered');
+    transferCity(state, from.seat, to, civCity, 'conquered');
 
     expect(from.cities).toHaveLength(0);
     expect(to.cities).toHaveLength(2);
@@ -112,9 +112,9 @@ describe('B-20 (#79): great works and relics ride a city transfer', () => {
     const state = makeState();
     const from = addCiv(state, 4, 4, 'Rome');
     const to = addCiv(state, 9, 9, 'Greece');
-    const rc = from.cities[0];
+    const civCity = from.cities[0];
 
-    transferCity(state, from.seat, to, rc, 'conquered');
+    transferCity(state, from.seat, to, civCity, 'conquered');
 
     const flipped = to.cities[to.cities.length - 1];
     expect(flipped.relics ?? 0).toBe(0);

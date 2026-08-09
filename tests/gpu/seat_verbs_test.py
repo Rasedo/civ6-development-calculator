@@ -35,19 +35,19 @@ def a_civ_builder(sim, r):
     """(slot, tile) of a civ-r BUILDER — retyping a live unit rather than
     waiting for the fixture to field one, so the lane does not depend on which
     turn a civ happens to train a builder."""
-    for v in range(sim.v_alive.shape[1]):
-        if bool(sim.v_alive[0, v]) and int(sim.v_civ[0, v]) == r:
-            sim.v_type[0, v] = sim._builder_idx
-            sim.v_charges[0, v] = 3
-            sim.v_mp[0, v] = 2
-            return v, int(sim.v_tile[0, v])
+    for v in range(sim.civ_unit_alive.shape[1]):
+        if bool(sim.civ_unit_alive[0, v]) and int(sim.civ_unit_civ[0, v]) == r:
+            sim.civ_unit_type[0, v] = sim._builder_idx
+            sim.civ_unit_charges[0, v] = 3
+            sim.civ_unit_mp[0, v] = 2
+            return v, int(sim.civ_unit_tile[0, v])
     return None, None
 
 
 def a_civ_soldier(sim, r):
-    for v in range(sim.v_alive.shape[1]):
-        if bool(sim.v_alive[0, v]) and int(sim.v_civ[0, v]) == r and float(sim._p_combat[int(sim.v_type[0, v])]) > 0:
-            return v, int(sim.v_tile[0, v])
+    for v in range(sim.civ_unit_alive.shape[1]):
+        if bool(sim.civ_unit_alive[0, v]) and int(sim.civ_unit_civ[0, v]) == r and float(sim._type_combat[int(sim.civ_unit_type[0, v])]) > 0:
+            return v, int(sim.civ_unit_tile[0, v])
     return None, None
 
 
@@ -84,13 +84,13 @@ def main() -> None:
     ut = int(sim._imp_unlock[k])
     if ut >= 0:
         sim.civ_only_techs[0, r, ut] = True
-    ch0 = int(sim.v_charges[0, slot])
+    ch0 = int(sim.civ_unit_charges[0, slot])
     order(sim, r, slot, res_lo + (k - 3))
     assert int(sim.improvement[0, tile]) == k, (
         f"#89 DISPATCH DEAD: resource improvement column {res_lo + (k - 3)} did nothing "
         f"(improvement is {int(sim.improvement[0, tile])}, wanted {k})"
     )
-    assert int(sim.v_charges[0, slot]) == ch0 - 1, "a build must spend a charge"
+    assert int(sim.civ_unit_charges[0, slot]) == ch0 - 1, "a build must spend a charge"
     print(f"  1 resource improvement {k} built by a civ builder OK (charge spent)")
 
     # -- 2: REPAIR clears a pillaged tile ----------------------------------
@@ -141,11 +141,11 @@ def main() -> None:
         s2 = fresh(rules, path)
         s2.controlled[0, r] = True
         sl = next(
-            v for v in range(s2.v_alive.shape[1])
-            if bool(s2.v_alive[0, v]) and int(s2.v_civ[0, v]) == r
-            and float(s2._p_combat[int(s2.v_type[0, v])]) > 0
+            v for v in range(s2.civ_unit_alive.shape[1])
+            if bool(s2.civ_unit_alive[0, v]) and int(s2.civ_unit_civ[0, v]) == r
+            and float(s2._type_combat[int(s2.civ_unit_type[0, v])]) > 0
         )
-        s2.v_mp[0, sl] = 4.0
+        s2.civ_unit_mp[0, sl] = 4.0
         sm = s2.seat_slot_map(r)[0]
         rw = int((sm == sl).nonzero(as_tuple=True)[0][0])
         return s2, sl, rw, sm.shape[0]
@@ -162,15 +162,15 @@ def main() -> None:
     d0 = next((d for d in range(6) if bool(m5[d])), None)
     assert d0 is not None, "no legal first step for this unit"
     s5.apply_seat_unit_sequence(r, seq_of([d0], nrows, rw5))
-    one_tile = int(s5.v_tile[0, sl5])
+    one_tile = int(s5.civ_unit_tile[0, sl5])
     m5b = s5.seat_unit_mask(r)[0, rw5]
     d1 = next((d for d in range(6) if bool(m5b[d])), None)
     assert d1 is not None, "no legal second step — pick another fixture/turn"
 
     s6, sl6b, rw6b, nrows2 = setup()
-    start_t = int(s6.v_tile[0, sl6b])
+    start_t = int(s6.civ_unit_tile[0, sl6b])
     s6.apply_seat_unit_sequence(r, seq_of([d0, d1], nrows2, rw6b))
-    two_tile = int(s6.v_tile[0, sl6b])
+    two_tile = int(s6.civ_unit_tile[0, sl6b])
     assert two_tile != one_tile, (
         f"#90 DEAD: the 2-step sequence ended where the 1-step did ({two_tile}) "
         "— the second rank never executed"
@@ -192,13 +192,13 @@ def main() -> None:
             continue
         probe.apply_seat_unit_sequence(r, seq_of([d], nrp, rwp))
         if not bool(probe.seat_unit_mask(r)[0, rwp][d]):
-            dead = (d, int(probe.v_tile[0, slp]))
+            dead = (d, int(probe.civ_unit_tile[0, slp]))
             break
     assert dead is not None, "no direction becomes illegal after one step — pick another fixture"
     d_dead, stop_tile = dead
     s7.apply_seat_unit_sequence(r, seq_of([d_dead, d_dead], nrows3, rw7))
-    assert int(s7.v_tile[0, sl7]) == stop_tile, (
-        f"#90: the walk did not stop at the illegal rank — ended {int(s7.v_tile[0, sl7])}, "
+    assert int(s7.civ_unit_tile[0, sl7]) == stop_tile, (
+        f"#90: the walk did not stop at the illegal rank — ended {int(s7.civ_unit_tile[0, sl7])}, "
         f"expected {stop_tile}"
     )
     print(f"  5b the walk STOPS at an illegal later step (dir {d_dead}, halted at {stop_tile}) OK")
@@ -222,7 +222,7 @@ def main() -> None:
     sq6[0, rw6, 1] = 0
     sim6.apply_seat_unit_sequence(r, sq6)
     assert bool(sim6.pillaged[0, t6]), "the rank-0 PILLAGE did not fire"
-    assert int(sim6.v_tile[0, sl6]) == t6, "a turn-ending verb must not be followed by a move"
+    assert int(sim6.civ_unit_tile[0, sl6]) == t6, "a turn-ending verb must not be followed by a move"
     print("  6 a turn-ending verb at rank 0 blocks later steps OK")
 
     # -- 7: SNIPE — a ranged unit strikes a ring-2 barbarian ----------------
@@ -233,31 +233,31 @@ def main() -> None:
     sl7b, t7 = a_civ_soldier(sim7, r)
     assert sl7b is not None
     # retype to ARCHER via the roster index in the sim's own tables
-    ai = next(i for i in range(sim7.NU) if float(sim7._p_rng_str[i]) > 0 and int(sim7._p_rng_rng[i]) >= 2)
-    sim7.v_type[0, sl7b] = ai
-    sim7.v_mp[0, sl7b] = 2.0
+    ai = next(i for i in range(sim7.NU) if float(sim7._type_ranged_strength[i]) > 0 and int(sim7._type_ranged_range[i]) >= 2)
+    sim7.civ_unit_type[0, sl7b] = ai
+    sim7.civ_unit_mp[0, sl7b] = 2.0
     ring = sim7.ring2[t7]
     rk = next(k for k in range(12) if int(ring[k]) >= 0 and bool(sim7.passable[0, int(ring[k])]))
     rt = int(ring[rk])
     # plant a barbarian on that ring tile (u-pool)
-    bslot = next(i for i in range(sim7.u_alive.shape[1]) if not bool(sim7.u_alive[0, i]))
-    sim7.u_alive[0, bslot] = True
-    sim7.u_tile[0, bslot] = rt
-    sim7.u_hp[0, bslot] = 100.0
-    sim7.u_type[0, bslot] = sim7._warrior_idx
-    sim7.occ_mil[0, rt] = bslot + sim7.POOL_LO["u"]
+    bslot = next(i for i in range(sim7.barb_unit_alive.shape[1]) if not bool(sim7.barb_unit_alive[0, i]))
+    sim7.barb_unit_alive[0, bslot] = True
+    sim7.barb_unit_tile[0, bslot] = rt
+    sim7.barb_unit_hp[0, bslot] = 100.0
+    sim7.barb_unit_type[0, bslot] = sim7._warrior_idx
+    sim7.military_at[0, rt] = bslot + sim7.POOL_LO["barb"]
     m7b = sim7.seat_unit_mask(r)
     sm7 = sim7.seat_slot_map(r)[0]
     rw7b = int((sm7 == sl7b).nonzero(as_tuple=True)[0][0])
     A_SN = sim7._A_SNIPE
     assert bool(m7b[0, rw7b, A_SN + rk]), "#92: the snipe column for a ring-2 barb must be LEGAL"
-    hp0 = float(sim7.u_hp[0, bslot])
+    hp0 = float(sim7.barb_unit_hp[0, bslot])
     acts7 = torch.full((1, sm7.shape[0]), -1, dtype=torch.long)
     acts7[0, rw7b] = A_SN + rk
     sim7._apply_seat_unit_actions(r, acts7)
-    hp1 = float(sim7.u_hp[0, bslot]) if bool(sim7.u_alive[0, bslot]) else 0.0
+    hp1 = float(sim7.barb_unit_hp[0, bslot]) if bool(sim7.barb_unit_alive[0, bslot]) else 0.0
     assert hp1 < hp0, f"#92 DISPATCH DEAD: snipe left the barb at {hp1} hp (was {hp0})"
-    assert float(sim7.v_mp[0, sl7b]) == 0.0, "a snipe must spend the turn"
+    assert float(sim7.civ_unit_mp[0, sl7b]) == 0.0, "a snipe must spend the turn"
     print(f"  7 SNIPE strikes a ring-2 barbarian OK ({hp0:.0f} -> {hp1:.0f} hp)")
 
     # -- 8: a replayed NAVAL water move SAILS -------------------------------
@@ -269,41 +269,41 @@ def main() -> None:
     sl8, t8 = a_civ_soldier(sim8, r)
     assert sl8 is not None
     ni = next(i for i in range(sim8.NU) if bool(sim8.unit_naval[i]))
-    sim8.v_type[0, sl8] = ni
-    sim8.v_mp[0, sl8] = 3.0
+    sim8.civ_unit_type[0, sl8] = ni
+    sim8.civ_unit_mp[0, sl8] = 3.0
     # park it on coastal water with a free water neighbour (occ bookkeeping
     # by hand, the city_first_test idiom)
     w8 = None
     for cand in (sim8.wpass[0] & ~sim8.ocean_tile[0]).nonzero(as_tuple=True)[0].tolist():
-        if int(sim8.occ_mil[0, cand]) >= 0:
+        if int(sim8.military_at[0, cand]) >= 0:
             continue
         for d8 in range(6):
             nb8 = int(sim8.neigh[cand, d8])
-            if nb8 >= 0 and bool(sim8.wpass[0, nb8]) and not bool(sim8.ocean_tile[0, nb8]) and int(sim8.occ_mil[0, nb8]) < 0:
+            if nb8 >= 0 and bool(sim8.wpass[0, nb8]) and not bool(sim8.ocean_tile[0, nb8]) and int(sim8.military_at[0, nb8]) < 0:
                 w8 = (int(cand), d8, nb8)
                 break
         if w8:
             break
     assert w8 is not None, "fixture has no free coastal pair"
     wt8, dir8, nb8 = w8
-    sim8.occ_mil[0, t8] = -1
-    sim8.v_tile[0, sl8] = wt8
-    sim8.occ_mil[0, wt8] = sl8 + sim8.POOL_LO["v"]
+    sim8.military_at[0, t8] = -1
+    sim8.civ_unit_tile[0, sl8] = wt8
+    sim8.military_at[0, wt8] = sl8 + sim8.POOL_LO["civ"]
     sm8 = sim8.seat_slot_map(r)[0]
     rw8 = int((sm8 == sl8).nonzero(as_tuple=True)[0][0])
     acts8 = torch.full((1, sm8.shape[0]), -1, dtype=torch.long)
     acts8[0, rw8] = dir8
     sim8._apply_seat_unit_actions(r, acts8)
-    assert int(sim8.v_tile[0, sl8]) == nb8, (
-        f"#70 t43 sibling: a replayed naval water step must SAIL (stuck at {int(sim8.v_tile[0, sl8])}, wanted {nb8})"
+    assert int(sim8.civ_unit_tile[0, sl8]) == nb8, (
+        f"#70 t43 sibling: a replayed naval water step must SAIL (stuck at {int(sim8.civ_unit_tile[0, sl8])}, wanted {nb8})"
     )
     # and the same hull never walks onto land
-    sim8.v_mp[0, sl8] = 3.0
+    sim8.civ_unit_mp[0, sl8] = 3.0
     landd = next((d for d in range(6) if int(sim8.neigh[nb8, d]) >= 0 and bool(sim8.passable[0, int(sim8.neigh[nb8, d])]) and not bool(sim8.wpass[0, int(sim8.neigh[nb8, d])])), None)
     if landd is not None:
         acts8[0, rw8] = landd
         sim8._apply_seat_unit_actions(r, acts8)
-        assert int(sim8.v_tile[0, sl8]) == nb8, "a naval hull must refuse a land step at the apply"
+        assert int(sim8.civ_unit_tile[0, sl8]) == nb8, "a naval hull must refuse a land step at the apply"
     print(f"  8 replayed naval move sails OK ({wt8} -> {nb8}), land step refused")
 
     print("CIV VERBS OK")

@@ -24,7 +24,7 @@ function newGame(opponents = 1) {
 /** Pre-load pressure so this endTurn's spread flips every listed city to g. */
 function pressAll(state: ReturnType<typeof newGame>, g: number, amount = 500) {
   const nRel = 1 + state.seats.length - 1;
-  const all = [...seatOf(state, 0)!.cities, ...state.seats.slice(1).flatMap((rv) => rv.cities)];
+  const all = [...seatOf(state, 0)!.cities, ...state.seats.slice(1).flatMap((civSeat) => civSeat.cities)];
   for (const c of all) {
     const pres = new Array(nRel).fill(0);
     pres[g] = amount;
@@ -35,9 +35,9 @@ function pressAll(state: ReturnType<typeof newGame>, g: number, amount = 500) {
 describe('B6-S3 religious victory', () => {
   it('a civ religion predominant in every civ is a DEFEAT (victoryType 6)', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
-    rv.religion.founded = true;
-    rv.religion.holyTile = rv.cities[0].centerIndex;
+    const civSeat = (state.seats[(0) + 1] as Seat);
+    civSeat.religion.founded = true;
+    civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
     endTurn(state, 0);
     expect(state.victoryType).toBe(6);
@@ -56,9 +56,9 @@ describe('B6-S3 religious victory', () => {
 
   it('no victory while any alive civ lacks a >half majority', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
-    rv.religion.founded = true;
-    rv.religion.holyTile = rv.cities[0].centerIndex;
+    const civSeat = (state.seats[(0) + 1] as Seat);
+    civSeat.religion.founded = true;
+    civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
     // Seat 0's single city resists: a dominant religion-0 accumulator
     // outweighs any ambient +1 religion-1 pressure this turn's spread adds.
@@ -71,12 +71,12 @@ describe('B6-S3 religious victory', () => {
 
   it('a civ with zero cities is excluded from the every-civ requirement', () => {
     const state = newGame(2);
-    const rv = (state.seats[(0) + 1] as Seat);
+    const civSeat = (state.seats[(0) + 1] as Seat);
     // Civ 1 is eliminated: no cities, no units.
     (state.seats[(1) + 1] as Seat).cities = [];
     state.units = state.units.filter((u) => !(u.seat === (state.seats[(1) + 1] as Seat).seat));
-    rv.religion.founded = true;
-    rv.religion.holyTile = rv.cities[0].centerIndex;
+    civSeat.religion.founded = true;
+    civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
     pressAll(state, 1);
     endTurn(state, 0);
     expect(state.victoryType).toBe(6);

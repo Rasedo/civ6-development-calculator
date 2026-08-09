@@ -27,7 +27,7 @@ import { TERRAINS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
-import { CITY_STATE_TYPES, CS_SUZERAIN_LIVE } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_LIVE } from '../data/cityStates';
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { LUXURY_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
@@ -37,14 +37,14 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const map = state.map;
   const ctx = makeYieldCtx(state);
 
-  const csAtStart = state.cityStates.map((cs) => ({
-    id: cs.id,
-    type: CITY_STATE_TYPES.indexOf(cs.type),
-    center: cs.centerIndex,
+  const cityStateAtStart = state.cityStates.map((cityState) => ({
+    id: cityState.id,
+    type: CITY_STATE_TYPES.indexOf(cityState.type),
+    center: cityState.centerIndex,
     pop: 3,
     // The suzerain unique-perk yield column for THIS named CS (-1 =
-    // descoped row), name-keyed off CS_SUZERAIN_LIVE.
-    suzKey: CS_SUZERAIN_LIVE[cs.name] ? YIELD_KEYS.indexOf(CS_SUZERAIN_LIVE[cs.name]) : -1,
+    // descoped row), name-keyed off CITY_STATE_SUZERAIN_LIVE.
+    suzKey: CITY_STATE_SUZERAIN_LIVE[cityState.name] ? YIELD_KEYS.indexOf(CITY_STATE_SUZERAIN_LIVE[cityState.name]) : -1,
   }));
 
   const unitRosterIdx = new Map(Object.values(UNITS).map((u, i) => [u.id, i]));
@@ -128,8 +128,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       camp: !isWater(t) && !isImpassable(t) && !t.wonder && !t.district && !t.builtWonder && !t.goodyHut ? 1 : 0,
       // city-state territory (static — placed at game creation)
       // #51/S1.3i: derived from the ONE seat field; the fixture keys are unchanged
-      cs: isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1,
-      // (#96 tail: the `rv`/`rci` civ-territory keys are DELETED — format-2
+      cityState: isCityStateSeat(tileSeat(t)) ? cityStateOfSeat(tileSeat(t)) : -1,
+      // (#96 tail: the `civSeat`/`rci` civ-territory keys are DELETED — format-2
       // worlds have no civ cities at t0, so both were provably all -1; the
       // engine starts its tile_seat civ half and tile_city registry empty.)
       // C1-B4b-2: Water Mill gates on a river at CIV-SEAT centers too
@@ -363,7 +363,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   const landTiles = map.tiles.filter((t) => !isWater(t)).length;
   const maxCamps = Math.max(1, Math.floor(landTiles / 120));
 
-  // No seat owns territory at t0 (city-state rings are the `cs` plane).
+  // No seat owns territory at t0 (city-state rings are the `cityState` plane).
   const ownerInit = map.tiles.map((t) => (tileSeat(t) === 0 ? tileCity(t) : -1));
 
   return {
@@ -376,16 +376,16 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     volcanoes,
     maxCamps,
     rngInit: world.rngInit >>> 0,
-    csMax: world.gen.params.csMax,
-    rMax: world.gen.params.rMax,
-    cityStates: csAtStart,
+    cityStateMax: world.gen.params.cityStateMax,
+    civMax: world.gen.params.civMax,
+    cityStates: cityStateAtStart,
     // ONE civ array, seat order, civ 0 not special: aggression + the t0
     // units (settler first, warrior second — file order is the contract).
     civs: state.seats.map((s) => ({
       seat: s.seat,
       aggression: s.aggression,
       treasury: 0,
-      cities: s.cities.map((rc) => ({ id: rc.id, center: rc.centerIndex, pop: rc.population })),
+      cities: s.cities.map((civCity) => ({ id: civCity.id, center: civCity.centerIndex, pop: civCity.population })),
       units: state.units
         .filter((u) => u.seat === s.seat)
         .map((u) => ({ type: unitRosterIdx.get(u.type) ?? 0, tile: u.tileIndex })),

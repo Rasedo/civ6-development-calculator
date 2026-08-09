@@ -31,11 +31,11 @@ import { GREAT_PEOPLE } from '../data/greatPeople';
  */
 import { NO_SEAT } from './types';
 export { NO_SEAT };
-const CS_SEAT_BASE = 100;
+const CITY_STATE_SEAT_BASE = 100;
 export const BARB_SEAT = 200;
 
-export const seatOfCityState = (csId: number): number => CS_SEAT_BASE + csId;
-export const cityStateOfSeat = (seat: number): number => seat - CS_SEAT_BASE;
+export const seatOfCityState = (cityStateId: number): number => CITY_STATE_SEAT_BASE + cityStateId;
+export const cityStateOfSeat = (seat: number): number => seat - CITY_STATE_SEAT_BASE;
 
 /**
  * Converts a 0-based civ index to a seat id, and back.
@@ -183,10 +183,10 @@ export const isBarbSeat = (seat: number): boolean => seat === BARB_SEAT;
 
 /** A MAJOR CIV — the seats that settle, research, trade and fight wars.
  *  City-states and barbarians sit above this range. */
-export const isCiv = (seat: number): boolean => seat >= 0 && seat < CS_SEAT_BASE;
+export const isCiv = (seat: number): boolean => seat >= 0 && seat < CITY_STATE_SEAT_BASE;
 
 /** Is this a city-state? They hold territory and act, but are never civs. */
-export const isCityStateSeat = (seat: number): boolean => seat >= CS_SEAT_BASE && seat < BARB_SEAT;
+export const isCityStateSeat = (seat: number): boolean => seat >= CITY_STATE_SEAT_BASE && seat < BARB_SEAT;
 
 /**
  * Which KIND of actor this seat is. The absolute seat space already encodes it,

@@ -28,7 +28,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, FIXTURES
-from core.engine import P_MAX, js_round, FLANKING_CS, SUPPORT_CS
+from core.engine import SEAT0_POOL_MAX, js_round, FLANKING_CS, SUPPORT_CS
 
 HOLD = 12
 
@@ -58,11 +58,11 @@ def find_melee(rules, paths):
         for _ in range(120):
             m = sim.unit_action_mask()[0]  # [P, 16]
             for p in m[:, 6:12].any(dim=1).nonzero(as_tuple=True)[0].tolist():
-                if float(sim._p_rng_str[sim.p_type[0, p]]) > 0:
+                if float(sim._type_ranged_strength[sim.seat0_unit_type[0, p]]) > 0:
                     continue  # want a melee unit
                 for d in m[p, 6:12].nonzero(as_tuple=True)[0].tolist():
-                    tgt = int(sim.neigh[int(sim.p_tile[0, p]), d])
-                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or int(sim.vmil_at[0, tgt]) >= 0):
+                    tgt = int(sim.neigh[int(sim.seat0_unit_tile[0, p]), d])
+                    if tgt >= 0 and (int(sim.barb_at[0, tgt]) >= 0 or int(sim.civ_military_at[0, tgt]) >= 0):
                         return sim, p, 6 + d, path.name
             sim.step()
     raise AssertionError("no adjacent-hostile melee situation found in scripted play")
@@ -130,7 +130,7 @@ def _diff_of(events, k):
 
 
 def test_integrated(sim, p, code, name) -> None:
-    here = int(sim.p_tile[0, p])
+    here = int(sim.seat0_unit_tile[0, p])
     d = code - 6
     tgt = int(sim.neigh[here, d])
     # known wounds: attacker 64 HP, defender 88 HP
@@ -138,19 +138,19 @@ def test_integrated(sim, p, code, name) -> None:
     is_barb = int(sim.barb_at[0, tgt]) >= 0
     if is_barb:
         dslot = int(sim.barb_at[0, tgt])
-        def_combat = int(sim._p_combat[sim.u_type[0, dslot]])
+        def_combat = int(sim._type_combat[sim.barb_unit_type[0, dslot]])
         def set_def_hp(v):
-            sim.u_hp[0, dslot] = v
-        def_fort = int(sim.u_fortify[0, dslot])
+            sim.barb_unit_hp[0, dslot] = v
+        def_fort = int(sim.barb_unit_fortify[0, dslot])
     else:
-        dslot = int(sim.vmil_at[0, tgt])
-        def_combat = int(sim._p_combat[sim.v_type[0, dslot]])
+        dslot = int(sim.civ_military_at[0, tgt])
+        def_combat = int(sim._type_combat[sim.civ_unit_type[0, dslot]])
         def set_def_hp(v):
-            sim.v_hp[0, dslot] = v
-        def_fort = int(sim.v_fortify[0, dslot])
-    atk_combat = int(sim._p_combat[sim.p_type[0, p]])
+            sim.civ_unit_hp[0, dslot] = v
+        def_fort = int(sim.civ_unit_fortify[0, dslot])
+    atk_combat = int(sim._type_combat[sim.seat0_unit_type[0, p]])
     tdef = int(sim.tdef[0, tgt])
-    ua = torch.full((1, P_MAX), HOLD, dtype=torch.long)
+    ua = torch.full((1, SEAT0_POOL_MAX), HOLD, dtype=torch.long)
     ua[0, p] = code
 
     # XP: force known experience so the level term is exercised. Attacker
@@ -166,11 +166,11 @@ def test_integrated(sim, p, code, name) -> None:
 
     def run(river_bit):
         snap = sim.snapshot()
-        sim.p_hp[0, p] = ATK_HP
+        sim.seat0_unit_hp[0, p] = ATK_HP
         set_def_hp(DEF_HP)
-        sim.p_xp[0, p] = ATK_XP  # attacker veterancy
+        sim.seat0_unit_xp[0, p] = ATK_XP  # attacker veterancy
         if not is_barb:
-            sim.v_xp[0, dslot] = DEF_XP  # civ defender veterancy
+            sim.civ_unit_xp[0, dslot] = DEF_XP  # civ defender veterancy
         # force the river edge on/off explicitly (river_mask is static; set it
         # each run so restore can't leak the previous state)
         rm = int(sim.river_mask[0, here])
@@ -190,7 +190,7 @@ def test_integrated(sim, p, code, name) -> None:
     # count once.
     def flank_support_ref():
         civ_def = not is_barb
-        dciv = int(sim.v_civ[0, dslot]) if civ_def else -1
+        dciv = int(sim.civ_unit_civ[0, dslot]) if civ_def else -1
         flank = support = 0
         for dd in range(6):
             nt = int(sim.neigh[tgt, dd])
@@ -198,9 +198,9 @@ def test_integrated(sim, p, code, name) -> None:
                 continue
             has_b = int(sim.barb_at[0, nt]) >= 0
             has_pm = int(sim.pmil_at[0, nt]) >= 0
-            vms = int(sim.vmil_at[0, nt])
+            vms = int(sim.civ_military_at[0, nt])
             has_vm = vms >= 0
-            vc = int(sim.v_civ[0, vms]) if has_vm else -1
+            vc = int(sim.civ_unit_civ[0, vms]) if has_vm else -1
             if civ_def:
                 atwar = bool(sim.civ_only_atwar[0, dciv])
                 hostile = has_b or (has_pm and atwar)
@@ -244,12 +244,12 @@ def test_integrated(sim, p, code, name) -> None:
 
     # RANGED across the same river edge: NO penalty (ranged is river-immune).
     slinger = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "SLINGER")
-    assert float(sim._p_rng_str[slinger]) > 0, "SLINGER rangedStrength not exported"
+    assert float(sim._type_ranged_strength[slinger]) > 0, "SLINGER rangedStrength not exported"
 
     def run_ranged(river_bit):
         snap = sim.snapshot()
-        sim.p_type[0, p] = slinger
-        sim.p_hp[0, p] = ATK_HP
+        sim.seat0_unit_type[0, p] = slinger
+        sim.seat0_unit_hp[0, p] = ATK_HP
         set_def_hp(DEF_HP)
         rm = int(sim.river_mask[0, here])
         sim.river_mask[0, here] = (rm | (1 << d)) if river_bit else (rm & ~(1 << d))

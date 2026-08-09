@@ -502,8 +502,8 @@ export interface CityState extends Seat {
   questIssuedTurn: number;
   /** Turns elapsed since seat 0 declared on this city-state; gates when
    *  peace may be offered. */
-  csWarTurns?: number;
-  /** Siege hit points; absent = full (CS_MAX_HP). */
+  cityStateWarTurns?: number;
+  /** Siege hit points; absent = full (CITY_STATE_MAX_HP). */
   hp?: number;
   /** Turn of seat 0's last militaristic levy here (cooldown). */
   lastLevyTurn?: number;

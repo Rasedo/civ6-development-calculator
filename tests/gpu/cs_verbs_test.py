@@ -38,8 +38,8 @@ def build(rules, path):
     return BatchSim([load_fixture(path)], rules, device="cpu", dtype=torch.float64)
 
 
-def v_next(sim) -> int:
-    return int(sim.v_next[0])
+def civ_unit_next(sim) -> int:
+    return int(sim.civ_unit_next[0])
 
 
 def active_mask(sim) -> torch.Tensor:
@@ -71,7 +71,7 @@ def empty_land_tiles(sim, k: int) -> list[int]:
     from any spawn probe so it perturbs nothing but the quota count)."""
     free = (
         sim.passable[0]
-        & (sim.vmil_at[0] < 0) & (sim.vciv_at[0] < 0) & (sim.barb_at[0] < 0)
+        & (sim.civ_military_at[0] < 0) & (sim.civ_civilian_at[0] < 0) & (sim.barb_at[0] < 0)
         & (sim.pmil_at[0] < 0) & (sim.pciv_at[0] < 0) & (sim.civ_city_at[0] < 0)
         & (sim.citystate_at[0] < 0) & (sim.owner[0] < 0) & (sim.civ_at[0] < 0)
     ).nonzero(as_tuple=True)[0].tolist()
@@ -80,8 +80,8 @@ def empty_land_tiles(sim, k: int) -> list[int]:
 
 
 def mil_count(sim, r: int) -> int:
-    t = sim.v_type[0].clamp(min=0, max=sim.NU - 1)
-    return int((sim.v_alive[0] & (sim.v_civ[0] == r) & (sim._p_combat[t] > 0)).sum())
+    t = sim.civ_unit_type[0].clamp(min=0, max=sim.NU - 1)
+    return int((sim.civ_unit_alive[0] & (sim.civ_unit_civ[0] == r) & (sim._type_combat[t] > 0)).sum())
 
 
 def meet_quota(sim, r: int) -> None:
@@ -93,16 +93,16 @@ def meet_quota(sim, r: int) -> None:
     if need == 0:
         return
     for t in empty_land_tiles(sim, need):
-        slot = int(sim.v_next[0])
-        sim.v_alive[0, slot] = True
-        sim.v_civ[0, slot] = r
-        sim.v_type[0, slot] = sim._warrior_idx
-        sim.v_tile[0, slot] = t
-        sim.v_hp[0, slot] = 100
-        sim.v_charges[0, slot] = 0
-        sim.v_fortify[0, slot] = 0
-        sim.occ_mil[0, t] = slot + sim.POOL_LO["v"]
-        sim.v_next[0] += 1
+        slot = int(sim.civ_unit_next[0])
+        sim.civ_unit_alive[0, slot] = True
+        sim.civ_unit_civ[0, slot] = r
+        sim.civ_unit_type[0, slot] = sim._warrior_idx
+        sim.civ_unit_tile[0, slot] = t
+        sim.civ_unit_hp[0, slot] = 100
+        sim.civ_unit_charges[0, slot] = 0
+        sim.civ_unit_fortify[0, slot] = 0
+        sim.military_at[0, t] = slot + sim.POOL_LO["civ"]
+        sim.civ_unit_next[0] += 1
 
 
 def count_levy(sim, vn0: int, s: int, warr: int) -> int:
@@ -113,8 +113,8 @@ def count_levy(sim, vn0: int, s: int, warr: int) -> int:
     cleared and the gold-buy unit branch quota-blocked, so every new R unit IS
     a levy spawn."""
     n = 0
-    for slot in range(vn0, int(sim.v_next[0])):
-        if int(sim.v_type[0, slot]) == warr and int(sim.v_civ[0, slot]) == R:
+    for slot in range(vn0, int(sim.civ_unit_next[0])):
+        if int(sim.civ_unit_type[0, slot]) == warr and int(sim.civ_unit_civ[0, slot]) == R:
             n += 1
     return n
 
@@ -126,7 +126,7 @@ def prep_levy(sim, s: int, envoys: int = 5) -> None:
     sim.civ_only_atwar[0, R] = True
     sim.civ_only_atwar[0, OTHER] = False
     sim.sync_war()  # a poke must write the legacy stores too
-    sim.civ_only_treasury[0, OTHER] = 0.0  # the shared v_next pool must not grow from OTHER's buys
+    sim.civ_only_treasury[0, OTHER] = 0.0  # the shared civ_unit_next pool must not grow from OTHER's buys
     make_suzerain_mil(sim, s, envoys)
     meet_quota(sim, R)
 
@@ -170,7 +170,7 @@ def main() -> None:
     prep_levy(sim, S0)
     stash_levy(sim, S0)
     sim.civ_only_treasury[0, R] = cost  # exactly the levy price
-    vn0 = v_next(sim)
+    vn0 = civ_unit_next(sim)
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) == T, f"L1 levy: citystate_last_levy not stamped ({int(sim.citystate_last_levy[0, S0])} != {T})"
     assert count_levy(sim, vn0, S0, warr) == n_units, f"L1 levy: expected {n_units} WARRIOR at CS center, got {count_levy(sim, vn0, S0, warr)}"
@@ -214,7 +214,7 @@ def main() -> None:
     stash_levy(sim, S0)
     sim.civ_only_treasury[0, R] = cost
     sim.citystate_last_levy[0, S0] = T - (cd - 1)  # one turn short of ready
-    vn0 = v_next(sim)
+    vn0 = civ_unit_next(sim)
     sim._seat_phase()
     assert int(sim.citystate_last_levy[0, S0]) == T - (cd - 1), "L5 cooldown: levied while on cooldown"
     assert count_levy(sim, vn0, S0, warr) == 0, "L5 cooldown: WARRIORs spawned at the CS while on cooldown"

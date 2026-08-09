@@ -250,7 +250,7 @@ export function encampmentIntact(tile: Tile): boolean {
 /**
  * The OWNER of a district tile, as a hostility probe. Seat
  * territory carries `seatIndex`; otherwise an owned tile belongs to the seat 0.
- * (City-states never build Encampments in this model, so `csId` needs no arm.)
+ * (City-states never build Encampments in this model, so `cityStateId` needs no arm.)
  */
 export function tileOwnerSide(tile: Tile): { seat: number } | null {
   const s = tileSeat(tile);

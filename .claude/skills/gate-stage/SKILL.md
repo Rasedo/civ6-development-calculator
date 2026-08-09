@@ -46,8 +46,8 @@ the spec; the GPU engine mirrors it turn-exactly. Never widen tolerances.
   then run repo-root commands in the same or later chain.
 - The exported catalog/planes are the SPEC scope: check whether a plane
   already exists (`farm_flat`, `mine_ok`, `wh`, `riv`…) before adding one.
-- Two id spaces: tiles use `civOfRival(r) = r+1`; rival UNITS carry the
-  raw rival id.
+- Two id spaces: tiles carry SEATS (civ index r = seat r+1); units carry
+  their owning seat.
 - Unit positions/hp: RU/BU/PU statelog lines carry hp+acted and RT
   carries tsum (territory shape) — but the TRACE doesn't; a stage
   touching movement/stacking still deserves a statelog pass (see

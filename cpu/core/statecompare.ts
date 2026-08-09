@@ -52,7 +52,7 @@ import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
-import { CITY_STATE_TYPES, CS_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, LEVY_COOLDOWN } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
@@ -204,7 +204,7 @@ function queueTile(q: City['queue'][number] | undefined): number {
  *  one (escalated builders) and otherwise takes the roster price; building and
  *  wonder items carry none at all and are priced from the catalog. The same
  *  rule as `the deleted trace, queueItemCost`, which is the derivation the
- *  trace's `rc.cost` column is green against. */
+ *  trace's `civCity.cost` column is green against. */
 function queueItemCost(q: City['queue'][number] | undefined): number {
   if (!q) return 0;
   switch (q.kind) {
@@ -242,8 +242,8 @@ const overCities = (fn: (r: CityRow, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityRow[]).map((r) => fn(r, state));
 const overUnits = (fn: (u: Unit) => Val): Extractor => (_state, rows) => (rows as Unit[]).map(fn);
 const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows as Tile[]).map(fn);
-const overCityStates = (fn: (cs: CityState, state: GameState) => Val): Extractor =>
-  (state, rows) => (rows as CityState[]).map((cs) => fn(cs, state));
+const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
+  (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
 
 const GAME: Record<string, Extractor> = {
   turn: (s) => [s.turn],
@@ -353,28 +353,28 @@ const perCiv = (state: GameState, fn: (seat: number) => number): number[] =>
   civSeats(state).map((s) => fn(s.seat));
 
 const CITY_STATE_G: Record<string, Extractor> = {
-  type: overCityStates((cs) => CITY_STATE_TYPES.indexOf(cs.type)),
-  centerIndex: overCityStates((cs) => cs.centerIndex),
-  population: overCityStates((cs) => cs.population),
-  hp: overCityStates((cs) => cs.hp ?? CS_MAX_HP),
-  envoys: overCityStates((cs, st) => perCiv(st, (seat) => envoysOf(cs, seat))),
-  met: overCityStates((cs, st) => perCiv(st, (seat) => (cs.met.includes(seat) ? 1 : 0))),
-  questKind: overCityStates((cs, st) =>
+  type: overCityStates((cityState) => CITY_STATE_TYPES.indexOf(cityState.type)),
+  centerIndex: overCityStates((cityState) => cityState.centerIndex),
+  population: overCityStates((cityState) => cityState.population),
+  hp: overCityStates((cityState) => cityState.hp ?? CITY_STATE_MAX_HP),
+  envoys: overCityStates((cityState, st) => perCiv(st, (seat) => envoysOf(cityState, seat))),
+  met: overCityStates((cityState, st) => perCiv(st, (seat) => (cityState.met.includes(seat) ? 1 : 0))),
+  questKind: overCityStates((cityState, st) =>
     perCiv(st, (seat) => {
-      const q = questFor(cs, seat);
+      const q = questFor(cityState, seat);
       return q ? QUEST_KIND[q.kind] ?? 0 : 0;
     }),
   ),
-  questIssued: overCityStates((cs, st) =>
-    perCiv(st, (seat) => (seat === 0 ? cs.questIssuedTurn : cs.seatQuestIssuedTurn?.[indexOfSeat(seat)] ?? 0)),
+  questIssued: overCityStates((cityState, st) =>
+    perCiv(st, (seat) => (seat === 0 ? cityState.questIssuedTurn : cityState.seatQuestIssuedTurn?.[indexOfSeat(seat)] ?? 0)),
   ),
-  questCamp: overCityStates((cs, st) => perCiv(st, (seat) => questFor(cs, seat)?.campIndex ?? -1)),
-  questDistrict: overCityStates((cs) => {
-    const d = cs.quest?.district;
+  questCamp: overCityStates((cityState, st) => perCiv(st, (seat) => questFor(cityState, seat)?.campIndex ?? -1)),
+  questDistrict: overCityStates((cityState) => {
+    const d = cityState.quest?.district;
     return d === undefined ? -1 : PLACEABLE_DISTRICTS.indexOf(d);
   }),
-  lastLevyTurn: overCityStates((cs) => cs.lastLevyTurn ?? -LEVY_COOLDOWN),
-  warTurns: overCityStates((cs) => cs.csWarTurns ?? 0),
+  lastLevyTurn: overCityStates((cityState) => cityState.lastLevyTurn ?? -LEVY_COOLDOWN),
+  warTurns: overCityStates((cityState) => cityState.cityStateWarTurns ?? 0),
 };
 
 const CITY: Record<string, Extractor> = {
@@ -488,7 +488,7 @@ export function groupKeys(group: string, rows: readonly unknown[]): number[] {
     case 'seat':
       return (rows as Seat[]).map((s) => s.seat);
     case 'cityState':
-      return (rows as CityState[]).map((cs) => cs.id);
+      return (rows as CityState[]).map((cityState) => cityState.id);
     case 'city':
       return (rows as CityRow[]).map((r) => r.city.centerIndex);
     case 'unit':

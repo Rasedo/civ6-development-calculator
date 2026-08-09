@@ -25,7 +25,7 @@ a net on raw eval alone.
   `out/pool/`) returns at a genuine plateau, ideally as mixed self+pool
   batches, never seat-alternation (halves per-seat experience).
 - FFA: `--seats 4 --fixtures gpu/fixtures_o4` (+ `--anchor <same-world
-  o4 ckpt> --anchor-kl 0.1` — obs width follows rival count, an O=2 net
+  o4 ckpt> --anchor-kl 0.1` — obs width follows the civ-seat count, an O=2 net
   cannot anchor O=4). Distillation: `--distill gpu/targets/<f>.pt`
   (generate with `gpu/eval/gen_targets.py`, `--policy <ckpt>` for net-driven
   states).

@@ -62,9 +62,9 @@ await runDriver({
   turns: N_TURNS - (state.turn - 1),
   // The obs layout's per-city slots: the seat city cap (format 1 derived the
   // same 6 from "capital + 5 planned sites").
-  cMax: MAX_CITIES_PER_SEAT,
-  csMax: world.gen.params.csMax,
-  rMax: world.gen.params.rMax,
+  cityMax: MAX_CITIES_PER_SEAT,
+  cityStateMax: world.gen.params.cityStateMax,
+  civMax: world.gen.params.civMax,
   horizon: HORIZON,
   improvementIds: IMPROVEMENT_IDS as unknown as string[],
   scaffoldDistricts: SCAFFOLD_DISTRICTS,

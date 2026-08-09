@@ -109,10 +109,10 @@ describe('#51/S7.8f war weariness — the per-battle model', () => {
   it('a CITY-STATE is a real opponent but keeps no accumulator of its own', () => {
     const state = newGame();
     const { away } = tiles(state, 0);
-    const cs = seatOfCityState(state.cityStates![0].id);
-    warWearinessBattle(state, 0, cs, away, { city: true });
-    expect(wwGet(seatOf(state, 0)!, cs)).toBeGreaterThan(0);
-    expect(wwSum(seatOf(state, cs))).toBe(0);
+    const cityState = seatOfCityState(state.cityStates![0].id);
+    warWearinessBattle(state, 0, cityState, away, { city: true });
+    expect(wwGet(seatOf(state, 0)!, cityState)).toBeGreaterThan(0);
+    expect(wwSum(seatOf(state, cityState))).toBe(0);
   });
 
   it('wars score SEPARATELY and only the worst is felt', () => {

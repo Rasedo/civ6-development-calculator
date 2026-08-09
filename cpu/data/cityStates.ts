@@ -30,7 +30,7 @@ export const CITY_STATE_TYPES: CityStateType[] = [
 ];
 
 /** Yield each type grants through envoys. */
-export const CS_TYPE_YIELD: Record<CityStateType, YieldKey> = {
+export const CITY_STATE_TYPE_YIELD: Record<CityStateType, YieldKey> = {
   scientific: 'science',
   cultural: 'culture',
   trade: 'gold',
@@ -40,7 +40,7 @@ export const CS_TYPE_YIELD: Record<CityStateType, YieldKey> = {
 };
 
 /** District whose presence carries the 3- and 6-envoy bonuses. */
-export const CS_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
+export const CITY_STATE_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
   scientific: 'CAMPUS',
   cultural: 'THEATER_SQUARE',
   trade: 'COMMERCIAL_HUB',
@@ -53,12 +53,12 @@ export const CS_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
 // not the district itself (a Campus with a Library + University earns the
 // scientific bonus TWICE in real Civ 6). This table records those real building
 // tiers per type, restricted to buildings that EXIST in this roster. The LIVE
-// envoy-bonus channel (csEnvoyBonuses/envoyBonusDelta + the GPU district-bonus
+// envoy-bonus channel (cityStateEnvoyBonuses/envoyBonusDelta + the GPU district-bonus
 // term) stays DISTRICT-keyed ("suzerain/quest logic stays as
 // is") — this is the catalog data for a future building-keyed wiring round.
 // Inert in the parity gate regardless: the scripted scenario never lifts a
 // city-state past 1 envoy, so the 3-envoy threshold is unreachable there.
-export const CS_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
+export const CITY_STATE_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
   scientific: ['LIBRARY', 'UNIVERSITY', 'RESEARCH_LAB'],
   cultural: ['AMPHITHEATER', 'MUSEUM', 'BROADCAST_CENTER'],
   trade: ['MARKET', 'BANK', 'STOCK_EXCHANGE'],
@@ -69,10 +69,10 @@ export const CS_TYPE_BUILDINGS: Record<CityStateType, string[]> = {
 
 // Per-CS UNIQUE suzerain bonus table (real GS bonuses, degraded to a
 // description + the closest expressible channel). The suzerain PERK logic stays
-// type-generic (isSuzerain / csTradeCapacityBonus / the militaristic levy) per
+// type-generic (isSuzerain / cityStateTradeCapacityBonus / the militaristic levy) per
 // out of scope, so this table is catalog DATA — it documents each named
 // city-state's real bonus for a future per-CS wiring round. Names mirror
-// CS_NAMES (type × 4). `channel` names the existing yield/effect surface a
+// CITY_STATE_NAMES (type × 4). `channel` names the existing yield/effect surface a
 // future wiring would use; `note` records what the real bonus needs that this
 // model lacks (tourism, spies, naval, era score, combat) → degraded/inert.
 export interface SuzerainBonusDef {
@@ -82,7 +82,7 @@ export interface SuzerainBonusDef {
   channel?: YieldKey | 'amenities' | 'production-capital' | 'none';
   note?: string;
 }
-export const CS_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
+export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   // scientific
   Geneva: { name: 'Geneva', type: 'scientific', bonus: '+15% science while not at war with any civ.', channel: 'science' },
   Stockholm: { name: 'Stockholm', type: 'scientific', bonus: '+2 science per specialty district building tier.', channel: 'science' },
@@ -116,11 +116,11 @@ export const CS_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
 };
 
 // The LIVE per-CS suzerain effect — a flat
-// +CS_SUZERAIN_YIELD/turn to the suzerain's CAPITAL in the named yield channel
+// +CITY_STATE_SUZERAIN_YIELD/turn to the suzerain's CAPITAL in the named yield channel
 // (whichever seat, either seat, holds suzerainty). This is the machine-
-// readable subset of CS_SUZERAIN_BONUS above; the 14 rows here degrade their
+// readable subset of CITY_STATE_SUZERAIN_BONUS above; the 14 rows here degrade their
 // real %-scaling/conditional bonus to a flat channel yield (documented per
-// row in CS_SUZERAIN_BONUS.bonus). Rows NOT listed are DESCOPED, each for a
+// row in CITY_STATE_SUZERAIN_BONUS.bonus). Rows NOT listed are DESCOPED, each for a
 // modeled-system gap:
 //   - channel 'none': Kabul (combat XP), Preslav (cavalry combat/movement),
 //     Yerevan (apostle promotions) — no yield channel to degrade to.
@@ -128,8 +128,8 @@ export const CS_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
 //   - power system (not modeled): Toronto, Cardiff.
 //   - amenities channel: Buenos Aires — the capital-yield vehicle carries the
 //     six yields only, not the amenity tier.
-export const CS_SUZERAIN_YIELD = 3;
-export const CS_SUZERAIN_LIVE: Record<string, YieldKey> = {
+export const CITY_STATE_SUZERAIN_YIELD = 3;
+export const CITY_STATE_SUZERAIN_LIVE: Record<string, YieldKey> = {
   Geneva: 'science',
   Stockholm: 'science',
   Seoul: 'science',
@@ -146,7 +146,7 @@ export const CS_SUZERAIN_LIVE: Record<string, YieldKey> = {
   Armagh: 'faith',
 };
 
-export const CS_TYPE_COLORS: Record<CityStateType, string> = {
+export const CITY_STATE_TYPE_COLORS: Record<CityStateType, string> = {
   scientific: '#4a90d9',
   cultural: '#b05fb0',
   trade: '#d9a94a',
@@ -155,7 +155,7 @@ export const CS_TYPE_COLORS: Record<CityStateType, string> = {
   religious: '#e8e4d8',
 };
 
-export const CS_NAMES: Record<CityStateType, string[]> = {
+export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   scientific: ['Geneva', 'Stockholm', 'Seoul', 'Anshan'],
   cultural: ['Vilnius', 'Antioch', 'Kumasi', 'Caguana'],
   trade: ['Amsterdam', 'Zanzibar', 'Bandar Brunei', 'Hunza'],
@@ -170,20 +170,20 @@ export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
 /** Envoy thresholds and per-threshold district yield amount. */
 export const ENVOY_THRESHOLDS = [1, 3, 6] as const;
-export const CS_CAPITAL_BONUS = 2;
-export const CS_DISTRICT_BONUS = 2;
+export const CITY_STATE_CAPITAL_BONUS = 2;
+export const CITY_STATE_DISTRICT_BONUS = 2;
 /** Envoys needed to be suzerain (strictly most among all civs). */
 export const SUZERAIN_ENVOYS = 3;
 /** a seat meets a CS once one of its cities or units sits within
  * this range of the CS center — the explore-to-meet mirror (the other seats have
  * no fog; seat 0 meets via isExplored). */
-export const CS_MEET_RANGE = 3;
+export const CITY_STATE_MEET_RANGE = 3;
 /** New quests are issued this many turns after the last one resolved. */
 export const QUEST_COOLDOWN = 12;
 /** Quest reward. */
 export const QUEST_ENVOYS = 1;
 /** Siege hit points of a city-state. */
-export const CS_MAX_HP = 150;
+export const CITY_STATE_MAX_HP = 150;
 /** Suzerain levy from militaristic city-states: units granted, gold, cooldown. */
 export const LEVY_UNITS = 2;
 export const LEVY_GOLD_COST = 120;

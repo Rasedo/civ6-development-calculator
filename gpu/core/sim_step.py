@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
 from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star import
-from . import simbase  # the PATCHABLE globals (U_MAX/P_MAX/_ALIAS_CHECK) must be read live
+from . import simbase  # the PATCHABLE globals (POOL_MAX/SEAT0_POOL_MAX/_ALIAS_CHECK) must be read live
 
 
 class SimStep:
@@ -32,7 +32,7 @@ class SimStep:
         gold).
         tech/civic: [B] long picks applied where the research slot is empty
         (validated against the masks; -1 = no pick).
-        units: [B, simbase.P_MAX] long unit orders (0–5 move, 6–11 attack, 12
+        units: [B, simbase.SEAT0_POOL_MAX] long unit orders (0–5 move, 6–11 attack, 12
         hold), executed in slot order before the turn advances.
         envoy: [B] or [B, K] long — back that city-state with one available
         envoy (validated; -1 = none).
@@ -112,11 +112,11 @@ class SimStep:
             is_s = act == self.SETTLER
             is_u = (act >= self.UNIT_BASE) & (act < self.UNIT_BASE + self.NU)
             ut = (act - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
-            trainable = (self._p_tech.unsqueeze(0) < 0) | self.techs.gather(
-                1, self._p_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
+            trainable = (self._type_tech.unsqueeze(0) < 0) | self.techs.gather(
+                1, self._type_tech.clamp(min=0).unsqueeze(0).expand(B, -1)
             )  # [B, NU]
             trainable = trainable & self._res_avail_mask(self.tile_seat == 0)  # re-validate strategic-resource access
-            trainable = trainable & ~self._p_faith_only.reshape(1, -1)  # faith-only never queues (trainableUnits mirror)
+            trainable = trainable & ~self._type_faith_only.reshape(1, -1)  # faith-only never queues (trainableUnits mirror)
             valid_u = is_u & trainable.gather(1, ut)
             if self._rl_purchase_active and self._builder_idx >= 0:
                 # With purchases live, builder queues are order-coupled with
@@ -125,7 +125,7 @@ class SimStep:
                 valid_u = valid_u & (ut != self._builder_idx)
             self.progress.copy_(torch.where(valid_b | valid_u, torch.zeros_like(self.progress), self.progress))
             self.cur_cost.copy_(torch.where(valid_b, rd.b_cost[act.clamp(min=0, max=self.NB - 1)], self.cur_cost))
-            self.cur_cost.copy_(torch.where(valid_u, self._p_cost[ut], self.cur_cost))
+            self.cur_cost.copy_(torch.where(valid_u, self._type_cost[ut], self.cur_cost))
             if self._builder_idx >= 0:
                 # Builder queues escalate like the settler prefix-sum — earlier
                 # slots' queues raise later slots' price (current is
@@ -146,7 +146,7 @@ class SimStep:
                 base_q = (self.current == self.SETTLER).sum(dim=1, keepdim=True)
                 prefix = is_s.long().cumsum(dim=1) - is_s.long()
                 n_cities = self.alive.sum(dim=1, keepdim=True)
-                s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self._p_settlers().unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
+                s_cost = r.settler_base + r.settler_per_city * (n_cities - 1 + self._seat0_settlers().unsqueeze(1) + base_q + prefix).clamp(min=0).to(self.dtype)
                 self.progress.copy_(torch.where(is_s, torch.zeros_like(self.progress), self.progress))
                 self.cur_cost.copy_(torch.where(is_s, s_cost, self.cur_cost))
                 self.current.copy_(torch.where(is_s, torch.full_like(self.current, self.SETTLER), self.current))
@@ -214,7 +214,7 @@ class SimStep:
         if self.units_mode:
             cap = self.rules.combat.get("unitHp", 100)
             # ONE heal rule, three pools. See _seat_heal.
-            for _pre in ("u", "v", "p"):
+            for _pre in ("barb", "civ", "seat0"):
                 _hp = getattr(self, f"{_pre}_hp")
                 _hp.copy_(torch.where(
                     getattr(self, f"{_pre}_alive") & ~self._spent_mp(_pre),
@@ -226,12 +226,12 @@ class SimStep:
             # 2); a move or attack resets it. Civilians and NAVAL units never
             # fortify. ONE rule, three pools — every pool can hold a hull, so
             # the naval gate applies to all three.
-            for _pre in ("u", "v", "p"):
+            for _pre in ("barb", "civ", "seat0"):
                 _alive = getattr(self, f"{_pre}_alive")
                 _typ = getattr(self, f"{_pre}_type")
                 _spent = self._spent_mp(_pre)
                 _fort = getattr(self, f"{_pre}_fortify")
-                _mil = (self._p_combat[_typ] > 0) & ~self.unit_naval[_typ]
+                _mil = (self._type_combat[_typ] > 0) & ~self.unit_naval[_typ]
                 _fort.copy_(torch.where(
                     _alive & _mil & ~_spent, (_fort + 1).clamp(max=2),
                     torch.where(_alive & _mil & _spent, torch.zeros_like(_fort), _fort),
@@ -245,7 +245,7 @@ class SimStep:
             # refreshUnits loops every unit regardless of seat, and the phases
             # below (seatPhase, barbarianPhase) then overwrite the two hostile
             # pools.
-            for _pre in ("p", "v", "u"):
+            for _pre in ("seat0", "civ", "barb"):
                 self._reset_mp(_pre)
 
         # --- worked tiles + city yields: the PER-CITY interleave ------------------
@@ -315,7 +315,7 @@ class SimStep:
             # adds unmultiplied — that order matters.
             prod_add = t_c[:, 1]
             if self._gov_has_effects and self._encamp_didx >= 0:
-                emult_p = self._gov_policy_mods_cached("p", self.civics)[5]
+                emult_p = self._gov_policy_mods_cached("seat0", self.civics)[5]
                 en_item = (cur_c >= 0) & (cur_c < self.NB) & (self._b_req_district[cur_c.clamp(min=0, max=self.NB - 1)] == self._encamp_didx)
                 if self._encamp_si >= 0:
                     en_item = en_item | (cur_c == self.UNIT_BASE + self.NU + self._encamp_si)
@@ -488,10 +488,10 @@ class SimStep:
         # +WARMONGER_DOW accrual on declaring has no twin here because no
         # declare-war grievance path reaches seat 0; the CAPTURE accrual does
         # mirror, in _capture_civ_city.
-        self.p_warmonger.copy_(torch.where(
-            (self.p_warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
-            self.p_warmonger - 1,
-            self.p_warmonger,
+        self.warmonger.copy_(torch.where(
+            (self.warmonger > 0) & ~self.civ_only_atwar.any(dim=1),
+            self.warmonger - 1,
+            self.warmonger,
         ))
 
         # --- loyalty & defections (right after the city loop) ------------------------------
@@ -505,7 +505,7 @@ class SimStep:
 
         # --- the hostile world (after the city loop, before research) ----------------------
         if self.units_mode:
-            self.treasury.sub_((self.p_alive.to(self.dtype) * self._p_maint[self.p_type]).sum(dim=1))
+            self.treasury.sub_((self.seat0_unit_alive.to(self.dtype) * self._type_maintenance[self.seat0_unit_type]).sum(dim=1))
             self._bankrupt_disband()  # after upkeep, before the barb phase
             self._barbarian_phase()
         if self.disasters:
@@ -579,11 +579,11 @@ class SimStep:
         # CIV6_RECLAIM_AT.
         if self.units_mode:
             if int(self.next_slot.max()) >= self._reclaim_at:
-                self._reclaim_pool("u")
-            if int(self.v_next.max()) >= self._reclaim_at:
-                self._reclaim_pool("v")
-            if int(self.p_next.max()) >= self._reclaim_at:
-                self._reclaim_pool("p")
+                self._reclaim_pool("barb")
+            if int(self.civ_unit_next.max()) >= self._reclaim_at:
+                self._reclaim_pool("civ")
+            if int(self.seat0_unit_next.max()) >= self._reclaim_at:
+                self._reclaim_pool("seat0")
         if self.R > 0:
             # rc high-water = last-alive slot + 1 (what the next append uses)
             civ_city_hw = (self.civ_city_alive.long() * (torch.arange(self.RC, device=dev).reshape(1, 1, -1) + 1)).amax(dim=2)

@@ -35,11 +35,11 @@ const CTX_PAIR_SEAT = 0;
 
 /** This seat's live quest at a city-state, if any. Seat 0's sits in `quest`;
  *  every other civ's in the per-civ `seatQuest` slot. */
-export function questFor(cs: CityState, seat: number): CityStateQuest | null {
-  return seat === 0 ? cs.quest : cs.seatQuest?.[indexOfSeat(seat)] ?? null;
+export function questFor(cityState: CityState, seat: number): CityStateQuest | null {
+  return seat === 0 ? cityState.quest : cityState.seatQuest?.[indexOfSeat(seat)] ?? null;
 }
 
-export function observeSeat(state: GameState, seat: number, cMax: number, horizon: number, csMax?: number): number[] {
+export function observeSeat(state: GameState, seat: number, cityMax: number, horizon: number, cityStateMax?: number): number[] {
   const s = seatOf(state, seat);
   const cities = citiesOf(state, seat);
   const nTech = Math.max(Object.keys(TECHS).length, 1);
@@ -52,7 +52,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     (s?.research.civicProgress ?? 0) / 50.0,
     settlerCount(state, seat),
     cities.reduce((n: number, c: City) => n + c.queue.filter((q) => q.kind === 'settler').length, 0),
-    cities.length / cMax,
+    cities.length / cityMax,
     Math.min((s?.treasury ?? 0) / 200.0, 5.0),
     (s?.envoysAvailable ?? 0) / 5.0,
     (s?.influencePoints ?? 0) / 100.0,
@@ -66,14 +66,14 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   // S1(c): FIXED S slots by t0 id, ZEROS when captured (the trace
   // tables' own convention — iterating the live array narrowed the vector
   // after a CS capture). Each slot renders THE SEAT'S OWN view: seat met
-  // is cs.seatMet (the envoy-verb plane), envoysOf is seat-keyed already,
+  // is cityState.seatMet (the envoy-verb plane), envoysOf is seat-keyed already,
   // and quests are a seat-0-only mechanic (zero for opponents, both engines).
-  const cs: number[] = [];
-  const nCs = csMax ?? (state.cityStates ?? []).length;
+  const cityState: number[] = [];
+  const nCs = cityStateMax ?? (state.cityStates ?? []).length;
   for (let i = 0; i < nCs; i++) {
     const c = (state.cityStates ?? []).find((x) => x.id === i);
-    if (!c) { cs.push(0, 0, 0); continue; }
-    cs.push(
+    if (!c) { cityState.push(0, 0, 0); continue; }
+    cityState.push(
       hasMet(c, seat) ? 1 : 0,
       envoysOf(c, seat) / 6.0,
       questFor(c, seat) ? 1 : 0,
@@ -97,7 +97,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     );
   }
   const per: number[] = [];
-  for (let i = 0; i < cMax; i++) {
+  for (let i = 0; i < cityMax; i++) {
     const c = cities[i];
     if (!c) { per.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0); continue; }  // #51/S8.4c: 10 per slot
     const head = c.queue[0];
@@ -162,7 +162,7 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
   // carries one such axis and this is the seat it names. That seat's own row
   // would be self-referential, so it renders zero. An unfinished wire, not a
   // rule: nothing in the engine gives that seat any other standing.
-  const rv = seat === CTX_PAIR_SEAT ? undefined : seatOf(state, seat);
+  const civSeat = seat === CTX_PAIR_SEAT ? undefined : seatOf(state, seat);
   const atOpp = atWarWithAny(state, seat);
   const ctx: number[] = [
     cities.length,
@@ -172,12 +172,12 @@ export function observeSeat(state: GameState, seat: number, cMax: number, horizo
     cities.length * 2 + (atOpp ? 3 : 1),
     Math.max(0, ...state.seats.filter((o) => o.seat !== seat).map((o) => seatStrength(state, o.seat))),
     seatStrength(state, seat),
-    rv ? Math.min(seatProximity(state, rv), 999) : 0,
-    rv ? (((seatOf(state, seat)!.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0) : 0,
-    rv ? rv.aggression : 0,
-    rv ? rv.peaceTurns : 0,
+    civSeat ? Math.min(seatProximity(state, civSeat), 999) : 0,
+    civSeat ? (((seatOf(state, seat)!.warmonger ?? 0) >= WARMONGER_GANG) ? 1 : 0) : 0,
+    civSeat ? civSeat.aggression : 0,
+    civSeat ? civSeat.peaceTurns : 0,
     atWarWithAny(state, seat) ? 1 : 0,
-    rv ? (seatOf(state, seat)!.cities.length > 0 ? 1 : 0) : 0,
+    civSeat ? (seatOf(state, seat)!.cities.length > 0 ? 1 : 0) : 0,
   ];
-  return [...emp, ...cs, ...riv, ...per, ...esc, ...costT, ...costC, ...ctx];
+  return [...emp, ...cityState, ...riv, ...per, ...esc, ...costT, ...costC, ...ctx];
 }

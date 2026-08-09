@@ -41,7 +41,7 @@ def build():
 def poison_slot(sim, pre: str) -> int:
     """Leave a DROWNED unit's residue in the next slot the pool will hand out:
     dead, but still flagged embarked — exactly what a reclaim leaves behind."""
-    counter = {"u": "next_slot", "v": "v_next"}.get(pre, "p_next")
+    counter = {"barb": "next_slot", "civ": "civ_unit_next"}.get(pre, "seat0_unit_next")
     slot = int(getattr(sim, counter)[0])
     getattr(sim, f"{pre}_alive")[0, slot] = False
     getattr(sim, f"{pre}_emb")[0, slot] = True  # the drowned occupant's flag
@@ -52,7 +52,7 @@ def poison_slot(sim, pre: str) -> int:
 
 def free_land(sim) -> int:
     for t in range(sim.T):
-        if bool(sim.passable[0, t]) and int(sim.occ_mil[0, t]) < 0 and int(sim.occ_civ[0, t]) < 0:
+        if bool(sim.passable[0, t]) and int(sim.military_at[0, t]) < 0 and int(sim.civilian_at[0, t]) < 0:
             return t
     raise AssertionError("no free land tile")
 
@@ -61,7 +61,7 @@ def check(sim, pre: str, slot: int, label: str) -> None:
     mp = int(getattr(sim, f"{pre}_mp")[0, slot])
     full = int(getattr(sim, f"{pre}_mp_full")[0, slot])
     typ = int(getattr(sim, f"{pre}_type")[0, slot])
-    want = int(sim._p_moves[typ])
+    want = int(sim._type_moves[typ])
     emb = int(getattr(sim, f"{pre}_emb")[0, slot])
     print(f"  {label}: type={typ} mp={mp} mp_full={full} (type's moves={want}) emb={emb}")
     assert emb == 0, (
@@ -79,24 +79,24 @@ def check(sim, pre: str, slot: int, label: str) -> None:
 def main() -> None:
     # --- the civ pool -------------------------------------------------------
     sim = build()
-    slot = poison_slot(sim, "v")
+    slot = poison_slot(sim, "civ")
     tile = free_land(sim)
     mask = torch.zeros(sim.B, dtype=torch.bool)
     mask[0] = True
     at = torch.full((sim.B,), tile, dtype=torch.long)
     sim._spawn_seat_civilian(mask, at, 0, type_idx=sim._missionary_idx,
                          charges=torch.full((sim.B,), 3, dtype=torch.long))
-    check(sim, "v", slot, "civ civilian (missionary)")
+    check(sim, "civ", slot, "civ civilian (missionary)")
 
     # --- the seat-0 pool, same ordering rule --------------------------------
     sim2 = build()
-    slot2 = poison_slot(sim2, "p")
+    slot2 = poison_slot(sim2, "seat0")
     tile2 = free_land(sim2)
     m2 = torch.zeros(sim2.B, dtype=torch.bool)
     m2[0] = True
     sim2._spawn_seat0(m2, torch.full((sim2.B,), tile2, dtype=torch.long),
                        torch.full((sim2.B,), 2, dtype=torch.long))  # WARRIOR
-    check(sim2, "p", slot2, "seat-0 military (warrior)")
+    check(sim2, "seat0", slot2, "seat-0 military (warrior)")
 
     print("SPAWN RECLAIM OK — a reclaimed slot hands on no drowned unit's movement pool")
 

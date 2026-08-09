@@ -27,7 +27,7 @@ import { DIPLO_FAVOR_PER_SUZERAIN } from '../data/seats';
 
 /** city-states this seat is Suzerain of. */
 export function suzerainCount(state: GameState, seat: number): number {
-  return state.cityStates.reduce((n, cs) => n + (isSuzerain(cs, seat) ? 1 : 0), 0);
+  return state.cityStates.reduce((n, cityState) => n + (isSuzerain(cityState, seat) ? 1 : 0), 0);
 }
 
 /** diplomatic favor earned per turn — government tier plus one
@@ -119,7 +119,7 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number): v
 /**
  * THE ONE PLACE A SEAT'S PRODUCTION CHOICE IS COMMITTED.
  *
- * The seat ladder pushed straight onto `rc.queue` at nine separate sites while
+ * The seat ladder pushed straight onto `civCity.queue` at nine separate sites while
  * an externally-driven seat's choice arrived as an ACTION and went through a
  * different applier. Two appliers for one decision is why a net cannot be
  * handed the AI's moves: the AI never produces a move, it produces a mutation.

@@ -41,11 +41,11 @@ function cultureFor(n: number) {
 describe('B-25 culture victory', () => {
   it('seat 0 out-touring every civ wins (victoryType 7)', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
+    const civSeat = (state.seats[(0) + 1] as Seat);
     seatOf(state, 0)!.tourism = tourismFor(5, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
-    rv.cultureTotal = cultureFor(4); // 5 visiting > 4 domestic
-    rv.tourism = 0;
+    civSeat.cultureTotal = cultureFor(4); // 5 visiting > 4 domestic
+    civSeat.tourism = 0;
     endTurn(state, 0);
     expect(state.victoryType).toBe(7);
     expect(state.gameOver).toBe(true);
@@ -53,9 +53,9 @@ describe('B-25 culture victory', () => {
 
   it('a civ out-touring everyone is a DEFEAT (victoryType 8)', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
-    rv.tourism = tourismFor(9, 2);
-    rv.cultureTotal = cultureFor(1);
+    const civSeat = (state.seats[(0) + 1] as Seat);
+    civSeat.tourism = tourismFor(9, 2);
+    civSeat.cultureTotal = cultureFor(1);
     seatOf(state, 0)!.cultureTotal = cultureFor(3); // civ 9 visiting > seat-0 3 domestic
     seatOf(state, 0)!.tourism = 0;
     endTurn(state, 0);
@@ -65,11 +65,11 @@ describe('B-25 culture victory', () => {
 
   it('EQUAL counts do not win — the bar is strictly greater', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
+    const civSeat = (state.seats[(0) + 1] as Seat);
     seatOf(state, 0)!.tourism = tourismFor(4, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
-    rv.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
-    rv.tourism = 0;
+    civSeat.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
+    civSeat.tourism = 0;
     endTurn(state, 0);
     expect(state.victoryType).not.toBe(7);
     expect(state.gameOver).toBe(false);
@@ -81,7 +81,7 @@ describe('B-25 culture victory', () => {
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
     (state.seats[(0) + 1] as Seat).cultureTotal = cultureFor(2); // beaten
     (state.seats[(1) + 1] as Seat).cultureTotal = cultureFor(9); // NOT beaten
-    for (const rv of state.seats.slice(1)) rv.tourism = 0;
+    for (const civSeat of state.seats.slice(1)) civSeat.tourism = 0;
     endTurn(state, 0);
     expect(state.victoryType).not.toBe(7);
     expect(state.gameOver).toBe(false);
@@ -101,9 +101,9 @@ describe('B-25 culture victory', () => {
     const three = newGame(2);
     seatOf(three, 0)!.tourism = tourismFor(6, 2); // same raw tourism as above
     seatOf(three, 0)!.cultureTotal = cultureFor(1);
-    for (const rv of three.seats.slice(1)) {
-      rv.cultureTotal = cultureFor(5);
-      rv.tourism = 0;
+    for (const civSeat of three.seats.slice(1)) {
+      civSeat.cultureTotal = cultureFor(5);
+      civSeat.tourism = 0;
     }
     endTurn(three, 0);
     expect(three.victoryType).not.toBe(7); // only 4 visiting now — 4 < 5
@@ -111,10 +111,10 @@ describe('B-25 culture victory', () => {
 
   it('a CITYLESS civ cannot win on tourism it banked while alive', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
-    rv.tourism = tourismFor(9, 2);
-    rv.cultureTotal = cultureFor(1);
-    rv.cities = []; // wiped off the map, but its lifetime totals remain
+    const civSeat = (state.seats[(0) + 1] as Seat);
+    civSeat.tourism = tourismFor(9, 2);
+    civSeat.cultureTotal = cultureFor(1);
+    civSeat.cities = []; // wiped off the map, but its lifetime totals remain
     seatOf(state, 0)!.cultureTotal = cultureFor(3);
     seatOf(state, 0)!.tourism = 0;
     endTurn(state, 0);
@@ -123,11 +123,11 @@ describe('B-25 culture victory', () => {
 
   it('a RELIGIOUS victory outranks a culture one on the same turn', () => {
     const state = newGame(1);
-    const rv = (state.seats[(0) + 1] as Seat);
+    const civSeat = (state.seats[(0) + 1] as Seat);
     // Civ religion predominant everywhere → victoryType 6 …
-    rv.religion.founded = true;
-    rv.religion.holyTile = rv.cities[0].centerIndex;
-    const all = [...seatOf(state, 0)!.cities, ...rv.cities];
+    civSeat.religion.founded = true;
+    civSeat.religion.holyTile = civSeat.cities[0].centerIndex;
+    const all = [...seatOf(state, 0)!.cities, ...civSeat.cities];
     for (const c of all) {
       const pres = new Array(2).fill(0);
       pres[1] = 500;
@@ -136,8 +136,8 @@ describe('B-25 culture victory', () => {
     // … while seat 0 would ALSO win on culture this very turn.
     seatOf(state, 0)!.tourism = tourismFor(5, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
-    rv.cultureTotal = cultureFor(4);
-    rv.tourism = 0;
+    civSeat.cultureTotal = cultureFor(4);
+    civSeat.tourism = 0;
     endTurn(state, 0);
     expect(state.victoryType).toBe(6);
   });

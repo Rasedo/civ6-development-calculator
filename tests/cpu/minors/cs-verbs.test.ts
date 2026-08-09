@@ -4,7 +4,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { cityStatePhase, envoysOf, isSuzerain, setMet } from '../../../cpu/core/cityStates';
 import { hexDistance, tilesWithin } from '../../../world/hex';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, CS_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, QUEST_ENVOYS, QUEST_COOLDOWN, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
 
 // A civ with ONE city; opts out of the belief/settle draws by default so a
@@ -78,7 +78,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
 
 function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> & { type?: CityStateType } = {}): CityState {
   const center = tileAtCoords(state.map, col, row);
-  const cs: CityState = {
+  const cityState: CityState = {
     ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
     name: `CS${state.cityStates.length}`,
@@ -91,16 +91,16 @@ function addCs(state: GameState, col: number, row: number, opts: Partial<CitySta
     questIssuedTurn: 0,
     ...opts,
   };
-  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id));
-  state.cityStates.push(cs);
-  return cs;
+  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
+  state.cityStates.push(cityState);
+  return cityState;
 }
 
 // (#104: the old meetQuota guard is gone — every gold rung is record-driven
 // now, so nothing can drain a levy-priced treasury without a record.)
 
-function levyUnitsNear(state: GameState, civ: Seat, cs: CityState): number {
-  const ct = state.map.tiles[cs.centerIndex];
+function levyUnitsNear(state: GameState, civ: Seat, cityState: CityState): number {
+  const ct = state.map.tiles[cityState.centerIndex];
   return unitsOf(state, civ.seat).filter((u) => {
     const t = state.map.tiles[u.tileIndex];
     return u.type === 'WARRIOR' && hexDistance(t.col, t.row, ct.col, ct.row) <= 1;
@@ -109,120 +109,120 @@ function levyUnitsNear(state: GameState, civ: Seat, cs: CityState): number {
 
 // ---------------------------------------------------------------------------
 describe('A-12 (B8-L): civ levy', () => {
-  function scenario(): { state: GameState; civ: Seat; cs: CityState } {
+  function scenario(): { state: GameState; civ: Seat; cityState: CityState } {
     const state = makeState(makeMap(24, 24));
     state.turn = 20; // > QUEST_COOLDOWN, ≤ 60 → WARRIOR ladder rung
     const civ = addCiv(state, 10, 10);
-    const cs = addCs(state, 16, 10, { type: 'militaristic' });
-    cs.met = [];
-    setMet(cs, civ.seat);
-    cs.envoys = {  };
-    cs.envoys[civ.seat] = 5; // strict suzerain (seat 0 at zero, no other civ)
-    return { state, civ, cs };
+    const cityState = addCs(state, 16, 10, { type: 'militaristic' });
+    cityState.met = [];
+    setMet(cityState, civ.seat);
+    cityState.envoys = {  };
+    cityState.envoys[civ.seat] = 5; // strict suzerain (seat 0 at zero, no other civ)
+    return { state, civ, cityState };
   }
 
   /** #104: the levy is a wire DECISION — store the kind-7 record the driver
    * would emit; seatPhase's arm re-validates the rule half (militaristic,
    * suzerain, cooldown, afford) through levyUnits itself. */
-  function stashLevy(state: GameState, seat: number, csIndex: number): void {
+  function stashLevy(state: GameState, seat: number, cityStateIndex: number): void {
     (state.seatActions ??= {})[state.turn - 1] = {
-      [seat]: { production: [], tech: null, civic: null, units: [], levy: csIndex },
+      [seat]: { production: [], tech: null, civic: null, units: [], levy: cityStateIndex },
     };
   }
 
   it('a recorded levy on a militaristic CS spawns LEVY_UNITS at its center', () => {
-    const { state, civ, cs } = scenario();
-    expect(isSuzerain(cs, civ.seat)).toBe(true);
+    const { state, civ, cityState } = scenario();
+    expect(isSuzerain(cityState, civ.seat)).toBe(true);
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST; // exactly the price — nothing else spends gold without a record
-    stashLevy(state, civ.seat, state.cityStates.indexOf(cs));
+    stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state, 0);
-    expect(cs.lastLevyTurn).toBe(state.turn);
-    expect(levyUnitsNear(state, civ, cs)).toBe(LEVY_UNITS);
+    expect(cityState.lastLevyTurn).toBe(state.turn);
+    expect(levyUnitsNear(state, civ, cityState)).toBe(LEVY_UNITS);
   });
 
   it('does not levy without a record (the scripted scan is gone)', () => {
-    const { state, civ, cs } = scenario();
+    const { state, civ, cityState } = scenario();
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST;
     seatPhase(state, 0);
-    expect(cs.lastLevyTurn).toBeUndefined();
+    expect(cityState.lastLevyTurn).toBeUndefined();
   });
 
   it('executes a recorded levy at peace — at-war is the driver policy, not a rule', () => {
-    const { state, civ, cs } = scenario();
+    const { state, civ, cityState } = scenario();
     setWar(state, civ.seat, 0, false);
     civ.treasury = LEVY_GOLD_COST;
-    stashLevy(state, civ.seat, state.cityStates.indexOf(cs));
+    stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state, 0);
-    expect(cs.lastLevyTurn).toBe(state.turn);
+    expect(cityState.lastLevyTurn).toBe(state.turn);
   });
 
   it('refuses a recorded levy without suzerainty (2 envoys)', () => {
-    const { state, civ, cs } = scenario();
-    cs.envoys[civ.seat] = 2;
+    const { state, civ, cityState } = scenario();
+    cityState.envoys[civ.seat] = 2;
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST;
-    stashLevy(state, civ.seat, state.cityStates.indexOf(cs));
+    stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state, 0);
-    expect(cs.lastLevyTurn).toBeUndefined();
+    expect(cityState.lastLevyTurn).toBeUndefined();
   });
 
   it('respects the gold cost (one below → no levy)', () => {
-    const { state, civ, cs } = scenario();
+    const { state, civ, cityState } = scenario();
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST - 1;
-    stashLevy(state, civ.seat, state.cityStates.indexOf(cs));
+    stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state, 0);
-    expect(cs.lastLevyTurn).toBeUndefined();
+    expect(cityState.lastLevyTurn).toBeUndefined();
   });
 
   it('shares one per-CS cooldown across seats (a recent levy blocks)', () => {
-    const { state, civ, cs } = scenario();
+    const { state, civ, cityState } = scenario();
     setWar(state, civ.seat, 0, true);
     civ.treasury = LEVY_GOLD_COST;
-    cs.lastLevyTurn = state.turn - (LEVY_COOLDOWN - 1); // still cooling down
-    const before = levyUnitsNear(state, civ, cs);
-    stashLevy(state, civ.seat, state.cityStates.indexOf(cs));
+    cityState.lastLevyTurn = state.turn - (LEVY_COOLDOWN - 1); // still cooling down
+    const before = levyUnitsNear(state, civ, cityState);
+    stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state, 0);
-    expect(cs.lastLevyTurn).toBe(state.turn - (LEVY_COOLDOWN - 1)); // unchanged
-    expect(levyUnitsNear(state, civ, cs)).toBe(before);
+    expect(cityState.lastLevyTurn).toBe(state.turn - (LEVY_COOLDOWN - 1)); // unchanged
+    expect(levyUnitsNear(state, civ, cityState)).toBe(before);
   });
 });
 
 // ---------------------------------------------------------------------------
 describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
-  function scenario(csType: CityStateType = 'scientific'): { state: GameState; civ: Seat; cs: CityState } {
+  function scenario(cityStateType: CityStateType = 'scientific'): { state: GameState; civ: Seat; cityState: CityState } {
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
     const civ = addCiv(state, 10, 10);
-    const cs = addCs(state, 16, 10, { type: csType });
-    cs.met = [];
-    setMet(cs, civ.seat);
-    cs.envoys = {  };
-    cs.envoys[civ.seat] = 3;
-    return { state, civ, cs };
+    const cityState = addCs(state, 16, 10, { type: cityStateType });
+    cityState.met = [];
+    setMet(cityState, civ.seat);
+    cityState.envoys = {  };
+    cityState.envoys[civ.seat] = 3;
+    return { state, civ, cityState };
   }
 
   it('issues buildDistrict when no camp is near and the district is unbuilt (zero-draw)', () => {
-    const { state, civ, cs } = scenario('scientific');
+    const { state, civ, cityState } = scenario('scientific');
     const rng0 = state.rngState;
     seatPhase(state, 0);
-    expect(cs.seatQuest?.[indexOfSeat(civ.seat)]?.kind).toBe('buildDistrict');
-    expect(cs.seatQuest?.[indexOfSeat(civ.seat)]?.district).toBe(CS_TYPE_DISTRICT['scientific']);
+    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]?.kind).toBe('buildDistrict');
+    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]?.district).toBe(CITY_STATE_TYPE_DISTRICT['scientific']);
     expect(state.rngState).toBe(rng0); // NO nextRandom consumed by the civ-quest path
   });
 
   it('prefers clearCamp when a camp is within range (nearest, ties lowest tile)', () => {
-    const { state, civ, cs } = scenario('scientific');
-    const ct = state.map.tiles[cs.centerIndex];
-    const near = tilesWithin(state.map, ct.col, ct.row, 2).filter((t) => t.index !== cs.centerIndex);
+    const { state, civ, cityState } = scenario('scientific');
+    const ct = state.map.tiles[cityState.centerIndex];
+    const near = tilesWithin(state.map, ct.col, ct.row, 2).filter((t) => t.index !== cityState.centerIndex);
     const far = near[near.length - 1].index;
     const close = near[0].index;
     state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
     const rng0 = state.rngState;
     seatPhase(state, 0);
-    const q = cs.seatQuest?.[indexOfSeat(civ.seat)];
+    const q = cityState.seatQuest?.[indexOfSeat(civ.seat)];
     expect(q?.kind).toBe('clearCamp');
     // nearest to the CS center
     const dc = hexDistance(state.map.tiles[close].col, state.map.tiles[close].row, ct.col, ct.row);
@@ -232,26 +232,26 @@ describe('A-12 (B8-L): civ quests (deterministic, zero-draw)', () => {
   });
 
   it('resolves a satisfied quest with +QUEST_ENVOYS to the civ, zero-draw', () => {
-    const { state, civ, cs } = scenario('scientific');
+    const { state, civ, cityState } = scenario('scientific');
     // pre-seed a clearCamp quest whose camp is already gone → satisfied
-    cs.seatQuest = [];
-    cs.seatQuest[indexOfSeat(civ.seat)] = { kind: 'clearCamp', campIndex: 999 };
-    cs.seatQuestIssuedTurn = [];
-    cs.seatQuestIssuedTurn[indexOfSeat(civ.seat)] = state.turn;
+    cityState.seatQuest = [];
+    cityState.seatQuest[indexOfSeat(civ.seat)] = { kind: 'clearCamp', campIndex: 999 };
+    cityState.seatQuestIssuedTurn = [];
+    cityState.seatQuestIssuedTurn[indexOfSeat(civ.seat)] = state.turn;
     state.barbSeat.camps = []; // camp 999 gone
-    const env0 = envoysOf(cs, civ.seat);
+    const env0 = envoysOf(cityState, civ.seat);
     const rng0 = state.rngState;
     seatPhase(state, 0);
-    expect(cs.seatQuest?.[indexOfSeat(civ.seat)]).toBeNull();
-    expect(envoysOf(cs, civ.seat)).toBe(env0 + QUEST_ENVOYS);
+    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]).toBeNull();
+    expect(envoysOf(cityState, civ.seat)).toBe(env0 + QUEST_ENVOYS);
     expect(state.rngState).toBe(rng0);
   });
 
   it('does not issue a quest for an UNMET city-state', () => {
-    const { state, civ, cs } = scenario('scientific');
-    cs.met = cs.met.filter((x) => x !== civ.seat);
+    const { state, civ, cityState } = scenario('scientific');
+    cityState.met = cityState.met.filter((x) => x !== civ.seat);
     seatPhase(state, 0);
-    expect(cs.seatQuest?.[indexOfSeat(civ.seat)] ?? null).toBeNull();
+    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)] ?? null).toBeNull();
   });
 });
 
@@ -264,16 +264,16 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
     const civ = addCiv(state, 10, 10);
-    const cs = addCs(state, 16, 10, { type: 'scientific' });
-    cs.met = [];
-    setMet(cs, civ.seat);
-    cs.envoys = {  };
-    cs.envoys[civ.seat] = 3;
+    const cityState = addCs(state, 16, 10, { type: 'scientific' });
+    cityState.met = [];
+    setMet(cityState, civ.seat);
+    cityState.envoys = {  };
+    cityState.envoys[civ.seat] = 3;
     // a satisfied quest to resolve + an issue on the same phase (second CS)
-    cs.seatQuest = [];
-    cs.seatQuest[indexOfSeat(civ.seat)] = { kind: 'clearCamp', campIndex: 999 };
-    cs.seatQuestIssuedTurn = [];
-    cs.seatQuestIssuedTurn[indexOfSeat(civ.seat)] = state.turn;
+    cityState.seatQuest = [];
+    cityState.seatQuest[indexOfSeat(civ.seat)] = { kind: 'clearCamp', campIndex: 999 };
+    cityState.seatQuestIssuedTurn = [];
+    cityState.seatQuestIssuedTurn[indexOfSeat(civ.seat)] = state.turn;
     const cs2 = addCs(state, 10, 16, { type: 'cultural' });
     cs2.met = [];
     setMet(cs2, civ.seat);
@@ -283,7 +283,7 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     const rng0 = state.rngState;
     seatPhase(state, 0);
     // both a resolve and an issue happened, drawing nothing
-    expect(cs.seatQuest?.[indexOfSeat(civ.seat)]).toBeNull();
+    expect(cityState.seatQuest?.[indexOfSeat(civ.seat)]).toBeNull();
     expect(cs2.seatQuest?.[indexOfSeat(civ.seat)]?.kind).toBe('buildDistrict');
     expect(state.rngState).toBe(rng0);
   });
@@ -294,14 +294,14 @@ describe('A-12 (B8-L): SEAT-0 quest draw-count neutrality', () => {
     // the shared PRNG, so quest issuance can never shift a draw count.
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
-    const cs = addCs(state, 16, 10, { type: 'scientific', met: [0] });
-    cs.questIssuedTurn = state.turn - QUEST_COOLDOWN; // due to issue
+    const cityState = addCs(state, 16, 10, { type: 'scientific', met: [0] });
+    cityState.questIssuedTurn = state.turn - QUEST_COOLDOWN; // due to issue
     state.barbSeat.camps = [];
     const rng0 = state.rngState;
     cityStatePhase(state, 0);
-    expect(cs.quest).not.toBeNull();
+    expect(cityState.quest).not.toBeNull();
     // scientific -> the type's own district, not a draw from a flat list
-    expect(cs.quest?.kind).toBe('buildDistrict');
+    expect(cityState.quest?.kind).toBe('buildDistrict');
     expect(state.rngState).toBe(rng0); // ZERO draws
   });
 });

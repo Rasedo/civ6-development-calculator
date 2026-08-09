@@ -7,7 +7,7 @@ import { tilesWithin } from '../../../world/hex';
 import { seatPhase, levyUnits, loyaltyDelta, applyLoyalty, flipCity } from '../../../cpu/core/phase';
 import { barbarianPhase, meleeAttack, attackTargets } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
-import { CS_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST } from '../../../cpu/data/cityStates';
+import { CITY_STATE_MAX_HP, LEVY_UNITS, LEVY_GOLD_COST } from '../../../cpu/data/cityStates';
 import { declareWarOnCityState } from '../../../cpu/core/cityStates';
 import type { CityState, CityStateType, GameState, City, Seat } from '../../../cpu/core/types';
 
@@ -80,7 +80,7 @@ function addCiv(state: GameState, col: number, row: number, opts: Partial<Seat> 
 
 function addCs(state: GameState, col: number, row: number, type: CityStateType, envoys = 0): CityState {
   const center = tileAtCoords(state.map, col, row);
-  const cs: CityState = {
+  const cityState: CityState = {
     ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
     name: 'Valletta',
@@ -92,9 +92,9 @@ function addCs(state: GameState, col: number, row: number, type: CityStateType, 
     quest: null,
     questIssuedTurn: 0,
   };
-  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id));
-  state.cityStates.push(cs);
-  return cs;
+  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
+  state.cityStates.push(cityState);
+  return cityState;
 }
 
 describe('civ tile economies', () => {
@@ -119,7 +119,7 @@ describe('civ tile economies', () => {
     // A productive civ converts POPULATION into CITIES, and each settler costs
     // its city a pop — so one city's count is NOT a growth proxy. Sum the
     // empire, which is what "grows faster" means.
-    const totalPop = (r: Seat) => r.cities.reduce((n, rc) => n + rc.population, 0);
+    const totalPop = (r: Seat) => r.cities.reduce((n, civCity) => n + civCity.population, 0);
     expect(a.cities.length).toBeGreaterThan(b.cities.length);
     expect(totalPop(a)).toBeGreaterThan(totalPop(b));
     // Production output is queue COMPLETIONS — richer land fields
@@ -129,11 +129,11 @@ describe('civ tile economies', () => {
       st.units.filter((u) => isCiv(u.seat) && u.seat === r.seat).length * 40 +
       (r.cities.length - 1) * 90 +
       r.cities.reduce(
-        (n, rc) =>
+        (n, civCity) =>
           n +
-          (rc.queue[0]?.progress ?? 0) +
-          rc.districts.filter((d) => d.type !== 'CITY_CENTER').length * 54 +
-          rc.buildings.length * 60,
+          (civCity.queue[0]?.progress ?? 0) +
+          civCity.districts.filter((d) => d.type !== 'CITY_CENTER').length * 54 +
+          civCity.buildings.length * 60,
         0,
       );
     expect(output(rich, a)).toBeGreaterThan(output(poor, b));
@@ -145,20 +145,20 @@ describe('barbarians vs the other civs', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
-    const rc = civ.cities[0];
-    rc.hp = 5;
+    const civCity = civ.cities[0];
+    civCity.hp = 5;
     const defender = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 3).index, civ.seat)!;
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 3, 4).index, BARB_SEAT);
     const sieger = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 7, 8).index, BARB_SEAT)!;
-    const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== rc.centerIndex)!;
+    const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== civCity.centerIndex)!;
     sieger.tileIndex = adj.index;
 
-    const popBefore = rc.population;
+    const popBefore = civCity.population;
     barbarianPhase(state, 0);
     // Civ city sacked, not captured — it still belongs to Rome.
     expect(civ.cities.length).toBe(1);
-    expect(rc.population).toBeLessThanOrEqual(popBefore);
-    expect(rc.hp).toBeGreaterThan(5); // reset after the sack
+    expect(civCity.population).toBeLessThanOrEqual(popBefore);
+    expect(civCity.hp).toBeGreaterThan(5); // reset after the sack
     // And the lone civ defender took a hit from its barbarian neighbor.
     expect(defender.hp < 100 || !state.units.includes(defender)).toBe(true);
   });
@@ -179,53 +179,53 @@ describe('city-state conquest and levies', () => {
   it('a besieged city-state falls and joins the empire', () => {
     const state = makeState();
     state.unitsMode = true;
-    const cs = addCs(state, 8, 8, 'scientific', 3);
-    cs.hp = 5;
+    const cityState = addCs(state, 8, 8, 'scientific', 3);
+    cityState.hp = 5;
     const attacker = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 6, 8).index, 0)!;
-    const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== cs.centerIndex)!;
+    const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== cityState.centerIndex)!;
     attacker.tileIndex = adj.index;
     attacker.movesLeft = 2;
 
     // A city-state is a separate seat — you must DECLARE first.
     // Peace is the default, and the resolver now refuses a peaceful target.
-    expect(meleeAttack(state, attacker.id, cs.centerIndex, 0).ok).toBe(false);
-    expect(declareWarOnCityState(state, cs.id, 0).ok).toBe(true);
+    expect(meleeAttack(state, attacker.id, cityState.centerIndex, 0).ok).toBe(false);
+    expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
 
-    const r = meleeAttack(state, attacker.id, cs.centerIndex, 0);
+    const r = meleeAttack(state, attacker.id, cityState.centerIndex, 0);
     expect(r.ok).toBe(true);
     expect(state.cityStates.length).toBe(0);
     const city = seatOf(state, 0)!.cities.find((c) => c.name === 'Valletta');
     expect(city).toBeDefined();
-    expect(tileCity(state.map.tiles[cs.centerIndex])).toBe(city!.id);
-    expect((isCityStateSeat(tileSeat(state.map.tiles[cs.centerIndex])) ? cityStateOfSeat(tileSeat(state.map.tiles[cs.centerIndex])) : -1)).toBe(-1);
+    expect(tileCity(state.map.tiles[cityState.centerIndex])).toBe(city!.id);
+    expect((isCityStateSeat(tileSeat(state.map.tiles[cityState.centerIndex])) ? cityStateOfSeat(tileSeat(state.map.tiles[cityState.centerIndex])) : -1)).toBe(-1);
   });
 
   it('autopilot target lists never include peaceful city-states', () => {
     const state = makeState();
     state.unitsMode = true;
-    const cs = addCs(state, 8, 8, 'trade', 0);
+    const cityState = addCs(state, 8, 8, 'trade', 0);
     const unit = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 6, 8).index, 0)!;
-    const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== cs.centerIndex)!;
+    const adj = tilesWithin(state.map, 8, 8, 1).find((t) => t.index !== cityState.centerIndex)!;
     unit.tileIndex = adj.index;
     unit.movesLeft = 2;
-    expect(attackTargets(state, unit)).not.toContain(cs.centerIndex);
+    expect(attackTargets(state, unit)).not.toContain(cityState.centerIndex);
     // ... And DOES once war is declared — the mask column the
     // residual was blocked on. The peaceful case above is the invariant
     // that made a war state necessary rather than an unconditional arm.
-    expect(declareWarOnCityState(state, cs.id, 0).ok).toBe(true);
-    expect(attackTargets(state, unit)).toContain(cs.centerIndex);
+    expect(declareWarOnCityState(state, cityState.id, 0).ok).toBe(true);
+    expect(attackTargets(state, unit)).toContain(cityState.centerIndex);
   });
 
   it('suzerains levy militaristic troops for gold, on a cooldown', () => {
     const state = makeState();
     state.unitsMode = true;
-    const cs = addCs(state, 8, 8, 'militaristic', 3);
+    const cityState = addCs(state, 8, 8, 'militaristic', 3);
     seatOf(state, 0)!.treasury = LEVY_GOLD_COST;
-    expect(levyUnits(state, cs.id, 0).ok).toBe(true);
+    expect(levyUnits(state, cityState.id, 0).ok).toBe(true);
     expect(state.units.filter((u) => (u.seat) === 0).length).toBe(LEVY_UNITS);
     expect(seatOf(state, 0)!.treasury).toBe(0);
     seatOf(state, 0)!.treasury = LEVY_GOLD_COST;
-    expect(levyUnits(state, cs.id, 0).ok).toBe(false); // cooldown
+    expect(levyUnits(state, cityState.id, 0).ok).toBe(false); // cooldown
 
     const nonMil = addCs(state, 2, 2, 'scientific', 3);
     expect(levyUnits(state, nonMil.id, 0).ok).toBe(false);
@@ -235,11 +235,11 @@ describe('city-state conquest and levies', () => {
 
   it('battered city-states recover over time', () => {
     const state = makeState();
-    const cs = addCs(state, 8, 8, 'trade', 0);
-    cs.hp = 50;
+    const cityState = addCs(state, 8, 8, 'trade', 0);
+    cityState.hp = 50;
     endTurn(state, 0);
-    expect(cs.hp).toBeGreaterThan(50);
-    expect(cs.hp).toBeLessThanOrEqual(CS_MAX_HP);
+    expect(cityState.hp).toBeGreaterThan(50);
+    expect(cityState.hp).toBeLessThanOrEqual(CITY_STATE_MAX_HP);
   });
 });
 

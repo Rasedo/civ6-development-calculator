@@ -421,12 +421,12 @@ describe('B-4 XP & levels', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col + 1, center.row); // adjacent → in range 1..2
-    const rv = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
-    rv.tileIndex = near.index;
-    rv.hp = 100; // survives the strike (defense 25 vs city ~15)
-    expect(rv.xp).toBe(0);
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    civSeat.tileIndex = near.index;
+    civSeat.hp = 100; // survives the strike (defense 25 vs city ~15)
+    expect(civSeat.xp).toBe(0);
     barbarianPhase(state, 0);
-    expect(rv.hp).toBeLessThan(100); // the walls strike landed
-    expect(rv.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
+    expect(civSeat.hp).toBeLessThan(100); // the walls strike landed
+    expect(civSeat.xp).toBe(2); // survived → +2 (attacker is the city, no attacker xp)
   });
 });

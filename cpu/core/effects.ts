@@ -9,7 +9,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, cardFitsSlot, GOVERNMENTS_ADOPTION_LIVE, type PolicyEffects, type GovernmentDef } from '../data/policies';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, B18_FOLLOWER_COUPLING_LIVE, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { seatOf, citiesOf } from './seats';
-import { csEnvoyBonuses, csSuzerainCapitalBonus } from './cityStates';
+import { cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus } from './cityStates';
 
 // ---------------------------------------------------------------------------
 // Unlocks
@@ -307,15 +307,15 @@ export function getModifiers(state: GameState, seat: number): Modifiers {
   // The city-state channel: envoy tier bonuses and the suzerain capital perk,
   // for whichever seat is asking. A seat holding no envoys reads zero.
   if (state.cityStates?.length) {
-    const cs = csEnvoyBonuses(state, seat);
-    addPartial(mods.capitalYields, cs.capital);
+    const cityState = cityStateEnvoyBonuses(state, seat);
+    addPartial(mods.capitalYields, cityState.capital);
     // The 3/6 tiers land on BUILDINGS (buildingYieldAdd, applied in
     // cityBuildingYields — inheriting its pillaged-dark + regional-skip).
-    for (const [building, y] of Object.entries(cs.buildingAdd)) {
+    for (const [building, y] of Object.entries(cityState.buildingAdd)) {
       const cur = (mods.buildingYieldAdd[building] ??= {});
       addPartial(cur, y);
     }
-    addPartial(mods.capitalYields, csSuzerainCapitalBonus(state, seat));
+    addPartial(mods.capitalYields, cityStateSuzerainCapitalBonus(state, seat));
   }
   return mods;
 }

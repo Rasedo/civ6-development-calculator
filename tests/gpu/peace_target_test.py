@@ -38,24 +38,24 @@ def build():
 def place(sim, tile, seat0, hp=100):
     """Put a MILITARY unit of the given side on `tile`, return its pool slot."""
     if seat0:
-        slot = int(sim.p_next[0])
-        sim.p_alive[0, slot] = True
-        sim.p_type[0, slot] = 2  # WARRIOR
-        sim.p_tile[0, slot] = tile
-        sim.p_hp[0, slot] = hp
-        sim.p_seat[0, slot] = 0
-        sim.occ_mil[0, tile] = slot
-        sim.p_next[0] += 1
+        slot = int(sim.seat0_unit_next[0])
+        sim.seat0_unit_alive[0, slot] = True
+        sim.seat0_unit_type[0, slot] = 2  # WARRIOR
+        sim.seat0_unit_tile[0, slot] = tile
+        sim.seat0_unit_hp[0, slot] = hp
+        sim.seat0_unit_seat[0, slot] = 0
+        sim.military_at[0, tile] = slot
+        sim.seat0_unit_next[0] += 1
         return slot
-    slot = int(sim.v_next[0])
-    sim.v_alive[0, slot] = True
-    sim.v_civ[0, slot] = 0
-    sim.v_seat[0, slot] = 1  # the absolute seat of civ 0
-    sim.v_type[0, slot] = 2
-    sim.v_tile[0, slot] = tile
-    sim.v_hp[0, slot] = hp
-    sim.occ_mil[0, tile] = slot + sim.POOL_LO["v"]
-    sim.v_next[0] += 1
+    slot = int(sim.civ_unit_next[0])
+    sim.civ_unit_alive[0, slot] = True
+    sim.civ_unit_civ[0, slot] = 0
+    sim.civ_unit_seat[0, slot] = 1  # the absolute seat of civ 0
+    sim.civ_unit_type[0, slot] = 2
+    sim.civ_unit_tile[0, slot] = tile
+    sim.civ_unit_hp[0, slot] = hp
+    sim.military_at[0, tile] = slot + sim.POOL_LO["civ"]
+    sim.civ_unit_next[0] += 1
     return slot
 
 
@@ -64,12 +64,12 @@ def scenario(sim):
     for t in range(sim.T):
         if not bool(sim.passable[0, t]):
             continue
-        if int(sim.occ_mil[0, t]) >= 0 or int(sim.occ_civ[0, t]) >= 0:
+        if int(sim.military_at[0, t]) >= 0 or int(sim.civilian_at[0, t]) >= 0:
             continue
         for n in sim.neigh[t].tolist():
             if n < 0 or not bool(sim.passable[0, n]):
                 continue
-            if int(sim.occ_mil[0, n]) >= 0 or int(sim.occ_civ[0, n]) >= 0:
+            if int(sim.military_at[0, n]) >= 0 or int(sim.civilian_at[0, n]) >= 0:
                 continue
             return t, n
     raise AssertionError("no free adjacent land pair for the scenario")
@@ -77,8 +77,8 @@ def scenario(sim):
 
 def run(ranged: bool) -> None:
     sim = build()
-    v_tile, pl_tile = scenario(sim)
-    v = place(sim, v_tile, seat0=False)
+    civ_unit_tile, pl_tile = scenario(sim)
+    v = place(sim, civ_unit_tile, seat0=False)
     p = place(sim, pl_tile, seat0=True)
 
     # civ 0 is AT PEACE with seat 0, and AT WAR with civ 1.
@@ -89,15 +89,15 @@ def run(ranged: bool) -> None:
         sim.civ_pair_war[0, 1, 0] = True
         sim.sync_war()  # close the poke under transpose
 
-    before = int(sim.p_hp[0, p])
+    before = int(sim.seat0_unit_hp[0, p])
     att = torch.zeros(sim.B, dtype=torch.bool)
     att[0] = True
     tgt = torch.full((sim.B,), pl_tile, dtype=torch.long)
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "v", v)
+        sim._hostile_ranged_strike(att, tgt, "civ", v)
     else:
-        sim._hostile_vs_unit(att, tgt, "v", v)
-    after = int(sim.p_hp[0, p])
+        sim._hostile_vs_unit(att, tgt, "civ", v)
+    after = int(sim.seat0_unit_hp[0, p])
     kind = "ranged" if ranged else "melee"
     assert after == before, (
         f"{kind}: a civ AT PEACE with seat 0 damaged a seat-0 unit "
@@ -110,10 +110,10 @@ def run(ranged: bool) -> None:
     sim.civ_only_atwar[0, 0] = True
     sim.sync_war()  # close the poke under transpose
     if ranged:
-        sim._hostile_ranged_strike(att, tgt, "v", v)
+        sim._hostile_ranged_strike(att, tgt, "civ", v)
     else:
-        sim._hostile_vs_unit(att, tgt, "v", v)
-    at_war = int(sim.p_hp[0, p])
+        sim._hostile_vs_unit(att, tgt, "civ", v)
+    at_war = int(sim.seat0_unit_hp[0, p])
     assert at_war < before, (
         f"{kind}: the scenario is inert — the attack did not land even AT WAR "
         f"({before} -> {at_war}); the peace assertion above proves nothing"

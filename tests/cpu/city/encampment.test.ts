@@ -71,11 +71,11 @@ describe('B-17 Encampment', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row); // adjacent -> in range
-    const rv = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
-    rv.hp = 100;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    civSeat.hp = 100;
     barbarianPhase(state, 0);
-    expect(rv.hp).toBeLessThan(100); // the Encampment strike landed
-    expect(rv.xp).toBe(2); // survived -> +2 (attacker is the city)
+    expect(civSeat.hp).toBeLessThan(100); // the Encampment strike landed
+    expect(civSeat.xp).toBe(2); // survived -> +2 (attacker is the city)
   });
 
   it('control: an incomplete Encampment strikes nothing', () => {
@@ -85,10 +85,10 @@ describe('B-17 Encampment', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const rv = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
-    rv.hp = 100;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    civSeat.hp = 100;
     barbarianPhase(state, 0);
-    expect(rv.hp).toBe(100);
+    expect(civSeat.hp).toBe(100);
   });
 
   it('walls + Encampment rolls twice, walls first', () => {
@@ -98,8 +98,8 @@ describe('B-17 Encampment', () => {
     state.seats.push({ id: 0, atWar: true, cities: [] } as any);
     const center = state.map.tiles[city.centerIndex];
     const near = tileAtCoords(state.map, center.col - 1, center.row);
-    const rv = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
-    rv.hp = 100;
+    const civSeat = spawnUnit(state, 'SPEARMAN', near.index, seatOfIndex(0))!;
+    civSeat.hp = 100;
     const log: string[] = [];
     (globalThis as any).__cbLog = log;
     try {

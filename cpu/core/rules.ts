@@ -59,10 +59,10 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
       return no(`Too close to ${c.name} (min ${CITY_MIN_DIST} tiles).`);
     }
   }
-  for (const cs of state.cityStates ?? []) {
-    const centre = state.map.tiles[cs.centerIndex];
+  for (const cityState of state.cityStates ?? []) {
+    const centre = state.map.tiles[cityState.centerIndex];
     if (hexDistance(centre.col, centre.row, tile.col, tile.row) < CITY_MIN_DIST) {
-      return no(`Too close to the city-state of ${cs.name}.`);
+      return no(`Too close to the city-state of ${cityState.name}.`);
     }
   }
   return ok;

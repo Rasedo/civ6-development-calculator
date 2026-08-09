@@ -22,9 +22,9 @@ import { availableTechsIn, availableCivicsIn, computeUnlocksIn, type Unlocks } f
 import { detectBoosts, effectiveResearchCostIn } from './boosts';
 import { getModifiers } from './effects';
  // Seat specialist yields
-import { routeYields, csRouteYields, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
+import { routeYields, cityStateRouteYields, TRADE_ROUTE_RANGE, TRADE_ROUTE_DURATION, tradeCapacity } from './trade';
 import { addEnvoys, hasMet, isSuzerain, issueQuest, questSatisfied, setMet } from './cityStates';
-import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CS_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
+import { LEVY_UNITS, LEVY_GOLD_COST, LEVY_COOLDOWN, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MEET_RANGE, QUEST_COOLDOWN, QUEST_ENVOYS } from '../data/cityStates';
 import { computeAdoption } from './effects';
 import { GOVERNMENTS_ADOPTION_LIVE } from '../data/policies';
 import type { RuleResult } from './rules';
@@ -142,8 +142,8 @@ export function placeSeats(state: GameState, count?: number): void {
     if (picked.length >= target) break;
     if (picked.some((p) => hexDistance(p.col, p.row, t.col, t.row) < CIV_SPACING)) continue;
     if (
-      state.cityStates.some((cs) => {
-        const c = state.map.tiles[cs.centerIndex];
+      state.cityStates.some((cityState) => {
+        const c = state.map.tiles[cityState.centerIndex];
         return hexDistance(c.col, c.row, t.col, t.row) < 8;
       })
     ) {
@@ -235,7 +235,7 @@ export function seatProximity(state: GameState, actor: Seat): number {
   for (const c of seatOf(state, seat)!.cities) {
     best = Math.min(
       best,
-      nearestDistance(state, c.centerIndex, actor.cities.map((rc) => rc.centerIndex)),
+      nearestDistance(state, c.centerIndex, actor.cities.map((civCity) => civCity.centerIndex)),
     );
   }
   return best;
@@ -302,24 +302,24 @@ function makePeace(state: GameState, actor: Seat): void {
   // this is the ONLY way out of a suzerain-driven war — see
   // sueForPeaceWithCityState, which refuses while the suzerain is still hostile.
   // Placed in makePeace, not sueForPeace, so the AI peace path gets it too.
-  for (const cs of state.cityStates ?? []) {
-    if (civsAtWar(state, cs.seat, WAR_COLUMN_SEAT) && isSuzerain(cs, actor.seat)) {
-      setWar(state, cs.seat, WAR_COLUMN_SEAT, false);
-      cs.csWarTurns = 0;
-      warWearinessPeace(state, WAR_COLUMN_SEAT, seatOfCityState(cs.id)); // #51/S7.8f
-      state.eventLog.push(`${cs.name} makes peace alongside its suzerain.`);
+  for (const cityState of state.cityStates ?? []) {
+    if (civsAtWar(state, cityState.seat, WAR_COLUMN_SEAT) && isSuzerain(cityState, actor.seat)) {
+      setWar(state, cityState.seat, WAR_COLUMN_SEAT, false);
+      cityState.cityStateWarTurns = 0;
+      warWearinessPeace(state, WAR_COLUMN_SEAT, seatOfCityState(cityState.id)); // #51/S7.8f
+      state.eventLog.push(`${cityState.name} makes peace alongside its suzerain.`);
     }
   }
   state.eventLog.push(`Peace with ${actor.name}.`);
 }
 
 /** Levy a militaristic city-state's troops (suzerain only, gold, cooldown). */
-export function levyUnits(state: GameState, csId: number, seat: number): RuleResult {
-  const cs = state.cityStates.find((c) => c.id === csId);
-  if (!cs) return no('No such city-state.');
-  if (cs.type !== 'militaristic') return no('Only militaristic city-states levy troops.');
-  if (!isSuzerain(cs, seat)) return no('You must be suzerain (3+ envoys).');
-  const since = state.turn - (cs.lastLevyTurn ?? -LEVY_COOLDOWN);
+export function levyUnits(state: GameState, cityStateId: number, seat: number): RuleResult {
+  const cityState = state.cityStates.find((c) => c.id === cityStateId);
+  if (!cityState) return no('No such city-state.');
+  if (cityState.type !== 'militaristic') return no('Only militaristic city-states levy troops.');
+  if (!isSuzerain(cityState, seat)) return no('You must be suzerain (3+ envoys).');
+  const since = state.turn - (cityState.lastLevyTurn ?? -LEVY_COOLDOWN);
   if (since < LEVY_COOLDOWN) {
     return no(`Their troops are spent — ready in ${LEVY_COOLDOWN - since} turns.`);
   }
@@ -329,10 +329,10 @@ export function levyUnits(state: GameState, csId: number, seat: number): RuleRes
   }
   const type = state.turn > 60 ? 'SPEARMAN' : 'WARRIOR';
   for (let i = 0; i < LEVY_UNITS; i++) {
-    spawnUnit(state, type, cs.centerIndex, seat);
+    spawnUnit(state, type, cityState.centerIndex, seat);
   }
-  cs.lastLevyTurn = state.turn;
-  state.eventLog.push(`${cs.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
+  cityState.lastLevyTurn = state.turn;
+  state.eventLog.push(`${cityState.name} levies ${LEVY_UNITS} ${type === 'SPEARMAN' ? 'spearmen' : 'warriors'} to your cause.`);
   return ok;
 }
 
@@ -470,16 +470,16 @@ export function relocatePalace(
 export function placeSeatDistrict(
   state: GameState,
   actor: Seat,
-  rc: City,
+  civCity: City,
   id: DistrictId,
   unlocks: Unlocks,
 ): boolean {
-  const owns = (t: Tile) => tileBelongsTo(t, rc);
+  const owns = (t: Tile) => tileBelongsTo(t, civCity);
   let best = -1;
   let bestAdj = -1;
   for (const t of state.map.tiles) {
     if (!owns(t) || t.improvement) continue;
-    if (!canPlaceDistrictIn(state, rc, id, t.index, { unlocks, ownsTile: owns }).ok) continue;
+    if (!canPlaceDistrictIn(state, civCity, id, t.index, { unlocks, ownsTile: owns }).ok) continue;
     const adj = Math.floor(districtAdjacency(state.map, t, id));
     if (adj > bestAdj) {
       bestAdj = adj;
@@ -499,8 +499,8 @@ export function placeSeatDistrict(
   // seat 0's queueDistrict (real Civ 6 rule; canPlaceDistrictIn already
   // refused luxury/strategic).
   if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-  rc.districts.push({ type: id, tileIndex: best });
-  commitProduction(state, rc.seat, rc, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
+  civCity.districts.push({ type: id, tileIndex: best });
+  commitProduction(state, civCity.seat, civCity, { kind: 'district', district: id, tileIndex: best, progress: 0, cost });
   return true;
 }
 
@@ -513,9 +513,9 @@ export function placeSeatDistrict(
  * time — the replay refuses rather than double-building. The capital gate
  * stays OUT: it is the scripted picker's heuristic (the #82 settler lesson),
  * and real Civ 6 lets any city raise any unlocked wonder. */
-export function placeSeatWonder(state: GameState, actor: Seat, rc: City, def: BuiltWonderDef): boolean {
+export function placeSeatWonder(state: GameState, actor: Seat, civCity: City, def: BuiltWonderDef): boolean {
   const civ = actor.seat;
-  const center = state.map.tiles[rc.centerIndex];
+  const center = state.map.tiles[civCity.centerIndex];
   {
     if (wonderExists(state, def.id)) return false;
     if (def.requiresTech && !actor.research.techs.includes(def.requiresTech)) return false;
@@ -524,9 +524,9 @@ export function placeSeatWonder(state: GameState, actor: Seat, rc: City, def: Bu
     const cands = tilesWithin(state.map, center.col, center.row, CITY_WORK_RADIUS)
       .filter((t) => {
         // Per-city ownership, mirroring canPlaceWonder's `tileCity(tile) ===
-        // city.id` — the wonder tile registers to THIS rc (`Tile.ownerCity`), not
+        // city.id` — the wonder tile registers to THIS civCity (`Tile.ownerCity`), not
         // merely the civ. Same coherence fix as tryQueueDistrict.
-        if (!tileOwnedByCiv(t, civ) || !tileBelongsTo(t, rc) || t.index === rc.centerIndex) return false;
+        if (!tileOwnedByCiv(t, civ) || !tileBelongsTo(t, civCity) || t.index === civCity.centerIndex) return false;
         if (t.district || t.builtWonder || t.wonder) return false;
         if (isImpassable(t)) return false;
         if (t.resource && RESOURCES[t.resource].category !== 'bonus') return false;
@@ -554,8 +554,8 @@ export function placeSeatWonder(state: GameState, actor: Seat, rc: City, def: Bu
     tile.improvement = null;
     tile.feature = tile.feature === 'FLOODPLAINS' ? tile.feature : null;
     if (tile.resource && RESOURCES[tile.resource].category === 'bonus') tile.resource = null;
-    rc.wonders.push({ id: def.id, tileIndex: tile.index });
-    commitProduction(state, rc.seat, rc, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
+    civCity.wonders.push({ id: def.id, tileIndex: tile.index });
+    commitProduction(state, civCity.seat, civCity, { kind: 'wonder', wonder: def.id, tileIndex: tile.index, progress: 0 });
     return true;
   }
 }
@@ -566,11 +566,11 @@ export function placeSeatWonder(state: GameState, actor: Seat, rc: City, def: Bu
  * the one-shot spaceProjects ledger), which no mask offers yet. Re-validates
  * the district on THIS city. */
 /** Queue a non-space project, judged by the shared `availableProjects` gate. */
-export function queueSeatProject(state: GameState, rc: City, projId: string): boolean {
+export function queueSeatProject(state: GameState, civCity: City, projId: string): boolean {
   const proj = PROJECTS[projId];
   if (!proj || proj.space || proj.victory) return false;
-  if (!availableProjects(state, rc).some((p) => p.id === projId)) return false;
-  return queueProject(state, rc.id, projId, rc.seat).ok;
+  if (!availableProjects(state, civCity).some((p) => p.id === projId)) return false;
+  return queueProject(state, civCity.id, projId, civCity.seat).ok;
 }
 
 
@@ -628,7 +628,7 @@ export function worldCongress(state: GameState): void {
 
 
 
-/** The rc → rc transfer (loyalty flips between opponents): pop ×0.75 floor 1,
+/** The civCity → civCity transfer (loyalty flips between opponents): pop ×0.75 floor 1,
  * fresh boxes, CITY_CENTER-only registry, half HP, territory re-tags —
  * the shared transferCity shape. */
 /**
@@ -643,7 +643,7 @@ export function transferCity(
   state: GameState,
   fromSeat: number,
   to: Seat,
-  rc: City,
+  civCity: City,
   why: string,
   plunder = why === 'conquered',
 ): boolean {
@@ -652,31 +652,31 @@ export function transferCity(
   // The losing seat's city list — one lookup, because every seat holds its own.
   const loser = seatOf(state, fromSeat);
   if (loser) {
-    loser.cities = loser.cities.filter((c) => c.id !== rc.id);
+    loser.cities = loser.cities.filter((c) => c.id !== civCity.id);
     relocatePalace(loser.cities);
     // Routes die with their endpoint (the receiver starts route-less).
-    if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== rc.id && x.to !== rc.id);
+    if (loser.tradeRoutes) loser.tradeRoutes = loser.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   }
-  state.tradeRoutes = state.tradeRoutes.filter((x) => x.from !== rc.id && x.to !== rc.id);
+  state.tradeRoutes = state.tradeRoutes.filter((x) => x.from !== civCity.id && x.to !== civCity.id);
   // CONQUEST razes at the winner's city cap — the city simply
   // ceases (tiles freed, centre unpaved, no plunder). Loyalty flips stay
   // uncapped. This arm lived only on the seat 0 path; a seat taking a seat
   // city past its cap silently exceeded it.
   if (why === 'conquered' && to.cities.length >= MAX_CITIES_PER_SEAT) {
     for (const t of state.map.tiles) {
-      if (tileBelongsTo(t, rc)) setTileOwner(t, NO_SEAT);
+      if (tileBelongsTo(t, civCity)) setTileOwner(t, NO_SEAT);
     }
-    const centre = state.map.tiles[rc.centerIndex];
+    const centre = state.map.tiles[civCity.centerIndex];
     centre.district = null;
     centre.districtComplete = false;
-    state.eventLog.push(`${rc.name} razed — ${to.name} cannot govern more cities.`);
+    state.eventLog.push(`${civCity.name} razed — ${to.name} cannot govern more cities.`);
     return false;
   }
   // Exactly the flipping city's tiles re-tag, found by registry scan: a
   // work-radius sweep would leak the outer ring and steal sibling frontage.
   for (const t of state.map.tiles) {
-    if (tileBelongsTo(t, rc)) {
-      setTileOwner(t, to.seat, to.nextCityId); // the rc pushed below
+    if (tileBelongsTo(t, civCity)) {
+      setTileOwner(t, to.seat, to.nextCityId); // the civCity pushed below
     }
   }
   // Conquest keeps infrastructure: the city carries its districts, its
@@ -696,23 +696,23 @@ export function transferCity(
       keptDistricts.push({ type: t.district, tileIndex: t.index });
     }
   }
-  const keptBuildings = rc.buildings.filter((b) => b !== 'PALACE');
+  const keptBuildings = civCity.buildings.filter((b) => b !== 'PALACE');
   const flipped: City = {
     id: to.nextCityId++,
-    name: rc.name,
+    name: civCity.name,
     seat: to.seat,
-    centerIndex: rc.centerIndex,
-    population: Math.max(1, Math.floor(rc.population * 0.75)),
+    centerIndex: civCity.centerIndex,
+    population: Math.max(1, Math.floor(civCity.population * 0.75)),
     foodBox: 0,
     cultureBox: 0,
-    tilesAcquired: rc.tilesAcquired,
+    tilesAcquired: civCity.tilesAcquired,
     lockedTiles: [],
     focus: 'balanced',
     queue: [],
     isCapital: false,
     buildings: keptBuildings,
     districts: keptDistricts,
-    wonders: rc.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
+    wonders: civCity.wonders.filter((w) => tileBelongsTo(state.map.tiles[w.tileIndex], { seat: to.seat, id: newId })).map((w) => ({ ...w })),
     specialists: {},
     // GREAT WORKS AND RELICS RIDE WITH THE CITY. Real Civ 6: the
     // victor gains control of the Great Works held in a captured city's
@@ -722,23 +722,23 @@ export function transferCity(
     // to be listed here too. One that is missed is destroyed silently on every
     // flip — no error, just a value that vanishes.
     // Religion travels with the city here too (the GPU twin keeps it).
-    religionPressure: rc.religionPressure ? [...rc.religionPressure] : undefined,
-    followedReligion: rc.followedReligion,
-    greatWorksWriting: rc.greatWorksWriting,
-    greatWorksArt: rc.greatWorksArt,
-    greatWorksMusic: rc.greatWorksMusic,
-    relics: rc.relics,
-    artifacts: rc.artifacts, // B-20 (#79): artifacts ride the flip too
+    religionPressure: civCity.religionPressure ? [...civCity.religionPressure] : undefined,
+    followedReligion: civCity.followedReligion,
+    greatWorksWriting: civCity.greatWorksWriting,
+    greatWorksArt: civCity.greatWorksArt,
+    greatWorksMusic: civCity.greatWorksMusic,
+    relics: civCity.relics,
+    artifacts: civCity.artifacts, // B-20 (#79): artifacts ride the flip too
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   };
   if (keptBuildings.includes('ANCIENT_WALLS')) flipped.outerHp = 0; // B-30: walls kept, outer pool 0
   to.cities.push(flipped);
   addEraScore(state, to.seat, ERA_SCORE_CONQUER);
-  revealAround(state, to.seat, rc.centerIndex, 3);
+  revealAround(state, to.seat, civCity.centerIndex, 3);
   // Real Civ 6 pays the captor gold for taking a city. One rate, every captor.
   if (plunder) to.treasury += 40;
-  state.eventLog.push(`${rc.name} defected to ${to.name}! (${why})`);
+  state.eventLog.push(`${civCity.name} defected to ${to.name}! (${why})`);
   // Losing the last city ends that war — elimination settles like any peace.
   if (loser && loser.cities.length === 0) {
     setWar(state, loser.seat, to.seat, false);
@@ -751,27 +751,27 @@ export function transferCity(
 /**
  * machine-check (env-gated by CIV6_RC_REGISTRY_CHECK; the TS twin of the
  * GPU engine's _check_rc_registry_invariant). Every district tile and wonder
- * tile an rc lists must register BACK to that rc — its `Tile.ownerCity` equals
- * `rc.id` (a district sits on a tile owned by THAT city, the placement rule
+ * tile an civCity lists must register BACK to that civCity — its `Tile.ownerCity` equals
+ * `civCity.id` (a district sits on a tile owned by THAT city, the placement rule
  * tryQueueDistrict/tryQueueWonder now enforce) — and that tile must
- * be owned by this seat's civ. A tile registered to a SIBLING rc (the seed
+ * be owned by this seat's civ. A tile registered to a SIBLING civCity (the seed
  * 9118 latent) throws. NO always-on cost: only called when the env flag is set.
  */
 export function assertCityRegistryCoherent(state: GameState): void {
   for (const actor of state.seats) {
     const civ = actor.seat;
-    for (const rc of actor.cities) {
+    for (const civCity of actor.cities) {
       const check = (kind: string, tileIndex: number, type: string) => {
         const t = state.map.tiles[tileIndex];
-        if (!tileBelongsTo(t, rc) || !tileOwnedByCiv(t, civ)) {
+        if (!tileBelongsTo(t, civCity) || !tileOwnedByCiv(t, civ)) {
           throw new Error(
-            `A-24 registry incoherence: actor=${indexOfSeat(actor.seat)} rc.id=${rc.id} ${kind}=${type} ` +
+            `A-24 registry incoherence: actor=${indexOfSeat(actor.seat)} civCity.id=${civCity.id} ${kind}=${type} ` +
               `tile=${tileIndex} ownerSeat=${tileSeat(t)} ownerCity=${tileCity(t)} turn=${state.turn}`,
           );
         }
       };
-      for (const d of rc.districts) check('district', d.tileIndex, d.type);
-      for (const w of rc.wonders ?? []) check('wonder', w.tileIndex, w.id);
+      for (const d of civCity.districts) check('district', d.tileIndex, d.type);
+      for (const w of civCity.wonders ?? []) check('wonder', w.tileIndex, w.id);
     }
   }
 }
@@ -780,7 +780,7 @@ export function assertCityRegistryCoherent(state: GameState): void {
 // Seat city-state quests — deterministic, zero-draw
 // ---------------------------------------------------------------------------
 
-/** Has this seat satisfied its `cs` quest? The seat-seat twin of
+/** Has this seat satisfied its `cityState` quest? The seat-seat twin of
  *  questSatisfied (cityStates.ts), now the shared seat-generic rule. */
 
 
@@ -819,12 +819,12 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   // The ENVOY verb: the recorded picks land here, met + availability
   // re-validated. BANK ONLY — conversion is an eager RULE at the CS phase for
   // every seat, so a decide-time pick can never exceed the bank.
-  for (const csIdx of rec.envoys ?? []) {
-    const cs = state.cityStates[csIdx];
-    if (!cs || !hasMet(cs, actor.seat)) continue;
+  for (const cityStateIdx of rec.envoys ?? []) {
+    const cityState = state.cityStates[cityStateIdx];
+    if (!cityState || !hasMet(cityState, actor.seat)) continue;
     if ((actor.envoysAvailable ?? 0) <= 0) continue;
     actor.envoysAvailable = (actor.envoysAvailable ?? 0) - 1;
-    addEnvoys(cs, actor.seat, 1);
+    addEnvoys(cityState, actor.seat, 1);
   }
   const warCol = rec.war;
   if (warCol !== null && warCol !== undefined && warCol >= 0) {
@@ -842,17 +842,17 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     }
   }
   for (const [centre, aCol] of prodPairs) {
-    const rc = actor.cities.find((c) => c.centerIndex === centre);
-    if (!rc) continue;                          // centre not this engine's city (drifted state)
+    const civCity = actor.cities.find((c) => c.centerIndex === centre);
+    if (!civCity) continue;                          // centre not this engine's city (drifted state)
     const a = aCol;
-    if (a < 0 || rc.queue.length > 0) continue; // the idle gate, as the GPU applies it
+    if (a < 0 || civCity.queue.length > 0) continue; // the idle gate, as the GPU applies it
     if (a < NB) {
       const id = buildings[a];
       const def = id ? BUILDINGS[id] : undefined;
-      if (def) commitProduction(state, rc.seat, rc, { kind: 'building', building: id, progress: 0 });
+      if (def) commitProduction(state, civCity.seat, civCity, { kind: 'building', building: id, progress: 0 });
     } else if (a === NB) {
-      if (state.sandbox || rc.population >= 2) {
-        commitProduction(state, rc.seat, rc, { kind: 'settler', progress: 0, cost: settlerCost(state, actor.seat) });
+      if (state.sandbox || civCity.population >= 2) {
+        commitProduction(state, civCity.seat, civCity, { kind: 'settler', progress: 0, cost: settlerCost(state, actor.seat) });
       }
     } else if (a >= NB + 2 && a < NB + 2 + NU) {
       const id = units[a - NB - 2];
@@ -860,8 +860,8 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       // the scripted branch and the GPU's queue arm both do — omitting the
       // cost here fell back to the base price and locked r1c1's builder at 30
       // where the GPU locked 32 t61, the qCost family).
-      if (id === 'BUILDER') commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, actor.seat) });
-      else if (id && UNITS[id]) commitProduction(state, rc.seat, rc, { kind: 'unit', unit: id, progress: 0 });
+      if (id === 'BUILDER') commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0, cost: builderCost(state, actor.seat) });
+      else if (id && UNITS[id]) commitProduction(state, civCity.seat, civCity, { kind: 'unit', unit: id, progress: 0 });
     }
     else if (a >= wonderLo && a < wonderLo + wonders.length) {
       // WONDER: the file names WHICH wonder; the engine re-runs the whole
@@ -869,17 +869,17 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
       // may have claimed it since recording; the replay refuses, never
       // double-builds).
       const wd = BUILT_WONDERS[wonders[a - wonderLo]];
-      if (wd) placeSeatWonder(state, actor, rc, wd);
+      if (wd) placeSeatWonder(state, actor, civCity, wd);
     } else if (a >= projectLo && a < projectLo + projects.length) {
       // PROJECT: base rows only; queueSeatProject re-validates.
-      queueSeatProject(state, rc, projects[a - projectLo]);
+      queueSeatProject(state, civCity, projects[a - projectLo]);
     } else if (a >= NB + 2 + NU) {
       // DISTRICT: the file names the TYPE, the engine still runs the placement
       // scan — a tile index in the record would be derived state, and the whole
       // point of the schema is that it carries DECISIONS only.
       const si = a - (NB + 2 + NU);
       const d = SCAFFOLD_DISTRICTS[si];
-      if (d) placeSeatDistrict(state, actor, rc, d.id, computeUnlocksIn(actor.research));
+      if (d) placeSeatDistrict(state, actor, civCity, d.id, computeUnlocksIn(actor.research));
     }
   }
   // unit orders are NOT applied here. This function runs at the PICK position;
@@ -1159,7 +1159,7 @@ export function seatPhase(state: GameState, seat: number): void {
     detectBoosts(state, actor.seat);
 
     // City-state diplomacy from that seat's seat — meet by
-    // PROXIMITY (a city or unit within CS_MEET_RANGE; opponents have no fog),
+    // PROXIMITY (a city or unit within CITY_STATE_MEET_RANGE; opponents have no fog),
     // then the seat 0's influence→envoy accrual (cityStatePhase mirror:
     // flat rate + the adopted government's tier), then the scripted
     // greedy assignment (neediest met CS by OWN envoys, ties lowest id).
@@ -1170,24 +1170,24 @@ export function seatPhase(state: GameState, seat: number): void {
     // uses (CS-meet proximity, unitCount, melee/ranged tally).
     const seatUnitList = unitsOf(state, actor.seat);
     {
-      for (const cs of state.cityStates) {
-        if (hasMet(cs, actor.seat)) continue;
-        const ct = state.map.tiles[cs.centerIndex];
+      for (const cityState of state.cityStates) {
+        if (hasMet(cityState, actor.seat)) continue;
+        const ct = state.map.tiles[cityState.centerIndex];
         const near =
-          actor.cities.some((rc) => {
-            const t = state.map.tiles[rc.centerIndex];
-            return hexDistance(t.col, t.row, ct.col, ct.row) <= CS_MEET_RANGE;
+          actor.cities.some((civCity) => {
+            const t = state.map.tiles[civCity.centerIndex];
+            return hexDistance(t.col, t.row, ct.col, ct.row) <= CITY_STATE_MEET_RANGE;
           }) ||
           seatUnitList.some((u) => {
             const t = state.map.tiles[u.tileIndex];
-            return hexDistance(t.col, t.row, ct.col, ct.row) <= CS_MEET_RANGE;
+            return hexDistance(t.col, t.row, ct.col, ct.row) <= CITY_STATE_MEET_RANGE;
           });
         if (near) {
-          setMet(cs, actor.seat);
-          state.eventLog.push(`${actor.name} met the city-state of ${cs.name}.`);
+          setMet(cityState, actor.seat);
+          state.eventLog.push(`${actor.name} met the city-state of ${cityState.name}.`);
         }
       }
-      if (state.cityStates.some((cs) => hasMet(cs, actor.seat))) {
+      if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
         const gov = GOVERNMENTS_ADOPTION_LIVE ? computeAdoption(actor.research).government : null;
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;
         actor.influencePoints = (actor.influencePoints ?? 0) + INFLUENCE_PER_TURN + tier;
@@ -1203,7 +1203,7 @@ export function seatPhase(state: GameState, seat: number): void {
       // CIV SEAT city-state quests — the ZERO-DRAW twin of
       // cityStatePhase's quest loop, at the accrual position (right
       // after the greedy envoy assignment). Each MET CS keeps ONE quest per
-      // seat (cs.seatQuest[seat.id]); a satisfied one resolves here
+      // seat (cityState.seatQuest[seat.id]); a satisfied one resolves here
       // (+QUEST_ENVOYS to THIS seat's envoys — the accrual channel), else a
       // new one issues on cooldown expiry. The kind is DETERMINISTIC: the
       // FIRST SATISFIABLE option in the fixed order [clearCamp, buildDistrict,
@@ -1211,20 +1211,20 @@ export function seatPhase(state: GameState, seat: number): void {
       // seat 0 quest path's draw count is untouched (the deferral's stated
       // risk removed by construction). questIssuedTurn clock defaults to 0
       // (the GPU civ_only_citystate_quest_issued zeros init) → first issue at turn≥cooldown.
-      for (const cs of state.cityStates) {
-        if (!hasMet(cs, actor.seat)) continue;
-        const rq = (cs.seatQuest ??= []);
-        const rqi = (cs.seatQuestIssuedTurn ??= []);
+      for (const cityState of state.cityStates) {
+        if (!hasMet(cityState, actor.seat)) continue;
+        const rq = (cityState.seatQuest ??= []);
+        const rqi = (cityState.seatQuestIssuedTurn ??= []);
         const cur = rq[indexOfSeat(actor.seat)] ?? null;
         if (cur) {
-          if (questSatisfied(state, cs, cur, seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities })) {
+          if (questSatisfied(state, cityState, cur, seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities })) {
             rq[indexOfSeat(actor.seat)] = null;
             rqi[indexOfSeat(actor.seat)] = state.turn;
-            addEnvoys(cs, actor.seat, QUEST_ENVOYS);
-            state.eventLog.push(`${cs.name} quest complete for ${actor.name}: +${QUEST_ENVOYS} envoy.`);
+            addEnvoys(cityState, actor.seat, QUEST_ENVOYS);
+            state.eventLog.push(`${cityState.name} quest complete for ${actor.name}: +${QUEST_ENVOYS} envoy.`);
           }
         } else if (state.turn - (rqi[indexOfSeat(actor.seat)] ?? 0) >= QUEST_COOLDOWN) {
-          const q = issueQuest(state, cs, seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // #96: one issuer, every seat
+          const q = issueQuest(state, cityState, seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // #96: one issuer, every seat
           if (q) {
             rq[indexOfSeat(actor.seat)] = q;
             rqi[indexOfSeat(actor.seat)] = state.turn;
@@ -1254,8 +1254,8 @@ export function seatPhase(state: GameState, seat: number): void {
       if (d.ranged) rangedCount += 1;
       else meleeCount += 1;
     }
-    for (const rc of actor.cities) {
-      const q = rc.queue[0];
+    for (const civCity of actor.cities) {
+      const q = civCity.queue[0];
       if (q?.kind === 'unit') {
         unitCount += 1;
         const d = q.unit ? UNITS[q.unit] : undefined;
@@ -1298,32 +1298,32 @@ export function seatPhase(state: GameState, seat: number): void {
         // order.
         const bv = rec.buy;
         if (bv && bv[0] === 0) {
-          const rc = actor.cities.find((c) => c.centerIndex === bv[1]);
+          const civCity = actor.cities.find((c) => c.centerIndex === bv[1]);
           // the SHIPPED catalog order (prodLayout, the one derivation) — NOT
           // Object.values(BUILDINGS): the exporter filters rows, so raw
           // enumeration is offset (9040 t178: idx 5 resolved ANCIENT_WALLS
           // where the wire meant LIBRARY; both buys refused silently).
           const bid = prodLayout().buildings[bv[2]];
           const def = bid ? BUILDINGS[bid] : undefined;
-          if (rc && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)) {
-            const have = new Set(rc.buildings);
+          if (civCity && def && !def.worship && !SCRIPTED_HELD_BUILDINGS.has(def.id)) {
+            const have = new Set(civCity.buildings);
             const done = new Set(
-              rc.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
+              civCity.districts.filter((d) => state.map.tiles[d.tileIndex].districtComplete).map((d) => d.type),
             );
-            const center = state.map.tiles[rc.centerIndex];
+            const center = state.map.tiles[civCity.centerIndex];
             const okBuy =
               !have.has(def.id) && done.has(def.district) && seatUnlocks.buildings.has(def.id) &&
               (!def.requiresAny || def.requiresAny.some((x) => have.has(x))) &&
               !def.exclusiveWith?.some((x) => have.has(x)) &&
               !(def.special === 'WATER_MILL' && !hasRiver(center)) &&
-              !(rc.queue[0]?.kind === 'building' && rc.queue[0].building === def.id);
+              !(civCity.queue[0]?.kind === 'building' && civCity.queue[0].building === def.id);
             if (okBuy) {
               const price = def.cost * GOLD_PURCHASE_MULT;
               const reserve = PEACE_GOLD_COST(0);
               if (Math.round((actor.treasury ?? 0) * 1000) >= Math.round((price + reserve) * 1000)) {
                 actor.treasury = (actor.treasury ?? 0) - price;
-                rc.buildings.push(def.id);
-                if (def.id === 'ANCIENT_WALLS') rc.outerHp = WALLS_HP; // AUDIT B-1
+                civCity.buildings.push(def.id);
+                if (def.id === 'ANCIENT_WALLS') civCity.outerHp = WALLS_HP; // AUDIT B-1
                 bought = true;
               }
             }
@@ -1404,11 +1404,11 @@ export function seatPhase(state: GameState, seat: number): void {
     {
       let boughtRelig = false;
       for (const [fk, centre] of rec?.buyFaith ?? []) {
-        const rcF = actor.cities.find((c) => c.centerIndex === centre);
-        if (!rcF) continue;
-        if (fk === 4) buyWorshipBuilding(state, rcF.id, actor.seat);
+        const civCityF = actor.cities.find((c) => c.centerIndex === centre);
+        if (!civCityF) continue;
+        if (fk === 4) buyWorshipBuilding(state, civCityF.id, actor.seat);
         else if ((fk === 5 || fk === 6) && !boughtRelig) {
-          boughtRelig = purchaseReligiousUnit(state, rcF.id, fk === 5 ? 'MISSIONARY' : 'APOSTLE', actor.seat).ok;
+          boughtRelig = purchaseReligiousUnit(state, civCityF.id, fk === 5 ? 'MISSIONARY' : 'APOSTLE', actor.seat).ok;
         }
       }
     }
@@ -1421,15 +1421,15 @@ export function seatPhase(state: GameState, seat: number): void {
     {
       const lvi = rec?.levy;
       if (lvi !== undefined && lvi !== null && lvi >= 0) {
-        const csL = state.cityStates[lvi];
-        if (csL) levyUnits(state, csL.id, actor.seat);
+        const cityStateL = state.cityStates[lvi];
+        if (cityStateL) levyUnits(state, cityStateL.id, actor.seat);
       }
     }
 
     // Trade — ONE new route per civ per turn while
     // capacity allows (trader-training pacing). Scan origins × destinations
     // in city-array order — own cities first, then MET city-states (from
-    // asc, to asc, cs asc — the deterministic GPU-mirrorable flat order);
+    // asc, to asc, cityState asc — the deterministic GPU-mirrorable flat order);
     // the best NEW in-range pair by the route's TOTAL yields (a CS route is
     // 3 gold + 1 specialty = 4 flat), strictly-greater beats so ties keep the
     // first-found.
@@ -1448,14 +1448,14 @@ export function seatPhase(state: GameState, seat: number): void {
             const ySum = y.food + y.production;
             if (!best || ySum > best.ySum) best = { from: from.id, to: to.id, ySum };
           }
-          for (const cs of state.cityStates) {
-            if (!hasMet(cs, actor.seat)) continue;
-            if (routes.some((x) => x.from === from.id && x.toCs === cs.id)) continue;
-            const ct = state.map.tiles[cs.centerIndex];
+          for (const cityState of state.cityStates) {
+            if (!hasMet(cityState, actor.seat)) continue;
+            if (routes.some((x) => x.from === from.id && x.toCs === cityState.id)) continue;
+            const ct = state.map.tiles[cityState.centerIndex];
             if (hexDistance(ft.col, ft.row, ct.col, ct.row) > TRADE_ROUTE_RANGE) continue;
-            const cy = csRouteYields(cs);
+            const cy = cityStateRouteYields(cityState);
             const ySum = cy.food + cy.production + cy.gold + cy.science + cy.culture + cy.faith;
-            if (!best || ySum > best.ySum) best = { from: from.id, toCs: cs.id, ySum };
+            if (!best || ySum > best.ySum) best = { from: from.id, toCs: cityState.id, ySum };
           }
         }
         // international: considered AFTER domestic + CS (only when no
@@ -1521,25 +1521,25 @@ export function seatPhase(state: GameState, seat: number): void {
     const luxMap = luxuryAmenities(state, actor.seat);
     const seatMods = getModifiers(state, actor.seat);
     const cityStats = new Map<number, CityStats>();
-    for (const rc of actor.cities) cityStats.set(rc.id, computeCityStats(state, rc, luxMap, seatMods));
+    for (const civCity of actor.cities) cityStats.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods));
     // S3: this seat's governor seats for THIS turn — same stateless
     // greedy as the seat 0 (quantized milli loyalty snapshot at the loop top,
-    // ties by array position == the GPU's rc slot order).
+    // ties by array position == the GPU's civCity slot order).
     const rGovPicks = governorPicks(
-      actor.cities.map((rc) => Math.round((rc.loyalty ?? LOYALTY_MAX) * 1000)),
+      actor.cities.map((civCity) => Math.round((civCity.loyalty ?? LOYALTY_MAX) * 1000)),
       governorTitles(actor.research.civics.length),
     );
     const rGovIds = new Set([...rGovPicks].map((i) => actor.cities[i].id));
-    const rcDefectors: City[] = [];
-    for (const rc of [...actor.cities]) {
-      const stats = cityStats.get(rc.id) ?? computeCityStats(state, rc, luxMap, seatMods);
+    const civCityDefectors: City[] = [];
+    for (const civCity of [...actor.cities]) {
+      const stats = cityStats.get(civCity.id) ?? computeCityStats(state, civCity, luxMap, seatMods);
       const tier = stats.amenities.tier;
       // Seat city loyalty at the loop top (the seat 0's
       // applyLoyalty position) — own = THIS civ's cities, foreign = the
       // seat 0's + every other seat's; capitals are immune; live pops
       // (earlier cities in this loop already grew — the seat 0's mix).
-      if (applyLoyalty(state, rc, tier.name, rGovIds.has(rc.id) ? GOVERNOR_LOYALTY : 0)) {
-        rcDefectors.push(rc);
+      if (applyLoyalty(state, civCity, tier.name, rGovIds.has(civCity.id) ? GOVERNOR_LOYALTY : 0)) {
+        civCityDefectors.push(civCity);
       }
       const y = stats.total;
       // `total.gold` is already NET of district+building upkeep — computeCityStats
@@ -1557,10 +1557,10 @@ export function seatPhase(state: GameState, seat: number): void {
       // ONE growth rule for every seat: the surplus arrives pre-folded (the
       // housing, amenity, belief and wonder factors all live in
       // computeCityStats) and seatGrowth banks, grows or starves.
-      seatGrowth(rc, stats.effectiveFoodSurplus, stats.growthNeeded);
+      seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded);
       // Queue progress + completion (settler founds via the site scan; a
       // unit spawns at THIS city — no home-city RNG draw anymore).
-      const q = rc.queue[0];
+      const q = civCity.queue[0];
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
         // The seat's GOVERNMENT/POLICY encampmentProdMult, which
         // `game.ts` has always applied to the seat 0's queue head and the
@@ -1571,9 +1571,9 @@ export function seatPhase(state: GameState, seat: number): void {
         // Pay in the bank, exactly where the seat 0's endTurn does
         // (game.ts, right after the production add). Without this the field
         // written below would be write-only.
-        if (rc.productionBank) {
-          q.progress += rc.productionBank;
-          rc.productionBank = 0;
+        if (civCity.productionBank) {
+          q.progress += civCity.productionBank;
+          civCity.productionBank = 0;
         }
         const cost =
           q.kind === 'unit'
@@ -1584,14 +1584,14 @@ export function seatPhase(state: GameState, seat: number): void {
                 ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // A-4: catalog cost (already speed-scaled)
                 : q.cost ?? 54; // settler / district / project carry their own cost
         if (q.progress >= cost) {
-          rc.queue.shift();
-          completeQueueItem(state, rc, q, cost);
+          civCity.queue.shift();
+          completeQueueItem(state, civCity, q, cost);
           // A completion's OVERFLOW carries to the next item, for every seat.
           // this is the largest single production leak in the model.
           // `City = City`, so the bank field the seat 0 has
           // used since V-H1 is already here — nothing new to store.
           //
-          // IT ALWAYS BANKS — it does NOT carry into `rc.queue[0]` even when a
+          // IT ALWAYS BANKS — it does NOT carry into `civCity.queue[0]` even when a
           // next item is waiting. Real Civ 6 (and this file's own queue) would
           // carry it immediately, and that is the more faithful shape, but the
           // GPU's seat city is a SINGLE SLOT with no queue at all. Carrying
@@ -1605,28 +1605,28 @@ export function seatPhase(state: GameState, seat: number): void {
           // (§7-4b). So the engines agree on the weaker rule and the LOSS is
           // declared here rather than hidden: banked overflow is paid on the
           // NEXT turn, one turn later than Civ 6 would pay it.
-          rc.productionBank = (rc.productionBank ?? 0) + (q.progress - cost);
+          civCity.productionBank = (civCity.productionBank ?? 0) + (q.progress - cost);
         }
       }
       // Cultural border growth: this city's culture (the culSum term,
       // pre-growth pop) fills its own box and consumes against the escalating
       // curve.
-      rc.cultureBox += culC;
+      civCity.cultureBox += culC;
       // Religious Settlements — the belief border-cost multiplier,
       // the seat 0's Math.round(base * borderCostMult) form (city.ts:507).
-      const rcBorderCost = () =>
-        Math.round(borderGrowthCost(rc.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult);
-      while (rc.cultureBox >= rcBorderCost()) {
-        const next = pickBorderTile(state, rc, { map: state.map, mods: getModifiers(state, actor.seat) });
+      const civCityBorderCost = () =>
+        Math.round(borderGrowthCost(civCity.tilesAcquired) * getModifiers(state, actor.seat).borderCostMult);
+      while (civCity.cultureBox >= civCityBorderCost()) {
+        const next = pickBorderTile(state, civCity, { map: state.map, mods: getModifiers(state, actor.seat) });
         if (next === null) {
           // Nowhere to grow: cap the box at the current threshold.
-          rc.cultureBox = Math.min(rc.cultureBox, rcBorderCost());
+          civCity.cultureBox = Math.min(civCity.cultureBox, civCityBorderCost());
           break;
         }
-        rc.cultureBox -= rcBorderCost();
+        civCity.cultureBox -= civCityBorderCost();
         // The same claim the seat 0 uses. `acquireTile` now gates its
         // fog reveal on the seat, so this stopped needing a hand-copy.
-        acquireTile(state, rc, next);
+        acquireTile(state, civCity, next);
       }
       // The mirror of the seat 0 city strike (combat.ts) —
       // a foreign city WITH ANCIENT_WALLS fires once per turn at the nearest
@@ -1634,13 +1634,13 @@ export function seatPhase(state: GameState, seat: number): void {
       // units, civilians included), lowest tile index breaking ties. One
       // roll at the foreign city's defense strength vs the target's defense
       // (cityDefenseStrength; single roll, no retaliation, never captures).
-      // rc order, immediately before the heal — a kill shifts the shared RNG.
-      const rcCenter = state.map.tiles[rc.centerIndex];
-      if (rc.buildings.includes('ANCIENT_WALLS')) {
+      // civCity order, immediately before the heal — a kill shifts the shared RNG.
+      const civCityCenter = state.map.tiles[civCity.centerIndex];
+      if (civCity.buildings.includes('ANCIENT_WALLS')) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
-          const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
+          const d = hexDistance(civCityCenter.col, civCityCenter.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
           // ANY unit hostile to this civ. A city's strike picks its
           // target by distance and combat strength, never by which enemy the
@@ -1665,10 +1665,10 @@ export function seatPhase(state: GameState, seat: number): void {
           // The general/admiral aura shields against city fire,
           // outside the embarked ternary (the combat.ts pcstk mirror).
           const defCSa = defCS + generalAuraCS(state, defender, bestTile);
-          const atkCS = cityDefenseStrength(state, rc);
+          const atkCS = cityDefenseStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'rcstk', bestTile);
           awardDefenseXp(defender); // B-4: +2 to a surviving military defender (attacker is the city)
-          warWearinessBattle(state, rc.seat, defender.seat, bestTile,
+          warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pcstk twin
           if (defender.hp <= 0) killUnit(state, defender, seat);  // #51/S7.12: a dig, like the seat 0's strike
         }
@@ -1676,14 +1676,14 @@ export function seatPhase(state: GameState, seat: number): void {
       // The mirror of the ADDITIONAL Encampment strike
       // (the pestk twin). A seat city with a COMPLETE unpillaged ENCAMPMENT
       // fires the same once-per-turn ranged strike right AFTER its walls strike
-      // (walls first, then Encampment — per rc, before the heal), k="restk".
+      // (walls first, then Encampment — per civCity, before the heal), k="restk".
       // A LIVE garrison is now required — an Encampment reduced to
       // 0 HP is occupied and fires nothing (the pestk twin's rule).
-      if (rc.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
+      if (civCity.districts.some((dd) => encampmentIntact(state.map.tiles[dd.tileIndex]))) {
         let bestTile = -1;
         let bestDist = 99;
         for (const t of state.map.tiles) {
-          const d = hexDistance(rcCenter.col, rcCenter.row, t.col, t.row);
+          const d = hexDistance(civCityCenter.col, civCityCenter.row, t.col, t.row);
           if (d < 1 || d > 2) continue;
           // ANY unit hostile to this civ. A city's strike picks its
           // target by distance and combat strength, never by which enemy the
@@ -1704,10 +1704,10 @@ export function seatPhase(state: GameState, seat: number): void {
             ? EMBARKED_DEFENSE_CS - woundPenalty(defender)
             : (UNITS[defender.type]?.combat ?? 0) + terrainDefense(tt) - woundPenalty(defender) + SUPPORT_CS * supportCount(state, bestTile, defender) + xpLevelBonus(defender);
           const defCSa = defCS + generalAuraCS(state, defender, bestTile); // #70/S2 (B-8), the rcstk mirror
-          const atkCS = cityDefenseStrength(state, rc);
+          const atkCS = cityDefenseStrength(state, civCity);
           defender.hp -= damageRoll(state, atkCS - defCSa, 'restk', bestTile);
           awardDefenseXp(defender);
-          warWearinessBattle(state, rc.seat, defender.seat, bestTile,
+          warWearinessBattle(state, civCity.seat, defender.seat, bestTile,
             { dDied: defender.hp <= 0, city: true }); // #51/S7.8f, the pestk twin
           if (defender.hp <= 0) killUnit(state, defender, seat);  // #51/S7.12: a dig, like the seat 0's strike
         }
@@ -1715,20 +1715,20 @@ export function seatPhase(state: GameState, seat: number): void {
       // A siege pins the HP: any adjacent unit hostile to THIS civ counts,
       // CIVILIANS included, per `unitsHostile` — the same predicate the rest
       // of the heal gate uses.
-      const besieged = neighbors(state.map, rcCenter).some((n) =>
+      const besieged = neighbors(state.map, civCityCenter).some((n) =>
         unitsAt(state, n.index).some((u) => unitsHostile(state, u, { seat: actor.seat })),
       );
       // Unbesieged cities heal at a flat rate, war or not (real Civ 6). The
       // outer wall pool heals on the same gate and rate (cap WALLS_HP),
       // full-HP or not.
       if (!besieged) {
-        rc.hp = Math.min(CITY_MAX_HP, rc.hp + CITY_HEAL_PER_TURN);
-        if (rc.buildings.includes('ANCIENT_WALLS')) {
-          rc.outerHp = Math.min(WALLS_HP, (rc.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
+        civCity.hp = Math.min(CITY_MAX_HP, civCity.hp + CITY_HEAL_PER_TURN);
+        if (civCity.buildings.includes('ANCIENT_WALLS')) {
+          civCity.outerHp = Math.min(WALLS_HP, (civCity.outerHp ?? WALLS_HP) + CITY_HEAL_PER_TURN);
         }
         // The Encampment garrison repairs on the same gate/rate —
         // the seat 0's barbarianPhase mirror.
-        for (const d of rc.districts) {
+        for (const d of civCity.districts) {
           if (d.type !== 'ENCAMPMENT') continue;
           const dt = state.map.tiles[d.tileIndex];
           if (dt.district !== 'ENCAMPMENT' || !dt.districtComplete || dt.districtPillaged) continue;
@@ -1739,7 +1739,7 @@ export function seatPhase(state: GameState, seat: number): void {
 
     // Loyalty collapses resolve after the city loop (they
     // mutate the list) — to the max-pressure civ; the SEAT 0 can win one.
-    for (const rc of rcDefectors) flipCity(state, rc);
+    for (const civCity of civCityDefectors) flipCity(state, civCity);
 
     // REAL research — cheapest-first auto-pick at RAW cost (no
     // eurekas for opponents until B6; ties keep the tech-table order via the

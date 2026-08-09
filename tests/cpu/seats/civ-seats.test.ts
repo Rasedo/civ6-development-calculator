@@ -141,7 +141,7 @@ describe('civ placement and expansion', () => {
 });
 
 describe('A-24 civ district/tile registry coherence', () => {
-  it('stays coherent across a full game (every district/wonder tile registers to its rc)', () => {
+  it('stays coherent across a full game (every district/wonder tile registers to its civCity)', () => {
     const state = createGame({ width: 44, height: 26, seed: 7, withResources: true, withWonders: true, opponents: true });
     // Run many turns; the scan (called from seatPhase under the env flag)
     // must never fire — placements/captures keep .districts and Tile.ownerCity
@@ -158,7 +158,7 @@ describe('A-24 civ district/tile registry coherence', () => {
     expect(placed).toBeGreaterThan(state.seats.length - 1); // more than just the CITY_CENTERs
   });
 
-  it('the scan catches a district tile registered to a SIBLING rc', () => {
+  it('the scan catches a district tile registered to a SIBLING civCity', () => {
     const state = makeState();
     const civ = addCiv(state, 6, 6);
     // a second city of the SAME civ; steal a ring tile from city 0's frontier
@@ -169,7 +169,7 @@ describe('A-24 civ district/tile registry coherence', () => {
     // forge an incoherent district: city 0 lists a tile registered to itself is
     // fine; re-register the tile to a phantom sibling id, then reference it.
     sibling.districts.push({ type: 'HOLY_SITE', tileIndex: stolen.index });
-    expect(() => assertCityRegistryCoherent(state)).not.toThrow(); // still coherent (tile registers to this rc)
+    expect(() => assertCityRegistryCoherent(state)).not.toThrow(); // still coherent (tile registers to this civCity)
     setTileOwner(stolen, tileSeat(stolen), sibling.id + 999); // now it belongs to a sibling
     expect(() => assertCityRegistryCoherent(state)).toThrow(/A-24 registry incoherence/);
   });
@@ -248,23 +248,23 @@ describe('war and peace', () => {
     expect(sueForPeace(state, indexOfSeat(civ.seat), 0).ok).toBe(false); // too broke
 
     // Conquest path instead: batter the city down and take it.
-    const rc = civ.cities[0];
-    rc.hp = 5;
+    const civCity = civ.cities[0];
+    civCity.hp = 5;
     const attacker = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 7, 8).index, 0)!;
-    const center = state.map.tiles[rc.centerIndex];
+    const center = state.map.tiles[civCity.centerIndex];
     const adj = tilesWithin(state.map, center.col, center.row, 1).find(
       (t) => t.index !== center.index,
     )!;
     attacker.tileIndex = adj.index;
     attacker.movesLeft = 2;
-    const r = meleeAttack(state, attacker.id, rc.centerIndex, 0);
+    const r = meleeAttack(state, attacker.id, civCity.centerIndex, 0);
     expect(r.ok).toBe(true);
     expect(civ.cities.length).toBe(0);
     expect(seatOf(state, 0)!.cities.some((c) => c.name === 'Roma')).toBe(true);
     const converted = seatOf(state, 0)!.cities.find((c) => c.name === 'Roma')!;
     expect(converted.population).toBeGreaterThanOrEqual(1);
-    expect(tileCity(state.map.tiles[rc.centerIndex])).toBe(converted.id);
-    expect((isCiv(tileSeat(state.map.tiles[rc.centerIndex])) ? indexOfSeat(tileSeat(state.map.tiles[rc.centerIndex])) : -1)).toBe(-1);
+    expect(tileCity(state.map.tiles[civCity.centerIndex])).toBe(converted.id);
+    expect((isCiv(tileSeat(state.map.tiles[civCity.centerIndex])) ? indexOfSeat(tileSeat(state.map.tiles[civCity.centerIndex])) : -1)).toBe(-1);
     expect(civsAtWar(state, civ.seat, 0)).toBe(false); // last city gone: war over
   });
 
@@ -272,12 +272,12 @@ describe('war and peace', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
-    const rc = civ.cities[0];
-    const center = state.map.tiles[rc.centerIndex];
+    const civCity = civ.cities[0];
+    const center = state.map.tiles[civCity.centerIndex];
     const adj = tilesWithin(state.map, center.col, center.row, 1).find((t) => t.index !== center.index)!;
     const attacker = spawnUnit(state, 'WARRIOR', adj.index, 0)!;
     attacker.tileIndex = adj.index;
-    const r = meleeAttack(state, attacker.id, rc.centerIndex, 0);
+    const r = meleeAttack(state, attacker.id, civCity.centerIndex, 0);
     expect(r.ok).toBe(false);
     expect(r.reason).toMatch(/peace/i);
   });
@@ -289,32 +289,32 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8, { warTurns: 10 });
     setWar(state, civ.seat, 0, true);
-    const rc = civ.cities[0];
-    const center = state.map.tiles[rc.centerIndex];
+    const civCity = civ.cities[0];
+    const center = state.map.tiles[civCity.centerIndex];
     const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);
     // A completed CAMPUS on one ring tile, a completed wonder on another.
     const campusTile = ring[0];
     campusTile.district = 'CAMPUS';
     campusTile.districtComplete = true;
-    setTileOwner(campusTile, civ.seat, rc.id);
-    rc.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
+    setTileOwner(campusTile, civ.seat, civCity.id);
+    civCity.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
     const wonderTile = ring[1];
     wonderTile.builtWonder = 'PYRAMIDS';
     wonderTile.builtWonderComplete = true;
-    setTileOwner(wonderTile, civ.seat, rc.id);
-    rc.wonders.push({ id: 'PYRAMIDS', tileIndex: wonderTile.index });
+    setTileOwner(wonderTile, civ.seat, civCity.id);
+    civCity.wonders.push({ id: 'PYRAMIDS', tileIndex: wonderTile.index });
     // An INCOMPLETE district must NOT carry (stays paved-but-dead): a carried
     // incomplete Holy Site would let availableBuildings offer a Shrine the GPU
     // (district-complete gated) never could.
     const holyTile = ring[2];
     holyTile.district = 'HOLY_SITE';
     holyTile.districtComplete = false;
-    setTileOwner(holyTile, civ.seat, rc.id);
-    rc.districts.push({ type: 'HOLY_SITE', tileIndex: holyTile.index });
+    setTileOwner(holyTile, civ.seat, civCity.id);
+    civCity.districts.push({ type: 'HOLY_SITE', tileIndex: holyTile.index });
     // PALACE must never transfer; MARKET + ANCIENT_WALLS are kept.
-    rc.buildings.push('PALACE', 'MARKET', 'ANCIENT_WALLS');
+    civCity.buildings.push('PALACE', 'MARKET', 'ANCIENT_WALLS');
 
-    transferCity(state, civ.seat, seatOf(state, 0)!, rc, 'conquered', true);
+    transferCity(state, civ.seat, seatOf(state, 0)!, civCity, 'conquered', true);
 
     const taken = seatOf(state, 0)!.cities.find((c) => c.centerIndex === center.index)!;
     expect(taken).toBeDefined();
@@ -364,17 +364,17 @@ describe('AUDIT B-30: conquest keeps infrastructure', () => {
     }
     const civ = addCiv(state, 8, 8, { warTurns: 10 });
     setWar(state, civ.seat, 0, true);
-    const rc = civ.cities[0];
-    const center = state.map.tiles[rc.centerIndex];
+    const civCity = civ.cities[0];
+    const center = state.map.tiles[civCity.centerIndex];
     const ring = tilesWithin(state.map, center.col, center.row, 1).filter((t) => t.index !== center.index);
     ring[0].district = 'CAMPUS';
     ring[0].districtComplete = true;
-    setTileOwner(ring[0], civ.seat, rc.id);
-    rc.districts.push({ type: 'CAMPUS', tileIndex: ring[0].index });
-    rc.buildings.push('MARKET');
+    setTileOwner(ring[0], civ.seat, civCity.id);
+    civCity.districts.push({ type: 'CAMPUS', tileIndex: ring[0].index });
+    civCity.buildings.push('MARKET');
 
     const before = seatOf(state, 0)!.cities.length;
-    transferCity(state, civ.seat, seatOf(state, 0)!, rc, 'conquered', true);
+    transferCity(state, civ.seat, seatOf(state, 0)!, civCity, 'conquered', true);
     // razed: no new city added, center unpaved (scorched earth).
     expect(seatOf(state, 0)!.cities.length).toBe(before);
     expect(state.map.tiles[center.index].district).toBeNull();
@@ -501,7 +501,7 @@ describe('civ trade routes (A-11)', () => {
 describe('civ CS trade routes (A-12b)', () => {
   function addCs(state: GameState, col: number, row: number, opts: Partial<CityState> = {}): CityState {
     const center = tileAtCoords(state.map, col, row);
-    const cs: CityState = {
+    const cityState: CityState = {
       ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
       name: `Testopolis ${state.cityStates.length}`,
@@ -514,37 +514,37 @@ describe('civ CS trade routes (A-12b)', () => {
       questIssuedTurn: 0,
       ...opts,
     };
-    for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id)); // placement's territory tags (cityStateAt resolves by tile csId)
-    state.cityStates.push(cs);
-    return cs;
+    for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id)); // placement's territory tags (cityStateAt resolves by tile cityStateId)
+    state.cityStates.push(cityState);
+    return cityState;
   }
 
   it('suzerainty of a trade CS adds civ route capacity (strict contest)', () => {
     const state = makeState();
     const civ = addCiv(state, 8, 8);
-    const cs = addCs(state, 11, 8, { type: 'trade' });
+    const cityState = addCs(state, 11, 8, { type: 'trade' });
     expect(tradeCapacity(state, civ.seat)).toBe(0);
-    cs.envoys = {  };
-    cs.envoys[civ.seat] = 3;
+    cityState.envoys = {  };
+    cityState.envoys[civ.seat] = 3;
     expect(tradeCapacity(state, civ.seat)).toBe(1); // uncontested at the minimum
-    cs.envoys = { [0]: 3 }; // seat 0 ties: nobody is suzerain
+    cityState.envoys = { [0]: 3 }; // seat 0 ties: nobody is suzerain
     expect(tradeCapacity(state, civ.seat)).toBe(0);
   });
 
   it('seatPhase routes to a met in-range CS; the origin earns gold + specialty', () => {
     const state = makeState();
     const civ = addCiv(state, 8, 8);
-    const cs = addCs(state, 11, 8); // scientific, distance 3
+    const cityState = addCs(state, 11, 8); // scientific, distance 3
     civ.research.civics.push('FOREIGN_TRADE'); // capacity 1
-    cs.met = [];
-    setMet(cs, civ.seat);
-    const rc = civ.cities[0];
-    const y0 = computeCityStats(state, rc).total;
+    cityState.met = [];
+    setMet(cityState, civ.seat);
+    const civCity = civ.cities[0];
+    const y0 = computeCityStats(state, civCity).total;
     seatPhase(state, 0);
     expect(civ.tradeRoutes?.length).toBe(1);
-    expect(civ.tradeRoutes![0]).toEqual({ from: rc.id, toCs: cs.id, expiresTurn: state.turn + 20 }); // B-23 duration
-    const y1 = computeCityStats(state, rc).total;
-    // csRouteYields: +3 gold, +1 science (both tier-scaled; band like the
+    expect(civ.tradeRoutes![0]).toEqual({ from: civCity.id, toCs: cityState.id, expiresTurn: state.turn + 20 }); // B-23 duration
+    const y1 = computeCityStats(state, civCity).total;
+    // cityStateRouteYields: +3 gold, +1 science (both tier-scaled; band like the
     // envoy tests — the phase also grew the city, so compare channels the
     // route alone moves meaningfully).
     expect(y1.gold - y0.gold).toBeGreaterThanOrEqual(2);
@@ -554,9 +554,9 @@ describe('civ CS trade routes (A-12b)', () => {
   it('captureCityState prunes civ CS routes', () => {
     const state = makeState();
     const civ = addCiv(state, 8, 8);
-    const cs = addCs(state, 11, 8);
-    civ.tradeRoutes = [{ from: civ.cities[0].id, toCs: cs.id }];
-    captureCityState(state, cs, 0);
+    const cityState = addCs(state, 11, 8);
+    civ.tradeRoutes = [{ from: civ.cities[0].id, toCs: cityState.id }];
+    captureCityState(state, cityState, 0);
     expect(civ.tradeRoutes.length).toBe(0);
   });
 
@@ -564,26 +564,26 @@ describe('civ CS trade routes (A-12b)', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 4, 4);
-    const cs = addCs(state, 9, 9);
-    cs.envoys = { [0]: 3 }; // seat 0 is suzerain, uncontested
+    const cityState = addCs(state, 9, 9);
+    cityState.envoys = { [0]: 3 }; // seat 0 is suzerain, uncontested
     spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 8).index, civ.seat);
     const u = state.units[state.units.length - 1];
-    expect(attackTargets(state, u)).not.toContain(cs.centerIndex); // at peace: no join-the-war
+    expect(attackTargets(state, u)).not.toContain(cityState.centerIndex); // at peace: no join-the-war
     setWar(state, civ.seat, 0, true);
-    expect(attackTargets(state, u)).toContain(cs.centerIndex);
-    cs.envoys = { [0]: 0 }; // not suzerain: the gate closes again
-    expect(attackTargets(state, u)).not.toContain(cs.centerIndex);
-    cs.envoys = { [0]: 3 };
-    cs.hp = 1;
+    expect(attackTargets(state, u)).toContain(cityState.centerIndex);
+    cityState.envoys = { [0]: 0 }; // not suzerain: the gate closes again
+    expect(attackTargets(state, u)).not.toContain(cityState.centerIndex);
+    cityState.envoys = { [0]: 3 };
+    cityState.hp = 1;
     const before = civ.cities.length;
-    meleeAttack(state, u.id, cs.centerIndex, 0);
-    expect(state.cityStates.find((c) => c.id === cs.id)).toBeUndefined();
+    meleeAttack(state, u.id, cityState.centerIndex, 0);
+    expect(state.cityStates.find((c) => c.id === cityState.id)).toBeUndefined();
     expect(civ.cities.length).toBe(before + 1);
-    const rc = civ.cities[civ.cities.length - 1];
-    expect(rc.centerIndex).toBe(cs.centerIndex);
-    expect(rc.population).toBe(2); // 3 × 0.75 floored
-    expect((isCiv(tileSeat(state.map.tiles[cs.centerIndex])) ? indexOfSeat(tileSeat(state.map.tiles[cs.centerIndex])) : -1)).toBe(indexOfSeat(civ.seat));
-    expect(tileCity(state.map.tiles[cs.centerIndex])).toBe(rc.id);
+    const civCity = civ.cities[civ.cities.length - 1];
+    expect(civCity.centerIndex).toBe(cityState.centerIndex);
+    expect(civCity.population).toBe(2); // 3 × 0.75 floored
+    expect((isCiv(tileSeat(state.map.tiles[cityState.centerIndex])) ? indexOfSeat(tileSeat(state.map.tiles[cityState.centerIndex])) : -1)).toBe(indexOfSeat(civ.seat));
+    expect(tileCity(state.map.tiles[cityState.centerIndex])).toBe(civCity.id);
   });
 });
 

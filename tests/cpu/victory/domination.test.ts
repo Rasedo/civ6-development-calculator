@@ -13,7 +13,7 @@ const mk = (capitalTiles: number[], seat0Centers: number[], civCenters: number[]
     // holds its own cities, so seat 0's live here like anyone else's.
     seats: [
       { seat: 0, cities: seat0Centers.map((centerIndex) => ({ centerIndex })) },
-      ...civCenters.map((cs) => ({ cities: cs.map((centerIndex) => ({ centerIndex })) })),
+      ...civCenters.map((cityState) => ({ cities: cityState.map((centerIndex) => ({ centerIndex })) })),
     ],
   }) as unknown as GameState;
 

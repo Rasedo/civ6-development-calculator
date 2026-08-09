@@ -996,9 +996,9 @@ function religiousVictor(state: GameState): number {
     const founded = !!state.seats[g]?.religion.founded;
     if (!founded) continue;
     let all = true;
-    for (const cs of civs) {
-      const n = cs.filter((c) => c.followedReligion === g).length;
-      if (n * 2 <= cs.length) {
+    for (const cityState of civs) {
+      const n = cityState.filter((c) => c.followedReligion === g).length;
+      if (n * 2 <= cityState.length) {
         all = false;
         break;
       }
@@ -1146,7 +1146,7 @@ export function deserialize(json: string): GameState {
   const legacyCamps = (state as unknown as { barbCamps?: number[] }).barbCamps;
   state.barbSeat ??= { ...emptySeat(BARB_SEAT), camps: legacyCamps ?? [] };
   state.barbSeat.camps ??= legacyCamps ?? [];
-  for (const cs of state.cityStates ?? []) Object.assign(cs, { ...emptySeat(seatOfCityState(cs.id)), ...cs });
+  for (const cityState of state.cityStates ?? []) Object.assign(cityState, { ...emptySeat(seatOfCityState(cityState.id)), ...cityState });
   // Per-pair diplomacy is ONE store per seat; every reader indexes these
   // without a guard, so a hand-built state gets empty defaults. (The
   // pre-seat legacy translation is gone — nothing can write that format.)
@@ -1183,19 +1183,19 @@ export function deserialize(json: string): GameState {
   for (const r of state.seats) {
     r.research ??= { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [] };
     r.treasury ??= 0; // VP-G1
-    for (const rc of r.cities as (City & { growthBox?: number })[]) {
-      rc.seat ??= r.seat;
-      rc.foodBox ??= rc.growthBox ?? 0;
-      delete rc.growthBox;
-      rc.cultureBox ??= 0;
-      rc.lockedTiles ??= [];
-      rc.focus ??= 'balanced';
-      rc.queue ??= [];
-      rc.isCapital ??= false;
-      rc.buildings ??= [];
-      rc.districts ??= [{ type: 'CITY_CENTER', tileIndex: rc.centerIndex }];
-      rc.wonders ??= [];
-      rc.specialists ??= {};
+    for (const civCity of r.cities as (City & { growthBox?: number })[]) {
+      civCity.seat ??= r.seat;
+      civCity.foodBox ??= civCity.growthBox ?? 0;
+      delete civCity.growthBox;
+      civCity.cultureBox ??= 0;
+      civCity.lockedTiles ??= [];
+      civCity.focus ??= 'balanced';
+      civCity.queue ??= [];
+      civCity.isCapital ??= false;
+      civCity.buildings ??= [];
+      civCity.districts ??= [{ type: 'CITY_CENTER', tileIndex: civCity.centerIndex }];
+      civCity.wonders ??= [];
+      civCity.specialists ??= {};
     }
   }
   state.claimedPantheons ??= [];

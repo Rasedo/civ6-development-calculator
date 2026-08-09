@@ -52,51 +52,51 @@ def clear_tile(sim, t: int) -> None:
     """Remove any unit/marker occupancy at tile t (0-batch)."""
     # clear the MERGED planes: p_/v_/u_ are DERIVED read-only views, so a
     # subscript write to one lands in a temporary and is silently discarded.
-    sim.occ_mil[0, t] = -1
-    sim.occ_civ[0, t] = -1
+    sim.military_at[0, t] = -1
+    sim.civilian_at[0, t] = -1
 
 
 def place_pmil(sim, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
-    slot = int(sim.p_next[0])
-    sim.p_alive[0, slot] = True
-    sim.p_type[0, slot] = type_idx
-    sim.p_tile[0, slot] = t
-    sim.p_hp[0, slot] = hp
-    sim.p_charges[0, slot] = 0
-    sim.p_fortify[0, slot] = 0
-    sim.p_emb[0, slot] = emb
-    sim.occ_mil[0, t] = slot
-    sim.p_next[0] += 1
+    slot = int(sim.seat0_unit_next[0])
+    sim.seat0_unit_alive[0, slot] = True
+    sim.seat0_unit_type[0, slot] = type_idx
+    sim.seat0_unit_tile[0, slot] = t
+    sim.seat0_unit_hp[0, slot] = hp
+    sim.seat0_unit_charges[0, slot] = 0
+    sim.seat0_unit_fortify[0, slot] = 0
+    sim.seat0_unit_emb[0, slot] = emb
+    sim.military_at[0, t] = slot
+    sim.seat0_unit_next[0] += 1
     return slot
 
 
 def place_rmil(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
-    slot = int(sim.v_next[0])
-    sim.v_alive[0, slot] = True
-    sim.v_civ[0, slot] = r
-    sim.v_type[0, slot] = type_idx
-    sim.v_tile[0, slot] = t
-    sim.v_hp[0, slot] = hp
-    sim.v_charges[0, slot] = 0
-    sim.v_fortify[0, slot] = 0
-    sim.v_emb[0, slot] = emb
-    sim.occ_mil[0, t] = slot + sim.POOL_LO["v"]
-    sim.v_next[0] += 1
+    slot = int(sim.civ_unit_next[0])
+    sim.civ_unit_alive[0, slot] = True
+    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_type[0, slot] = type_idx
+    sim.civ_unit_tile[0, slot] = t
+    sim.civ_unit_hp[0, slot] = hp
+    sim.civ_unit_charges[0, slot] = 0
+    sim.civ_unit_fortify[0, slot] = 0
+    sim.civ_unit_emb[0, slot] = emb
+    sim.military_at[0, t] = slot + sim.POOL_LO["civ"]
+    sim.civ_unit_next[0] += 1
     return slot
 
 
 def place_rciv(sim, r: int, t: int, type_idx: int, hp: int = 100, emb: bool = False) -> int:
-    slot = int(sim.v_next[0])
-    sim.v_alive[0, slot] = True
-    sim.v_civ[0, slot] = r
-    sim.v_type[0, slot] = type_idx
-    sim.v_tile[0, slot] = t
-    sim.v_hp[0, slot] = hp
-    sim.v_charges[0, slot] = 0
-    sim.v_fortify[0, slot] = 0
-    sim.v_emb[0, slot] = emb
-    sim.occ_civ[0, t] = slot + sim.POOL_LO["v"]
-    sim.v_next[0] += 1
+    slot = int(sim.civ_unit_next[0])
+    sim.civ_unit_alive[0, slot] = True
+    sim.civ_unit_civ[0, slot] = r
+    sim.civ_unit_type[0, slot] = type_idx
+    sim.civ_unit_tile[0, slot] = t
+    sim.civ_unit_hp[0, slot] = hp
+    sim.civ_unit_charges[0, slot] = 0
+    sim.civ_unit_fortify[0, slot] = 0
+    sim.civ_unit_emb[0, slot] = emb
+    sim.civilian_at[0, t] = slot + sim.POOL_LO["civ"]
+    sim.civ_unit_next[0] += 1
     return slot
 
 
@@ -109,7 +109,7 @@ def dir_to(sim, frm: int, to: int) -> int:
 
 
 def order(sim, slot: int, code: int) -> torch.Tensor:
-    ua = torch.full((1, sim.p_alive.shape[1]), -1, dtype=torch.long)
+    ua = torch.full((1, sim.seat0_unit_alive.shape[1]), -1, dtype=torch.long)
     ua[0, slot] = code
     return ua
 
@@ -134,7 +134,7 @@ def empty_neighbor(sim, ctr: int) -> int:
             continue
         if (
             int(sim.pmil_at[0, t]) < 0 and int(sim.pciv_at[0, t]) < 0
-            and int(sim.vmil_at[0, t]) < 0 and int(sim.vciv_at[0, t]) < 0
+            and int(sim.civ_military_at[0, t]) < 0 and int(sim.civ_civilian_at[0, t]) < 0
             and int(sim.barb_at[0, t]) < 0 and not is_center(sim, t)
         ):
             return t
@@ -157,19 +157,19 @@ def first_civ_city(sim):
 
 
 def neutralize_barbs(sim) -> None:
-    sim.u_alive[:] = False
-    _pl = sim.occ_mil  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
+    sim.barb_unit_alive[:] = False
+    _pl = sim.military_at  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
     sim.n_camps[:] = sim.max_camps
     sim.camp_tile[:] = -1
 
 
 def clear_all_civ_units(sim) -> None:
-    sim.v_alive[:] = False
-    _pl = sim.occ_mil  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
-    _pl = sim.occ_civ  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["v"]) & (_pl < sim.POOL_HI["v"])] = -1
+    sim.civ_unit_alive[:] = False
+    _pl = sim.military_at  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["civ"]) & (_pl < sim.POOL_HI["civ"])] = -1
+    _pl = sim.civilian_at  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["civ"]) & (_pl < sim.POOL_HI["civ"])] = -1
 
 
 # ------------------------------------------------------------------ pokes -----
@@ -202,7 +202,7 @@ def poke_galley_city(rules, path, GALLEY):
     assert bool((~sim.alive[0]).any()), "no free seat-0 city slot for the capture"
     sim.civ_city_hp[0, r, j] = 1
     sim.civ_city_outer_hp[0, r, j] = 0
-    sim.p_hp[0, slot] = 100  # heal the ship (counter fire earlier)
+    sim.seat0_unit_hp[0, slot] = 100  # heal the ship (counter fire earlier)
     ncity0 = int(sim.alive[0].sum())
     sim._apply_unit_actions(order(sim, slot, 6 + d))
     assert not bool(sim.civ_city_alive[0, r, j]), "coastal city at 1 HP not captured by the galley"
@@ -223,7 +223,7 @@ def poke_galley_cs(rules, path, GALLEY):
     assert len(live), "no city-state on this seed"
     s = int(live[0])
     # a city-state is a separate seat you must DECLARE on, and the GPU enforces
-    # it (`citystate_here` carries `citystate_atwar`, mirroring TS's csTarget). This poke
+    # it (`citystate_here` carries `citystate_atwar`, mirroring TS's cityStateTarget). This poke
     # sieges, so it must be at war first; there is no declare VERB on the GPU,
     # so set the plane directly.
     sim.citystate_atwar[0, s] = True
@@ -237,11 +237,11 @@ def poke_galley_cs(rules, path, GALLEY):
     assert d >= 0
     # remove any barbarian within 2 of the center that could land the kill first
     near = sim.pair_dist[ctr] <= 2
-    for u in (sim.u_alive[0] & near[sim.u_tile[0].clamp(min=0)]).nonzero(as_tuple=True)[0].tolist():
-        t_ = int(sim.u_tile[0, u])
-        sim.u_alive[0, u] = False
+    for u in (sim.barb_unit_alive[0] & near[sim.barb_unit_tile[0].clamp(min=0)]).nonzero(as_tuple=True)[0].tolist():
+        t_ = int(sim.barb_unit_tile[0, u])
+        sim.barb_unit_alive[0, u] = False
         if int(sim.barb_at[0, t_]) == u:
-            sim.occ_mil[0, t_] = -1
+            sim.military_at[0, t_] = -1
     sim.citystate_hp[0, s] = 1
     assert bool((~sim.alive[0]).any()), "no free seat-0 city slot for the CS capture"
     pop_before = int(sim.citystate_pop[0, s])
@@ -262,7 +262,7 @@ def poke_quadrireme_unit(rules, path, QUAD, WARRIOR):
     for _ in range(25):
         sim.step()
     assert sim._rl_ranged_active, "ranged head must be active for a bombard"
-    assert float(sim._p_rng_str[QUAD]) > 0 and bool(sim.unit_naval[QUAD]), "quadrireme must be a naval ranged unit"
+    assert float(sim._type_ranged_strength[QUAD]) > 0 and bool(sim.unit_naval[QUAD]), "quadrireme must be a naval ranged unit"
     r, j, ctr = first_civ_city(sim)
     sim.civ_only_atwar[0, r] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
@@ -277,12 +277,12 @@ def poke_quadrireme_unit(rules, path, QUAD, WARRIOR):
     qslot = place_pmil(sim, wt, QUAD)
     d = dir_to(sim, wt, dt)
     assert d >= 0
-    vhp0, php0, tile0 = int(sim.v_hp[0, vslot]), int(sim.p_hp[0, qslot]), int(sim.p_tile[0, qslot])
+    vhp0, php0, tile0 = int(sim.civ_unit_hp[0, vslot]), int(sim.seat0_unit_hp[0, qslot]), int(sim.seat0_unit_tile[0, qslot])
     sim._apply_unit_actions(order(sim, qslot, 6 + d))
-    assert int(sim.v_hp[0, vslot]) < vhp0, "bombard dealt no damage to the civ unit"
-    assert int(sim.p_hp[0, qslot]) == php0, "ranged bombard must take NO retaliation"
-    assert int(sim.p_tile[0, qslot]) == tile0, "ranged bombard must NOT advance"
-    print(f"  3 quadrireme bombards a unit OK (civ hp {vhp0}->{int(sim.v_hp[0, vslot])}, ship unharmed, no advance)")
+    assert int(sim.civ_unit_hp[0, vslot]) < vhp0, "bombard dealt no damage to the civ unit"
+    assert int(sim.seat0_unit_hp[0, qslot]) == php0, "ranged bombard must take NO retaliation"
+    assert int(sim.seat0_unit_tile[0, qslot]) == tile0, "ranged bombard must NOT advance"
+    print(f"  3 quadrireme bombards a unit OK (civ hp {vhp0}->{int(sim.civ_unit_hp[0, vslot])}, ship unharmed, no advance)")
 
 
 def poke_quadrireme_city(rules, path, QUAD):
@@ -333,16 +333,16 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     wt = empty_neighbor(sim, anchor)
     assert wt >= 0 and wt != anchor
     force_water(sim, wt)
-    n0 = int(sim.p_next[0])
+    n0 = int(sim.seat0_unit_next[0])
     sim._spawn_seat0(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
-    assert int(sim.p_next[0]) == n0 + 1, "seat-0 galley failed to spawn"
+    assert int(sim.seat0_unit_next[0]) == n0 + 1, "seat-0 galley failed to spawn"
     gslot = n0
-    assert bool(sim.wpass[0, int(sim.p_tile[0, gslot])]), "naval unit must spawn on WATER"
-    assert not bool(sim.p_emb[0, gslot]), "a naval unit is never 'embarked'"
-    assert bool(sim.unit_naval[sim.p_type[0, gslot]]), "spawned unit is the galley"
+    assert bool(sim.wpass[0, int(sim.seat0_unit_tile[0, gslot])]), "naval unit must spawn on WATER"
+    assert not bool(sim.seat0_unit_emb[0, gslot]), "a naval unit is never 'embarked'"
+    assert bool(sim.unit_naval[sim.seat0_unit_type[0, gslot]]), "spawned unit is the galley"
 
     # attack: put an at-war civ-seat unit next to the spawned ship, batter it.
-    gt = int(sim.p_tile[0, gslot])
+    gt = int(sim.seat0_unit_tile[0, gslot])
     dt = empty_neighbor(sim, gt)
     assert dt >= 0
     clear_tile(sim, dt)
@@ -350,21 +350,21 @@ def poke_seat0_naval(rules, path, GALLEY, WARRIOR):
     sim.best_melee[0] = 40
     da = dir_to(sim, gt, dt)
     assert da >= 0
-    vhp0 = int(sim.v_hp[0, vslot])
+    vhp0 = int(sim.civ_unit_hp[0, vslot])
     sim._apply_unit_actions(order(sim, gslot, 6 + da))
-    assert int(sim.v_hp[0, vslot]) < vhp0, "seat-0 galley dealt no melee damage"
+    assert int(sim.civ_unit_hp[0, vslot]) < vhp0, "seat-0 galley dealt no melee damage"
 
     # the controlled MOVE verb cannot move a ship onto water.
-    gt2 = int(sim.p_tile[0, gslot])
+    gt2 = int(sim.seat0_unit_tile[0, gslot])
     wt2 = empty_neighbor(sim, gt2)
     assert wt2 >= 0
     force_water(sim, wt2)
     assert not bool(sim.passable[0, wt2]), "water is not on the land `passable` plane"
     dm = dir_to(sim, gt2, wt2)
     assert dm >= 0
-    before = int(sim.p_tile[0, gslot])
+    before = int(sim.seat0_unit_tile[0, gslot])
     sim._apply_unit_actions(order(sim, gslot, dm))  # a MOVE order (0..5)
-    assert int(sim.p_tile[0, gslot]) == before, (
+    assert int(sim.seat0_unit_tile[0, gslot]) == before, (
         "RL/controlled move stepped a ship onto water — the #50 residual (seat-0 naval "
         "water-move columns) is unexpectedly LIVE; TS findPath is the naval-aware path"
     )
@@ -403,15 +403,15 @@ def poke_ocean_gate(rules, path, GALLEY):
 
     # pre-CARTOGRAPHY: the ocean spot is gated out -> no spawn.
     sim.techs[0, cart] = False
-    n0 = int(sim.p_next[0])
+    n0 = int(sim.seat0_unit_next[0])
     sim._spawn_seat0(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
-    assert int(sim.p_next[0]) == n0, "ship spawned on OCEAN without CARTOGRAPHY"
+    assert int(sim.seat0_unit_next[0]) == n0, "ship spawned on OCEAN without CARTOGRAPHY"
 
     # post-CARTOGRAPHY: the ocean spot opens -> the ship lands there.
     sim.techs[0, cart] = True
     sim._spawn_seat0(torch.tensor([True]), torch.tensor([anchor]), torch.tensor([GALLEY]))
-    assert int(sim.p_next[0]) == n0 + 1, "ship failed to spawn on OCEAN with CARTOGRAPHY"
-    assert int(sim.p_tile[0, n0]) == ot, "the ship must land on the (now-enterable) ocean tile"
+    assert int(sim.seat0_unit_next[0]) == n0 + 1, "ship failed to spawn on OCEAN with CARTOGRAPHY"
+    assert int(sim.seat0_unit_tile[0, n0]) == ot, "the ship must land on the (now-enterable) ocean tile"
 
     # COAST is ungated: a fresh coast candidate spawns with CARTOGRAPHY absent.
     sim2 = build(rules, path)
@@ -423,9 +423,9 @@ def poke_ocean_gate(rules, path, GALLEY):
     assert anchor2 >= 0 and ct >= 0
     force_water(sim2, ct, ocean=False)  # COAST
     sim2.techs[0, cart] = False
-    m0 = int(sim2.p_next[0])
+    m0 = int(sim2.seat0_unit_next[0])
     sim2._spawn_seat0(torch.tensor([True]), torch.tensor([anchor2]), torch.tensor([GALLEY]))
-    assert int(sim2.p_next[0]) == m0 + 1, "COAST spawn must NOT need CARTOGRAPHY"
+    assert int(sim2.seat0_unit_next[0]) == m0 + 1, "COAST spawn must NOT need CARTOGRAPHY"
     print("  6 OCEAN gate OK (pre-CART blocked, post-CART allowed; COAST ungated)")
 
 
@@ -453,7 +453,7 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     sim.best_melee[0] = 40
     base = sim.snapshot()
     sim._barbarian_phase()
-    assert int(sim.v_hp[0, gslot]) < 100, "seat-0 city walls did not strike the ship"
+    assert int(sim.civ_unit_hp[0, gslot]) < 100, "seat-0 city walls did not strike the ship"
 
     # -- embarked override: a civ-seat WARRIOR at the same tile, embarked vs grounded.
     sim.restore(base)
@@ -462,11 +462,11 @@ def poke_walls_pcstk(rules, path, GALLEY, WARRIOR):
     sim.best_melee[0] = 20  # keep the hit sub-lethal so we can read the damage
     snap = sim.snapshot()
     sim._barbarian_phase()
-    emb_dmg = 100 - int(sim.v_hp[0, wslot])
+    emb_dmg = 100 - int(sim.civ_unit_hp[0, wslot])
     sim.restore(snap)
-    sim.v_emb[0, wslot] = False  # same warrior, grounded (combat 20 + terrain)
+    sim.civ_unit_emb[0, wslot] = False  # same warrior, grounded (combat 20 + terrain)
     sim._barbarian_phase()
-    gnd_dmg = 100 - int(sim.v_hp[0, wslot])
+    gnd_dmg = 100 - int(sim.civ_unit_hp[0, wslot])
     assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at pcstk (emb {emb_dmg} <= gnd {gnd_dmg})"
     print(f"  7a pcstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
 
@@ -475,7 +475,7 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     """7b. Civ-seat city ANCIENT_WALLS strike (rcstk, in _seat_phase): a seat-0
     ship IS struck and an EMBARKED seat-0 target takes the flat-CS override.
     Isolation: one at-war civ seat with a walled city and ZERO units/queue, all
-    other seats at peace, all barbarians cleared — only rcstk can touch p_hp."""
+    other seats at peace, all barbarians cleared — only rcstk can touch seat0_unit_hp."""
     sim = build(rules, path)
     for _ in range(25):
         sim.step()
@@ -485,9 +485,9 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     sim.civ_only_atwar[0, r] = True
     sim.sync_war()  # a poke writes one cell; close the war matrix under transpose
     clear_all_civ_units(sim)
-    sim.u_alive[:] = False
-    _pl = sim.occ_mil  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["u"]) & (_pl < sim.POOL_HI["u"])] = -1
+    sim.barb_unit_alive[:] = False
+    _pl = sim.military_at  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["barb"]) & (_pl < sim.POOL_HI["barb"])] = -1
     sim.civ_city_bldg[0, r, j, sim._walls_bidx] = True
     sim.civ_city_current[0, r] = -1
     sim.civ_city_progress[0, r] = 0.0
@@ -501,29 +501,29 @@ def poke_walls_rcstk(rules, path, GALLEY, WARRIOR):
     sim.civ_only_best_melee[0, r] = 40
     base = sim.snapshot()
     sim._seat_phase()
-    assert int(sim.p_hp[0, gslot]) < 100, "civ city walls did not strike the seat-0 ship"
+    assert int(sim.seat0_unit_hp[0, gslot]) < 100, "civ city walls did not strike the seat-0 ship"
 
     # -- embarked override (two-run compare on one RNG).
     sim.restore(base)
     # drop the ship, put a seat-0 WARRIOR on the same tile
-    sim.occ_mil[0, tt] = -1
-    sim.p_alive[0, gslot] = False
+    sim.military_at[0, tt] = -1
+    sim.seat0_unit_alive[0, gslot] = False
     wslot = place_pmil(sim, tt, WARRIOR, emb=True)
     sim.civ_only_best_melee[0, r] = 20
     snap = sim.snapshot()
     sim._seat_phase()
-    emb_dmg = 100 - int(sim.p_hp[0, wslot])
+    emb_dmg = 100 - int(sim.seat0_unit_hp[0, wslot])
     sim.restore(snap)
-    sim.p_emb[0, wslot] = False
+    sim.seat0_unit_emb[0, wslot] = False
     sim._seat_phase()
-    gnd_dmg = 100 - int(sim.p_hp[0, wslot])
+    gnd_dmg = 100 - int(sim.seat0_unit_hp[0, wslot])
     assert emb_dmg > gnd_dmg, f"embarked flat-CS override not applied at rcstk (emb {emb_dmg} <= gnd {gnd_dmg})"
     print(f"  7b rcstk OK (ship struck; embarked override: dmg {emb_dmg} > grounded {gnd_dmg})")
 
 
 def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     """8. Capturing an EMBARKED civ-seat civilian: the captured unit appends at
-    the seat-0 POOL END (p_next) and KEEPS embarked under its new seat (civk).
+    the seat-0 POOL END (seat0_unit_next) and KEEPS embarked under its new seat (civk).
     """
     sim = build(rules, path)
     for _ in range(25):
@@ -551,16 +551,16 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
             tail = cand
             break
     tail_slot = place_pmil(sim, tail, WARRIOR)
-    old_next = int(sim.p_next[0])
+    old_next = int(sim.seat0_unit_next[0])
     d = dir_to(sim, land, bt)
     assert d >= 0
     sim._apply_unit_actions(order(sim, wslot, 6 + d))
     cap = old_next  # captured unit appends at the pool end
-    assert bool(sim.p_alive[0, cap]), "captured builder not appended to the seat-0 pool"
-    assert int(sim.p_type[0, cap]) == BUILDER, "captured unit is the builder"
-    assert bool(sim.p_emb[0, cap]), "captured civilian must KEEP embarked under the new owner"
+    assert bool(sim.seat0_unit_alive[0, cap]), "captured builder not appended to the seat-0 pool"
+    assert int(sim.seat0_unit_type[0, cap]) == BUILDER, "captured unit is the builder"
+    assert bool(sim.seat0_unit_emb[0, cap]), "captured civilian must KEEP embarked under the new owner"
     assert cap > tail_slot, "capture must append at POOL END (after the pre-existing tail)"
-    assert not bool(sim.v_alive[0, bslot]), "the civ builder must despawn on capture"
+    assert not bool(sim.civ_unit_alive[0, bslot]), "the civ builder must despawn on capture"
     assert int(sim.pciv_at[0, bt]) == cap, "captured civilian occupies the tile as a seat-0 unit"
     print(f"  8 embarked-civilian capture OK (pool-end slot {cap} > tail {tail_slot}, keeps embarked)")
 
@@ -586,7 +586,7 @@ def poke_flank_support(rules, path, GALLEY):
         ok = True
         for d in range(6):
             n = int(nb[d])
-            if any(int(m[0, n]) >= 0 for m in (sim.pmil_at, sim.pciv_at, sim.vmil_at, sim.vciv_at, sim.barb_at, sim.center_at, sim.citystate_at, sim.civ_city_at)):
+            if any(int(m[0, n]) >= 0 for m in (sim.pmil_at, sim.pciv_at, sim.civ_military_at, sim.civ_civilian_at, sim.barb_at, sim.center_at, sim.citystate_at, sim.civ_city_at)):
                 ok = False
                 break
         if ok:
@@ -605,8 +605,8 @@ def poke_flank_support(rules, path, GALLEY):
     assert int(flank0) >= 1, "a seat-0 naval unit must count for flanking"
 
     # embark BOTH — neither contributes now.
-    sim.v_emb[0, ally] = True
-    sim.p_emb[0, foe] = True
+    sim.civ_unit_emb[0, ally] = True
+    sim.seat0_unit_emb[0, foe] = True
     flank1, sup1 = sim._flank_support(dtile, dseat, noatk)
     assert int(sup0) - int(sup1) == 1, "the naval ally embarked must drop support by exactly 1"
     assert int(flank0) - int(flank1) == 1, "the naval unit embarked must drop flanking by exactly 1"

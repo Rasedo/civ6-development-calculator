@@ -115,7 +115,7 @@ def controlled_pair(rules, path, extra_for_a: bool = True):
     civ seat 1's capital (16 v 8: si > sj AND si > sj*1.3, proximity 1)."""
     sim = build(rules, path)
     assert sim.R >= 2, "fixtures must carry two civs"
-    sim.v_alive[:] = False  # strengths reduce to nCities*8 exactly
+    sim.civ_unit_alive[:] = False  # strengths reduce to nCities*8 exactly
     ja = keep_capital_only(sim, 0)
     jb = keep_capital_only(sim, 1)
     if extra_for_a:
@@ -384,32 +384,32 @@ def main() -> None:
 
     # --- seat 0's grievance twin ---------------------------------------------
     from core.engine import _MUTABLE as _MUT2
-    # `p_warmonger` and `civ_only_warmonger` are the two halves of ONE
+    # `warmonger` and `civ_only_warmonger` are the two halves of ONE
     # `civ_warmonger [B, 1+R]` plane, so the BASE is what carries the state
     # through a snapshot. Registering a view beside its base would restore into
     # fresh storage and orphan the other half.
     assert "civ_warmonger" in _MUT2, "civ_warmonger must be registered in _MUTABLE"
-    assert "p_warmonger" not in _MUT2, "p_warmonger is a VIEW of civ_warmonger"
+    assert "warmonger" not in _MUT2, "warmonger is a VIEW of civ_warmonger"
     s3 = BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)
-    assert s3.p_warmonger.shape == (1,), s3.p_warmonger.shape
-    assert s3.p_warmonger.data_ptr() == s3.civ_warmonger.data_ptr(), (
-        "p_warmonger must share storage with civ_warmonger[:, 0]"
+    assert s3.warmonger.shape == (1,), s3.warmonger.shape
+    assert s3.warmonger.data_ptr() == s3.civ_warmonger.data_ptr(), (
+        "warmonger must share storage with civ_warmonger[:, 0]"
     )
     # snapshot/restore round-trip
-    s3.p_warmonger[:] = 7
+    s3.warmonger[:] = 7
     _snap = s3.snapshot()
-    s3.p_warmonger[:] = 0
+    s3.warmonger[:] = 0
     s3.restore(_snap)
-    assert int(s3.p_warmonger[0]) == 7, "p_warmonger must survive snapshot/restore"
+    assert int(s3.warmonger[0]) == 7, "warmonger must survive snapshot/restore"
     # decay only at peace on EVERY axis, floored at 0
     s3.civ_only_atwar[:] = False
     s3.sync_war()  # a poke writes one cell; close the war matrix under transpose
-    s3.p_warmonger[:] = 2
+    s3.warmonger[:] = 2
     s3.step()
-    assert int(s3.p_warmonger[0]) <= 1, "grievances must decay at peace"
-    s3.p_warmonger[:] = 0
+    assert int(s3.warmonger[0]) <= 1, "grievances must decay at peace"
+    s3.warmonger[:] = 0
     s3.step()
-    assert int(s3.p_warmonger[0]) == 0, "decay floors at zero"
+    assert int(s3.warmonger[0]) == 0, "decay floors at zero"
     print("seat-0 grievances OK — _MUTABLE, decay, floor")
 
     # --- DIPLOMATIC FAVOR ----------------------------------------------------

@@ -5,9 +5,9 @@ import { createGame, foundCity, endTurn, serialize, deserialize } from '../../..
 import { canFoundCity } from '../../../cpu/core/rules';
 import { borderCandidates, computeCityStats } from '../../../cpu/core/city';
 import { tilesWithin, hexDistance } from '../../../world/hex';
-import { assignEnvoy, cityStatePhase, csEnvoyBonuses, csSuzerainCapitalBonus, envoyBonusDelta, envoysOf, isSuzerain } from '../../../cpu/core/cityStates';
+import { assignEnvoy, cityStatePhase, cityStateEnvoyBonuses, cityStateSuzerainCapitalBonus, envoyBonusDelta, envoysOf, isSuzerain } from '../../../cpu/core/cityStates';
 import { tradeCapacity, addCsTradeRoute, cityTradeYields } from '../../../cpu/core/trade';
-import { ENVOY_COST, CS_SUZERAIN_YIELD } from '../../../cpu/data/cityStates';
+import { ENVOY_COST, CITY_STATE_SUZERAIN_YIELD } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
 function addCs(
@@ -17,7 +17,7 @@ function addCs(
   opts: Partial<CityState> & { type?: CityStateType } = {},
 ): CityState {
   const center = tileAtCoords(state.map, col, row);
-  const cs: CityState = {
+  const cityState: CityState = {
     ...emptySeat(seatOfCityState(state.cityStates.length)), // #51/S6.12
     id: state.cityStates.length,
     name: `Testopolis ${state.cityStates.length}`,
@@ -30,9 +30,9 @@ function addCs(
     questIssuedTurn: 0,
     ...opts,
   };
-  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cs.id));
-  state.cityStates.push(cs);
-  return cs;
+  for (const t of tilesWithin(state.map, col, row, 1)) setTileOwner(t, seatOfCityState(cityState.id));
+  state.cityStates.push(cityState);
+  return cityState;
 }
 
 describe('city-state placement', () => {
@@ -41,11 +41,11 @@ describe('city-state placement', () => {
     const b = createGame({ width: 44, height: 26, seed: 5, withResources: true, withWonders: true, cityStates: true });
     expect(a.cityStates.length).toBeGreaterThanOrEqual(2);
     expect(serialize(a)).toBe(serialize(b));
-    for (const cs of a.cityStates) {
-      const center = a.map.tiles[cs.centerIndex];
-      expect((isCityStateSeat(tileSeat(center)) ? cityStateOfSeat(tileSeat(center)) : -1)).toBe(cs.id);
+    for (const cityState of a.cityStates) {
+      const center = a.map.tiles[cityState.centerIndex];
+      expect((isCityStateSeat(tileSeat(center)) ? cityStateOfSeat(tileSeat(center)) : -1)).toBe(cityState.id);
       for (const other of a.cityStates) {
-        if (other.id === cs.id) continue;
+        if (other.id === cityState.id) continue;
         const oc = a.map.tiles[other.centerIndex];
         expect(hexDistance(center.col, center.row, oc.col, oc.row)).toBeGreaterThanOrEqual(8);
       }
@@ -54,9 +54,9 @@ describe('city-state placement', () => {
 
   it('blocks settling on and next to city-states', () => {
     const state = makeState();
-    const cs = addCs(state, 6, 6);
-    expect(canFoundCity(state, cs.centerIndex, 0).ok).toBe(false);
-    const ring1 = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== cs.centerIndex)!;
+    const cityState = addCs(state, 6, 6);
+    expect(canFoundCity(state, cityState.centerIndex, 0).ok).toBe(false);
+    const ring1 = tilesWithin(state.map, 6, 6, 1).find((t) => t.index !== cityState.centerIndex)!;
     expect(canFoundCity(state, ring1.index, 0).ok).toBe(false);
     const ring2 = tilesWithin(state.map, 6, 6, 2).find(
       (t) => hexDistance(t.col, t.row, 6, 6) === 2,
@@ -85,12 +85,12 @@ describe('envoys', () => {
   it('1 envoy boosts the capital; 3 boost matching districts; 3+ is suzerain', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
-    const cs = addCs(state, 9, 9, { type: 'scientific' });
+    const cityState = addCs(state, 9, 9, { type: 'scientific' });
 
     // Bonuses ride the normal yield pipeline (amenity multipliers included),
     // so assert a band rather than an exact +2.
     const before = computeCityStats(state, city).total.science;
-    cs.envoys = { [0]: 1 };
+    cityState.envoys = { [0]: 1 };
     const withOne = computeCityStats(state, city).total.science;
     expect(withOne - before).toBeGreaterThanOrEqual(2);
     expect(withOne - before).toBeLessThan(2.5);
@@ -104,12 +104,12 @@ describe('envoys', () => {
     city.districts.push({ type: 'CAMPUS', tileIndex: campusTile.index });
     city.buildings.push('LIBRARY', 'UNIVERSITY');
     const campusBase = computeCityStats(state, city).total.science;
-    cs.envoys = { [0]: 3 };
+    cityState.envoys = { [0]: 3 };
     const withThree = computeCityStats(state, city).total.science;
     expect(withThree - campusBase).toBeGreaterThanOrEqual(2);
     expect(withThree - campusBase).toBeLessThan(2.5);
-    expect(isSuzerain(cs, 0)).toBe(true);
-    cs.envoys = { [0]: 6 };
+    expect(isSuzerain(cityState, 0)).toBe(true);
+    cityState.envoys = { [0]: 6 };
     const withSix = computeCityStats(state, city).total.science;
     expect(withSix - campusBase).toBeGreaterThanOrEqual(4);
     expect(withSix - campusBase).toBeLessThan(5);
@@ -118,26 +118,26 @@ describe('envoys', () => {
   it('predicts the gain of the next envoy', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
-    const cs = addCs(state, 9, 9, { type: 'cultural' });
-    expect(envoyBonusDelta(state, cs, 0).culture).toBe(2); // crossing 1
-    cs.envoys = { [0]: 1 };
-    expect(envoyBonusDelta(state, cs, 0).culture).toBe(0); // 2 crosses nothing
-    cs.envoys = { [0]: 2 };
+    const cityState = addCs(state, 9, 9, { type: 'cultural' });
+    expect(envoyBonusDelta(state, cityState, 0).culture).toBe(2); // crossing 1
+    cityState.envoys = { [0]: 1 };
+    expect(envoyBonusDelta(state, cityState, 0).culture).toBe(0); // 2 crosses nothing
+    cityState.envoys = { [0]: 2 };
     const theater = tileAtCoords(state.map, 6, 5);
     theater.district = 'THEATER_SQUARE';
     theater.districtComplete = true;
     city.districts.push({ type: 'THEATER_SQUARE', tileIndex: theater.index });
     // The 3-envoy tier keys to the cultural tier-1 building (AMPHITHEATER).
     city.buildings.push('AMPHITHEATER');
-    expect(envoyBonusDelta(state, cs, 0).culture).toBe(2); // crossing 3 with one Amphitheater
+    expect(envoyBonusDelta(state, cityState, 0).culture).toBe(2); // crossing 3 with one Amphitheater
   });
 
   it('suzerainty of a trade city-state adds route capacity', () => {
     const state = makeState();
     foundCity(state, tileAtCoords(state.map, 5, 5).index, 0);
-    const cs = addCs(state, 9, 9, { type: 'trade' });
+    const cityState = addCs(state, 9, 9, { type: 'trade' });
     const base = tradeCapacity(state, 0);
-    cs.envoys = { [0]: 3 };
+    cityState.envoys = { [0]: 3 };
     expect(tradeCapacity(state, 0)).toBe(base + 1);
   });
 
@@ -166,7 +166,7 @@ describe('envoys', () => {
     const state = makeState();
     addCs(state, 3, 3, { type: 'scientific', envoys: { [0]: 1 } });
     addCs(state, 9, 9, { type: 'religious', envoys: { [0]: 3 } });
-    const bonuses = csEnvoyBonuses(state, 0);
+    const bonuses = cityStateEnvoyBonuses(state, 0);
     expect(bonuses.capital.science).toBe(2);
     expect(bonuses.capital.faith).toBe(2);
     // The 3-envoy tier lands on the religious tier-1 building (SHRINE).
@@ -178,38 +178,38 @@ describe('quests and trade', () => {
   it('completing a quest earns an envoy', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
-    const cs = addCs(state, 9, 9);
-    cs.quest = { kind: 'buildDistrict', district: 'CAMPUS' };
+    const cityState = addCs(state, 9, 9);
+    cityState.quest = { kind: 'buildDistrict', district: 'CAMPUS' };
     cityStatePhase(state, 0);
-    expect(envoysOf(cs, 0)).toBe(0); // not built yet
+    expect(envoysOf(cityState, 0)).toBe(0); // not built yet
     const campus = tileAtCoords(state.map, 6, 5);
     campus.district = 'CAMPUS';
     campus.districtComplete = true;
     city.districts.push({ type: 'CAMPUS', tileIndex: campus.index });
     cityStatePhase(state, 0);
-    expect(envoysOf(cs, 0)).toBe(1);
-    expect(cs.quest).toBeNull();
+    expect(envoysOf(cityState, 0)).toBe(1);
+    expect(cityState.quest).toBeNull();
   });
 
   it('routes to city-states pay gold plus their specialty', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     city.buildings.push('MARKET'); // capacity 1
-    const cs = addCs(state, 9, 9, { type: 'scientific' });
-    const r = addCsTradeRoute(state, city.id, cs.id, 0);
+    const cityState = addCs(state, 9, 9, { type: 'scientific' });
+    const r = addCsTradeRoute(state, city.id, cityState.id, 0);
     expect(r.ok).toBe(true);
     const y = cityTradeYields(state, city);
     expect(y.gold).toBe(3);
     expect(y.science).toBe(1);
-    expect(addCsTradeRoute(state, city.id, cs.id, 0).ok).toBe(false); // duplicate
+    expect(addCsTradeRoute(state, city.id, cityState.id, 0).ok).toBe(false); // duplicate
   });
 
   it('unmet city-states cannot receive routes', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
     city.buildings.push('MARKET');
-    const cs = addCs(state, 9, 9, { met: [] });
-    expect(addCsTradeRoute(state, city.id, cs.id, 0).ok).toBe(false);
+    const cityState = addCs(state, 9, 9, { met: [] });
+    expect(addCsTradeRoute(state, city.id, cityState.id, 0).ok).toBe(false);
   });
 });
 
@@ -231,42 +231,42 @@ describe('determinism', () => {
 describe('civ envoys and the suzerain contest (A-12)', () => {
   it('suzerainty needs strictly more envoys than every civ', () => {
     const state = makeState();
-    const cs = addCs(state, 8, 8, { type: 'trade', envoys: { [0]: 3 } });
-    expect(isSuzerain(cs, 0)).toBe(true); // uncontested
-    cs.envoys = { [seatOfIndex(0)]: 3 };
-    expect(isSuzerain(cs, 0)).toBe(false); // tied: nobody rules
-    expect(isSuzerain(cs, seatOfIndex(0))).toBe(false);
-    cs.envoys = { [seatOfIndex(0)]: 4 };
-    expect(isSuzerain(cs, 0)).toBe(false);
-    expect(isSuzerain(cs, seatOfIndex(0))).toBe(true);
-    cs.envoys = { [0]: 5 };
-    expect(isSuzerain(cs, 0)).toBe(true);
-    expect(isSuzerain(cs, seatOfIndex(0))).toBe(false);
+    const cityState = addCs(state, 8, 8, { type: 'trade', envoys: { [0]: 3 } });
+    expect(isSuzerain(cityState, 0)).toBe(true); // uncontested
+    cityState.envoys = { [seatOfIndex(0)]: 3 };
+    expect(isSuzerain(cityState, 0)).toBe(false); // tied: nobody rules
+    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(false);
+    cityState.envoys = { [seatOfIndex(0)]: 4 };
+    expect(isSuzerain(cityState, 0)).toBe(false);
+    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(true);
+    cityState.envoys = { [0]: 5 };
+    expect(isSuzerain(cityState, 0)).toBe(true);
+    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(false);
   });
 
   it('the envoy bonuses apply the 1/3/6 thresholds off that civ only', () => {
     const state = makeState();
-    const cs = addCs(state, 8, 8, { type: 'scientific' });
-    cs.envoys = { [seatOfIndex(0)]: 6, [seatOfIndex(1)]: 1 };
-    const b0 = csEnvoyBonuses(state, seatOfIndex(0));
+    const cityState = addCs(state, 8, 8, { type: 'scientific' });
+    cityState.envoys = { [seatOfIndex(0)]: 6, [seatOfIndex(1)]: 1 };
+    const b0 = cityStateEnvoyBonuses(state, seatOfIndex(0));
     expect(b0.capital.science).toBe(2);
     // At 6 envoys the 3-tier lands on the tier-1 building (LIBRARY) and
     // the 6-tier on the tier-2 building (UNIVERSITY) — +2 each, separate keys.
     expect(b0.buildingAdd.LIBRARY?.science).toBe(2);
     expect(b0.buildingAdd.UNIVERSITY?.science).toBe(2);
-    const b1 = csEnvoyBonuses(state, seatOfIndex(1));
+    const b1 = cityStateEnvoyBonuses(state, seatOfIndex(1));
     expect(b1.capital.science).toBe(2);
     expect(b1.buildingAdd.LIBRARY).toBeUndefined(); // 1 envoy: capital only
   });
 });
 
-describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
+describe('B-21 suzerain unique perk (CITY_STATE_SUZERAIN_LIVE)', () => {
   it('grants the shipped channel yield to a strict seat-0 suzerain', () => {
     const state = makeState();
     // Geneva (scientific) is a SHIPPED row -> science channel.
-    const cs = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    expect(isSuzerain(cs, 0)).toBe(true);
-    expect(csSuzerainCapitalBonus(state, 0).science).toBe(CS_SUZERAIN_YIELD);
+    const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
+    expect(isSuzerain(cityState, 0)).toBe(true);
+    expect(cityStateSuzerainCapitalBonus(state, 0).science).toBe(CITY_STATE_SUZERAIN_YIELD);
   });
 
   it('pays nothing for a descoped row or a non-suzerain', () => {
@@ -274,29 +274,29 @@ describe('B-21 suzerain unique perk (CS_SUZERAIN_LIVE)', () => {
     // Antioch (cultural) is DESCOPED (trade-route bonus) -> no live channel.
     const desc = addCs(state, 8, 8, { type: 'cultural', name: 'Antioch', envoys: { [0]: 4 } });
     expect(isSuzerain(desc, 0)).toBe(true);
-    expect(csSuzerainCapitalBonus(state, 0)).toEqual({});
+    expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
     // A shipped row but only 2 envoys -> not suzerain -> no perk.
     const weak = addCs(state, 4, 4, { type: 'scientific', name: 'Geneva', envoys: { [0]: 2 } });
     expect(isSuzerain(weak, 0)).toBe(false);
-    expect(csSuzerainCapitalBonus(state, 0)).toEqual({});
+    expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
   });
 
   it('loses the perk when a civ wins the strict contest', () => {
     const state = makeState();
-    const cs = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
-    cs.envoys = { [seatOfIndex(0)]: 4 }; // civ 0 out-envoys seat 0
-    expect(isSuzerain(cs, 0)).toBe(false);
-    expect(csSuzerainCapitalBonus(state, 0)).toEqual({});
+    const cityState = addCs(state, 8, 8, { type: 'scientific', name: 'Geneva', envoys: { [0]: 3 } });
+    cityState.envoys = { [seatOfIndex(0)]: 4 }; // civ 0 out-envoys seat 0
+    expect(isSuzerain(cityState, 0)).toBe(false);
+    expect(cityStateSuzerainCapitalBonus(state, 0)).toEqual({});
   });
 
   it('grants the perk to a strict civ suzerain (the civ twin)', () => {
     const state = makeState();
     // Vilnius (cultural) is SHIPPED -> culture channel.
-    const cs = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: { [0]: 0 } });
-    cs.envoys = { [seatOfIndex(0)]: 3 };
-    expect(isSuzerain(cs, seatOfIndex(0))).toBe(true);
-    expect(csSuzerainCapitalBonus(state, seatOfIndex(0)).culture).toBe(CS_SUZERAIN_YIELD);
+    const cityState = addCs(state, 8, 8, { type: 'cultural', name: 'Vilnius', envoys: { [0]: 0 } });
+    cityState.envoys = { [seatOfIndex(0)]: 3 };
+    expect(isSuzerain(cityState, seatOfIndex(0))).toBe(true);
+    expect(cityStateSuzerainCapitalBonus(state, seatOfIndex(0)).culture).toBe(CITY_STATE_SUZERAIN_YIELD);
     // no perk for a civ that is not the suzerain
-    expect(csSuzerainCapitalBonus(state, seatOfIndex(1))).toEqual({});
+    expect(cityStateSuzerainCapitalBonus(state, seatOfIndex(1))).toEqual({});
   });
 });

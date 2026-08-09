@@ -27,7 +27,7 @@ its own gate-stage.
 
 ## The promotion checklist (per mechanic)
 
-- **State**: TS fields on the right object (City/RivalCiv/Tile) + GPU
+- **State**: TS fields on the right object (City/Seat/Tile) + GPU
   tensors sized [B, …] with pad conventions (−1 empty, slot pools
   append-only) + registration in `_MUTABLE` (snapshot/restore).
 - **Save migration**: `deserialize` fills new fields IN-PLACE with `??=`
@@ -44,9 +44,9 @@ its own gate-stage.
   gate-checked from its FIRST turn or it isn't checked at all. Remember
   the trace prices queue items by kind (a new kind needs its cost read).
 - **Owner scoping**: decide per consumer whether the mechanic is
-  player-scoped or global. The leak list from B4: CS quests, eurekas,
-  luxury amenities are PLAYER-only (`owner >= 0` / `cityId !== -1`);
-  district adjacency and paving are global. When rivals gain a mechanic,
+  seat-0-scoped or global. The leak list from B4: CS quests, eurekas,
+  luxury amenities are seat-0-only (`owner >= 0` / `cityId !== -1`);
+  district adjacency and paving are global. When civ seats gain a mechanic,
   parameterize the rule over `{unlocks, ownsTile}` (the `*In`
   extraction pattern) instead of duplicating it.
 - **Float discipline**: mirror the TS ASSOCIATION token-for-token

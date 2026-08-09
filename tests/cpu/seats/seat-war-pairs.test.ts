@@ -22,8 +22,8 @@ function newGame(): GameState {
 describe('the war relation covers every seat pair', () => {
   it('a civ and a city-state read the one war store, both orders', () => {
     const state = newGame();
-    const cs = state.cityStates![0];
-    const seat = seatOfCityState(cs.id);
+    const cityState = state.cityStates![0];
+    const seat = seatOfCityState(cityState.id);
     expect(civsAtWar(state, 0, seat)).toBe(false);
     expect(civsAtWar(state, seat, 0)).toBe(false);
     setWar(state, seat, 0, true);
@@ -33,11 +33,11 @@ describe('the war relation covers every seat pair', () => {
 
   it('a city-state unit is hostile to a seat-0 unit exactly when at war', () => {
     const state = newGame();
-    const cs = state.cityStates![0];
-    const a = { seat: seatOfCityState(cs.id) };
+    const cityState = state.cityStates![0];
+    const a = { seat: seatOfCityState(cityState.id) };
     const b = { seat: 0 };
     expect(unitsHostile(state, a, b)).toBe(false);
-    setWar(state, seatOfCityState(cs.id), 0, true);
+    setWar(state, seatOfCityState(cityState.id), 0, true);
     expect(unitsHostile(state, a, b)).toBe(true);
     expect(unitsHostile(state, b, a)).toBe(true);
   });
@@ -55,8 +55,8 @@ describe('the war relation covers every seat pair', () => {
 
   it('the barbarian arm still wins over everything', () => {
     const state = newGame();
-    const cs = state.cityStates![0];
-    expect(unitsHostile(state, { seat: BARB_SEAT }, { seat: seatOfCityState(cs.id) })).toBe(true);
+    const cityState = state.cityStates![0];
+    expect(unitsHostile(state, { seat: BARB_SEAT }, { seat: seatOfCityState(cityState.id) })).toBe(true);
     expect(unitsHostile(state, { seat: BARB_SEAT }, { seat: BARB_SEAT })).toBe(false);
   });
 

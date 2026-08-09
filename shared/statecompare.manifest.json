@@ -11,7 +11,7 @@
   "per-seat": "one row per CIV seat; key = the absolute seat id (cpu/core/seats.ts)",
   "per-city-state": "one row per living city-state; key = its id",
   "per-city": "one row per living city of any civ seat; key = the city's CENTER TILE index — globally unique, stable across capture, and stored by both engines. Slot index, founding order and array position are all engine-local and none of them is a valid join.",
-  "per-unit": "one row per living unit; key = tileIndex * 2 + (civilian ? 1 : 0). Both engines allow at most one military and one civilian unit per tile (the GPU's occ_mil/occ_civ pair), so the pair is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
+  "per-unit": "one row per living unit; key = tileIndex * 2 + (civilian ? 1 : 0). Both engines allow at most one military and one civilian unit per tile (the GPU's military_at/civilian_at pair), so the pair is unique. `game.unitCount` guards the assumption: two units colliding on one key would merge silently in the digest but change the count.",
   "per-tile": "one row per map tile; key = the tile index"
  },
  "censusTypes": [
@@ -784,7 +784,7 @@
      "name": "warTurns",
      "compare": "exact",
      "covers": [
-      "CityState.csWarTurns"
+      "CityState.cityStateWarTurns"
      ],
      "planes": []
     }
@@ -1322,7 +1322,7 @@
    },
    {
     "path": "GameState.nextUnitId",
-    "why": "TS's unit-id allocator. The GPU allocates slots (`p_next`/`v_next`/`next_slot`) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
+    "why": "TS's unit-id allocator. The GPU allocates slots (`seat0_unit_next`/`civ_unit_next`/`next_slot`) in a different space, and the unit join key is (tile, military/civilian), so no unit id is ever compared."
    },
    {
     "path": "GameState.eventLog",
@@ -1527,11 +1527,11 @@
     "why": "unit-pool allocation cursor. Slot bookkeeping that exists because the GPU has slots and TS has arrays."
    },
    {
-    "plane": "p_next",
+    "plane": "seat0_unit_next",
     "why": "unit-pool allocation cursor (see next_slot)."
    },
    {
-    "plane": "v_next",
+    "plane": "civ_unit_next",
     "why": "unit-pool allocation cursor (see next_slot)."
    },
    {
@@ -1595,15 +1595,15 @@
     "why": "the civ index at a civ centre — a cached derived property over centre_slot_at + tile_seat, both covered."
    },
    {
-    "plane": "occ_mil",
+    "plane": "military_at",
     "why": "the tile -> unit occupancy index, derived from unit_tile and unit_alive; it is the unit group's join key, not a separate fact."
    },
    {
-    "plane": "occ_civ",
-    "why": "occupancy index (see occ_mil)."
+    "plane": "civilian_at",
+    "why": "occupancy index (see military_at)."
    },
    {
-    "plane": "v_civ",
+    "plane": "civ_unit_civ",
     "why": "redundant with unit_seat, which is covered. Slated for deletion by the seat unification."
    },
    {

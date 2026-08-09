@@ -25,16 +25,16 @@ def build(rules, path):
 
 def setup(sim, types, tiles, treasury):
     """Wipe seat 0's roster and plant a known set at slots 0.. (spawn order)."""
-    sim.p_alive[0, :] = False
-    _pl = sim.occ_mil[0]  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
-    _pl = sim.occ_civ[0]  # clear only this pool's entries
-    _pl[(_pl >= sim.POOL_LO["p"]) & (_pl < sim.POOL_HI["p"])] = -1
+    sim.seat0_unit_alive[0, :] = False
+    _pl = sim.military_at[0]  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["seat0"]) & (_pl < sim.POOL_HI["seat0"])] = -1
+    _pl = sim.civilian_at[0]  # clear only this pool's entries
+    _pl[(_pl >= sim.POOL_LO["seat0"]) & (_pl < sim.POOL_HI["seat0"])] = -1
     for i, (ty, ti) in enumerate(zip(types, tiles)):
-        sim.p_alive[0, i] = True
-        sim.p_type[0, i] = ty
-        sim.p_tile[0, i] = ti
-        sim.occ_mil[0, ti] = i
+        sim.seat0_unit_alive[0, i] = True
+        sim.seat0_unit_type[0, i] = ty
+        sim.seat0_unit_tile[0, i] = ti
+        sim.military_at[0, ti] = i
     sim.treasury[0] = treasury
 
 
@@ -61,21 +61,21 @@ def main() -> int:
     sim = build(rules, path)
     setup(sim, [H, S, H], [100, 101, 102], -4.0)
     sim._bankrupt_disband()
-    assert not bool(sim.p_alive[0, 0]), "slot 0 (priciest, oldest) should disband"
-    assert bool(sim.p_alive[0, 1]) and bool(sim.p_alive[0, 2]), "exactly one per turn"
+    assert not bool(sim.seat0_unit_alive[0, 0]), "slot 0 (priciest, oldest) should disband"
+    assert bool(sim.seat0_unit_alive[0, 1]) and bool(sim.seat0_unit_alive[0, 2]), "exactly one per turn"
     assert int(sim.pmil_at[0, 100]) == -1, "disbanded unit's occupancy cleared"
 
     # 2. Solvent -> nothing disbands.
     sim = build(rules, path)
     setup(sim, [H, S], [100, 101], 50.0)
     sim._bankrupt_disband()
-    assert bool(sim.p_alive[0, 0]) and bool(sim.p_alive[0, 1]), "solvent keeps all"
+    assert bool(sim.seat0_unit_alive[0, 0]) and bool(sim.seat0_unit_alive[0, 1]), "solvent keeps all"
 
     # 3. Only free units, deep in the red -> nothing disbands (0-upkeep is never a victim).
     sim = build(rules, path)
     setup(sim, [W, W], [100, 101], -50.0)
     sim._bankrupt_disband()
-    assert bool(sim.p_alive[0, 0]) and bool(sim.p_alive[0, 1]), "0-upkeep units are kept"
+    assert bool(sim.seat0_unit_alive[0, 0]) and bool(sim.seat0_unit_alive[0, 1]), "0-upkeep units are kept"
 
     print("bankruptcy OK — priciest/tie-lowest-slot/solvent/free all match TS")
     return 0

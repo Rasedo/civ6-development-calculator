@@ -31,7 +31,7 @@ function newGame(opponents = 1) {
 /** Force every civ past the Medieval gate by handing them a Medieval tech. */
 function medieval(state: ReturnType<typeof newGame>) {
   seatOf(state, 0)!.research.techs.push('APPRENTICESHIP'); // Medieval
-  for (const rv of state.seats.slice(1)) rv.research.techs.push('APPRENTICESHIP');
+  for (const civSeat of state.seats.slice(1)) civSeat.research.techs.push('APPRENTICESHIP');
 }
 
 describe('B-22 world congress', () => {
